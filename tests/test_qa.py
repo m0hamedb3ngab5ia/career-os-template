@@ -694,3 +694,29 @@ def test_matched_question_wins_over_a_wrong_standard_key(tmp_path: Path) -> None
                                        "type": "standard", "standard_key": "sponsorship", "bullet_ids": []}])
     c = by_name(run(job), "standard_answers")
     assert c["ok"] is False and "work_authorization" in c["detail"], c["detail"]
+
+
+# --- close rotation (write-cover-letter close_variant) --------------------------------------------------
+
+def _letter_job(jobs: Path, jid: str, company: str, close: str | None) -> Path:
+    d = jobs / jid
+    d.mkdir(parents=True)
+    fm = COVER_LETTER.replace("company: Ledgerline", f"company: {company}")
+    if close:
+        fm = fm.replace("voice_verified: false", f'voice_verified: false\nclose_variant: "{close}"')
+    (d / "cover_letter.md").write_text(fm)
+    return d
+
+
+@pytest.mark.parametrize("other_company,other_close,ok", [
+    ("Ledgerline", "Would like to talk.", False),         # same close, same company -> soft warn
+    ("Ledgerline Inc.", "Would like to talk.", False),    # normalized company name
+    ("Ledgerline", "Happy to walk through the code.", True),
+    ("Initech", "Would like to talk.", True),              # other company: fine
+])
+def test_close_variant_not_repeated_to_same_company(tmp_path: Path, other_company, other_close, ok):
+    job = make_job(tmp_path, cover=COVER_LETTER.replace("voice_verified: false",
+                                                        'voice_verified: false\nclose_variant: "Would like to talk."'))
+    _letter_job(job.parent, "older", other_company, other_close)
+    c = by_name(run(job), "close_variant_repeated")
+    assert c["level"] == "soft" and c["ok"] is ok, c["detail"]
