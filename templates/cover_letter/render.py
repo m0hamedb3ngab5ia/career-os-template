@@ -248,6 +248,7 @@ def main(argv: list[str] | None = None) -> int:
     # Any older PDF goes first: a failed or PDF-less run must never leave it next to newer sources.
     Path(a.cover_letter_md).resolve().with_name("cover_letter.pdf").unlink(missing_ok=True)
     try:
+        _identity({})  # every mode needs the candidate's profile (no profile -> exit 1, nothing written)
         if not a.txt_only:
             render(a.cover_letter_md, pdf=not a.no_pdf)
         render_txt(a.cover_letter_md)

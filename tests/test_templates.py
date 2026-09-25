@@ -312,3 +312,10 @@ def test_offline_env_makes_tectonic_cache_only(mod, monkeypatch):
     assert "--only-cached" not in mod.find_engine()[1]
     monkeypatch.setenv("CAREEROS_LATEX_OFFLINE", "1")
     assert "--only-cached" in mod.find_engine()[1]
+
+
+def test_cover_txt_only_without_profile_fails(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(cover, "PROFILE", tmp_path / "missing" / "master.yaml")
+    p = _cl(tmp_path, "Body.\n")
+    assert cover.main([p.as_posix(), "--txt-only"]) == 1
+    assert not (tmp_path / "cover_letter.txt").exists()
