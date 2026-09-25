@@ -1,0 +1,21 @@
+# Bot-detection registry. The apply-job skill appends an entry whenever it hits CAPTCHA, a Cloudflare
+# challenge, Turnstile, an unexpected redirect, or a silent form rejection. It reads this file before
+# every attempt: a company or domain listed here with `skip_auto: true` goes straight to an Action Item
+# ("review & submit", prepared materials attached) instead of an automated run.
+#
+# detection_type: hcaptcha | recaptcha | turnstile | cloudflare_challenge | verify_human_text |
+#                 unexpected_redirect | silent_rejection | rate_limit | account_verify_email | other
+# Remove or set skip_auto: false after the candidate confirms the site works again.
+
+entries: []
+# example:
+# - company: Example Corp
+#   domain: boards.greenhouse.io/examplecorp
+#   ats: greenhouse
+#   detection_type: recaptcha
+#   first_seen: 2026-09-24T14:03:00+00:00
+#   last_seen: 2026-09-24T14:03:00+00:00
+#   count: 1
+#   skip_auto: true
+#   job_ids: [a1b2c3d4e5f6]
+#   notes: "reCAPTCHA v2 checkbox under the submit button; not solvable by the applier"
