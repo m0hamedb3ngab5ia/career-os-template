@@ -14,6 +14,9 @@ each step's RESULT JSON in memory; you will summarize them at the end.
 Before starting, read `config/targets.yaml` (tiers, thresholds) and `config/qa.yaml` (`critic.max_regenerations`).
 Initialize `action_items = []`, `steps = {}`.
 
+Re-run guard: if `JOB/prepare.json` exists with `qa_pass: true` and `--force` was not given, print its
+RESULT again (status unchanged) and stop. `--force` re-prepares from Step 1.
+
 ## Step 1: score
 
 Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `steps.score`.
@@ -32,8 +35,9 @@ If it reports `qa_hard_fails` non-empty after its own fix loop, continue (qa-rev
 
 `rule = tier_cfg.cover_letter` (`always` | `if_required`).
 - `always`: follow `.claude/skills/write-cover-letter/SKILL.md`.
-- `if_required`: only if `posting.description_text` says a cover letter is required/requested
-  (regex `cover letter.{0,40}(required|must|please)`) -> follow the skill; else skip and record
+- `if_required`: only if `posting.description_text` says a cover letter is required/requested, in either
+  word order (regex `(required|must|please|include|attach|submit|upload)\b.{0,40}cover letter|cover letter.{0,40}\b(required|must|please)`),
+  case-insensitive -> follow the skill; else skip and record
   `steps.cover_letter = {"skipped": "not_required"}`.
 Store RESULT as `steps.cover_letter`.
 
@@ -55,7 +59,10 @@ Store RESULT as `steps.cover_letter`.
 ```
 if steps.qa.pass:
     status = "needs_review" if tier == "A" or tier_cfg.review_required non-empty else "queued"
-    if category's categories.yaml new_category_reviews_remaining > 0: status = "needs_review"; action_items.append("new_category_review: <category> (<n> left)")
+    n = category's categories.yaml new_category_reviews_remaining (0 if unset)
+    done = number of OTHER job dirs under data/jobs/ whose score.json category == this category and
+           that have a prepare.json (a rerun of this job never counts; config is never edited)
+    if done < n: status = "needs_review"; action_items.append("new_category_review: <category> (<n - done> left)")
 else:
     status = "needs_review"
 ```
@@ -66,14 +73,23 @@ Any RESULT that contained `ACTION_ITEM` is appended verbatim.
 Outreach: if `tier_cfg.outreach == "always"`, note `"outreach": "run /find-contacts then /draft-outreach"` in
 the final RESULT (do not run them here; they run after apply).
 
-## Step 6: record
+## Step 6: render the cover letter for pasting
+
+If QA passed and `JOB/cover_letter.md` exists, run
+`.venv/bin/python templates/cover_letter/render.py JOB/cover_letter.md`
+It writes `JOB/cover_letter.txt` (the body apply-job pastes into forms) and `JOB/cover_letter.pdf`
+(a missing LaTeX engine is a warning: the .txt is still written). A nonzero exit means the letter is
+not usable: status `needs_review`, `action_items.append("cover_letter_render: <stderr first line>")`.
+`resume.pdf` comes from tailor-resume's render step.
+
+## Step 7: record
 
 Write `JOB/prepare.json`:
 ```json
 {"job_id": "...", "prepared_at": "<ISO>", "status": "queued|needs_review|skipped", "tier": "B",
  "category": "...", "fit": 78, "regenerations": 0, "qa_pass": true, "qa_mean": 8.2,
  "steps": {"score": {...}, "resume": {...}, "cover_letter": {...}, "qa": {...}},
- "action_items": ["..."], "files": ["score.json", "resume.json", "resume.txt", "resume.tex", "cover_letter.md", "qa.json"]}
+ "action_items": ["..."], "files": ["score.json", "resume.json", "resume.txt", "resume.tex", "resume.pdf", "cover_letter.md", "cover_letter.txt", "cover_letter.pdf", "qa.json"]}
 ```
 Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [prepare-job] status=<s> tier=<t> fit=<n> qa_pass=<b> regenerations=<n> action_items=<n>`
 (format `- YYYY-MM-DD HH:MM:SS [<skill>] <message>`, local time, identical to `store.append_log`; e.g. `date '+%F %T'`).

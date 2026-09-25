@@ -945,6 +945,28 @@ class Checker:
         if "?" in self.cover_body:
             self.add("no_rhetorical_questions", "soft", False, "question mark in cover letter body")
 
+    def check_close_variant(self) -> None:
+        """Soft: the letter's `close_variant` was already used in another letter to the same company
+        (sibling job dirs). write-cover-letter rotates closes from the style guide's Close variants."""
+        close = str(self.cover_fm.get("close_variant") or "").strip() if self.cover_md is not None else ""
+        if not close:
+            return
+        from careeros.config import normalize_company
+
+        posting_company = self.posting.get("company") if isinstance(self.posting, dict) else ""
+        company = normalize_company(str(self.cover_fm.get("company") or posting_company or ""))
+        repeats = []
+        for d in sorted(self.job_dir.parent.iterdir()) if self.job_dir.parent.is_dir() else []:
+            md = d / "cover_letter.md"
+            if d == self.job_dir or not md.is_file():
+                continue
+            fm, _ = split_frontmatter(md.read_text(encoding="utf-8", errors="replace"))
+            if str(fm.get("close_variant") or "").strip() == close and normalize_company(str(fm.get("company") or "")) == company:
+                repeats.append(d.name)
+        self.add("close_variant_repeated", "soft", not repeats,
+                 f"close {close!r} not used before for this company" if not repeats
+                 else f"close {close!r} already used for this company in: {', '.join(repeats)}")
+
     def check_answers_review(self) -> None:
         if not isinstance(self.answers, list):
             return
@@ -970,6 +992,7 @@ class Checker:
         self.check_pdf()
         self.check_keyword_coverage()
         self.check_cover_letter_structure()
+        self.check_close_variant()
         self.check_answers_review()
         hard_fail = [c for c in self.checks if c["level"] == "hard" and not c["ok"]]
         soft_fail = [c for c in self.checks if c["level"] == "soft" and not c["ok"]]

@@ -37,7 +37,17 @@ Query (one search per job, newer_than in days from `date_applied` or `--since`):
 `("<company>" OR from:@<company_domain> OR from:@greenhouse-mail.io OR from:@hire.lever.co OR from:@ashbyhq.com) newer_than:<n>d`
 Then filter threads client-side: subject/body must mention the company name or the role title
 (case-insensitive); drop newsletters/marketing (`unsubscribe` + no role mention).
-Skip thread ids already listed in `data/inbox_seen.json` (create the file if missing; append processed ids).
+
+Same company, several active jobs: when more than one loaded job has this company (normalized name), a
+thread belongs to a job only if it names that job's role title (or its core, e.g. "Backend Engineer") or
+contains its ATS job id / apply URL. A thread that matches the company but no single job is **ambiguous**:
+change no status; add one Action Item (`careeros action add "Email from <company> could be for <role A> or
+<role B>: <subject>" --type review --priority H --needs anytime`) and mark it processed.
+
+`data/inbox_seen.json` maps thread id -> last processed message id (`{"<thread_id>": "<message_id>"}`;
+create the file if missing; an old list-of-ids file counts as `{id: null}`). Skip a thread only when its
+latest message id equals the stored one: a new reply in a known thread (interview invite after the
+confirmation) is processed again. After processing, store the thread's latest message id.
 
 For each remaining thread call `get_thread` and read the latest message from a sender other than the candidate.
 

@@ -69,9 +69,12 @@ rubric_ok = mean >= critic.pass_threshold (7.5) and zero_fabrication >= 8
 pass = hard_ok and rubric_ok
 ```
 `fail_reasons[]`: every deterministic hard fail (verbatim `fail_reasons`), every UNSUPPORTED claim
-(`"fabrication: <claim> (<artifact>)"`), and every rubric key below 7 (`"<key>=<n>: <justification>"`).
+(`"fabrication: <claim> (<artifact>)"`), every rubric key below 7 (`"<key>=<n>: <justification>"`), and,
+when `mean < pass_threshold` or `zero_fabrication < 8` even though no key is below 7,
+`"critic_mean=<mean> < <threshold>"` (or `"zero_fabrication=<n> < 8"`), so a failed rubric always has a reason.
 
-`regenerate_suggestions[]`: one actionable instruction per fail reason, addressed to the writer skill,
+`regenerate_suggestions[]`: one actionable instruction per fail reason (for a `critic_mean` reason: one each
+for the two lowest-scoring keys, naming what would raise them), addressed to the writer skill,
 e.g. `{"skill":"write-cover-letter","suggestion":"Replace 'millions of events' with the exact 2 million from acme.1"}`,
 `{"skill":"tailor-resume","suggestion":"Remove 'Docker' from skills (not in profile); add initech_intern.1 to cover ETL"}`.
 Missing artifacts that the tier requires (resume always; cover letter when tier rule says `always`) are

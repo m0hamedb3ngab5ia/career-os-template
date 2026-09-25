@@ -106,3 +106,63 @@ def test_checker_catches_bad_references():
     assert _check_cli(["job", "status"]) is None
     assert "unknown subcommand 'nope'" in _check_cli(["tracker", "nope"])
     assert "needs a subcommand" in _check_cli(["tracker"])
+
+
+# --- prepare-job / write-cover-letter contracts ---------------------------------------------------
+
+SKILL_DIR = ROOT / ".claude" / "skills"
+
+
+def _skill(name: str) -> str:
+    return (SKILL_DIR / name / "SKILL.md").read_text(encoding="utf-8")
+
+
+COVER_RENDER_RE = re.compile(r"\.venv/bin/python templates/cover_letter/render\.py JOB/cover_letter\.md")
+
+
+def test_prepare_job_renders_cover_letter_txt():
+    """apply-job pastes cover_letter.txt; prepare-job must produce it (render.py) and list it."""
+    text = _skill("prepare-job")
+    assert COVER_RENDER_RE.search(text), "prepare-job must run templates/cover_letter/render.py JOB/cover_letter.md"
+    files = re.search(r'"files": \[([^\]]*)\]', text).group(1)
+    assert '"cover_letter.txt"' in files and '"resume.pdf"' in files
+
+
+def _required_letter_regex() -> re.Pattern[str]:
+    m = re.search(r"\(regex `([^`]+)`\)", _skill("prepare-job"))
+    assert m, "prepare-job must state the cover-letter-required regex"
+    return re.compile(m.group(1), re.I)
+
+
+@pytest.mark.parametrize("posting,required", [
+    ("Please submit a cover letter with your application.", True),
+    ("A cover letter is required.", True),
+    ("Cover letter required.", True),
+    ("Please include a short cover letter.", True),
+    ("Cover letters are optional.", False),
+    ("We build ledgers.", False),
+])
+def test_cover_letter_required_regex_both_word_orders(posting, required):
+    assert bool(_required_letter_regex().search(posting)) is required
+
+
+def test_write_cover_letter_reads_length_and_voice_from_candidate_files():
+    text = _skill("write-cover-letter")
+    assert not re.search(r"\b120\s*[-–]\s*250\b", text), "length must come from config/qa.yaml, not a hardcode"
+    assert "cover_letter.min_words" in text and "cover_letter.max_words" in text
+    assert "close_variant" in text and "Dear Hiring Manager" in text
+    assert "Hi <Company> team," not in text, "greeting format comes from the style guide"
+
+
+def test_example_style_guide_declares_letter_settings():
+    guide = (EXAMPLE_REPO / "profile" / "voice" / "style_guide.md").read_text(encoding="utf-8")
+    for label in ("Greeting:", "Sign-off:", "Length:", "Close variants:"):
+        assert re.search(rf"^- {re.escape(label)}", guide, re.M), label
+    variants = re.search(r"^- Close variants:\n((?:  - .+\n)+)", guide, re.M)
+    assert variants and len(variants.group(1).strip().splitlines()) >= 3
+
+
+def test_tailor_resume_section_order_comes_from_config():
+    text = _skill("tailor-resume")
+    assert "resume.hard.section_order" in text
+    assert "put `projects`\n   before `experience`" not in text and "projects` before `experience`" not in text

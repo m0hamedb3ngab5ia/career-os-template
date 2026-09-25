@@ -1,6 +1,6 @@
 ---
 name: write-cover-letter
-description: Write a 120-250 word cover letter for a scored job dir in the candidate's voice, using only profile bullets/narratives by id and at least two sourced company facts. Writes cover_letter.md with YAML frontmatter for QA.
+description: Write a cover letter (length from config/qa.yaml) for a scored job dir in the candidate's voice, using only profile bullets/narratives by id and at least two sourced company facts. Writes cover_letter.md with YAML frontmatter for QA.
 ---
 
 # write-cover-letter
@@ -30,8 +30,11 @@ letter and resume tell the same story.
 
 1. `JOB/posting.json`, `JOB/score.json` (category, tier, required_skills, matched_skills, skill_evidence).
 2. `profile/master.yaml` (bullets, narratives, summary_variants, identity).
-3. `profile/voice/style_guide.md` (Rules, Cover-letter skeleton, and `## Learned` if filled) and every
-   file in `profile/voice/samples/`. If `samples/` is empty, the letter is `voice_verified: false`.
+3. `profile/voice/style_guide.md`: its `## Letter settings` (Greeting, Sign-off, Length, Close variants),
+   Rules, Cover-letter skeleton, and `## Learned` if filled; and every file in `profile/voice/samples/`.
+   If `samples/` is empty, the letter is `voice_verified: false`.
+   Previous closes: the `close_variant` frontmatter of every `data/jobs/*/cover_letter.md` (note the most
+   recent one by `date`, and every one whose `company` is this company).
 4. `templates/cover_letter/skeleton.md` if present (frontmatter keys expected by its renderer).
 5. `config/qa.yaml`: `banned_phrases`, `style_rules`, `cover_letter.min_words/max_words`.
 6. `config/targets.yaml` tiers: if tier C and `cover_letter: if_required`, and the posting does not
@@ -57,25 +60,30 @@ If still fewer than 2: write the letter with what you have and set `facts_shortf
 
 ## 4. Draft (follow the skeleton in style_guide.md)
 
-Greeting: `Hi <Team> team,` only when a real team name is known, else `Hi <Company> team,`.
-A `departments` value is a team name only if it reads like one (e.g. "Payments Infrastructure",
+Greeting: the style guide's `Greeting:` line, with its placeholders filled. If the guide has none, use
+`Hi <Team> team,` when a real team name is known, else the company form. Never `Dear Hiring Manager`
+(also a banned phrase). A `departments` value is a team name only if it reads like one (e.g. "Payments Infrastructure",
 "Developer Platform"). Values that look like ATS buckets are NOT team names: anything containing a
 digit, or matching `/general|university|early careers|campus|other/i` (e.g. "University 2026",
-"Early Careers", "General", "Other") -> use `Hi <Company> team,` and set `team: null`.
-Never `Dear Hiring Manager`.
+"Early Careers", "General", "Other") -> use the company form and set `team: null`.
 
 1. Hook (1-2 sentences): one sourced fact + the one thing the candidate did that connects. Name the role and
    company exactly as in posting.json (title may be shortened to its core, e.g. "Software Engineer, Backend").
 2. Proof A (3-4 sentences): "I did X, result Y" with exact numbers from cited bullets.
 3. Proof B (2-3 sentences): requirement #2 or narrative angle; tie back to the hook fact.
-4. Close (1-2 sentences): plain ask ("Happy to walk through the code." / "Would like to talk."). Sign with the first name from `profile/master.yaml: identity.name`.
+4. Close (1-2 sentences): one line from the style guide's `Close variants:`. Pick a variant that is
+   neither the most recent letter's `close_variant` nor any `close_variant` already sent to this company
+   (QA soft-warns `close_variant_repeated`). If every variant was used for this company, pick the least
+   recently used. Record it as `close_variant`. No variants listed -> a plain ask in the same spirit.
+   Sign-off: the style guide's `Sign-off:` line (default: first name from `profile/master.yaml: identity.name`).
 
 Voice rules (hard): first person, short sentences, one idea each, contractions ok, no throat-clearing
 openers, no praise beyond the sourced facts, <= 2 em-dashes, no rhetorical questions, no tricolon of
 adjectives, none of `banned_phrases` (case-insensitive, including "leverage"/"dynamic"/"thrilled").
 If `--suggestions` were passed, apply them without violating any rule above.
 
-Length: 120-250 words in the body (greeting through sign-off). QA computes the count itself
+Length: `config/qa.yaml: cover_letter.min_words` to `cover_letter.max_words` words in the body (greeting
+through sign-off); the style guide's `Length:` line points there. QA computes the count itself
 (`cover_letter_word_count` in `careeros.qa` output); your own count is only a guide.
 
 ## 5. Write `JOB/cover_letter.md`
@@ -86,9 +94,10 @@ job_id: <job_id>
 company: <exact company>
 role: <exact title>
 team: <team or null>
-greeting: "Hi <Team> team,"
+greeting: "<greeting from the style guide>"
 date: <YYYY-MM-DD>
-sign_off: "<first name from identity.name>"
+sign_off: "<Sign-off from the style guide>"
+close_variant: "<the Close variant used, verbatim>"
 word_count: <int, body only; optional/informational. QA computes the real count and never fails on a mismatch>
 facts_used:
   - {fact: "<fact as used>", source: posting}

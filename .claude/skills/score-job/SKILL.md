@@ -39,7 +39,7 @@ Add one string per hit to `hard_filter_fails`, wording exactly:
 | `title_excluded` | category resolves to one with `excluded: true` |
 | `salary_below_min` | `salary_max` is a number and `< candidate.min_base_usd`. Unknown salary = allowed. |
 | `already_applied_recent` | (company, role family) in `companies.already_applied` with date < 90 days ago |
-| `prestige_avoid` | company in `prestige_tiers.avoid` (skip unless fit >= 90, then flag `needs_review_avoid` instead) |
+| `prestige_avoid` | company in `prestige_tiers.avoid`: skip, unless the fit **before** `prestige_bonus` (sum of the other components, section 5) is >= 90, then flag `needs_review_avoid` instead |
 
 ## 3. Category
 

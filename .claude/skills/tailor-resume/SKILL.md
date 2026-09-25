@@ -67,9 +67,9 @@ Procedure:
    - `mobile` -> `swe_mobile`
    - `general` -> everything else
    Set to null if the budget is exceeded.
-6. Section order: default `experience, projects, education, skills` (QA hard rule). For
-   `swe_mobile`/`swe_fullstack` where the strongest evidence is a project, you may put `projects`
-   before `experience`; keep `education` and `skills` last. Summary, when present, is first.
+6. Section order: exactly `config/qa.yaml: resume.hard.section_order` (the shipped default is
+   `experience, projects, education, skills`). No per-category reordering; to lead with a project,
+   change that config value. Summary, when present, is first.
 7. Dates: display strings `Mon YYYY` (e.g. `Jun 2025`), `Present` for open-ended. Convert from
    the profile's `YYYY-MM`.
 
