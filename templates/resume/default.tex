@@ -1,0 +1,98 @@
+((= ------------------------------------------------------------------
+    career-os default résumé template (ATS-safe, single column).
+    Jinja delimiters: blocks use double-paren-star, variables use
+    triple parens, comments use double-paren-equals (see render.py).
+    All values arrive already LaTeX-escaped from render.py.
+    Swap this file by setting `resume_template: <name>` in
+    config/categories.yaml (loads templates/resume/<name>.tex).
+------------------------------------------------------------------ =))
+\documentclass[10pt,letterpaper]{article}
+
+\usepackage[margin=0.5in]{geometry}
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage{enumitem}
+\usepackage{titlesec}
+\usepackage[hidelinks,pdfusetitle]{hyperref}
+
+\pagestyle{empty}
+\setlength{\tabcolsep}{0pt}
+\setlength{\parskip}{1pt}
+\setlength{\parindent}{0pt}
+
+\titleformat{\section}{\normalsize\bfseries\uppercase}{}{0pt}{}[\vspace{-8pt}\rule{\textwidth}{0.5pt}\vspace{-6pt}]
+\titlespacing*{\section}{0pt}{4pt}{2pt}
+
+\setlist[itemize]{nosep, leftmargin=*, label=\textbullet, itemsep=0pt, topsep=0pt, parsep=0pt, partopsep=0pt, after=\vspace{2pt}}
+
+\newcommand{\entry}[4]{%
+  \noindent\textbf{#1}\hfill #2\\
+  \textit{#3}\hfill\textit{#4}\par
+}
+
+\begin{document}
+\small
+
+((= ----------------------------- header ----------------------------- =))
+\begin{center}
+  {\Large\bfseries (((identity.name)))}\\[1pt]
+  (((identity.location)))((* if identity.phone *)) \textbar{} (((identity.phone)))((* endif *))((* if identity.email *)) \textbar{} \href{mailto:(((identity.email_raw)))}{(((identity.email)))}((* endif *))\\
+  ((* if identity.linkedin *))\href{(((identity.linkedin_raw)))}{(((identity.linkedin)))}((* endif *))((* if identity.github *)) \textbar{} \href{(((identity.github_raw)))}{(((identity.github)))}((* endif *))((* if identity.website *)) \textbar{} \href{(((identity.website_raw)))}{(((identity.website)))}((* endif *))
+\end{center}
+
+((* if summary *))
+\section{Summary}
+(((summary)))
+((* endif *))
+
+((* for sec in sections *))
+((* if sec.type == "experience" and experience *))
+\section{Experience}
+((* for e in experience *))
+\entry{(((e.company)))}{(((e.start))) -- (((e.end)))}{(((e.title)))((* if e.team *)), (((e.team)))((* endif *))}{(((e.location)))}
+((* if e.bullets *))
+\begin{itemize}
+((* for b in e.bullets *))
+  \item (((b.text)))
+((* endfor *))
+\end{itemize}
+((* endif *))
+((* endfor *))
+((* elif sec.type == "projects" and projects *))
+\section{Projects}
+((* for p in projects *))
+\entry{((* if p.link *))\href{(((p.link_raw)))}{(((p.name)))}((* else *))(((p.name)))((* endif *))}{(((p.date)))}{((* if p.stack *))(((p.stack | join(", "))))((* endif *))}{}
+((* if p.bullets *))
+\begin{itemize}
+((* for b in p.bullets *))
+  \item (((b.text)))
+((* endfor *))
+\end{itemize}
+((* endif *))
+((* endfor *))
+((* elif sec.type == "education" and education *))
+\section{Education}
+((* for ed in education *))
+\entry{(((ed.school)))}{(((ed.start))) -- (((ed.end)))}{(((ed.degree)))((* if ed.gpa *)), GPA (((ed.gpa)))((* endif *))}{(((ed.location)))}
+((* if ed.coursework *))
+\textit{Coursework:} (((ed.coursework | join(", ")))) \par
+((* endif *))
+((* if ed.activities *))
+\textit{Activities:} (((ed.activities | join(", ")))) \par
+((* endif *))
+((* endfor *))
+((* elif sec.type == "skills" and skills *))
+\section{Skills}
+((* if skills.programming *))\textbf{Programming:} (((skills.programming | join(", "))))\par
+((* endif *))
+((* if skills.frameworks *))\textbf{Frameworks \& Libraries:} (((skills.frameworks | join(", "))))\par
+((* endif *))
+((* if skills.tools *))\textbf{Tools \& Platforms:} (((skills.tools | join(", "))))\par
+((* endif *))
+((* if skills.concepts *))\textbf{Concepts:} (((skills.concepts | join(", "))))\par
+((* endif *))
+((* endif *))
+((* endfor *))
+
+\end{document}
