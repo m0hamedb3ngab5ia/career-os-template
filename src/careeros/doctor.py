@@ -14,7 +14,8 @@ What it checks:
 - Tools: claude (FAIL: every skill needs it), tectonic or pdflatex (WARN: PDF), gh and codex (WARN: /review).
 - Voice samples: none in profile/voice/samples/ (WARN).
 - Open `metric_questions` in profile/master.yaml (WARN "N metric questions open"), and questions naming a
-  bullet id that does not exist (WARN). Optional bullet flags resume_default / weak / estimate must be booleans.
+  bullet id that does not exist (WARN). Optional bullet flags resume_default / weak / estimate must be booleans;
+  an `estimate: true` bullet without a "~<number>" in its text (WARN: QA's estimate_marked cannot guard it).
 
 The prepare-job and apply-job skills run `careeros doctor --quiet` first and stop on a nonzero exit,
 so the fictional example candidate never reaches a real application.
@@ -322,6 +323,15 @@ def check_metric_questions(master: dict) -> list[Check]:
     return out
 
 
+def check_estimates(master: dict) -> list[Check]:
+    """WARN for `estimate: true` bullets whose text has no "~<number>" (resume_writing_rules.md, OVERRIDE rule 3)."""
+    bad = [str(b.get("id")) for sec in ("experience", "projects", "leadership") for e in master.get(sec) or []
+           if isinstance(e, dict) for b in e.get("bullets") or []
+           if isinstance(b, dict) and b.get("estimate") is True and not re.search(r"~\s*\$?\d", str(b.get("text") or ""))]
+    return [Check(WARN, "estimates", f"profile/master.yaml: {i} has estimate: true but no ~number in its text; "
+                                     "write the estimated number as ~N (e.g. ~40%)") for i in bad]
+
+
 def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None) -> list[Check]:
     out = []
     latex = [t for t in ("tectonic", "pdflatex") if which(t)]
@@ -404,6 +414,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     checks += check_bullet_priority(cfg["categories"], master)
     if not probs:
         checks += check_metric_questions(master)
+        checks += check_estimates(master)
     checks += check_tools(which, env)
     checks.append(check_voice(root))
     return checks

@@ -25,7 +25,8 @@ a pass here means the artifacts may be submitted without a human reading them (t
 Run `.venv/bin/python -m careeros.qa JOB`. Parse the JSON: `pass`, `checks[]` ({check, level, ok, detail, skipped?}),
 `fail_reasons[]`, `warnings[]`, `keyword_coverage`, `cover_letter_word_count`, `orphan_numbers[]`,
 `unknown_tools[]`, `banned_hits[]`, `bullet_shape[]` ({id, line, issues}: soft `weak_opener` / `no_metric` / `too_long`
-warnings, never a fail), `confidential_hits[]` (terms/patterns from `profile/confidential_terms.yaml`
+warnings, never a fail; the hard `estimate_marked` check fails a candidate estimate shown without its `~`),
+`confidential_hits[]` (terms/patterns from `profile/confidential_terms.yaml`
 found in resume.txt, cover_letter.md, answers.json or outreach.json; always a hard fail, never waived).
 Store the whole object as `deterministic`. If the command itself errors, set
 `deterministic = {"pass": false, "error": "<stderr>"}` and treat as a hard fail.

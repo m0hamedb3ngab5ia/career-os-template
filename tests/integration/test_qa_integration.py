@@ -150,3 +150,26 @@ def test_weak_bullet_is_a_soft_bullet_shape_warning(temp_root: Path, home: Path,
     shape = {c["check"]: c for c in res["checks"]}["bullet_shape"]
     assert shape["level"] == "soft" and not shape["ok"] and "acme.5: weak_opener, no_metric" in shape["detail"]
     assert res["bullet_shape"] == [{"id": "acme.5", "line": weak, "issues": ["weak_opener", "no_metric"]}]
+
+
+def test_candidate_estimate_keeps_its_tilde_through_render_and_qa(temp_root: Path, home: Path, job_dir: Path):
+    """An `estimate: true` bullet ("~40") renders with its "~" and passes; the same résumé with the "~" dropped
+    passes bullet_fidelity and number_audit (both ignore "~") but hard-fails estimate_marked."""
+    prof_path = temp_root / "profile" / "master.yaml"
+    prof = yaml.safe_load(prof_path.read_text())
+    b = prof["experience"][0]["bullets"][1]
+    b.update(text=b["text"].replace("40 analysts", "~40 analysts"), metrics=["~40"], estimate=True)
+    b.pop("variants", None)
+    prof_path.write_text(yaml.safe_dump(prof, sort_keys=False))
+    (job_dir / "resume.json").write_text(json.dumps(build_resume_json(prof, BULLETS, job_id="t1"), indent=2))
+    assert _run(temp_root, home, "templates/resume/render.py", str(job_dir / "resume.json"), "--txt-only").returncode == 0
+    assert "~40 analysts" in (job_dir / "resume.txt").read_text()
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 0 and res["pass"] is True, res["fail_reasons"]
+
+    (job_dir / "resume.txt").write_text((job_dir / "resume.txt").read_text().replace("~40 analysts", "40 analysts"))
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    checks = {c["check"]: c for c in res["checks"]}
+    assert code == 1 and res["pass"] is False
+    assert checks["bullet_fidelity"]["ok"] and checks["number_audit:resume.txt"]["ok"]
+    assert any(r.startswith("estimate_marked: resume.txt: acme.2 estimate 40 shown without ~") for r in res["fail_reasons"])

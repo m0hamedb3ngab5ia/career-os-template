@@ -356,3 +356,15 @@ def test_personalize_keeps_metric_questions_on_renamed_ids(tmp_path: Path):
     m = yaml.safe_load((filled(tmp_path) / "profile" / "master.yaml").read_text())
     ids = {b["id"] for e in m["experience"] + m["projects"] for b in e["bullets"]}
     assert m["metric_questions"] and all(q["bullet_id"] in ids for q in m["metric_questions"])
+
+
+def test_estimate_flag_without_tilde_number_warns(tmp_path: Path):
+    root = filled(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["experience"][0]["bullets"][1]["estimate"] = True        # northwind.2: "... used by 40 analysts ..."
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    warns = text_of(doctor(root), WARN)
+    assert "northwind.2 has estimate: true but no ~number" in warns
+    m["experience"][0]["bullets"][1]["text"] = m["experience"][0]["bullets"][1]["text"].replace("40", "~40")
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    assert "estimate: true" not in text_of(doctor(root), WARN)

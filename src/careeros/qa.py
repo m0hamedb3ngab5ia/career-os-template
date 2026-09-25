@@ -23,6 +23,8 @@ Output schema (dict / JSON):
       "confidential_hits": [...],        # "<file>: term '<t>'" | "<file>: patterns[<i>]"
       "bullet_shape": [ {id: str | None, line: str, issues: [weak_opener|no_metric|too_long]} ]
                                          # soft: resume.txt bullets that break _shared/resume_writing_rules.md
+      # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
+      #   about/approximately/roughly/around) wherever an artifact citing that bullet shows it
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
     }
 
@@ -77,6 +79,11 @@ DEFAULT_WEAK_OPENERS = ("worked on", "helped", "responsible for", "assisted", "p
                         "tasked with")
 DEFAULT_BULLET_MAX_WORDS = 35
 DEFAULT_SCALE_WORDS = ("users", "requests", "records", "teams", "services", "daily", "million", "thousand", "dozen")
+
+# A candidate estimate ("~40%" in an `estimate: true` bullet) must stay hedged. Résumé bullets keep the "~";
+# prose (cover letter, answers) may also say it in words.
+ESTIMATE_RE = re.compile(r"~\s*(\$?\d[\d,\.]*[%KkMx+]?)")
+HEDGE_WORDS = ("about", "approximately", "roughly", "around")
 
 # Place names are not hardcoded: every word of the profile's identity.location and each experience /
 # project / education `location` is allowed at runtime (ProfileIndex.place_words).
@@ -628,6 +635,44 @@ class Checker:
             self.add("cover_letter_cites_ids", "hard", False,
                      "cover_letter.md frontmatter has no bullet_ids_used / narrative_ids_used")
 
+    def check_estimates(self) -> None:
+        """Hard: bullet_fidelity and number_audit ignore "~", so an `estimate: true` bullet's "~40" shown as a bare
+        "40" would pass both. Every occurrence of an estimated number in an artifact that cites the bullet must be
+        hedged, unless another cited bullet states that same number exactly."""
+        name = "estimate_marked"
+        cited = self._cited_ids()
+        docs: list[tuple[str, str, set[str], bool]] = []   # (file, text, cited ids, prose?)
+        if self.resume_txt is not None:
+            docs.append(("resume.txt", self.resume_txt, cited.get("resume.json", set()), False))
+        if self.cover_md is not None:
+            docs.append(("cover_letter.md", self.cover_body, cited.get("cover_letter.md", set()), True))
+        if isinstance(self.answers, list):
+            docs.append(("answers.json", "\n".join(str(a.get("answer") or "") for a in self.answers if isinstance(a, dict)),
+                         cited.get("answers.json", set()), True))
+        if not docs:
+            self.skip(name, "hard", "no text artifacts")
+            return
+        problems, n_est = [], 0
+        for fname, text, ids, prose in docs:
+            est = [b for b in sorted(ids) if (self.profile.bullets.get(b) or {}).get("estimate") is True]
+            if not est:
+                continue
+            exact = number_tokens(" ".join(ESTIMATE_RE.sub("", self.profile.bullet_text(b))
+                                           for b in ids if b not in est))
+            hedge = r"(?:~\s*" + ("|(?:" + "|".join(HEDGE_WORDS) + r")\s+" if prose else "") + r")$"
+            for bid in est:
+                for num in dict.fromkeys(m.rstrip(".,") for m in ESTIMATE_RE.findall(self.profile.bullet_text(bid))):
+                    n_est += 1
+                    if num.lower() in exact:
+                        continue
+                    for m in re.finditer(r"(?<![\d.,$])" + re.escape(num) + r"(?![\d])", text):
+                        if not re.search(hedge, text[max(0, m.start() - 20):m.start()], re.I):
+                            problems.append(f"{fname}: {bid} estimate {num} shown without ~")
+                            break
+        self.add(name, "hard", not problems,
+                 (f"{n_est} estimated numbers keep their ~" if n_est else "no estimate bullets cited")
+                 if not problems else "; ".join(problems) + " (profile marks it estimate: true; keep the ~)")
+
     def _allowed_numbers(self, ids: Iterable[str], extra_text: str = "") -> set[str]:
         pool = [self.profile.identity_text(), self.profile.education_text(), self.profile.header_text(), extra_text]
         for bid in ids:
@@ -1092,6 +1137,7 @@ class Checker:
         self.check_skills_traced()
         self.check_standard_answers()
         self.check_numbers()
+        self.check_estimates()
         self.check_tools()
         self.check_contact()
         self.check_pdf()

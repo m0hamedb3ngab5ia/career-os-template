@@ -865,3 +865,72 @@ def test_example_qa_yaml_declares_bullet_shape_keys() -> None:
     soft = yaml.safe_load((EXAMPLE_REPO / "config" / "qa.yaml").read_text())["resume"]["soft"]
     assert soft["bullet_max_words"] == 35
     assert set(soft["weak_openers"]) == set(DEFAULT_WEAK_OPENERS)
+
+
+# --- estimate_marked (hard): a candidate estimate keeps its "~" in every artifact ---------------------
+
+EST_TEXT = "Shipped a React and TypeScript dashboard used by ~40 analysts to review reconciliation breaks"
+
+
+def _estimate_root(tmp_path: Path) -> Path:
+    root = _copied_root(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    b = m["experience"][0]["bullets"][1]
+    assert b["id"] == "acme.2"
+    b.update(text=EST_TEXT, metrics=["~40"], estimate=True)
+    b.pop("variants", None)
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m, sort_keys=False))
+    return root
+
+
+def _estimate_job(tmp_path: Path, root: Path, resume_line: str, cover: str | None = None) -> Path:
+    job = make_job(tmp_path, resume_txt=RESUME_TXT.replace(
+        "Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks", resume_line),
+        cover=cover)
+    rj = build_resume_json(yaml.safe_load((root / "profile" / "master.yaml").read_text()),
+                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
+    (job / "resume.json").write_text(json.dumps(rj))
+    return job
+
+
+def test_estimate_kept_with_tilde_passes(tmp_path: Path) -> None:
+    root = _estimate_root(tmp_path)
+    res = run_deterministic(_estimate_job(tmp_path / "a", root, EST_TEXT), root=root)
+    c = by_name(res, "estimate_marked")
+    assert c["level"] == "hard" and c["ok"] and not c.get("skipped"), c["detail"]
+    assert by_name(res, "bullet_fidelity")["ok"] and by_name(res, "number_audit:resume.txt")["ok"]
+
+
+def test_estimate_without_tilde_in_resume_fails(tmp_path: Path) -> None:
+    """bullet_fidelity and number_audit both ignore "~", so only this check sees an estimate shown as exact."""
+    root = _estimate_root(tmp_path)
+    res = run_deterministic(_estimate_job(tmp_path / "a", root, EST_TEXT.replace("~40", "40")), root=root)
+    c = by_name(res, "estimate_marked")
+    assert not c["ok"] and "resume.txt: acme.2 estimate 40 shown without ~" in c["detail"]
+    assert res["pass"] is False
+
+
+@pytest.mark.parametrize("phrase,ok", [("about 40 analysts", True), ("~40 analysts", True), ("40 analysts", False)])
+def test_estimate_in_cover_letter_needs_a_hedge(tmp_path: Path, phrase: str, ok: bool) -> None:
+    root = _estimate_root(tmp_path)
+    cover = COVER_LETTER.replace("bullet_ids_used: [acme.1,", "bullet_ids_used: [acme.2, acme.1,").replace(
+        "Both jobs were about", f"I also shipped a dashboard for {phrase}. Both jobs were about")
+    c = by_name(run_deterministic(_estimate_job(tmp_path / "a", root, EST_TEXT, cover=cover), root=root),
+                "estimate_marked")
+    assert c["ok"] is ok, c["detail"]
+
+
+def test_estimate_number_also_in_an_exact_bullet_is_not_flagged(tmp_path: Path) -> None:
+    root = _estimate_root(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["experience"][0]["bullets"][0]["text"] += " for 40 analysts"  # acme.1 states 40 exactly
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m, sort_keys=False))
+    job = _estimate_job(tmp_path / "a", root, EST_TEXT)
+    txt = (job / "resume.txt").read_text().replace("2 million events per day", "2 million events per day for 40 analysts")
+    (job / "resume.txt").write_text(txt)
+    assert by_name(run_deterministic(job, root=root), "estimate_marked")["ok"]
+
+
+def test_estimate_marked_ok_without_estimate_bullets(tmp_path: Path) -> None:
+    c = by_name(run(make_job(tmp_path)), "estimate_marked")
+    assert c["ok"] and "no estimate" in c["detail"]

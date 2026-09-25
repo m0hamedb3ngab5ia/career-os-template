@@ -38,8 +38,10 @@ candidate never stated, "find related metrics"). None of that applies in career-
    "N metric questions open in profile/master.yaml" until the list is empty.
 3. **Candidate-supplied estimates are marked.** If the candidate answers with an estimate of their own ("about
    40%"), the bullet text carries a `~` prefix on that number (`~40%`) and the bullet gets `estimate: true`.
-   The `~` and the flag are never added or dropped by a skill; the number is still frozen. When the candidate
-   answers, they edit the bullet's `text` and `metrics` and delete the question.
+   The `~` and the flag are never added or dropped by a skill; the number is still frozen. Every artifact that
+   shows the number keeps the `~` (a cover letter or answer may say "about", "approximately", "roughly" or
+   "around" instead); QA's `estimate_marked` hard-fails one that drops it. When the candidate answers, they
+   edit the bullet's `text` and `metrics` and delete the question.
 4. **"Every bullet has a number" is a soft target, not a rule.** A true bullet without a number beats a
    fabricated one. QA's `bullet_shape` check only warns; a missing metric never fails a résumé and never
    justifies rewriting a bullet.
