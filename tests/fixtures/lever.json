@@ -2,24 +2,45 @@
   {
     "id": "a1b2c3d4-0000-4000-8000-000000000001",
     "text": "Data Engineer",
-    "categories": {"commitment": "Full-time", "department": "Engineering", "location": "New York", "team": "Data Platform"},
-    "allLocations": ["New York", "San Francisco"],
+    "categories": {
+      "commitment": "Full-time",
+      "department": "Engineering",
+      "location": "New York",
+      "team": "Data Platform",
+      "allLocations": [
+        "New York",
+        "San Francisco"
+      ]
+    },
     "workplaceType": "hybrid",
     "country": "US",
     "createdAt": 1758000000000,
     "description": "<p>Own our <b>ETL</b> pipelines.</p>",
     "descriptionPlain": "Own our ETL pipelines.",
-    "lists": [{"text": "Requirements", "content": "<li>SQL</li><li>Airflow</li>"}],
+    "lists": [
+      {
+        "text": "Requirements",
+        "content": "<li>SQL</li><li>Airflow</li>"
+      }
+    ],
     "additional": "<p>EEO statement.</p>",
     "additionalPlain": "EEO statement.",
     "hostedUrl": "https://jobs.lever.co/acme/a1b2c3d4-0000-4000-8000-000000000001",
     "applyUrl": "https://jobs.lever.co/acme/a1b2c3d4-0000-4000-8000-000000000001/apply",
-    "salaryRange": {"min": 140000, "max": 180000, "currency": "USD", "interval": "per-year-salary"}
+    "salaryRange": {
+      "min": 140000,
+      "max": 180000,
+      "currency": "USD",
+      "interval": "per-year-salary"
+    }
   },
   {
     "id": "a1b2c3d4-0000-4000-8000-000000000002",
     "text": "Software Engineer",
-    "categories": {"commitment": "Full-time", "location": "Berlin"},
+    "categories": {
+      "commitment": "Full-time",
+      "location": "Berlin"
+    },
     "workplaceType": "onsite",
     "country": "DE",
     "createdAt": 1758000000000,

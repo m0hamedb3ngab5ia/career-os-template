@@ -104,3 +104,24 @@ def test_upsert_bad_input_exits_2_and_writes_nothing(cli, settings, capsys, argv
     assert cli(argv) == 2
     assert err in capsys.readouterr().err
     assert not settings.paths["tracker_xlsx"].exists()
+
+
+def test_upsert_status_also_updates_status_json_so_sync_keeps_it(cli, settings, capsys):
+    from careeros.models import Posting
+    from careeros.store import Store
+
+    store = Store(settings)
+    store.save_posting(Posting(job_id="s1", company="Acme", title="SWE", ats="greenhouse"))
+    assert cli(["tracker", "upsert", "s1", "--field", "Status=applied", "--field", "DateApplied=today"]) == 0
+    assert store.get_status("s1") == "applied"
+    assert "status -> applied" in store.read_log("s1")
+    assert cli(["tracker", "sync"]) == 0
+    assert Tracker(settings=settings).get_job("s1")["Status"] == "applied"
+
+
+def test_upsert_status_for_unknown_job_touches_only_tracker(cli, settings):
+    from careeros.store import Store
+
+    assert cli(["tracker", "upsert", "ghost", "--field", "Status=queued"]) == 0
+    assert Tracker(settings=settings).get_job("ghost")["Status"] == "queued"
+    assert not Store(settings).job_dir("ghost").exists()

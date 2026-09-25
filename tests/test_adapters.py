@@ -221,3 +221,19 @@ def test_guess_remote(fields, out):
     from careeros.scout.base import guess_remote
 
     assert guess_remote(*fields) is out
+
+
+def test_lever_all_locations_read_from_categories():
+    data = [{"id": "m", "text": "SWE", "hostedUrl": "https://x/m",
+             "categories": {"location": "New York", "allLocations": ["New York", "Toronto"]}}]
+    assert LeverAdapter().parse(data, BOARD)[0].location == "New York, Toronto"
+
+
+def test_lever_secondary_location_in_blocked_country_is_filtered(settings):
+    from careeros.scout import Prefilter
+
+    settings.targets.setdefault("location", {})["blocked_countries"] = ["CA"]
+    data = [{"id": "m", "text": "Software Engineer", "hostedUrl": "https://x/m",
+             "categories": {"location": "New York", "allLocations": ["New York", "Toronto"]}}]
+    p = LeverAdapter().parse(data, BOARD)[0]
+    assert Prefilter(settings).location_blocked(p)

@@ -279,3 +279,17 @@ def test_yaml_schema_smoke(root: Path):
 
     s = Settings.load(root)  # and the loader agrees
     assert s.boards and s.title_keywords()
+
+
+def test_cli_upsert_status_survives_tracker_sync(temp_root: Path, home: Path):
+    """apply-job's `tracker upsert --field Status=applied` must not be reverted by the next `tracker sync`."""
+    jid = _seed_job(temp_root)
+    assert _cli(temp_root, home, "tracker", "upsert", jid, "--field", "Status=applied",
+                "--field", "DateApplied=today").returncode == 0
+    assert json.loads((temp_root / "data" / "jobs" / jid / "status.json").read_text())["status"] == "applied"
+    r = _cli(temp_root, home, "tracker", "sync")
+    assert r.returncode == 0, r.stderr
+    ws = load_workbook(temp_root / "JobTracker.xlsx")["Jobs"]
+    hdr = {c.value: c.column - 1 for c in ws[1]}
+    row = next(r for r in ws.iter_rows(min_row=2, values_only=True) if r[hdr["JobID"]] == jid)
+    assert row[hdr["Status"]] == "applied"

@@ -314,3 +314,73 @@ def test_row_data_requires_job_id(tmp_path: Path):
     tr = Tracker(path=tmp_path / "t.xlsx")
     with pytest.raises(ValueError):
         tr.upsert_job({"company": "Acme"})
+
+
+def test_flush_while_still_locked_keeps_every_queued_op_in_order(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+
+    def boom(self, filename):
+        raise PermissionError(13, "locked")
+
+    monkeypatch.setattr(Workbook, "save", boom)
+    with pytest.warns(UserWarning):
+        tr.upsert_job({"job_id": "q1", "company": "Acme"})
+        tr.set_status("q1", "queued")
+        tr.add_action_item("check q1", id="a1")
+    assert tr.pending_count() == 3
+
+    with pytest.warns(UserWarning):
+        assert tr.flush_pending() == 0  # still locked: nothing replayed, nothing lost
+    assert [q["op"] for q in json.loads(tr.pending_path.read_text())] == ["upsert_job", "set_status", "add_action_item"]
+
+    monkeypatch.setattr(Workbook, "save", real_save)
+    assert tr.flush_pending() == 3
+    assert tr.pending_count() == 0 and not tr.pending_path.exists()
+    assert tr.get_job("q1")["Status"] == "queued"
+    assert [i["ID"] for i in tr.list_action_items()] == ["a1"]
+
+
+def test_flush_partial_progress_keeps_unreplayed_tail(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    tr.pending_path.write_text(json.dumps([
+        {"op": "log", "payload": {"job_id": str(i), "component": "t", "message": "m"}} for i in range(3)]))
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+    calls = {"n": 0}
+
+    def second_save_locked(self, filename):
+        calls["n"] += 1
+        if calls["n"] == 2:
+            raise PermissionError(13, "locked")
+        return real_save(self, filename)
+
+    monkeypatch.setattr(Workbook, "save", second_save_locked)
+    with pytest.warns(UserWarning):
+        assert tr.flush_pending() == 1
+    assert [q["payload"]["job_id"] for q in json.loads(tr.pending_path.read_text())] == ["1", "2"]
+
+
+@pytest.mark.parametrize("err", [OSError(35, "Resource temporarily unavailable"), OSError(16, "busy"),
+                                 PermissionError(13, "locked")])
+def test_lock_error_on_load_queues_and_never_resets_tracker(tmp_path: Path, monkeypatch, err):
+    import careeros.tracker as tmod
+
+    p = tmp_path / "JobTracker.xlsx"
+    tr = Tracker(path=p)
+    tr.upsert_job({"job_id": "keep", "company": "Acme"})
+
+    def locked(*a, **k):
+        raise err
+
+    monkeypatch.setattr(tmod, "load_workbook", locked)
+    with pytest.warns(UserWarning, match="queued"):
+        assert tr.upsert_job({"job_id": "new"}) == "queued"
+    monkeypatch.undo()
+    assert not list(tmp_path.glob("JobTracker.corrupt-*.xlsx"))
+    assert tr.get_job("keep") is not None and tr.pending_count() == 1

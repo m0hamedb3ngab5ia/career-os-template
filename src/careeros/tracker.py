@@ -13,6 +13,7 @@ from zipfile import BadZipFile
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
+from openpyxl.utils.exceptions import InvalidFileException
 from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
@@ -222,9 +223,8 @@ class Tracker:
                 wb = load_workbook(self.path)
             self._migrate(wb)
             return wb
-        except (BadZipFile, KeyError, OSError) as e:
-            if isinstance(e, PermissionError):
-                raise
+        except (BadZipFile, KeyError, InvalidFileException) as e:
+            # Only a malformed file is "corrupt". OSErrors (locks, iCloud) propagate so _mutate queues them.
             backup = self.path.with_name(f"{self.path.stem}.corrupt-{datetime.now():%Y%m%d-%H%M%S}{self.path.suffix}")
             self.path.replace(backup)
             warnings.warn(f"tracker {self.path.name} unreadable ({e}); moved to {backup.name} and recreated", stacklevel=3)
@@ -282,7 +282,7 @@ class Tracker:
     def _queue(self, op: str, payload: dict[str, Any], err: str) -> None:
         q = self._read_pending()
         q.append({"op": op, "payload": payload, "queued_at": _now()})
-        self.pending_path.write_text(json.dumps(q, indent=2, default=str), encoding="utf-8")
+        self._write_pending(q)
         warnings.warn(
             f"tracker locked ({err}); queued '{op}' to {self.pending_path.name} — run `careeros tracker flush`",
             stacklevel=3,
@@ -296,21 +296,36 @@ class Tracker:
         except json.JSONDecodeError:
             return []
 
+    def _write_pending(self, q: list[dict[str, Any]]) -> None:
+        if not q:
+            self.pending_path.unlink(missing_ok=True)
+            return
+        tmp = self.pending_path.with_name(self.pending_path.name + ".tmp")
+        tmp.write_text(json.dumps(q, indent=2, default=str), encoding="utf-8")
+        tmp.replace(self.pending_path)
+
     def pending_count(self) -> int:
         return len(self._read_pending())
 
     def flush_pending(self) -> int:
+        """Replay queued ops in order. If the workbook is still locked (the op re-queues itself) or an op
+        raises, the failed op and every op after it stay queued, in their original order."""
         q = self._read_pending()
         if not q:
             return 0
         self.pending_path.unlink(missing_ok=True)
         done = 0
-        for item in q:
+        for i, item in enumerate(q):
             fn = getattr(self, item["op"], None)
             if fn is None:
                 continue
-            fn(**item["payload"])
-            if self.pending_path.exists():
+            try:
+                fn(**item["payload"])
+            except Exception:
+                self._write_pending(self._read_pending() + q[i:])
+                raise
+            if self.pending_path.exists():  # re-queued: still locked
+                self._write_pending(self._read_pending() + q[i + 1:])
                 break
             done += 1
         return done

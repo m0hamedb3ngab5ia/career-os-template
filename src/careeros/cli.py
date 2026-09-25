@@ -128,7 +128,12 @@ def cmd_tracker_upsert(args: argparse.Namespace) -> int:
     if not data:
         print("tracker upsert: give at least one --field key=value", file=sys.stderr)
         return 2
-    tr = Tracker(settings=_settings(args))
+    s = _settings(args)
+    if "status" in data:  # keep status.json in step, or the next `tracker sync` reverts the row
+        store = Store(s)
+        if store.exists(args.job_id):
+            store.set_status(args.job_id, data["status"], "via tracker upsert")
+    tr = Tracker(settings=s)
     res = tr.upsert_job({"job_id": args.job_id, **data})
     print(f"{args.job_id}: {res} ({', '.join(sorted(data))})")
     return 0
