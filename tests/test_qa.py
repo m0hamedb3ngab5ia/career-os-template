@@ -5,7 +5,8 @@ import json
 from pathlib import Path
 
 import pytest
-from conftest import EXAMPLE_REPO, FIXTURES
+import yaml
+from conftest import EXAMPLE_REPO, FIXTURES, build_resume_json
 
 from careeros.qa import ProfileIndex, collect_ids, number_tokens, run_deterministic, split_frontmatter
 from careeros.qa import main as qa_main
@@ -43,15 +44,9 @@ Programming: Python, SQL, TypeScript, Swift
 Tools & Platforms: PostgreSQL, Kafka, Docker, AWS, Airflow, Git
 """
 
-RESUME_JSON = {
-    "experience": [
-        {"id": "acme", "bullets": [{"id": "acme.1"}, {"id": "acme.2"}, {"id": "acme.3"}]},
-        {"id": "initech_intern", "bullets": [{"id": "initech_intern.1"}]},
-    ],
-    "projects": [{"id": "widgetizer", "bullets": [{"id": "widgetizer.1"}]}],
-    "education": [{"id": "state_u"}],
-    "meta": {"job_id": "t1", "category": "swe_backend"},
-}
+RESUME_JSON = build_resume_json(
+    yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()),
+    ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
 
 COVER_LETTER = """---
 company: Ledgerline
@@ -545,7 +540,7 @@ ACME_1 = "Built a FastAPI service in Python that ingests Kafka order events into
 
 @pytest.mark.parametrize("text,ok", [
     (ACME_1, True),                                                                          # verbatim
-    ("Developed a FastAPI service in Python that ingests Kafka order events into PostgreSQL", True),  # verb swap + trim
+    ("Developed a FastAPI service in Python that ingests Kafka order events into PostgreSQL", False),  # undeclared verb swap
     ("Built a FastAPI service in Python that ingests Kafka order events", True),             # trailing clause trimmed
     ("Led company-wide hiring strategy and managed executive stakeholders", False),          # fabricated text, valid id
     ("Built a FastAPI service in Python that ingests Kafka order events into Redis", False), # tool swapped
@@ -648,3 +643,47 @@ def test_confidential_term_in_pdf_text_fails(tmp_path: Path, monkeypatch) -> Non
     res = run_deterministic(job, root=root)
     assert "resume.pdf: term 'Nightjar'" in res["confidential_hits"]
     assert not by_name(res, "confidential_terms")["ok"]
+
+
+
+# --- fix-scoped round: empty text, first-word swaps, required headers, mislabeled legal answers --------
+
+@pytest.mark.parametrize("text", [None, "", "   "])
+def test_bullet_without_text_fails(tmp_path: Path, text) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "company": "Acme", "title": "Software Engineer",
+                                                        "start": "Jun 2026", "end": "Present",
+                                                        "bullets": [{"id": "acme.3", "text": text}]}])
+    assert by_name(run(job), "bullet_fidelity")["ok"] is False
+
+
+def test_first_word_substitution_fails(tmp_path: Path) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "company": "Acme", "title": "Software Engineer",
+        "start": "Jun 2026", "end": "Present",
+        "bullets": [{"id": "acme.3", "text": "Decommissioned three services with Docker and deployed them to AWS"}]}])
+    assert by_name(run(job), "bullet_fidelity")["ok"] is False
+
+
+@pytest.mark.parametrize("section,entry", [
+    ("experience", {"id": "acme", "title": "Software Engineer", "start": "Jun 2026", "end": "Present"}),   # no company
+    ("experience", {"id": "acme", "company": "Acme", "start": "Jun 2026", "end": "Present"}),             # no title
+    ("experience", {"id": "acme", "company": "Acme", "title": "Software Engineer", "end": "Present"}),     # no start
+    ("projects", {"id": "widgetizer"}),                                                                   # no name
+    ("education", {"id": "state_u", "degree": "Bachelor of Science, Computer Science"}),                  # no school
+])
+def test_required_header_fields_must_be_present(tmp_path: Path, section: str, entry: dict) -> None:
+    job = _resume_with(make_job(tmp_path), **{section: [{**entry, "bullets": []}] if section != "education" else [entry]})
+    c = by_name(run(job), "entry_headers")
+    assert c["ok"] is False and "missing" in c["detail"], c["detail"]
+
+
+@pytest.mark.parametrize("entry,ok", [
+    ({"question": "Are you legally authorized to work in the US?", "answer": "No", "type": "generated"}, False),
+    ({"question": "Are you legally authorized to work in the US?", "answer": "Yes", "type": "generated"}, True),
+    ({"question": "What are your salary expectations?", "answer": "150k", "type": "essay"}, False),
+    ({"question": "What are your salary expectations?", "answer": None, "type": "essay", "needs_review": True}, True),
+    ({"question": "Tell us about a hard bug you fixed.", "answer": "I shipped a dashboard.", "type": "generated"}, True),
+])
+def test_questions_matching_standard_patterns_need_the_standard_answer(tmp_path: Path, entry: dict, ok: bool) -> None:
+    job = make_job(tmp_path, answers=[{"bullet_ids": [], **entry}])
+    c = by_name(run(job), "standard_answers")
+    assert c["ok"] is ok, c["detail"]

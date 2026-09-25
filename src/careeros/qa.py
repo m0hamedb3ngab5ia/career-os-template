@@ -155,17 +155,13 @@ def _fid_words(text: str) -> list[str]:
 
 
 def bullet_text_allowed(out: str, sources: Iterable[str]) -> bool:
-    """tailor-resume rule 1: text is a source (master text or a variant) verbatim, optionally with the
-    leading verb swapped and/or a trailing clause trimmed: words after the first are a prefix of the
-    source's words after the first."""
+    """tailor-resume rule 1: text is a source (master text or a declared variant) verbatim, optionally with
+    a trailing clause trimmed: its words are a prefix of the source's words (punctuation ignored). A
+    different leading verb must be declared as a variant in master.yaml."""
     ow = _fid_words(out)
     if len(ow) < 2:
         return False
-    for src in sources:
-        sw = _fid_words(src)
-        if ow == sw or (len(sw) >= len(ow) and sw[1:len(ow)] == ow[1:]):
-            return True
-    return False
+    return any(_fid_words(src)[:len(ow)] == ow for src in sources)
 
 
 def _year(v: Any) -> str | None:
@@ -687,7 +683,8 @@ class Checker:
                 if not isinstance(b, dict) or not str(b.get("id") or "").strip():
                     problems.append(f"bullet without an id in '{e.get('id')}': {str(b)[:80]!r}")
                     continue
-                if b.get("text") is None:
+                if not str(b.get("text") or "").strip():
+                    problems.append(f"'{b['id']}' has no text")
                     continue
                 n += 1
                 bid = str(b["id"])
@@ -711,6 +708,8 @@ class Checker:
             self.skip("entry_headers", "hard", "resume.json missing")
             return
         edu = {e.get("id"): e for e in self.profile.profile.get("education") or [] if isinstance(e, dict)}
+        required = {"experience": ("company", "title", "start", "end"), "projects": ("name",),
+                    "education": ("school", "degree")}
         fields = {"experience": ("company", "team", "location"), "projects": ("name",),
                   "leadership": ("org", "role", "name"), "education": ("school", "degree", "gpa", "location")}
         problems = []
@@ -723,6 +722,9 @@ class Checker:
                 if not src:
                     problems.append(f"{section}: entry {eid or '<no id>'} not in profile")
                     continue
+                missing = [k for k in required.get(section, ()) if str(e.get(k) or "").strip() == ""]
+                if missing:
+                    problems.append(f"{eid}: missing {', '.join(missing)}")
                 for k in keys:
                     if e.get(k) not in (None, "") and str(e[k]).strip() != str(src.get(k, "")).strip():
                         problems.append(f"{eid}.{k} {e[k]!r} != profile {src.get(k)!r}")
@@ -773,18 +775,36 @@ class Checker:
             self.add("standard_answers", "hard", False, f"cannot parse {self.standard_answers_path.name}: {e}")
             return
         table: dict[str, Any] = {}
+        patterns: list[tuple[str, list[re.Pattern[str]]]] = []  # file order: first hit wins (as the applier)
         if isinstance(sa, dict):
             for ent in sa.get("answers") or []:
                 if isinstance(ent, dict) and ent.get("key"):
                     table[str(ent["key"])] = ent.get("answer")
+                    rxs = []
+                    for m in ent.get("match") or []:
+                        try:
+                            rxs.append(re.compile(str(m), re.I))
+                        except re.error:
+                            continue
+                    patterns.append((str(ent["key"]), rxs))
             for k, ent in (sa.get("eeo") or {}).items():
                 if isinstance(ent, dict):
                     table[f"eeo.{k}"] = ent.get("answer")
+        def same(ans: Any, want: Any) -> bool:
+            return ans in (None, "") if want is None else (ans is not None and str(ans).strip() == str(want).strip())
+
         problems = []
         for i, a in enumerate(self.answers):
             if not isinstance(a, dict):
                 continue
             ans = a.get("answer")
+            question = str(a.get("question") or "")
+            hit = next((k for k, rxs in patterns if any(rx.search(question) for rx in rxs)), None)
+            if a.get("type") != "standard" and hit is not None:
+                # a standard question answered as anything else (mislabeled): the standard value still rules
+                if not same(ans, table[hit]):
+                    problems.append(f"#{i}: question matches standard '{hit}' but the answer differs")
+                continue
             if a.get("type") == "standard":
                 key = a.get("standard_key")
                 if sa is None:
@@ -792,9 +812,7 @@ class Checker:
                 elif not key or str(key) not in table:
                     problems.append(f"#{i}: standard_key {key!r} not in {self.standard_answers_path.name}")
                 else:
-                    want = table[str(key)]
-                    same = ans is None if want is None else (ans is not None and str(ans).strip() == str(want).strip())
-                    if not same:
+                    if not same(ans, table[str(key)]):
                         problems.append(f"#{i}: {key} answer differs from {self.standard_answers_path.name}")
             elif a.get("class") in ("sensitive", "salary_freeform") and ans not in (None, ""):
                 problems.append(f"#{i}: {a.get('class')} answer must be left for the candidate (Action Item)")
