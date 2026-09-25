@@ -153,3 +153,16 @@ def test_cli_malformed_config_exits_1_with_message(settings, monkeypatch, capsys
     monkeypatch.setattr(cli_mod, "_settings", bad)
     assert cli_mod.main(["stats"]) == 1
     assert "targets.yaml" in capsys.readouterr().err
+
+
+
+def test_tracker_show_prints_one_row_as_json(cli, settings, capsys):
+    import json as _json
+
+    assert cli(["tracker", "show", "nope", "--json"]) == 0
+    assert _json.loads(capsys.readouterr().out) is None  # no tracker / no row -> null
+    tr = Tracker(settings=settings)
+    tr.upsert_job({"job_id": "o1", "company": "Acme", "override": "A"})
+    assert cli(["tracker", "show", "o1", "--json"]) == 0
+    row = _json.loads(capsys.readouterr().out)
+    assert row["JobID"] == "o1" and row["Override"] == "A"

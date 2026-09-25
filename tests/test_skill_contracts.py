@@ -188,3 +188,26 @@ def test_tailor_resume_bullet_rule_matches_qa_fidelity():
     skill must not promise more (e.g. free synonym swaps of the leading verb)."""
     rule = _skill("tailor-resume").split("1. Every bullet you output", 1)[1].split("\n2. ", 1)[0]
     assert "synonym" not in rule and "variants" in rule and "trailing" in rule
+
+
+
+# --- apply-job contracts (submit safety, QA gate, override, answers.json) ----------------------------
+
+def test_apply_job_gates_on_qa_review_pass_field():
+    text = _skill("apply-job")
+    assert "passed: true" not in text
+    assert re.search(r"`qa\.json`[^\n]*`pass`", text) and "deterministic.pass" in text
+
+
+def test_apply_job_persists_submit_before_clicking_and_refuses_reruns():
+    text = _skill("apply-job")
+    assert "ApplySession.already_submitted(job_dir)" in text
+    click = text.index("one click on the submit control")
+    assert 0 <= text.rfind("s.mark_submit_clicked(job_dir)", 0, click) < click
+
+
+def test_apply_job_reads_override_via_cli_and_allows_tier_a_staging():
+    text = _skill("apply-job")
+    assert "careeros tracker show <job_id> --json" in text
+    assert "needs_review" in text.split("## 1.", 1)[1].split("### 1b", 1)[0]
+    assert "answers.json[" not in text
