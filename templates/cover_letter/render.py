@@ -10,6 +10,7 @@ Engine: tectonic if on PATH, else pdflatex, else warning and .tex left in place 
 from __future__ import annotations
 
 import argparse
+import os
 import re
 import shutil
 import subprocess
@@ -20,7 +21,22 @@ from typing import Any
 import yaml
 
 HERE = Path(__file__).resolve().parent
-PROFILE = HERE.parent.parent / "profile" / "master.yaml"
+REPO = HERE.parent.parent
+PROFILE: Path | None = None  # override for tests; default = config/pipeline.yaml paths.profile
+
+
+def _profile_path() -> Path:
+    if PROFILE is not None:
+        return PROFILE
+    rel = "profile/master.yaml"
+    pipeline = REPO / "config" / "pipeline.yaml"
+    if pipeline.exists():
+        try:
+            rel = ((yaml.safe_load(pipeline.read_text(encoding="utf-8")) or {}).get("paths") or {}).get("profile") or rel
+        except yaml.YAMLError as e:
+            raise ValueError(f"cannot parse {pipeline}: {str(e).splitlines()[0]}") from None
+    p = Path(str(rel)).expanduser()
+    return p if p.is_absolute() else REPO / p
 _FM_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 
 _ESC = {
@@ -170,11 +186,12 @@ def _identity(meta: dict[str, Any]) -> dict[str, Any]:
     """Identity from profile/master.yaml (the only source of candidate facts). A frontmatter `identity:`
     block is used only when no profile exists (standalone rendering); otherwise it is ignored."""
     fm = meta.get("identity") if isinstance(meta.get("identity"), dict) else None
-    if PROFILE.exists():
+    prof = _profile_path()
+    if prof.exists():
         try:
-            ident = (yaml.safe_load(PROFILE.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
+            ident = (yaml.safe_load(prof.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
         except yaml.YAMLError as e:
-            raise ValueError(f"cannot parse {PROFILE}: {str(e).splitlines()[0]}") from None
+            raise ValueError(f"cannot parse {prof}: {str(e).splitlines()[0]}") from None
         if fm:
             print("WARNING: ignoring frontmatter identity; using profile/master.yaml", file=sys.stderr)
         return ident
@@ -188,7 +205,9 @@ NO_ENGINE_MSG = "WARNING: no LaTeX engine; run `brew install tectonic`. Left .te
 
 def find_engine() -> tuple[str, list[str]] | None:
     if shutil.which("tectonic"):
-        return "tectonic", ["tectonic", "--keep-logs", "-o", "."]
+        # CAREEROS_LATEX_OFFLINE=1: never download the TeX bundle (tests; offline machines)
+        offline = ["--only-cached"] if os.environ.get("CAREEROS_LATEX_OFFLINE") == "1" else []
+        return "tectonic", ["tectonic", "--keep-logs", *offline, "-o", "."]
     if shutil.which("pdflatex"):
         return "pdflatex", ["pdflatex", "-interaction=nonstopmode", "-halt-on-error"]
     return None
@@ -227,8 +246,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-pdf", action="store_true")
     ap.add_argument("--txt-only", action="store_true")
     a = ap.parse_args(argv)
-    if a.txt_only or a.no_pdf:  # no PDF this run: never leave an older one next to the new text
-        Path(a.cover_letter_md).resolve().with_name("cover_letter.pdf").unlink(missing_ok=True)
+    # Any older PDF goes first: a failed or PDF-less run must never leave it next to newer sources.
+    Path(a.cover_letter_md).resolve().with_name("cover_letter.pdf").unlink(missing_ok=True)
     try:
         if not a.txt_only:
             render(a.cover_letter_md, pdf=not a.no_pdf)

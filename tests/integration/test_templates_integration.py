@@ -8,12 +8,13 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import PY, build_resume_json, subprocess_env
+from conftest import PY, build_resume_json, subprocess_env, tectonic_cache
 
 pytestmark = pytest.mark.integration
 
-HAS_ENGINE = bool(shutil.which("tectonic") or shutil.which("pdflatex"))
-needs_engine = pytest.mark.skipif(not HAS_ENGINE, reason="no LaTeX engine (tectonic/pdflatex) on PATH")
+# Offline only: tectonic with a local bundle cache (run with CAREEROS_LATEX_OFFLINE=1), or pdflatex.
+HAS_ENGINE = bool((shutil.which("tectonic") and tectonic_cache()) or shutil.which("pdflatex"))
+needs_engine = pytest.mark.skipif(not HAS_ENGINE, reason="no offline LaTeX engine (cached tectonic or pdflatex)")
 
 BULLETS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1", "widgetizer.2"]
 

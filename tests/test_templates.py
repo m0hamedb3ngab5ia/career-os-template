@@ -261,3 +261,39 @@ def test_modes_without_pdf_drop_stale_pdf(tmp_path: Path, monkeypatch, mod, src,
     stale.write_text("OLD")
     assert mod.main([p.as_posix(), flag]) == 0
     assert not stale.exists()
+
+
+def test_validation_failure_also_drops_stale_pdf(tmp_path: Path):
+    p = _resume_json(tmp_path, "Cut latency by [FILL IN metric]")
+    (tmp_path / "resume.pdf").write_text("OLD")
+    assert resume.main([p.as_posix()]) == 1
+    assert not (tmp_path / "resume.pdf").exists()
+    bad = tmp_path / "cl" / "cover_letter.md"
+    bad.parent.mkdir()
+    bad.write_text("no frontmatter\n")
+    (bad.parent / "cover_letter.pdf").write_text("OLD")
+    assert cover.main([bad.as_posix()]) == 1
+    assert not (bad.parent / "cover_letter.pdf").exists()
+
+
+def test_cover_identity_follows_pipeline_profile_path(tmp_path: Path, monkeypatch):
+    root = tmp_path / "repo"
+    (root / "config").mkdir(parents=True)
+    (root / "profile").mkdir()
+    (root / "config" / "pipeline.yaml").write_text("paths:\n  profile: private/me.yaml\n")
+    (root / "profile" / "master.yaml").write_text("identity: {name: Alex Example}\n")  # stale example copy
+    (root / "private").mkdir()
+    (root / "private" / "me.yaml").write_text("identity: {name: Jordan Real, email: j@example.org}\n")
+    monkeypatch.setattr(cover, "REPO", root)
+    monkeypatch.setattr(cover, "PROFILE", None)
+    tex = cover.render(_cl(tmp_path, "Body.\n"), pdf=False).read_text()
+    assert r"\textbf{Jordan Real}" in tex and "Alex Example" not in tex
+
+
+@pytest.mark.parametrize("mod", [resume, cover], ids=["resume", "cover"])
+def test_offline_env_makes_tectonic_cache_only(mod, monkeypatch):
+    monkeypatch.setattr(mod.shutil, "which", lambda n: "/x/tectonic" if n == "tectonic" else None)
+    monkeypatch.delenv("CAREEROS_LATEX_OFFLINE", raising=False)
+    assert "--only-cached" not in mod.find_engine()[1]
+    monkeypatch.setenv("CAREEROS_LATEX_OFFLINE", "1")
+    assert "--only-cached" in mod.find_engine()[1]

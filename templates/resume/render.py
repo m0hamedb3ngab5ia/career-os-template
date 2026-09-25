@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import re
 import shutil
 import subprocess
@@ -151,7 +152,9 @@ def resolve_template(data: dict[str, Any], explicit: str | None) -> str:
 
 def find_engine() -> tuple[str, list[str]] | None:
     if shutil.which("tectonic"):
-        return "tectonic", ["tectonic", "--keep-logs", "-o", "."]
+        # CAREEROS_LATEX_OFFLINE=1: never download the TeX bundle (tests; offline machines)
+        offline = ["--only-cached"] if os.environ.get("CAREEROS_LATEX_OFFLINE") == "1" else []
+        return "tectonic", ["tectonic", "--keep-logs", *offline, "-o", "."]
     if shutil.which("pdflatex"):
         return "pdflatex", ["pdflatex", "-interaction=nonstopmode", "-halt-on-error"]
     return None
@@ -320,8 +323,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-pdf", action="store_true", help="write .tex only, skip compilation")
     ap.add_argument("--txt-only", action="store_true", help="only write resume.txt")
     a = ap.parse_args(argv)
-    if a.txt_only or a.no_pdf:  # no PDF this run: never leave an older one next to the new text
-        Path(a.resume_json).resolve().with_name("resume.pdf").unlink(missing_ok=True)
+    # Any older PDF goes first: a failed or PDF-less run must never leave it next to newer sources.
+    Path(a.resume_json).resolve().with_name("resume.pdf").unlink(missing_ok=True)
     try:
         if not a.txt_only:
             render(a.resume_json, template=a.template, pdf=not a.no_pdf)

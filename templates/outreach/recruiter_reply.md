@@ -6,9 +6,11 @@ For messages from recruiters (LinkedIn or email) about a role. Draft only; the c
 ## Guidance
 
 - Say yes or no to interest in the first sentence. Don't make them read to the end.
-- If yes: give availability in concrete slots (weekday, time window, the candidate's timezone).
-- If they asked for salary: do not answer with a number. Use `profile/standard_answers.yaml` rule:
-  freeform salary is an Action Item. Draft says "happy to discuss once I understand the level and scope".
+- If yes and they asked for times: use only slots the candidate supplied for this reply. None supplied ->
+  leave `<AVAILABILITY: candidate to fill>` in the draft and add an Action Item (`careeros action add
+  "Recruiter reply: add availability" --type send_email`). Never invent slots.
+- If they asked for salary: never a number. Freeform salary is always an Action Item
+  (`careeros action add "..." --type salary`); the draft says "happy to discuss once I understand the level and scope".
 - If they asked for work authorization / sponsorship: answers from `standard_answers.yaml` only
   (`work_authorization`, `sponsorship`, `citizenship`), verbatim.
 - Attach the current résumé PDF only if they asked; use the general version, not a tailored one.
@@ -22,7 +24,7 @@ Hi <First>,
 
 <Yes/no + role name.> <Answers to their questions, in order, one sentence each.>
 
-<Availability slots, with timezone.> <Résumé attached, if asked.>
+<Candidate-supplied slots with timezone, or <AVAILABILITY: candidate to fill>.> <Résumé attached, if asked.>
 
 <Candidate first name>
 <identity.phone>
