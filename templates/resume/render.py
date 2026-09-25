@@ -320,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-pdf", action="store_true", help="write .tex only, skip compilation")
     ap.add_argument("--txt-only", action="store_true", help="only write resume.txt")
     a = ap.parse_args(argv)
+    if a.txt_only or a.no_pdf:  # no PDF this run: never leave an older one next to the new text
+        Path(a.resume_json).resolve().with_name("resume.pdf").unlink(missing_ok=True)
     try:
         if not a.txt_only:
             render(a.resume_json, template=a.template, pdf=not a.no_pdf)

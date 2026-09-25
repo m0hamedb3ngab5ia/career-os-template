@@ -178,7 +178,8 @@ def test_inline_markdown_to_latex():
     assert s == r"Built \textbf{R\&D} tool, \textit{50\%} faster: \href{https://x.com/a_b\#c}{site\_1}"
 
 
-def test_cover_tex_uses_frontmatter_identity(tmp_path: Path):
+def test_cover_tex_uses_frontmatter_identity(tmp_path: Path, monkeypatch):
+    monkeypatch.setattr(cover, "PROFILE", tmp_path / "no-profile" / "master.yaml")  # standalone: no profile
     fm = FM.replace("---\n", "---\nidentity: {name: Alex Example, email: a_x@example.com, phone: '555'}\n", 1)
     tex = cover.render(_cl(tmp_path, "Body 100%.\n", fm), pdf=False).read_text()
     assert r"\textbf{Alex Example}" in tex and r"a\_x@example.com" in tex
@@ -239,3 +240,24 @@ def test_engine_success_without_pdf_is_an_error(tmp_path: Path, monkeypatch):
     p = _resume_json(tmp_path)
     monkeypatch.setattr(resume, "find_engine", lambda: ("fake", ["true"]))
     assert resume.main([p.as_posix()]) == 1
+
+
+def test_cover_identity_comes_from_profile_not_frontmatter(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(cover, "PROFILE", EXAMPLE_REPO / "profile" / "master.yaml")
+    fm = FM.replace("---\n", "---\nidentity: {name: Mallory Fake, email: m@evil.example, phone: '999'}\n", 1)
+    tex = cover.render(_cl(tmp_path, "Body.\n", fm), pdf=False).read_text()
+    assert r"\textbf{Alex Example}" in tex
+    assert "Mallory" not in tex and "evil.example" not in tex
+    assert "ignoring frontmatter identity" in capsys.readouterr().err
+
+
+@pytest.mark.parametrize("mod,src,flag", [(resume, "resume", "--no-pdf"), (resume, "resume", "--txt-only"),
+                                          (cover, "cover", "--no-pdf"), (cover, "cover", "--txt-only")])
+def test_modes_without_pdf_drop_stale_pdf(tmp_path: Path, monkeypatch, mod, src, flag):
+    if src == "cover":
+        monkeypatch.setattr(cover, "PROFILE", EXAMPLE_REPO / "profile" / "master.yaml")
+    p = _resume_json(tmp_path) if src == "resume" else _cl(tmp_path, "Body.\n")
+    stale = tmp_path / ("resume.pdf" if src == "resume" else "cover_letter.pdf")
+    stale.write_text("OLD")
+    assert mod.main([p.as_posix(), flag]) == 0
+    assert not stale.exists()

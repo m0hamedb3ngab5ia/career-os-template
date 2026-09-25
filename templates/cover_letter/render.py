@@ -20,6 +20,7 @@ from typing import Any
 import yaml
 
 HERE = Path(__file__).resolve().parent
+PROFILE = HERE.parent.parent / "profile" / "master.yaml"
 _FM_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 
 _ESC = {
@@ -166,16 +167,18 @@ def render(md_path: str | Path, pdf: bool = True) -> Path:
 
 
 def _identity(meta: dict[str, Any]) -> dict[str, Any]:
-    """Identity from frontmatter `identity:` block, else profile/master.yaml."""
-    if isinstance(meta.get("identity"), dict):
-        return meta["identity"]
-    prof = HERE.parent.parent / "profile" / "master.yaml"
-    if prof.exists():
+    """Identity from profile/master.yaml (the only source of candidate facts). A frontmatter `identity:`
+    block is used only when no profile exists (standalone rendering); otherwise it is ignored."""
+    fm = meta.get("identity") if isinstance(meta.get("identity"), dict) else None
+    if PROFILE.exists():
         try:
-            return (yaml.safe_load(prof.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
-        except Exception:
-            return {}
-    return {}
+            ident = (yaml.safe_load(PROFILE.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
+        except yaml.YAMLError as e:
+            raise ValueError(f"cannot parse {PROFILE}: {str(e).splitlines()[0]}") from None
+        if fm:
+            print("WARNING: ignoring frontmatter identity; using profile/master.yaml", file=sys.stderr)
+        return ident
+    return fm or {}
 
 
 # --- engine (same logic as templates/resume/render.py) -------------------------
@@ -224,6 +227,8 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--no-pdf", action="store_true")
     ap.add_argument("--txt-only", action="store_true")
     a = ap.parse_args(argv)
+    if a.txt_only or a.no_pdf:  # no PDF this run: never leave an older one next to the new text
+        Path(a.cover_letter_md).resolve().with_name("cover_letter.pdf").unlink(missing_ok=True)
     try:
         if not a.txt_only:
             render(a.cover_letter_md, pdf=not a.no_pdf)
