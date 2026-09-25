@@ -102,4 +102,8 @@ def link_private(root: Path, private_dir: Path) -> InitReport:
             dest.unlink()
         dest.symlink_to(target, target_is_directory=target.is_dir())
         rep.add(name, "linked")
+    notes = root / LOCAL_NOTES
+    if notes.is_symlink() and all(name != LOCAL_NOTES for name, _, _ in plan):
+        notes.unlink()  # left over from a previous private dir; never mix its context with the new profile
+        rep.add(LOCAL_NOTES, "unlinked")
     return rep

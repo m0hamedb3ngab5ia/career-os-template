@@ -123,3 +123,23 @@ def test_link_requires_config_and_profile_in_private_dir(checkout: Path, private
 def test_link_private_dir_missing(checkout: Path, tmp_path: Path):
     with pytest.raises(InitError, match="not a directory"):
         link_private(checkout, tmp_path / "nope")
+
+
+def test_relink_to_dir_without_local_notes_drops_stale_notes_symlink(checkout: Path, private: Path, tmp_path: Path):
+    link_private(checkout, private)
+    assert (checkout / "CLAUDE.local.md").is_symlink()
+    other = tmp_path / "other"
+    shutil.copytree(private, other)
+    (other / "CLAUDE.local.md").unlink()
+    rep = link_private(checkout, other)
+    notes = checkout / "CLAUDE.local.md"
+    assert not notes.exists() and not notes.is_symlink()  # no stale context from the previous private dir
+    assert ("CLAUDE.local.md", "unlinked") in rep.actions
+    assert (checkout / "profile").resolve() == (other / "profile").resolve()
+
+
+def test_relink_without_local_notes_keeps_a_real_local_notes_file(checkout: Path, private: Path):
+    (private / "CLAUDE.local.md").unlink()
+    (checkout / "CLAUDE.local.md").write_text("mine\n")
+    link_private(checkout, private)
+    assert (checkout / "CLAUDE.local.md").read_text() == "mine\n"

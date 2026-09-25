@@ -30,7 +30,7 @@ class LeverAdapter(Adapter):
             loc = (cats.get("location") or "").strip()
             all_locs = cats.get("allLocations") or j.get("allLocations") or ([loc] if loc else [])
             workplace = (j.get("workplaceType") or "").lower()
-            remote: bool | None = True if workplace == "remote" else (False if workplace in {"onsite", "on-site"} else guess_remote(loc))
+            remote: bool | None = True if workplace == "remote" else (False if workplace in {"onsite", "on-site"} else guess_remote(*all_locs, loc))
             html_parts = [j.get("descriptionBody") or j.get("description") or ""]
             for lst in j.get("lists") or []:
                 html_parts.append(f"<h3>{lst.get('text', '')}</h3>{lst.get('content', '')}")

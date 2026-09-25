@@ -237,3 +237,10 @@ def test_lever_secondary_location_in_blocked_country_is_filtered(settings):
              "categories": {"location": "New York", "allLocations": ["New York", "Toronto"]}}]
     p = LeverAdapter().parse(data, BOARD)[0]
     assert Prefilter(settings).location_blocked(p)
+
+
+def test_lever_remote_secondary_location_without_workplace_type():
+    data = [{"id": "r", "text": "SWE", "hostedUrl": "https://x/r",
+             "categories": {"location": "New York", "allLocations": ["New York", "Remote"]}}]
+    p = LeverAdapter().parse(data, BOARD)[0]
+    assert p.location == "New York, Remote" and p.remote is True
