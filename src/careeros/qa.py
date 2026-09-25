@@ -465,7 +465,8 @@ class Checker:
                 self.add(name, "hard", False, f"patterns[{i}] is not a valid regex: {e}")
                 return
         docs = {"resume.txt": self.resume_txt, "cover_letter.md": self.cover_md,
-                "answers.json": self.answers_raw, "outreach.json": self.outreach_raw}
+                "answers.json": self.answers_raw, "outreach.json": self.outreach_raw,
+                "resume.pdf": self._pdf_text() if self.pdf_path.exists() else None}  # the uploaded file
         docs = {k: v for k, v in docs.items() if v is not None}
         if not docs:
             self.skip(name, "hard", "no text artifacts")
@@ -683,7 +684,10 @@ class Checker:
         problems, n = [], 0
         for e in self._resume_entries():
             for b in e.get("bullets") or []:
-                if not isinstance(b, dict) or not b.get("id") or b.get("text") is None:
+                if not isinstance(b, dict) or not str(b.get("id") or "").strip():
+                    problems.append(f"bullet without an id in '{e.get('id')}': {str(b)[:80]!r}")
+                    continue
+                if b.get("text") is None:
                     continue
                 n += 1
                 bid = str(b["id"])
@@ -697,6 +701,47 @@ class Checker:
                 problems.append("summary is not one of profile.summary_variants")
         self.add("bullet_fidelity", "hard", not problems,
                  f"{n} bullets match master text/variants" if not problems else "; ".join(problems))
+
+    def check_entry_headers(self) -> None:
+        """Every experience/project/leadership/education entry names a profile entry by `id`, and its
+        company/title/team/name/school/degree/gpa/location equal that entry; dates keep the same year
+        (display format may change), an open-ended profile role stays `Present`."""
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        if rj is None:
+            self.skip("entry_headers", "hard", "resume.json missing")
+            return
+        edu = {e.get("id"): e for e in self.profile.profile.get("education") or [] if isinstance(e, dict)}
+        fields = {"experience": ("company", "team", "location"), "projects": ("name",),
+                  "leadership": ("org", "role", "name"), "education": ("school", "degree", "gpa", "location")}
+        problems = []
+        for section, keys in fields.items():
+            for e in rj.get(section) or []:
+                if not isinstance(e, dict):
+                    continue
+                eid = str(e.get("id") or "")
+                src = edu.get(eid) if section == "education" else self.profile.parents.get(eid)
+                if not src:
+                    problems.append(f"{section}: entry {eid or '<no id>'} not in profile")
+                    continue
+                for k in keys:
+                    if e.get(k) not in (None, "") and str(e[k]).strip() != str(src.get(k, "")).strip():
+                        problems.append(f"{eid}.{k} {e[k]!r} != profile {src.get(k)!r}")
+                if section == "experience" and e.get("title") not in (None, ""):
+                    titles = {str(src.get(t)).strip() for t in ("title", "title_display") if src.get(t)}
+                    if str(e["title"]).strip() not in titles:
+                        problems.append(f"{eid}.title {e['title']!r} not in profile {sorted(titles)}")
+                for k in ("start", "end", "date"):
+                    out = e.get(k)
+                    if out in (None, ""):
+                        continue
+                    want = src.get(k)
+                    if k == "end" and (want is None or str(want).lower() in ("present", "current")):
+                        if str(out).strip().lower() not in ("present", "current"):
+                            problems.append(f"{eid}.end {out!r} but profile role is open-ended")
+                    elif _year(want) and _year(re.sub(r"^\D*", "", str(out))) != _year(want):
+                        problems.append(f"{eid}.{k} {out!r} != profile {want!r}")
+        self.add("entry_headers", "hard", not problems,
+                 "entry headers match profile" if not problems else "; ".join(problems))
 
     def check_skills_traced(self) -> None:
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
@@ -788,6 +833,15 @@ class Checker:
         missing = self._contact_missing(self.resume_txt)
         self.add("contact_intact:resume.txt", "hard", not missing,
                  "name/email/phone/linkedin/github present" if not missing else f"missing: {', '.join(missing)}")
+
+    def _pdf_text(self) -> str | None:
+        """Extracted text of resume.pdf (None if pypdf is missing or the file is unreadable)."""
+        try:
+            from pypdf import PdfReader  # type: ignore
+
+            return "\n".join((p.extract_text() or "") for p in PdfReader(str(self.pdf_path)).pages)
+        except Exception:  # noqa: BLE001 - check_pdf reports unreadable PDFs
+            return None
 
     def check_pdf(self) -> None:
         if not self.pdf_path.exists():
@@ -889,6 +943,7 @@ class Checker:
         self.check_em_dashes()
         self.check_truth_trace()
         self.check_bullet_fidelity()
+        self.check_entry_headers()
         self.check_skills_traced()
         self.check_standard_answers()
         self.check_numbers()

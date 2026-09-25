@@ -606,3 +606,45 @@ def test_standard_answers_match_profile(tmp_path: Path, entry: dict, ok: bool) -
     job = make_job(tmp_path, answers=[{"question": "Q?", "bullet_ids": [], **entry}])
     c = by_name(run(job), "standard_answers")
     assert c["ok"] is ok, c["detail"]
+
+
+# --- round 2: id-less bullets, entry headers, PDF confidentiality --------------------------------------
+
+@pytest.mark.parametrize("bullet", [{"text": "Managed global hiring operations"}, "Managed global hiring operations",
+                                    {"id": "", "text": "Managed global hiring operations"}])
+def test_bullet_without_id_fails(tmp_path: Path, bullet) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "bullets": [bullet]}])
+    assert by_name(run(job), "bullet_fidelity")["ok"] is False
+
+
+@pytest.mark.parametrize("section,entry,ok", [
+    ("experience", {"id": "acme", "company": "Acme", "title": "Software Engineer", "start": "Jun 2026", "end": "Present"}, True),
+    ("experience", {"id": "acme", "company": "Google", "title": "Software Engineer"}, False),
+    ("experience", {"id": "acme", "company": "Acme", "title": "Staff Engineer"}, False),
+    ("experience", {"id": "acme", "company": "Acme", "start": "Jun 2024"}, False),
+    ("experience", {"id": "acme", "company": "Acme", "end": "Aug 2026"}, False),          # profile says present
+    ("experience", {"id": "globex", "company": "Globex"}, False),                        # unknown entry id
+    ("experience", {"company": "Acme"}, False),                                           # no id
+    ("projects", {"id": "widgetizer", "name": "Widgetizer", "date": "Nov 2025"}, True),
+    ("projects", {"id": "widgetizer", "name": "Widgetizer Pro"}, False),
+    ("education", {"id": "state_u", "school": "Springfield State University",
+                   "degree": "Bachelor of Science, Computer Science", "gpa": "3.6", "end": "May 2026"}, True),
+    ("education", {"id": "state_u", "school": "MIT"}, False),
+    ("education", {"id": "state_u", "gpa": "3.9"}, False),
+])
+def test_entry_headers_match_profile(tmp_path: Path, section: str, entry: dict, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), **{section: [{**entry, "bullets": []}] if section != "education" else [entry]})
+    c = by_name(run(job), "entry_headers")
+    assert c["ok"] is ok, c["detail"]
+
+
+def test_confidential_term_in_pdf_text_fails(tmp_path: Path, monkeypatch) -> None:
+    import careeros.qa as qa_mod
+
+    root = _root_with_terms(tmp_path, "employer: Acme\nterms: [Nightjar]\npatterns: []\n")
+    job = make_job(tmp_path)
+    _blank_pdf(job / "resume.pdf", 1)
+    monkeypatch.setattr(qa_mod.Checker, "_pdf_text", lambda self: "Alex Example\nWorked on Nightjar")
+    res = run_deterministic(job, root=root)
+    assert "resume.pdf: term 'Nightjar'" in res["confidential_hits"]
+    assert not by_name(res, "confidential_terms")["ok"]
