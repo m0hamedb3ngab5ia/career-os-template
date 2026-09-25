@@ -156,7 +156,7 @@ Flow:
      type the answer, press Enter, then verify the displayed value.
    - Answer with `null` (salary) → needs_review.
    - `classify_question` = `eeo` → skip here; handled in step 8.
-   - Otherwise → `answers.json` (prepared by `answer-question` skill, keyed by normalized label).
+   - Otherwise → the `answers.json` entry (a list, written by `answer-question`) whose normalized `question` equals the normalized label.
      Missing → run `/answer-question` now; `needs_review` result → stop.
    - Char limits: read `maxlength`; if the answer exceeds it, stop (needs_review, "answer over limit").
 8. EEO: `#eeoc_fields` (classic) or section titled "Voluntary Self-Identification" / "Equal

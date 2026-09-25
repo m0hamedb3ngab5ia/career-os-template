@@ -77,16 +77,26 @@ class ApplySession:
         self.screenshots.append(p)
         return p
 
-    def mark_submit_clicked(self) -> None:
-        """Call before clicking submit. `can_click_submit()` is False afterwards: never click twice.
+    def mark_submit_clicked(self, job_dir: str | Path) -> None:
+        """Call right before clicking submit. Persists `submit_clicked` to `job_dir/apply_session.json`
+        first, so a crash after the click can never lead to a second one (see `already_submitted`).
 
-        Raises RuntimeError when submit was already clicked or this session may not auto-submit (Tier A).
+        Raises RuntimeError when submit was already clicked (this session or any earlier one for the job)
+        or this session may not auto-submit (Tier A).
         """
+        if self.submit_clicked or self.already_submitted(job_dir):
+            raise RuntimeError(f"refusing to click submit for {self.job_id}: submit already clicked")
         if not self.can_click_submit():
-            why = "submit already clicked" if self.submit_clicked else "auto_submit is off for this session"
-            raise RuntimeError(f"refusing to click submit for {self.job_id}: {why}")
+            raise RuntimeError(f"refusing to click submit for {self.job_id}: auto_submit is off for this session")
         self.submit_clicked = True
         self.step("submit_click", ok=True, note="submit clicked once")
+        self._write(Path(job_dir))
+
+    @classmethod
+    def already_submitted(cls, job_dir: str | Path) -> bool:
+        """True when any earlier session for this job dir recorded a submit click (never click again)."""
+        prev = cls.load(job_dir)
+        return bool(prev and prev.submit_clicked)
 
     def can_click_submit(self) -> bool:
         return self.auto_submit and not self.submit_clicked
@@ -132,13 +142,17 @@ class ApplySession:
         d["failed_steps"] = [s for s in self.steps if not s["ok"]]
         return d
 
-    def save(self, job_dir: str | Path) -> Path:
-        jd = Path(job_dir)
+    def _write(self, jd: Path) -> Path:
         jd.mkdir(parents=True, exist_ok=True)
         p = jd / SESSION_FILE
         tmp = p.with_suffix(".tmp")
         tmp.write_text(json.dumps(self.to_dict(), indent=2, ensure_ascii=False), encoding="utf-8")
         tmp.replace(p)
+        return p
+
+    def save(self, job_dir: str | Path) -> Path:
+        jd = Path(job_dir)
+        p = self._write(jd)
         self._append_log(jd)
         return p
 

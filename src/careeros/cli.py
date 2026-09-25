@@ -119,6 +119,14 @@ def cmd_tracker_applied_count(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tracker_show(args: argparse.Namespace) -> int:
+    """One Jobs row as JSON (header -> value), or `null` when there is no tracker or no such row."""
+    tr = Tracker(settings=_settings(args))
+    row = tr.get_job(args.job_id) if tr.path.exists() else None
+    print(json.dumps(row, default=str))
+    return 0
+
+
 def cmd_tracker_upsert(args: argparse.Namespace) -> int:
     try:
         data = parse_field_args(args.field or [])
@@ -286,6 +294,10 @@ def build_parser() -> argparse.ArgumentParser:
     tac.add_argument("company", nargs="?", help="company name (normalized match); omit for all companies")
     tac.add_argument("--days", type=int, default=90)
     tac.set_defaults(fn=cmd_tracker_applied_count)
+    tsh = trs.add_parser("show", help="one Jobs row as JSON (e.g. the Override column); null if absent")
+    tsh.add_argument("job_id")
+    tsh.add_argument("--json", action="store_true", help="JSON output (the only format)")
+    tsh.set_defaults(fn=cmd_tracker_show)
     tup = trs.add_parser("upsert", help="create/update one Jobs row: --field Header=value (repeatable)")
     tup.add_argument("job_id")
     tup.add_argument("--field", action="append", metavar="KEY=VALUE",

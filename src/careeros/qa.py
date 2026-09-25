@@ -164,6 +164,17 @@ def bullet_text_allowed(out: str, sources: Iterable[str]) -> bool:
     return any(_fid_words(src)[:len(ow)] == ow for src in sources)
 
 
+def _standard_hit(question: str, path: Path, patterns: list[tuple[str, list[re.Pattern[str]]]]) -> str | None:
+    """Key of the standard answer this question maps to. Uses the applier's matcher (EEO excluded,
+    legal/salary wording guarded) so QA and the form filler agree; plain first-hit fallback otherwise."""
+    try:
+        from careeros.apply.questions import match_standard_answer
+    except ImportError:  # pragma: no cover - applier not installed
+        return next((k for k, rxs in patterns if any(rx.search(question) for rx in rxs)), None)
+    hit = match_standard_answer(question, path)
+    return hit[0] if hit else None
+
+
 def _year(v: Any) -> str | None:
     if v is None:
         return None
@@ -799,7 +810,7 @@ class Checker:
                 continue
             ans = a.get("answer")
             question = str(a.get("question") or "")
-            hit = next((k for k, rxs in patterns if any(rx.search(question) for rx in rxs)), None)
+            hit = _standard_hit(question, self.standard_answers_path, patterns) if sa is not None else None
             if hit is not None:
                 # the question's own pattern match decides the key, whatever type/standard_key the record says
                 if not same(ans, table[hit]):

@@ -24,12 +24,13 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 
 | Check | Source | On fail |
 |---|---|---|
-| status is `queued` (or `prepared`) | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
-| every `qa.json` result has `passed: true` | `qa.json` | outcome failed, reason "qa not passed"; no browser |
+| no earlier submit: `ApplySession.already_submitted(job_dir)` is False | `apply_session.json` | outcome failed, reason "submit already clicked in an earlier session; check the ATS by hand"; Action Item type `review`; no browser |
+| status is `queued` (or `prepared`); `needs_review` only when the effective tier (row below) is A, and then `auto_submit` is forced off (staging for the candidate) | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
+| `qa.json` top-level `pass` is `true` and `deterministic.pass` is `true` (the qa-review schema) | `qa.json` | outcome failed, reason "qa not passed"; no browser |
 | `resume.pdf` exists | job dir | if only `resume.tex`: Action Item type `other` "no PDF; install LaTeX engine (`brew install tectonic`) then rerun /prepare-job"; outcome failed |
 | `cover_letter.txt` exists when tier `cover_letter: always`, or posting requires one | job dir, targets.yaml | outcome failed, reason "cover letter missing" |
 | detected ATS (adapters.md table, from `posting.apply_url` or `url`) | posting.json | record in session |
-| tier from `score.json: tier` (tracker `Override` column wins if set) | score.json, tracker | |
+| tier from `score.json: tier`; the tracker `Override` column wins if set: read it with `.venv/bin/careeros tracker show <job_id> --json` (`Override` key; `A`/`B`/`C` replace the tier, `manual` or `skip` = no auto-submit) | score.json, tracker | if the command fails: `auto_submit` = false |
 | `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` | targets.yaml | if false: proceed in assisted mode (stop before submit) |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
 | daily cap: `.venv/bin/careeros tracker applied-count --days 1` (all companies, today) < `volume.max_applications_per_day` x `season_multiplier[month]` | tracker | outcome failed, reason "daily cap" |
@@ -105,7 +106,8 @@ hit = match_standard_answer(label, "profile/standard_answers.yaml")
   - no hit: `classify_question(label)`:
     - `eeo` → section 4.
     - `legal` → STOP, Action Item type `question` ("legal question not in standard answers: <label>"). Never guess.
-    - `essay` / `unknown` / `standard` → look up `answers.json[normalized_label]`. Missing → run
+    - `essay` / `unknown` / `standard` → look up the `answers.json` entry (a JSON list) whose `question`,
+      whitespace-collapsed and lower-cased, equals the label normalized the same way. Missing → run
       `/answer-question <job_dir> "<label>" --limit <maxlength>` per
       `.claude/skills/answer-question/SKILL.md`. If it returns `needs_review` → STOP, screenshot,
       Action Item type `question`, status needs_review.
@@ -144,7 +146,8 @@ value the helper did not return.
    Action Item type `review`, priority H for tier A, `what`: "Review & submit <company> <role>. Form is
    filled in the open tab. Screenshot: <prefill_review path>", `link`: apply_url. Leave the tab open.
    `s.finish("needs_review", reason="assisted: review & submit")`. Go to 7.
-4. Auto-submit: `s.mark_submit_clicked()` then one click on the submit control from adapters.md.
+4. Auto-submit: `s.mark_submit_clicked(job_dir)` (writes `submit_clicked: true` to `apply_session.json`
+   before anything else; it raises if any earlier session already clicked), then one click on the submit control from adapters.md.
 5. Wait and poll for a success signal (adapters.md "Success detection", up to 20 s).
    - Success: screenshot → `s.shot(..., "confirmation")`; `s.finish("submitted", confirmation_text=...)`;
      status `applied` (`careeros job status <job_id> applied`), then

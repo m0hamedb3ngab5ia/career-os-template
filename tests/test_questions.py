@@ -256,7 +256,7 @@ def test_session_roundtrip_and_log(tmp_path: Path) -> None:
     s.step("open_tab")
     s.shot(s.next_screenshot_path(job, "form"))
     assert s.can_click_submit()
-    s.mark_submit_clicked()
+    s.mark_submit_clicked(job)
     assert not s.can_click_submit()
     s.finish("submitted", reason="confirmation matched", confirmation_text="Thank you for applying")
     p = s.save(job)
@@ -402,23 +402,22 @@ def test_fixture_profile_file_order(text: str, key: str) -> None:
 
 def test_session_second_submit_click_raises(tmp_path: Path) -> None:
     s = ApplySession.start("j", "greenhouse", tier="B", auto_submit=True)
-    s.mark_submit_clicked()
+    s.mark_submit_clicked(tmp_path)
     with pytest.raises(RuntimeError):
-        s.mark_submit_clicked()
+        s.mark_submit_clicked(tmp_path)
     assert sum(1 for st in s.steps if st["action"] == "submit_click") == 1
 
 
 def test_session_no_auto_submit_cannot_mark(tmp_path: Path) -> None:
     s = ApplySession.start("j", "greenhouse", tier="A", auto_submit=False)
     with pytest.raises(RuntimeError):
-        s.mark_submit_clicked()
-    assert not s.submit_clicked
+        s.mark_submit_clicked(tmp_path)
+    assert not s.submit_clicked and not ApplySession.already_submitted(tmp_path)
 
 
 def test_session_submit_guard_survives_reload(tmp_path: Path) -> None:
     s = ApplySession.start("j", "lever", auto_submit=True)
-    s.mark_submit_clicked()
-    s.save(tmp_path)  # crash after click, before finish
+    s.mark_submit_clicked(tmp_path)  # persisted before the click; a crash right after loses nothing
     back = ApplySession.load(tmp_path)
     assert back.submit_clicked and not back.can_click_submit()
     assert back.outcome is None and back.status == "needs_review"
@@ -447,3 +446,15 @@ def test_screenshot_paths_numbered_and_sanitized(tmp_path: Path) -> None:
     p1 = s.shot(s.next_screenshot_path(tmp_path, "form page/1"))
     p2 = s.next_screenshot_path(tmp_path, "x" * 80)
     assert Path(p1).name == "01_form_page_1.png" and p2.name == "02_" + "x" * 40 + ".png"
+
+
+
+def test_submit_click_is_persisted_before_the_click_and_blocks_a_rerun(tmp_path: Path) -> None:
+    assert not ApplySession.already_submitted(tmp_path)
+    s = ApplySession.start("j", "greenhouse", tier="B", auto_submit=True)
+    s.mark_submit_clicked(tmp_path)
+    # crash here: no finish(), no save()
+    assert ApplySession.already_submitted(tmp_path)
+    fresh = ApplySession.start("j", "greenhouse", tier="B", auto_submit=True)
+    with pytest.raises(RuntimeError, match="already clicked"):
+        fresh.mark_submit_clicked(tmp_path)

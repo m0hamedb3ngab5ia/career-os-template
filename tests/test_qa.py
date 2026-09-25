@@ -720,3 +720,11 @@ def test_close_variant_not_repeated_to_same_company(tmp_path: Path, other_compan
     _letter_job(job.parent, "older", other_company, other_close)
     c = by_name(run(job), "close_variant_repeated")
     assert c["level"] == "soft" and c["ok"] is ok, c["detail"]
+
+
+def test_standard_matching_is_the_applier_matcher(tmp_path: Path) -> None:
+    """QA and the applier agree: a legal question that only mentions 'city' is not the address question."""
+    job = make_job(tmp_path, answers=[{"question": "Have you ever been convicted of a crime in any city?",
+                                       "answer": None, "type": "generated", "class": "sensitive",
+                                       "needs_review": True, "bullet_ids": []}])
+    assert by_name(run(job), "standard_answers")["ok"]

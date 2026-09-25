@@ -121,3 +121,19 @@ def test_edited_eeo_block_resolves_to_configured_values(answers_path: Path):
     }
     for field, choice in got.items():
         assert choice.lower().startswith(str(spec[field]["answer"]).lower()), field
+
+
+def test_crash_after_submit_click_blocks_rerun(tmp_path: Path):
+    """The exact skill order in two processes: click persisted, process dies, rerun refuses."""
+    import subprocess
+
+    from conftest import PY, ROOT
+
+    job = tmp_path / "job"
+    env = {"PYTHONPATH": str(ROOT / "src"), "HOME": str(tmp_path), "PATH": "/usr/bin:/bin"}
+    crash = ("import os, sys; from careeros.apply.session import ApplySession as S; "
+             "s = S.start('j', 'greenhouse', tier='B', auto_submit=True); s.mark_submit_clicked(sys.argv[1]); os._exit(9)")
+    assert subprocess.run([PY, "-c", crash, str(job)], env=env).returncode == 9
+    check = "import sys; from careeros.apply.session import ApplySession as S; print(S.already_submitted(sys.argv[1]))"
+    out = subprocess.run([PY, "-c", check, str(job)], env=env, capture_output=True, text=True).stdout.strip()
+    assert out == "True"
