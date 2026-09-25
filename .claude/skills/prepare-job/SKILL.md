@@ -76,6 +76,10 @@ else:
 ```
 Tier A always ends `needs_review` with `action_items.append("tier_a_review: review resume + cover letter before submitting <company> <title>")` (priority H).
 If `steps.cover_letter.facts_shortfall` is true: `action_items.append("cover_letter_facts: add 2 company facts for <company>")`.
+Metric questions (`.claude/skills/_shared/resume_writing_rules.md`, OVERRIDE): for each entry of `JOB/resume.json`
+`meta.metric_questions`, add a separate item `metric_question: <bullet_id>: <question>` (type `question`, priority
+L, needs `phone`, no `--job`: it is about the profile, not this job) unless an open Action Item already starts
+with `metric_question: <bullet_id>:`. They never change `status`.
 Any RESULT that contained `ACTION_ITEM` is appended verbatim.
 
 Outreach: if `tier_cfg.outreach == "always"`, note `"outreach": "run /find-contacts then /draft-outreach"` in

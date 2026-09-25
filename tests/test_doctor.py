@@ -252,3 +252,119 @@ def test_missing_claude_cli_passes_when_running_inside_claude_code(tmp_path: Pat
     checks = doctor(filled(tmp_path), tools=ALL_TOOLS - {"claude"}, env={"CLAUDECODE": "1"})
     assert "claude" not in text_of(checks, FAIL)
     assert any(c.name == "claude" and c.level == PASS for c in checks)
+
+
+# --- résumé-writing keys (resume_default / weak / estimate, metric_questions, bullet_shape config) ---
+
+def _examples_cfg_prof():
+    load = lambda p: yaml.safe_load(p.read_text())  # noqa: E731
+    cfg = {n: load(EXAMPLE_REPO / "config" / f"{n}.yaml") for n in ("targets", "categories", "companies", "qa", "pipeline")}
+    prof = {n: load(EXAMPLE_REPO / "profile" / f"{n}.yaml") for n in ("master", "standard_answers", "confidential_terms")}
+    return cfg, prof
+
+
+def test_example_demonstrates_optional_bullet_keys_and_metric_questions():
+    _, prof = _examples_cfg_prof()
+    m = prof["master"]
+    bullets = [b for e in m["experience"] + m["projects"] for b in e["bullets"]]
+    assert any(b.get("resume_default") is True for b in bullets)
+    assert m["metric_questions"] and all({"bullet_id", "question"} <= set(q) for q in m["metric_questions"])
+    ids = {b["id"] for b in bullets}
+    assert all(q["bullet_id"] in ids for q in m["metric_questions"])
+
+
+def test_optional_bullet_keys_absent_is_fine():
+    cfg, prof = _examples_cfg_prof()
+    prof["master"].pop("metric_questions")
+    for e in prof["master"]["experience"] + prof["master"]["projects"]:
+        for b in e["bullets"]:
+            for k in ("resume_default", "weak", "estimate"):
+                b.pop(k, None)
+    assert schema_problems(cfg, prof) == []
+
+
+@pytest.mark.parametrize("key", ["resume_default", "weak", "estimate"])
+def test_optional_bullet_flag_must_be_bool(key: str):
+    cfg, prof = _examples_cfg_prof()
+    prof["master"]["experience"][0]["bullets"][0][key] = "yes"
+    assert any(f"acme.1.{key} must be true or false" in p for p in schema_problems(cfg, prof))
+    prof["master"]["experience"][0]["bullets"][0][key] = False
+    assert schema_problems(cfg, prof) == []
+
+
+@pytest.mark.parametrize("mq", [
+    "ask me later",
+    [{"bullet_id": "acme.3"}],
+    [{"question": "How many?"}],
+    ["acme.3: how many?"],
+])
+def test_metric_questions_shape(mq):
+    cfg, prof = _examples_cfg_prof()
+    prof["master"]["metric_questions"] = mq
+    assert any("profile/master.yaml: metric_questions" in p for p in schema_problems(cfg, prof))
+
+
+def test_metric_questions_empty_or_null_is_fine():
+    cfg, prof = _examples_cfg_prof()
+    for v in ([], None):
+        prof["master"]["metric_questions"] = v
+        assert schema_problems(cfg, prof) == []
+
+
+def test_qa_yaml_bullet_shape_keys_optional_but_typed():
+    cfg, prof = _examples_cfg_prof()
+    soft = cfg["qa"]["resume"]["soft"]
+    soft.pop("bullet_max_words"), soft.pop("weak_openers"), soft.pop("scale_words", None)
+    assert schema_problems(cfg, prof) == []  # personal configs from before this key existed still pass
+    soft["bullet_max_words"] = "thirty"
+    soft["weak_openers"] = "helped"
+    probs = schema_problems(cfg, prof)
+    assert any("config/qa.yaml: resume.soft.bullet_max_words" in p for p in probs)
+    assert any("config/qa.yaml: resume.soft.weak_openers" in p for p in probs)
+
+
+def test_open_metric_questions_warn_with_count(tmp_path: Path):
+    root = filled(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["metric_questions"] = [{"bullet_id": "northwind.3", "question": "How much faster did deploys get?"},
+                             {"bullet_id": "contoso_intern.2", "question": "How many reports use the lineage?"}]
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    checks = doctor(root)
+    assert "metric_questions: 2 metric questions open in profile/master.yaml" in details(checks, WARN)
+    assert exit_code(checks) == 0
+
+
+def test_no_metric_questions_passes(tmp_path: Path):
+    root = filled(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m.pop("metric_questions", None)
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    checks = doctor(root)
+    assert any(c.name == "metric_questions" and c.level == PASS for c in checks)
+
+
+def test_metric_question_for_unknown_bullet_warns(tmp_path: Path):
+    root = filled(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["metric_questions"] = [{"bullet_id": "ghost.1", "question": "How many?"}]
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    warns = text_of(doctor(root), WARN)
+    assert "ghost.1" in warns and "not a bullet in profile/master.yaml" in warns
+
+
+def test_personalize_keeps_metric_questions_on_renamed_ids(tmp_path: Path):
+    m = yaml.safe_load((filled(tmp_path) / "profile" / "master.yaml").read_text())
+    ids = {b["id"] for e in m["experience"] + m["projects"] for b in e["bullets"]}
+    assert m["metric_questions"] and all(q["bullet_id"] in ids for q in m["metric_questions"])
+
+
+def test_estimate_flag_without_tilde_number_warns(tmp_path: Path):
+    root = filled(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["experience"][0]["bullets"][1]["estimate"] = True        # northwind.2: "... used by 40 analysts ..."
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    warns = text_of(doctor(root), WARN)
+    assert "northwind.2 has estimate: true but no ~number" in warns
+    m["experience"][0]["bullets"][1]["text"] = m["experience"][0]["bullets"][1]["text"].replace("40", "~40")
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
+    assert "estimate: true" not in text_of(doctor(root), WARN)

@@ -13,7 +13,9 @@ bullets (`placeholder: true` or text starting `[FILL IN`) are never evidence.
 Rules:
 
 1. A number never travels without its bullet id. Numbers are frozen: no rounding, combining or
-   extrapolating. A claim with a number that cannot cite a bullet id is fabrication.
+   extrapolating. A claim with a number that cannot cite a bullet id is fabrication. A number written `~N` in a
+   bullet with `estimate: true` is the candidate's own estimate: keep the `~` (prose may say "about N");
+   never estimate a number yourself (`.claude/skills/_shared/resume_writing_rules.md`, OVERRIDE).
 2. `skills.*` / `stack` justify *familiarity only*. They never justify a metric, an outcome, seniority
    ("expert in"), or a duration ("3 years of Go").
 3. Synonyms are allowed for the familiarity check only: Postgres/PostgreSQL, JS/JavaScript,

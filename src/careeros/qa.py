@@ -20,7 +20,11 @@ Output schema (dict / JSON):
       "keyword_coverage": float | None,
       "cover_letter_word_count": int | None,   # computed from the body; frontmatter word_count is ignored
       "orphan_numbers": [...], "unknown_tools": [...], "banned_hits": [...],
-      "confidential_hits": [...]         # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      "confidential_hits": [...],        # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      "bullet_shape": [ {id: str | None, line: str, issues: [weak_opener|no_metric|too_long]} ]
+                                         # soft: resume.txt bullets that break _shared/resume_writing_rules.md
+      # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
+      #   about/approximately/roughly/around) wherever an artifact citing that bullet shows it
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
     }
 
@@ -69,6 +73,18 @@ TOOL_ALLOWLIST = {
     "rest", "grpc", "tdd", "oop", "mvp", "beta", "testflight", "app", "store",
     "north", "south", "east", "west", "new", "city",
 }
+# bullet_shape defaults (config/qa.yaml: resume.soft.{weak_openers, bullet_max_words, scale_words} override them;
+# a personal qa.yaml written before these keys existed gets these values).
+DEFAULT_WEAK_OPENERS = ("worked on", "helped", "responsible for", "assisted", "participated in", "involved in",
+                        "tasked with")
+DEFAULT_BULLET_MAX_WORDS = 35
+DEFAULT_SCALE_WORDS = ("users", "requests", "records", "teams", "services", "daily", "million", "thousand", "dozen")
+
+# A candidate estimate ("~40%" in an `estimate: true` bullet) must stay hedged. Résumé bullets keep the "~";
+# prose (cover letter, answers) may also say it in words.
+ESTIMATE_RE = re.compile(r"~\s*(\$?\d[\d,\.]*[%KkMx+]?)")
+HEDGE_WORDS = ("about", "approximately", "roughly", "around")
+
 # Place names are not hardcoded: every word of the profile's identity.location and each experience /
 # project / education `location` is allowed at runtime (ProfileIndex.place_words).
 
@@ -163,6 +179,23 @@ def bullet_text_allowed(out: str, sources: Iterable[str]) -> bool:
     if len(ow) < 2:
         return False
     return any(_fid_words(src)[:len(ow)] == ow for src in sources)
+
+
+def bullet_shape_issues(text: str, weak_openers: Iterable[str], max_words: int,
+                        scale_words: Iterable[str] = DEFAULT_SCALE_WORDS) -> list[str]:
+    """Soft résumé-bullet checks from .claude/skills/_shared/resume_writing_rules.md, in this order:
+    `weak_opener` (starts with one of `weak_openers`, whole words, any case), `no_metric` (no digit and no
+    scale word), `too_long` (more than `max_words` words)."""
+    t = str(text or "").strip()
+    low = t.lower()
+    issues = []
+    if any(re.match(re.escape(str(w).strip().lower()) + r"(?![a-z0-9])", low) for w in weak_openers if str(w).strip()):
+        issues.append("weak_opener")
+    if not re.search(r"\d", t) and not any(_term_in_text(str(w).strip(), t) for w in scale_words if str(w).strip()):
+        issues.append("no_metric")
+    if _count_words(t) > max_words:
+        issues.append("too_long")
+    return issues
 
 
 def _standard_hit(question: str, path: Path, patterns: list[tuple[str, list[re.Pattern[str]]]]) -> str | None:
@@ -602,6 +635,44 @@ class Checker:
             self.add("cover_letter_cites_ids", "hard", False,
                      "cover_letter.md frontmatter has no bullet_ids_used / narrative_ids_used")
 
+    def check_estimates(self) -> None:
+        """Hard: bullet_fidelity and number_audit ignore "~", so an `estimate: true` bullet's "~40" shown as a bare
+        "40" would pass both. Every occurrence of an estimated number in an artifact that cites the bullet must be
+        hedged, unless another cited bullet states that same number exactly."""
+        name = "estimate_marked"
+        cited = self._cited_ids()
+        docs: list[tuple[str, str, set[str], bool]] = []   # (file, text, cited ids, prose?)
+        if self.resume_txt is not None:
+            docs.append(("resume.txt", self.resume_txt, cited.get("resume.json", set()), False))
+        if self.cover_md is not None:
+            docs.append(("cover_letter.md", self.cover_body, cited.get("cover_letter.md", set()), True))
+        if isinstance(self.answers, list):
+            docs.append(("answers.json", "\n".join(str(a.get("answer") or "") for a in self.answers if isinstance(a, dict)),
+                         cited.get("answers.json", set()), True))
+        if not docs:
+            self.skip(name, "hard", "no text artifacts")
+            return
+        problems, n_est = [], 0
+        for fname, text, ids, prose in docs:
+            est = [b for b in sorted(ids) if (self.profile.bullets.get(b) or {}).get("estimate") is True]
+            if not est:
+                continue
+            exact = number_tokens(" ".join(ESTIMATE_RE.sub("", self.profile.bullet_text(b))
+                                           for b in ids if b not in est))
+            hedge = r"(?:~\s*" + ("|(?:" + "|".join(HEDGE_WORDS) + r")\s+" if prose else "") + r")$"
+            for bid in est:
+                for num in dict.fromkeys(m.rstrip(".,") for m in ESTIMATE_RE.findall(self.profile.bullet_text(bid))):
+                    n_est += 1
+                    if num.lower() in exact:
+                        continue
+                    for m in re.finditer(r"(?<![\d.,$])" + re.escape(num) + r"(?![\d])", text):
+                        if not re.search(hedge, text[max(0, m.start() - 20):m.start()], re.I):
+                            problems.append(f"{fname}: {bid} estimate {num} shown without ~")
+                            break
+        self.add(name, "hard", not problems,
+                 (f"{n_est} estimated numbers keep their ~" if n_est else "no estimate bullets cited")
+                 if not problems else "; ".join(problems) + " (profile marks it estimate: true; keep the ~)")
+
     def _allowed_numbers(self, ids: Iterable[str], extra_text: str = "") -> set[str]:
         pool = [self.profile.identity_text(), self.profile.education_text(), self.profile.header_text(), extra_text]
         for bid in ids:
@@ -1006,6 +1077,45 @@ class Checker:
                  f"close {close!r} not used before for this company" if not repeats
                  else f"close {close!r} already used for this company in: {', '.join(repeats)}")
 
+    def check_bullet_shape(self) -> None:
+        """Soft: each `- ` bullet line of resume.txt against resume_writing_rules.md (weak opener, no number or
+        scale word, over `bullet_max_words`). Never fails QA: bullets are frozen profile text, so the fix is a
+        stronger variant or a metric question in profile/master.yaml. Offenders are named by resume.json id."""
+        if self.resume_txt is None:
+            self.skip("bullet_shape", "soft", "resume.txt missing")
+            return
+        soft = ((self.qa_cfg.get("resume") or {}).get("soft") or {}) if isinstance(self.qa_cfg, dict) else {}
+        weak = soft.get("weak_openers")
+        weak = list(weak) if isinstance(weak, list) else list(DEFAULT_WEAK_OPENERS)
+        scale = soft.get("scale_words")
+        scale = list(scale) if isinstance(scale, list) else list(DEFAULT_SCALE_WORDS)
+        try:
+            max_words = int(soft.get("bullet_max_words", DEFAULT_BULLET_MAX_WORDS))
+        except (TypeError, ValueError):
+            max_words = DEFAULT_BULLET_MAX_WORDS
+        ids_by_text: dict[str, str] = {}
+        for e in self._resume_entries():
+            for b in e.get("bullets") or []:
+                if isinstance(b, dict) and b.get("id") and b.get("text"):
+                    ids_by_text.setdefault(" ".join(_fid_words(b["text"])), str(b["id"]))
+        found, n = [], 0
+        for i, raw in enumerate(self.resume_txt.splitlines(), 1):
+            m = re.match(r"\s*[-•*·]\s+(.*\S)", raw)
+            if not m:
+                continue
+            n += 1
+            line = m.group(1)
+            issues = bullet_shape_issues(line, weak, max_words, scale)
+            if issues:
+                found.append({"id": ids_by_text.get(" ".join(_fid_words(line))), "line": line, "issues": issues,
+                              "_n": i})
+        self.extras["bullet_shape"] = [{k: v for k, v in f.items() if k != "_n"} for f in found]
+        detail = "; ".join(f"{f['id'] or 'line ' + str(f['_n'])}: {', '.join(f['issues'])}"
+                           + ("" if f["id"] else f" ({f['line'][:60]})") for f in found)
+        self.add("bullet_shape", "soft", not found,
+                 f"{n} bullets: verb-first, a number or scale word, <= {max_words} words" if not found
+                 else f"{detail} (see .claude/skills/_shared/resume_writing_rules.md)")
+
     def check_answers_review(self) -> None:
         if not isinstance(self.answers, list):
             return
@@ -1027,10 +1137,12 @@ class Checker:
         self.check_skills_traced()
         self.check_standard_answers()
         self.check_numbers()
+        self.check_estimates()
         self.check_tools()
         self.check_contact()
         self.check_pdf()
         self.check_keyword_coverage()
+        self.check_bullet_shape()
         self.check_cover_letter_structure()
         self.check_close_variant()
         self.check_answers_review()
@@ -1052,6 +1164,7 @@ class Checker:
             "unknown_tools": self.extras["unknown_tools"],
             "banned_hits": self.extras["banned_hits"],
             "confidential_hits": self.extras.get("confidential_hits", []),
+            "bullet_shape": self.extras.get("bullet_shape", []),
         }
 
 
@@ -1065,6 +1178,7 @@ def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> di
             "summary": {"hard_fail": 1, "soft_fail": 0, "skipped": 0},
             "fail_reasons": [f"job_dir_exists: {job_dir} does not exist"], "warnings": [],
             "keyword_coverage": None, "orphan_numbers": [], "unknown_tools": [], "banned_hits": [], "confidential_hits": [],
+            "bullet_shape": [],
         }
     return Checker(job_dir, root_path).run()
 
