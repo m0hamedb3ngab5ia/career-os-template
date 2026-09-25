@@ -1,0 +1,96 @@
+---
+name: prepare-job
+description: Orchestrate full preparation of one job dir: score-job, then (if decision=prepare) tailor-resume, write-cover-letter per tier rule, qa-review with one regeneration cycle. Prints a final RESULT with status queued | needs_review | skipped and any ACTION_ITEMs.
+---
+
+# prepare-job
+
+`$ARGUMENTS` = job dir (`JOB`), optional `--force` (re-prepare even if qa.json says pass).
+
+Skills cannot call each other programmatically. For each step, open the named SKILL.md, follow it
+inline exactly as written (same inputs, same output files, same RESULT line), then continue here. Keep
+each step's RESULT JSON in memory; you will summarize them at the end.
+
+Before starting, read `config/targets.yaml` (tiers, thresholds) and `config/qa.yaml` (`critic.max_regenerations`).
+Initialize `action_items = []`, `steps = {}`.
+
+## Step 1: score
+
+Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `steps.score`.
+- If it errored: final status `skipped`, reason `score_error`, go to Finish.
+- If `decision == "skip"`: final status `skipped`, reason = `skip_reason` (or first hard filter). Go to Finish.
+- If `profile_gap` is set: `action_items.append("profile_gap: " + profile_gap)` (priority M, once per gap).
+
+`tier` = score.tier. `tier_cfg` = `targets.tiers[tier]` (tier null -> treat as C).
+
+## Step 2: resume
+
+Follow `.claude/skills/tailor-resume/SKILL.md` with `JOB`. Store RESULT as `steps.resume`.
+If it reports `qa_hard_fails` non-empty after its own fix loop, continue (qa-review will judge).
+
+## Step 3: cover letter (per tier rule)
+
+`rule = tier_cfg.cover_letter` (`always` | `if_required`).
+- `always`: follow `.claude/skills/write-cover-letter/SKILL.md`.
+- `if_required`: only if `posting.description_text` says a cover letter is required/requested
+  (regex `cover letter.{0,40}(required|must|please)`) -> follow the skill; else skip and record
+  `steps.cover_letter = {"skipped": "not_required"}`.
+Store RESULT as `steps.cover_letter`.
+
+## Step 4: QA with one regeneration cycle
+
+`regenerations = 0`. Loop:
+1. Follow `.claude/skills/qa-review/SKILL.md` with `JOB`. Store RESULT as `steps.qa`.
+2. If `pass`: break.
+3. If `next_action == "regenerate"` and `regenerations < max_regenerations`:
+   - `regenerations += 1`; update `JOB/qa.json` field `regenerations`.
+   - For each distinct `skill` in `regenerate[]` (order: tailor-resume, then write-cover-letter):
+     follow that SKILL.md again with `JOB --suggestions "<its suggestions joined by '; '>"`.
+   - Continue the loop (qa-review runs again).
+4. Else (fail after the allowed regeneration, or `next_action == "action_item"`): break with
+   `action_items.append("qa_failed_twice: " + top 2 fail_reasons)`.
+
+## Step 5: status
+
+```
+if steps.qa.pass:
+    status = "needs_review" if tier == "A" or tier_cfg.review_required non-empty else "queued"
+    if category's categories.yaml new_category_reviews_remaining > 0: status = "needs_review"; action_items.append("new_category_review: <category> (<n> left)")
+else:
+    status = "needs_review"
+```
+Tier A always ends `needs_review` with `action_items.append("tier_a_review: review resume + cover letter before submitting <company> <title>")` (priority H).
+If `steps.cover_letter.facts_shortfall` is true: `action_items.append("cover_letter_facts: add 2 company facts for <company>")`.
+Any RESULT that contained `ACTION_ITEM` is appended verbatim.
+
+Outreach: if `tier_cfg.outreach == "always"`, note `"outreach": "run /find-contacts then /draft-outreach"` in
+the final RESULT (do not run them here; they run after apply).
+
+## Step 6: record
+
+Write `JOB/prepare.json`:
+```json
+{"job_id": "...", "prepared_at": "<ISO>", "status": "queued|needs_review|skipped", "tier": "B",
+ "category": "...", "fit": 78, "regenerations": 0, "qa_pass": true, "qa_mean": 8.2,
+ "steps": {"score": {...}, "resume": {...}, "cover_letter": {...}, "qa": {...}},
+ "action_items": ["..."], "files": ["score.json", "resume.json", "resume.txt", "resume.tex", "cover_letter.md", "qa.json"]}
+```
+Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [prepare-job] status=<s> tier=<t> fit=<n> qa_pass=<b> regenerations=<n> action_items=<n>`
+(format `- YYYY-MM-DD HH:MM:SS [<skill>] <message>`, local time, identical to `store.append_log`; e.g. `date '+%F %T'`).
+
+Then record the final status in both `JOB/status.json` and the tracker row:
+`.venv/bin/careeros job status <job_id> <queued|needs_review|skipped> --note "<reason, e.g. qa pass tier A | skip_reason>"`.
+(If the tracker is locked the op is queued; `careeros tracker flush` later.)
+
+Before adding action items, run `.venv/bin/careeros action list` once and skip any item for which an
+open row with the same JobID and Type already exists (a rerun must not duplicate items). Then for
+each remaining action item run
+`.venv/bin/careeros action add "<text>" --type <review|qa_fail|profile_gap|other> --job <job_id> --priority <H|M> --needs <laptop|phone|anytime> --dedupe`
+(`--dedupe` makes the CLI enforce the same rule: if an open item with the same job + type exists it
+prints the existing id and adds nothing; `profile_gap` for profile-gap items; `laptop` for anything
+that needs the repo or a browser, e.g. tier_a_review; `phone` for quick answers; default `anytime`).
+If the CLI is unavailable the caller applies them from RESULT.
+
+## Finish: RESULT (last line)
+
+`RESULT: {"skill":"prepare-job","job_id":"...","status":"queued","tier":"B","category":"swe_backend","fit":78,"decision":"prepare","skip_reason":null,"qa_pass":true,"qa_mean":8.2,"regenerations":0,"cover_letter":true,"files":["..."],"ACTION_ITEMS":["..."],"outreach":null}`
