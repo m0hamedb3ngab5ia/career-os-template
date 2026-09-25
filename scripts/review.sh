@@ -38,7 +38,14 @@ Reply with finding blocks only, or exactly "None."
 PROMPT_EOF
 )"
 
-codex exec -C "$WT" --sandbox read-only --ephemeral -o "$OUT_DIR/codex.md" "$PROMPT" > "$OUT_DIR/codex.log" 2>&1 \
-  || { echo "codex review failed; see $OUT_DIR/codex.log" >&2; exit 1; }
+if ! codex exec -C "$WT" --sandbox read-only --ephemeral -o "$OUT_DIR/codex.md" "$PROMPT" > "$OUT_DIR/codex.log" 2>&1; then
+  # Out of usage is the common failure: say so (with the reset time) instead of a generic error.
+  if grep -qiE 'usage limit|rate limit|quota|try again at' "$OUT_DIR/codex.log"; then
+    echo "codex review failed: out of usage: $(grep -iE 'usage limit|try again at' "$OUT_DIR/codex.log" | tail -1 | sed 's/^ERROR: *//')" >&2
+    exit 3
+  fi
+  echo "codex review failed; see $OUT_DIR/codex.log" >&2
+  exit 1
+fi
 
 echo "$OUT_DIR/codex.md"
