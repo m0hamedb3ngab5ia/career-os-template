@@ -687,3 +687,10 @@ def test_questions_matching_standard_patterns_need_the_standard_answer(tmp_path:
     job = make_job(tmp_path, answers=[{"bullet_ids": [], **entry}])
     c = by_name(run(job), "standard_answers")
     assert c["ok"] is ok, c["detail"]
+
+
+def test_matched_question_wins_over_a_wrong_standard_key(tmp_path: Path) -> None:
+    job = make_job(tmp_path, answers=[{"question": "Are you legally authorized to work in the US?", "answer": "No",
+                                       "type": "standard", "standard_key": "sponsorship", "bullet_ids": []}])
+    c = by_name(run(job), "standard_answers")
+    assert c["ok"] is False and "work_authorization" in c["detail"], c["detail"]

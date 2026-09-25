@@ -800,8 +800,8 @@ class Checker:
             ans = a.get("answer")
             question = str(a.get("question") or "")
             hit = next((k for k, rxs in patterns if any(rx.search(question) for rx in rxs)), None)
-            if a.get("type") != "standard" and hit is not None:
-                # a standard question answered as anything else (mislabeled): the standard value still rules
+            if hit is not None:
+                # the question's own pattern match decides the key, whatever type/standard_key the record says
                 if not same(ans, table[hit]):
                     problems.append(f"#{i}: question matches standard '{hit}' but the answer differs")
                 continue
