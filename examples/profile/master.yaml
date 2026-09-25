@@ -1,118 +1,136 @@
-# MASTER PROFILE — single source of truth for every résumé bullet, cover-letter claim and form answer.
-# This is the fictional example candidate "Alex Example". `careeros init` copies it to profile/master.yaml;
-# replace everything with your own facts (EDIT). Keep the shape: skills and QA read these keys.
-# Every bullet has an `id`. Tailored résumés/cover letters may ONLY use bullets by id (verbatim or `variants`).
-# Numbers in bullets are frozen: the tailor may rephrase around them but never change them.
-# `placeholder: true` bullets (or text containing "[OPEN:" / "[FILL IN") are never used.
+# ==================================================================================================
+# profile/master.yaml: MASTER PROFILE
+#
+# What this file is:
+#   The single source of truth for every résumé bullet, cover-letter claim and form answer. The shipped
+#   values are a fictional candidate, "Alex Example"; `careeros init` copies this file to profile/master.yaml.
+#   Skills may ONLY use facts from here: bullets are cited by `id`, and numbers in bullets are frozen.
+#
+# What you must fill in:
+#   - identity: every line (name, email, phone, location, links)
+#   - education, experience, projects, leadership: your own entries. Give each entry and bullet a
+#     short, unique `id` (e.g. `northwind`, `northwind.1`); do not keep the example ids (acme, ...).
+#   - skills: only what you can defend in an interview
+#   - narratives: 1-3 true sentences about what motivates you (used in cover letters)
+#   Every personal line carries an INSERT comment: what goes there, the format, an example.
+#   `careeros doctor` FAILs while the example identity or ids are still here and WARNs for each
+#   INSERT line left unchanged. Delete the INSERT comment once a line holds your real value.
+#
+# What you can leave as is:
+#   - the key names and the overall shape (skills and QA read them)
+#   - `placeholder: true` bullets (or text with "[OPEN:" / "[FILL IN") are never used; keep them as a
+#     to-do list for stories you will add later
+# ==================================================================================================
 
-identity:                    # EDIT all of it
-  name: Alex Example
-  email: alex@example.com
-  phone: 555-010-0199
-  location: Springfield, NY
-  linkedin: https://linkedin.com/in/alex-example
-  github: https://github.com/alex-example
-  website: null
-  pronouns: null
+identity:
+  name: Alex Example                              # INSERT: full name as on your résumé, e.g. Jordan Lee
+  email: alex@example.com                         # INSERT: email recruiters should use, e.g. jordan.lee@gmail.com
+  phone: 555-010-0199                             # INSERT: phone, digits with dashes, e.g. 555-123-4567
+  location: Springfield, NY                       # INSERT: City, ST printed on the résumé, e.g. Austin, TX
+  linkedin: https://linkedin.com/in/alex-example  # INSERT: full LinkedIn URL, or null
+  github: https://github.com/alex-example         # INSERT: full GitHub URL, or null
+  website: null                                   # INSERT: personal site URL, or null
+  pronouns: null                                  # INSERT: e.g. she/her, or null to leave off
 
-summary_variants:
+summary_variants:            # INSERT: optional one-line summaries per angle; only facts that also appear in bullets
   general: >-
     Software engineer at Acme building Python services on AWS and a React dashboard used by 40 analysts.
   backend: >-
     Backend engineer at Acme working on Kafka-driven Python services and PostgreSQL.
 
 education:
-  - id: state_u
-    school: Springfield State University
-    degree: Bachelor of Science, Computer Science
-    gpa: "3.6"
-    location: Springfield, NY
-    start: 2022-08
-    end: 2026-05
-    coursework: [Databases, Operating Systems, Machine Learning]
-    activities: [ACM Chapter Treasurer]
+  - id: state_u                                   # INSERT: short unique id for this school, e.g. ut_austin
+    school: Springfield State University          # INSERT: official school name
+    degree: Bachelor of Science, Computer Science   # INSERT: degree as printed, e.g. Bachelor of Arts, Mathematics
+    gpa: "3.6"                                    # INSERT: GPA as a quoted string, e.g. "3.4", or null to omit
+    location: Springfield, NY                     # INSERT: City, ST
+    start: 2022-08                                # INSERT: start month, YYYY-MM, e.g. 2023-06
+    end: 2026-05                                  # INSERT: end month, YYYY-MM, e.g. 2025-05 (expected graduation is fine)
+    coursework: [Databases, Operating Systems, Machine Learning]   # INSERT: 0-6 relevant courses, or []
+    activities: [ACM Chapter Treasurer]                            # INSERT: clubs/roles, or []
 
+# One block per job. Bullets: past tense, one fact each, with the real number if there is one.
 experience:
-  - id: acme
-    company: Acme
-    title: Software Engineer
-    title_display: Software Engineer
-    location: New York, NY
-    start: 2026-06
-    end: present
-    tags: [swe_backend, swe_fullstack, data_engineering]
-    stack: [Python, FastAPI, PostgreSQL, Kafka, Docker, AWS, React, TypeScript]
+  - id: acme                                      # INSERT: short unique id, e.g. northwind (its bullets: northwind.1, .2 ...)
+    company: Acme                                 # INSERT: employer name
+    title: Software Engineer                      # INSERT: your official title
+    title_display: Software Engineer              # INSERT: title to print (may be clearer than the HR title)
+    location: New York, NY                        # INSERT: City, ST or Remote
+    start: 2026-06                                # INSERT: start month, YYYY-MM, e.g. 2023-06
+    end: present                                  # INSERT: end month, YYYY-MM or present, e.g. 2025-05
+    tags: [swe_backend, swe_fullstack, data_engineering]   # INSERT: category names (config/categories.yaml) this job supports
+    stack: [Python, FastAPI, PostgreSQL, Kafka, Docker, AWS, React, TypeScript]   # INSERT: tools you really used here
     # Internal codenames/hostnames never go in bullets; list them in profile/confidential_terms.yaml
     # so QA hard-fails any artifact that leaks them.
     confidentiality: "Plain descriptions only; see profile/confidential_terms.yaml."
     bullets:
-      - id: acme.1
-        text: Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day
-        ownership: own
-        metrics: ["2 million"]
-      - id: acme.2
-        text: Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks
-        ownership: own
-        metrics: ["40"]
+      - id: acme.1                                # INSERT: <entry id>.<n>, e.g. northwind.1
+        text: Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day   # INSERT: what you did, with what, and the result
+        ownership: own                            # INSERT: own (you led it) | team (you contributed)
+        metrics: ["2 million"]                    # INSERT: every number in `text`, as written
+      - id: acme.2                                # INSERT: <entry id>.<n>
+        text: Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks   # INSERT: one fact per bullet
+        ownership: own                            # INSERT: own | team
+        metrics: ["40"]                           # INSERT: every number in `text`
         variants:
-          short: Shipped a React/TypeScript dashboard for 40 analysts
-      - id: acme.3
-        text: Containerized three services with Docker and deployed them to AWS
-        ownership: team
+          short: Shipped a React/TypeScript dashboard for 40 analysts   # INSERT: optional shorter wording, same facts and numbers
+      - id: acme.3                                # INSERT: <entry id>.<n>
+        text: Containerized three services with Docker and deployed them to AWS   # INSERT: one fact per bullet
+        ownership: team                           # INSERT: own | team
       - id: acme.4
         text: "[OPEN: on-call story — add when it happens]"
         placeholder: true
 
-  - id: initech_intern
-    company: Initech
-    title: Data Engineering Intern
-    location: Boston, MA
-    start: 2025-06
-    end: 2025-08
-    tags: [data_engineering]
-    stack: [SQL, Airflow, Python]
+  - id: initech_intern                            # INSERT: short unique id, e.g. contoso_intern
+    company: Initech                              # INSERT: employer name
+    title: Data Engineering Intern                # INSERT: your official title
+    location: Boston, MA                          # INSERT: City, ST or Remote
+    start: 2025-06                                # INSERT: start month, YYYY-MM, e.g. 2023-06
+    end: 2025-08                                  # INSERT: end month, YYYY-MM, e.g. 2025-05
+    tags: [data_engineering]                      # INSERT: category names this job supports
+    stack: [SQL, Airflow, Python]                 # INSERT: tools you really used here
     bullets:
-      - id: initech_intern.1
-        text: Wrote 12 Airflow DAGs in Python moving SQL reports into a warehouse, cutting manual prep by 5 hours per week
-        metrics: ["12", "5 hours"]
-      - id: initech_intern.2
-        text: Profiled data quality across 30 SQL tables and documented lineage for the reporting team
-        metrics: ["30"]
+      - id: initech_intern.1                      # INSERT: <entry id>.<n>
+        text: Wrote 12 Airflow DAGs in Python moving SQL reports into a warehouse, cutting manual prep by 5 hours per week   # INSERT: one fact per bullet
+        metrics: ["12", "5 hours"]                # INSERT: every number in `text`
+      - id: initech_intern.2                      # INSERT: <entry id>.<n>
+        text: Profiled data quality across 30 SQL tables and documented lineage for the reporting team   # INSERT: one fact per bullet
+        metrics: ["30"]                           # INSERT: every number in `text`
 
 projects:
-  - id: widgetizer
-    name: Widgetizer
-    date: 2025-11
-    link: null
-    stack: [Swift, SwiftUI, Supabase]
-    tags: [swe_mobile, swe_fullstack]
+  - id: widgetizer                                # INSERT: short unique id, e.g. tasklight
+    name: Widgetizer                              # INSERT: project name
+    date: 2025-11                                 # INSERT: date, YYYY-MM, e.g. 2023-06
+    link: null                                    # INSERT: repo or demo URL, or null
+    stack: [Swift, SwiftUI, Supabase]             # INSERT: main tools; the first 3 are printed
+    tags: [swe_mobile, swe_fullstack]             # INSERT: category names this project supports
     bullets:
-      - id: widgetizer.1
-        text: Built an iOS app in Swift and SwiftUI with a Supabase backend, reaching 300 beta users
-        metrics: ["300"]
-      - id: widgetizer.2
-        text: Wrote 15 XCTest suites covering sync and offline logic
-        metrics: ["15"]
+      - id: widgetizer.1                          # INSERT: <entry id>.<n>
+        text: Built an iOS app in Swift and SwiftUI with a Supabase backend, reaching 300 beta users   # INSERT: one fact per bullet
+        metrics: ["300"]                          # INSERT: every number in `text`
+      - id: widgetizer.2                          # INSERT: <entry id>.<n>
+        text: Wrote 15 XCTest suites covering sync and offline logic   # INSERT: one fact per bullet
+        metrics: ["15"]                           # INSERT: every number in `text`
 
-skills:
-  programming: [Python, SQL, TypeScript, JavaScript, Swift, Java]
-  frameworks: [FastAPI, React, SwiftUI, Node.js]
-  tools: [PostgreSQL, Kafka, Docker, AWS, Airflow, Git, Supabase, XCTest]
-  concepts: [REST APIs, ETL Pipelines, Microservices, CI/CD]
+skills:                      # QA rejects any tool in a résumé that is not listed here or in a cited bullet
+  programming: [Python, SQL, TypeScript, JavaScript, Swift, Java]    # INSERT: languages, e.g. [Python, Go]
+  frameworks: [FastAPI, React, SwiftUI, Node.js]                     # INSERT: frameworks and libraries
+  tools: [PostgreSQL, Kafka, Docker, AWS, Airflow, Git, Supabase, XCTest]   # INSERT: databases, cloud, tools
+  concepts: [REST APIs, ETL Pipelines, Microservices, CI/CD]         # INSERT: concepts and practices
 
 leadership:
-  - id: acm
-    org: ACM Chapter
-    role: Treasurer
-    date: 2024
+  - id: acm                                       # INSERT: short unique id, or delete the whole section
+    org: ACM Chapter                              # INSERT: organization
+    role: Treasurer                               # INSERT: your role
+    date: 2024                                    # INSERT: date, YYYY or YYYY-MM, e.g. 2024
     bullets:
-      - id: acm.1
-        text: Managed a 4000 dollar budget for 20 student events
-        metrics: ["4000", "20"]
+      - id: acm.1                                 # INSERT: <entry id>.<n>
+        text: Managed a 4000 dollar budget for 20 student events   # INSERT: one fact per bullet
+        metrics: ["4000", "20"]                   # INSERT: every number in `text`
 
 # Narrative facts for cover letters / "why us" answers. Only these may be used as personal motivation claims.
 narratives:
   - id: n.builder
-    text: Likes owning a product end to end; shipped Widgetizer solo.
+    text: Likes owning a product end to end; shipped Widgetizer solo.   # INSERT: one true sentence about what drives you, e.g. Likes turning flaky tools into reliable ones.
   - id: n.data
-    text: Enjoys making messy data trustworthy; spent an internship on data quality.
+    text: Enjoys making messy data trustworthy; spent an internship on data quality.   # INSERT: another true motivation, or delete

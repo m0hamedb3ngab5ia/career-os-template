@@ -21,6 +21,7 @@ Output schema (dict / JSON):
       "cover_letter_word_count": int | None,   # computed from the body; frontmatter word_count is ignored
       "orphan_numbers": [...], "unknown_tools": [...], "banned_hits": [...],
       "confidential_hits": [...]         # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
     }
 
 A check that cannot run because its input artifact is missing is reported with
@@ -367,6 +368,7 @@ class Checker:
         if not prof_path.is_absolute():
             prof_path = root / prof_path
         self.profile = ProfileIndex(_load_yaml(prof_path))
+        self.prof_path = prof_path
         # profile/confidential_terms.yaml sits next to master.yaml (gitignored with the rest of profile/)
         self.confidential_path = prof_path.parent / "confidential_terms.yaml"
         sa_path = Path(paths.get("standard_answers", prof_path.parent / "standard_answers.yaml"))
@@ -487,6 +489,32 @@ class Checker:
         self.add(name, "hard", not hits,
                  f"{len(terms)} terms, {len(patterns)} patterns; none found in {', '.join(docs)}" if not hits
                  else "confidential content: " + "; ".join(hits))
+
+    def check_example_identity(self) -> None:
+        """Hard fail when resume.txt or cover_letter.md carries the fictional example candidate's name or
+        email (examples/profile/master.yaml): an untouched `careeros init` copy must never reach an
+        application. Skipped when the QA root is the shipped examples/ repo itself (tests, demos)."""
+        from careeros.doctor import example_identity, find_examples
+
+        name = "example_identity"
+        examples = find_examples(self.root)
+        if examples is None:
+            self.skip(name, "hard", "no examples/ to compare against")
+            return
+        if self.prof_path.resolve().is_relative_to(examples.resolve()):
+            self.skip(name, "hard", "QA root is the shipped example repo")
+            return
+        ident = example_identity(examples)
+        needles = [v for v in (ident.get("name"), ident.get("email")) if v]
+        docs = {"resume.txt": self.resume_txt, "cover_letter.md": self.cover_md}
+        docs = {k: v for k, v in docs.items() if v is not None}
+        if not docs:
+            self.skip(name, "hard", "no resume.txt or cover_letter.md")
+            return
+        hits = [f"{fname}: '{v}'" for fname, text in docs.items() for v in needles if v.lower() in text.lower()]
+        self.add(name, "hard", not hits,
+                 "no example identity" if not hits else
+                 "example candidate data (fill in profile/master.yaml, run `careeros doctor`): " + "; ".join(hits))
 
     def check_word_counts(self) -> None:
         cl_cfg = self.qa_cfg.get("cover_letter", {}) or {}
@@ -990,6 +1018,7 @@ class Checker:
         self.check_artifacts()
         self.check_banned()
         self.check_confidential()
+        self.check_example_identity()
         self.check_word_counts()
         self.check_em_dashes()
         self.check_truth_trace()

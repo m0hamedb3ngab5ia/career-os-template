@@ -45,6 +45,7 @@ def test_init_copies_examples_then_everything_runs(checkout: Path, home: Path):
                  "config/targets.yaml", "config/companies.yaml"):
         assert hint in r.stdout, hint
     assert (checkout / "profile" / "master.yaml").is_file() and (checkout / "config" / "pipeline.yaml").is_file()
+    assert "# INSERT" in r.stdout and "careeros doctor" in r.stdout and "docs/GETTING_STARTED.md" in r.stdout
 
     (checkout / "profile" / "master.yaml").write_text((checkout / "profile" / "master.yaml").read_text()
                                                      .replace("Alex Example", "Sam Candidate"))

@@ -11,6 +11,12 @@ Never type anything that is not in the profile, standard answers, answers.json, 
 
 Argument: `data/jobs/<job_id>` (absolute or repo-relative). Everything below refers to files in it.
 
+## Setup guard (before anything else)
+
+Run `.venv/bin/careeros doctor --quiet` first. If it exits nonzero, STOP before opening a browser:
+print its FAIL lines and a `RESULT` with `outcome: failed`, reason `setup: careeros doctor failed`.
+Never submit with the example candidate's data (Alex Example) or a half-configured profile.
+
 ## 0. Load tools
 
 `ToolSearch` once: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__find,mcp__claude-in-chrome__form_input,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__file_upload,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_network_requests,mcp__claude-in-chrome__tabs_close_mcp`

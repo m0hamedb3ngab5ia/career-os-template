@@ -1,105 +1,120 @@
-# Standard application answers for the fictional example candidate "Alex Example".
-# `careeros init` copies this to profile/standard_answers.yaml. EDIT every `answer` to your own truth.
-# The applier matches form questions to these by `match` patterns (case-insensitive regex), in file
-# order: first hit wins, so specific entries go above general ones. No match → Action Item (never guessed).
-# Keep every key: skills and tests expect the full set.
+# ==================================================================================================
+# profile/standard_answers.yaml: STANDARD APPLICATION ANSWERS
+#
+# What this file is:
+#   The only answers the applier may type into application forms without asking you. The shipped values
+#   belong to the fictional candidate "Alex Example"; `careeros init` copies this file to profile/.
+#   Form questions are matched to entries by `match` patterns (case-insensitive regex), in file order:
+#   the first hit wins, so specific entries go above general ones. No match -> Action Item (never guessed).
+#
+# What you must fill in:
+#   - every `answer` marked with an INSERT comment (work authorization, school, links, phone, address ...)
+#   - the `eeo:` block at the bottom (voluntary self-identification); "Decline" is a valid choice
+#   `careeros doctor` FAILs while this file is identical to the example and WARNs for each INSERT
+#   line left unchanged. If the example value happens to be your true answer (e.g. "Yes"), delete the
+#   INSERT comment on that line to mark it reviewed.
+#
+# What you can leave as is:
+#   - every `key` and `match` list (reusable default: fine to keep); skills and tests expect the full key set
+#   - salary_expectation: null (freeform salary is always an Action Item), previously_applied, referral
+# ==================================================================================================
 
 answers:
   - key: work_authorization
     match: ["authorized to work", "legally authorized", "work authorization", "eligible to work"]
-    answer: "Yes"                    # EDIT
+    answer: "Yes"                    # INSERT: "Yes" or "No": legally authorized to work in the country of the job
   - key: sponsorship
     match: ["sponsorship", "require .*visa", "need .*visa", "immigration"]
-    answer: "No"                     # EDIT
+    answer: "No"                     # INSERT: "Yes" or "No": will you need visa sponsorship now or later
   - key: citizenship
     match: ["citizen", "citizenship status"]
-    answer: "U.S. Citizen"           # EDIT
+    answer: "U.S. Citizen"           # INSERT: e.g. "U.S. Citizen", "Permanent Resident", "F-1 OPT"
   - key: over_18
     match: ["18 years", "at least 18", "legal age"]
-    answer: "Yes"                    # EDIT
+    answer: "Yes"                    # INSERT: "Yes" or "No"
   - key: relocate
     match: ["willing to relocate", "relocation"]
-    answer: "Yes"                    # EDIT
+    answer: "Yes"                    # INSERT: "Yes" or "No"
   - key: remote_hybrid
     match: ["work from office", "hybrid", "on-site", "onsite", "in.office"]
-    answer: "Yes"                    # EDIT
+    answer: "Yes"                    # INSERT: "Yes" or "No": fine working on-site / hybrid
   - key: start_date
     match: ["start date", "available to start", "earliest .*start", "availability"]
-    answer: "Flexible; two weeks' notice."   # EDIT
+    answer: "Flexible; two weeks' notice."   # INSERT: short free text, e.g. "June 2026" or "Two weeks' notice"
   - key: current_employer
     match: ["current employer", "current company"]
-    answer: "Acme"                   # EDIT
+    answer: "Acme"                   # INSERT: current employer name, or "None"
   - key: current_title
     match: ["current title", "current role"]
-    answer: "Software Engineer"      # EDIT
+    answer: "Software Engineer"      # INSERT: current job title, or "Student"
   - key: years_experience_fulltime
     match: ["years of full.time", "full.time .*experience", "years of professional .*post.grad"]
-    answer: "0"                      # EDIT; for a dropdown the applier picks the matching bucket ("0-1")
+    answer: "0"                      # INSERT: whole number as a string, e.g. "2"; for a dropdown the applier picks the matching bucket ("0-1")
   - key: years_experience
     match: ["years of .*experience", "how many years"]
-    answer: "1"                      # EDIT; rounded total incl. internships/co-ops
+    answer: "1"                      # INSERT: whole number, rounded total incl. internships/co-ops, e.g. "3"
   - key: degree
     match: ["highest .*degree", "education level", "highest level of education"]
-    answer: "Bachelor's Degree"      # EDIT
+    answer: "Bachelor's Degree"      # INSERT: e.g. "Bachelor's Degree", "Master's Degree"
   - key: school
     match: ["school", "university", "college name"]
-    answer: "Springfield State University"   # EDIT
+    answer: "Springfield State University"   # INSERT: official school name, same as master.yaml education
   - key: major
     match: ["major", "field of study", "discipline"]
-    answer: "Computer Science"       # EDIT
+    answer: "Computer Science"       # INSERT: e.g. "Computer Science"
   - key: grad_year
     match: ["graduation", "grad year", "graduate"]
-    answer: "2026"                   # EDIT
+    answer: "2026"                   # INSERT: YYYY, e.g. "2025"
   - key: gpa
     match: ["gpa"]
-    answer: "3.6"                    # EDIT
+    answer: "3.6"                    # INSERT: e.g. "3.4", or "" to leave blank
   - key: salary_expectation
     match: ["salary", "compensation expectation", "desired pay", "expected .*salary"]
     answer: null                     # keep null: freeform salary is always an Action Item (config safety.pause_on)
     note: "If a range dropdown exists, the applier picks the lowest bucket >= config/targets.yaml candidate.salary_dropdown_floor_usd; else Action Item."
   - key: previously_applied
     match: ["previously applied", "applied .*before", "worked .*here before", "former employee"]
-    answer: "No"                     # the applier overrides to Yes if the company is in tracker history
+    answer: "No"                     # reusable default: fine to keep (the applier overrides to Yes from tracker history)
   - key: referral
     match: ["referred", "referral", "how did you hear"]
-    answer: "Company careers page"
+    answer: "Company careers page"   # reusable default: fine to keep
     note: "If the Contacts tab has a referrer for this company → use their name."
   - key: non_compete
     match: ["non-compete", "noncompete", "restrictive covenant"]
-    answer: "No"                     # EDIT: confirm with your current contract
+    answer: "No"                     # INSERT: "Yes" or "No": check your current contract
   - key: security_clearance
     match: ["clearance"]
-    answer: "No"                     # EDIT
+    answer: "No"                     # INSERT: "No", or the clearance level you hold, e.g. "Secret"
   - key: linkedin
     match: ["linkedin"]
-    answer: "https://linkedin.com/in/alex-example"   # EDIT
+    answer: "https://linkedin.com/in/alex-example"   # INSERT: full LinkedIn URL, same as master.yaml identity
   - key: github
     match: ["github", "portfolio", "personal website"]
-    answer: "https://github.com/alex-example"        # EDIT
+    answer: "https://github.com/alex-example"        # INSERT: GitHub or portfolio URL
   - key: pronouns
     match: ["pronouns"]
-    answer: ""                       # EDIT or leave blank
+    answer: ""                       # INSERT: e.g. "she/her", or "" to leave blank
   - key: phone
     match: ["phone"]
-    answer: "555-010-0199"           # EDIT
+    answer: "555-010-0199"           # INSERT: phone, same as master.yaml identity, e.g. "555-123-4567"
   - key: address
     match: ["street address", "address line", "city", "zip", "postal"]
-    answer: "Springfield, NY 10001"  # EDIT: city/state/zip is enough unless a verified ATS requires more
+    answer: "Springfield, NY 10001"  # INSERT: "City, ST ZIP" is enough unless a verified ATS requires more
 
 # EEO / voluntary self-identification. The applier fills ONLY these; any other option set → Action Item.
 # Matching: pick the option whose label contains `answer` (whole word, case-insensitive). `prefer` wins when
 # the form offers it; `match_not` drops loose substring matches containing those words.
-# The example declines every field. EDIT each `answer` (e.g. "Female", "No", "Asian") if you want them filled.
+# The example declines every field. Change each `answer` (e.g. "Female", "No", "Asian") if you want them filled.
 eeo:
     gender:
-      answer: "Decline"                      # EDIT
+      answer: "Decline"                      # INSERT: e.g. "Female", "Male", "Non-binary", or "Decline"
     hispanic_latino:
-      answer: "Decline"                      # EDIT
+      answer: "Decline"                      # INSERT: "Yes", "No", or "Decline"
     race_ethnicity:
-      answer: "Decline"                      # EDIT
-      prefer: null                           # EDIT: a more specific label to pick when offered
-      match_not: []                          # EDIT: e.g. ["Hispanic"]
+      answer: "Decline"                      # INSERT: e.g. "Asian", "White", "Black", or "Decline"
+      prefer: null                           # INSERT: a more specific label to pick when offered, e.g. "East Asian", or null
+      match_not: []                          # INSERT: words that rule out loose matches, e.g. ["Hispanic"], or []
     veteran:
-      answer: "I don't wish to answer"       # EDIT, e.g. "I am not a protected veteran"
+      answer: "I don't wish to answer"       # INSERT: e.g. "I am not a protected veteran"
     disability:
-      answer: "I do not want to answer"      # EDIT, e.g. "No, I do not have a disability" (CC-305 wording)
+      answer: "I do not want to answer"      # INSERT: e.g. "No, I do not have a disability" (CC-305 wording)

@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import FIXTURES, PY, build_resume_json, subprocess_env, tectonic_cache
+from conftest import FIXTURES, PY, build_resume_json, personalize_identity, subprocess_env, tectonic_cache
 from test_qa import COVER_LETTER
 
 pytestmark = pytest.mark.integration
@@ -32,6 +32,7 @@ def _run(root: Path, home: Path, *args: str) -> subprocess.CompletedProcess:
 
 @pytest.fixture
 def job_dir(temp_root: Path, home: Path) -> Path:
+    personalize_identity(temp_root)  # the untouched example identity is a hard QA fail (example_identity)
     d = temp_root / "data" / "jobs" / "t1"
     d.mkdir(parents=True)
     posting = json.loads((FIXTURES / "example_posting.json").read_text())
@@ -115,3 +116,13 @@ def test_rewritten_bullet_and_contradicted_standard_answer_fail_strict(temp_root
     assert code == 1 and res["pass"] is False
     failed = {r.split(":")[0] for r in res["fail_reasons"]}
     assert {"bullet_fidelity", "entry_headers", "skills_traced", "standard_answers"} <= failed
+
+
+def test_untouched_example_identity_fails_strict(temp_root: Path, home: Path, job_dir: Path):
+    """Same job dir, but the resume still carries Alex Example's name/email (a copy nobody filled in)."""
+    txt = (job_dir / "resume.txt").read_text()
+    prof = yaml.safe_load((temp_root / "profile" / "master.yaml").read_text())
+    (job_dir / "resume.txt").write_text(txt.replace(prof["identity"]["name"], "Alex Example"))
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 1 and res["pass"] is False
+    assert any(r.startswith("example_identity:") and "Alex Example" in r for r in res["fail_reasons"])

@@ -196,14 +196,6 @@ def test_cli_stats_without_tracker(temp_root: Path, home: Path):
 # --- YAML schema smoke ---------------------------------------------------------
 
 REPO = FIXTURES.parents[1]
-KNOWN_ATS = {"greenhouse", "lever", "ashby", "custom"}
-# The full key set skills and the applier rely on (profile/standard_answers.yaml).
-STANDARD_KEYS = {
-    "work_authorization", "sponsorship", "citizenship", "over_18", "relocate", "remote_hybrid", "start_date",
-    "current_employer", "current_title", "years_experience_fulltime", "years_experience", "degree", "school",
-    "major", "grad_year", "gpa", "salary_expectation", "previously_applied", "referral", "non_compete",
-    "security_clearance", "linkedin", "github", "pronouns", "phone", "address",
-}
 
 
 # Only the shipped examples: tests never read the personal config/ + profile/ (gitignored, often
@@ -220,62 +212,19 @@ def _strict(path: Path) -> dict:
 
 @pytest.mark.parametrize("root", list(_roots()))
 def test_yaml_schema_smoke(root: Path):
+    """The same required-key rules `careeros doctor` applies to a candidate's own files (doctor.schema_problems),
+    plus what only the shipped example must satisfy."""
+    from careeros.doctor import STANDARD_KEYS, schema_problems
+
     cfg = {n: _strict(root / "config" / f"{n}.yaml") for n in ("targets", "categories", "companies", "qa", "pipeline")}
-    t = cfg["targets"]
-    for key in ("candidate", "location", "seniority", "categories", "thresholds", "tiers"):
-        assert key in t, f"targets.{key}"
-    assert isinstance(t["location"].get("blocked_countries", []), list)
-    assert isinstance(t["seniority"]["exclude_title_keywords"], list)
-    cats = cfg["categories"]
-    for name, c in cats.items():
-        assert isinstance(c.get("title_keywords"), list) and c["title_keywords"], f"categories.{name}.title_keywords"
-    for group in ("primary", "secondary", "excluded"):
-        for name in t["categories"].get(group) or []:
-            assert name in cats, f"targets.categories.{group} references unknown category {name}"
-    co = cfg["companies"]
-    for b in co["boards"]:
-        assert b.get("company") and b.get("ats") in KNOWN_ATS, b
-        assert b.get("slug") or (b["ats"] == "custom" and b.get("url")), b
-    tiers = co.get("prestige_tiers") or {}
-    for tier in (co.get("prestige_scoring") or {}).get("auto_dream") or []:
-        assert tier in tiers, f"auto_dream tier {tier} missing from prestige_tiers"
-    assert isinstance((co.get("blocklist") or {}).get("companies", []), list)
-    for key in ("resume", "cover_letter", "banned_phrases"):
-        assert key in cfg["qa"], f"qa.{key}"
-    assert {"jobs_dir", "seen_file", "tracker_xlsx"} <= set(cfg["pipeline"]["paths"])
-    assert isinstance(t["candidate"].get("salary_dropdown_floor_usd"), int)  # applier salary-dropdown floor
+    prof = {n: _strict(root / "profile" / f"{n}.yaml") for n in ("master", "standard_answers", "confidential_terms")}
+    assert schema_problems(cfg, prof) == []
+
+    # example-only expectations
+    t, co = cfg["targets"], cfg["companies"]
     assert t["location"].get("blocked_countries") == [] and co.get("already_applied") == []  # neutral example
-
-    prof = _strict(root / "profile" / "master.yaml")
-    for key in ("identity", "education", "experience", "skills"):
-        assert key in prof, f"master.{key}"
-    for key in ("name", "email", "phone"):
-        assert prof["identity"].get(key), f"identity.{key}"
-    ids = [b["id"] for sec in ("experience", "projects", "leadership") for e in prof.get(sec) or []
-           for b in e.get("bullets") or []]
-    assert ids and len(ids) == len(set(ids)), "bullet ids must be unique"
-    assert all(isinstance(b.get("text"), str) for sec in ("experience", "projects") for e in prof.get(sec) or []
-               for b in e.get("bullets") or [])
-
-    sa = _strict(root / "profile" / "standard_answers.yaml")
-    import re
-
-    keys = []
-    for a in sa["answers"]:
-        assert a.get("key"), a
-        keys.append(a["key"])
-        for pat in a.get("match") or []:
-            re.compile(pat, re.I)  # every pattern must be a valid regex
-    assert len(keys) == len(set(keys)), "duplicate standard answer keys"
-    assert set(keys) == STANDARD_KEYS, set(keys) ^ STANDARD_KEYS
-    assert isinstance(sa.get("eeo"), dict)
-    for field in ("gender", "race_ethnicity", "veteran", "disability"):
-        assert "answer" in sa["eeo"][field], f"eeo.{field}.answer"
-
-    ct = _strict(root / "profile" / "confidential_terms.yaml")
-    assert isinstance(ct.get("terms"), list) and isinstance(ct.get("patterns"), list)
-    for pat in ct["patterns"]:
-        re.compile(pat)
+    keys = [a["key"] for a in prof["standard_answers"]["answers"]]
+    assert set(keys) == set(STANDARD_KEYS), set(keys) ^ set(STANDARD_KEYS)  # exactly the full set, nothing extra
 
     s = Settings.load(root)  # and the loader agrees
     assert s.boards and s.title_keywords()

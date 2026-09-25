@@ -140,3 +140,74 @@ def build_resume_json(profile: dict, bullet_ids: list[str], job_id: str = "job00
         "skills": {k: list(v) for k, v in profile["skills"].items()},
         "meta": {"job_id": job_id, "category": category, "resume_version": f"{category}-v1", "template": "default"},
     }
+
+
+# --- a "filled-in" candidate (not the untouched example) -------------------------------------------
+# `careeros doctor` and the QA `example_identity` gate fail on the untouched Alex Example data. These
+# helpers turn a copied example root into a coherent second fictional candidate, "Sam Candidate".
+
+FILLED_IDENTITY = {
+    "name": "Sam Candidate",
+    "email": "sam@candidate.dev",
+    "phone": "555-020-0142",
+    "linkedin": "https://linkedin.com/in/sam-candidate",
+    "github": "https://github.com/sam-candidate",
+}
+# example entry id -> filled-in entry id (bullet ids follow: acme.1 -> northwind.1)
+FILLED_IDS = {"acme": "northwind", "initech_intern": "contoso_intern", "widgetizer": "tasklight",
+              "state_u": "lakeside_u", "acm": "robotics_club"}
+
+
+def _yaml_rw(path: Path, fn) -> None:
+    import yaml
+
+    data = yaml.safe_load(path.read_text(encoding="utf-8"))
+    fn(data)
+    path.write_text(yaml.safe_dump(data, sort_keys=False, allow_unicode=True), encoding="utf-8")
+
+
+def personalize_identity(root: Path) -> Path:
+    """Replace only the example identity (name, email, phone, links) in root/profile/master.yaml.
+    Entry and bullet ids stay the example's, so example artifacts (COVER_LETTER, bullet lists) still trace."""
+    _yaml_rw(root / "profile" / "master.yaml", lambda d: d["identity"].update(FILLED_IDENTITY))
+    return root
+
+
+def personalize(root: Path) -> Path:
+    """A fully filled-in root: new identity, renamed entry/bullet ids (categories follow), edited standard
+    answers, one voice sample. YAML is re-dumped, so no `# INSERT` markers survive."""
+    personalize_identity(root)
+
+    def _ids(d):
+        for sec in ("experience", "projects", "education", "leadership"):
+            for e in d.get(sec) or []:
+                new = FILLED_IDS.get(e["id"], e["id"])
+                for b in e.get("bullets") or []:
+                    b["id"] = new + b["id"][len(e["id"]):]
+                e["id"] = new
+
+    _yaml_rw(root / "profile" / "master.yaml", _ids)
+
+    def _cats(d):
+        for c in d.values():
+            if isinstance(c, dict) and c.get("bullet_priority"):
+                c["bullet_priority"] = [FILLED_IDS.get(i, i) for i in c["bullet_priority"]]
+
+    _yaml_rw(root / "config" / "categories.yaml", _cats)
+
+    def _answers(d):
+        by_key = {a["key"]: a for a in d["answers"]}
+        by_key["phone"]["answer"] = FILLED_IDENTITY["phone"]
+        by_key["linkedin"]["answer"] = FILLED_IDENTITY["linkedin"]
+        by_key["github"]["answer"] = FILLED_IDENTITY["github"]
+        by_key["school"]["answer"] = "Lakeside University"
+
+    _yaml_rw(root / "profile" / "standard_answers.yaml", _answers)
+    for name in ("targets", "companies"):
+        p = root / "config" / f"{name}.yaml"
+        _yaml_rw(p, lambda d: None)  # drop comments (and their `# INSERT` markers): "reviewed"
+    _yaml_rw(root / "profile" / "confidential_terms.yaml", lambda d: None)
+    samples = root / "profile" / "voice" / "samples"
+    samples.mkdir(parents=True, exist_ok=True)
+    (samples / "letter1.md").write_text("I built the thing because the old one kept breaking.\n")
+    return root

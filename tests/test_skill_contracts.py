@@ -17,6 +17,9 @@ pytestmark = pytest.mark.unit
 SKILLS = sorted((ROOT / ".claude" / "skills").glob("*/SKILL.md"))
 DOCS = SKILLS + sorted((ROOT / ".claude" / "skills" / "_shared").glob("*.md")) + sorted(
     (ROOT / "src" / "careeros" / "apply").glob("*.md"))
+# User-facing docs: every command and file they tell a new user to run or edit must exist too.
+USER_DOCS = [ROOT / "README.md", ROOT / "docs" / "GETTING_STARTED.md"]
+DOCS = DOCS + USER_DOCS
 CLI_RE = re.compile(r"careeros((?: [a-z][a-z-]*)+)")
 PATH_RE = re.compile(r"(?<![\w/.])((?:profile|config|templates|src/careeros)/[\w/.-]+\.(?:ya?ml|md|py|tex))")
 TARGETS_KEY_RE = re.compile(r"targets\.yaml: ?([a-z_]+(?:\.[a-z_]+)+)")
@@ -211,3 +214,25 @@ def test_apply_job_reads_override_via_cli_and_allows_tier_a_staging():
     assert "careeros tracker show <job_id> --json" in text
     assert "needs_review" in text.split("## 1.", 1)[1].split("### 1b", 1)[0]
     assert "answers.json[" not in text
+
+
+@pytest.mark.parametrize("skill", ["prepare-job", "apply-job"])
+def test_fake_data_guard_runs_doctor_first(skill: str):
+    """Both skills that produce or submit an application run `careeros doctor --quiet` before anything
+    else and stop on a nonzero exit (untouched example data, missing claude CLI, broken YAML)."""
+    text = (ROOT / ".claude" / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
+    body = text.split("---", 2)[2]
+    first_step = body.index("## ")
+    guard = body.find("careeros doctor --quiet")
+    assert 0 <= guard < body.index("## ", first_step + 3), "doctor guard must come in the first section"
+    assert "nonzero" in body[guard - 400: guard + 600].lower() or "non-zero" in body[guard - 400: guard + 600].lower()
+
+
+def test_user_docs_exist_and_link():
+    readme = (ROOT / "README.md").read_text(encoding="utf-8")
+    assert (ROOT / "docs" / "GETTING_STARTED.md").is_file()
+    head = readme[: readme.index("## ", readme.index("## ") + 3)] if readme.count("## ") > 1 else readme
+    assert "docs/GETTING_STARTED.md" in head, "README must point to the getting-started guide first"
+    for section in ("## How it works", "## What you configure vs what's reusable", "## Reference"):
+        assert section in readme, section
+    assert readme.index("## Reference") > readme.index("## How it works")

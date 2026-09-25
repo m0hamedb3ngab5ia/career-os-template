@@ -1,4 +1,17 @@
-# Quality gate. Every artifact must pass before submit. hard = fail blocks; soft = warn + score.
+# ==================================================================================================
+# config/qa.yaml: QUALITY GATE
+#
+# What this file is:
+#   The rules every résumé, cover letter and answer must pass before anything is submitted
+#   (`python -m careeros.qa` + the /qa-review critic). hard = a failure blocks; soft = warn + score.
+#
+# What you must fill in:
+#   - nothing. Every value here is generic.
+#
+# What you can leave as is (reusable default: fine to keep):
+#   - the whole file. Optionally add words you never want to see to banned_phrases.
+# ==================================================================================================
+# reusable default: fine to keep
 
 resume:
   max_pages: 1
@@ -38,7 +51,7 @@ critic:
   pass_threshold: 7.5            # mean over rubric
   max_regenerations: 1           # then → Action Item
 
-banned_phrases:
+banned_phrases:                  # reusable default: fine to keep; add your own pet peeves
   - spearheaded
   - leveraged
   - leverage
