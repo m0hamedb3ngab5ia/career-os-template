@@ -14,6 +14,8 @@ a pass here means the artifacts may be submitted without a human reading them (t
 - `config/qa.yaml` (rubric list, `pass_threshold`, `max_regenerations`, banned phrases, style rules,
   per-artifact hard/soft rules).
 - `profile/master.yaml` and `profile/voice/style_guide.md` (+ `samples/`).
+- `.claude/skills/_shared/resume_writing_rules.md` (bullet formulas, weak openers, ownership honesty; the
+  `bullet_strength` rubric row below scores against it).
 - `JOB/posting.json`, `JOB/score.json`, and whichever exist of `resume.json`, `resume.txt`,
   `cover_letter.md`, `answers.json`, `resume.pdf`.
 - `JOB/qa.json` if it exists: read `regenerations` (default 0).
@@ -22,7 +24,8 @@ a pass here means the artifacts may be submitted without a human reading them (t
 
 Run `.venv/bin/python -m careeros.qa JOB`. Parse the JSON: `pass`, `checks[]` ({check, level, ok, detail, skipped?}),
 `fail_reasons[]`, `warnings[]`, `keyword_coverage`, `cover_letter_word_count`, `orphan_numbers[]`,
-`unknown_tools[]`, `banned_hits[]`, `confidential_hits[]` (terms/patterns from `profile/confidential_terms.yaml`
+`unknown_tools[]`, `banned_hits[]`, `bullet_shape[]` ({id, line, issues}: soft `weak_opener` / `no_metric` / `too_long`
+warnings, never a fail), `confidential_hits[]` (terms/patterns from `profile/confidential_terms.yaml`
 found in resume.txt, cover_letter.md, answers.json or outreach.json; always a hard fail, never waived).
 Store the whole object as `deterministic`. If the command itself errors, set
 `deterministic = {"pass": false, "error": "<stderr>"}` and treat as a hard fail.
@@ -58,8 +61,13 @@ tool, or outcome not in the profile bullet -> UNSUPPORTED entry with artifact `r
 | voice_match | reads like `style_guide.md` (short sentences, first person, plain ask, no praise); matches `## Learned` patterns and samples | cap 6 if em-dashes > 2, rhetorical question, tricolon of adjectives, or any throat-clearing opener; cap 8 if `voice_verified: false` (cannot verify beyond rules) |
 | zero_fabrication | `unsupported_count == 0` and deterministic truth_trace/number_audit/tool_audit ok | 1 if any number/tool fabricated; max 4 if any UNSUPPORTED; 10 only when zero |
 | ats_safety | single column, standard section headers, contact intact, no tables/icons, keyword coverage >= 0.6, 1 page | cap 5 if `contact_intact` or `pdf_page_count` failed; cap 7 if coverage < 0.6 |
+| bullet_strength | resume.txt bullets follow `resume_writing_rules.md`: action verb first, technical what, impact/scale, tech named; team work worded "contributed to" / "member of" | cap 7 if `bullet_shape` has any `weak_opener`; cap 8 if more than a third of bullets are `no_metric` |
 
-`mean` = average of the five, 2 decimals.
+`mean` = average of the five keys in `critic.model_rubric` (relevance .. ats_safety), 2 decimals.
+`bullet_strength` is advisory: it is scored and written to `rubric`, but it is not in `mean` and never a
+fail reason (bullets are frozen profile text; regenerating cannot add a number). When it is below 7, its
+`why` names the weakest bullet ids and one metric question per bullet without a number (never a guessed
+value; `resume_writing_rules.md` OVERRIDE).
 
 ## 5. Decide
 
@@ -69,7 +77,7 @@ rubric_ok = mean >= critic.pass_threshold (7.5) and zero_fabrication >= 8
 pass = hard_ok and rubric_ok
 ```
 `fail_reasons[]`: every deterministic hard fail (verbatim `fail_reasons`), every UNSUPPORTED claim
-(`"fabrication: <claim> (<artifact>)"`), every rubric key below 7 (`"<key>=<n>: <justification>"`), and,
+(`"fabrication: <claim> (<artifact>)"`), every `critic.model_rubric` key below 7 (`"<key>=<n>: <justification>"`; never `bullet_strength`), and,
 when `mean < pass_threshold` or `zero_fabrication < 8` even though no key is below 7,
 `"critic_mean=<mean> < <threshold>"` (or `"zero_fabrication=<n> < 8"`), so a failed rubric always has a reason.
 
@@ -89,7 +97,7 @@ a fail with suggestion `{"skill":"<writer>","suggestion":"artifact missing"}`.
   "rubric": {
     "relevance": {"score": 8, "why": "..."}, "specificity": {"score": 7, "why": "..."},
     "voice_match": {"score": 7, "why": "..."}, "zero_fabrication": {"score": 10, "why": "..."},
-    "ats_safety": {"score": 9, "why": "..."}
+    "ats_safety": {"score": 9, "why": "..."}, "bullet_strength": {"score": 7, "why": "..."}
   },
   "fabrication_audit": [ ... ], "unsupported_count": 0,
   "mean": 8.2, "pass": true,

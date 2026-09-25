@@ -24,7 +24,7 @@ Acme | Jun 2026 - Present
 Software Engineer | New York, NY
 - Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day
 - Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks
-- Containerized three services with Docker and deployed them to AWS
+- Contributed to containerizing three services with Docker and deploying them to AWS as a member of the platform team
 
 Initech | Jun 2025 - Aug 2025
 Data Engineering Intern | Boston, MA
@@ -659,7 +659,7 @@ def test_bullet_without_text_fails(tmp_path: Path, text) -> None:
 def test_first_word_substitution_fails(tmp_path: Path) -> None:
     job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "company": "Acme", "title": "Software Engineer",
         "start": "Jun 2026", "end": "Present",
-        "bullets": [{"id": "acme.3", "text": "Decommissioned three services with Docker and deployed them to AWS"}]}])
+        "bullets": [{"id": "acme.3", "text": "Led containerizing three services with Docker and deploying them to AWS as a member of the platform team"}]}])
     assert by_name(run(job), "bullet_fidelity")["ok"] is False
 
 
@@ -774,3 +774,94 @@ def test_example_identity_skipped_on_the_shipped_example_repo(tmp_path: Path) ->
     """QA run against examples/ itself (tests, demos) is not a candidate setup: skipped, not failed."""
     c = by_name(run(make_job(tmp_path)), "example_identity")
     assert c["ok"] and c.get("skipped")
+
+
+# --- bullet_shape (soft): weak opener, no metric/scale, too long -------------------------------------
+
+from careeros.qa import DEFAULT_WEAK_OPENERS, bullet_shape_issues  # noqa: E402
+
+LONG_BULLET = ("Built a FastAPI service in Python that ingests order events into PostgreSQL and then reconciles them "
+               "against the ledger daily for 40 analysts so that the finance group can review every break the next morning "
+               "without opening a spreadsheet")
+
+
+@pytest.mark.parametrize("text,issues", [
+    ("Built a FastAPI service processing 2 million events per day", []),
+    ("Containerized three services with Docker and deployed them to AWS", []),     # scale word, no digit
+    ("Shipped a dashboard used daily by the reporting group", []),                  # scale word "daily"
+    ("Worked on the billing pipeline for the payments group", ["weak_opener", "no_metric"]),
+    ("helped migrate 12 services to Docker", ["weak_opener"]),                     # case-insensitive
+    ("Responsible for 3 Airflow DAGs", ["weak_opener"]),
+    ("Helpfully documented the ledger schema", ["no_metric"]),                     # whole words only
+    ("Refactored the ledger module in Python", ["no_metric"]),
+    (LONG_BULLET, ["too_long"]),
+])
+def test_bullet_shape_issues(text: str, issues: list[str]) -> None:
+    assert bullet_shape_issues(text, DEFAULT_WEAK_OPENERS, 35) == issues
+
+
+def test_bullet_shape_default_weak_openers() -> None:
+    assert set(DEFAULT_WEAK_OPENERS) == {"worked on", "helped", "responsible for", "assisted", "participated in",
+                                         "involved in", "tasked with"}
+
+
+def test_bullet_shape_ok_on_clean_resume_and_soft(tmp_path: Path) -> None:
+    c = by_name(run(make_job(tmp_path)), "bullet_shape")
+    assert c["level"] == "soft" and c["ok"] and not c.get("skipped"), c["detail"]
+
+
+def test_bullet_shape_reports_ids_and_never_fails_qa(tmp_path: Path) -> None:
+    job = make_job(tmp_path)
+    rj = json.loads((job / "resume.json").read_text())
+    weak = "Helped the reporting group with the ledger"
+    rj["experience"][0]["bullets"][2]["text"] = weak  # acme.3
+    (job / "resume.json").write_text(json.dumps(rj))
+    txt = RESUME_TXT.replace("Contributed to containerizing three services with Docker and deploying them to AWS as a member of the platform team", weak)
+    txt = txt.replace("EDUCATION", f"- {LONG_BULLET}\n\nEDUCATION")
+    (job / "resume.txt").write_text(txt)
+    res = run(job)
+    c = by_name(res, "bullet_shape")
+    assert c["level"] == "soft" and not c["ok"]
+    assert "acme.3: weak_opener, no_metric" in c["detail"]
+    assert "too_long" in c["detail"] and "line " in c["detail"]  # a line with no resume.json id is named by line
+    shapes = {s.get("id") or s["line"]: s["issues"] for s in res["bullet_shape"]}
+    assert shapes["acme.3"] == ["weak_opener", "no_metric"]
+    assert any(v == ["too_long"] for k, v in shapes.items() if k != "acme.3")
+    assert all(not r.startswith("bullet_shape") for r in res["fail_reasons"])
+    assert any(w.startswith("bullet_shape:") for w in res["warnings"])
+
+
+def test_bullet_shape_reads_config(tmp_path: Path) -> None:
+    root = _copied_root(tmp_path)
+    qa = yaml.safe_load((root / "config" / "qa.yaml").read_text())
+    qa["resume"]["soft"]["bullet_max_words"] = 10
+    qa["resume"]["soft"]["weak_openers"] = ["built"]
+    (root / "config" / "qa.yaml").write_text(yaml.safe_dump(qa))
+    c = by_name(run_deterministic(make_job(tmp_path), root=root), "bullet_shape")
+    assert not c["ok"]
+    assert "acme.1: weak_opener, too_long" in c["detail"]   # "Built ..." is now a weak opener, 19 words > 10
+    assert "widgetizer.1: weak_opener, too_long" in c["detail"]
+
+
+def test_bullet_shape_defaults_when_config_keys_absent(tmp_path: Path) -> None:
+    root = _copied_root(tmp_path)
+    qa = yaml.safe_load((root / "config" / "qa.yaml").read_text())
+    for k in ("bullet_max_words", "weak_openers", "scale_words"):
+        qa["resume"]["soft"].pop(k, None)
+    (root / "config" / "qa.yaml").write_text(yaml.safe_dump(qa))
+    job = make_job(tmp_path, resume_txt=RESUME_TXT.replace("EDUCATION", "- Worked on the ledger\n\nEDUCATION"))
+    c = by_name(run_deterministic(job, root=root), "bullet_shape")
+    assert not c["ok"] and "weak_opener, no_metric" in c["detail"]
+
+
+def test_bullet_shape_skipped_without_resume_txt(tmp_path: Path) -> None:
+    job = make_job(tmp_path)
+    (job / "resume.txt").unlink()
+    c = by_name(run(job), "bullet_shape")
+    assert c["ok"] and c.get("skipped")
+
+
+def test_example_qa_yaml_declares_bullet_shape_keys() -> None:
+    soft = yaml.safe_load((EXAMPLE_REPO / "config" / "qa.yaml").read_text())["resume"]["soft"]
+    assert soft["bullet_max_words"] == 35
+    assert set(soft["weak_openers"]) == set(DEFAULT_WEAK_OPENERS)

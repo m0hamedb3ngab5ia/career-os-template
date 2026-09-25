@@ -44,7 +44,7 @@ Warn if PR metadata, intent, or base freshness cannot be verified.
 ## Review process
 
 1. Read `CLAUDE.md`, `ARCHITECTURE.md`, `examples/` (config + profile shape), and for touched skills
-   `.claude/skills/_shared/evidence_rules.md`.
+   `.claude/skills/_shared/evidence_rules.md` (+ `resume_writing_rules.md` for résumé skills).
 2. Compare PR intent (title/body) to the diff: missing behavior, scope creep, dead code,
    a skill that references a CLI subcommand, file, or config key that does not exist.
 3. Read whole functions and whole SKILL.md sections, not only hunks.
@@ -114,7 +114,10 @@ This repo requires tests with code (`CLAUDE.md` → Testing). For every PR that 
 - `src/careeros/tracker.py` - column order, migrations on existing workbooks, user-edit preservation.
 - `src/careeros/scout/` - prefilter correctness (seniority, blocked countries, blocklist), dedup by `job_id`.
 - `src/careeros/apply/` + `.claude/skills/apply-job/` - submit guards, EEO selection, standard-answer matching order.
-- `.claude/skills/*` - contradictions with `evidence_rules.md`, `config/qa.yaml`, or another skill's file schema.
+- `.claude/skills/*` - contradictions with `evidence_rules.md`, `resume_writing_rules.md` (its OVERRIDE: never
+  estimate a number), `config/qa.yaml`, or another skill's file schema.
+- `third_party/` - vendored reference only: never moved under `.claude/skills/`, never cited as a rule over
+  `_shared/*.md`.
 - `examples/` - schema changes without matching loader/skill/`careeros init` updates; any real person's data
   (examples must stay fictional); a key the skills read that the example lacks.
 

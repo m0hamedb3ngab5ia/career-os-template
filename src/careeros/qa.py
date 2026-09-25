@@ -20,7 +20,9 @@ Output schema (dict / JSON):
       "keyword_coverage": float | None,
       "cover_letter_word_count": int | None,   # computed from the body; frontmatter word_count is ignored
       "orphan_numbers": [...], "unknown_tools": [...], "banned_hits": [...],
-      "confidential_hits": [...]         # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      "confidential_hits": [...],        # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      "bullet_shape": [ {id: str | None, line: str, issues: [weak_opener|no_metric|too_long]} ]
+                                         # soft: resume.txt bullets that break _shared/resume_writing_rules.md
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
     }
 
@@ -69,6 +71,13 @@ TOOL_ALLOWLIST = {
     "rest", "grpc", "tdd", "oop", "mvp", "beta", "testflight", "app", "store",
     "north", "south", "east", "west", "new", "city",
 }
+# bullet_shape defaults (config/qa.yaml: resume.soft.{weak_openers, bullet_max_words, scale_words} override them;
+# a personal qa.yaml written before these keys existed gets these values).
+DEFAULT_WEAK_OPENERS = ("worked on", "helped", "responsible for", "assisted", "participated in", "involved in",
+                        "tasked with")
+DEFAULT_BULLET_MAX_WORDS = 35
+DEFAULT_SCALE_WORDS = ("users", "requests", "records", "teams", "services", "daily", "million", "thousand", "dozen")
+
 # Place names are not hardcoded: every word of the profile's identity.location and each experience /
 # project / education `location` is allowed at runtime (ProfileIndex.place_words).
 
@@ -163,6 +172,23 @@ def bullet_text_allowed(out: str, sources: Iterable[str]) -> bool:
     if len(ow) < 2:
         return False
     return any(_fid_words(src)[:len(ow)] == ow for src in sources)
+
+
+def bullet_shape_issues(text: str, weak_openers: Iterable[str], max_words: int,
+                        scale_words: Iterable[str] = DEFAULT_SCALE_WORDS) -> list[str]:
+    """Soft résumé-bullet checks from .claude/skills/_shared/resume_writing_rules.md, in this order:
+    `weak_opener` (starts with one of `weak_openers`, whole words, any case), `no_metric` (no digit and no
+    scale word), `too_long` (more than `max_words` words)."""
+    t = str(text or "").strip()
+    low = t.lower()
+    issues = []
+    if any(re.match(re.escape(str(w).strip().lower()) + r"(?![a-z0-9])", low) for w in weak_openers if str(w).strip()):
+        issues.append("weak_opener")
+    if not re.search(r"\d", t) and not any(_term_in_text(str(w).strip(), t) for w in scale_words if str(w).strip()):
+        issues.append("no_metric")
+    if _count_words(t) > max_words:
+        issues.append("too_long")
+    return issues
 
 
 def _standard_hit(question: str, path: Path, patterns: list[tuple[str, list[re.Pattern[str]]]]) -> str | None:
@@ -1006,6 +1032,45 @@ class Checker:
                  f"close {close!r} not used before for this company" if not repeats
                  else f"close {close!r} already used for this company in: {', '.join(repeats)}")
 
+    def check_bullet_shape(self) -> None:
+        """Soft: each `- ` bullet line of resume.txt against resume_writing_rules.md (weak opener, no number or
+        scale word, over `bullet_max_words`). Never fails QA: bullets are frozen profile text, so the fix is a
+        stronger variant or a metric question in profile/master.yaml. Offenders are named by resume.json id."""
+        if self.resume_txt is None:
+            self.skip("bullet_shape", "soft", "resume.txt missing")
+            return
+        soft = ((self.qa_cfg.get("resume") or {}).get("soft") or {}) if isinstance(self.qa_cfg, dict) else {}
+        weak = soft.get("weak_openers")
+        weak = list(weak) if isinstance(weak, list) else list(DEFAULT_WEAK_OPENERS)
+        scale = soft.get("scale_words")
+        scale = list(scale) if isinstance(scale, list) else list(DEFAULT_SCALE_WORDS)
+        try:
+            max_words = int(soft.get("bullet_max_words", DEFAULT_BULLET_MAX_WORDS))
+        except (TypeError, ValueError):
+            max_words = DEFAULT_BULLET_MAX_WORDS
+        ids_by_text: dict[str, str] = {}
+        for e in self._resume_entries():
+            for b in e.get("bullets") or []:
+                if isinstance(b, dict) and b.get("id") and b.get("text"):
+                    ids_by_text.setdefault(" ".join(_fid_words(b["text"])), str(b["id"]))
+        found, n = [], 0
+        for i, raw in enumerate(self.resume_txt.splitlines(), 1):
+            m = re.match(r"\s*[-•*·]\s+(.*\S)", raw)
+            if not m:
+                continue
+            n += 1
+            line = m.group(1)
+            issues = bullet_shape_issues(line, weak, max_words, scale)
+            if issues:
+                found.append({"id": ids_by_text.get(" ".join(_fid_words(line))), "line": line, "issues": issues,
+                              "_n": i})
+        self.extras["bullet_shape"] = [{k: v for k, v in f.items() if k != "_n"} for f in found]
+        detail = "; ".join(f"{f['id'] or 'line ' + str(f['_n'])}: {', '.join(f['issues'])}"
+                           + ("" if f["id"] else f" ({f['line'][:60]})") for f in found)
+        self.add("bullet_shape", "soft", not found,
+                 f"{n} bullets: verb-first, a number or scale word, <= {max_words} words" if not found
+                 else f"{detail} (see .claude/skills/_shared/resume_writing_rules.md)")
+
     def check_answers_review(self) -> None:
         if not isinstance(self.answers, list):
             return
@@ -1031,6 +1096,7 @@ class Checker:
         self.check_contact()
         self.check_pdf()
         self.check_keyword_coverage()
+        self.check_bullet_shape()
         self.check_cover_letter_structure()
         self.check_close_variant()
         self.check_answers_review()
@@ -1052,6 +1118,7 @@ class Checker:
             "unknown_tools": self.extras["unknown_tools"],
             "banned_hits": self.extras["banned_hits"],
             "confidential_hits": self.extras.get("confidential_hits", []),
+            "bullet_shape": self.extras.get("bullet_shape", []),
         }
 
 
@@ -1065,6 +1132,7 @@ def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> di
             "summary": {"hard_fail": 1, "soft_fail": 0, "skipped": 0},
             "fail_reasons": [f"job_dir_exists: {job_dir} does not exist"], "warnings": [],
             "keyword_coverage": None, "orphan_numbers": [], "unknown_tools": [], "banned_hits": [], "confidential_hits": [],
+            "bullet_shape": [],
         }
     return Checker(job_dir, root_path).run()
 

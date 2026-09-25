@@ -126,3 +126,27 @@ def test_untouched_example_identity_fails_strict(temp_root: Path, home: Path, jo
     code, res = _qa(temp_root, home, job_dir, "--strict")
     assert code == 1 and res["pass"] is False
     assert any(r.startswith("example_identity:") and "Alex Example" in r for r in res["fail_reasons"])
+
+
+def test_weak_bullet_is_a_soft_bullet_shape_warning(temp_root: Path, home: Path, job_dir: Path):
+    """A real profile bullet with a weak opener and no metric renders, passes every hard check (it is true),
+    and shows up only as a bullet_shape warning naming its id."""
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 0 and {c["check"]: c for c in res["checks"]}["bullet_shape"]["ok"]
+
+    weak = "Worked on the reconciliation job for the finance group"
+    prof_path = temp_root / "profile" / "master.yaml"
+    prof = yaml.safe_load(prof_path.read_text())
+    prof["experience"][0]["bullets"].append({"id": "acme.5", "text": weak, "weak": True})
+    prof_path.write_text(yaml.safe_dump(prof, sort_keys=False))
+    rj = json.loads((job_dir / "resume.json").read_text())
+    rj["experience"][0]["bullets"].append({"id": "acme.5", "text": weak})
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    assert _run(temp_root, home, "templates/resume/render.py", str(job_dir / "resume.json"), "--txt-only").returncode == 0
+    assert f"- {weak}" in (job_dir / "resume.txt").read_text()
+
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 0 and res["pass"] is True, res["fail_reasons"]
+    shape = {c["check"]: c for c in res["checks"]}["bullet_shape"]
+    assert shape["level"] == "soft" and not shape["ok"] and "acme.5: weak_opener, no_metric" in shape["detail"]
+    assert res["bullet_shape"] == [{"id": "acme.5", "line": weak, "issues": ["weak_opener", "no_metric"]}]

@@ -25,6 +25,17 @@ resume:
   soft:
     keyword_coverage_min: 0.6    # share of posting required_skills present honestly
     date_format: "Mon YYYY – Mon YYYY"
+    # bullet_shape (warn only, never fails): .claude/skills/_shared/resume_writing_rules.md
+    bullet_max_words: 35         # flag bullets longer than this (target 15-28 words, 1-2 lines)
+    weak_openers:                # flag bullets that start with one of these
+      - worked on
+      - helped
+      - responsible for
+      - assisted
+      - participated in
+      - involved in
+      - tasked with
+    scale_words: [users, requests, records, teams, services, daily, million, thousand, dozen]   # count as a metric when a bullet has no digit
 
 cover_letter:
   max_words: 250

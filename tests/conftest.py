@@ -185,6 +185,9 @@ def personalize(root: Path) -> Path:
                 for b in e.get("bullets") or []:
                     b["id"] = new + b["id"][len(e["id"]):]
                 e["id"] = new
+        for q in d.get("metric_questions") or []:
+            old, _, n = q["bullet_id"].partition(".")
+            q["bullet_id"] = f"{FILLED_IDS.get(old, old)}.{n}"
 
     _yaml_rw(root / "profile" / "master.yaml", _ids)
 

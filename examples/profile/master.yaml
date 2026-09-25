@@ -50,6 +50,11 @@ education:
     activities: [ACM Chapter Treasurer]                            # INSERT: clubs/roles, or []
 
 # One block per job. Bullets: past tense, one fact each, with the real number if there is one.
+# How to write them: .claude/skills/_shared/resume_writing_rules.md (X-Y-Z / tech formula, verb first, 15-28 words,
+# never an invented number). Optional per-bullet flags:
+#   resume_default: true   tailor-resume prefers this bullet when choosing between bullets of equal relevance
+#   weak: true             you know it is weak; used only when nothing stronger covers the posting
+#   estimate: true         the number is your own estimate; the text then carries a "~" prefix (e.g. ~40%)
 experience:
   - id: acme                                      # INSERT: short unique id, e.g. northwind (its bullets: northwind.1, .2 ...)
     company: Acme                                 # INSERT: employer name
@@ -68,6 +73,7 @@ experience:
         text: Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day   # INSERT: what you did, with what, and the result
         ownership: own                            # INSERT: own (you led it) | team (you contributed)
         metrics: ["2 million"]                    # INSERT: every number in `text`, as written
+        resume_default: true                      # INSERT: optional; true = lead with this bullet
       - id: acme.2                                # INSERT: <entry id>.<n>
         text: Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks   # INSERT: one fact per bullet
         ownership: own                            # INSERT: own | team
@@ -75,7 +81,7 @@ experience:
         variants:
           short: Shipped a React/TypeScript dashboard for 40 analysts   # INSERT: optional shorter wording, same facts and numbers
       - id: acme.3                                # INSERT: <entry id>.<n>
-        text: Containerized three services with Docker and deployed them to AWS   # INSERT: one fact per bullet
+        text: Contributed to containerizing three services with Docker and deploying them to AWS as a member of the platform team   # INSERT: team work says "contributed to" / "member of", never "built"
         ownership: team                           # INSERT: own | team
       - id: acme.4
         text: "[OPEN: on-call story — add when it happens]"
@@ -94,7 +100,7 @@ experience:
         text: Wrote 12 Airflow DAGs in Python moving SQL reports into a warehouse, cutting manual prep by 5 hours per week   # INSERT: one fact per bullet
         metrics: ["12", "5 hours"]                # INSERT: every number in `text`
       - id: initech_intern.2                      # INSERT: <entry id>.<n>
-        text: Profiled data quality across 30 SQL tables and documented lineage for the reporting team   # INSERT: one fact per bullet
+        text: Profiled data quality and documented lineage across 30 SQL tables with Python checks, giving the reporting team one traced source per field   # INSERT: [verb] + [technical what] + [scale] + [tech]
         metrics: ["30"]                           # INSERT: every number in `text`
 
 projects:
@@ -109,8 +115,9 @@ projects:
         text: Built an iOS app in Swift and SwiftUI with a Supabase backend, reaching 300 beta users   # INSERT: one fact per bullet
         metrics: ["300"]                          # INSERT: every number in `text`
       - id: widgetizer.2                          # INSERT: <entry id>.<n>
-        text: Wrote 15 XCTest suites covering sync and offline logic   # INSERT: one fact per bullet
+        text: Wrote 15 XCTest suites for the Swift sync and offline logic, catching merge-conflict bugs before each TestFlight beta build   # INSERT: one fact per bullet
         metrics: ["15"]                           # INSERT: every number in `text`
+        resume_default: true                      # INSERT: optional
 
 skills:                      # QA rejects any tool in a résumé that is not listed here or in a cited bullet
   programming: [Python, SQL, TypeScript, JavaScript, Swift, Java]    # INSERT: languages, e.g. [Python, Go]
@@ -127,6 +134,13 @@ leadership:
       - id: acm.1                                 # INSERT: <entry id>.<n>
         text: Managed a 4000 dollar budget for 20 student events   # INSERT: one fact per bullet
         metrics: ["4000", "20"]                   # INSERT: every number in `text`
+
+# Numbers you still owe. When a bullet has no metric, a skill or you add {bullet_id, question} here instead of
+# guessing a number (resume_writing_rules.md: OVERRIDE). Answer by editing the bullet's text + metrics (an estimate
+# gets "~" and `estimate: true`), then delete the question. `careeros doctor` WARNs while any is open.
+metric_questions:
+  - bullet_id: acme.3
+    question: How long did a deploy of those three services take before and after Docker (minutes)?
 
 # Narrative facts for cover letters / "why us" answers. Only these may be used as personal motivation claims.
 narratives:

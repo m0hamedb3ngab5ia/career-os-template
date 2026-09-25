@@ -92,3 +92,18 @@ def test_doctor_quiet_inside_claude_code_without_cli_on_path(checkout: Path, hom
     r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(checkout), "doctor", "--quiet"], capture_output=True,
                        text=True, env=env, timeout=120)
     assert r.returncode == 0 and r.stdout.strip() == ""
+
+
+def test_doctor_warns_on_open_metric_questions(checkout: Path, home: Path, tmp_path: Path):
+    """The example ships one metric question; after filling in (ids renamed) doctor still passes but WARNs."""
+    import yaml
+
+    bin_ = fake_bin(tmp_path, ("claude", "tectonic", "gh", "codex"))
+    assert _cli(checkout, home, bin_, "init").returncode == 0
+    personalize(checkout)
+    r = _cli(checkout, home, bin_, "doctor")
+    assert r.returncode == 0, r.stdout
+    n = len(yaml.safe_load((checkout / "profile" / "master.yaml").read_text())["metric_questions"])
+    assert "WARN" in r.stdout and f"{n} metric question{'s' if n != 1 else ''} open in profile/master.yaml" in r.stdout
+    q = _cli(checkout, home, bin_, "doctor", "--quiet")
+    assert q.returncode == 0 and q.stdout.strip() == ""

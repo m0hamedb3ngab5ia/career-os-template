@@ -236,3 +236,73 @@ def test_user_docs_exist_and_link():
     for section in ("## How it works", "## What you configure vs what's reusable", "## Reference"):
         assert section in readme, section
     assert readme.index("## Reference") > readme.index("## How it works")
+
+
+# --- résumé-writing rules (_shared/resume_writing_rules.md, vendored ResumeSkills reference) ---------
+
+RULES = SKILL_DIR / "_shared" / "resume_writing_rules.md"
+VENDORED = ["resume-bullet-writer", "tech-resume-optimizer", "resume-quantifier", "resume-tailor",
+            "resume-ats-optimizer"]
+
+
+def _section(text: str, heading: str) -> str:
+    start = text.index(heading)
+    nxt = re.search(r"^#{1,3} ", text[start + len(heading):], re.M)
+    return text[start: start + len(heading) + (nxt.start() if nxt else len(text))]
+
+
+def test_resume_writing_rules_exist_and_are_referenced():
+    assert RULES.is_file()
+    for skill in ("tailor-resume", "qa-review"):
+        assert ".claude/skills/_shared/resume_writing_rules.md" in _skill(skill), skill
+    assert "evidence_rules.md" in RULES.read_text(encoding="utf-8")
+
+
+def test_resume_writing_rules_power_verbs_avoid_banned_phrases():
+    text = RULES.read_text(encoding="utf-8")
+    verbs = [v.strip().lower() for line in _section(text, "## Power verbs").splitlines()
+             if line.startswith("- **") for v in line.split(":**", 1)[1].split(",") if v.strip()]
+    assert len(verbs) >= 30
+    banned = [str(b).lower().rstrip(",") for b in
+              yaml.safe_load((EXAMPLE_REPO / "config" / "qa.yaml").read_text())["banned_phrases"]]
+    assert not [v for v in verbs if any(re.search(rf"(?<![a-z]){re.escape(b)}(?![a-z])", v) for b in banned)]
+    assert "config/qa.yaml" in _section(text, "## Power verbs")
+
+
+def test_resume_writing_rules_weak_openers_match_qa_config():
+    text = RULES.read_text(encoding="utf-8")
+    listed = re.findall(r"^- `([a-z ]+)`", _section(text, "## Weak openers"), re.M)
+    soft = yaml.safe_load((EXAMPLE_REPO / "config" / "qa.yaml").read_text())["resume"]["soft"]
+    assert listed and set(listed) == set(soft["weak_openers"])
+
+
+def test_resume_writing_rules_override_forbids_estimates():
+    text = RULES.read_text(encoding="utf-8")
+    override = _section(text, "## OVERRIDE")
+    assert text.index("## OVERRIDE") < text.index("## Formulas"), "the override comes before any vendored advice"
+    for needle in ("never estimate", "metric_questions", "bullet_id", "question", "`~`", "estimate: true",
+                   "soft target"):
+        assert needle in override.lower() if needle.islower() else needle in override, needle
+    assert "contributed to" in text and "member of" in text  # ownership honesty
+
+
+def test_vendored_resumeskills_are_reference_only():
+    base = ROOT / "third_party" / "resumeskills"
+    readme = (base / "README.md").read_text(encoding="utf-8")
+    assert "https://github.com/Paramchoudhary/ResumeSkills" in readme and "74ae19e" in readme and "MIT" in readme
+    assert "NOT loaded as skills" in readme
+    assert (base / "LICENSE").is_file()
+    for name in VENDORED:
+        assert (base / name / "SKILL.md").is_file(), name
+        assert not (SKILL_DIR / name).exists(), f"{name} must not sit under .claude/skills (it would auto-trigger)"
+        assert f"third_party/resumeskills/{name}/SKILL.md" in RULES.read_text(encoding="utf-8")
+
+
+def test_tailor_resume_prefers_resume_default_and_qa_review_scores_bullet_strength():
+    tailor = _skill("tailor-resume")
+    assert "resume_default: true" in tailor and "weak: true" in tailor
+    qa = _skill("qa-review")
+    row = next(ln for ln in qa.splitlines() if ln.startswith("| bullet_strength |"))
+    for part in ("action verb", "technical", "scale", "tech"):
+        assert part in row, part
+    assert "bullet_shape" in qa

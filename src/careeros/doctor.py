@@ -13,6 +13,8 @@ What it checks:
 - categories.yaml bullet_priority ids that don't exist in profile/master.yaml (FAIL).
 - Tools: claude (FAIL: every skill needs it), tectonic or pdflatex (WARN: PDF), gh and codex (WARN: /review).
 - Voice samples: none in profile/voice/samples/ (WARN).
+- Open `metric_questions` in profile/master.yaml (WARN "N metric questions open"), and questions naming a
+  bullet id that does not exist (WARN). Optional bullet flags resume_default / weak / estimate must be booleans.
 
 The prepare-job and apply-job skills run `careeros doctor --quiet` first and stop on a nonzero exit,
 so the fictional example candidate never reaches a real application.
@@ -43,6 +45,7 @@ STANDARD_KEYS = (
 IDENTITY_KEYS = ("name", "email", "phone", "linkedin", "github")
 ENTRY_SECTIONS = ("experience", "projects", "education", "leadership")
 MARKER_RE = re.compile(r"#\s*(INSERT\b|EDIT\b)")
+BULLET_FLAGS = ("resume_default", "weak", "estimate")   # optional per-bullet booleans (resume_writing_rules.md)
 EXAMPLE_EMAIL_RE = re.compile(r"[\w.+-]+@example\.com\b", re.I)
 
 
@@ -129,6 +132,17 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
 
     for key in ("resume", "cover_letter", "banned_phrases"):
         need(key in (cfg.get("qa") or {}), f"config/qa.yaml: {key} missing")
+    # bullet_shape keys are optional (careeros.qa has defaults); when present they must have the right type
+    soft = ((cfg.get("qa") or {}).get("resume") or {}).get("soft") or {}
+    if isinstance(soft, dict):
+        if "bullet_max_words" in soft:
+            v = soft["bullet_max_words"]
+            need(isinstance(v, int) and not isinstance(v, bool) and v > 0,
+                 "config/qa.yaml: resume.soft.bullet_max_words must be a positive whole number")
+        for key in ("weak_openers", "scale_words"):
+            if key in soft:
+                need(isinstance(soft[key], list) and all(isinstance(w, str) and w.strip() for w in soft[key]),
+                     f"config/qa.yaml: resume.soft.{key} must be a list of words/phrases")
     paths = (cfg.get("pipeline") or {}).get("paths") or {}
     for key in ("jobs_dir", "seen_file", "tracker_xlsx"):
         need(key in paths, f"config/pipeline.yaml: paths.{key} missing")
@@ -147,6 +161,19 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
         for e in m.get(sec) or []:
             for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
                 need(isinstance(b, dict) and isinstance(b.get("text"), str), f"profile/master.yaml: bullet {b.get('id') if isinstance(b, dict) else b} needs text")
+    for sec in ("experience", "projects", "leadership"):
+        for e in m.get(sec) or []:
+            for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
+                for flag in BULLET_FLAGS if isinstance(b, dict) else ():
+                    if flag in b:
+                        need(isinstance(b[flag], bool), f"profile/master.yaml: {b.get('id')}.{flag} must be true or false")
+    mq = m.get("metric_questions")
+    if mq is not None and need(isinstance(mq, list), "profile/master.yaml: metric_questions must be a list of "
+                                                     "{bullet_id, question}"):
+        for i, q in enumerate(mq):
+            need(isinstance(q, dict) and isinstance(q.get("bullet_id"), str) and q["bullet_id"].strip()
+                 and isinstance(q.get("question"), str) and q["question"].strip(),
+                 f"profile/master.yaml: metric_questions[{i}] needs a bullet_id and a question")
 
     sa = prof.get("standard_answers") or {}
     keys: list[str] = []
@@ -278,6 +305,23 @@ def check_bullet_priority(categories: dict, master: dict) -> list[Check]:
     return out or [Check(PASS, "bullet_priority", "every categories.yaml bullet_priority id exists in master.yaml")]
 
 
+def check_metric_questions(master: dict) -> list[Check]:
+    """WARN while the candidate owes answers to metric questions (resume_writing_rules.md: never estimate a
+    number for them); WARN for a question whose bullet_id is not a bullet (e.g. left over from the example)."""
+    qs = [q for q in master.get("metric_questions") or [] if isinstance(q, dict)]
+    if not qs:
+        return [Check(PASS, "metric_questions", "no open metric questions in profile/master.yaml")]
+    bullets = {str(b.get("id")) for sec in ("experience", "projects", "leadership") for e in master.get(sec) or []
+               if isinstance(e, dict) for b in e.get("bullets") or [] if isinstance(b, dict)}
+    n = len(qs)
+    out = [Check(WARN, "metric_questions", f"{n} metric question{'s' if n != 1 else ''} open in profile/master.yaml")]
+    unknown = [str(q.get("bullet_id")) for q in qs if str(q.get("bullet_id")) not in bullets]
+    if unknown:
+        out.append(Check(WARN, "metric_questions", f"bullet_id {', '.join(unknown)} is not a bullet in "
+                                                   "profile/master.yaml: fix the id or delete the question"))
+    return out
+
+
 def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None) -> list[Check]:
     out = []
     latex = [t for t in ("tectonic", "pdflatex") if which(t)]
@@ -358,6 +402,8 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     else:
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
+    if not probs:
+        checks += check_metric_questions(master)
     checks += check_tools(which, env)
     checks.append(check_voice(root))
     return checks

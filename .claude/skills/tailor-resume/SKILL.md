@@ -31,6 +31,8 @@ description: Build a one-page tailored resume for a scored job dir from profile/
 - `profile/master.yaml`.
 - `config/categories.yaml` -> `bullet_priority` for `score.category`, and `resume_template`.
 - `config/qa.yaml` -> `resume.hard.section_order`, `resume.soft.keyword_coverage_min`.
+- `.claude/skills/_shared/resume_writing_rules.md`: how a strong bullet reads, which bullet and variant to
+  prefer, and its OVERRIDE (never estimate a number; a bullet without one gets a metric question).
 - `templates/resume/resume_schema.md` (the JSON shape `render.py` expects) and `templates/resume/<resume_template>.tex`.
   If `resume_schema.md` is absent, use the shape in section 4 below (it is the same shape) and say so in the RESULT.
 
@@ -52,11 +54,20 @@ Procedure:
 2. Bullet count per entry: tag-matched entries (entry `tags` include `score.category`, or `stack`
    overlaps >= 2 `required_skills`) get 3-4 bullets; other entries get 1-2. Always include at least
    1 bullet per included entry. Choose bullets by: (a) text contains a `required_skills` term (per
-   `score.skill_evidence`), (b) has `metrics`, (c) the rest.
+   `score.skill_evidence`), (b) `resume_default: true` when present, (c) has `metrics`, (d) the rest.
+   Use a bullet marked `weak: true` only when no other bullet covers that requirement or the entry would
+   otherwise be empty. Variant choice: between a bullet's `text` and its `variants`, take the one that best
+   fits the tech bullet formula in `resume_writing_rules.md` (verb first, technical what, scale, technology)
+   at about 15-28 words; `variants.short` when the page is tight.
    Projects: ALWAYS include the entry's descriptive "what it is" bullet (the one describing the project
    overall; in the example profile, `widgetizer.1`) before any metric bullet, even at a 1-bullet cap.
    Display order within an entry: descriptive bullet first (projects), then by relevance to
-   `required_skills`, then metric-only bullets.
+   `required_skills`, then the most formula-complete bullets (per `resume_writing_rules.md`), then
+   metric-only bullets.
+   Metric questions: for each included bullet with no digit and no scale word, propose one question
+   (`resume_writing_rules.md`, OVERRIDE rule 2) in `meta.metric_questions` unless
+   `profile.metric_questions` already has one for that id. Never add or guess a number; never edit
+   `profile/master.yaml` from this skill.
 3. Education: always every `education[]` entry (most recent first); include `gpa`; include up to 6 `coursework` items, prioritizing ones
    that echo posting terms (e.g. Database Systems, Machine Learning); include `activities` only if the
    budget allows.
@@ -95,10 +106,13 @@ Exactly the shape in `templates/resume/resume_schema.md`: `identity` (copied fro
   "keyword_mirror": {"ETL pipelines": "initech_intern.1", "AWS": "skills.tools", "SQL": "initech_intern.2"},
   "required_skills_covered": ["Python", "SQL", "AWS"], "missing_terms": ["Go", "Kafka"],
   "coverage": 0.71, "profile_gaps": ["acme.4: placeholder bullet skipped"],
-  "word_count_estimate": 520, "dropped_for_fit": []
+  "word_count_estimate": 520, "dropped_for_fit": [],
+  "metric_questions": [{"bullet_id": "acme.3", "question": "How long did a deploy take before and after Docker?"}]
 }
 ```
 `keyword_mirror` values are the bullet id or `skills.<key>` that justifies using that posting term.
+`meta.metric_questions` lists questions for the candidate (copy them into `profile/master.yaml:
+metric_questions`); prepare-job surfaces them, and they never block QA.
 `resume_version` = `<category>-v<n>` where n increments if a resume.json for this job already existed.
 
 ## 5. Render
