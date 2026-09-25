@@ -26,7 +26,7 @@ EXAMPLE (fictional candidate Alex Example) — regenerate in the candidate's voi
 ```
 Hi Dan,
 
-One thing I left out: the dashboard I shipped at Acme is used by 40 analysts to review reconciliation breaks, which is close to your settlement tooling. Code for my side project is on my GitHub. Still interested in 15 minutes if you have them.
+One thing I left out: the dashboard I shipped at Acme is used by 40 analysts to review reconciliation breaks, which is close to your settlement tooling. Still interested in 15 minutes if you have them.
 
 Alex
 ```

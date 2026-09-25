@@ -37,7 +37,7 @@ Subject: Backend SWE interview today
 
 Hi Priya,
 
-Thanks for the time today. The idempotency discussion around retried settlement writes stuck with me; it maps onto the Kafka consumer I built at Acme, where a replayed order event must not be written twice.
+Thanks for the time today. The discussion around retried settlement writes stuck with me; it is close to the FastAPI service I built at Acme that ingests Kafka order events into PostgreSQL, 2 million a day.
 
 On the partitioning question, I should have said: partition by merchant, not by date, since the hot path is per-merchant reads.
 

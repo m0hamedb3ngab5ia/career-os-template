@@ -191,7 +191,15 @@ def find_engine() -> tuple[str, list[str]] | None:
     return None
 
 
+class CompileError(RuntimeError):
+    """A LaTeX engine is installed but did not produce the PDF."""
+
+
 def compile_tex(tex_path: Path) -> Path | None:
+    """None only when no engine is installed (a warning). Raises CompileError on failure.
+    Any older PDF is removed first, so a PDF next to the .tex is always built from it."""
+    pdf = tex_path.with_suffix(".pdf")
+    pdf.unlink(missing_ok=True)
     engine = find_engine()
     if engine is None:
         print(NO_ENGINE_MSG, file=sys.stderr)
@@ -199,14 +207,15 @@ def compile_tex(tex_path: Path) -> Path | None:
     name, cmd = engine
     proc = subprocess.run(cmd + [tex_path.name], cwd=tex_path.parent, capture_output=True, text=True)
     if proc.returncode != 0:
-        print(f"ERROR: {name} failed on {tex_path}:\n{(proc.stdout + proc.stderr)[-3000:]}", file=sys.stderr)
-        return None
+        pdf.unlink(missing_ok=True)
+        raise CompileError(f"{name} failed on {tex_path}:\n{(proc.stdout + proc.stderr)[-3000:]}")
     for ext in (".aux", ".out"):
         p = tex_path.with_suffix(ext)
         if p.exists():
             p.unlink()
-    pdf = tex_path.with_suffix(".pdf")
-    return pdf if pdf.exists() else None
+    if not pdf.exists():
+        raise CompileError(f"{name} exited 0 but wrote no {pdf.name}")
+    return pdf
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -219,7 +228,7 @@ def main(argv: list[str] | None = None) -> int:
         if not a.txt_only:
             render(a.cover_letter_md, pdf=not a.no_pdf)
         render_txt(a.cover_letter_md)
-    except (ValueError, FileNotFoundError) as e:
+    except (ValueError, FileNotFoundError, CompileError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     return 0

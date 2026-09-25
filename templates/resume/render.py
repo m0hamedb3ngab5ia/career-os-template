@@ -160,7 +160,15 @@ def find_engine() -> tuple[str, list[str]] | None:
 NO_ENGINE_MSG = "WARNING: no LaTeX engine; run `brew install tectonic`. Left .tex in place, no PDF produced."
 
 
+class CompileError(RuntimeError):
+    """A LaTeX engine is installed but did not produce the PDF."""
+
+
 def compile_tex(tex_path: Path) -> Path | None:
+    """Compile tex -> pdf. None only when no engine is installed (a warning). Raises CompileError on failure.
+    Any older PDF is removed first, so a PDF next to the .tex is always built from it."""
+    pdf = tex_path.with_suffix(".pdf")
+    pdf.unlink(missing_ok=True)
     engine = find_engine()
     if engine is None:
         print(NO_ENGINE_MSG, file=sys.stderr)
@@ -172,15 +180,16 @@ def compile_tex(tex_path: Path) -> Path | None:
         proc = subprocess.run(cmd + [tex_path.name], cwd=workdir, capture_output=True, text=True)
         if proc.returncode != 0:
             log_tail = (proc.stdout + proc.stderr)[-3000:]
-            print(f"ERROR: {name} failed on {tex_path}:\n{log_tail}", file=sys.stderr)
-            return None
+            pdf.unlink(missing_ok=True)
+            raise CompileError(f"{name} failed on {tex_path}:\n{log_tail}")
     # successful compile: drop build artefacts, including the engine log (it is kept only on failure)
     for ext in (".aux", ".out", ".log"):
         p = tex_path.with_suffix(ext)
         if p.exists():
             p.unlink()
-    pdf = tex_path.with_suffix(".pdf")
-    return pdf if pdf.exists() else None
+    if not pdf.exists():
+        raise CompileError(f"{name} exited 0 but wrote no {pdf.name}")
+    return pdf
 
 
 # --- renderers ---------------------------------------------------------------------
@@ -250,6 +259,9 @@ def render_txt(resume_json_path: str | Path) -> Path:
     """resume.json -> resume.txt (plain text, ATS order). Returns the .txt path."""
     src = Path(resume_json_path).resolve()
     d = load_resume(src)
+    bad = check_placeholders(d)
+    if bad:
+        raise ValueError(f"placeholder text in resume.json: {', '.join(bad)}")
     idn = d["identity"]
     lines: list[str] = [idn.get("name", "")]
     lines.append(_line(idn.get("location", ""), idn.get("phone", ""), idn.get("email", "")))
@@ -312,7 +324,7 @@ def main(argv: list[str] | None = None) -> int:
         if not a.txt_only:
             render(a.resume_json, template=a.template, pdf=not a.no_pdf)
         render_txt(a.resume_json)
-    except (ValueError, FileNotFoundError) as e:
+    except (ValueError, FileNotFoundError, CompileError) as e:
         print(f"ERROR: {e}", file=sys.stderr)
         return 1
     return 0

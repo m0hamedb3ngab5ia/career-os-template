@@ -184,3 +184,58 @@ def test_cover_tex_uses_frontmatter_identity(tmp_path: Path):
     assert r"\textbf{Alex Example}" in tex and r"a\_x@example.com" in tex
     assert r"Acme \& Co \textbar{} Software Engineer, Backend" in tex
     assert r"Body 100\%." in tex and "Hi Payments team," in tex
+
+
+# --- stale artifacts / compile failures -------------------------------------------------------------
+
+def _resume_json(tmp_path: Path, extra: str | None = None) -> Path:
+    data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()), ["acme.1"])
+    if extra:
+        data["experience"][0]["bullets"].append({"id": "acme.1", "text": extra})
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(data))
+    return p
+
+
+def test_txt_only_rejects_placeholders_and_writes_nothing(tmp_path: Path):
+    p = _resume_json(tmp_path, "Cut latency by [FILL IN metric]")
+    assert resume.main([p.as_posix(), "--txt-only"]) == 1
+    assert not (tmp_path / "resume.txt").exists()
+
+
+def _failing_engine(mod, monkeypatch):
+    monkeypatch.setattr(mod, "find_engine", lambda: ("fake", ["sh", "-c", "echo '! LaTeX Error'; exit 1", "sh"]))
+
+
+def test_resume_compile_failure_exits_1_and_removes_stale_pdf(tmp_path: Path, monkeypatch, capsys):
+    p = _resume_json(tmp_path)
+    (tmp_path / "resume.pdf").write_text("OLD")
+    _failing_engine(resume, monkeypatch)
+    assert resume.main([p.as_posix()]) == 1
+    assert not (tmp_path / "resume.pdf").exists()
+    assert "fake failed" in capsys.readouterr().err
+
+
+def test_cover_compile_failure_exits_1_and_removes_stale_pdf(tmp_path: Path, monkeypatch):
+    p = _cl(tmp_path, "Body paragraph.\n")
+    (tmp_path / "cover_letter.pdf").write_text("OLD")
+    _failing_engine(cover, monkeypatch)
+    assert cover.main([p.as_posix()]) == 1
+    assert not (tmp_path / "cover_letter.pdf").exists()
+
+
+@pytest.mark.parametrize("mod,src", [(resume, "resume"), (cover, "cover")])
+def test_no_engine_is_a_warning_but_drops_stale_pdf(tmp_path: Path, monkeypatch, capsys, mod, src):
+    p = _resume_json(tmp_path) if src == "resume" else _cl(tmp_path, "Body.\n")
+    stale = tmp_path / ("resume.pdf" if src == "resume" else "cover_letter.pdf")
+    stale.write_text("OLD")
+    monkeypatch.setattr(mod, "find_engine", lambda: None)
+    assert mod.main([p.as_posix()]) == 0
+    assert not stale.exists()  # an old PDF must never sit next to a newer .tex
+    assert "no LaTeX engine" in capsys.readouterr().err
+
+
+def test_engine_success_without_pdf_is_an_error(tmp_path: Path, monkeypatch):
+    p = _resume_json(tmp_path)
+    monkeypatch.setattr(resume, "find_engine", lambda: ("fake", ["true"]))
+    assert resume.main([p.as_posix()]) == 1

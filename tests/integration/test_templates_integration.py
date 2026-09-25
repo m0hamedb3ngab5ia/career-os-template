@@ -132,3 +132,20 @@ def test_cover_letter_render(temp_root: Path, home: Path, pdf: bool):
     if pdf:
         pages, text = _pdf_pages_and_text(d / "cover_letter.pdf")
         assert pages == 1 and "Alex Example" in text
+
+
+def test_rerender_with_failing_engine_exits_1_and_leaves_no_stale_pdf(temp_root: Path, home: Path, resume_json: Path,
+                                                                       tmp_path: Path):
+    """A second render whose LaTeX step fails must not leave the first run's resume.pdf to be uploaded."""
+    fake_bin = tmp_path / "bin"
+    fake_bin.mkdir()
+    (fake_bin / "tectonic").write_text("#!/bin/sh\necho '! LaTeX Error: boom'\nexit 1\n")
+    (fake_bin / "tectonic").chmod(0o755)
+    (resume_json.parent / "resume.pdf").write_text("OLD RUN")
+    env = subprocess_env(temp_root, home)
+    env["PATH"] = f"{fake_bin}:{env.get('PATH', '')}"
+    r = subprocess.run([PY, str(temp_root / "templates/resume/render.py"), str(resume_json)], capture_output=True,
+                       text=True, cwd=temp_root, env=env, timeout=120)
+    assert r.returncode == 1 and "tectonic failed" in r.stderr
+    assert not (resume_json.parent / "resume.pdf").exists()
+    assert (resume_json.parent / "resume.tex").exists()
