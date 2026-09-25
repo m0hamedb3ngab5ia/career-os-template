@@ -401,11 +401,15 @@ class Tracker:
             if key not in data:
                 continue
             val = data[key]
-            cell = ws.cell(row=r, column=hdr[header])
-            if key in ("folder", "url"):
-                cell.value = "open" if key == "folder" else str(val)
+            if key == "folder":  # our own job dir path
+                cell = _put(ws, r, hdr[header], "open")
                 cell.hyperlink = str(val)
                 cell.font = Font(color="0563C1", underline="single")
+            elif key == "url":  # board data: always text; clickable only for http(s)
+                cell = _put(ws, r, hdr[header], str(val))
+                cell.hyperlink = str(val) if re.match(r"https?://", str(val), re.I) else None
+                if cell.hyperlink is not None:
+                    cell.font = Font(color="0563C1", underline="single")
             else:
                 _put(ws, r, hdr[header], val)
         return "created" if created else "updated"

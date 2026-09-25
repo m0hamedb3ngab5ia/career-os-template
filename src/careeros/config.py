@@ -9,6 +9,7 @@ from typing import Any
 import yaml
 
 CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
+ATS_WITH_SLUG = ("greenhouse", "lever", "ashby")  # adapters that fetch by board slug (custom uses url)
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
     "pipeline": ("paths",),
@@ -235,6 +236,9 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
                 raise ConfigError(f"config/companies.yaml: boards[{i}] must be a mapping, got {type(b).__name__}")
             if not b.get("company") or not b.get("ats"):
                 raise ConfigError(f"config/companies.yaml: boards[{i}] needs company and ats")
+            ats = str(b["ats"]).lower()
+            if ats in ATS_WITH_SLUG and not str(b.get("slug") or "").strip():
+                raise ConfigError(f"config/companies.yaml: boards[{i}] ({ats}) needs a slug")
 
 
 def _fuzzy_eq(a: str, b: str) -> bool:

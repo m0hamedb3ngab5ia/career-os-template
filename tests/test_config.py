@@ -222,9 +222,17 @@ def test_settings_load_rejects_wrong_shapes(tmp_path, fname, body, where):
     ("boards: {company: Acme, ats: greenhouse, slug: acme}\n", "boards must be a list"),
     ("boards: [acme]\n", r"boards\[0\] must be a mapping"),
     ("boards: [{ats: greenhouse, slug: acme}]\n", r"boards\[0\] needs company and ats"),
+    ("boards: [{company: Acme, ats: greenhouse}]\n", r"boards\[0\] \(greenhouse\) needs a slug"),
+    ("boards: [{company: Acme, ats: lever, slug: ''}]\n", r"boards\[0\] \(lever\) needs a slug"),
 ])
 def test_boards_shape_is_validated(tmp_path, boards, msg):
     root = _root(tmp_path)
     (root / "config" / "companies.yaml").write_text(boards)
     with pytest.raises(ConfigError, match=msg):
         Settings.load(root)
+
+
+def test_custom_board_may_use_url_instead_of_slug(tmp_path):
+    root = _root(tmp_path)
+    (root / "config" / "companies.yaml").write_text("boards: [{company: Acme, ats: custom, url: 'https://acme.example/jobs'}]\n")
+    assert Settings.load(root).boards[0]["ats"] == "custom"
