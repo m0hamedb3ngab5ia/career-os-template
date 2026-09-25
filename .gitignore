@@ -1,0 +1,22 @@
+# personal data: lives in the candidate's private repo (see README "Keeping your data private")
+/profile
+/config
+/CLAUDE.local.md
+/data/
+/.reviews/
+
+# iCloud / Finder duplicates ("render 2.py", "posting 3.json")
+* [0-9].*
+* [0-9]
+
+.venv/
+__pycache__/
+*.pyc
+.DS_Store
+*.aux
+*.log
+*.out
+.claude/settings.local.json
+*.egg-info/
+.pytest_cache/
+.coverage
