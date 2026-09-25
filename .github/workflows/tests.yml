@@ -1,0 +1,30 @@
+name: tests
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Skip until the Python package exists
+        id: has_pkg
+        run: echo "present=$([ -f pyproject.toml ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
+      - name: Install
+        if: steps.has_pkg.outputs.present == 'yes'
+        run: pip install -e ".[test]"
+      - name: Unit tests
+        if: steps.has_pkg.outputs.present == 'yes'
+        run: pytest -q -m unit
+      - name: Integration tests
+        if: steps.has_pkg.outputs.present == 'yes'
+        run: pytest -q -m integration
+      - name: Everything + coverage
+        if: steps.has_pkg.outputs.present == 'yes'
+        run: pytest -q --cov=careeros --cov-report=term-missing
