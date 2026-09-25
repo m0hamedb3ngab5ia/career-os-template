@@ -1,0 +1,14 @@
+{
+  "job_id": "_example",
+  "company": "Ledgerline",
+  "title": "Software Engineer, Backend (New Grad 2026)",
+  "location": "New York, NY (Hybrid)",
+  "url": "https://boards.greenhouse.io/ledgerline/jobs/7412093",
+  "apply_url": "https://boards.greenhouse.io/ledgerline/jobs/7412093#app",
+  "ats": "greenhouse",
+  "posted_at": "2026-09-20",
+  "salary_min": 135000,
+  "salary_max": 165000,
+  "departments": ["Engineering", "Payments Platform"],
+  "description_text": "About Ledgerline\n\nLedgerline is the ledger and reconciliation layer for modern fintechs. We process more than $40B in annualized payment volume for 300+ customers, from neobanks to B2B payment platforms, and we are SOC 2 Type II certified. We are a team of 180 people headquartered in New York with an office in London.\n\nThe Payments Platform team owns the double-entry ledger, the settlement engine that reconciles card-network files (Visa, Mastercard) against internal balances every night, and the public REST and gRPC APIs our customers build on. The team is 11 engineers and ships to production several times a day.\n\nThe role\n\nWe are hiring Software Engineers (Backend) graduating in 2025 or 2026 to join the Payments Platform team in our New York office (hybrid, 3 days a week). You will:\n\n- Design and build backend services in Python and Go that move money correctly, every time\n- Extend our double-entry ledger and the settlement pipelines that reconcile card-network files against it\n- Write and maintain ETL jobs on AWS (Glue, Athena, S3) that feed our customer-facing reporting\n- Own services end to end: design docs, tests, observability, on-call in rotation\n- Work with PostgreSQL, Kafka, Docker, and Kubernetes\n\nWhat we look for\n\n- Bachelor's degree in Computer Science, Software Engineering, or equivalent, graduating between December 2025 and June 2026\n- Strong fundamentals in data structures, algorithms, and SQL\n- Experience with Python or Go (internship, co-op, or substantial project work)\n- Familiarity with AWS and relational databases (PostgreSQL preferred)\n- You have shipped something real: an internship deliverable, a side project with users, or open source\n- Clear written communication; we work async across two time zones\n\nNice to have\n\n- Experience with financial data, reconciliation, or regulated environments\n- Exposure to Kafka, gRPC, Kubernetes, or Terraform\n- Interest in AI-assisted developer tooling; we run an internal program evaluating coding agents\n\nCompensation and logistics\n\n- Base salary $135,000 - $165,000 plus equity\n- Hybrid: 3 days per week in our Flatiron office\n- Must be authorized to work in the United States. We do not sponsor visas for this role at this time.\n\nLedgerline is an equal opportunity employer."
+}
