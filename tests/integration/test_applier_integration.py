@@ -107,7 +107,7 @@ eeo:
 
 
 def test_edited_eeo_block_resolves_to_configured_values(answers_path: Path):
-    """The shape a candidate gets after editing the `# EDIT` values: loaded from disk, same parser."""
+    """The shape a candidate gets after filling in the `# INSERT` values: loaded from disk, same parser."""
     text = answers_path.read_text()
     answers_path.write_text(text[: text.index("\neeo:")] + FILLED_EEO)
     clear_cache()

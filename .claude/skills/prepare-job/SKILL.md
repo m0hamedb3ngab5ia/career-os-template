@@ -14,6 +14,13 @@ each step's RESULT JSON in memory; you will summarize them at the end.
 Before starting, read `config/targets.yaml` (tiers, thresholds) and `config/qa.yaml` (`critic.max_regenerations`).
 Initialize `action_items = []`, `steps = {}`.
 
+## Step 0: setup guard (fake-data guard)
+
+Run `.venv/bin/careeros doctor --quiet` first. If it exits nonzero, STOP: do not score, tailor or write
+anything. Print its FAIL lines, then the final RESULT with `status: skipped`, `skip_reason: "setup: careeros doctor failed"`
+and `ACTION_ITEMS: ["setup: fix the careeros doctor FAIL lines (profile still has example data or a tool is missing)"]`.
+This keeps the fictional example candidate (Alex Example) out of every real application.
+
 Re-run guard: if `JOB/prepare.json` exists with `qa_pass: true` and `--force` was not given, print its
 RESULT again (status unchanged) and stop. `--force` re-prepares from Step 1.
 

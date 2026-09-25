@@ -1,4 +1,17 @@
-# Runtime paths + scheduling. Relative paths resolve against the repo root; `~` is expanded.
+# ==================================================================================================
+# config/pipeline.yaml: PATHS, SCHEDULE, LLM RUNNER
+#
+# What this file is:
+#   Where data lives and when the pipeline runs. Relative paths resolve against the repo root; `~` is expanded.
+#
+# What you must fill in:
+#   - nothing. Optionally point paths.tracker_xlsx somewhere you can open it easily
+#     (e.g. ~/Documents/JobTracker.xlsx).
+#
+# What you can leave as is (reusable default: fine to keep):
+#   - the whole file. llm.runner stays claude_code (your Claude Code subscription; no API key).
+# ==================================================================================================
+# reusable default: fine to keep
 paths:
   tracker_xlsx: data/JobTracker.xlsx       # gitignored. Point it anywhere, e.g. ~/Documents/JobTracker.xlsx
   jobs_dir: data/jobs
@@ -9,7 +22,7 @@ paths:
   resume_template_dir: templates/resume
   output_dir_per_job: true                 # data/jobs/<id>/{posting.json,score.json,resume.pdf,cover_letter.md,answers.json,qa.json,log.md}
 
-schedule:                                  # for /schedule cloud routines or local cron
+schedule:                                  # reusable default: fine to keep. For /schedule cloud routines or local cron
   scout: "0 7 * * *"                       # daily 7am
   score_and_prepare: "30 7 * * *"
   inbox_sync: "0 8,18 * * *"

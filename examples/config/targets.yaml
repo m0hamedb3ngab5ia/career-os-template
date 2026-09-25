@@ -1,19 +1,33 @@
-# What to apply to, and how autonomously. Edit freely; the pipeline re-reads it every run.
-# Copied to config/targets.yaml by `careeros init`. Lines marked `# EDIT` are personal: change them.
+# ==================================================================================================
+# config/targets.yaml: WHAT TO APPLY TO, AND HOW AUTONOMOUSLY
+#
+# What this file is:
+#   Job preferences read by scout (prefilter), score-job (fit, tier) and apply-job (caps, safety).
+#   The pipeline re-reads it every run. `careeros init` copies it to config/targets.yaml.
+#
+# What you must fill in (lines with an INSERT comment):
+#   - candidate: level, graduation, salary floors, work authorization
+#   - location: preferred cities and regions
+#   - industries: which to boost, which to block
+#
+# What you can leave as is (reusable default: fine to keep):
+#   - seniority keywords, categories, thresholds, tiers, tier_rules, volume, safety.
+#     Tune them later once you see what scout and score-job produce.
+# ==================================================================================================
 
 candidate:
-  level: new_grad            # EDIT: new_grad | early_career (0-2 yrs) — both accepted
-  graduation: 2026-05        # EDIT
-  current_base_usd: null     # EDIT: optional, informational only
-  min_base_usd: 90000        # EDIT: skip if a posting's max salary is below this (unknown salary = allowed)
-  salary_dropdown_floor_usd: 90000   # EDIT: when a form offers salary *ranges* in a dropdown, the applier
+  level: new_grad            # INSERT: new_grad | early_career (0-2 yrs); both accepted
+  graduation: 2026-05        # INSERT: YYYY-MM of your (expected) graduation, e.g. 2025-12
+  current_base_usd: null     # INSERT: optional current base salary in USD, e.g. 85000, or null (informational)
+  min_base_usd: 90000        # INSERT: whole USD; skip a posting whose max salary is below this (unknown = allowed), e.g. 100000
+  salary_dropdown_floor_usd: 90000   # INSERT: whole USD; when a form offers salary *ranges* in a dropdown, the applier
                                      # picks the lowest bucket whose floor is >= this. Freeform salary = Action Item.
-  work_authorization: us_citizen     # EDIT
-  needs_sponsorship: false           # EDIT
+  work_authorization: us_citizen     # INSERT: us_citizen | permanent_resident | visa (e.g. F-1 OPT, H-1B)
+  needs_sponsorship: false           # INSERT: true | false
 
 location:
-  preferred: [New York NY, Boston MA, San Francisco CA, Seattle WA]   # EDIT
-  preferred_regions: [US]            # EDIT
+  preferred: [New York NY, Boston MA, San Francisco CA, Seattle WA]   # INSERT: cities as "City ST", e.g. [Austin TX, Chicago IL]
+  preferred_regions: [US]            # INSERT: ISO country codes, e.g. [US, CA]
   allowed_countries: [US, "*"]       # "*" = anywhere else allowed...
   blocked_countries: []              # ...except these ISO codes, e.g. [XX, YY]
   remote_ok: true
@@ -22,25 +36,27 @@ location:
   #   DE: [germany, berlin, munich]
   # Non-preferred location still applied to if fit >= thresholds.min_fit_nonpreferred_location.
 
-seniority:                  # title-level prefilter in scout (cheap, before LLM scoring)
+seniority:                  # reusable default: fine to keep. Title-level prefilter in scout (cheap, before LLM scoring)
   exclude_title_keywords: [senior, sr., staff, principal, lead, manager, director, head of, vp, vice president, distinguished, architect, fellow, intern, internship, co-op, phd, postdoc, chief]
   # "lead" matches "Tech Lead"; "Team Lead" etc. Titles like "Software Engineer II" pass; scorer handles YOE.
 
-categories:                 # see categories.yaml for keyword definitions
+categories:                 # reusable default: fine to keep (see categories.yaml for keyword definitions)
   primary: [swe_backend, swe_fullstack, data_engineering, swe_platform]
   secondary: [ml_engineering, swe_mobile, quant_dev, sre_devops]
   excluded: [product_manager, sales_eng, support, qa_manual, hardware]
 
 industries:
-  boost: [ai_ml, fintech, developer_tools, infra_cloud]   # EDIT
-  blocked: [gambling]                                     # EDIT
+  boost: [ai_ml, fintech, developer_tools, infra_cloud]   # INSERT: industries to rank higher, e.g. [healthtech, climate]
+  blocked: [gambling]                                     # INSERT: industries never applied to, or []
 
+# reusable default: fine to keep. Fit-score cutoffs used by score-job.
 thresholds:
   min_fit_to_prepare: 70     # below → status skipped, reason logged
   min_fit_nonpreferred_location: 85
   boost_industry_bonus: 5    # added to fit for boost industries (doesn't bypass min)
   tier_a_min_fit: 60         # dream firms: prepare even at lower fit, but flag gap
 
+# reusable default: fine to keep. Autonomy per tier (README "Autonomy tiers").
 tiers:
   A:
     description: dream firms — full prep, the candidate submits
@@ -61,7 +77,7 @@ tiers:
     outreach: never
     review_required: []
 
-tier_rules:                 # first match wins; default tier by fit score
+tier_rules:                 # reusable default: fine to keep. First match wins; default tier by fit score
   - if: company_in dream_list
     tier: A
   - if: fit >= 85
@@ -69,6 +85,7 @@ tier_rules:                 # first match wins; default tier by fit score
   - if: fit >= 70
     tier: C
 
+# reusable default: fine to keep. Daily and per-company caps.
 volume:
   max_applications_per_day: 15
   max_per_company_per_90_days: 2      # avoid spray flag
@@ -79,6 +96,7 @@ volume:
     "1": 2.0
     "2": 1.5
 
+# reusable default: fine to keep. Only change if you understand the applier (src/careeros/apply/adapters.md).
 safety:
   # ATS families where auto-submit is allowed. Others → prepare + Action Item.
   auto_submit_ats: [greenhouse, lever, ashby]

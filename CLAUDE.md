@@ -21,6 +21,8 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros init` copies `examples/{profile,config}` → `profile/`, `config/` (never overwrites);
   `careeros init --link <private-dir>` symlinks them (and `CLAUDE.local.md`) from the candidate's private repo.
   Every other command exits with "run `careeros init`" until then.
+- `.venv/bin/careeros doctor [--quiet]` — setup checklist (exit 1 on FAIL: example data left, broken YAML, unknown
+  bullet_priority ids, no `claude`). `prepare-job` / `apply-job` run it first. New-user walkthrough: `docs/GETTING_STARTED.md`.
 
 ## Commands
 - `.venv/bin/careeros scout --sync` — pull boards, prefilter, store, sync tracker

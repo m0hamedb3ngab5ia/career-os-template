@@ -1,8 +1,21 @@
-# Terms that must never appear in any generated artifact (resume.txt, cover_letter.md, answers.json,
-# outreach.json). `careeros.qa` hard-fails the job when one does. Keep the real file private
-# (profile/ is gitignored). This example is fictional: EDIT it for your own employer.
-employer: Acme               # informational: whose internal vocabulary this is (the name itself is allowed)
-terms: [PROJECTZEBRA, ledgerd, OPSGRID]   # case-insensitive, whole word
+# ==================================================================================================
+# profile/confidential_terms.yaml: WORDS THAT MUST NEVER LEAK
+#
+# What this file is:
+#   Terms that must never appear in any generated artifact (resume.txt, cover_letter.md, answers.json,
+#   outreach.json). `careeros.qa` hard-fails the job when one does. The shipped values are fictional.
+#
+# What you must fill in:
+#   - employer: your current employer
+#   - terms: its internal project codenames, service and host names, team nicknames
+#   - patterns: regexes for internal id shapes (ticket numbers, account numbers, hostnames)
+#   Nothing at your employer is secret (student, between jobs)? Use `terms: []` and `patterns: []`.
+#
+# What you can leave as is:
+#   - the file shape. Keep the real file private (profile/ is gitignored).
+# ==================================================================================================
+employer: Acme               # INSERT: current employer (informational; the company name itself is allowed)
+terms: [PROJECTZEBRA, ledgerd, OPSGRID]   # INSERT: internal codenames, case-insensitive whole words, e.g. [Nightjar, billingd]
 patterns:                    # Python regexes, case-sensitive
-  - '\bACME-[A-Z]{3}\d{4}\b'  # ticket / hostname-shaped ids
-  - '\b9\d{9}\b'             # account-number-shaped ids
+  - '\bACME-[A-Z]{3}\d{4}\b'  # INSERT: ticket / hostname-shaped ids, e.g. '\bNJ-\d{4}\b'
+  - '\b9\d{9}\b'             # INSERT: account-number-shaped ids, or delete

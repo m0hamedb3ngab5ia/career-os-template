@@ -32,13 +32,30 @@ def cmd_init(args: argparse.Namespace) -> int:
         print(f"\nprofile/ and config/ now live in {Path(args.link).expanduser().resolve()} (keep that repo private).")
         return 0
     if any(what == "copied" for _, what in rep.actions):
-        print("\nExample candidate \"Alex Example\" copied. Replace it with your own data (lines marked # EDIT):")
+        print("\nExample candidate \"Alex Example\" copied. Replace it with your own data (lines marked # INSERT):")
         for path, what in EDIT_HINTS:
             print(f"  {path:<34} {what}")
-        print("\nOptional: personal notes for Claude in CLAUDE.local.md (gitignored). Then: careeros scout --sync")
+        print("\nThen run `careeros doctor` until it shows no FAIL (walkthrough: docs/GETTING_STARTED.md).")
+        print("Optional: personal notes for Claude in CLAUDE.local.md (gitignored). Then: careeros scout --sync")
     else:
         print("\nnothing copied; existing profile/ and config/ left untouched")
     return 0
+
+
+def cmd_doctor(args: argparse.Namespace) -> int:
+    """Setup checklist (see careeros.doctor). Exit 1 on any FAIL. Needs no setup itself."""
+    from careeros.doctor import exit_code, format_report, run_doctor
+
+    try:
+        root = Path(args.root).resolve() if getattr(args, "root", None) else find_repo_root()
+    except FileNotFoundError as e:
+        print(f"  FAIL  setup                  {e}")
+        return 1
+    checks = run_doctor(root)
+    out = format_report(checks, quiet=args.quiet, root=root)
+    if out:
+        print(out)
+    return exit_code(checks)
 
 
 def cmd_scout(args: argparse.Namespace) -> int:
@@ -277,6 +294,10 @@ def build_parser() -> argparse.ArgumentParser:
     it = sub.add_parser("init", help="create profile/ and config/ (copy examples, or --link your private dir)")
     it.add_argument("--link", metavar="DIR", help="symlink profile/, config/ (and CLAUDE.local.md) from DIR instead of copying")
     it.set_defaults(fn=cmd_init)
+
+    dr = sub.add_parser("doctor", help="check setup: files, example data left, tools (exit 1 on any FAIL)")
+    dr.add_argument("--quiet", action="store_true", help="print only FAIL lines (nothing when all good)")
+    dr.set_defaults(fn=cmd_doctor)
 
     sc = sub.add_parser("scout", help="fetch postings from configured boards")
     sc.add_argument("--only", nargs="*", help="limit to company names or slugs")

@@ -18,8 +18,8 @@ belong in each candidate's own private repo, not here.
 - [ ] Weekly self-review report: acceptance rate by category/tier, QA fail reasons, time saved
 - [ ] P1.5 scout source: Simplify New-Grad GitHub list parser (public, ATS links)
 - [ ] P7 chrome discovery: Jobright + Handshake feeds (saved-search URLs → `config/companies.yaml: searches`)
-- [ ] `careeros doctor`: validate the candidate's own config/profile against the example schema (the test
-      suite only checks `examples/`)
+- [x] `careeros doctor`: validate the candidate's own config/profile against the example schema, fail on
+      untouched example data; `docs/GETTING_STARTED.md`
 
 ## Future (not now)
 - [ ] Action Items redesign: group by `Type` + `Needs` column = `laptop` (Chrome/Handshake/Workday session, candidate present) | `phone` (approve/send from anywhere) | `anytime`; sort by Priority then NextActionDate; separate "Today" view. Tier A submits, Handshake, Workday review pages = `laptop`. LinkedIn sends, email approvals, cover-letter reviews = `phone`.

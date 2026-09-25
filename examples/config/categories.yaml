@@ -1,13 +1,27 @@
-# Job categories. Scorer assigns exactly one. Each maps to résumé template + bullet priorities.
-# Add a category = add a block here. First 3 outputs of any new category are review_required regardless of tier.
-# `bullet_priority` lists entry ids from profile/master.yaml (experience/projects), most relevant first. EDIT per candidate.
+# ==================================================================================================
+# config/categories.yaml: JOB CATEGORIES
+#
+# What this file is:
+#   The job families score-job sorts postings into (exactly one each). Each maps to title and skill
+#   keywords, a résumé template and the order in which your experience is considered.
+#
+# What you must fill in (lines with an INSERT comment):
+#   - bullet_priority in every category you target: entry ids from YOUR profile/master.yaml
+#     (experience / projects), most relevant first. `careeros doctor` FAILs on an id that does not exist.
+#
+# What you can leave as is (reusable default: fine to keep):
+#   - labels, title_keywords, skill_keywords, cover_letter, the excluded categories.
+#     Add a category = add a block here (and name it in config/targets.yaml categories). The first
+#     3 outputs of a new category are review_required regardless of tier.
+# ==================================================================================================
 
+# reusable default: fine to keep (everything except bullet_priority)
 swe_backend:
   label: Software Engineer (Backend)
   title_keywords: [software engineer, backend engineer, back-end, server engineer, api engineer, software developer, sde, swe]
   skill_keywords: [python, java, typescript, go, sql, aws, distributed, microservices, rest, grpc, postgres, kafka]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 0
 
@@ -16,7 +30,7 @@ swe_fullstack:
   title_keywords: [full stack, fullstack, full-stack, web engineer, frontend engineer, front-end, product engineer]
   skill_keywords: [react, next.js, typescript, node, tailwind, postgres, supabase, prisma, rest]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 0
 
@@ -25,7 +39,7 @@ swe_platform:
   title_keywords: [platform engineer, infrastructure engineer, infra, developer productivity, tooling engineer, systems engineer software]
   skill_keywords: [aws, kubernetes, docker, ci/cd, terraform, python, go, linux, observability]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 3
 
@@ -34,7 +48,7 @@ data_engineering:
   title_keywords: [data engineer, analytics engineer, etl engineer, data platform, pipeline engineer, data infrastructure]
   skill_keywords: [sql, python, etl, airflow, spark, aws glue, athena, snowflake, dbt, data governance, lineage, tableau]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 0
 
@@ -43,7 +57,7 @@ ml_engineering:
   title_keywords: [machine learning engineer, ml engineer, ai engineer, applied scientist, llm engineer, ai software engineer]
   skill_keywords: [python, pytorch, scikit-learn, llm, rag, agents, pandas, numpy, model, inference]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 3
 
@@ -52,7 +66,7 @@ swe_mobile:
   title_keywords: [ios engineer, ios developer, mobile engineer, swift engineer, mobile developer]
   skill_keywords: [swift, swiftui, xcode, xctest, ios, core data, webkit, supabase]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 3
 
@@ -61,7 +75,7 @@ quant_dev:
   title_keywords: [quant developer, quantitative developer, trading systems, trading engineer, low latency, quant software]
   skill_keywords: [c++, python, low latency, linux, market data, order, risk, numpy, performance]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: true
   new_category_reviews_remaining: 3
 
@@ -70,11 +84,11 @@ sre_devops:
   title_keywords: [site reliability, sre, devops, production engineer, reliability engineer]
   skill_keywords: [linux, kubernetes, aws, monitoring, python, ci/cd, incident]
   resume_template: default
-  bullet_priority: [acme, initech_intern, widgetizer]
+  bullet_priority: [acme, initech_intern, widgetizer]   # INSERT: entry ids from your master.yaml, most relevant first, e.g. [northwind, tasklight]
   cover_letter: false
   new_category_reviews_remaining: 3
 
-# Excluded (scorer still labels them so we can see what was skipped)
+# Excluded (scorer still labels them so we can see what was skipped). reusable default: fine to keep
 product_manager: {label: Product Manager, title_keywords: [product manager, apm, program manager], excluded: true}
 sales_eng: {label: Sales / Solutions Eng, title_keywords: [solutions engineer, sales engineer, customer engineer], excluded: true}
 support: {label: Support, title_keywords: [support engineer, technical support, help desk], excluded: true}

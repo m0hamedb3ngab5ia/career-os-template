@@ -16,7 +16,7 @@ from careeros.config import PERSONAL_DIRS, PKG_ROOT
 
 LOCAL_NOTES = "CLAUDE.local.md"
 
-# Shown after a copy: the files that carry personal values (marked `# EDIT` inside).
+# Shown after a copy: the files that carry personal values (lines marked `# INSERT: ...` inside).
 EDIT_HINTS: tuple[tuple[str, str], ...] = (
     ("profile/master.yaml", "identity, education, experience bullets (by id), skills, narratives"),
     ("profile/standard_answers.yaml", "every `answer` (work auth, school, links, phone, address) and the `eeo:` block"),

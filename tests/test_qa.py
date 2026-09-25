@@ -728,3 +728,49 @@ def test_standard_matching_is_the_applier_matcher(tmp_path: Path) -> None:
                                        "answer": None, "type": "generated", "class": "sensitive",
                                        "needs_review": True, "bullet_ids": []}])
     assert by_name(run(job), "standard_answers")["ok"]
+
+
+# --- example_identity: the untouched example candidate never reaches an application -----------------
+
+def _copied_root(tmp_path: Path) -> Path:
+    """A repo root where profile/ + config/ are verbatim copies of examples/ (a fresh `careeros init`)."""
+    import shutil
+
+    root = tmp_path / "repo"
+    shutil.copytree(EXAMPLE_REPO / "config", root / "config")
+    shutil.copytree(EXAMPLE_REPO / "profile", root / "profile")
+    return root
+
+
+def test_example_identity_fails_on_untouched_copy(tmp_path: Path) -> None:
+    root = _copied_root(tmp_path)
+    res = run_deterministic(make_job(tmp_path), root=root)
+    c = by_name(res, "example_identity")
+    assert c["level"] == "hard" and not c["ok"]
+    assert "resume.txt" in c["detail"] and "Alex Example" in c["detail"] and "alex@example.com" in c["detail"]
+    assert res["pass"] is False
+
+
+def test_example_identity_catches_cover_letter_email(tmp_path: Path) -> None:
+    from conftest import FILLED_IDENTITY, personalize_identity
+
+    root = personalize_identity(_copied_root(tmp_path))
+    resume = RESUME_TXT.replace("Alex Example", FILLED_IDENTITY["name"]).replace("alex@example.com", FILLED_IDENTITY["email"])
+    cover = COVER_LETTER.replace("Happy to walk", "Reach me at alex@example.com. Happy to walk")
+    c = by_name(run_deterministic(make_job(tmp_path, resume_txt=resume, cover=cover), root=root), "example_identity")
+    assert not c["ok"] and "cover_letter.md" in c["detail"] and "resume.txt" not in c["detail"]
+
+
+def test_example_identity_passes_for_real_candidate(tmp_path: Path) -> None:
+    from conftest import FILLED_IDENTITY, personalize_identity
+
+    root = personalize_identity(_copied_root(tmp_path))
+    resume = RESUME_TXT.replace("Alex Example", FILLED_IDENTITY["name"]).replace("alex@example.com", FILLED_IDENTITY["email"])
+    c = by_name(run_deterministic(make_job(tmp_path, resume_txt=resume), root=root), "example_identity")
+    assert c["ok"] and not c.get("skipped")
+
+
+def test_example_identity_skipped_on_the_shipped_example_repo(tmp_path: Path) -> None:
+    """QA run against examples/ itself (tests, demos) is not a candidate setup: skipped, not failed."""
+    c = by_name(run(make_job(tmp_path)), "example_identity")
+    assert c["ok"] and c.get("skipped")
