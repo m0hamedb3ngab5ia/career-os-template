@@ -22,6 +22,17 @@ their findings. Method, invariants and output format: `docs/CODE_REVIEW_PROMPT.m
    worktree if Python changed (`<repo>/.venv/bin/python -m pytest -q` from the worktree dir).
 5. When the Codex job finishes, read `.reviews/pr-<PR>/codex.md`. If it failed, say so in one line
    (point to `.reviews/pr-<PR>/codex.log`) and continue with Claude's findings only.
+   **Codex stalling or failing → check its status.** If the job is still running about 10 minutes after
+   you finished your own review with no `codex.md` yet, or `scripts/review.sh` exited nonzero, run
+   `scripts/codex-status.sh <PR>`. This is the non-interactive equivalent of Codex's `/status`: it scans
+   `codex.log` for a usage-limit error, checks login, and sends a tiny probe.
+   - Exit 3 (out of usage): stop waiting (TaskStop the job), report `Codex out of usage: <try again at …>`
+     in one line, continue Claude-only, and head the posted comment `## Review (Claude; Codex pending: usage limit until <time>)`.
+     Offer to re-run Codex after the reset.
+   - Exit 4 (not logged in): same, and tell the user to run `codex login`.
+   - Exit 0 (Codex healthy, just slow): keep waiting up to about 20 more minutes, then treat it as failed.
+   Never ask the user to open the Codex TUI unless the script itself fails; if it does, they can check
+   `/status` inside `codex`.
 6. **Merge:**
    - Same file + same root cause = one finding, tagged `Both`. Take the more severe severity only if
      that reviewer's evidence supports it.
