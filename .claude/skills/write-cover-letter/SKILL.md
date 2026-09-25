@@ -111,11 +111,11 @@ voice_verified: <true only if profile/voice/samples/ has >= 1 file AND style_gui
 facts_shortfall: false
 regeneration: <0, or n if rewritten after qa-review>
 ---
-Hi <Team> team,
+<greeting>
 
-<body paragraphs separated by blank lines>
+<body paragraphs separated by blank lines; the last one ends with the close_variant>
 
-<first name>
+<sign_off>
 ```
 (The duplicated keys keep both `templates/cover_letter/render.py` and `careeros.qa` happy.)
 

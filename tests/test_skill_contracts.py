@@ -128,10 +128,12 @@ def test_prepare_job_renders_cover_letter_txt():
     assert '"cover_letter.txt"' in files and '"resume.pdf"' in files
 
 
-def _required_letter_regex() -> re.Pattern[str]:
-    m = re.search(r"\(regex `([^`]+)`\)", _skill("prepare-job"))
-    assert m, "prepare-job must state the cover-letter-required regex"
-    return re.compile(m.group(1), re.I)
+def _letter_required(posting: str) -> bool:
+    text = _skill("prepare-job")
+    req = re.search(r"\(regex `([^`]+)`\)", text)
+    opt_out = re.search(r"\(opt-out regex `([^`]+)`\)", text)
+    assert req and opt_out, "prepare-job must state the cover-letter-required and opt-out regexes"
+    return bool(re.search(req.group(1), posting, re.I)) and not re.search(opt_out.group(1), posting, re.I)
 
 
 @pytest.mark.parametrize("posting,required", [
@@ -141,9 +143,22 @@ def _required_letter_regex() -> re.Pattern[str]:
     ("Please include a short cover letter.", True),
     ("Cover letters are optional.", False),
     ("We build ledgers.", False),
+    ("Do not include a cover letter.", False),
+    ("Please note that a cover letter is optional.", False),
+    ("No cover letter needed.", False),
+    ("Please upload your resume; a cover letter is not required.", False),
 ])
 def test_cover_letter_required_regex_both_word_orders(posting, required):
-    assert bool(_required_letter_regex().search(posting)) is required
+    assert _letter_required(posting) is required
+
+
+def test_letter_skeleton_and_example_defer_to_letter_settings():
+    skeleton = (ROOT / "templates" / "cover_letter" / "skeleton.md").read_text(encoding="utf-8")
+    example = _skill("write-cover-letter").split("## 5.", 1)[1].split("## 6.", 1)[0]
+    for text in (skeleton, example):
+        assert not re.search(r"\b120\b.{0,10}\b250\b", text)
+        assert "Hi <Team> team," not in text and "Hi <Company> team," not in text
+    assert "Letter settings" in skeleton and "Happy to walk through the code." not in skeleton
 
 
 def test_write_cover_letter_reads_length_and_voice_from_candidate_files():

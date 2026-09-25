@@ -37,7 +37,8 @@ If it reports `qa_hard_fails` non-empty after its own fix loop, continue (qa-rev
 - `always`: follow `.claude/skills/write-cover-letter/SKILL.md`.
 - `if_required`: only if `posting.description_text` says a cover letter is required/requested, in either
   word order (regex `(required|must|please|include|attach|submit|upload)\b.{0,40}cover letter|cover letter.{0,40}\b(required|must|please)`),
-  case-insensitive -> follow the skill; else skip and record
+  and no opt-out wording (opt-out regex `\b(no|not|don't|do not|without)\b[^.;]{0,30}cover letter|cover letter[^.;]{0,30}\b(optional|not required|not needed|not necessary)`),
+  both case-insensitive -> follow the skill; else skip and record
   `steps.cover_letter = {"skipped": "not_required"}`.
 Store RESULT as `steps.cover_letter`.
 
