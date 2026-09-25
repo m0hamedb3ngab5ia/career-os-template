@@ -150,3 +150,13 @@ def test_rerender_with_failing_engine_exits_1_and_leaves_no_stale_pdf(temp_root:
     assert r.returncode == 1 and "tectonic failed" in r.stderr
     assert not (resume_json.parent / "resume.pdf").exists()
     assert (resume_json.parent / "resume.tex").exists()
+
+
+def test_cover_txt_only_without_profile_exits_1_and_writes_nothing(temp_root: Path, home: Path):
+    """Subprocess on a temp root whose configured profile is missing: no identity -> no letter output."""
+    shutil.rmtree(temp_root / "profile")
+    d = _job_dir(temp_root)
+    (d / "cover_letter.md").write_text(COVER)
+    r = _run(temp_root, home, "templates/cover_letter/render.py", str(d / "cover_letter.md"), "--txt-only")
+    assert r.returncode == 1 and "profile not found" in r.stderr
+    assert not (d / "cover_letter.txt").exists()
