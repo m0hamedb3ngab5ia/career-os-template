@@ -216,3 +216,15 @@ def test_settings_load_rejects_wrong_shapes(tmp_path, fname, body, where):
     (root / "config" / fname).write_text(body)
     with pytest.raises(ConfigError, match=where):
         Settings.load(root)
+
+
+@pytest.mark.parametrize("boards,msg", [
+    ("boards: {company: Acme, ats: greenhouse, slug: acme}\n", "boards must be a list"),
+    ("boards: [acme]\n", r"boards\[0\] must be a mapping"),
+    ("boards: [{ats: greenhouse, slug: acme}]\n", r"boards\[0\] needs company and ats"),
+])
+def test_boards_shape_is_validated(tmp_path, boards, msg):
+    root = _root(tmp_path)
+    (root / "config" / "companies.yaml").write_text(boards)
+    with pytest.raises(ConfigError, match=msg):
+        Settings.load(root)

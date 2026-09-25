@@ -157,6 +157,14 @@ def _find_row(ws: Worksheet, col_idx: int, value: str) -> int | None:
     return None
 
 
+def _put(ws: Worksheet, row: int, column: int, value: Any) -> Any:
+    """Write a cell. Strings are always text: board data like "=HYPERLINK(...)" must never become a formula."""
+    cell = ws.cell(row=row, column=column, value=value)
+    if isinstance(value, str) and value.startswith("="):
+        cell.data_type = "s"
+    return cell
+
+
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -282,7 +290,7 @@ class Tracker:
         _add_list_validation(ws, col, list(ACTION_NEEDS))
         for r in range(2, ws.max_row + 1):
             if ws.cell(row=r, column=hdr["ID"]).value not in (None, ""):
-                ws.cell(row=r, column=col, value="anytime")
+                _put(ws, r, col, "anytime")
 
     def _save(self, wb: Workbook) -> None:
         tmp = self.path.with_name(f".{self.path.stem}.tmp-{os.getpid()}{self.path.suffix}")
@@ -387,8 +395,8 @@ class Tracker:
             while ws.cell(row=r, column=hdr["JobID"]).value not in (None, ""):
                 r += 1
             index[jid] = r
-            ws.cell(row=r, column=hdr["Status"], value="found")
-            ws.cell(row=r, column=hdr["DateFound"], value=_today())
+            _put(ws, r, hdr["Status"], "found")
+            _put(ws, r, hdr["DateFound"], _today())
         for header, key, _ in JOB_COLUMNS:
             if key not in data:
                 continue
@@ -399,7 +407,7 @@ class Tracker:
                 cell.hyperlink = str(val)
                 cell.font = Font(color="0563C1", underline="single")
             else:
-                cell.value = val
+                _put(ws, r, hdr[header], val)
         return "created" if created else "updated"
 
     @staticmethod
@@ -445,14 +453,14 @@ class Tracker:
             r = _find_row(ws, hdr["JobID"], job_id)
             if r is None:
                 r = ws.max_row + 1
-                ws.cell(row=r, column=hdr["JobID"], value=job_id)
-                ws.cell(row=r, column=hdr["DateFound"], value=_today())
-            ws.cell(row=r, column=hdr["Status"], value=status)
+                _put(ws, r, hdr["JobID"], job_id)
+                _put(ws, r, hdr["DateFound"], _today())
+            _put(ws, r, hdr["Status"], status)
             if status == "applied" and not ws.cell(row=r, column=hdr["DateApplied"]).value:
-                ws.cell(row=r, column=hdr["DateApplied"], value=_today())
+                _put(ws, r, hdr["DateApplied"], _today())
             if note:
-                cell = ws.cell(row=r, column=hdr["Notes"])
-                cell.value = f"{cell.value}\n{note}" if cell.value else note
+                prev = ws.cell(row=r, column=hdr["Notes"]).value
+                _put(ws, r, hdr["Notes"], f"{prev}\n{note}" if prev else note)
             self._append_log_ws(wb, job_id, "tracker", f"status -> {status}" + (f": {note}" if note else ""))
 
         self._mutate("set_status", {"job_id": job_id, "status": status, "note": note}, fn)
@@ -532,7 +540,7 @@ class Tracker:
                     "Link": item.link, "Priority": item.priority, "Needs": item.needs, "Done": "N", "DoneDate": ""}
             for h, v in vals.items():
                 if h in hdr:
-                    ws.cell(row=r, column=hdr[h], value=v)
+                    _put(ws, r, hdr[h], v)
             self._append_log_ws(wb, item.job_id, "action", f"[{item.type}/{item.priority}/{item.needs}] {item.what}")
             return item.id
 
@@ -561,8 +569,8 @@ class Tracker:
             r = _find_row(ws, hdr["ID"], id)
             if r is None:
                 return False
-            ws.cell(row=r, column=hdr["Done"], value="Y")
-            ws.cell(row=r, column=hdr["DoneDate"], value=_today())
+            _put(ws, r, hdr["Done"], "Y")
+            _put(ws, r, hdr["DoneDate"], _today())
             return True
 
         return self._mutate("mark_action_done", {"id": id}, fn)
@@ -592,7 +600,7 @@ class Tracker:
             vals = [c.job_id, c.company, c.name, c.title, c.linkedin, c.email, c.email_confidence,
                     c.draft_message, "N", "", ""]
             for i, v in enumerate(vals, start=1):
-                ws.cell(row=r, column=i, value=v)
+                _put(ws, r, i, v)
 
         payload = c.model_dump(include={"company", "name", "job_id", "title", "linkedin", "email", "email_confidence", "draft_message"})
         self._mutate("add_contact", payload, fn)
@@ -603,7 +611,7 @@ class Tracker:
         ws = wb["Log"]
         r = ws.max_row + 1
         for i, v in enumerate([_now(), job_id, component, message], start=1):
-            ws.cell(row=r, column=i, value=v)
+            _put(ws, r, i, v)
 
     def log(self, job_id: str, component: str, message: str) -> None:
         self._mutate("log", {"job_id": job_id, "component": component, "message": message},
@@ -615,8 +623,8 @@ class Tracker:
             r = _find_row(ws, 1, key)
             if r is None:
                 r = ws.max_row + 1
-                ws.cell(row=r, column=1, value=key)
-            ws.cell(row=r, column=2, value=value)
+                _put(ws, r, 1, key)
+            _put(ws, r, 2, value)
 
         self._mutate("set_config", {"key": key, "value": value}, fn)
 

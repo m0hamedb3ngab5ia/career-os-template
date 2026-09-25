@@ -226,6 +226,15 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
         for key in MAPPING_KEYS.get(name, ()):
             if data.get(key) is not None and not isinstance(data[key], dict):
                 raise ConfigError(f"config/{name}.yaml: {key} must be a mapping, got {type(data[key]).__name__}")
+    boards = cfg.get("companies", {}).get("boards")
+    if boards is not None:
+        if not isinstance(boards, list):
+            raise ConfigError(f"config/companies.yaml: boards must be a list of {{company, ats, slug}}, got {type(boards).__name__}")
+        for i, b in enumerate(boards):
+            if not isinstance(b, dict):
+                raise ConfigError(f"config/companies.yaml: boards[{i}] must be a mapping, got {type(b).__name__}")
+            if not b.get("company") or not b.get("ats"):
+                raise ConfigError(f"config/companies.yaml: boards[{i}] needs company and ats")
 
 
 def _fuzzy_eq(a: str, b: str) -> bool:
