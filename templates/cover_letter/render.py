@@ -183,19 +183,18 @@ def render(md_path: str | Path, pdf: bool = True) -> Path:
 
 
 def _identity(meta: dict[str, Any]) -> dict[str, Any]:
-    """Identity from profile/master.yaml (the only source of candidate facts). A frontmatter `identity:`
-    block is used only when no profile exists (standalone rendering); otherwise it is ignored."""
-    fm = meta.get("identity") if isinstance(meta.get("identity"), dict) else None
+    """Identity from the configured profile (`config/pipeline.yaml: paths.profile`), the only source of
+    candidate facts. A frontmatter `identity:` block is always ignored; no profile -> error."""
     prof = _profile_path()
-    if prof.exists():
-        try:
-            ident = (yaml.safe_load(prof.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
-        except yaml.YAMLError as e:
-            raise ValueError(f"cannot parse {prof}: {str(e).splitlines()[0]}") from None
-        if fm:
-            print("WARNING: ignoring frontmatter identity; using profile/master.yaml", file=sys.stderr)
-        return ident
-    return fm or {}
+    if not prof.exists():
+        raise FileNotFoundError(f"profile not found: {prof} (run `careeros init`); identity is never taken from frontmatter")
+    try:
+        ident = (yaml.safe_load(prof.read_text(encoding="utf-8")) or {}).get("identity", {}) or {}
+    except yaml.YAMLError as e:
+        raise ValueError(f"cannot parse {prof}: {str(e).splitlines()[0]}") from None
+    if isinstance(meta.get("identity"), dict):
+        print("WARNING: ignoring frontmatter identity; using the profile", file=sys.stderr)
+    return ident
 
 
 # --- engine (same logic as templates/resume/render.py) -------------------------

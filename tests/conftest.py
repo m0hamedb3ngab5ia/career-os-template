@@ -64,14 +64,11 @@ def temp_root(tmp_path: Path) -> Path:
 
 
 def tectonic_cache() -> Path | None:
-    """Tectonic's local bundle cache (a tool cache, not personal data), or None. PDF tests run only when it
-    exists: with CAREEROS_LATEX_OFFLINE=1 tectonic reads this cache and never downloads (no network)."""
+    """Tectonic bundle cache the developer opted into via TECTONIC_CACHE_DIR (tests never probe $HOME).
+    Unset -> tectonic PDF tests skip; with CAREEROS_LATEX_OFFLINE=1 tectonic never downloads (no network)."""
     env = os.environ.get("TECTONIC_CACHE_DIR")
-    for cand in ([Path(env)] if env else []) + [Path.home() / "Library" / "Caches" / "TectonicProject.Tectonic",
-                                                 Path.home() / ".cache" / "Tectonic"]:
-        if cand.is_dir() and any(cand.iterdir()):
-            return cand
-    return None
+    cand = Path(env) if env else None
+    return cand if cand and cand.is_dir() and any(cand.iterdir()) else None
 
 
 def subprocess_env(root: Path, home: Path) -> dict[str, str]:

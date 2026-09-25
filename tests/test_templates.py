@@ -12,6 +12,12 @@ pytestmark = pytest.mark.unit
 resume = load_script("templates/resume/render.py")
 cover = load_script("templates/cover_letter/render.py")
 
+
+@pytest.fixture(autouse=True)
+def _example_profile(monkeypatch):
+    """Cover-letter identity comes from a profile; tests use the fictional example, never the checkout's profile/."""
+    monkeypatch.setattr(cover, "PROFILE", EXAMPLE_REPO / "profile" / "master.yaml")
+
 SPECIALS = {
     "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#", "_": r"\_",
     "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
@@ -178,13 +184,22 @@ def test_inline_markdown_to_latex():
     assert s == r"Built \textbf{R\&D} tool, \textit{50\%} faster: \href{https://x.com/a_b\#c}{site\_1}"
 
 
-def test_cover_tex_uses_frontmatter_identity(tmp_path: Path, monkeypatch):
-    monkeypatch.setattr(cover, "PROFILE", tmp_path / "no-profile" / "master.yaml")  # standalone: no profile
-    fm = FM.replace("---\n", "---\nidentity: {name: Alex Example, email: a_x@example.com, phone: '555'}\n", 1)
-    tex = cover.render(_cl(tmp_path, "Body 100%.\n", fm), pdf=False).read_text()
-    assert r"\textbf{Alex Example}" in tex and r"a\_x@example.com" in tex
+def test_cover_tex_uses_profile_identity_escaped(tmp_path: Path, monkeypatch):
+    prof = tmp_path / "me.yaml"
+    prof.write_text("identity: {name: Jordan Real, email: j_r@example.org, phone: '555-0100'}\n")
+    monkeypatch.setattr(cover, "PROFILE", prof)
+    tex = cover.render(_cl(tmp_path, "Body 100%.\n"), pdf=False).read_text()
+    assert r"\textbf{Jordan Real}" in tex and r"j\_r@example.org" in tex
     assert r"Acme \& Co \textbar{} Software Engineer, Backend" in tex
     assert r"Body 100\%." in tex and "Hi Payments team," in tex
+
+
+def test_cover_without_profile_fails_even_with_frontmatter_identity(tmp_path: Path, monkeypatch, capsys):
+    monkeypatch.setattr(cover, "PROFILE", tmp_path / "missing" / "master.yaml")
+    fm = FM.replace("---\n", "---\nidentity: {name: Mallory Fake, email: m@evil.example}\n", 1)
+    p = _cl(tmp_path, "Body.\n", fm)
+    assert cover.main([p.as_posix(), "--no-pdf"]) == 1
+    assert "profile" in capsys.readouterr().err and not (tmp_path / "cover_letter.tex").exists()
 
 
 # --- stale artifacts / compile failures -------------------------------------------------------------
