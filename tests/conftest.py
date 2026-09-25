@@ -63,11 +63,23 @@ def temp_root(tmp_path: Path) -> Path:
     return make_temp_root(tmp_path / "repo")
 
 
+def tectonic_cache() -> Path | None:
+    """Tectonic bundle cache the developer opted into via TECTONIC_CACHE_DIR (tests never probe $HOME).
+    Unset -> tectonic PDF tests skip; with CAREEROS_LATEX_OFFLINE=1 tectonic never downloads (no network)."""
+    env = os.environ.get("TECTONIC_CACHE_DIR")
+    cand = Path(env) if env else None
+    return cand if cand and cand.is_dir() and any(cand.iterdir()) else None
+
+
 def subprocess_env(root: Path, home: Path) -> dict[str, str]:
-    """Env for `python -m careeros...` subprocesses: temp repo root, temp HOME, src on path."""
+    """Env for `python -m careeros...` subprocesses: temp repo root, temp HOME, src on path, LaTeX offline."""
     env = dict(os.environ)
     env["CAREEROS_ROOT"] = str(root)
     env["HOME"] = str(home)
+    env["CAREEROS_LATEX_OFFLINE"] = "1"
+    cache = tectonic_cache()
+    if cache:
+        env["TECTONIC_CACHE_DIR"] = str(cache)
     env["PYTHONPATH"] = os.pathsep.join([str(ROOT / "src"), env.get("PYTHONPATH", "")]).rstrip(os.pathsep)
     return env
 
