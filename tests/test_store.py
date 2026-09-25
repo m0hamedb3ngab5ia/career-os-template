@@ -92,3 +92,16 @@ def test_list_jobs_status_filter_and_score_fields(settings):
 ])
 def test_finder_copy_names(name, dup):
     assert _is_finder_copy(name) is dup
+
+
+def test_save_seen_uses_a_private_temp_file(settings, monkeypatch):
+    """Two scouts writing seen.json must not share one temp path (one would replace the other's file)."""
+    import os
+
+    store = Store(settings)
+    shared = store.seen_file.with_suffix(".tmp")
+    shared.write_text("in use by another writer")
+    store.save_seen({"a", "b"})
+    assert shared.read_text() == "in use by another writer"
+    assert store.load_seen() == {"a", "b"}
+    assert not list(store.seen_file.parent.glob(f"*.{os.getpid()}.tmp"))

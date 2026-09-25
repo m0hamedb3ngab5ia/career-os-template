@@ -9,6 +9,12 @@ from typing import Any
 import yaml
 
 CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
+# Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
+MAPPING_KEYS = {
+    "pipeline": ("paths",),
+    "targets": ("candidate", "location", "seniority", "categories"),
+    "companies": ("blocklist", "prestige_scoring", "prestige_tiers"),
+}
 
 _SUFFIX_RE = re.compile(
     r"\b(inc|llc|ltd|corp|corporation|co|plc|lp|l\.p\.|limited|holdings|group|technologies)\b\.?",
@@ -93,6 +99,7 @@ class Settings:
         root = (root or find_repo_root()).resolve()
         require_setup(root)
         cfg = {name: _load_yaml(root / "config" / f"{name}.yaml") for name in CONFIG_FILES}
+        _check_shapes(cfg)
         s = cls(root=root, **cfg)
         raw_paths = s.pipeline.get("paths", {}) or {}
         for key, val in raw_paths.items():
@@ -210,6 +217,15 @@ class Settings:
         from careeros.models import STATUSES
 
         return list(STATUSES)
+
+
+def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
+    for name, data in cfg.items():
+        if "_items" in data:
+            raise ConfigError(f"config/{name}.yaml: top level must be a mapping (key: value), got a list")
+        for key in MAPPING_KEYS.get(name, ()):
+            if data.get(key) is not None and not isinstance(data[key], dict):
+                raise ConfigError(f"config/{name}.yaml: {key} must be a mapping, got {type(data[key]).__name__}")
 
 
 def _fuzzy_eq(a: str, b: str) -> bool:

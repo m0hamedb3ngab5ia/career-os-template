@@ -204,3 +204,15 @@ def test_active_categories_and_keyword_helpers():
     assert s.blocked_countries() == ["XX", "GB"]
     assert s.country_aliases() == {"XX": ["freedonia"], "YY": []}
     assert Settings(root=Path("."), targets={"location": {"country_aliases": ["not", "a", "map"]}}).country_aliases() == {}
+
+
+@pytest.mark.parametrize("fname,body,where", [
+    ("pipeline.yaml", "paths: [jobs_dir]\n", "pipeline.yaml: paths"),
+    ("companies.yaml", "- Acme\n- Initech\n", "companies.yaml"),
+    ("targets.yaml", "location: [US]\n", "targets.yaml: location"),
+])
+def test_settings_load_rejects_wrong_shapes(tmp_path, fname, body, where):
+    root = _root(tmp_path)
+    (root / "config" / fname).write_text(body)
+    with pytest.raises(ConfigError, match=where):
+        Settings.load(root)

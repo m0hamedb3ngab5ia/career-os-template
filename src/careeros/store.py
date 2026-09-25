@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 import re
 import warnings
 from datetime import datetime
@@ -55,7 +56,7 @@ class Store:
         d = self.job_dir(job_id)
         d.mkdir(parents=True, exist_ok=True)
         p = d / name
-        tmp = p.with_suffix(".tmp")
+        tmp = p.with_name(f"{p.name}.{os.getpid()}.tmp")
         tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
         tmp.replace(p)
         return p
@@ -134,7 +135,7 @@ class Store:
             return set()
 
     def save_seen(self, seen: set[str]) -> None:
-        tmp = self.seen_file.with_suffix(".tmp")
+        tmp = self.seen_file.with_name(f"{self.seen_file.name}.{os.getpid()}.tmp")  # per-writer temp
         tmp.write_text(json.dumps(sorted(seen)), encoding="utf-8")
         tmp.replace(self.seen_file)
 
