@@ -5,10 +5,16 @@ import os
 import re
 import uuid
 import warnings
+from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterator
 from zipfile import BadZipFile
+
+try:
+    import fcntl
+except ImportError:  # Windows: no cross-process lock
+    fcntl = None  # type: ignore[assignment]
 
 from openpyxl import Workbook, load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
@@ -166,6 +172,29 @@ class Tracker:
         self.path = Path(path) if path else s.paths["tracker_xlsx"]  # type: ignore[union-attr]
         self.pending_path = self.path.with_name(self.path.name + ".pending.json")
         self.jobs_dir: Path | None = s.paths["jobs_dir"] if s else None
+        self.lock_path = self.path.with_name(f".{self.path.name}.lock")
+        self._lock_depth = 0
+
+    @contextmanager
+    def _lock(self) -> Iterator[None]:
+        """Cross-process exclusive lock around load -> mutate -> save and pending-queue writes.
+        Reentrant within one Tracker (flush replays ops that lock again)."""
+        if self._lock_depth or fcntl is None:
+            self._lock_depth += 1
+            try:
+                yield
+            finally:
+                self._lock_depth -= 1
+            return
+        self.lock_path.parent.mkdir(parents=True, exist_ok=True)
+        with self.lock_path.open("a") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            self._lock_depth += 1
+            try:
+                yield
+            finally:
+                self._lock_depth -= 1
+                fcntl.flock(fh, fcntl.LOCK_UN)
 
     # --- create ------------------------------------------------------------
 
@@ -265,6 +294,10 @@ class Tracker:
                 tmp.unlink(missing_ok=True)
 
     def _mutate(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
+        with self._lock():
+            return self._mutate_locked(op, payload, fn)
+
+    def _mutate_locked(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
         try:
             wb = self._load()
             result = fn(wb)
@@ -310,6 +343,10 @@ class Tracker:
     def flush_pending(self) -> int:
         """Replay queued ops in order. If the workbook is still locked (the op re-queues itself) or an op
         raises, the failed op and every op after it stay queued, in their original order."""
+        with self._lock():
+            return self._flush_locked()
+
+    def _flush_locked(self) -> int:
         q = self._read_pending()
         if not q:
             return 0
@@ -516,7 +553,8 @@ class Tracker:
             out.append(d)
         return out
 
-    def mark_action_done(self, id: str) -> bool:
+    def mark_action_done(self, id: str) -> bool | None:
+        """True = marked, False = no such id, None = tracker locked and the op was queued."""
         def fn(wb: Workbook) -> bool:
             ws = wb["Action Items"]
             hdr = _header_index(ws)
@@ -527,7 +565,7 @@ class Tracker:
             ws.cell(row=r, column=hdr["DoneDate"], value=_today())
             return True
 
-        return bool(self._mutate("mark_action_done", {"id": id}, fn))
+        return self._mutate("mark_action_done", {"id": id}, fn)
 
     # --- contacts ----------------------------------------------------------
 

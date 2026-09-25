@@ -129,3 +129,22 @@ def test_store_ignores_finder_duplicates(settings):
     assert [j["job_id"] for j in jobs] == ["abc123"]
     msgs = [str(x.message) for x in w if "Finder duplicate" in str(x.message)]
     assert len(msgs) == 1 and "abc123 2" in msgs[0]
+
+
+def test_run_scout_refuses_without_title_keywords_and_marks_nothing_seen(settings, monkeypatch):
+    import careeros.scout as scout_mod
+    from careeros.config import ConfigError
+
+    class FakeGH:
+        ats = "greenhouse"
+
+        def fetch(self, board):
+            return [_p("Software Engineer", company=board["company"], jid="a")]
+
+    monkeypatch.setattr(scout_mod, "ADAPTERS", {"greenhouse": FakeGH})
+    settings.categories = {}  # missing/emptied categories.yaml: every title would be filtered and marked seen
+    settings.companies["boards"] = [{"company": "Acme", "ats": "greenhouse", "slug": "acme"}]
+    store = Store(settings)
+    with pytest.raises(ConfigError, match="title_keywords"):
+        run_scout(settings, store, log=lambda *_: None)
+    assert store.load_seen() == set()

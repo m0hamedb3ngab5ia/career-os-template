@@ -6,7 +6,7 @@ from pathlib import Path
 import pytest
 import yaml
 
-from careeros.config import Settings, SetupError, _fuzzy_eq, _load_yaml, find_repo_root, normalize_company
+from careeros.config import ConfigError, Settings, SetupError, _fuzzy_eq, _load_yaml, find_repo_root, normalize_company
 
 pytestmark = pytest.mark.unit
 
@@ -112,10 +112,15 @@ def test_load_yaml_missing_list_and_invalid(tmp_path):
     assert _load_yaml(empty) == {}
     bad = tmp_path / "bad.yaml"
     bad.write_text("answers:\n  - key: x\n   answer: [unclosed\n")
-    with warnings.catch_warnings(record=True) as w:
-        warnings.simplefilter("always")
-        assert _load_yaml(bad) == {}
-    assert any("could not parse" in str(x.message) for x in w)
+    with pytest.raises(ConfigError, match=r"could not parse .*bad\.yaml"):  # fail closed, never silently {}
+        _load_yaml(bad)
+
+
+def test_settings_load_fails_closed_on_malformed_config(tmp_path):
+    root = _root(tmp_path)
+    (root / "config" / "targets.yaml").write_text("location:\n  blocked_countries: [DE\n")
+    with pytest.raises(ConfigError, match="targets.yaml"):
+        Settings.load(root)
 
 
 # --- company normalization / matching ---------------------------------------

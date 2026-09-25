@@ -8,7 +8,7 @@ from datetime import datetime
 from pathlib import Path
 
 from careeros.bootstrap import EDIT_HINTS, InitError, copy_examples, link_private
-from careeros.config import Settings, SetupError, find_repo_root, get_settings
+from careeros.config import ConfigError, Settings, SetupError, find_repo_root, get_settings
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, TrackerRow
 from careeros.scout import run_scout
 from careeros.store import Store
@@ -232,6 +232,9 @@ def cmd_action_list(args: argparse.Namespace) -> int:
 def cmd_action_done(args: argparse.Namespace) -> int:
     tr = Tracker(settings=_settings(args))
     ok = tr.mark_action_done(args.id)
+    if ok is None:
+        print(f"action item {args.id}: queued (tracker locked); run `careeros tracker flush`")
+        return 0
     print("done" if ok else f"action item {args.id} not found")
     return 0 if ok else 1
 
@@ -337,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
         return int(args.fn(args) or 0)
-    except SetupError as e:
+    except (SetupError, ConfigError) as e:
         print(f"careeros: {e}", file=sys.stderr)
         return 1
     except BrokenPipeError:

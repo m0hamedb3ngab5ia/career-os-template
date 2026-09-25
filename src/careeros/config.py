@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import os
 import re
-import warnings
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -21,6 +20,10 @@ _NON_ALNUM = re.compile(r"[^a-z0-9 ]+")
 # Package checkout root (src/careeros/config.py -> repo). Holds examples/ for `careeros init`.
 PKG_ROOT = Path(__file__).resolve().parents[2]
 PERSONAL_DIRS = ("config", "profile")
+
+
+class ConfigError(ValueError):
+    """A config/ or profile/ YAML file is malformed or unusable. Fail closed: never run on an empty config."""
 
 
 class SetupError(FileNotFoundError):
@@ -69,8 +72,7 @@ def _load_yaml(path: Path) -> dict[str, Any]:
         with path.open("r", encoding="utf-8") as f:
             data = yaml.safe_load(f)
     except yaml.YAMLError as e:
-        warnings.warn(f"could not parse {path}: {str(e).splitlines()[0]}", stacklevel=2)
-        return {}
+        raise ConfigError(f"could not parse {path}: {str(e).splitlines()[0]}; fix the YAML and re-run") from None
     return data if isinstance(data, dict) else {"_items": data} if data else {}
 
 

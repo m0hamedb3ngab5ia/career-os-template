@@ -125,3 +125,31 @@ def test_upsert_status_for_unknown_job_touches_only_tracker(cli, settings):
     assert cli(["tracker", "upsert", "ghost", "--field", "Status=queued"]) == 0
     assert Tracker(settings=settings).get_job("ghost")["Status"] == "queued"
     assert not Store(settings).job_dir("ghost").exists()
+
+
+def test_action_done_while_locked_reports_queued_not_missing(cli, settings, capsys, monkeypatch):
+    tr = Tracker(settings=settings)
+    aid = tr.add_action_item("check", id="d1")
+    from openpyxl.workbook.workbook import Workbook
+
+    def boom(self, filename):
+        raise PermissionError(13, "locked")
+
+    monkeypatch.setattr(Workbook, "save", boom)
+    with pytest.warns(UserWarning):
+        assert cli(["action", "done", aid]) == 0
+    out = capsys.readouterr().out
+    assert "queued" in out and "not found" not in out
+    assert tr.pending_count() == 1
+
+
+def test_cli_malformed_config_exits_1_with_message(settings, monkeypatch, capsys):
+    import careeros.cli as cli_mod
+    from careeros.config import ConfigError
+
+    def bad(args):
+        raise ConfigError("could not parse config/targets.yaml: mapping values are not allowed here")
+
+    monkeypatch.setattr(cli_mod, "_settings", bad)
+    assert cli_mod.main(["stats"]) == 1
+    assert "targets.yaml" in capsys.readouterr().err

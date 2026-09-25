@@ -4,7 +4,7 @@ import re
 from dataclasses import dataclass, field
 from typing import Any
 
-from careeros.config import Settings, get_settings
+from careeros.config import ConfigError, Settings, get_settings
 from careeros.models import Posting
 from careeros.scout.ashby import AshbyAdapter
 from careeros.scout.base import Adapter, BoardNotFound, FetchError
@@ -141,6 +141,9 @@ def run_scout(
     s = settings or get_settings()
     st = store or Store(s)
     pf = Prefilter(s)
+    if not any(pf.active.values()):
+        # Every title would fail the prefilter and be marked seen for good; refuse instead.
+        raise ConfigError("no active category has title_keywords in config/categories.yaml; refusing to scout")
     seen = st.load_seen()
     summary = ScoutSummary()
 
