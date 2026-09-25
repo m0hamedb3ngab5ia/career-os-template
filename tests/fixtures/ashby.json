@@ -1,0 +1,28 @@
+{
+  "apiVersion": "1",
+  "jobs": [
+    {
+      "id": "7f0e0000-1111-2222-3333-444444444444",
+      "title": "Full Stack Engineer",
+      "department": "Engineering",
+      "team": "Product Engineering",
+      "employmentType": "FullTime",
+      "location": "New York",
+      "secondaryLocations": [{"location": "San Francisco", "address": {"postalAddress": {"addressCountry": "United States"}}}],
+      "publishedAt": "2026-09-18T15:00:00.000Z",
+      "isRemote": false,
+      "workplaceType": "Hybrid",
+      "address": {"postalAddress": {"addressRegion": "New York", "addressCountry": "United States", "addressLocality": "New York"}},
+      "descriptionHtml": "<h2>About</h2><p>Ship <em>product</em> features with React and Postgres.</p>",
+      "descriptionPlain": "About\nShip product features with React and Postgres.",
+      "jobUrl": "https://jobs.ashbyhq.com/acme/7f0e0000-1111-2222-3333-444444444444",
+      "applyUrl": "https://jobs.ashbyhq.com/acme/7f0e0000-1111-2222-3333-444444444444/application",
+      "compensation": {
+        "compensationTierSummary": "$150K – $200K • Offers Equity",
+        "summaryComponents": [
+          {"compensationType": "Salary", "interval": "1 YEAR", "currencyCode": "USD", "minValue": 150000, "maxValue": 200000}
+        ]
+      }
+    }
+  ]
+}

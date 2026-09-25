@@ -1,0 +1,69 @@
+# Quality gate. Every artifact must pass before submit. hard = fail blocks; soft = warn + score.
+
+resume:
+  max_pages: 1
+  hard:
+    truth_trace: true            # every bullet cites a profile bullet id; numbers identical
+    no_new_tools: true           # every tech mentioned exists in profile.skills or cited bullet
+    contact_intact: true         # name, email, phone, linkedin, github survive PDF text extraction
+    section_order: [experience, projects, education, skills]   # ATS-friendly; summary optional first
+    single_column: true
+    no_tables_icons: true
+  soft:
+    keyword_coverage_min: 0.6    # share of posting required_skills present honestly
+    date_format: "Mon YYYY – Mon YYYY"
+
+cover_letter:
+  max_words: 250
+  min_words: 120
+  hard:
+    truth_trace: true
+    company_facts_min: 2         # concrete facts about company/team, sourced from posting or site
+    names_role_and_company: true
+    no_banned_phrases: true
+  soft:
+    voice_match_min: 7           # 1-10 rubric vs profile/voice/style_guide.md
+    specificity_min: 7
+
+answers:                         # free-text application questions
+  hard:
+    truth_trace: true
+    no_banned_phrases: true
+    within_char_limit: true
+  soft:
+    voice_match_min: 7
+
+critic:
+  model_rubric: [relevance, specificity, voice_match, zero_fabrication, ats_safety]
+  pass_threshold: 7.5            # mean over rubric
+  max_regenerations: 1           # then → Action Item
+
+banned_phrases:
+  - spearheaded
+  - leveraged
+  - leverage
+  - passionate about
+  - fast-paced environment
+  - I am excited to apply
+  - I am writing to express
+  - proven track record
+  - results-driven
+  - synergy
+  - dynamic
+  - thrilled
+  - delve
+  - tapestry
+  - testament to
+  - in today's
+  - game-changer
+  - cutting-edge
+  - hit the ground running
+  - wear many hats
+  - I believe I would be a great fit
+  - Dear Hiring Manager,   # use team/role name if known; else "Hi <Company> team,"
+style_rules:
+  - max_em_dashes_per_doc: 2
+  - no_rhetorical_questions
+  - no_tricolon_lists_of_adjectives   # "fast, reliable, and scalable"
+  - contractions_ok: true
+  - first_person_ok: true
