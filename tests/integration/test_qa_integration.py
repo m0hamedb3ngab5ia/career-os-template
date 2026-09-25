@@ -46,7 +46,8 @@ def job_dir(temp_root: Path, home: Path) -> Path:
     assert r.returncode == 0, r.stderr
     (d / "cover_letter.md").write_text(COVER_LETTER)
     (d / "answers.json").write_text(json.dumps([{"question": "Are you legally authorized to work in the US?",
-                                                 "answer": "Yes", "type": "standard", "needs_review": False}]))
+                                                 "answer": "Yes", "type": "standard", "standard_key": "work_authorization",
+                                                 "needs_review": False}]))
     return d
 
 
@@ -98,3 +99,18 @@ def test_confidential_term_in_outreach_fails_strict(temp_root: Path, home: Path,
     assert code == 1 and res["pass"] is False
     assert res["confidential_hits"] == ["resume.txt: patterns[0]", "outreach.json: term 'Nightjar'"]
     assert any(r.startswith("confidential_terms: confidential content") for r in res["fail_reasons"])
+
+
+def test_rewritten_bullet_and_contradicted_standard_answer_fail_strict(temp_root: Path, home: Path, job_dir: Path):
+    """Valid ids with fabricated text, and a legal answer contradicting profile/standard_answers.yaml."""
+    rj = json.loads((job_dir / "resume.json").read_text())
+    rj["experience"][0]["bullets"][0]["text"] = "Led company-wide hiring strategy and managed executive stakeholders"
+    rj["skills"]["tools"] = list(rj["skills"].get("tools") or []) + ["terraform"]
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    ans = json.loads((job_dir / "answers.json").read_text())
+    ans[0]["answer"] = "No"
+    (job_dir / "answers.json").write_text(json.dumps(ans))
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 1 and res["pass"] is False
+    failed = {r.split(":")[0] for r in res["fail_reasons"]}
+    assert {"bullet_fidelity", "skills_traced", "standard_answers"} <= failed

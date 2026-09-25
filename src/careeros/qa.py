@@ -1,7 +1,10 @@
 """Deterministic QA checks for a job directory.
 
 Usage:
-    python -m careeros.qa <job_dir> [--root <repo_root>]
+    python -m careeros.qa <job_dir> [--root <repo_root>] [--strict]
+
+Prints the JSON report and exits 0 (report mode; callers gate on `pass`). With --strict it exits 1
+when any hard check fails, for shell pipelines that gate on the exit status.
 
 Importable:
     from careeros.qa import run_deterministic
@@ -144,6 +147,27 @@ def _count_words(text: str) -> int:
     return len(re.findall(r"\S+", text or ""))
 
 
+_FID_TOKEN = re.compile(r"[a-z0-9$%+#]+(?:[.'/-][a-z0-9$%+#]+)*")
+
+
+def _fid_words(text: str) -> list[str]:
+    return _FID_TOKEN.findall(str(text or "").lower())
+
+
+def bullet_text_allowed(out: str, sources: Iterable[str]) -> bool:
+    """tailor-resume rule 1: text is a source (master text or a variant) verbatim, optionally with the
+    leading verb swapped and/or a trailing clause trimmed: words after the first are a prefix of the
+    source's words after the first."""
+    ow = _fid_words(out)
+    if len(ow) < 2:
+        return False
+    for src in sources:
+        sw = _fid_words(src)
+        if ow == sw or (len(sw) >= len(ow) and sw[1:len(ow)] == ow[1:]):
+            return True
+    return False
+
+
 def _year(v: Any) -> str | None:
     if v is None:
         return None
@@ -252,6 +276,15 @@ class ProfileIndex:
                     parts.extend(str(x) for x in e.get("stack", []) or [])
         return " ".join(parts)
 
+    def bullet_sources(self, bid: str) -> list[str]:
+        """The bullet's master text and each declared variant, separately."""
+        b = self.bullets.get(bid)
+        if not b:
+            return []
+        variants = b.get("variants") or []
+        vals = variants.values() if isinstance(variants, dict) else variants
+        return [str(b.get("text", ""))] + [str(v) for v in vals]
+
     def bullet_text(self, bid: str) -> str:
         b = self.bullets.get(bid)
         if b:
@@ -329,6 +362,8 @@ class Checker:
         self.profile = ProfileIndex(_load_yaml(prof_path))
         # profile/confidential_terms.yaml sits next to master.yaml (gitignored with the rest of profile/)
         self.confidential_path = prof_path.parent / "confidential_terms.yaml"
+        sa_path = Path(paths.get("standard_answers", prof_path.parent / "standard_answers.yaml"))
+        self.standard_answers_path = sa_path if sa_path.is_absolute() else root / sa_path
         self.checks: list[dict[str, Any]] = []
         self.extras: dict[str, Any] = {"orphan_numbers": [], "unknown_tools": [], "banned_hits": []}
 
@@ -368,6 +403,10 @@ class Checker:
 
     # ---- individual checks ----------------------------------------------
     def check_artifacts(self) -> None:
+        req = [k for k in ("resume.json", "resume.txt") if not self.artifacts.get(k)]
+        # tailor-resume writes both before any QA run; a dir without them has nothing to gate
+        self.add("resume_present", "hard", not req, "resume.json + resume.txt present" if not req
+                 else f"missing: {', '.join(req)}")
         missing = [k for k, v in self.artifacts.items() if not v and k != "resume.pdf"]
         self.add("artifacts_present", "soft", not missing,
                  "all artifacts present" if not missing else f"missing: {', '.join(missing)}")
@@ -627,6 +666,96 @@ class Checker:
                  "all capitalised terms traced to profile" if not unknown
                  else f"not in profile skills/cited bullets: {', '.join(unknown)}")
 
+    def _resume_entries(self) -> list[dict[str, Any]]:
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else {}
+        out = []
+        for section in ("experience", "projects", "leadership"):
+            out.extend(e for e in rj.get(section) or [] if isinstance(e, dict))
+        return out
+
+    def check_bullet_fidelity(self) -> None:
+        """Each resume.json bullet's text is its master text / a variant (verb swap + trailing trim only);
+        summary is a profile summary_variant verbatim or null."""
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        if rj is None:
+            self.skip("bullet_fidelity", "hard", "resume.json missing")
+            return
+        problems, n = [], 0
+        for e in self._resume_entries():
+            for b in e.get("bullets") or []:
+                if not isinstance(b, dict) or not b.get("id") or b.get("text") is None:
+                    continue
+                n += 1
+                bid = str(b["id"])
+                sources = self.profile.bullet_sources(bid)
+                if sources and not bullet_text_allowed(str(b["text"]), sources):
+                    problems.append(f"'{bid}' text differs from master text/variants: {str(b['text'])[:80]!r}")
+        summary = rj.get("summary")
+        if summary:
+            variants = [str(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
+            if str(summary).strip() not in variants:
+                problems.append("summary is not one of profile.summary_variants")
+        self.add("bullet_fidelity", "hard", not problems,
+                 f"{n} bullets match master text/variants" if not problems else "; ".join(problems))
+
+    def check_skills_traced(self) -> None:
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        skills = (rj or {}).get("skills")
+        if not isinstance(skills, dict) or not any(skills.values()):
+            self.skip("skills_traced", "hard", "resume.json has no skills")
+            return
+        allowed = {str(x).strip().lower() for vals in (self.profile.profile.get("skills") or {}).values()
+                   for x in (vals or [])}
+        for e in self._resume_entries():
+            parent = self.profile.parents.get(str(e.get("id") or ""), {})
+            allowed |= {str(x).strip().lower() for x in parent.get("stack") or []}
+        cited = " ".join(self.profile.bullet_text(b) for b in self._cited_ids().get("resume.json", set()))
+        unknown = [str(t) for vals in skills.values() for t in (vals or [])
+                   if str(t).strip().lower() not in allowed and not _term_in_text(str(t).strip(), cited)]
+        self.add("skills_traced", "hard", not unknown,
+                 "all skills in profile skills/stack/cited bullets" if not unknown
+                 else f"not in profile: {', '.join(unknown)}")
+
+    def check_standard_answers(self) -> None:
+        """type=standard answers equal profile/standard_answers.yaml verbatim (by standard_key; null stays
+        null); sensitive / freeform-salary answers that are not standard are never filled."""
+        if not isinstance(self.answers, list):
+            self.skip("standard_answers", "hard", "answers.json missing")
+            return
+        try:
+            sa = _load_yaml(self.standard_answers_path) if self.standard_answers_path.exists() else None
+        except yaml.YAMLError as e:
+            self.add("standard_answers", "hard", False, f"cannot parse {self.standard_answers_path.name}: {e}")
+            return
+        table: dict[str, Any] = {}
+        if isinstance(sa, dict):
+            for ent in sa.get("answers") or []:
+                if isinstance(ent, dict) and ent.get("key"):
+                    table[str(ent["key"])] = ent.get("answer")
+            for k, ent in (sa.get("eeo") or {}).items():
+                if isinstance(ent, dict):
+                    table[f"eeo.{k}"] = ent.get("answer")
+        problems = []
+        for i, a in enumerate(self.answers):
+            if not isinstance(a, dict):
+                continue
+            ans = a.get("answer")
+            if a.get("type") == "standard":
+                key = a.get("standard_key")
+                if sa is None:
+                    problems.append(f"#{i}: {self.standard_answers_path.name} missing")
+                elif not key or str(key) not in table:
+                    problems.append(f"#{i}: standard_key {key!r} not in {self.standard_answers_path.name}")
+                else:
+                    want = table[str(key)]
+                    same = ans is None if want is None else (ans is not None and str(ans).strip() == str(want).strip())
+                    if not same:
+                        problems.append(f"#{i}: {key} answer differs from {self.standard_answers_path.name}")
+            elif a.get("class") in ("sensitive", "salary_freeform") and ans not in (None, ""):
+                problems.append(f"#{i}: {a.get('class')} answer must be left for the candidate (Action Item)")
+        self.add("standard_answers", "hard", not problems,
+                 "standard answers match profile" if not problems else "; ".join(problems))
+
     def _contact_fields(self) -> dict[str, str]:
         ident = self.profile.profile.get("identity", {}) or {}
         out = {}
@@ -759,6 +888,9 @@ class Checker:
         self.check_word_counts()
         self.check_em_dashes()
         self.check_truth_trace()
+        self.check_bullet_fidelity()
+        self.check_skills_traced()
+        self.check_standard_answers()
         self.check_numbers()
         self.check_tools()
         self.check_contact()

@@ -91,8 +91,8 @@ def make_job(tmp_path: Path, resume_txt: str = RESUME_TXT, cover: str | None = C
     if cover is not None:
         (job / "cover_letter.md").write_text(cover)
     (job / "answers.json").write_text(json.dumps(answers if answers is not None else [
-        {"question": "Are you authorized to work?", "answer": "Yes", "type": "standard", "bullet_ids": [],
-         "needs_review": False}]))
+        {"question": "Are you authorized to work?", "answer": "Yes", "type": "standard",
+         "standard_key": "work_authorization", "bullet_ids": [], "needs_review": False}]))
     return job
 
 
@@ -396,10 +396,19 @@ def test_missing_artifacts_graceful(tmp_path: Path) -> None:
     job.mkdir(parents=True)
     (job / "posting.json").write_text(json.dumps({"job_id": "empty", "company": "X", "title": "Y"}))
     res = run(job)
-    assert res["pass"] is True
+    assert res["pass"] is False  # nothing to gate: a posting-only dir never passes
+    assert not by_name(res, "resume_present")["ok"]
     assert res["artifacts"]["resume.txt"] is False
     assert res["summary"]["skipped"] > 0
     assert not by_name(res, "artifacts_present")["ok"]
+
+
+def test_cover_letter_and_answers_stay_optional(tmp_path: Path) -> None:
+    job = make_job(tmp_path, cover=None)
+    (job / "answers.json").unlink()
+    res = run(job)
+    assert res["pass"] is True, res["fail_reasons"]
+    assert by_name(res, "resume_present")["ok"]
 
 
 def test_invalid_json_is_hard_fail(tmp_path: Path) -> None:
@@ -520,3 +529,80 @@ def test_tool_audit_allows_profile_places_only(tmp_path: Path) -> None:
     bad = RESUME_TXT.replace("Software Engineer | New York, NY", "Software Engineer | New York, NY / Gotham")
     res = run(make_job(tmp_path / "b", resume_txt=bad))
     assert res["unknown_tools"] == ["Gotham"]  # not a profile location -> not whitelisted
+
+
+# --- bullet fidelity / summary / skills (resume.json text vs master.yaml) -----------------------------
+
+def _resume_with(job: Path, **kw) -> Path:
+    data = json.loads((job / "resume.json").read_text())
+    data.update(kw)
+    (job / "resume.json").write_text(json.dumps(data))
+    return job
+
+
+ACME_1 = "Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day"
+
+
+@pytest.mark.parametrize("text,ok", [
+    (ACME_1, True),                                                                          # verbatim
+    ("Developed a FastAPI service in Python that ingests Kafka order events into PostgreSQL", True),  # verb swap + trim
+    ("Built a FastAPI service in Python that ingests Kafka order events", True),             # trailing clause trimmed
+    ("Led company-wide hiring strategy and managed executive stakeholders", False),          # fabricated text, valid id
+    ("Built a FastAPI service in Python that ingests Kafka order events into Redis", False), # tool swapped
+    ("Built a Go service in Python that ingests Kafka order events into PostgreSQL", False),  # word changed mid-bullet
+])
+def test_bullet_fidelity(tmp_path: Path, text: str, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "bullets": [{"id": "acme.1", "text": text}]}])
+    assert by_name(run(job), "bullet_fidelity")["ok"] is ok
+
+
+def test_bullet_fidelity_accepts_declared_variant(tmp_path: Path) -> None:
+    prof = ProfileIndex(__import__("yaml").safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()))
+    variants = {bid: b.get("variants") for bid, b in prof.bullets.items() if b.get("variants")}
+    assert variants, "example profile should declare at least one variant"
+    bid, v = next(iter(variants.items()))
+    text = next(iter(v.values())) if isinstance(v, dict) else v[0]
+    entry = prof.bullet_parent[bid]["id"]
+    job = _resume_with(make_job(tmp_path), experience=[{"id": entry, "bullets": [{"id": bid, "text": text}]}])
+    assert by_name(run(job), "bullet_fidelity")["ok"]
+
+
+@pytest.mark.parametrize("summary,ok", [(None, True), ("__variant__", True), ("I am a rockstar 10x engineer.", False)])
+def test_summary_must_be_a_profile_variant(tmp_path: Path, summary, ok: bool) -> None:
+    prof = __import__("yaml").safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text())
+    if summary == "__variant__":
+        summary = next(iter(prof["summary_variants"].values()))
+    job = _resume_with(make_job(tmp_path), summary=summary)
+    assert by_name(run(job), "bullet_fidelity")["ok"] is ok
+
+
+@pytest.mark.parametrize("skills,ok", [
+    ({"programming": ["Python", "SQL"], "tools": ["Docker", "AWS"]}, True),
+    ({"programming": ["python"], "tools": ["docker"]}, True),          # case-insensitive
+    ({"tools": ["terraform"]}, False),                                  # lowercase new tool
+    ({"frameworks": ["Kubernetes"]}, False),
+])
+def test_skills_traced(tmp_path: Path, skills: dict, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), skills=skills)
+    c = by_name(run(job), "skills_traced")
+    assert c["ok"] is ok, c["detail"]
+
+
+# --- standard answers (profile/standard_answers.yaml) ------------------------------------------------
+
+@pytest.mark.parametrize("entry,ok", [
+    ({"answer": "Yes", "type": "standard", "standard_key": "work_authorization"}, True),
+    ({"answer": "No", "type": "standard", "standard_key": "work_authorization"}, False),     # contradicts config
+    ({"answer": "Yes", "type": "standard", "standard_key": "no_such_key"}, False),
+    ({"answer": "Yes", "type": "standard"}, False),                                         # no key: unverifiable
+    ({"answer": None, "type": "standard", "standard_key": "salary_expectation"}, True),     # null stays null
+    ({"answer": "$150k", "type": "standard", "standard_key": "salary_expectation"}, False),
+    ({"answer": "Decline", "type": "standard", "standard_key": "eeo.gender"}, True),
+    ({"answer": "Female", "type": "standard", "standard_key": "eeo.gender"}, False),
+    ({"answer": "About 120k", "type": "generated", "class": "salary_freeform"}, False),      # never answered
+    ({"answer": None, "type": "generated", "class": "sensitive", "needs_review": True}, True),
+])
+def test_standard_answers_match_profile(tmp_path: Path, entry: dict, ok: bool) -> None:
+    job = make_job(tmp_path, answers=[{"question": "Q?", "bullet_ids": [], **entry}])
+    c = by_name(run(job), "standard_answers")
+    assert c["ok"] is ok, c["detail"]
