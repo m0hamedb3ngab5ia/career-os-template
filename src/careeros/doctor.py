@@ -19,6 +19,7 @@ so the fictional example candidate never reaches a real application.
 """
 from __future__ import annotations
 
+import os
 import re
 import shutil
 from dataclasses import dataclass
@@ -277,13 +278,18 @@ def check_bullet_priority(categories: dict, master: dict) -> list[Check]:
     return out or [Check(PASS, "bullet_priority", "every categories.yaml bullet_priority id exists in master.yaml")]
 
 
-def check_tools(which: Callable[[str], str | None]) -> list[Check]:
+def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None) -> list[Check]:
     out = []
     latex = [t for t in ("tectonic", "pdflatex") if which(t)]
     out.append(Check(PASS, "latex", f"{latex[0]} found") if latex else Check(
         WARN, "latex", "neither tectonic nor pdflatex on PATH: résumés stay .tex, no PDF (brew install tectonic)"))
-    out.append(Check(PASS, "claude", "claude CLI found") if which("claude") else Check(
-        FAIL, "claude", "claude (Claude Code CLI) not on PATH: every skill needs it. Install Claude Code, then `claude` once to log in"))
+    inside = (os.environ if env is None else env).get("CLAUDECODE") == "1"  # set by Claude Code in its shells
+    if which("claude"):
+        out.append(Check(PASS, "claude", "claude CLI found"))
+    elif inside:
+        out.append(Check(PASS, "claude", "running inside Claude Code (no `claude` on PATH; headless `claude -p` needs it)"))
+    else:
+        out.append(Check(FAIL, "claude", "claude (Claude Code CLI) not on PATH: every skill needs it. Install Claude Code, then `claude` once to log in"))
     for tool in ("gh", "codex"):
         out.append(Check(PASS, tool, f"{tool} found") if which(tool) else Check(
             WARN, tool, f"{tool} not on PATH: only needed for /review (code review of PRs)"))
@@ -304,7 +310,7 @@ def check_voice(root: Path) -> Check:
 # --------------------------------------------------------------------------- #
 
 def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
-               examples: Path | None = None) -> list[Check]:
+               examples: Path | None = None, env: dict[str, str] | None = None) -> list[Check]:
     root = Path(root)
     examples = examples if examples is not None else find_examples(root)
     checks: list[Check] = []
@@ -312,7 +318,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     if missing:
         checks.append(Check(FAIL, "setup", f"{' and '.join(d + '/' for d in missing)} missing under {root}: "
                                            "run `careeros init` (or `careeros init --link <your-private-dir>`)"))
-        return checks + check_tools(which)
+        return checks + check_tools(which, env)
     checks.append(Check(PASS, "setup", "profile/ and config/ present"))
 
     data: dict[str, Any] = {}
@@ -335,7 +341,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
             continue
         data[rel] = d
     if bad:
-        return checks + check_tools(which) + [check_voice(root)]
+        return checks + check_tools(which, env) + [check_voice(root)]
     checks.append(Check(PASS, "yaml", "every config/ and profile/ YAML parses"))
 
     cfg = {n: data[f"config/{n}.yaml"] for n in CONFIG_FILES}
@@ -352,7 +358,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     else:
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
-    checks += check_tools(which)
+    checks += check_tools(which, env)
     checks.append(check_voice(root))
     return checks
 

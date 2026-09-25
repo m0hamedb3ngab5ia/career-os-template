@@ -41,8 +41,9 @@ def filled(tmp_path: Path) -> Path:
     return personalize(fresh(tmp_path))
 
 
-def doctor(root: Path, tools: set[str] = ALL_TOOLS) -> list[Check]:
-    return run_doctor(root, which=which_from(tools), examples=EXAMPLE_REPO)
+def doctor(root: Path, tools: set[str] = ALL_TOOLS, env: dict[str, str] | None = None) -> list[Check]:
+    # env pinned: this suite may itself run inside Claude Code (CLAUDECODE=1)
+    return run_doctor(root, which=which_from(tools), examples=EXAMPLE_REPO, env=env or {})
 
 
 def details(checks: list[Check], level: str) -> list[str]:
@@ -242,3 +243,12 @@ def test_placeholder_warnings_are_one_line_per_file_with_line_and_key(tmp_path: 
     sa = next(w for w in warns if "profile/standard_answers.yaml" in w)
     assert "phone.answer" in sa and "gender.answer" in sa  # repeated keys qualified by their entry
     assert any("config/targets.yaml" in w and "min_base_usd" in w for w in warns)
+
+
+
+def test_missing_claude_cli_passes_when_running_inside_claude_code(tmp_path: Path):
+    """prepare-job/apply-job run `careeros doctor --quiet` from inside Claude Code (Desktop, IDE, web),
+    where the `claude` binary may not be on PATH; the skill running is proof enough."""
+    checks = doctor(filled(tmp_path), tools=ALL_TOOLS - {"claude"}, env={"CLAUDECODE": "1"})
+    assert "claude" not in text_of(checks, FAIL)
+    assert any(c.name == "claude" and c.level == PASS for c in checks)

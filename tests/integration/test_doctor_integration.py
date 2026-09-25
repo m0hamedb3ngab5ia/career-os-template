@@ -40,6 +40,7 @@ def fake_bin(tmp_path: Path, tools: tuple[str, ...]) -> Path:
 def _cli(root: Path, home: Path, path: Path, *args: str) -> subprocess.CompletedProcess:
     env = subprocess_env(root, home)
     env["PATH"] = str(path)
+    env.pop("CLAUDECODE", None)  # a standalone terminal, even when the suite runs inside Claude Code
     return subprocess.run([PY, "-m", "careeros.cli", "--root", str(root), *args], capture_output=True, text=True,
                           env=env, timeout=120)
 
@@ -79,3 +80,15 @@ def test_doctor_missing_claude_cli_fails(checkout: Path, home: Path, tmp_path: P
     personalize(checkout)
     r = _cli(checkout, home, bin_, "doctor")
     assert r.returncode == 1 and "claude" in r.stdout
+
+
+
+def test_doctor_quiet_inside_claude_code_without_cli_on_path(checkout: Path, home: Path, tmp_path: Path):
+    bin_ = fake_bin(tmp_path, ("tectonic", "gh", "codex"))
+    assert _cli(checkout, home, bin_, "init").returncode == 0
+    personalize(checkout)
+    env = subprocess_env(checkout, home)
+    env.update(PATH=str(bin_), CLAUDECODE="1")
+    r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(checkout), "doctor", "--quiet"], capture_output=True,
+                       text=True, env=env, timeout=120)
+    assert r.returncode == 0 and r.stdout.strip() == ""
