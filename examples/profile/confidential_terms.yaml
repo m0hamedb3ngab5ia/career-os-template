@@ -1,0 +1,8 @@
+# Terms that must never appear in any generated artifact (resume.txt, cover_letter.md, answers.json,
+# outreach.json). `careeros.qa` hard-fails the job when one does. Keep the real file private
+# (profile/ is gitignored). This example is fictional: EDIT it for your own employer.
+employer: Acme               # informational: whose internal vocabulary this is (the name itself is allowed)
+terms: [PROJECTZEBRA, ledgerd, OPSGRID]   # case-insensitive, whole word
+patterns:                    # Python regexes, case-sensitive
+  - '\bACME-[A-Z]{3}\d{4}\b'  # ticket / hostname-shaped ids
+  - '\b9\d{9}\b'             # account-number-shaped ids

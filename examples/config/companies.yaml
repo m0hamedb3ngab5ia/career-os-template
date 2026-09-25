@@ -1,0 +1,97 @@
+# Company lists. Scout pulls every board under `boards`. Dream/blocklist affect tier + filtering.
+# ATS board slugs: greenhouse = boards-api.greenhouse.io/v1/boards/<slug>/jobs
+#                  lever      = api.lever.co/v0/postings/<slug>
+#                  ashby      = api.ashbyhq.com/posting-api/job-board/<slug>
+# Add a company = one line. Unknown slug? scout reports it as a 404 "bad slug".
+
+dream_list:            # EDIT. Tier A — full prep, the candidate submits, outreach prioritized
+  - Stripe
+  - Databricks
+  - Anthropic
+
+already_applied: []    # EDIT. e.g. {company: Acme, role: Software Engineer, date: 2026-07}; skipped unless 90 days passed
+
+blocklist:             # never apply
+  companies: [Globex Bank]                    # EDIT: your current employer (fictional example)
+  industries: [gambling]                      # EDIT
+  name_patterns: [draftkings, fanduel]        # EDIT: substring match on the normalized company name
+
+boards:                # scout sources. ats: greenhouse | lever | ashby | custom (no adapter yet; skipped)
+  # --- AI ---
+  - {company: Anthropic,        ats: greenhouse, slug: anthropic}
+  - {company: OpenAI,           ats: ashby,      slug: openai}
+  - {company: Scale AI,         ats: greenhouse, slug: scaleai}
+  - {company: Cohere,           ats: ashby,      slug: cohere}
+  - {company: Perplexity,       ats: ashby,      slug: perplexity}
+  - {company: Hugging Face,     ats: custom,     url: https://apply.workable.com/huggingface/}   # Workable; no adapter yet
+  - {company: Mistral AI,       ats: custom,     url: https://jobs.lever.co/mistral}              # lever slug returns empty; verify
+  - {company: Cursor,           ats: ashby,      slug: cursor}
+  - {company: Runway,           ats: ashby,      slug: runway}
+  # --- Quant / HF ---
+  - {company: Hudson River Trading, ats: greenhouse, slug: wehrtyou}
+  - {company: Two Sigma,        ats: custom,     url: https://careers.twosigma.com/careers/OpenRoles}
+  - {company: Jump Trading,     ats: greenhouse, slug: jumptrading}
+  - {company: Citadel,          ats: custom,     url: https://www.citadel.com/careers/open-opportunities/}
+  - {company: DRW,              ats: greenhouse, slug: drweng}
+  - {company: IMC,              ats: greenhouse, slug: imc}
+  - {company: Optiver,          ats: greenhouse, slug: optiverus}
+  - {company: Point72,          ats: greenhouse, slug: point72}
+  - {company: Millennium,       ats: custom,     url: https://www.mlp.com/careers/}
+  - {company: Tower Research,   ats: greenhouse, slug: towerresearchcapital}
+  - {company: Akuna Capital,    ats: greenhouse, slug: akunacapital}
+  - {company: Five Rings,       ats: greenhouse, slug: fiveringsllc}
+  # --- Fintech / Infra / Dev tools ---
+  - {company: Stripe,           ats: greenhouse, slug: stripe}
+  - {company: Databricks,       ats: greenhouse, slug: databricks}
+  - {company: Ramp,             ats: ashby,      slug: ramp}
+  - {company: Brex,             ats: greenhouse, slug: brex}
+  - {company: Plaid,            ats: ashby,      slug: plaid}
+  - {company: Vercel,           ats: greenhouse, slug: vercel}
+  - {company: Supabase,         ats: ashby,      slug: supabase}
+  - {company: Datadog,          ats: greenhouse, slug: datadog}
+  - {company: Cloudflare,       ats: greenhouse, slug: cloudflare}
+  - {company: Figma,            ats: greenhouse, slug: figma}
+  - {company: Notion,           ats: ashby,      slug: notion}
+  - {company: Linear,           ats: ashby,      slug: linear}
+  - {company: Robinhood,        ats: greenhouse, slug: robinhood}
+  - {company: Bloomberg,        ats: custom,     url: https://bloomberg.avature.net/careers}
+  - {company: Snowflake,        ats: custom,     url: https://careers.snowflake.com}
+  - {company: Airbnb,           ats: greenhouse, slug: airbnb}
+  - {company: Coinbase,         ats: greenhouse, slug: coinbase}
+
+# Aggregator / discovery sources. Priority order. All feed postings into the same pipeline; apply ALWAYS on company ATS.
+# public = no login, parse directly.  chrome = read through the candidate's logged-in Chrome (Claude in Chrome); fragile, discovery only.
+searches:
+  keywords: [software engineer new grad, software engineer early career, backend engineer, data engineer, platform engineer]   # EDIT
+  sources:
+    - {name: simplify_newgrad_github, kind: public, enabled: true,
+       url: https://github.com/SimplifyJobs/New-Grad-Positions, notes: "README table → company, role, location, apply link (ATS). Daily."}
+    - {name: jobright, kind: chrome, enabled: false,
+       url: null, notes: "EDIT: paste your saved-search / recommended-jobs URL. Extract the company apply URL; never use Jobright auto-apply."}
+    - {name: handshake, kind: chrome, enabled: false,
+       url: null, notes: "EDIT: paste your school's Handshake job-search URL. Alumni access is often time-limited."}
+    - {name: linkedin_jobs, kind: chrome, enabled: false,
+       url: null, notes: "Discovery only. Never Easy Apply."}
+
+# Prestige tiers (community ranking; edit freely). Used by the scorer:
+#   - god/sss/ss/ss_minus/s → default Tier A candidates (still gated by fit; tier_a_min_fit applies)
+#   - a_plus/a → Tier B boost (+prestige bonus)
+#   - b_plus/b/b_minus → neutral
+#   - avoid → skipped unless fit >= 90 and the candidate overrides
+# Team/work matter more than letter; this only nudges ordering. Add names freely.
+prestige_tiers:
+  god:      [Renaissance Technologies, Radix Trading, TGS Management, Arrowstreet Capital, PDT Partners]
+  sss:      [Citadel, Citadel Securities, Hudson River Trading, Jump Trading]
+  ss:       [Optiver, Two Sigma, D. E. Shaw, Five Rings, Voleon, XTX Markets, Anthropic, OpenAI]
+  ss_minus: [IMC, Susquehanna, SIG, DRW, Virtu, Millennium, Tower Research, AQR, Point72]
+  s:        [WorldQuant, Akuna Capital, NVIDIA, Netflix, Roblox]
+  a_plus:   [Microsoft, Meta, Apple, Google, Stripe, Airbnb, Databricks, Tesla, Uber, DoorDash]
+  a:        [Notion, Asana, Reddit, LinkedIn, Spotify, Dropbox, Pinterest, Plaid, Figma, Discord]
+  b_plus:   [Amazon, Adobe, Cloudflare, eBay, X, GitHub, HashiCorp, Oracle, Lyft, Twitch, Salesforce]
+  b:        [Capital One, JPMorgan, Morgan Stanley, Intel, Booking, BlackRock, IBM]
+  b_minus:  [Citi, Wells Fargo, Goldman Sachs, Bank of America, Boeing, Booz Allen, Walmart]
+  avoid:    [Accenture, TCS, Deloitte, HCLTech, Cognizant, Infosys, Capgemini, Wipro]
+
+prestige_scoring:
+  bonus: {god: 10, sss: 10, ss: 8, ss_minus: 6, s: 5, a_plus: 4, a: 2, b_plus: 0, b: 0, b_minus: -2, avoid: -100}
+  auto_dream: [god, sss, ss, ss_minus, s]   # merged into dream_list at runtime

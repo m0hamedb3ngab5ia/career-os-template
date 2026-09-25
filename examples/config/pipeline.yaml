@@ -1,0 +1,31 @@
+# Runtime paths + scheduling. Relative paths resolve against the repo root; `~` is expanded.
+paths:
+  tracker_xlsx: data/JobTracker.xlsx       # gitignored. Point it anywhere, e.g. ~/Documents/JobTracker.xlsx
+  jobs_dir: data/jobs
+  seen_file: data/seen.json
+  profile: profile/master.yaml
+  standard_answers: profile/standard_answers.yaml
+  voice_dir: profile/voice
+  resume_template_dir: templates/resume
+  output_dir_per_job: true                 # data/jobs/<id>/{posting.json,score.json,resume.pdf,cover_letter.md,answers.json,qa.json,log.md}
+
+schedule:                                  # for /schedule cloud routines or local cron
+  scout: "0 7 * * *"                       # daily 7am
+  score_and_prepare: "30 7 * * *"
+  inbox_sync: "0 8,18 * * *"
+  followups: "0 9 * * 1-5"
+
+llm:
+  runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
+  headless_cmd: ["claude", "-p", "--output-format", "json", "--permission-mode", "acceptEdits"]
+  model_hint: null                         # leave null = Claude Code default
+
+notify:
+  on_interview: push                       # push | none  (PushNotification tool from inbox-sync)
+  on_offer: push
+  on_qa_fail: action_item_only
+  daily_digest: true
+
+resume_build:
+  engine: tectonic                         # tectonic | pdflatex
+  fallback: markdown_to_pdf

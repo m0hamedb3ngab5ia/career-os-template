@@ -1,0 +1,105 @@
+# Standard application answers for the fictional example candidate "Alex Example".
+# `careeros init` copies this to profile/standard_answers.yaml. EDIT every `answer` to your own truth.
+# The applier matches form questions to these by `match` patterns (case-insensitive regex), in file
+# order: first hit wins, so specific entries go above general ones. No match → Action Item (never guessed).
+# Keep every key: skills and tests expect the full set.
+
+answers:
+  - key: work_authorization
+    match: ["authorized to work", "legally authorized", "work authorization", "eligible to work"]
+    answer: "Yes"                    # EDIT
+  - key: sponsorship
+    match: ["sponsorship", "require .*visa", "need .*visa", "immigration"]
+    answer: "No"                     # EDIT
+  - key: citizenship
+    match: ["citizen", "citizenship status"]
+    answer: "U.S. Citizen"           # EDIT
+  - key: over_18
+    match: ["18 years", "at least 18", "legal age"]
+    answer: "Yes"                    # EDIT
+  - key: relocate
+    match: ["willing to relocate", "relocation"]
+    answer: "Yes"                    # EDIT
+  - key: remote_hybrid
+    match: ["work from office", "hybrid", "on-site", "onsite", "in.office"]
+    answer: "Yes"                    # EDIT
+  - key: start_date
+    match: ["start date", "available to start", "earliest .*start", "availability"]
+    answer: "Flexible; two weeks' notice."   # EDIT
+  - key: current_employer
+    match: ["current employer", "current company"]
+    answer: "Acme"                   # EDIT
+  - key: current_title
+    match: ["current title", "current role"]
+    answer: "Software Engineer"      # EDIT
+  - key: years_experience_fulltime
+    match: ["years of full.time", "full.time .*experience", "years of professional .*post.grad"]
+    answer: "0"                      # EDIT; for a dropdown the applier picks the matching bucket ("0-1")
+  - key: years_experience
+    match: ["years of .*experience", "how many years"]
+    answer: "1"                      # EDIT; rounded total incl. internships/co-ops
+  - key: degree
+    match: ["highest .*degree", "education level", "highest level of education"]
+    answer: "Bachelor's Degree"      # EDIT
+  - key: school
+    match: ["school", "university", "college name"]
+    answer: "Springfield State University"   # EDIT
+  - key: major
+    match: ["major", "field of study", "discipline"]
+    answer: "Computer Science"       # EDIT
+  - key: grad_year
+    match: ["graduation", "grad year", "graduate"]
+    answer: "2026"                   # EDIT
+  - key: gpa
+    match: ["gpa"]
+    answer: "3.6"                    # EDIT
+  - key: salary_expectation
+    match: ["salary", "compensation expectation", "desired pay", "expected .*salary"]
+    answer: null                     # keep null: freeform salary is always an Action Item (config safety.pause_on)
+    note: "If a range dropdown exists, the applier picks the lowest bucket >= config/targets.yaml candidate.salary_dropdown_floor_usd; else Action Item."
+  - key: previously_applied
+    match: ["previously applied", "applied .*before", "worked .*here before", "former employee"]
+    answer: "No"                     # the applier overrides to Yes if the company is in tracker history
+  - key: referral
+    match: ["referred", "referral", "how did you hear"]
+    answer: "Company careers page"
+    note: "If the Contacts tab has a referrer for this company → use their name."
+  - key: non_compete
+    match: ["non-compete", "noncompete", "restrictive covenant"]
+    answer: "No"                     # EDIT: confirm with your current contract
+  - key: security_clearance
+    match: ["clearance"]
+    answer: "No"                     # EDIT
+  - key: linkedin
+    match: ["linkedin"]
+    answer: "https://linkedin.com/in/alex-example"   # EDIT
+  - key: github
+    match: ["github", "portfolio", "personal website"]
+    answer: "https://github.com/alex-example"        # EDIT
+  - key: pronouns
+    match: ["pronouns"]
+    answer: ""                       # EDIT or leave blank
+  - key: phone
+    match: ["phone"]
+    answer: "555-010-0199"           # EDIT
+  - key: address
+    match: ["street address", "address line", "city", "zip", "postal"]
+    answer: "Springfield, NY 10001"  # EDIT: city/state/zip is enough unless a verified ATS requires more
+
+# EEO / voluntary self-identification. The applier fills ONLY these; any other option set → Action Item.
+# Matching: pick the option whose label contains `answer` (whole word, case-insensitive). `prefer` wins when
+# the form offers it; `match_not` drops loose substring matches containing those words.
+# The example declines every field. EDIT each `answer` (e.g. "Female", "No", "Asian") if you want them filled.
+eeo:
+    gender:
+      answer: "Decline"                      # EDIT
+    hispanic_latino:
+      answer: "Decline"                      # EDIT
+    race_ethnicity:
+      answer: "Decline"                      # EDIT
+      prefer: null                           # EDIT: a more specific label to pick when offered
+      match_not: []                          # EDIT: e.g. ["Hispanic"]
+    veteran:
+      answer: "I don't wish to answer"       # EDIT, e.g. "I am not a protected veteran"
+    disability:
+      answer: "I do not want to answer"      # EDIT, e.g. "No, I do not have a disability" (CC-305 wording)

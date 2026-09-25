@@ -1,0 +1,27 @@
+{
+  "jobs": [
+    {
+      "id": 4011001,
+      "internal_job_id": 2500001,
+      "title": "Software Engineer, Backend",
+      "updated_at": "2026-09-20T10:00:00-04:00",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4011001",
+      "location": {"name": "New York, NY"},
+      "content": "&lt;div&gt;&lt;p&gt;We build &lt;strong&gt;payments&lt;/strong&gt; infra.&lt;/p&gt;&lt;ul&gt;&lt;li&gt;Python&lt;/li&gt;&lt;li&gt;Postgres&lt;/li&gt;&lt;/ul&gt;&lt;/div&gt;",
+      "departments": [{"id": 1, "name": "Engineering"}],
+      "offices": [{"id": 2, "name": "New York"}],
+      "metadata": [{"id": 9, "name": "Employment Type", "value": "Full-time"}]
+    },
+    {
+      "id": 4011002,
+      "title": "Product Manager, Growth",
+      "updated_at": "2026-09-19T10:00:00-04:00",
+      "absolute_url": "https://boards.greenhouse.io/acme/jobs/4011002",
+      "location": {"name": "Remote - US"},
+      "content": "<p>PM role</p>",
+      "departments": [],
+      "offices": []
+    }
+  ],
+  "meta": {"total": 2}
+}

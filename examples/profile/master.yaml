@@ -1,0 +1,118 @@
+# MASTER PROFILE — single source of truth for every résumé bullet, cover-letter claim and form answer.
+# This is the fictional example candidate "Alex Example". `careeros init` copies it to profile/master.yaml;
+# replace everything with your own facts (EDIT). Keep the shape: skills and QA read these keys.
+# Every bullet has an `id`. Tailored résumés/cover letters may ONLY use bullets by id (verbatim or `variants`).
+# Numbers in bullets are frozen: the tailor may rephrase around them but never change them.
+# `placeholder: true` bullets (or text containing "[OPEN:" / "[FILL IN") are never used.
+
+identity:                    # EDIT all of it
+  name: Alex Example
+  email: alex@example.com
+  phone: 555-010-0199
+  location: Springfield, NY
+  linkedin: https://linkedin.com/in/alex-example
+  github: https://github.com/alex-example
+  website: null
+  pronouns: null
+
+summary_variants:
+  general: >-
+    Software engineer at Acme building Python services on AWS and a React dashboard used by 40 analysts.
+  backend: >-
+    Backend engineer at Acme working on Kafka-driven Python services and PostgreSQL.
+
+education:
+  - id: state_u
+    school: Springfield State University
+    degree: Bachelor of Science, Computer Science
+    gpa: "3.6"
+    location: Springfield, NY
+    start: 2022-08
+    end: 2026-05
+    coursework: [Databases, Operating Systems, Machine Learning]
+    activities: [ACM Chapter Treasurer]
+
+experience:
+  - id: acme
+    company: Acme
+    title: Software Engineer
+    title_display: Software Engineer
+    location: New York, NY
+    start: 2026-06
+    end: present
+    tags: [swe_backend, swe_fullstack, data_engineering]
+    stack: [Python, FastAPI, PostgreSQL, Kafka, Docker, AWS, React, TypeScript]
+    # Internal codenames/hostnames never go in bullets; list them in profile/confidential_terms.yaml
+    # so QA hard-fails any artifact that leaks them.
+    confidentiality: "Plain descriptions only; see profile/confidential_terms.yaml."
+    bullets:
+      - id: acme.1
+        text: Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day
+        ownership: own
+        metrics: ["2 million"]
+      - id: acme.2
+        text: Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks
+        ownership: own
+        metrics: ["40"]
+        variants:
+          short: Shipped a React/TypeScript dashboard for 40 analysts
+      - id: acme.3
+        text: Containerized three services with Docker and deployed them to AWS
+        ownership: team
+      - id: acme.4
+        text: "[OPEN: on-call story — add when it happens]"
+        placeholder: true
+
+  - id: initech_intern
+    company: Initech
+    title: Data Engineering Intern
+    location: Boston, MA
+    start: 2025-06
+    end: 2025-08
+    tags: [data_engineering]
+    stack: [SQL, Airflow, Python]
+    bullets:
+      - id: initech_intern.1
+        text: Wrote 12 Airflow DAGs in Python moving SQL reports into a warehouse, cutting manual prep by 5 hours per week
+        metrics: ["12", "5 hours"]
+      - id: initech_intern.2
+        text: Profiled data quality across 30 SQL tables and documented lineage for the reporting team
+        metrics: ["30"]
+
+projects:
+  - id: widgetizer
+    name: Widgetizer
+    date: 2025-11
+    link: null
+    stack: [Swift, SwiftUI, Supabase]
+    tags: [swe_mobile, swe_fullstack]
+    bullets:
+      - id: widgetizer.1
+        text: Built an iOS app in Swift and SwiftUI with a Supabase backend, reaching 300 beta users
+        metrics: ["300"]
+      - id: widgetizer.2
+        text: Wrote 15 XCTest suites covering sync and offline logic
+        metrics: ["15"]
+
+skills:
+  programming: [Python, SQL, TypeScript, JavaScript, Swift, Java]
+  frameworks: [FastAPI, React, SwiftUI, Node.js]
+  tools: [PostgreSQL, Kafka, Docker, AWS, Airflow, Git, Supabase, XCTest]
+  concepts: [REST APIs, ETL Pipelines, Microservices, CI/CD]
+
+leadership:
+  - id: acm
+    org: ACM Chapter
+    role: Treasurer
+    date: 2024
+    bullets:
+      - id: acm.1
+        text: Managed a 4000 dollar budget for 20 student events
+        metrics: ["4000", "20"]
+
+# Narrative facts for cover letters / "why us" answers. Only these may be used as personal motivation claims.
+narratives:
+  - id: n.builder
+    text: Likes owning a product end to end; shipped Widgetizer solo.
+  - id: n.data
+    text: Enjoys making messy data trustworthy; spent an internship on data quality.

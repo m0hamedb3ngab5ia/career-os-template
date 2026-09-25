@@ -1,0 +1,82 @@
+# Job categories. Scorer assigns exactly one. Each maps to résumé template + bullet priorities.
+# Add a category = add a block here. First 3 outputs of any new category are review_required regardless of tier.
+# `bullet_priority` lists entry ids from profile/master.yaml (experience/projects), most relevant first. EDIT per candidate.
+
+swe_backend:
+  label: Software Engineer (Backend)
+  title_keywords: [software engineer, backend engineer, back-end, server engineer, api engineer, software developer, sde, swe]
+  skill_keywords: [python, java, typescript, go, sql, aws, distributed, microservices, rest, grpc, postgres, kafka]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 0
+
+swe_fullstack:
+  label: Software Engineer (Full Stack)
+  title_keywords: [full stack, fullstack, full-stack, web engineer, frontend engineer, front-end, product engineer]
+  skill_keywords: [react, next.js, typescript, node, tailwind, postgres, supabase, prisma, rest]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 0
+
+swe_platform:
+  label: Software Engineer (Platform / Infra)
+  title_keywords: [platform engineer, infrastructure engineer, infra, developer productivity, tooling engineer, systems engineer software]
+  skill_keywords: [aws, kubernetes, docker, ci/cd, terraform, python, go, linux, observability]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 3
+
+data_engineering:
+  label: Data Engineer
+  title_keywords: [data engineer, analytics engineer, etl engineer, data platform, pipeline engineer, data infrastructure]
+  skill_keywords: [sql, python, etl, airflow, spark, aws glue, athena, snowflake, dbt, data governance, lineage, tableau]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 0
+
+ml_engineering:
+  label: ML / AI Engineer
+  title_keywords: [machine learning engineer, ml engineer, ai engineer, applied scientist, llm engineer, ai software engineer]
+  skill_keywords: [python, pytorch, scikit-learn, llm, rag, agents, pandas, numpy, model, inference]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 3
+
+swe_mobile:
+  label: Software Engineer (iOS / Mobile)
+  title_keywords: [ios engineer, ios developer, mobile engineer, swift engineer, mobile developer]
+  skill_keywords: [swift, swiftui, xcode, xctest, ios, core data, webkit, supabase]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 3
+
+quant_dev:
+  label: Quant Developer / Trading Systems
+  title_keywords: [quant developer, quantitative developer, trading systems, trading engineer, low latency, quant software]
+  skill_keywords: [c++, python, low latency, linux, market data, order, risk, numpy, performance]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: true
+  new_category_reviews_remaining: 3
+
+sre_devops:
+  label: SRE / DevOps
+  title_keywords: [site reliability, sre, devops, production engineer, reliability engineer]
+  skill_keywords: [linux, kubernetes, aws, monitoring, python, ci/cd, incident]
+  resume_template: default
+  bullet_priority: [acme, initech_intern, widgetizer]
+  cover_letter: false
+  new_category_reviews_remaining: 3
+
+# Excluded (scorer still labels them so we can see what was skipped)
+product_manager: {label: Product Manager, title_keywords: [product manager, apm, program manager], excluded: true}
+sales_eng: {label: Sales / Solutions Eng, title_keywords: [solutions engineer, sales engineer, customer engineer], excluded: true}
+support: {label: Support, title_keywords: [support engineer, technical support, help desk], excluded: true}
+qa_manual: {label: Manual QA, title_keywords: [qa analyst, manual tester, test analyst], excluded: true}
+hardware: {label: Hardware, title_keywords: [hardware engineer, electrical engineer, fpga, asic], excluded: true}

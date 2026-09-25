@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "careeros"
+version = "0.1.0"
+description = "Job-search automation core"
+requires-python = ">=3.11"
+dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl"]
+
+[project.optional-dependencies]
+dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]
+test = ["pytest", "pytest-cov", "jinja2", "pypdf"]
+
+[project.scripts]
+careeros = "careeros.cli:main"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+addopts = "--strict-markers"
+markers = [
+    "unit: pure functions/classes; fakes for IO; no subprocess, no network",
+    "integration: crosses a boundary (CLI subprocess, filesystem layout, workbook, recorded HTTP, PDF render, real YAML)",
+]
