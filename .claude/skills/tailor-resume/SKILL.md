@@ -11,8 +11,9 @@ description: Build a one-page tailored resume for a scored job dir from profile/
 ## Anti-fabrication contract (read twice)
 
 1. Every bullet you output is a profile bullet referenced by `id`. Text is the bullet's `text` verbatim
-   or one of its listed `variants`. You may trim a trailing clause or swap a leading verb for a synonym,
-   but every number, tool name, and proper noun in the output must already be in that bullet's text.
+   or one of its listed `variants`; you may only trim a trailing clause (QA `bullet_fidelity` checks the
+   output is a word-prefix of the text or a variant). Want a different leading verb? Add it to the
+   bullet's `variants` in `profile/master.yaml` (an Action Item `profile_gap`), never improvise it.
 2. Bullets with `placeholder: true` or text starting `[FILL IN` are never used. If the category's
    `bullet_priority` points to an entry whose bullets are all placeholders, skip that entry and record
    it in `meta.profile_gaps`.

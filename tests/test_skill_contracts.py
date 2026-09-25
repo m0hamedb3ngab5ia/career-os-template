@@ -166,3 +166,10 @@ def test_tailor_resume_section_order_comes_from_config():
     text = _skill("tailor-resume")
     assert "resume.hard.section_order" in text
     assert "put `projects`\n   before `experience`" not in text and "projects` before `experience`" not in text
+
+
+def test_tailor_resume_bullet_rule_matches_qa_fidelity():
+    """QA bullet_fidelity accepts master text or a declared variant, optionally trimmed at the end; the
+    skill must not promise more (e.g. free synonym swaps of the leading verb)."""
+    rule = _skill("tailor-resume").split("1. Every bullet you output", 1)[1].split("\n2. ", 1)[0]
+    assert "synonym" not in rule and "variants" in rule and "trailing" in rule
