@@ -29,10 +29,48 @@ schedule:                                  # reusable default: fine to keep. For
   followups: "0 9 * * 1-5"
   prune: "0 3 * * 0"                       # weekly, Sunday 3am: `careeros prune --yes` (see retention below)
 
-llm:
+llm:                                       # reusable default: fine to keep
   runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
-  headless_cmd: ["claude", "-p", "--output-format", "json", "--permission-mode", "acceptEdits"]
-  model_hint: null                         # leave null = Claude Code default
+  # How `careeros run` calls a skill (the prompt `/score-job data/jobs/<id>` is appended). (Recommended) as is:
+  # -p prints and exits; stream-json + --verbose streams events live and ends with one `result` event;
+  # dontAsk denies any tool not in allowed_tools instead of waiting for a prompt nobody will answer.
+  headless_cmd: ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "dontAsk"]
+  allowed_tools:                           # passed as --allowedTools. (Recommended) this list: what score-job and
+    - Read                                 # prepare-job use. A tool a skill needs but is not here ends the run
+    - Write                                # with stop reason permission_denied (never a hang).
+    - Edit
+    - Glob
+    - Grep
+    - Bash(.venv/bin/careeros *)
+    - Bash(.venv/bin/python *)
+    - Bash(date *)
+    - WebSearch                            # score-job: company checks, hiring-freeze signals
+    - WebFetch
+  model_hint: null                         # null = Claude Code default (Recommended); e.g. sonnet
+
+runs:                                      # reusable default: fine to keep. `careeros run score|prepare`
+  preset: medium                           # small | medium (Recommended) | large | max | custom
+  presets:                                 # jobs per run and wall-clock minutes; a run stops at whichever comes first
+    small:  {max_score_jobs: 10, max_prepare_jobs: 2, max_minutes: 30}
+    medium: {max_score_jobs: 25, max_prepare_jobs: 5, max_minutes: 90}      # (Recommended)
+    large:  {max_score_jobs: 50, max_prepare_jobs: 10, max_minutes: 180}
+    max:    {max_score_jobs: 150, max_prepare_jobs: 25, max_minutes: 480}
+  custom: {max_score_jobs: 25, max_prepare_jobs: 5, max_minutes: 90}       # used when preset: custom
+  job_timeout_minutes: {score: 10, prepare: 45}   # (Recommended) one skill call is killed after this
+  stop_on_timeout: true                    # true (Recommended): a hung call usually means a prompt or auth wait
+  max_consecutive_failures: 3              # 3 (Recommended): stop after this many failed jobs in a row
+  preflight_doctor: true                   # true (Recommended): never run on example data or a broken setup
+  ranking:                                 # which jobs go first (no LLM). `careeros run score --dry-run` shows why
+    freshness_weight: 60                   # 60 (Recommended): freshness dominates
+    fresh_hours: 48                        # 48 (Recommended): postings younger than this get the full weight
+    stale_days: 30                         # freshness falls linearly to 0 at this age
+    dream_bonus: 25                        # dream_list / auto_dream companies
+    deadline_bonus: 15                     # the posting closes within deadline_days
+    deadline_days: 7
+    fit_weight: 0.5                        # prepare runs only: points per fit point
+    retry_bonus: 30                        # a job whose last attempt failed goes near the front of the next run
+  required_mcp_servers: []                 # MCP servers a run needs logged in (e.g. [gmail] for inbox work);
+                                           # one reported needs-auth stops the run with auth_required
 
 retention:                                 # reusable default: fine to keep. `careeros prune` (dry run unless --yes)
   screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this

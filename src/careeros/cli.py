@@ -647,6 +647,195 @@ def cmd_stats(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- runs (careeros.runs) -------------------------------------------------------------------------------
+
+RUN_BUSY_EXIT = 5
+
+
+def _fmt_minutes(sec: float | None) -> str:
+    if sec is None:
+        return "-"
+    return f"{sec / 60:.0f}m" if sec >= 60 else f"{sec:.0f}s"
+
+
+def _run_state(rs, run: dict) -> str:
+    """run.json `status`, except a `running` run whose process no longer holds the runner lock: interrupted."""
+    from careeros.runs import locks
+
+    if run.get("status") != "running":
+        return str(run.get("status"))
+    held = locks.status(rs.runner_lock_path)
+    return "running" if held.get("state") == "held" and held.get("owner") == f"run:{run['id']}" else "interrupted"
+
+
+def _print_queue(items: list, limit: int) -> None:
+    for r in items[:limit]:
+        print(f"  {r['rank']:>3}. {r['job_id']:<12} {str(r.get('company') or '')[:18]:<18} "
+              f"{str(r.get('title') or '')[:36]:<36} {r['score']:>6g}  {r['why']}")
+
+
+def _run_kind(args: argparse.Namespace, kind: str) -> int:
+    import signal
+    import threading
+
+    from careeros.runs.config import budget_for, load_runs_config
+    from careeros.runs.runner import CLEAN_STOPS, RunBusy, execute_run
+
+    s = _settings(args)
+    cfg = load_runs_config(s)
+    try:
+        budget = budget_for(cfg, kind, preset=args.preset, max_jobs=args.max_jobs, max_minutes=args.max_minutes)
+    except ValueError as e:
+        print(f"run {kind}: {e}", file=sys.stderr)
+        return 2
+    cancel = threading.Event()
+    old = {}
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            old[sig] = signal.signal(sig, lambda *_: cancel.set())
+        except ValueError:  # not the main thread
+            pass
+    echo = (lambda line: None) if args.json else print
+    try:
+        rec = execute_run(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
+                          echo=echo)
+    except RunBusy as e:
+        print(f"run {kind}: {e}; not started", file=sys.stderr)
+        return RUN_BUSY_EXIT
+    finally:
+        for sig, h in old.items():
+            signal.signal(sig, h)
+    if args.json:
+        print(json.dumps(rec, indent=2, default=str))
+    elif rec.get("dry_run"):
+        b = rec["budget"]
+        print(f"dry run: {kind} would take {len(rec['selected'])} of {rec['candidates']} candidate(s) "
+              f"(preset {b['preset']}: max {b['max_jobs']} jobs, {b['max_minutes']:g} min)")
+        _print_queue(rec["selected"], len(rec["selected"]))
+        if rec["excluded"]:
+            print(f"excluded: " + ", ".join(f"{e['job_id']} ({e['reason']})" for e in rec["excluded"][:10]))
+    else:
+        c = rec["counters"]
+        print(f"run {rec['id']}: {rec['stop_reason']} — attempted {c['attempted']}, ok {c['ok']}, "
+              f"failed {c['failed']}" + (f", locked {c['locked']}" if c.get("locked") else "")
+              + (f" ({rec['detail']})" if rec.get("detail") else ""))
+    if rec.get("dry_run"):
+        return 0
+    return 0 if rec["stop_reason"] in CLEAN_STOPS else 1
+
+
+def cmd_run_score(args: argparse.Namespace) -> int:
+    """Score the best-ranked `found` jobs with /score-job, one headless call each, within a budget."""
+    return _run_kind(args, "score")
+
+
+def cmd_run_list(args: argparse.Namespace) -> int:
+    from careeros.runs.store import RunStore
+
+    rs = RunStore(_settings(args))
+    runs = rs.list_runs(kind=args.kind, limit=args.limit)
+    for r in runs:
+        r["state"] = _run_state(rs, r)
+    if args.json:
+        print(json.dumps(runs, indent=2, default=str))
+        return 0
+    if not runs:
+        print("no runs yet")
+        return 0
+    print(f"{'id':<30} {'trigger':<9} {'state':<12} {'stop':<21} {'done':>9}  took")
+    for r in runs:
+        c = r.get("counters") or {}
+        print(f"{r['id']:<30} {r.get('trigger', ''):<9} {r['state']:<12} {str(r.get('stop_reason') or '-'):<21} "
+              f"{c.get('ok', 0):>3}/{c.get('attempted', 0):<3}{'':>2}  {_fmt_minutes(r.get('duration_s'))}")
+    return 0
+
+
+def cmd_run_show(args: argparse.Namespace) -> int:
+    from careeros.runs.store import RunStore
+
+    rs = RunStore(_settings(args))
+    run = rs.load_run(args.run_id)
+    if run is None:
+        print(f"run {args.run_id} not found", file=sys.stderr)
+        return 1
+    run["state"] = _run_state(rs, run)
+    atts = rs.load_attempts(args.run_id)
+    if args.json:
+        print(json.dumps({**run, "attempts": atts}, indent=2, default=str))
+        return 0
+    if args.log:
+        print(rs.read_log(args.run_id).rstrip())
+        return 0
+    c = run.get("counters") or {}
+    print(f"{run['id']}  {run['kind']} ({run['trigger']})  {run['state']}  stop={run.get('stop_reason') or '-'}")
+    print(f"budget: {run['budget']}  started {run['started_at']}  took {_fmt_minutes(run.get('duration_s'))}")
+    print(f"counters: " + ", ".join(f"{k}={v}" for k, v in c.items()))
+    if run.get("detail"):
+        print(f"detail: {run['detail']}")
+    for a in atts:
+        print(f"  [{a['n']}] {a['job_id']} {a['stage']:<7} {a['outcome']:<17} {_fmt_minutes(a.get('duration_s')):>5} "
+              f"session {a.get('session_id') or '-'}" + (f"  {a['detail']}" if a.get("detail") else ""))
+    return 0
+
+
+def _run_status_data(s: Settings) -> dict:
+    from datetime import timezone
+
+    from careeros.runs import locks
+    from careeros.runs.config import KINDS, load_runs_config
+    from careeros.runs.runner import select_candidates
+    from careeros.runs.store import RunStore
+
+    rs = RunStore(s)
+    now = datetime.now(timezone.utc)
+    held = locks.status(rs.runner_lock_path)
+    cfg = load_runs_config(s)
+    last, nxt = {}, {}
+    for kind in KINDS:
+        prev = rs.list_runs(kind=kind, limit=1)
+        last[kind] = ({k: prev[0].get(k) for k in ("id", "trigger", "stop_reason", "started_at", "ended_at",
+                                                    "counters")} | {"state": _run_state(rs, prev[0])}) if prev else None
+    for kind in _STATUS_QUEUE_KINDS:
+        ranked, _ = select_candidates(s, kind, cfg, now)
+        nxt[kind] = [{k: r[k] for k in ("job_id", "company", "title", "score", "why")} for r in ranked[:5]]
+    return {"running": held if held.get("state") == "held" else None, "paused": rs.pause_state(now),
+            "preset": cfg.preset, "last": last, "next": nxt}
+
+
+_STATUS_QUEUE_KINDS = ("score",)
+
+
+def cmd_run_status(args: argparse.Namespace) -> int:
+    """What is running, whether runs are paused, the last run of each kind and what goes next (and why)."""
+    data = _run_status_data(_settings(args))
+    if args.json:
+        print(json.dumps(data, indent=2, default=str))
+        return 0
+    r = data["running"]
+    print("running: " + (f"{r.get('owner')} ({r.get('note')}, pid {r.get('pid')}, since {r.get('acquired_at')})"
+                         if r else "none"))
+    p = data["paused"]
+    print("paused: " + (f"yes, until {p.get('until') or 'resumed'} ({p.get('reason') or '-'})" if p else "no"))
+    for kind, prev in data["last"].items():
+        print(f"last {kind}: " + (f"{prev['id']} {prev['state']} stop={prev.get('stop_reason') or '-'}"
+                                  if prev else "never"))
+    for kind, items in data["next"].items():
+        print(f"next {kind} (preset {data['preset']}):" + ("" if items else " nothing waiting"))
+        for i, it in enumerate(items, 1):
+            print(f"  {i}. {it['job_id']} {it['company'][:18]} — {it['title'][:36]}: {it['why']}")
+    return 0
+
+
+def _run_budget_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--preset", choices=("small", "medium", "large", "max", "custom"),
+                   help="budget preset from pipeline.yaml runs.presets (default: runs.preset)")
+    p.add_argument("--max-jobs", type=int, help="override the preset's job count")
+    p.add_argument("--max-minutes", type=float, help="override the preset's wall-clock minutes")
+    p.add_argument("--dry-run", action="store_true", help="rank and show what would run, with the reasons; run nothing")
+    p.add_argument("--trigger", choices=("manual", "schedule", "catch_up"), default="manual", help=argparse.SUPPRESS)
+    p.add_argument("--json", action="store_true")
+
+
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(prog="careeros", description="career-os job-search automation")
     p.add_argument("--root", help="repo root (default: auto-detect)")
@@ -812,6 +1001,26 @@ def build_parser() -> argparse.ArgumentParser:
     omk.add_argument("--degree", type=int)
     omk.add_argument("--mutuals", type=int)
     omk.set_defaults(fn=cmd_outreach_mark)
+
+    rn = sub.add_parser("run", help="unattended batches: rank jobs, call one skill per job headless, within a budget")
+    rns = rn.add_subparsers(dest="run_cmd", required=True)
+    rsc = rns.add_parser("score", help="/score-job the best-ranked found jobs (exit 1 on a stop that needs you, "
+                                       f"{RUN_BUSY_EXIT} if a run is already going)")
+    _run_budget_args(rsc)
+    rsc.set_defaults(fn=cmd_run_score)
+    rls = rns.add_parser("list", help="past and current runs, newest first")
+    rls.add_argument("--kind", choices=("score", "prepare"))
+    rls.add_argument("--limit", type=int, default=20)
+    rls.add_argument("--json", action="store_true")
+    rls.set_defaults(fn=cmd_run_list)
+    rsh = rns.add_parser("show", help="one run: budget, counters, stop reason, every attempt")
+    rsh.add_argument("run_id")
+    rsh.add_argument("--json", action="store_true", help="run.json plus its attempts")
+    rsh.add_argument("--log", action="store_true", help="print run.log")
+    rsh.set_defaults(fn=cmd_run_show)
+    rst = rns.add_parser("status", help="running run, pause, last run per kind, what goes next and why")
+    rst.add_argument("--json", action="store_true")
+    rst.set_defaults(fn=cmd_run_status)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p

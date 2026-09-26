@@ -495,3 +495,41 @@ def test_bold_in_a_skill_under_a_dotted_key_still_fails(tmp_path: Path):
     _edit_master(root, lambda m: m.setdefault("skills", {}).update({"lang.v2": ["**Python**"]}))
     fails = [c for c in doctor(root) if c.name == "bold_markup" and c.level == FAIL]
     assert fails and "lang.v2" in fails[0].detail
+
+
+# --- runs / llm config (careeros.runs.config) ---------------------------------------------------------------
+
+def test_check_runs_passes_on_the_example_pipeline():
+    from careeros.doctor import check_runs
+
+    cfg = yaml.safe_load((EXAMPLE_REPO / "config" / "pipeline.yaml").read_text())
+    (c,) = check_runs(cfg)
+    assert c.level == PASS and c.name == "runs"
+
+
+def test_check_runs_fails_on_a_bad_budget():
+    from careeros.doctor import check_runs
+
+    (c,) = check_runs({"runs": {"preset": "huge"}})
+    assert c.level == FAIL and "runs.preset" in c.detail
+
+
+def test_check_runs_warns_when_headless_cmd_does_not_stream():
+    from careeros.doctor import check_runs
+
+    checks = check_runs({"llm": {"headless_cmd": ["claude", "-p", "--output-format", "json"]}})
+    assert [c.level for c in checks] == [WARN]
+    assert "stream-json" in checks[0].detail
+
+
+def test_run_doctor_reports_runs_config(tmp_path):
+    root = tmp_path / "r"
+    import shutil as _sh
+    _sh.copytree(EXAMPLE_REPO / "config", root / "config")
+    _sh.copytree(EXAMPLE_REPO / "profile", root / "profile")
+    p = root / "config" / "pipeline.yaml"
+    data = yaml.safe_load(p.read_text())
+    data["runs"] = {"max_consecutive_failures": 0}
+    p.write_text(yaml.safe_dump(data))
+    fails = [c for c in run_doctor(root, which=lambda t: "/bin/" + t, examples=EXAMPLE_REPO) if c.name == "runs"]
+    assert fails and fails[0].level == FAIL

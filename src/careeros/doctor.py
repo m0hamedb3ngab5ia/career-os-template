@@ -385,6 +385,23 @@ def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None =
     return out
 
 
+def check_runs(pipeline: dict[str, Any]) -> list[Check]:
+    """`pipeline.yaml: runs` and `llm` parse (careeros.runs.config); the headless command streams."""
+    from careeros.config import ConfigError
+    from careeros.runs.config import load_runs_config
+
+    try:
+        cfg = load_runs_config(type("_P", (), {"pipeline": pipeline})())
+    except ConfigError as e:
+        return [Check(FAIL, "runs", str(e))]
+    cmd = cfg.headless_cmd
+    fmt = cmd[cmd.index("--output-format") + 1] if "--output-format" in cmd[:-1] else "text"
+    if fmt != "stream-json" or "--verbose" not in cmd:
+        return [Check(WARN, "runs", "llm.headless_cmd should use --output-format stream-json --verbose: "
+                                    "`careeros run` reads the live event stream and its final result event")]
+    return [Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ...")]
+
+
 def check_voice(root: Path) -> Check:
     d = root / "profile" / "voice" / "samples"
     n = sum(1 for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.is_dir() else 0
@@ -449,6 +466,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     else:
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
+    checks += check_runs(cfg["pipeline"])
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)

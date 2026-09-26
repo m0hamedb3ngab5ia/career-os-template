@@ -128,3 +128,13 @@ def test_history_tracks_reposts_edits_and_counts(settings):
     assert e["times_seen"] == 3 and e["first_published"] == "2026-08-01" and e["last_updated"] == "2026-09-20"
     assert e["first_seen"].startswith("2026-08-02") and e["last_seen"].startswith("2026-09-21")
     assert e["sightings"] == ["2026-08-01", "2026-09-20"]
+
+
+def test_underscore_dirs_are_fixtures_not_jobs(settings):
+    st = Store(settings)
+    st.save_posting(_post("j1"))
+    ex = st.jobs_dir / "_example"
+    ex.mkdir()
+    (ex / "posting.json").write_text((st.job_dir("j1") / "posting.json").read_text())
+    assert list(st.iter_job_ids()) == ["j1"]
+    assert [j["job_id"] for j in st.list_jobs()] == ["j1"]
