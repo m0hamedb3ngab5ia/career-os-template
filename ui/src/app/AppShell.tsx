@@ -51,16 +51,17 @@ const LIVE_TEXT: Record<Connection, string> = {
 
 function Freshness({ status, connection }: { status: StatusSummary | undefined; connection: Connection }) {
   const now = useNow();
-  const synced = formatRelative(status?.index?.synced_at, now);
-  const exported = formatRelative(status?.tracker?.exported_at, now);
+  const synced = formatRelative(status?.index?.indexed_at, now);
+  // Only the connection state is announced; the relative time ticks and would be noise in a live region.
   return (
-    <div className={styles.footer} aria-live="polite">
+    <div className={styles.footer}>
       <span className={styles.live}>
         <span className={styles.dot} data-state={connection} aria-hidden="true" />
-        {LIVE_TEXT[connection]}
-        {synced ? ` · index synced ${synced}` : null}
+        <span data-testid="connection" aria-live="polite">
+          {LIVE_TEXT[connection]}
+        </span>
       </span>
-      {exported ? <span>JobTracker.xlsx exported {exported}</span> : null}
+      {synced ? <span>Index synced {synced}</span> : null}
     </div>
   );
 }

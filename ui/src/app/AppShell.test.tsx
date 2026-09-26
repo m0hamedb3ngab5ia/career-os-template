@@ -1,7 +1,9 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { render, screen, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { act } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { FakeEventSource } from "../test/fakeEventSource";
 import { ToastProvider } from "../kit/Toast";
 import { axeViolations } from "../test/axe";
 import { routes } from "./routes";
@@ -22,7 +24,14 @@ function renderAt(path: string, status: unknown = {}) {
   );
 }
 
-afterEach(() => vi.unstubAllGlobals());
+beforeEach(() => {
+  FakeEventSource.instances = [];
+  vi.stubGlobal("EventSource", FakeEventSource);
+});
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.useRealTimers();
+});
 
 describe("AppShell", () => {
   it("lists the sections in the mockup's order and groups", () => {
@@ -75,5 +84,32 @@ describe("AppShell", () => {
   it("has no axe violations", async () => {
     const { container } = renderAt("/");
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  describe("freshness footer", () => {
+    it("reports the live connection: Connecting…, Live, Reconnecting…", () => {
+      renderAt("/");
+      const state = screen.getByTestId("connection");
+      expect(state).toHaveTextContent("Connecting…");
+      expect(state).toHaveAttribute("aria-live", "polite");
+      act(() => FakeEventSource.last.open());
+      expect(state).toHaveTextContent("Live");
+      act(() => FakeEventSource.last.fail(false));
+      expect(state).toHaveTextContent("Reconnecting…");
+    });
+
+    it("shows when the index was synced, outside the live region", async () => {
+      vi.useFakeTimers({ shouldAdvanceTime: true });
+      vi.setSystemTime(new Date("2026-09-26T12:00:00Z"));
+      renderAt("/", { index: { indexed_at: "2026-09-26T11:58:00Z" } });
+      const synced = await screen.findByText(/Index synced 2 minutes ago/);
+      expect(synced.closest("[aria-live]")).toBeNull();
+    });
+
+    it("shows no freshness text without timestamps", async () => {
+      renderAt("/", { counts: { jobs: 0 } });
+      await screen.findAllByText("0");
+      expect(screen.queryByText(/synced/)).not.toBeInTheDocument();
+    });
   });
 });

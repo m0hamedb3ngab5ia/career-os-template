@@ -165,6 +165,16 @@
   background: var(--accent);
 }
 @media (pointer: coarse) {
+  /* 44 pt touch targets (HIG) */
+  .button,
+  .switchRow,
+  .segment,
+  .toastAction {
+    min-height: var(--touch);
+  }
+  .toastAction {
+    min-width: var(--touch);
+  }
   .done {
     width: var(--touch);
     height: var(--touch);

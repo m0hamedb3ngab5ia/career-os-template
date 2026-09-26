@@ -1,3 +1,4 @@
+/* TODO(phone slice, docs/UI.md slice 7): below ~600 px the sidebar becomes the phone tab bar (PhoneToday artboard). */
 .shell {
   display: flex;
   min-height: 100dvh;

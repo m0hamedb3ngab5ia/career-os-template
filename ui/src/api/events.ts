@@ -1,64 +1,110 @@
 import { useQueryClient, type QueryKey } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 
-// The server pushes one small event per change (`{type, id?}`) on /api/events after re-indexing; the client
-// marks the matching queries stale and TanStack Query refetches whatever is on screen. No polling.
+// Live updates from `careeros ui` (src/careeros/ui/routers/events.py): a named `hello` frame on every connect,
+// then one named `changed` frame per re-indexed batch. The client marks the matching queries stale and
+// TanStack Query refetches whatever is on screen. No polling.
 
-export interface LiveEvent {
-  type: string;
-  id?: string;
+export interface ChangedPayload {
+  jobs?: string[];
+  runs?: string[];
+  actions?: boolean;
+  config?: boolean;
+  status?: boolean;
 }
 
 export type Connection = "connecting" | "open" | "reconnecting";
 
-export function keysForEvent(e: LiveEvent): QueryKey[] {
-  switch (e.type) {
-    case "job":
-      return e.id ? [["jobs"], ["job", e.id], ["status"]] : [["jobs"], ["status"]];
-    case "run":
-      return [["runs"], ["status"]];
-    case "action":
-      return [["actions"], ["status"]];
-    case "contact":
-      return [["contacts"]];
-    case "settings":
-      return [["settings"], ["meta"], ["status"]];
-    case "storage":
-      return [["storage"]];
-    case "reindex":
-      return [[]];
-    default:
-      return [["status"]];
+const BACKOFF_MS = [1000, 2000, 4000, 8000, 15000, 30000];
+
+export function keysForChange(p: ChangedPayload): QueryKey[] {
+  const keys: QueryKey[] = [];
+  const add = (k: QueryKey) => {
+    if (!keys.some((x) => JSON.stringify(x) === JSON.stringify(k))) keys.push(k);
+  };
+  if (p.jobs?.length) {
+    add(["jobs"]);
+    for (const id of p.jobs) add(["job", id]);
+    add(["contacts"]); // contacts.json lives in the job folder
+    add(["status"]);
   }
+  if (p.runs?.length) {
+    add(["runs"]);
+    for (const id of p.runs) add(["run", id]);
+    add(["status"]);
+  }
+  if (p.actions) {
+    add(["status"]);
+    add(["actions"]);
+  }
+  if (p.config) {
+    add(["meta"]);
+    add(["settings"]);
+    add(["status"]);
+  }
+  if (p.status) add(["status"]);
+  return keys;
 }
 
-function parseEvent(data: unknown): LiveEvent | null {
+function parse(data: unknown): ChangedPayload | null {
   if (typeof data !== "string") return null;
   try {
     const v: unknown = JSON.parse(data);
-    if (v && typeof v === "object" && typeof (v as LiveEvent).type === "string") return v as LiveEvent;
+    return v && typeof v === "object" ? (v as ChangedPayload) : null;
   } catch {
-    /* not JSON: ignore */
+    return null;
   }
-  return null;
 }
 
-/** Subscribe once (in the app shell). EventSource reconnects by itself; we only report the state. */
+/**
+ * Subscribe once (in the app shell). While the browser retries on its own the state is "reconnecting"; if it
+ * gives up (readyState CLOSED) we recreate the connection with backoff. Every `hello` after the first means we
+ * may have missed changes, so all queries refetch.
+ */
 export function useLiveEvents(url = "/api/events"): Connection {
   const qc = useQueryClient();
   const [state, setState] = useState<Connection>("connecting");
 
   useEffect(() => {
     if (typeof EventSource === "undefined") return;
-    const es = new EventSource(url);
-    es.onopen = () => setState("open");
-    es.onerror = () => setState("reconnecting");
-    es.onmessage = (m) => {
-      const e = parseEvent(m.data);
-      if (!e) return;
-      for (const queryKey of keysForEvent(e)) void qc.invalidateQueries({ queryKey });
+    let es: EventSource | null = null;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    let attempt = 0;
+    let hellos = 0;
+    let stopped = false;
+
+    function connect() {
+      es = new EventSource(url);
+      es.onopen = () => setState("open");
+      es.addEventListener("hello", () => {
+        attempt = 0;
+        hellos += 1;
+        setState("open");
+        if (hellos > 1) void qc.invalidateQueries();
+      });
+      es.addEventListener("changed", (m) => {
+        const p = parse((m as MessageEvent).data);
+        if (!p) return;
+        for (const queryKey of keysForChange(p)) void qc.invalidateQueries({ queryKey });
+      });
+      es.onerror = () => {
+        setState("reconnecting");
+        if (es?.readyState !== 2) return; // CONNECTING: the browser retries by itself
+        es.close();
+        const delay = BACKOFF_MS[Math.min(attempt, BACKOFF_MS.length - 1)]!;
+        attempt += 1;
+        timer = setTimeout(() => {
+          if (!stopped) connect();
+        }, delay);
+      };
+    }
+
+    connect();
+    return () => {
+      stopped = true;
+      clearTimeout(timer);
+      es?.close();
     };
-    return () => es.close();
   }, [qc, url]);
 
   return state;
