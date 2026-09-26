@@ -49,6 +49,7 @@ scout ──► data/jobs/<job_id>/posting.json
             │
             ▼
          applier  ──► submits (if tier allows auto) OR Action Item with screenshot
+            │         └► submitted/<stamp>/  frozen copy of what went out + form values (manifest.json)
             │
             ▼
          tracker  ──► JobTracker.xlsx row updated (careeros tracker upsert), Log appended

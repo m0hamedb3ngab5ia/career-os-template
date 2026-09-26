@@ -5,6 +5,7 @@
     s = ApplySession.start(job_id="a1b2c3d4e5f6", ats="greenhouse", apply_url=url)
     s.step("open_tab", ok=True, note=url)
     s.shot(s.screenshot_dir(job_dir) / "01_form.png")
+    s.record_field("First name", "Alex", "standard")
     s.finish("submitted")
     s.save(job_dir)          # -> data/jobs/<id>/apply_session.json, appends to log.md
 
@@ -47,6 +48,7 @@ class ApplySession:
     action_item: dict[str, Any] | None = None
     resume_version: str | None = None
     confirmation_text: str | None = None
+    entered: list[dict[str, Any]] = field(default_factory=list)
 
     # --- construction ---------------------------------------------------------------
 
@@ -70,6 +72,12 @@ class ApplySession:
     def step(self, action: str, ok: bool = True, note: str = "") -> dict[str, Any]:
         entry = {"time": _now(), "action": action, "ok": bool(ok), "note": note}
         self.steps.append(entry)
+        return entry
+
+    def record_field(self, label: str, value: Any, source: str | None = None) -> dict[str, Any]:
+        """Remember a value typed or picked into the form (kept in the as-submitted snapshot)."""
+        entry = {"label": label, "value": value, "source": source}
+        self.entered.append(entry)
         return entry
 
     def shot(self, path: str | Path) -> str:
