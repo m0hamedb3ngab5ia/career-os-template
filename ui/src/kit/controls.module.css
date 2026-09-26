@@ -34,6 +34,12 @@
   color: var(--destructive-fg);
   border: 0;
 }
+/* Disabled with a reason: still focusable so the reason (title / aria-describedby) can be read */
+.button[aria-disabled="true"] {
+  opacity: 0.5;
+  cursor: default;
+  filter: none;
+}
 .spinner {
   animation: spin 0.9s linear infinite;
 }
@@ -136,6 +142,28 @@
 }
 .confirmQuestion {
   flex-grow: 1;
+}
+.confirmButtons {
+  display: inline-flex;
+  gap: var(--space-2);
+}
+.confirm[data-variant="primary"] {
+  background: var(--group);
+  border: 1px solid var(--sep);
+}
+.confirm[data-stacked] {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.confirm[data-stacked] .confirmQuestion {
+  font-weight: 600;
+}
+.confirm[data-stacked] .confirmButtons {
+  margin-top: 6px;
+}
+.confirmDetail {
+  font-size: var(--fs-caption);
 }
 
 /* Mark done */

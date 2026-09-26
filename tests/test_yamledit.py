@@ -133,3 +133,18 @@ def test_nested_new_mapping_is_created(tmp_path):
     p = _write(tmp_path)
     yamledit.apply_changes(p, [("runs.retry.max_attempts", 3)], validate=lambda path: None)
     assert "max_attempts: 3" in p.read_text()
+
+
+def test_unindented_block_lists_keep_their_indentation(tmp_path):
+    """A file written by PyYAML (`- item` level with its key) must not come back re-indented and broken."""
+    import yaml as pyyaml
+
+    p = tmp_path / "companies.yaml"
+    p.write_text(pyyaml.safe_dump({"blocklist": {"companies": ["Globex Bank"], "industries": ["gambling"]},
+                                   "boards": [{"company": "Acme", "notes": "a long note " * 8}]}, sort_keys=False))
+    before = p.read_text()
+    yamledit.apply_changes(p, [("blocklist.companies", ["Globex Bank", "Initrode"])], validate=lambda _p: None)
+    after = p.read_text()
+    assert pyyaml.safe_load(after)["blocklist"]["companies"] == ["Globex Bank", "Initrode"]
+    assert pyyaml.safe_load(after)["boards"] == pyyaml.safe_load(before)["boards"]
+    assert "  - Initrode" in after.splitlines() and "  - Globex Bank" in after.splitlines()

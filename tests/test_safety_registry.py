@@ -78,3 +78,22 @@ def test_verified_record_needs_two_signals_for_low_risk(tmp_path):
                               evidence=["https://linkedin.com/company/nimbusq"])
     assert len(registry.load(path)) == 1 and len(e["signals"]) == 3 and len(e["evidence"]) == 2
     assert e["risk"] == "low" and e["domain"] == "nimbusq.com" and e["checked_at"]
+
+
+def test_restore_puts_back_a_cleared_entry(tmp_path):
+    """The UI's undo of "Mark posting safe": the entry as it was before `clear`."""
+    p = tmp_path / "flagged_registry.yaml"
+    e = registry.add_or_bump(p, "Obsidian Quant Partners", domain="obsidian-careers.example", reason="SCAM_PAYMENT")
+    before = dict(e)
+    registry.clear(p, "Obsidian Quant Partners", note="checked")
+    assert registry.is_flagged(registry.load(p), "Obsidian Quant Partners") is None
+    registry.restore(p, before)
+    got = registry.load(p)
+    assert len(got) == 1 and got[0]["state"] == "active" and got[0]["review_note"] == before["review_note"]
+    assert registry.is_flagged(got, "Obsidian Quant Partners") is not None
+
+
+def test_restore_adds_a_missing_entry(tmp_path):
+    p = tmp_path / "flagged_registry.yaml"
+    registry.restore(p, {"company": "Nimbus Hiring", "state": "active", "confidence": "high"})
+    assert [e["company"] for e in registry.load(p)] == ["Nimbus Hiring"]

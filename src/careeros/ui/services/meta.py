@@ -30,6 +30,7 @@ def meta(settings: Any) -> dict[str, Any]:
         "clean_stops": list(CLEAN_STOPS),
         "presets": {"names": list(PRESET_NAMES), "values": {k: dict(v) for k, v in runs.presets.items()},
                     "recommended": RECOMMENDED_PRESET, "current": runs.preset},
-        "pipeline": {"columns": ui.columns, "closed": ui.closed},
-        "ui": {"theme": ui.theme, "undo_seconds": ui.undo_seconds, "page_size": ui.page_size},
+        "pipeline": {"columns": ui.columns, "closed": ui.closed, "card_limit": ui.card_limit},
+        "ui": {"theme": ui.theme, "undo_seconds": ui.undo_seconds, "page_size": ui.page_size,
+               "due_soon_hours": ui.due_soon_hours},
     }

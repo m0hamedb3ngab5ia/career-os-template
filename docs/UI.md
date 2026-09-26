@@ -2,7 +2,8 @@
 
 Status: building. The mockup is signed off; Phase 2 is being built in slices. Built so far: the `careeros ui`
 server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/status`, `/api/jobs`, `/api/events`,
-`pipeline.yaml: ui`). Everything else in this file is not built yet unless it says so.
+`pipeline.yaml: ui`), the Action Items screen (`/api/actions`) and the Pipeline board (`/api/pipeline`,
+`POST /api/jobs/{id}/status`). Everything else in this file is not built yet unless it says so.
 
 ## Goals
 
@@ -239,7 +240,8 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
 - `careeros ui [--port 8765] [--host 127.0.0.1] [--reindex] [--no-open]` subcommand; server binds to `127.0.0.1` by
   default (any other `--host` requires auth; see Phone below).
 - `pipeline.yaml: ui` (built): port, host, open_browser, theme, undo_seconds, page_size, watch_debounce_ms,
-  index_path and the Pipeline board's `pipeline.columns` (status -> column; statuses in no column form the "Closed"
+  index_path, `due_soon_hours` (Action Items' orange window) and the Pipeline board's `pipeline.columns` and
+  `pipeline.card_limit` (status -> column; statuses in no column form the "Closed"
   line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier, action type and
   stop reason from the models, so the frontend renders codes it was never told about (grey fallback).
 - Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write

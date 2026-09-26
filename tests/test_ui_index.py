@@ -73,6 +73,13 @@ def test_action_items_and_contacts_and_runs(idx, data):
     assert att[0]["outcome"] == "ok" and att[0]["job_id"] == data["jobs"]["queued"]
 
 
+def test_action_item_due_is_indexed(idx, data):
+    acts = {r["id"]: r for r in idx.query("SELECT * FROM action_items")}
+    high = acts[data["actions"]["high"]]
+    assert high["due"] and high["due"].startswith("20") and high["due_reason"] == "posting closes"
+    assert acts[data["actions"]["medium"]]["due"] is None
+
+
 def test_wal_mode_and_schema_version(idx):
     assert idx.query("PRAGMA journal_mode")[0]["journal_mode"] == "wal"
     assert idx.get_meta("schema_version") == str(index_mod.SCHEMA_VERSION)

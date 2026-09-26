@@ -82,7 +82,7 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import events, health, jobs, meta, status
+    from careeros.ui.routers import actions, events, health, job_actions, jobs, meta, pipeline, status
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -103,7 +103,7 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=503)
 
-    for r in (health, meta, status, jobs, events):
+    for r in (health, meta, status, jobs, events, actions, pipeline, job_actions):
         app.include_router(r.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)

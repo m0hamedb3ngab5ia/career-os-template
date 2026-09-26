@@ -13,7 +13,8 @@ from careeros.config import ConfigError
 from careeros.models import STATUSES
 
 UI_KEYS = ("port", "host", "open_browser", "theme", "undo_seconds", "page_size", "watch_debounce_ms", "index_path",
-           "pipeline")
+           "due_soon_hours", "pipeline")
+PIPELINE_KEYS = ("columns", "card_limit")
 THEMES = ("system", "light", "dark")
 # The mockup's board: one column per stage; statuses left out (skipped, rejected, withdrawn, ghosted) are
 # counted in the "Closed" summary line under the board.
@@ -37,6 +38,8 @@ class UiConfig:
     page_size: int = 100
     watch_debounce_ms: int = 300
     index_path: str | None = None          # None: data/careeros.db next to data/jobs
+    due_soon_hours: int = 48               # Action Items: orange "due soon" within this many hours
+    card_limit: int = 10                   # Pipeline: cards per column before "Show all"
     columns: list[dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_COLUMNS))
 
     @property
@@ -113,10 +116,14 @@ def load_ui_config(settings: Any) -> UiConfig:
         if not isinstance(raw["index_path"], str) or not raw["index_path"].strip():
             raise _err(f"index_path must be a file path or null, got {raw['index_path']!r}")
         cfg.index_path = raw["index_path"]
+    if "due_soon_hours" in raw:
+        cfg.due_soon_hours = _int(raw["due_soon_hours"], "due_soon_hours", 1, 24 * 14)
     pl = raw.get("pipeline")
     if pl is not None:
-        if not isinstance(pl, dict) or set(pl) - {"columns"}:
-            raise _err("pipeline must be a mapping with only columns")
+        if not isinstance(pl, dict) or set(pl) - set(PIPELINE_KEYS):
+            raise _err(f"pipeline must be a mapping with only {' and '.join(PIPELINE_KEYS)}")
         if "columns" in pl:
             cfg.columns = _columns(pl["columns"])
+        if "card_limit" in pl:
+            cfg.card_limit = _int(pl["card_limit"], "pipeline.card_limit", 1, 500)
     return cfg

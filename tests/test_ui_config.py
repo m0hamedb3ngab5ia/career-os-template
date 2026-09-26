@@ -75,10 +75,22 @@ def test_overrides_and_custom_columns():
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"]}, {"name": "B", "statuses": ["found"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"], "x": 1}]}}},
     {"ui": {"pipeline": {"nope": 1}}},
+    {"ui": {"pipeline": {"card_limit": 0}}},
+    {"ui": {"pipeline": {"card_limit": "10"}}},
+    {"ui": {"due_soon_hours": 0}},
+    {"ui": {"due_soon_hours": 24 * 15}},
 ])
 def test_invalid_config_fails_closed(bad):
     with pytest.raises(ConfigError):
         load_ui_config(S(bad))
+
+
+def test_board_card_limit_and_due_soon_window():
+    cfg = load_ui_config(S({}))
+    assert cfg.card_limit == 10 and cfg.due_soon_hours == 48
+    cfg = load_ui_config(S({"ui": {"due_soon_hours": 24, "pipeline": {"card_limit": 25}}}))
+    assert cfg.card_limit == 25 and cfg.due_soon_hours == 24
+    assert [c["name"] for c in cfg.columns][0] == "Found"      # card_limit alone keeps the default columns
 
 
 def test_default_columns_are_not_shared_state():

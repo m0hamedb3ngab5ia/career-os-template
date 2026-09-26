@@ -150,6 +150,21 @@ def clear(path: Path, company: str, note: str = "") -> dict[str, Any] | None:
     return e
 
 
+def restore(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    """Put an entry back exactly as it was (undo of `clear` in the UI): replaces the entry for the same company,
+    or appends it when there is none."""
+    entries = load(path)
+    key = normalize_company(str(entry.get("company") or ""))
+    for i, e in enumerate(entries):
+        if normalize_company(str(e.get("company") or "")) == key:
+            entries[i] = dict(entry)
+            break
+    else:
+        entries.append(dict(entry))
+    _save(path, entries)
+    return dict(entry)
+
+
 # --- verified companies (made-up company protection) ------------------------------------------------
 
 RISKS = ("low", "medium", "high")

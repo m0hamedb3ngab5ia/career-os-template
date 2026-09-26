@@ -1,0 +1,180 @@
+/* Listbox, Menu (popup lists under a small button) and Sheet (modal edit panel). Mockup: 28px trigger, 7px
+   radius, 12px text; popups use the popover shadow. */
+.anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.caption {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-nav);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.trigger[data-size="small"] {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-segment);
+}
+.popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--sep);
+  box-shadow: var(--shadow-popover);
+  outline: none;
+}
+.popup[data-align="end"] {
+  left: auto;
+  right: 0;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-segment);
+  background: transparent;
+  color: var(--label);
+  font-size: var(--fs-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.option[data-active],
+.option:hover,
+.option:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.option[aria-disabled="true"] {
+  color: var(--sec);
+  cursor: default;
+}
+.check {
+  display: inline-flex;
+  width: 14px;
+  color: var(--accent);
+}
+
+.backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  padding: 12vh 16px 16px;
+  background: rgba(0, 0, 0, 0.28);
+}
+.sheet {
+  width: min(440px, 100%);
+  max-height: 76vh;
+  overflow-y: auto;
+  padding: var(--space-5);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--label);
+  box-shadow: var(--shadow-popover);
+  overscroll-behavior: contain;
+  animation: sheetIn 0.18s ease-out;
+}
+.sheetTitle {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+}
+.sheetDesc {
+  margin: 4px 0 0;
+  color: var(--sec);
+}
+.sheetBody {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-4);
+}
+.sheetFooter {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+  margin-top: var(--space-5);
+}
+@keyframes sheetIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sheet {
+    animation: none;
+  }
+}
+@media (pointer: coarse) {
+  .trigger,
+  .option {
+    min-height: var(--touch);
+  }
+}
+
+/* Form fields (sheets) */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fieldLabel {
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--label);
+}
+.fieldHint {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.input {
+  height: var(--control-h);
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-body);
+}
+.input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: var(--touch);
+    font-size: 16px; /* no zoom on focus (iOS) */
+  }
+}
