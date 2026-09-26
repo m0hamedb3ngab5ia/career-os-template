@@ -16,6 +16,7 @@ Pure functions, standard library only: the standalone render script imports this
 """
 from __future__ import annotations
 
+import re
 from typing import Any
 
 MARKER = "**"
@@ -55,3 +56,13 @@ def bold_spans(text: Any) -> list[str]:
     if not isinstance(text, str):
         return []
     return text.split(MARKER)[1::2]
+
+
+# a bold pair as markdown writes it: `**` not glued to a word on the outside, non-space just inside. Code such as
+# `**kwargs` (no closing pair) or `2**32` (glued to a digit) is not bold.
+_MD_BOLD = re.compile(r"(?<![\w*])\*\*(?=\S)[^*\n]+?(?<=\S)\*\*(?![\w*])")
+
+
+def has_markdown_bold(text: Any) -> bool:
+    """True when `text` holds a markdown **bold** pair (what a copied bullet marker looks like)."""
+    return isinstance(text, str) and bool(_MD_BOLD.search(text))

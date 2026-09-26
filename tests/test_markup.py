@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from careeros.markup import bold_spans, strip_bold, validate_bold
+from careeros.markup import bold_spans, strip_bold, validate_bold, has_markdown_bold
 
 pytestmark = pytest.mark.unit
 
@@ -50,3 +50,10 @@ def test_validate_bold_rejects(text, why):
 
 def test_validate_bold_non_string():
     assert validate_bold(None) is None and validate_bold(42) is None
+
+
+@pytest.mark.parametrize("text,expected", [("Built **FastAPI** services", True), ("**Python**, SQL", True),
+                                           ("accepts *args and **kwargs", False), ("2**32 and 2**64", False),
+                                           ("plain text", False)])
+def test_has_markdown_bold(text: str, expected: bool) -> None:
+    assert has_markdown_bold(text) is expected

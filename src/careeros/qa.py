@@ -51,7 +51,7 @@ from typing import Any, Iterable
 
 import yaml
 
-from careeros.markup import MARKER, strip_bold, validate_bold
+from careeros.markup import MARKER, strip_bold, validate_bold, has_markdown_bold
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -1242,13 +1242,13 @@ class Checker:
         if isinstance(self.answers, list):
             ran = True
             problems += [f"answers.json#{i}" for i, a in enumerate(self.answers)
-                         if isinstance(a, dict) and MARKER in str(a.get("answer") or "")]
+                         if isinstance(a, dict) and has_markdown_bold(str(a.get("answer") or ""))]
         if self.outreach is not None:
             from careeros.qa_ext import outreach_items, outreach_texts
 
             ran = True
             problems += [f"outreach.json:{section}[{i}].{field}" for section, i, d in outreach_items(self)
-                         for field, text in outreach_texts(d) if MARKER in text]
+                         for field, text in outreach_texts(d) if has_markdown_bold(text)]
         bold_letter: list[str] = []
         if self.cover_md is not None:
             ran = True

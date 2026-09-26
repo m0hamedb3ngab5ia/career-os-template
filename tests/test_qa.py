@@ -1097,3 +1097,21 @@ def test_cover_letter_bold_balanced_is_soft_unbalanced_is_hard(tmp_path: Path) -
     clean = run(make_job(tmp_path / "c"))
     assert by_name(clean, "no_markdown_bold")["ok"]
     assert "cover_letter_bold" not in {x["check"] for x in clean["checks"]}
+
+
+# --- review fixes (#26) -----------------------------------------------------------------------------
+def test_no_markdown_bold_checks_per_draft_followups(tmp_path: Path) -> None:
+    job = make_job(tmp_path)
+    (job / "outreach.json").write_text(json.dumps({"drafts": [{
+        "linkedin_note": "Hi, I build backend services.", "bullet_ids": ["acme.1"],
+        "followups": [{"kind": "status_followup", "message": "Built **FastAPI** services since."}]}]}))
+    c = by_name(run(job), "no_markdown_bold")
+    assert not c["ok"] and "followups[0]" in c["detail"]
+
+
+@pytest.mark.parametrize("answer", ["I refactored the handler to accept *args and **kwargs.",
+                                    "The hash space is 2**32 and later 2**64 buckets."])
+def test_code_double_star_is_not_markdown_bold(tmp_path: Path, answer: str) -> None:
+    answers = [{"question": "Describe a project", "type": "generated", "bullet_ids": ["acme.1"],
+                "answer": answer, "needs_review": False}]
+    assert by_name(run(make_job(tmp_path, answers=answers)), "no_markdown_bold")["ok"]

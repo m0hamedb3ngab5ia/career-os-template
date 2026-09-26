@@ -117,6 +117,8 @@ text: Wrote **12 Airflow DAGs** in **Python** moving SQL reports into a warehous
 - tailor-resume copies the text **with** its markers into `resume.json`; `render.py` writes `\textbf{12 Airflow
   DAGs}` in `resume.tex` (the inner text is LaTeX-escaped; no `*` reaches LaTeX) and the plain sentence in
   `resume.txt`, which is what ATS parsers and QA read.
+- YAML: a value that starts with `**` must be quoted (`text: "**Python** scripts ..."`); unquoted, YAML reads
+  the leading `*` as an alias and `master.yaml` stops parsing.
 - Rules (`src/careeros/markup.py: validate_bold`): markers in pairs, no empty span (`****`), no space just inside
   a marker, no `***` / nesting. A single `*` is ordinary text. `**` in any other field (titles, skills, dates) is
   an error. `render.py` exits 1 on any violation and writes nothing; `careeros doctor` FAILs on invalid markup in

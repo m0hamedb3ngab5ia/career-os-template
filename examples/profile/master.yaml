@@ -58,6 +58,7 @@ education:
 # Bold: wrap tech names and metrics in **...** inside `text` / `variants` (e.g. "Built a **FastAPI** service ...
 # processing **2 million events per day**"). The résumé PDF prints them bold; resume.txt, QA and every cover
 # letter / answer / outreach message use the plain text. 1-3 spans per bullet; pairs only, no nesting.
+# A value that STARTS with ** must be quoted (YAML reads a leading * as an alias): text: "**Python** ..."
 experience:
   - id: acme                                      # INSERT: short unique id, e.g. northwind (its bullets: northwind.1, .2 ...)
     company: Acme                                 # INSERT: employer name

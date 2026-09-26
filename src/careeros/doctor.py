@@ -419,7 +419,9 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         try:
             d = yaml.safe_load(p.read_text(encoding="utf-8"))
         except yaml.YAMLError as e:
-            checks.append(Check(FAIL, "yaml", f"{rel} does not parse: {' '.join(str(e).split())[:160]}"))
+            hint = (" (a value starting with ** must be quoted: text: \"**Python** ...\")"
+                    if "scanning an alias" in str(e) else "")
+            checks.append(Check(FAIL, "yaml", f"{rel} does not parse: {' '.join(str(e).split())[:160]}{hint}"))
             bad = True
             continue
         if not isinstance(d, dict):

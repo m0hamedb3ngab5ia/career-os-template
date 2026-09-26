@@ -422,3 +422,13 @@ def test_bold_marked_estimate_counts_as_tilde_number(tmp_path: Path):
         b["text"] = "Shipped a React and TypeScript dashboard used by **~40 analysts** to review reconciliation breaks"
     _edit_master(root, edit)
     assert "estimate: true" not in text_of(doctor(root), WARN)
+
+
+def test_yaml_alias_error_hints_to_quote_bold(tmp_path):
+    from conftest import make_temp_root
+    from careeros.doctor import run_doctor
+    root = make_temp_root(tmp_path / "repo")
+    p = root / "profile" / "master.yaml"
+    p.write_text(p.read_text().replace("summary_variants:", "bad: **Python** first\nsummary_variants:", 1))
+    msgs = [c.detail for c in run_doctor(root) if c.name == "yaml"]
+    assert any("must be quoted" in m for m in msgs), msgs
