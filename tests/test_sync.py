@@ -150,3 +150,35 @@ def test_check_plan_uses_repo_venv_and_ui_when_present(tmp_path: Path):
     assert plan[0][1][0] == str(tmp_path / ".venv" / "bin" / "python")
     assert plan[2][1] == ["npm", "test", "--", "--run"]
     assert plan[3][2] == tmp_path / "ui"
+
+
+@pytest.mark.parametrize("path", ["Personal/notes.md", "PROFILE/master.yaml", "claude.local.md", "Data", "Config/x"])
+def test_is_personal_case_insensitive(path):
+    assert sync.is_personal(path, PERSONAL) is True
+
+
+class _FakeGit(sync.Git):
+    """Answers git calls from a table keyed by the first arg; asserts path reads use -z."""
+
+    def __init__(self, outputs: dict[str, str]):
+        super().__init__(Path("."))
+        self.outputs = outputs
+
+    def run(self, *args, check=True, input=None):
+        import subprocess as sp
+
+        if args[0] in ("log", "ls-tree", "diff"):
+            assert "-z" in args, args
+        return sp.CompletedProcess(["git", *args], 0, self.outputs.get(args[0], ""), "")
+
+
+def test_pushed_paths_reads_nul_separated_unquoted_names():
+    g = _FakeGit({"log": "src/a.py\0personal/résumé.md\0", "ls-tree": "src/a.py\0profile/my \"cv\".pdf\0",
+                  "rev-parse": ""})
+    got = sync.pushed_paths(g, "template", "a" * 40, sync.ZERO_SHA)
+    assert got == {"src/a.py", "personal/résumé.md", 'profile/my "cv".pdf'}
+    assert sync.blocked_paths(sorted(got), PERSONAL) == ["personal/résumé.md", 'profile/my "cv".pdf']
+
+
+def test_keep_globs_match_unquoted_non_ascii_names():
+    assert sync.compute_drift(["docs/Lebenslauf – alt.md", "src/ü.py"], PERSONAL, ["docs/Lebenslauf*"]) == ["src/ü.py"]

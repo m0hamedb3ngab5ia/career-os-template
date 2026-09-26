@@ -61,7 +61,9 @@ def _path_matches(path: str, entry: str) -> bool:
 
 
 def is_personal(path: str, personal: Iterable[str]) -> bool:
-    return any(_path_matches(path, e) for e in personal)
+    """Case-insensitive (fail closed): on a case-insensitive filesystem `Personal/` is the same folder."""
+    low = path.lower()
+    return any(_path_matches(low, e.lower()) for e in personal)
 
 
 def parse_keep(text: str) -> list[str]:
@@ -182,7 +184,8 @@ class Git:
     root: Path
 
     def run(self, *args: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
-        r = subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True, input=input)
+        r = subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True, input=input,
+                           encoding="utf-8", errors="surrogateescape")
         if check and r.returncode != 0:
             raise SyncError(f"git {' '.join(args)} failed: {(r.stderr or r.stdout).strip()}")
         return r
@@ -192,6 +195,11 @@ class Git:
 
     def lines(self, *args: str) -> list[str]:
         return [ln for ln in self.run(*args).stdout.splitlines() if ln.strip()]
+
+    def paths(self, *args: str) -> list[str]:
+        """Path output read with -z: NUL-separated and never quoted (core.quotePath would quote non-ASCII
+        and special names like `"personal/CV \\342..."`, which no pattern would match)."""
+        return [p for p in self.run(args[0], "-z", *args[1:]).stdout.split("\0") if p.strip("\n")]
 
     def config(self, key: str) -> str | None:
         r = self.run("config", "--get", key, check=False)
@@ -248,10 +256,10 @@ def compute_status(root: Path, remote: str = DEFAULT_REMOTE, template_branch: st
     if not g.ref_exists(ref):
         raise SyncError(f"{ref} not found; fetch it first (drop --no-fetch)")
     behind = g.lines("log", "--format=%h %s", f"HEAD..{ref}")
-    differs = set(g.lines("diff", "--name-only", ref, "HEAD"))
+    differs = set(g.paths("diff", "--name-only", ref, "HEAD"))
     # Only files changed on this side count as drift, not the template's own unmerged changes.
     mb = g.run("merge-base", ref, "HEAD", check=False).stdout.strip()
-    changed = differs & set(g.lines("diff", "--name-only", mb, "HEAD")) if mb else differs
+    changed = differs & set(g.paths("diff", "--name-only", mb, "HEAD")) if mb else differs
     return Status(ref=ref, behind=behind, drift=compute_drift(changed, personal_paths(g), _keep_globs(root)))
 
 
@@ -325,7 +333,7 @@ def pull(root: Path, *, remote: str = DEFAULT_REMOTE, template_branch: str = DEF
     lines = [f"on {branch} (from {base}): merging {len(commits)} commit(s) from {ref}"]
     m = g.run("merge", "--no-ff", "--no-edit", "-m", f"Merge {ref} into {branch}", ref, check=False)
     if m.returncode != 0:
-        conflicts = g.lines("diff", "--name-only", "--diff-filter=U")
+        conflicts = g.paths("diff", "--name-only", "--diff-filter=U")
         if not conflicts:
             # e.g. an untracked file the merge would overwrite: undo everything, leave the user on base
             if g.run("rev-parse", "--verify", "--quiet", "MERGE_HEAD", check=False).returncode == 0:
@@ -371,8 +379,8 @@ def pushed_paths(g: Git, remote: str, lsha: str, rsha: str) -> set[str]:
     exclude = ["--not", f"--remotes={remote}"]
     if rsha != ZERO_SHA and g.ref_exists(rsha):
         exclude.append(rsha)
-    paths = set(g.lines("log", "--format=", "--name-only", "--no-renames", "-m", lsha, *exclude))
-    paths.update(g.lines("ls-tree", "-r", "--name-only", lsha))
+    paths = set(g.paths("log", "--format=", "--name-only", "--no-renames", "-m", lsha, *exclude))
+    paths.update(g.paths("ls-tree", "-r", "--name-only", lsha))
     return paths
 
 

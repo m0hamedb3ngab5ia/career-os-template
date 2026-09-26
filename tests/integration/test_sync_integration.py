@@ -256,6 +256,27 @@ def test_hook_blocks_committed_symlink_to_private_dir(repos, env):
     assert r.returncode != 0 and "BLOCKED" in r.stderr and "profile" in r.stderr
 
 
+@pytest.mark.parametrize("name", ["personal/CV \u2013 2026.pdf", "data/jobs/x/r\u00e9sum\u00e9.pdf",
+                                  'profile/my "cv".pdf'])
+def test_hook_blocks_non_ascii_and_quoted_personal_names(repos, env, name):
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "switch", "-q", "-c", "fix/q", "template/main")
+    commit(priv, env, {name: "x\n"}, "add file")
+    r = git(priv, env, "push", "template", "fix/q", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr
+    assert name in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "fix/q").stdout.strip() == ""
+
+
+def test_status_in_sync_with_non_ascii_personal_file_and_kept_file(repos, env):
+    priv = repos["private"]
+    commit(priv, env, {"personal/CV \u2013 2026.pdf": "x\n", "docs/Notiz \u00fc.md": "mine\n",
+                       ".template-sync-keep": "README.md  # private\ndocs/Notiz*  # private note\n"}, "more")
+    r = cli(priv, env, "status")
+    assert r.returncode == 0, r.stdout + r.stderr
+
+
 def test_hook_pattern_and_personal_paths_from_git_config(repos, env):
     priv = repos["private"]
     assert cli(priv, env, "install-hook").returncode == 0
