@@ -368,3 +368,57 @@ def test_estimate_flag_without_tilde_number_warns(tmp_path: Path):
     m["experience"][0]["bullets"][1]["text"] = m["experience"][0]["bullets"][1]["text"].replace("40", "~40")
     (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m))
     assert "estimate: true" not in text_of(doctor(root), WARN)
+
+
+# --- **bold** markup in bullet text ---------------------------------------------------------------------
+
+def _edit_master(root: Path, fn) -> None:
+    p = root / "profile" / "master.yaml"
+    m = yaml.safe_load(p.read_text())
+    fn(m)
+    p.write_text(yaml.safe_dump(m, sort_keys=False))
+
+
+def test_valid_bold_markup_passes(tmp_path: Path):
+    root = filled(tmp_path)
+    _edit_master(root, lambda m: m["experience"][0]["bullets"][0].update(text="Built **FastAPI** for **2 million** events"))
+    checks = doctor(root)
+    assert "bold_markup" not in text_of(checks, FAIL) and "bold_markup" not in text_of(checks, WARN)
+    assert any(c.name == "bold_markup" and c.level == PASS for c in checks)
+
+
+@pytest.mark.parametrize("where", ["text", "variant", "summary"])
+def test_unbalanced_bold_markup_fails(tmp_path: Path, where: str):
+    root = filled(tmp_path)
+
+    def edit(m):
+        b = m["experience"][0]["bullets"][1]
+        if where == "text":
+            b["text"] = "Shipped a **React dashboard used by 40 analysts"
+        elif where == "variant":
+            b["variants"] = {"short": "Shipped a **React** dashboard for **40 analysts"}
+        else:
+            m["summary_variants"]["general"] = "Engineer using ****."
+    _edit_master(root, edit)
+    fails = text_of(doctor(root), FAIL)
+    assert "bold_markup" in fails
+    want = {"text": "northwind.2.text", "variant": "northwind.2.variants.short", "summary": "summary_variants.general"}
+    assert want[where] in fails, fails
+
+
+def test_bold_in_narratives_warns(tmp_path: Path):
+    root = filled(tmp_path)
+    _edit_master(root, lambda m: m["narratives"][0].update(text="Likes **owning** a product end to end."))
+    warns = text_of(doctor(root), WARN)
+    assert "bold_markup" in warns and "narratives" in warns
+
+
+def test_bold_marked_estimate_counts_as_tilde_number(tmp_path: Path):
+    root = filled(tmp_path)
+
+    def edit(m):
+        b = m["experience"][0]["bullets"][1]
+        b["estimate"] = True
+        b["text"] = "Shipped a React and TypeScript dashboard used by **~40 analysts** to review reconciliation breaks"
+    _edit_master(root, edit)
+    assert "estimate: true" not in text_of(doctor(root), WARN)

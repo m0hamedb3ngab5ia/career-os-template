@@ -26,6 +26,10 @@ Output schema (dict / JSON):
       # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
       #   about/approximately/roughly/around) wherever an artifact citing that bullet shows it
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
+      # hard check `bold_markup`: resume.json `**bold**` markup valid and only in bullet text / summary; resume.txt
+      #   carries no markers. Every truth/number/tool/keyword check compares bullet text with markers stripped.
+      # hard check `no_markdown_bold`: no `**` in answers.json / outreach.json text, no stray (unbalanced) `**` in
+      #   the cover letter body; soft `cover_letter_bold` (only on findings): balanced **bold** in the letter body
       # extended checks (careeros.qa_ext.*; see each module's docstring):
       "wrong_company_hits": [ {file, name, context} ],   # company.check_wrong_company
       "consistency": {...},              # consistency.check_cross_doc: titles/years/numbers across documents
@@ -46,6 +50,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 import yaml
+
+from careeros.markup import MARKER, strip_bold, validate_bold
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -332,7 +338,7 @@ class ProfileIndex:
         return {w.rstrip(".,;:").lower() for w in WORD_RE.findall(" ".join(locs))}
 
     def summary_text(self) -> str:
-        return " ".join(str(v) for v in (self.profile.get("summary_variants", {}) or {}).values())
+        return strip_bold(" ".join(str(v) for v in (self.profile.get("summary_variants", {}) or {}).values()))
 
     def skill_terms(self) -> list[str]:
         """`skills.*` lists plus `skill_groups[].items` (the master résumé's grouped skills)."""
@@ -361,9 +367,10 @@ class ProfileIndex:
             return []
         variants = b.get("variants") or []
         vals = variants.values() if isinstance(variants, dict) else variants
-        return [str(b.get("text", ""))] + [str(v) for v in vals]
+        return [strip_bold(b.get("text", ""))] + [strip_bold(v) for v in vals]
 
     def bullet_text(self, bid: str) -> str:
+        """Master text + variants (or a narrative's text), `**bold**` markers stripped."""
         b = self.bullets.get(bid)
         if b:
             t = str(b.get("text", ""))
@@ -371,10 +378,10 @@ class ProfileIndex:
             # master.yaml stores variants as a mapping ({short: "..."}); older data may use a list
             for v in (variants.values() if isinstance(variants, dict) else variants):
                 t += " " + str(v)
-            return t
+            return strip_bold(t)
         n = self.narratives.get(bid)
         if n:
-            return str(n.get("text", ""))
+            return strip_bold(n.get("text", ""))
         return ""
 
 
@@ -849,12 +856,12 @@ class Checker:
                 n += 1
                 bid = str(b["id"])
                 sources = self.profile.bullet_sources(bid)
-                if sources and not bullet_text_allowed(str(b["text"]), sources):
+                if sources and not bullet_text_allowed(strip_bold(b["text"]), sources):
                     problems.append(f"'{bid}' text differs from master text/variants: {str(b['text'])[:80]!r}")
         summary = rj.get("summary")
         if summary:
-            variants = [str(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
-            if str(summary).strip() not in variants:
+            variants = [strip_bold(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
+            if strip_bold(summary).strip() not in variants:
                 problems.append("summary is not one of profile.summary_variants")
         self.add("bullet_fidelity", "hard", not problems,
                  f"{n} bullets match master text/variants" if not problems else "; ".join(problems))
@@ -1172,7 +1179,7 @@ class Checker:
         for e in self._resume_entries():
             for b in e.get("bullets") or []:
                 if isinstance(b, dict) and b.get("id") and b.get("text"):
-                    ids_by_text.setdefault(" ".join(_fid_words(b["text"])), str(b["id"]))
+                    ids_by_text.setdefault(" ".join(_fid_words(strip_bold(b["text"]))), str(b["id"]))
         found, n = [], 0
         for i, raw in enumerate(self.resume_txt.splitlines(), 1):
             m = re.match(r"\s*[-•*·]\s+(.*\S)", raw)
@@ -1190,6 +1197,76 @@ class Checker:
         self.add("bullet_shape", "soft", not found,
                  f"{n} bullets: verb-first, a number or scale word, <= {max_words} words" if not found
                  else f"{detail} (see .claude/skills/_shared/resume_writing_rules.md)")
+
+    def check_bold_markup(self) -> None:
+        """Hard: resume.json `**bold**` markup is valid (paired, non-empty, not nested) and appears only in bullet
+        text and the summary (render.py fails otherwise); resume.txt carries no markers (render strips them)."""
+        name = "bold_markup"
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        if rj is None:
+            self.skip(name, "hard", "resume.json missing")
+            return
+        problems: list[str] = []
+        text_paths = {"summary"}
+        for section in ("experience", "projects", "leadership"):
+            for i, e in enumerate(rj.get(section) or []):
+                for j, _ in enumerate((e.get("bullets") or []) if isinstance(e, dict) else []):
+                    text_paths.add(f"{section}[{i}].bullets[{j}].text")
+
+        def walk(node: Any, path: str) -> None:
+            if isinstance(node, dict):
+                for k, v in node.items():
+                    walk(v, f"{path}.{k}" if path else str(k))
+            elif isinstance(node, list):
+                for i, v in enumerate(node):
+                    walk(v, f"{path}[{i}]")
+            elif isinstance(node, str) and MARKER in node:
+                if path not in text_paths:
+                    problems.append(f"resume.json {path}: '**' is allowed only in bullet text and the summary")
+                elif (err := validate_bold(node)):
+                    problems.append(f"resume.json {path}: {err}")
+
+        walk(rj, "")
+        if self.resume_txt is not None and MARKER in self.resume_txt:
+            problems.append("resume.txt contains '**' (re-render with templates/resume/render.py)")
+        self.add(name, "hard", not problems, "bold markup valid; resume.txt plain" if not problems else "; ".join(problems))
+
+    def check_no_markdown_bold(self) -> None:
+        """Prose never carries `**`: answers and outreach are pasted as plain text (a hard fail anywhere), and a
+        stray / unbalanced `**` in the cover letter prints literally in cover_letter.pdf and .txt (hard). Balanced
+        **bold** in the letter renders bold, so it is only a soft `cover_letter_bold` warning (letters are plain
+        prose; bullet markers must not be copied into them)."""
+        name = "no_markdown_bold"
+        problems: list[str] = []
+        ran = False
+        if isinstance(self.answers, list):
+            ran = True
+            problems += [f"answers.json#{i}" for i, a in enumerate(self.answers)
+                         if isinstance(a, dict) and MARKER in str(a.get("answer") or "")]
+        if self.outreach is not None:
+            from careeros.qa_ext import outreach_items, outreach_texts
+
+            ran = True
+            problems += [f"outreach.json:{section}[{i}].{field}" for section, i, d in outreach_items(self)
+                         for field, text in outreach_texts(d) if MARKER in text]
+        bold_letter: list[str] = []
+        if self.cover_md is not None:
+            ran = True
+            err = validate_bold(self.cover_body)
+            if err:
+                problems.append(f"cover_letter.md: {err}")
+            elif MARKER in self.cover_body:
+                bold_letter = self.cover_body.split(MARKER)[1::2]
+        if not ran:
+            self.skip(name, "hard", "no prose artifacts")
+            return
+        self.add(name, "hard", not problems,
+                 "no '**' in answers, outreach or cover letter prose" if not problems
+                 else "'**' in prose (copy bullet text without its bold markers): " + "; ".join(problems))
+        if bold_letter:
+            self.add("cover_letter_bold", "soft", False,
+                     "cover letter body has **bold**: " + ", ".join(repr(x) for x in bold_letter[:5])
+                     + " (letters are plain prose; drop the markers)")
 
     def check_answers_review(self) -> None:
         if not isinstance(self.answers, list):
@@ -1226,6 +1303,8 @@ class Checker:
         check_pdf_fidelity(self)
         self.check_keyword_coverage()
         self.check_bullet_shape()
+        self.check_bold_markup()
+        self.check_no_markdown_bold()
         self.check_cover_letter_structure()
         self.check_close_variant()
         check_wrong_company(self)

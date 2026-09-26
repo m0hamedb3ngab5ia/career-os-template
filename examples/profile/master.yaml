@@ -55,6 +55,9 @@ education:
 #   resume_default: true   tailor-resume prefers this bullet when choosing between bullets of equal relevance
 #   weak: true             you know it is weak; used only when nothing stronger covers the posting
 #   estimate: true         the number is your own estimate; the text then carries a "~" prefix (e.g. ~40%)
+# Bold: wrap tech names and metrics in **...** inside `text` / `variants` (e.g. "Built a **FastAPI** service ...
+# processing **2 million events per day**"). The résumé PDF prints them bold; resume.txt, QA and every cover
+# letter / answer / outreach message use the plain text. 1-3 spans per bullet; pairs only, no nesting.
 experience:
   - id: acme                                      # INSERT: short unique id, e.g. northwind (its bullets: northwind.1, .2 ...)
     company: Acme                                 # INSERT: employer name
@@ -70,16 +73,16 @@ experience:
     confidentiality: "Plain descriptions only; see profile/confidential_terms.yaml."
     bullets:
       - id: acme.1                                # INSERT: <entry id>.<n>, e.g. northwind.1
-        text: Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day   # INSERT: what you did, with what, and the result
+        text: Built a **FastAPI** service in **Python** that ingests **Kafka** order events into **PostgreSQL**, processing **2 million events per day**   # INSERT: what you did, with what, and the result
         ownership: own                            # INSERT: own (you led it) | team (you contributed)
         metrics: ["2 million"]                    # INSERT: every number in `text`, as written
         resume_default: true                      # INSERT: optional; true = lead with this bullet
       - id: acme.2                                # INSERT: <entry id>.<n>
-        text: Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks   # INSERT: one fact per bullet
+        text: Shipped a **React** and **TypeScript** dashboard used by **40 analysts** to review reconciliation breaks   # INSERT: one fact per bullet
         ownership: own                            # INSERT: own | team
         metrics: ["40"]                           # INSERT: every number in `text`
         variants:
-          short: Shipped a React/TypeScript dashboard for 40 analysts   # INSERT: optional shorter wording, same facts and numbers
+          short: Shipped a **React/TypeScript** dashboard for **40 analysts**   # INSERT: optional shorter wording, same facts and numbers
       - id: acme.3                                # INSERT: <entry id>.<n>
         text: Contributed to containerizing three services with Docker and deploying them to AWS as a member of the platform team   # INSERT: team work says "contributed to" / "member of", never "built"
         ownership: team                           # INSERT: own | team
@@ -97,7 +100,7 @@ experience:
     stack: [SQL, Airflow, Python]                 # INSERT: tools you really used here
     bullets:
       - id: initech_intern.1                      # INSERT: <entry id>.<n>
-        text: Wrote 12 Airflow DAGs in Python moving SQL reports into a warehouse, cutting manual prep by 5 hours per week   # INSERT: one fact per bullet
+        text: Wrote **12 Airflow DAGs** in **Python** moving SQL reports into a warehouse, cutting manual prep by **5 hours per week**   # INSERT: one fact per bullet
         metrics: ["12", "5 hours"]                # INSERT: every number in `text`
       - id: initech_intern.2                      # INSERT: <entry id>.<n>
         text: Profiled data quality and documented lineage across 30 SQL tables with Python checks, giving the reporting team one traced source per field   # INSERT: [verb] + [technical what] + [scale] + [tech]
@@ -112,7 +115,7 @@ projects:
     tags: [swe_mobile, swe_fullstack]             # INSERT: category names this project supports
     bullets:
       - id: widgetizer.1                          # INSERT: <entry id>.<n>
-        text: Built an iOS app in Swift and SwiftUI with a Supabase backend, reaching 300 beta users   # INSERT: one fact per bullet
+        text: Built an iOS app in **Swift** and **SwiftUI** with a **Supabase** backend, reaching **300 beta users**   # INSERT: one fact per bullet
         metrics: ["300"]                          # INSERT: every number in `text`
       - id: widgetizer.2                          # INSERT: <entry id>.<n>
         text: Wrote 15 XCTest suites for the Swift sync and offline logic, catching merge-conflict bugs before each TestFlight beta build   # INSERT: one fact per bullet

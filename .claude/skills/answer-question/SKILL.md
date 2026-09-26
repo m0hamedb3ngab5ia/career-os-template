@@ -55,6 +55,8 @@ Rules:
 - Company facts only from `posting.json.description_text` or `cover_letter.md` frontmatter `facts_used`.
 - Voice: first person, short sentences, no banned phrases (`config/qa.yaml`), <= 2 em-dashes,
   no rhetorical questions. Start with the concrete thing.
+- Plain text: answers are pasted into form fields. Bullet text may carry `**bold**` markers (résumé PDF only);
+  never copy them: an answer containing `**` hard-fails QA (`no_markdown_bold`).
 - Length: <= `--limit` characters if given (leave 5% headroom); else 600-1200 characters. Count.
 - "Why us" answers: 1 sourced fact + 1 narrative id + 1 bullet id. "Project" answers: use the bullets
   of the `projects[]` entry whose `tags`/`stack` best match the posting (`config/categories.yaml:

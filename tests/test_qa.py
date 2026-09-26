@@ -957,3 +957,143 @@ def test_estimate_number_also_in_an_exact_bullet_is_not_flagged(tmp_path: Path) 
 def test_estimate_marked_ok_without_estimate_bullets(tmp_path: Path) -> None:
     c = by_name(run(make_job(tmp_path)), "estimate_marked")
     assert c["ok"] and "no estimate" in c["detail"]
+
+
+# --- **bold** markup: bullet text may carry markers; QA compares stripped text ---------------------
+
+MARKS = {  # acme.1 / acme.2 (+ its variant) / initech_intern.1 with tech names and metrics bolded
+    "acme.1": "Built a **FastAPI** service in **Python** that ingests **Kafka** order events into **PostgreSQL**, "
+              "processing **2 million events per day**",
+    "acme.2": "Shipped a **React** and **TypeScript** dashboard used by **40 analysts** to review reconciliation breaks",
+    "initech_intern.1": "Wrote **12 Airflow DAGs** in **Python** moving SQL reports into a warehouse, cutting manual "
+                        "prep by **5 hours per week**",
+}
+
+
+def _bold_root(tmp_path: Path, marked: bool) -> Path:
+    """Copied example root whose bullets are plain (marked=False) or carry MARKS (marked=True)."""
+    from careeros.markup import strip_bold
+
+    root = _copied_root(tmp_path)
+    p = root / "profile" / "master.yaml"
+    m = yaml.safe_load(p.read_text())
+    for sec in ("experience", "projects", "leadership"):
+        for e in m.get(sec) or []:
+            for b in e.get("bullets") or []:
+                b["text"] = MARKS[b["id"]] if marked and b["id"] in MARKS else strip_bold(b["text"])
+                if isinstance(b.get("variants"), dict):
+                    b["variants"] = {k: (f"Shipped a **React/TypeScript** dashboard for **40 analysts**"
+                                         if marked and b["id"] == "acme.2" else strip_bold(v))
+                                     for k, v in b["variants"].items()}
+    p.write_text(yaml.safe_dump(m, sort_keys=False))
+    return root
+
+
+def _bold_job(tmp_path: Path, root: Path, **kw) -> Path:
+    job = make_job(tmp_path, **kw)
+    rj = build_resume_json(yaml.safe_load((root / "profile" / "master.yaml").read_text()),
+                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
+    (job / "resume.json").write_text(json.dumps(rj))
+    return job
+
+
+def _hard(res: dict) -> dict:
+    return {c["check"]: c["ok"] for c in res["checks"] if c["level"] == "hard"}
+
+
+def test_bold_markers_do_not_change_hard_results(tmp_path: Path) -> None:
+    plain_root, marked_root = _bold_root(tmp_path / "p", False), _bold_root(tmp_path / "m", True)
+    plain = run_deterministic(_bold_job(tmp_path / "pj", plain_root), root=plain_root)
+    marked = run_deterministic(_bold_job(tmp_path / "mj", marked_root), root=marked_root)
+    assert "**" in (tmp_path / "mj" / "jobs" / "t1" / "resume.json").read_text()
+    assert _hard(marked) == _hard(plain)
+    assert marked["orphan_numbers"] == plain["orphan_numbers"] == []
+    assert marked["unknown_tools"] == plain["unknown_tools"] == []
+    assert marked["keyword_coverage"] == plain["keyword_coverage"]
+    assert marked["bullet_shape"] == plain["bullet_shape"]
+    for name in ("bullet_fidelity", "truth_trace", "tool_audit", "number_audit:resume.txt", "bold_markup",
+                 "no_markdown_bold", "numbers_consistent"):
+        assert by_name(marked, name)["ok"], (name, by_name(marked, name)["detail"])
+
+
+def test_bold_fidelity_ignores_marker_differences(tmp_path: Path) -> None:
+    """Master marked, resume.json plain (or the other way round): same words, so fidelity holds."""
+    marked_root = _bold_root(tmp_path / "m", True)
+    plain_root = _bold_root(tmp_path / "p", False)
+    job = _bold_job(tmp_path / "a", plain_root)        # plain resume.json ...
+    assert by_name(run_deterministic(job, root=marked_root), "bullet_fidelity")["ok"]   # ... vs marked master
+    job = _bold_job(tmp_path / "b", marked_root)       # marked resume.json ...
+    assert by_name(run_deterministic(job, root=plain_root), "bullet_fidelity")["ok"]    # ... vs plain master
+
+
+def test_bold_marked_estimate_keeps_its_tilde(tmp_path: Path) -> None:
+    root = _estimate_root(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["experience"][0]["bullets"][1]["text"] = EST_TEXT.replace("~40 analysts", "**~40 analysts**")
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m, sort_keys=False))
+    ok = run_deterministic(_estimate_job(tmp_path / "a", root, EST_TEXT), root=root)
+    assert by_name(ok, "estimate_marked")["ok"] and "1 estimated" in by_name(ok, "estimate_marked")["detail"]
+    bad = run_deterministic(_estimate_job(tmp_path / "b", root, EST_TEXT.replace("~40", "40")), root=root)
+    assert not by_name(bad, "estimate_marked")["ok"]
+
+
+def test_profile_index_strips_bold() -> None:
+    idx = ProfileIndex({"experience": [{"id": "x", "bullets": [
+        {"id": "x.1", "text": "Built **FastAPI** for **40** users", "variants": {"short": "**FastAPI** for 40"}}]}],
+        "summary_variants": {"general": "Engineer using **Python**."},
+        "narratives": [{"id": "n.1", "text": "Likes **data**."}]})
+    assert idx.bullet_sources("x.1") == ["Built FastAPI for 40 users", "FastAPI for 40"]
+    assert "**" not in idx.bullet_text("x.1") and idx.bullet_text("n.1") == "Likes data."
+    assert idx.summary_text() == "Engineer using Python."
+
+
+@pytest.mark.parametrize("where,why", [
+    ("bullet", "unbalanced"), ("title", "only in bullet text"), ("resume.txt", "resume.txt"),
+])
+def test_bold_markup_hard_fails(tmp_path: Path, where: str, why: str) -> None:
+    job = make_job(tmp_path)
+    rj = json.loads((job / "resume.json").read_text())
+    if where == "bullet":
+        rj["experience"][0]["bullets"][0]["text"] = "Built a **FastAPI service in Python"
+    elif where == "title":
+        rj["experience"][0]["title"] = "**Software Engineer**"
+    else:
+        (job / "resume.txt").write_text(RESUME_TXT.replace("40 analysts", "**40 analysts**"))
+    (job / "resume.json").write_text(json.dumps(rj))
+    res = run(job)
+    c = by_name(res, "bold_markup")
+    assert c["level"] == "hard" and not c["ok"] and why in c["detail"], c["detail"]
+    assert res["pass"] is False
+
+
+def test_bold_markup_ok_and_skipped(tmp_path: Path) -> None:
+    job = make_job(tmp_path)
+    assert by_name(run(job), "bold_markup")["ok"]
+    (job / "resume.json").unlink()
+    assert by_name(run(job), "bold_markup").get("skipped")
+
+
+def test_no_markdown_bold_in_answers_and_outreach_is_hard(tmp_path: Path) -> None:
+    answers = [{"question": "Describe a project", "type": "generated", "bullet_ids": ["acme.2"],
+                "answer": "I shipped a **React** dashboard used by 40 analysts.", "needs_review": False}]
+    job = make_job(tmp_path, answers=answers)
+    (job / "outreach.json").write_text(json.dumps({"drafts": [{"linkedin_note": "Hi, I built **FastAPI** services.",
+                                                              "bullet_ids": ["acme.1"]}]}))
+    res = run(job)
+    c = by_name(res, "no_markdown_bold")
+    assert c["level"] == "hard" and not c["ok"]
+    assert "answers.json#0" in c["detail"] and "outreach.json" in c["detail"]
+    assert res["pass"] is False
+
+
+def test_cover_letter_bold_balanced_is_soft_unbalanced_is_hard(tmp_path: Path) -> None:
+    soft = run(make_job(tmp_path / "a", cover=COVER_LETTER.replace("2 million events", "**2 million** events")))
+    assert soft["pass"] is True and by_name(soft, "no_markdown_bold")["ok"]
+    c = by_name(soft, "cover_letter_bold")
+    assert c["level"] == "soft" and not c["ok"] and "2 million" in c["detail"]
+    hard = run(make_job(tmp_path / "b", cover=COVER_LETTER.replace("2 million events", "**2 million events")))
+    c = by_name(hard, "no_markdown_bold")
+    assert not c["ok"] and "cover_letter.md" in c["detail"] and hard["pass"] is False
+    clean = run(make_job(tmp_path / "c"))
+    assert by_name(clean, "no_markdown_bold")["ok"]
+    assert "cover_letter_bold" not in {x["check"] for x in clean["checks"]}

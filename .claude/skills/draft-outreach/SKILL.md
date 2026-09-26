@@ -32,6 +32,8 @@ first). This skill writes drafts only. It never sends, never creates Gmail draft
 - One company/team fact per message, from `contacts.json`/posting/cover letter facts (source recorded).
 - Voice: first person, short sentences, plain ask, no flattery, no banned phrases, no em-dash > 1 per
   message, no rhetorical questions, no "I hope this finds you well".
+- Plain text: bullet text may carry `**bold**` markers (résumé PDF only). Never copy them into a note, message or
+  email; any `**` in outreach.json hard-fails QA (`no_markdown_bold`).
 - Never claim a referral, a mutual contact, or that you were told to reach out. Never mention having
   guessed the email.
 - Use the contact's first name only if `confidence` is `high`; else open with "Hi," (no name).

@@ -88,6 +88,15 @@ in `src/careeros/qa_ext/` and read the Checker's shared inputs (`pipeline_cfg`, 
 | `outreach_policy.py` | `outreach_manual_contacts`, `linkedin_draft_only`, `linkedin_note_length` (> 300 chars), `email_autosend_verified`, `thank_you_manual`, `outreach_cold_limit`, `outreach_json_valid` | `outreach_word_counts` | `outreach_policy` |
 | `pdf_fidelity.py` | `pdf_links_clickable`, `pdf_text_matches_resume` | `pdf_text_split_words`, `pdf_hidden_text`, `pdf_fonts_embedded`, `pdf_metadata` | `pdf_fidelity` |
 
+**Bold markup.** Bullet `text` / `variants` and `summary_variants` in `profile/master.yaml` may carry `**bold**`
+spans (tech names, metrics). `src/careeros/markup.py` (`strip_bold`, `bold_spans`, `validate_bold`) is the one
+parser: `templates/resume/render.py` turns each span into `\textbf{}` (escaping inside it) and writes resume.txt
+plain; every truth / number / tool / keyword / consistency check compares stripped text, so markers never change a
+verdict. `bold_markup` (hard) rejects invalid markup and `**` outside bullet text / summary in resume.json, and any
+`**` in resume.txt; `no_markdown_bold` (hard) rejects `**` in answers and outreach and a stray `**` in the cover
+letter; balanced bold in a letter is only the soft `cover_letter_bold`. `careeros doctor` FAILs on invalid markup
+in master.yaml.
+
 `cover_letter_names_company` (hard, in `qa.py`) accepts the company's configured aliases and domain stems. Every
 threshold is optional config in `config/qa.yaml` (`consistency:`, `outreach:`, `pdf:`; defaults commented in
 `examples/config/qa.yaml`). A job without `outreach.json` or `resume.pdf` skips those checks. `/qa-review` caps

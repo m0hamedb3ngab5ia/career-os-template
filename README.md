@@ -29,7 +29,9 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
   and evidence. Levels per code are yours to change in `config/targets.yaml: safety.levels`.
 - **Score** (`/score-job`): category, fit 0-100 and tier (A dream list, B strong fit, C volume) from `config/`.
 - **Tailor** (`/tailor-resume`, `/write-cover-letter`): builds a résumé and letter only from bullets in
-  `profile/master.yaml`, cited by id, with numbers frozen.
+  `profile/master.yaml`, cited by id, with numbers frozen. Wrap tech names and metrics in `**...**` inside a
+  bullet's `text` ("Built a **FastAPI** service ... **2 million events per day**") and the résumé PDF prints them
+  bold; resume.txt, QA and every letter, answer and outreach message use the plain text.
 - **QA** (`python -m careeros.qa`, `/qa-review`): fabrication audit, banned phrases, confidential terms,
   the example-identity guard and a critic score; one regeneration, then an Action Item. It also catches another
   company's name left in a letter, answer or outreach draft, titles/years/numbers that disagree across documents,
