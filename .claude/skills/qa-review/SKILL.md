@@ -57,9 +57,9 @@ tool, or outcome not in the profile bullet -> UNSUPPORTED entry with artifact `r
 
 | key | 10 means | automatic caps |
 |---|---|---|
-| relevance | resume top bullets and letter Proof A hit the posting's top 2 requirements; category-appropriate ordering | cap 5 if `keyword_coverage` < 0.4; cap 7 if the letter never names the team's actual work |
+| relevance | resume top bullets and letter main experience hit the posting's top 2 requirements; category-appropriate ordering | cap 5 if `keyword_coverage` < 0.4; cap 7 if the letter never names the team's actual work |
 | specificity | every paragraph has a concrete number/system/name; facts are checkable | cap 6 if `facts_used` < 2 or any fact is generic ("innovative company") |
-| voice_match | reads like `style_guide.md` (short sentences, first person, plain ask, no praise); matches `## Learned` patterns and samples | cap 6 if em-dashes > 2, rhetorical question, tricolon of adjectives, or any throat-clearing opener; cap 8 if `voice_verified: false` (cannot verify beyond rules) |
+| voice_match | reads like `style_guide.md` (its register and structure, first person, plain ask, no praise) and the density of any `voice/examples/` letter; matches `## Learned` patterns where the guide does not override them | cap 6 if em-dashes > 2, rhetorical question, tricolon of adjectives, or any throat-clearing opener; cap 7 if the letter restates the résumé instead of 1-2 chosen experiences, or lists tools as a comma chain; cap 8 if `voice_verified: false` (cannot verify beyond rules) |
 | zero_fabrication | `unsupported_count == 0` and deterministic truth_trace/number_audit/tool_audit ok | 1 if any number/tool fabricated; max 4 if any UNSUPPORTED; 10 only when zero |
 | ats_safety | single column, standard section headers, contact intact, no tables/icons, keyword coverage >= 0.6, 1 page | cap 5 if `contact_intact` or `pdf_page_count` failed; cap 7 if coverage < 0.6 |
 | bullet_strength | resume.txt bullets follow `resume_writing_rules.md`: action verb first, technical what, impact/scale, tech named; team work worded "contributed to" / "member of" | cap 7 if `bullet_shape` has any `weak_opener`; cap 8 if more than a third of bullets are `no_metric` |

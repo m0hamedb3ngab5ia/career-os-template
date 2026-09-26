@@ -33,6 +33,9 @@ letter and resume tell the same story.
 3. `profile/voice/style_guide.md`: its `## Letter settings` (Greeting, Sign-off, Length, Close variants),
    Rules, Cover-letter skeleton, and `## Learned` if filled; and every file in `profile/voice/samples/`.
    If `samples/` is empty, the letter is `voice_verified: false`.
+   Also every file in `profile/voice/examples/` if present: approved reference letters. Copy their quality,
+   structure and density, never their content (experiences, technologies, themes). When the style guide
+   describes a letter structure or evidence-selection method, it overrides the defaults in steps 3-4 below.
    Previous closes: the `close_variant` frontmatter of every `data/jobs/*/cover_letter.md` (note the most
    recent one by `date`, and every one whose `company` is this company).
 4. `templates/cover_letter/skeleton.md` if present (frontmatter keys expected by its renderer).
@@ -49,16 +52,22 @@ company homepage or `/about`/engineering blog (max 2 fetches) and take facts fro
 If still fewer than 2: write the letter with what you have and set `facts_shortfall: true` (QA will fail
 `company_facts_min`; the caller creates an Action Item).
 
-## 3. Choose evidence
+## 3. Plan (internal; do not print the plan)
 
-- Requirement #1 = the posting's most emphasized requirement that the profile can match
-  (use `score.skill_evidence`). Pick 1-2 bullet ids as Proof A.
-- Requirement #2 or domain angle: 1 bullet id or 1 narrative id as Proof B. Pick the `narratives[]`
-  entry whose text fits the company's domain (e.g. the example's `n.data` for data-heavy teams, `n.builder`
-  for early-stage/ownership roles); never write motivation that is not in a narrative.
-- Prefer bullets already in `JOB/resume.json` so the story is consistent.
+Every letter answers: why this company and role; what the candidate has done that is most relevant; what that
+proves about them as an engineer; why that makes them a fit for this company. It is not a résumé summary.
 
-## 4. Draft (follow the skeleton in style_guide.md)
+Before drafting, decide:
+1. What the company actually builds, what engineering problems it solves, who depends on it (from the facts in step 2).
+2. Which qualities the posting emphasizes (`score.skill_evidence`, requirements, "who you are" text).
+3. The 1-2 experiences (bullet ids or narrative ids) that are the strongest evidence for those qualities. Choose from
+   the whole profile, not the most recent job by default; the style guide may list defaults per company type.
+   Prefer bullets already in `JOB/resume.json` so the story is consistent.
+4. Which experience makes the most natural opening connection to what the company builds.
+5. Which technologies are worth naming for this company (only those that strengthen the story) and which details to drop.
+6. What each paragraph proves.
+
+## 4. Draft (default structure; the style guide's structure wins if it has one)
 
 Greeting: the style guide's `Greeting:` line, with its placeholders filled. If the guide has none, use
 `Hi <Team> team,` when a real team name is known, else the company form. Never `Dear Hiring Manager`
@@ -67,20 +76,27 @@ Greeting: the style guide's `Greeting:` line, with its placeholders filled. If t
 digit, or matching `/general|university|early careers|campus|other/i` (e.g. "University 2026",
 "Early Careers", "General", "Other") -> use the company form and set `team: null`.
 
-1. Hook (1-2 sentences): one sourced fact + the one thing the candidate did that connects. Name the role and
-   company exactly as in posting.json (title may be shortened to its core, e.g. "Software Engineer, Backend").
-2. Proof A (3-4 sentences): "I did X, result Y" with exact numbers from cited bullets.
-3. Proof B (2-3 sentences): requirement #2 or narrative angle; tie back to the hook fact.
-4. Close (1-2 sentences): one line from the style guide's `Close variants:`. Pick a variant that is
-   neither the most recent letter's `close_variant` nor any `close_variant` already sent to this company
-   (QA soft-warns `close_variant_repeated`). If every variant was used for this company, pick the least
-   recently used. Record it as `close_variant`. No variants listed -> a plain ask in the same spirit.
-   Sign-off: the style guide's `Sign-off:` line (default: first name from `profile/master.yaml: identity.name`).
+1. Opening (2-3 sentences): name the role exactly as in posting.json (title may be shortened to its core) and say
+   something concrete about what the company builds and who depends on it, then the natural connection to the
+   candidate's work. No generic praise ("innovative culture", "mission resonates").
+2. Main experience (3-5 sentences): what system or product, who depended on it, what the candidate personally worked
+   on, what they built or changed, production context or scale or a result when useful, a few relevant technologies.
+   Explain domain terms through context for a reader outside the field. End on what the experience demonstrates
+   (reliability, ownership, production engineering, ...), not on a technology.
+3. Second experience (2-4 sentences, optional): adds something the first does not (a project, another role, a
+   workflow, leadership), or the "why this domain" angle from a narrative. Skip it if another shape is stronger.
+4. Back to the company + close (2-3 sentences): the intersection of what the company needs, what the candidate has
+   shown, and the work they want to keep doing; it must feel earned by the paragraphs above. Then one line from the
+   style guide's `Close variants:`. Pick a variant that is neither the most recent letter's `close_variant` nor any
+   `close_variant` already sent to this company (QA soft-warns `close_variant_repeated`). If every variant was used for
+   this company, pick the least recently used. Record it as `close_variant`. No variants listed -> a plain ask in the
+   same spirit. Sign-off: the style guide's `Sign-off:` line (default: first name from `profile/master.yaml: identity.name`).
 
-Voice rules (hard): first person, short sentences, one idea each, contractions ok, no throat-clearing
-openers, no praise beyond the sourced facts, <= 2 em-dashes, no rhetorical questions, no tricolon of
-adjectives, none of `banned_phrases` (case-insensitive, including "leverage"/"dynamic"/"thrilled").
-If `--suggestions` were passed, apply them without violating any rule above.
+Voice: the style guide's rules decide register (contractions, sentence length). Hard in every case: first person,
+specific evidence instead of adjectives, no stack dump (never a bare comma list of tools), no throat-clearing openers
+("I had the opportunity to", "I was fortunate enough to"), no praise beyond the sourced facts, <= 2 em-dashes, no
+rhetorical questions, no tricolon of adjectives, none of `banned_phrases` (case-insensitive, including
+"leverage"/"dynamic"/"thrilled"). If `--suggestions` were passed, apply them without violating any rule above.
 
 Length: `config/qa.yaml: cover_letter.min_words` to `cover_letter.max_words` words in the body (greeting
 through sign-off); the style guide's `Length:` line points there. QA computes the count itself

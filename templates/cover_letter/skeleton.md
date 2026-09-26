@@ -1,7 +1,7 @@
 # Cover letter skeleton
 
 Structure only. `write-cover-letter` produces `data/jobs/<id>/cover_letter.md` with this frontmatter
-and four paragraphs. Never copy sentences from here. Source of voice: `profile/voice/style_guide.md`.
+and usually four paragraphs. Never copy sentences from here. Source of voice: `profile/voice/style_guide.md`.
 Source of facts: `profile/master.yaml` (bullet ids) and `posting.json`. Nothing else.
 
 Length, greeting, sign-off and close variants come from the candidate's files, never from this skeleton:
@@ -30,39 +30,47 @@ company_facts:                      # min 2, each with a source URL or "posting"
 
 ## Body
 
-### 1. Hook (1 to 2 sentences)
+The candidate's `profile/voice/style_guide.md` may define its own structure and evidence-selection method; if so it
+wins over this default. Reference letters in `profile/voice/examples/` show quality and density, never content.
 
-Must contain: one concrete, sourced fact about this role or team (from `company_facts`) and the one
-thing the candidate actually did that connects to it. Name the role and company in plain words.
+Every letter answers: why this company and role, what the candidate did that is most relevant, what that proves about
+them as an engineer, and why that makes them a fit here. Pick 1-2 experiences; do not summarize the résumé.
 
-Forbidden: "I am writing to", "I'm excited", "I came across", praise without a fact, any sentence
-about the company that could apply to a different company.
+### 1. Opening (2 to 3 sentences)
 
-### 2. Proof A (3 to 4 sentences)
+Must contain: the role, and something concrete about what the company builds, what problems it solves or who
+depends on it (from `company_facts`), connected naturally to the candidate's work.
 
-Must contain: the strongest match for the posting's requirement #1, told as "I built X because Y,
-result Z" using the numbers from the cited bullet ids exactly. Numbers over adjectives.
+Forbidden: "I am writing to", "I'm excited", "I came across", "your mission resonates", praise without a fact, any
+sentence about the company that could apply to a different company.
 
-Forbidden: rephrasing a bullet so a number changes or a tool appears that is not in the profile;
-listing skills as a comma chain; tricolons of adjectives.
+### 2. Main experience (3 to 5 sentences)
 
-### 3. Proof B (2 to 3 sentences)
+Must contain: what the system or product was, who depended on it, what the candidate personally built or changed,
+production context or a result when useful, and only the technologies that matter to this company. Domain terms are
+explained through context. Ends on what the experience demonstrates, not on a technology.
 
-Must contain: either the match for requirement #2, or the "why this domain" angle taken from
-`profile/master.yaml: narratives` by id (e.g. `n.data`, `n.builder`). Ties back to the hook fact.
+Forbidden: rephrasing a bullet so a number changes or a tool appears that is not in the profile; listing skills as a
+comma chain; architecture dumps; tricolons of adjectives.
+
+### 3. Second experience (2 to 4 sentences, optional)
+
+Must contain: something the first paragraph does not show (another project or role, a workflow, leadership), or the
+"why this domain" angle taken from `profile/master.yaml: narratives` by id (e.g. `n.data`, `n.builder`).
 
 Forbidden: a second company compliment; inventing motivation not in `narratives`; "passionate".
 
-### 4. Close (1 to 2 sentences)
+### 4. Back to the company, then close (2 to 3 sentences)
 
-Must contain: one line from Letter settings `Close variants` (rotated; see write-cover-letter), then the sign-off.
+Must contain: the intersection of what the company needs and what the candidate has shown, earned by the paragraphs
+above; then one line from Letter settings `Close variants` (rotated; see write-cover-letter), then the sign-off.
 
 Forbidden: "I believe I would be a great fit", "look forward to hearing from you", thanking them for
 their time, restating the résumé.
 
 ## Global rules
 
-- First person, short sentences, one idea each. Contractions fine.
+- First person. Register (contractions, sentence length) follows the style guide. Specific evidence over adjectives.
 - Max 2 em dashes in the whole document. No rhetorical questions.
 - No word or phrase on `config/qa.yaml: banned_phrases`.
 - Company name spelled exactly as in `posting.json`.
