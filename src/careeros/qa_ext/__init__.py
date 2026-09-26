@@ -47,4 +47,11 @@ def outreach_texts(item: dict[str, Any]) -> list[tuple[str, str]]:
                 if isinstance(email.get(k), str) and email[k].strip()]
     elif isinstance(email, str) and email.strip():
         out.append(("email", email))
+    # a draft's own follow-ups (`drafts[i].followups[j]`) are prose that goes out too
+    nested = item.get("followups")
+    for j, f in enumerate(nested if isinstance(nested, list) else []):
+        if isinstance(f, dict):
+            out += [(f"followups[{j}].{k}", t) for k, t in outreach_texts(f)]
+        elif isinstance(f, str) and f.strip():
+            out.append((f"followups[{j}]", f))
     return out

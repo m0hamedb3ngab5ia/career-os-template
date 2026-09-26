@@ -400,6 +400,30 @@ def test_top_level_followups_are_checked(tmp_path: Path) -> None:
     assert chk["ok"] is False and "followups" in chk["detail"]
 
 
+# --- **bold** markers in bullet text never change the comparison -----------------------------------------
+
+def _marked_profile() -> dict:
+    prof = json.loads(json.dumps(PROFILE))
+    b = prof["experience"][0]["bullets"][0]
+    assert b["id"] == "acme.1"
+    b["text"] = ("Built a **FastAPI** service in **Python** that ingests **Kafka** order events into **PostgreSQL**, "
+                 "processing **2 million** events per day")
+    return prof
+
+
+def test_marked_reference_same_number_ok(tmp_path: Path) -> None:
+    ck = run(make_job(tmp_path, profile=_marked_profile()))
+    assert by_name(ck, "numbers_consistent")["ok"], by_name(ck, "numbers_consistent")["detail"]
+
+
+def test_marked_reference_changed_number_is_hard_and_plain(tmp_path: Path) -> None:
+    cover = COVER_LETTER.replace("processing 2 million events per day.", "processing 3 million events per day.")
+    ck = run(make_job(tmp_path, cover=cover, profile=_marked_profile()))
+    chk = by_name(ck, "numbers_consistent")
+    assert chk["ok"] is False and "acme.1" in chk["detail"] and "2 million" in chk["detail"]
+    assert "**" not in chk["detail"]
+
+
 # --- hedged bullet numbers --------------------------------------------------------------------------
 def _hedged_root(tmp_path: Path, bullet_phrase: str) -> tuple[Path, dict]:
     root = make_temp_root(tmp_path / "repo")

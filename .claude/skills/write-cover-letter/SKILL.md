@@ -98,6 +98,11 @@ specific evidence instead of adjectives, no stack dump (never a bare comma list 
 rhetorical questions, no tricolon of adjectives, none of `banned_phrases` (case-insensitive, including
 "leverage"/"dynamic"/"thrilled"). If `--suggestions` were passed, apply them without violating any rule above.
 
+Plain prose: profile bullet text may carry `**bold**` markers around tech names and metrics (they are for the résumé
+PDF only). Never copy them into the letter: write "2 million events per day", not "**2 million events per day**".
+QA hard-fails a stray `**` in the body (`no_markdown_bold`, it would print literally) and soft-warns any bold
+(`cover_letter_bold`).
+
 Length: `config/qa.yaml: cover_letter.min_words` to `cover_letter.max_words` words in the body (greeting
 through sign-off); the style guide's `Length:` line points there. QA computes the count itself
 (`cover_letter_word_count` in `careeros.qa` output); your own count is only a guide.

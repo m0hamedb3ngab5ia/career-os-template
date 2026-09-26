@@ -55,6 +55,10 @@ these shapes best.
 - **X-Y-Z** (Google): "Accomplished **X** as measured by **Y** by doing **Z**". X = the outcome, Y = the
   number that proves it, Z = what the candidate did. Example: "Cut manual report prep by 5 hours per week by
   writing 12 Airflow DAGs in Python that move SQL reports into a warehouse".
+- **Bold (optional):** wrap the tech names and metrics a recruiter should catch in `**...**` inside the bullet's
+  `text` / `variants`: "Built a **FastAPI** service in **Python** ... processing **2 million events per day**". 1-3
+  spans per bullet, pairs only, no nesting (`careeros doctor` FAILs invalid markup). The résumé PDF prints them
+  bold; resume.txt, QA and all prose (letters, answers, outreach) use the text without markers.
 - **Tech bullet formula:** **[action verb] + [technical what] + [scale/impact] + [technology]**. Example:
   "Built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, processing 2 million
   events per day".

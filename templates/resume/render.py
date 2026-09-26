@@ -5,6 +5,10 @@ Standalone: only needs jinja2 (and pyyaml for the optional categories.yaml templ
 
     .venv/bin/python templates/resume/render.py data/jobs/<id>/resume.json [--template default] [--no-pdf] [--txt-only]
 
+Bullet text and the summary may carry `**bold**` markup (src/careeros/markup.py): each span becomes
+\\textbf{...} in resume.tex (inner text LaTeX-escaped) and the markers are dropped from resume.txt. Invalid
+markup, or `**` in any other field, is an error (exit 1, nothing written).
+
 Template selection order: --template flag > resume.json meta.template > categories.yaml[meta.category].resume_template > default.
 Templates live in this directory as <name>.tex and use delimiters ((* *)), ((( ))), ((= =)).
 """
@@ -24,6 +28,16 @@ from jinja2 import Environment, FileSystemLoader, StrictUndefined
 
 HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
+
+try:
+    from careeros.markup import MARKER, strip_bold, validate_bold
+except ImportError:  # standalone checkout without the package installed: load the module file directly
+    import importlib.util
+
+    _spec = importlib.util.spec_from_file_location("_careeros_markup", REPO / "src" / "careeros" / "markup.py")
+    _markup = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_markup)  # type: ignore[union-attr]
+    MARKER, strip_bold, validate_bold = _markup.MARKER, _markup.strip_bold, _markup.validate_bold
 CATEGORIES_YAML = REPO / "config" / "categories.yaml"
 
 SECTION_ORDER_DEFAULT = ["experience", "projects", "education", "skills"]
@@ -67,6 +81,19 @@ def latex_escape(s: Any) -> str:
     for a, b in _TYPO:
         s = s.replace(a, b)
     return s
+
+
+def latex_bold(s: Any) -> str:
+    """latex_escape with `**x**` -> \\textbf{x}: split on the markers first, escape every piece, then wrap the
+    bold pieces, so escaping never touches a marker and no `*` of a marker reaches LaTeX. Invalid markup
+    raises ValueError."""
+    if s is None:
+        return ""
+    err = validate_bold(s)
+    if err:
+        raise ValueError(f"invalid **bold** markup: {err}")
+    parts = str(s).split(MARKER)
+    return "".join(latex_escape(p) if i % 2 == 0 else r"\textbf{" + latex_escape(p) + "}" for i, p in enumerate(parts))
 
 
 def url_escape(s: Any) -> str:
@@ -130,6 +157,41 @@ def check_placeholders(data: dict[str, Any]) -> list[str]:
 
     walk(data, "")
     return hits
+
+
+BULLET_SECTIONS = ("experience", "projects", "leadership")
+_BOLD_TEXT_RE = re.compile(r"^(summary|(%s)\[\d+\]\.bullets\[\d+\]\.text)$" % "|".join(BULLET_SECTIONS))
+
+
+def check_bold(data: dict[str, Any]) -> list[str]:
+    """"<path>: <reason>" for invalid `**` markup in bullet text / summary, and for `**` in any other field
+    (bold is allowed only in bullet text and the summary)."""
+    errs: list[str] = []
+
+    def walk(node: Any, path: str) -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                walk(v, f"{path}.{k}" if path else k)
+        elif isinstance(node, list):
+            for i, v in enumerate(node):
+                walk(v, f"{path}[{i}]")
+        elif isinstance(node, str) and MARKER in node:
+            if not _BOLD_TEXT_RE.match(path):
+                errs.append(f"{path}: '**' is allowed only in bullet text and the summary")
+            elif (err := validate_bold(node)):
+                errs.append(f"{path}: {err}")
+
+    walk(data, "")
+    return errs
+
+
+def _validate(data: dict[str, Any]) -> None:
+    bad = check_placeholders(data)
+    if bad:
+        raise ValueError(f"placeholder text in resume.json: {', '.join(bad)}")
+    bold = check_bold(data)
+    if bold:
+        raise ValueError("bold markup in resume.json: " + "; ".join(bold))
 
 
 def resolve_template(data: dict[str, Any], explicit: str | None) -> str:
@@ -217,14 +279,22 @@ def render(resume_json_path: str | Path, template: str | None = None, pdf: bool 
     """resume.json -> resume.tex next to it. Compiles PDF when an engine exists. Returns the .tex path."""
     src = Path(resume_json_path).resolve()
     data = load_resume(src)
-    bad = check_placeholders(data)
-    if bad:
-        raise ValueError(f"placeholder text in resume.json: {', '.join(bad)}")
+    _validate(data)
     tname = resolve_template(data, template)
     tfile = f"{tname}.tex" if not tname.endswith(".tex") else tname
     if not (HERE / tfile).exists():
         raise FileNotFoundError(f"template not found: {HERE / tfile}")
     ctx = escape_tree(data)
+    # bullet text and the summary: escaped again from the raw value, with **bold** -> \textbf{}
+    if isinstance(data.get("summary"), str):
+        ctx["summary"] = latex_bold(data["summary"])
+    for sec in BULLET_SECTIONS:
+        for raw_e, e in zip(data.get(sec) or [], ctx.get(sec) or []):
+            if not (isinstance(raw_e, dict) and isinstance(e, dict)):
+                continue
+            for raw_b, b in zip(raw_e.get("bullets") or [], e.get("bullets") or []):
+                if isinstance(raw_b, dict) and isinstance(b, dict) and isinstance(raw_b.get("text"), str):
+                    b["text"] = latex_bold(raw_b["text"])
     # identity fields the template always references
     for k in ("name", "email", "phone", "location", "linkedin", "github", "website"):
         ctx["identity"].setdefault(k, "")
@@ -266,16 +336,14 @@ def render_txt(resume_json_path: str | Path) -> Path:
     """resume.json -> resume.txt (plain text, ATS order). Returns the .txt path."""
     src = Path(resume_json_path).resolve()
     d = load_resume(src)
-    bad = check_placeholders(d)
-    if bad:
-        raise ValueError(f"placeholder text in resume.json: {', '.join(bad)}")
+    _validate(d)
     idn = d["identity"]
     lines: list[str] = [idn.get("name", "")]
     lines.append(_line(idn.get("location", ""), idn.get("phone", ""), idn.get("email", "")))
     lines.append(_line(idn.get("linkedin") or "", idn.get("github") or "", idn.get("website") or ""))
     lines.append("")
     if d.get("summary"):
-        lines += ["SUMMARY", d["summary"], ""]
+        lines += ["SUMMARY", strip_bold(d["summary"]), ""]
     for sec in d["sections"]:
         t = sec.get("type")
         if t == "experience" and d["experience"]:
@@ -284,7 +352,7 @@ def render_txt(resume_json_path: str | Path) -> Path:
                 lines.append(_line(e.get("company", ""), f"{e.get('start', '')} - {e.get('end', '')}"))
                 sub = e.get("title", "") + (f", {e['team']}" if e.get("team") else "")
                 lines.append(_line(sub, e.get("location", "")))
-                lines += [f"- {b['text']}" for b in e.get("bullets", [])]
+                lines += [f"- {strip_bold(b['text'])}" for b in e.get("bullets", [])]
                 lines.append("")
         elif t == "projects" and d["projects"]:
             lines.append("PROJECTS")
@@ -294,7 +362,7 @@ def render_txt(resume_json_path: str | Path) -> Path:
                     lines.append(", ".join(p["stack"]))
                 if p.get("link"):
                     lines.append(p["link"])
-                lines += [f"- {b['text']}" for b in p.get("bullets", [])]
+                lines += [f"- {strip_bold(b['text'])}" for b in p.get("bullets", [])]
                 lines.append("")
         elif t == "education" and d["education"]:
             lines.append("EDUCATION")

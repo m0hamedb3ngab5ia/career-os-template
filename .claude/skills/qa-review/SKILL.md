@@ -117,6 +117,9 @@ Route the extended checks by the file named in the failure:
   `pdf_metadata`: `tailor-resume` (re-render `templates/resume/render.py`); when the fault is in the template itself
   (metadata, fonts, kerning splits on a fresh render) say so: `{"skill":"tailor-resume","suggestion":"template:
   templates/resume/<name>.tex <fix>"}`.
+- `bold_markup`: `tailor-resume` (copy bullet text with its `**` markers exactly; re-render so resume.txt is plain).
+  `no_markdown_bold` / `cover_letter_bold`: the writer of the named file (`write-cover-letter`, `answer-question`,
+  `draft-outreach`): "drop the `**` markers copied from bullet text".
 Missing artifacts that the tier requires (resume always; cover letter when tier rule says `always`) are
 a fail with suggestion `{"skill":"<writer>","suggestion":"artifact missing"}`.
 

@@ -16,6 +16,8 @@ What it checks:
 - Open `metric_questions` in profile/master.yaml (WARN "N metric questions open"), and questions naming a
   bullet id that does not exist (WARN). Optional bullet flags resume_default / weak / estimate must be booleans;
   an `estimate: true` bullet without a "~<number>" in its text (WARN: QA's estimate_marked cannot guard it).
+- `**bold**` markup (careeros.markup) in bullet text, variants and summary_variants: unbalanced, empty or nested
+  markers FAIL (the résumé render would fail); `**` in narratives WARNs (narratives feed prose, which stays plain).
 
 The prepare-job and apply-job skills run `careeros doctor --quiet` first and stop on a nonzero exit,
 so the fictional example candidate never reaches a real application.
@@ -30,6 +32,8 @@ from pathlib import Path
 from typing import Any, Callable, Iterator
 
 import yaml
+
+from careeros.markup import MARKER, strip_bold, validate_bold
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
 
@@ -327,9 +331,38 @@ def check_estimates(master: dict) -> list[Check]:
     """WARN for `estimate: true` bullets whose text has no "~<number>" (resume_writing_rules.md, OVERRIDE rule 3)."""
     bad = [str(b.get("id")) for sec in ("experience", "projects", "leadership") for e in master.get(sec) or []
            if isinstance(e, dict) for b in e.get("bullets") or []
-           if isinstance(b, dict) and b.get("estimate") is True and not re.search(r"~\s*\$?\d", str(b.get("text") or ""))]
+           if isinstance(b, dict) and b.get("estimate") is True and not re.search(r"~\s*\$?\d", strip_bold(b.get("text")))]
     return [Check(WARN, "estimates", f"profile/master.yaml: {i} has estimate: true but no ~number in its text; "
                                      "write the estimated number as ~N (e.g. ~40%)") for i in bad]
+
+
+def check_bold(master: dict) -> list[Check]:
+    """FAIL for invalid `**bold**` markup in bullet text / variants / summary_variants (render.py rejects it);
+    WARN for `**` in narratives (cover letters and answers draw on them and must stay plain prose)."""
+    fails: list[str] = []
+    for sec in ("experience", "projects", "leadership"):
+        for e in master.get(sec) or []:
+            for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
+                if not isinstance(b, dict):
+                    continue
+                fields = [("text", b.get("text"))]
+                variants = b.get("variants") or {}
+                if isinstance(variants, dict):
+                    fields += [(f"variants.{k}", v) for k, v in variants.items()]
+                elif isinstance(variants, list):
+                    fields += [(f"variants[{i}]", v) for i, v in enumerate(variants)]
+                fails += [f"{b.get('id')}.{f}: {err}" for f, v in fields if (err := validate_bold(v))]
+    sv = master.get("summary_variants")
+    for k, v in (sv.items() if isinstance(sv, dict) else []):
+        if (err := validate_bold(v)):
+            fails.append(f"summary_variants.{k}: {err}")
+    out = [Check(FAIL, "bold_markup", f"profile/master.yaml: {f}") for f in fails]
+    narr = [str(n.get("id")) for n in master.get("narratives") or []
+            if isinstance(n, dict) and MARKER in str(n.get("text") or "")]
+    if narr:
+        out.append(Check(WARN, "bold_markup", f"profile/master.yaml: narratives {', '.join(narr)} contain '**'; "
+                                              "narratives feed cover letters and answers, which stay plain: drop it"))
+    return out or [Check(PASS, "bold_markup", "**bold** markup in bullets and summaries is valid")]
 
 
 def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None) -> list[Check]:
@@ -386,7 +419,9 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         try:
             d = yaml.safe_load(p.read_text(encoding="utf-8"))
         except yaml.YAMLError as e:
-            checks.append(Check(FAIL, "yaml", f"{rel} does not parse: {' '.join(str(e).split())[:160]}"))
+            hint = (" (a value starting with ** must be quoted: text: \"**Python** ...\")"
+                    if "scanning an alias" in str(e) else "")
+            checks.append(Check(FAIL, "yaml", f"{rel} does not parse: {' '.join(str(e).split())[:160]}{hint}"))
             bad = True
             continue
         if not isinstance(d, dict):
@@ -415,6 +450,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)
+        checks += check_bold(master)
     checks += check_tools(which, env)
     checks.append(check_voice(root))
     return checks

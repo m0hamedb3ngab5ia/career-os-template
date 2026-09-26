@@ -9,7 +9,9 @@ Rules:
 - Every bullet `id` must exist in `profile/master.yaml`. Text may be a verbatim bullet or one of its
   `variants`; numbers are frozen.
 - No placeholder bullets (`placeholder: true` in master, or text containing `[FILL IN` / `[OPEN:`).
-- Text is plain: no LaTeX, no Markdown. `render.py` escapes `& % $ # _ { } ~ ^ \`.
+- Text is plain: no LaTeX, no Markdown, with one exception: bullet `text` and `summary` may carry
+  `**bold**` spans copied verbatim from `profile/master.yaml` (see "Bold markup" below). `render.py` escapes
+  `& % $ # _ { } ~ ^ \`.
 - Dates are display strings already formatted as `Mon YYYY` (QA soft rule `date_format`).
 - Section order is decided by `sections[].order`; QA expects `experience, projects, education, skills`
   (summary optional, always first when present).
@@ -102,6 +104,29 @@ Rules:
 | `meta.template` | no | Overrides the template name (default: `categories.yaml[category].resume_template`, else `default`). |
 | `meta.resume_version` | yes | Goes to the tracker `ResumeVersion` column. |
 | `meta.keyword_mirror` | no | Posting term to profile phrasing map; QA uses it to check `keyword_coverage_min`. |
+
+## Bold markup
+
+The candidate bolds tech names and metrics in `profile/master.yaml` bullet `text` / `variants` (and
+`summary_variants`) with `**...**`:
+
+```yaml
+text: Wrote **12 Airflow DAGs** in **Python** moving SQL reports into a warehouse, cutting manual prep by **5 hours per week**
+```
+
+- tailor-resume copies the text **with** its markers into `resume.json`; `render.py` writes `\textbf{12 Airflow
+  DAGs}` in `resume.tex` (the inner text is LaTeX-escaped; no `*` reaches LaTeX) and the plain sentence in
+  `resume.txt`, which is what ATS parsers and QA read.
+- YAML: a value that starts with `**` must be quoted (`text: "**Python** scripts ..."`); unquoted, YAML reads
+  the leading `*` as an alias and `master.yaml` stops parsing.
+- Rules (`src/careeros/markup.py: validate_bold`): markers in pairs, no empty span (`****`), no space just inside
+  a marker, no `***` / nesting. A single `*` is ordinary text. `**` in any other field (titles, skills, dates) is
+  an error. `render.py` exits 1 on any violation and writes nothing; `careeros doctor` FAILs on invalid markup in
+  master.yaml.
+- QA compares bullet text with the markers stripped (`strip_bold`), so bold never changes a verdict. Hard check
+  `bold_markup` re-validates resume.json and fails if resume.txt contains `**`.
+- Cover letters, answers and outreach never carry the markers: `no_markdown_bold` hard-fails `**` in answers and
+  outreach and a stray `**` in the letter; balanced bold in the letter body is the soft `cover_letter_bold`.
 
 ## Plain-text render order (`resume.txt`)
 

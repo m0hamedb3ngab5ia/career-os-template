@@ -14,6 +14,8 @@ description: Build a one-page tailored resume for a scored job dir from profile/
    or one of its listed `variants`; you may only trim a trailing clause (QA `bullet_fidelity` checks the
    output is a word-prefix of the text or a variant). Want a different leading verb? Add it to the
    bullet's `variants` in `profile/master.yaml` (an Action Item `profile_gap`), never improvise it.
+   Copy the text **with** any `**bold**` markers exactly as in the profile (render.py prints them bold and writes
+   resume.txt plain; QA compares the stripped text). Never add, move or drop a marker yourself.
 2. Bullets with `placeholder: true` or text starting `[FILL IN` are never used. If the category's
    `bullet_priority` points to an entry whose bullets are all placeholders, skip that entry and record
    it in `meta.profile_gaps`.
@@ -23,7 +25,7 @@ description: Build a one-page tailored resume for a scored job dir from profile/
    `profile.skills.<key>` or a `stack`; anything with a number or outcome needs a bullet id. Keyword
    mirroring is allowed only under those rules; record each pair in `meta.keyword_mirror`.
 5. Summary is one of `profile.summary_variants` verbatim (`general`, `backend`, `data`, `mobile`), or
-   null. Do not write a new summary.
+   null. Do not write a new summary. Markers are copied as in rule 1.
 
 ## 1. Read
 

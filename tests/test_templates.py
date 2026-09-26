@@ -355,3 +355,89 @@ def test_tex_legacy_skills_still_render(tmp_path: Path):
     p.write_text(json.dumps(data))
     tex = resume.render(p, pdf=False).read_text()
     assert r"\section{Skills}" in tex and r"\textbf{Programming:}" in tex
+
+
+# --- **bold** markup in bullet text / summary ---------------------------------------
+
+MARKED = "Audited **312** SQL controls in **R&D_ops** using **AWS Athena**, saving **$5K (50%)**"
+
+
+def test_latex_bold_escapes_inside_and_outside_the_markers():
+    out = resume.latex_bold(MARKED)
+    assert out == (r"Audited \textbf{312} SQL controls in \textbf{R\&D\_ops} using \textbf{AWS Athena}, "
+                   r"saving \textbf{\$5K (50\%)}")
+    assert "*" not in out
+    assert resume.latex_bold("plain 5*3") == "plain 5*3" and resume.latex_bold(None) == ""
+
+
+@pytest.mark.parametrize("text", ["Built **FastAPI service", "empty **** span", "***x***"])
+def test_latex_bold_rejects_invalid_markup(text):
+    with pytest.raises(ValueError, match=r"\*\*"):
+        resume.latex_bold(text)
+
+
+def _marked_resume(tmp_path: Path, text: str = MARKED, summary: str | None = None, **top) -> Path:
+    data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()),
+                             ["acme.1", "widgetizer.1"])
+    data["experience"][0]["bullets"][0]["text"] = text
+    data["summary"] = summary
+    data.update(top)
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(data))
+    return p
+
+
+def test_render_bolds_bullets_and_summary_txt_stays_plain(tmp_path: Path):
+    p = _marked_resume(tmp_path, summary="Engineer shipping **Python** services.")
+    tex = resume.render(p, pdf=False).read_text()
+    assert r"\item Audited \textbf{312} SQL controls in \textbf{R\&D\_ops}" in tex
+    assert r"Engineer shipping \textbf{Python} services." in tex
+    assert "**" not in tex
+    txt = resume.render_txt(p).read_text()
+    assert "- Audited 312 SQL controls in R&D_ops using AWS Athena, saving $5K (50%)" in txt
+    assert "Engineer shipping Python services." in txt and "*" not in txt
+
+
+@pytest.mark.parametrize("text", ["Built **FastAPI service", "a **** b"])
+def test_render_fails_clearly_on_bad_markup(tmp_path: Path, text: str, capsys):
+    p = _marked_resume(tmp_path, text=text)
+    assert resume.check_bold(resume.load_resume(p))[0].startswith("experience[0].bullets[0].text: ")
+    with pytest.raises(ValueError, match=r"bold markup"):
+        resume.render(p, pdf=False)
+    with pytest.raises(ValueError, match=r"bold markup"):
+        resume.render_txt(p)
+    assert resume.main([str(p), "--no-pdf"]) == 1
+    assert "experience[0].bullets[0].text" in capsys.readouterr().err
+    assert not (tmp_path / "resume.tex").exists() and not (tmp_path / "resume.txt").exists()
+
+
+def test_bold_markup_outside_bullets_and_summary_is_rejected(tmp_path: Path):
+    p = _marked_resume(tmp_path)
+    data = json.loads(p.read_text())
+    data["experience"][0]["title"] = "**Senior** Engineer"
+    data["skills"]["programming"][0] = "**Python**"
+    p.write_text(json.dumps(data))
+    errs = resume.check_bold(resume.load_resume(p))
+    assert any(e.startswith("experience[0].title: ") for e in errs)
+    assert any(e.startswith("skills.programming[0]: ") for e in errs)
+    with pytest.raises(ValueError, match="bold markup"):
+        resume.render(p, pdf=False)
+
+
+def test_placeholder_check_still_sees_marked_placeholders(tmp_path: Path):
+    p = _marked_resume(tmp_path, text="Built **[FILL IN tool]** for **[OPEN: team]**")
+    assert resume.check_placeholders(resume.load_resume(p)) == ["experience[0].bullets[0].text"]
+    with pytest.raises(ValueError, match="placeholder"):
+        resume.render(p, pdf=False)
+
+
+def test_example_profile_bullets_carry_bold_markers():
+    """The shipped example shows the style: tech names and metrics bolded in a few bullets (valid markup)."""
+    from careeros.markup import bold_spans
+
+    m = yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text())
+    texts = [b["text"] for sec in ("experience", "projects", "leadership") for e in m.get(sec) or []
+             for b in e.get("bullets") or []]
+    spans = [s for t in texts for s in bold_spans(t)]
+    assert len(spans) >= 6
+    assert any(any(c.isdigit() for c in s) for s in spans) and "Python" in spans

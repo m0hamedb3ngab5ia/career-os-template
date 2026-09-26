@@ -23,6 +23,8 @@
   "nearly 40") of an exact bullet number. Repeating the bullet's own hedge class ("about 2" for "~2", "more than 40%" for "over 40%") is
   not reported; flipping a bound ("up to 40%" -> "over 40%") is.
 
+Bullet text (resume.json, profile) is compared with its `**bold**` markers stripped (careeros.markup.strip_bold).
+
 Config (`config/qa.yaml: consistency`, all optional): enabled (true), min_overlap (3), year_window (40),
 role_nouns, seniority_words (lists; defaults below). Findings go to `ck.extras["consistency"]`:
 {docs, config, letter_off_resume, title_mismatches, title_uncertain, number_mismatches, number_paraphrases}.
@@ -32,6 +34,7 @@ from __future__ import annotations
 import re
 from typing import Any
 
+from careeros.markup import strip_bold
 from careeros.qa import cited_ids_cover_letter
 from careeros.qa_ext import outreach_data, outreach_items, outreach_texts
 
@@ -492,7 +495,7 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
     for _, e in _resume_entries(rj):
         for b in e.get("bullets") or []:
             if isinstance(b, dict) and b.get("id") and b.get("text"):
-                refs[str(b["id"])] = (str(b["text"]), "resume.json")
+                refs[str(b["id"])] = (strip_bold(b["text"]), "resume.json")
     all_docs = list(docs)
     if ck.resume_txt is not None:
         all_docs.insert(0, ("resume.txt", ck.resume_txt, set(refs)))
@@ -508,7 +511,7 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
             if bid in refs:
                 cands[bid] = refs[bid]
             elif bid in ck.profile.bullets:
-                cands[bid] = (str(ck.profile.bullets[bid].get("text") or ""), "profile")
+                cands[bid] = (strip_bold(ck.profile.bullets[bid].get("text") or ""), "profile")
         if not cands:
             continue
         words = {bid: _content(t) for bid, (t, _) in cands.items()}
