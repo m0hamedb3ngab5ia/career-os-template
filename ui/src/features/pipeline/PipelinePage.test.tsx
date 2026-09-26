@@ -153,7 +153,7 @@ describe("Pipeline", () => {
     expect(add).toHaveAttribute("aria-disabled", "true");
     expect(add).toHaveAccessibleDescription("Adding jobs by hand isn't supported yet — run scout");
     await user.click(add);
-    expect(await screen.findByRole("status")).toHaveTextContent("Adding jobs by hand isn't supported yet — run scout");
+    expect(screen.queryByRole("dialog")).toBeNull();
     const view = screen.getByRole("navigation", { name: "View" });
     expect(within(view).getByRole("link", { name: "Table" })).toHaveAttribute("href", "/jobs");
     expect(within(view).getByRole("link", { name: "Board" })).toHaveAttribute("aria-current", "page");

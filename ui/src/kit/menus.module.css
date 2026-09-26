@@ -1,4 +1,4 @@
-/* Listbox, Menu (popup lists under a small button) and Sheet (modal edit panel). Mockup: 28px trigger, 7px
+/* Listbox and Menu (popup lists under a small button) and form fields. Mockup: 28px trigger, 7px
    radius, 12px text; popups use the popover shadow. */
 .anchor {
   position: relative;
@@ -83,60 +83,6 @@
   color: var(--accent);
 }
 
-.backdrop {
-  position: fixed;
-  inset: 0;
-  z-index: 40;
-  display: flex;
-  align-items: flex-start;
-  justify-content: center;
-  padding: 12vh 16px 16px;
-  background: rgba(0, 0, 0, 0.28);
-}
-.sheet {
-  width: min(440px, 100%);
-  max-height: 76vh;
-  overflow-y: auto;
-  padding: var(--space-5);
-  border-radius: var(--r-card);
-  background: var(--card);
-  color: var(--label);
-  box-shadow: var(--shadow-popover);
-  overscroll-behavior: contain;
-  animation: sheetIn 0.18s ease-out;
-}
-.sheetTitle {
-  margin: 0;
-  font-size: var(--fs-h2);
-  font-weight: 600;
-}
-.sheetDesc {
-  margin: 4px 0 0;
-  color: var(--sec);
-}
-.sheetBody {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-3);
-  margin-top: var(--space-4);
-}
-.sheetFooter {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
-}
-@keyframes sheetIn {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-@media (prefers-reduced-motion: reduce) {
-  .sheet {
-    animation: none;
-  }
-}
 @media (pointer: coarse) {
   .trigger,
   .option {

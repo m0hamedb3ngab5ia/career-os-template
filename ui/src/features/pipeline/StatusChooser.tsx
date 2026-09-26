@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { Button } from "../../kit/Button";
 import { STATUSES, describeCode } from "../../kit/labels";
 import { Sheet } from "../../kit/Sheet";
@@ -15,28 +15,40 @@ interface StatusChooserProps {
 /** A column holds several statuses (Queued = queued + prepared): ask which one before moving. */
 export function StatusChooser({ company, target, statuses, onChoose, onClose }: StatusChooserProps) {
   const [value, setValue] = useState(statuses[0] ?? "");
+  const formId = useId();
   function submit(e: FormEvent) {
     e.preventDefault();
     if (value) onChoose(value);
   }
   return (
-    <Sheet title={`Move ${company} to ${target}`} description="This column holds more than one status. Which one?" onClose={onClose}>
-      <form onSubmit={submit}>
+    <Sheet
+      open
+      title={`Move ${company} to ${target}`}
+      closeLabel="Cancel"
+      onClose={onClose}
+      footer={
+        <Button type="submit" form={formId} variant="primary">
+          Move
+        </Button>
+      }
+    >
+      <form id={formId} onSubmit={submit}>
         <fieldset className={styles.choices}>
-          <legend className={styles.srOnlyLegend}>Status</legend>
+          <legend className={styles.legend}>This column holds more than one status. Which one?</legend>
           {statuses.map((s) => (
             <label key={s} className={styles.choice}>
-              <input type="radio" name="status" value={s} checked={value === s} onChange={() => setValue(s)} />
+              <input
+                type="radio"
+                name="status"
+                value={s}
+                checked={value === s}
+                onChange={() => setValue(s)}
+                data-autofocus={value === s || undefined}
+              />
               {describeCode(STATUSES, s).label}
             </label>
           ))}
         </fieldset>
-        <div className={styles.sheetButtons}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary">
-            Move
-          </Button>
-        </div>
       </form>
     </Sheet>
   );

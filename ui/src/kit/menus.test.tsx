@@ -3,10 +3,8 @@ import userEvent from "@testing-library/user-event";
 import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../test/axe";
-import { TextField } from "./FormField";
 import { Listbox } from "./Listbox";
 import { Menu } from "./Menu";
-import { Sheet } from "./Sheet";
 
 const OPTS = [
   { value: "due", label: "Due date" },
@@ -112,40 +110,4 @@ describe("Menu", () => {
     expect(screen.queryByRole("menu")).toBeNull();
     expect(screen.getByRole("button", { name: "Move to…" })).toHaveFocus();
   });
-});
-
-describe("Sheet", () => {
-  function Harness() {
-    const [open, setOpen] = useState(false);
-    return (
-      <>
-        <button type="button" onClick={() => setOpen(true)}>
-          Add date
-        </button>
-        {open ? (
-          <Sheet title="Add a date" description="When is it due?" onClose={() => setOpen(false)}
-            footer={<button type="button" onClick={() => setOpen(false)}>Save</button>}>
-            <TextField label="Due" type="date" defaultValue="" />
-          </Sheet>
-        ) : null}
-      </>
-    );
-  }
-
-  it("focuses the first field, traps Tab, closes on Escape and returns focus", async () => {
-    const user = userEvent.setup();
-    const { container } = render(<Harness />);
-    await user.click(screen.getByRole("button", { name: "Add date" }));
-    const dialog = screen.getByRole("dialog", { name: "Add a date" });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(screen.getByLabelText("Due")).toHaveFocus();
-    expect(await axeViolations(container)).toEqual([]);
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Save" })).toHaveFocus();
-    await user.tab();
-    expect(screen.getByLabelText("Due")).toHaveFocus();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).toBeNull();
-    expect(screen.getByRole("button", { name: "Add date" })).toHaveFocus();
-  }, 20_000);
 });

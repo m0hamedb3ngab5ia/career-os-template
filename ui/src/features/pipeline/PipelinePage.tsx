@@ -4,12 +4,12 @@ import { Link, useSearchParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
 import { Page } from "../../app/PageHeader";
-import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { SAFETY, STATUSES, describeCode, humanize } from "../../kit/labels";
 import { Listbox } from "../../kit/Listbox";
 import type { MenuItem } from "../../kit/Menu";
 import { useToast } from "../../kit/Toast";
+import { UnavailableButton } from "../../kit/UnavailableButton";
 import { formatCount } from "../../lib/format";
 import { useBoard, useSetStatus } from "./api";
 import { BoardColumn } from "./BoardColumn";
@@ -154,18 +154,9 @@ export function PipelinePage() {
               Table
             </Link>
           </nav>
-          <Button
-            aria-disabled="true"
-            title={ADD_JOB_REASON}
-            aria-describedby="add-job-reason"
-            icon={<Plus size={14} strokeWidth={1.7} aria-hidden="true" />}
-            onClick={() => toast.show({ message: ADD_JOB_REASON })}
-          >
+          <UnavailableButton reason={ADD_JOB_REASON} icon={<Plus size={14} strokeWidth={1.7} aria-hidden="true" />}>
             Add job
-          </Button>
-          <span id="add-job-reason" className="sr-only">
-            {ADD_JOB_REASON}
-          </span>
+          </UnavailableButton>
         </>
       }
     >

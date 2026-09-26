@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
 import { Button } from "../../kit/Button";
@@ -17,6 +17,7 @@ export function AddItemSheet({ onClose }: { onClose: () => void }) {
   const meta = useMeta().data ?? FALLBACK;
   const add = useAddItem();
   const toast = useToast();
+  const formId = useId();
   const [f, setF] = useState({
     what: "", type: "other", needs: "anytime", priority: "M", company: "", role: "", link: "", date: "", time: "", reason: "",
   });
@@ -41,9 +42,20 @@ export function AddItemSheet({ onClose }: { onClose: () => void }) {
 
   const opts = (codes: string[], table: typeof ACTION_TYPES) => codes.map((c) => ({ value: c, label: describeCode(table, c).label }));
   return (
-    <Sheet title="Add item" description="Something only you can do. It shows here and on Today." onClose={onClose}>
-      <form onSubmit={submit} className={styles.form}>
-        <TextField label="What to do" name="what" required autoComplete="off" value={f.what} onChange={set("what")} />
+    <Sheet
+      open
+      title="Add item"
+      closeLabel="Cancel"
+      onClose={onClose}
+      footer={
+        <Button type="submit" form={formId} variant="primary" pending={add.isPending} pendingLabel="Adding…">
+          Add item
+        </Button>
+      }
+    >
+      <form id={formId} onSubmit={submit} className={styles.form}>
+        <p className={styles.sheetNote}>Something only you can do. It shows here and on Today.</p>
+        <TextField data-autofocus label="What to do" name="what" required autoComplete="off" value={f.what} onChange={set("what")} />
         <div className={styles.row2}>
           <TextField label="Company (optional)" name="company" autoComplete="off" value={f.company} onChange={set("company")} />
           <TextField label="Role (optional)" name="role" autoComplete="off" value={f.role} onChange={set("role")} />
@@ -76,12 +88,6 @@ export function AddItemSheet({ onClose }: { onClose: () => void }) {
             {add.error instanceof ApiError ? add.error.message : "Couldn't add the item."}
           </p>
         ) : null}
-        <div className={styles.formButtons}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" pending={add.isPending} pendingLabel="Adding…" >
-            Add item
-          </Button>
-        </div>
       </form>
     </Sheet>
   );

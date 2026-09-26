@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useId, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { TextField } from "../../kit/FormField";
@@ -17,6 +17,7 @@ export function DueSheet({ item, onClose }: { item: ActionItem; onClose: () => v
   const setDue = useSetDue();
   const toast = useToast();
   const name = item.company || item.what;
+  const formId = useId();
 
   function submit(e: FormEvent) {
     e.preventDefault();
@@ -35,13 +36,20 @@ export function DueSheet({ item, onClose }: { item: ActionItem; onClose: () => v
 
   return (
     <Sheet
+      open
       title="Add date"
-      description={`When is ${name} due? Only add a date the posting, email or form actually gives.`}
+      closeLabel="Cancel"
       onClose={onClose}
+      footer={
+        <Button type="submit" form={formId} variant="primary" pending={setDue.isPending} pendingLabel="Saving…">
+          Save date
+        </Button>
+      }
     >
-      <form onSubmit={submit} className={styles.form}>
+      <form id={formId} onSubmit={submit} className={styles.form}>
+        <p className={styles.sheetNote}>When is {name} due? Only add a date the posting, email or form actually gives.</p>
         <div className={styles.row2}>
-          <TextField label="Date" type="date" name="due-date" autoComplete="off" required value={date} onChange={(e) => setDate(e.target.value)} />
+          <TextField data-autofocus label="Date" type="date" name="due-date" autoComplete="off" required value={date} onChange={(e) => setDate(e.target.value)} />
           <TextField label="Time (optional)" type="time" name="due-time" autoComplete="off" value={time} onChange={(e) => setTime(e.target.value)} />
         </div>
         <TextField
@@ -57,12 +65,6 @@ export function DueSheet({ item, onClose }: { item: ActionItem; onClose: () => v
             {setDue.error instanceof ApiError ? setDue.error.message : "Couldn't save the date."}
           </p>
         ) : null}
-        <div className={styles.formButtons}>
-          <Button onClick={onClose}>Cancel</Button>
-          <Button type="submit" variant="primary" pending={setDue.isPending} pendingLabel="Saving…" >
-            Save date
-          </Button>
-        </div>
       </form>
     </Sheet>
   );

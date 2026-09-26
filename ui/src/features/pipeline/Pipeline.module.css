@@ -194,13 +194,10 @@
   min-height: 32px;
   cursor: pointer;
 }
-.srOnlyLegend {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip: rect(0 0 0 0);
-  white-space: nowrap;
+.legend {
+  padding: 0;
+  margin-bottom: var(--space-2);
+  color: var(--sec);
 }
 @media (max-width: 1100px) {
   .board {
@@ -215,12 +212,6 @@
   .choice {
     min-height: var(--touch);
   }
-}
-.sheetButtons {
-  display: flex;
-  justify-content: flex-end;
-  gap: var(--space-2);
-  margin-top: var(--space-5);
 }
 .hintDue {
   white-space: nowrap;
