@@ -11,7 +11,7 @@ One local app that replaces opening the xlsx, reading `data/jobs/<id>/*.json` by
    QA, tier A review, "needs you") and the post-apply work (inbox classification, follow-ups, contacts).
 2. **Act on what needs you.** Action Items as a to-do list; every item's `Link` is a real link.
 3. **Run and watch the pipeline.** Scout, prepare, apply, inbox sync, with live progress.
-4. **Change settings without editing YAML**, and ask Claude for anything a form can't express.
+4. **Change settings without editing YAML.** Every option is a form control; the app works on its own.
 5. **Phone companion** for the things that don't need a laptop: approve drafts, mark items done, interview alerts.
 
 Minimal, Apple Human Interface Guidelines look and behaviour (see [HIG notes](#hig-notes)).
@@ -50,7 +50,8 @@ No polling; works whether the change came from the UI, a terminal, a scheduled r
 
 ## Settings model
 
-**Hybrid: structured keys are forms; everything else is "Ask Claude".**
+**Forms only.** Every setting is a switch, field or list that writes YAML directly. There is no "Ask Claude" box:
+the UI has to stand on its own as an application, without a Claude Code session behind it.
 
 - **Forms** for keys with a known shape, written back with `ruamel.yaml` round-trip mode so comments, key order and
   the example file's guidance survive. After each save the file is re-loaded with `Settings.load` (same
@@ -61,10 +62,7 @@ No polling; works whether the change came from the UI, a terminal, a scheduled r
   - `companies.yaml`: dream_list, blocklist, company_domains, boards.
   - `pipeline.yaml`: paths, schedule, notify, outreach (`manual_if_connected`, `manual_if_mutuals`).
   - `qa.yaml`: critic pass threshold, max regenerations, banned phrases.
-- **Ask Claude** for everything unstructured or behavioural: profile bullets, voice, templates, "stop applying to
-  X-type roles", "make follow-ups shorter", or a code change. The box runs
-  `claude -p "<instruction>" --output-format json` (the `pipeline.yaml: llm.headless_cmd`) in the repo, shows the
-  resulting diff, and applies it only when the candidate confirms. Code changes open a branch, not a direct edit.
+- Profile, voice and templates are edited outside the UI for now (they are free text, not settings).
 - Locked rows show policy that the system enforces and a form can't turn off: LinkedIn is draft-only; thank-you
   notes after interviews are always written by hand.
 
@@ -95,7 +93,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
 8. **Runs**: live and past runs of scout (per-source and per-filter counts), prepare-job (score → tailor → cover
    letter → QA), apply-job (step stream + latest screenshot), inbox-sync; run buttons with options; log pane; cancel.
 9. **Settings**: grouped lists: General, Targets, Autonomy, Safety, Scout, Companies, Outreach, Notifications,
-   Schedule, Ask Claude (see [Settings model](#settings-model)).
+   Schedule (see [Settings model](#settings-model)).
 10. **Phone: Today**: stat strip, phone/anytime Action Items, swipe to mark done, interview push banner.
 11. **Phone: Approve draft**: cover letter or outreach draft with Approve / Edit / Reject.
 
