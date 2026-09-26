@@ -108,6 +108,20 @@ retention:                                 # reusable default: fine to keep. `ca
                                            # 0 turns a rule off. Never touched: active jobs, submitted/ copies,
                                            # seen.json, posting_history.json, the scam registries.
 
+storage:                                   # reusable default: fine to keep. `careeros storage`, `careeros advise`
+  budget_mb: 1024                          # 1024 (Recommended): how much data/ may grow before advise warns
+  warn_at_pct: 80                          # 80 (Recommended): warn when now or 90 days out passes this % of the budget
+  disk_free_warn_pct: 10                   # 10 (Recommended): warn when the disk has less free space than this
+
+advisor:                                   # suggest-only: `careeros advise` never changes config;
+                                           # `careeros advise apply <id>` changes one key, only when you run it
+  advise_after_days: 14                    # 14 (Recommended): storage advice once snapshots span this many days
+  prune_idle_weeks: 4                      # 4 (Recommended): prune removed nothing this long -> suggest keeping more
+  min_runs: 5                              # 5 (Recommended): run advice once a kind has this many runs...
+  window_days: 30                          # ...in the last 30 days (Recommended)
+  usage_limit_stops: 2                     # 2 (Recommended): this many usage-limit stops -> suggest a smaller preset
+  failure_rate_warn: 0.3                   # 0.3 (Recommended): warn when more than 30% of jobs fail
+
 notify:
   on_interview: push                       # push | none  (PushNotification tool from inbox-sync)
   on_offer: push

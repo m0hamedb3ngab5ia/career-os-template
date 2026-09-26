@@ -86,9 +86,16 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
     def prune(trigger: str) -> tuple[str, str]:
         from careeros import retention
 
+        from careeros.runs.storage import snapshot_after_prune
+
         items = retention.plan(settings)
         freed = retention.execute(settings, items)
-        return "ok", f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
+        detail = f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
+        try:
+            snapshot_after_prune(settings, freed)
+        except OSError as e:  # the prune worked; a missing snapshot only delays `careeros advise`
+            detail += f"; snapshot skipped ({e})"
+        return "ok", detail
 
     def inbox_sync(trigger: str) -> tuple[str, str]:
         from careeros.runs.service import run_skill

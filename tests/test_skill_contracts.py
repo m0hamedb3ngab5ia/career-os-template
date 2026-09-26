@@ -29,23 +29,25 @@ def _ids(paths):
     return [str(p.relative_to(ROOT)) for p in paths]
 
 
-def _subparsers(p: argparse.ArgumentParser) -> dict[str, argparse.ArgumentParser]:
+def _subparsers(p: argparse.ArgumentParser) -> tuple[dict[str, argparse.ArgumentParser], bool]:
+    """(subcommands, required). `careeros advise` has an optional `apply`: bare `advise` is a command too."""
     for a in p._actions:
         if isinstance(a, argparse._SubParsersAction):
-            return dict(a.choices)
-    return {}
+            return dict(a.choices), bool(a.required)
+    return {}, False
 
 
 def _check_cli(words: list[str]) -> str | None:
     parser = build_parser()
     for i, w in enumerate(words):
-        subs = _subparsers(parser)
-        if not subs:
+        subs, required = _subparsers(parser)
+        if not subs or (not required and w not in subs):
             return None  # reached a leaf command; the rest are positional args
         if w not in subs:
             return f"`careeros {' '.join(words[:i + 1])}`: unknown subcommand {w!r} (have {sorted(subs)})"
         parser = subs[w]
-    return None if not _subparsers(parser) else f"`careeros {' '.join(words)}` needs a subcommand"
+    subs, required = _subparsers(parser)
+    return None if not subs or not required else f"`careeros {' '.join(words)}` needs a subcommand"
 
 
 def test_skills_found():
@@ -427,3 +429,8 @@ def test_apply_job_daily_cap_is_the_cli_check():
     text = _skill("apply-job")
     assert "careeros run cap --check" in text
     assert "tracker applied-count --days 1" not in text
+
+
+def test_checker_allows_optional_subcommands():
+    assert _check_cli(["advise"]) is None and _check_cli(["advise", "apply"]) is None
+    assert _check_cli(["run"]) == "`careeros run` needs a subcommand"

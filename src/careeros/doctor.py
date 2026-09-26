@@ -414,6 +414,12 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
         on = [k for k, j in sched.jobs.items() if j.enabled]
         out.append(Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} "
                                            "(install: careeros schedule install)"))
+    from careeros.runs.advisor import load_advisor_config
+
+    try:
+        load_advisor_config(pipeline)
+    except ConfigError as e:
+        out.append(Check(FAIL, "advisor", str(e)))
     return out
 
 

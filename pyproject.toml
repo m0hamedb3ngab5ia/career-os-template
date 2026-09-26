@@ -7,7 +7,7 @@ name = "careeros"
 version = "0.1.0"
 description = "Job-search automation core"
 requires-python = ">=3.11"
-dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl"]
+dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl", "ruamel.yaml>=0.18"]
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]

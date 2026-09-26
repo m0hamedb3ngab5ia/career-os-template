@@ -643,10 +643,14 @@ def cmd_prune(args: argparse.Namespace) -> int:
     summary = retention.summarize(items)
     if args.json:
         freed = 0 if dry else retention.execute(s, items)
+        if not dry:
+            _snapshot_after_prune(s, freed)
         print(json.dumps({"dry_run": dry, "items": [i.to_dict() for i in items], "summary": summary,
                           "freed_bytes": freed}, indent=2))
         return 0
     if not items:
+        if not dry:
+            _snapshot_after_prune(s, 0)
         print("prune: nothing to remove")
         return 0
     for i in items:
@@ -663,8 +667,18 @@ def cmd_prune(args: argparse.Namespace) -> int:
         print(f"\ndry run: would free {total}. Re-run with --yes to apply.")
         return 0
     freed = retention.execute(s, items)
+    _snapshot_after_prune(s, freed)
     print(f"\npruned {total}; freed {retention.human_bytes(freed)}")
     return 0
+
+
+def _snapshot_after_prune(s: Settings, freed: int) -> None:
+    from careeros.runs.storage import snapshot_after_prune
+
+    try:
+        snapshot_after_prune(s, freed)
+    except OSError as e:  # a snapshot must never make a prune fail
+        print(f"prune: storage snapshot skipped ({e})", file=sys.stderr)
 
 
 def _contacts_path(args: argparse.Namespace) -> tuple[Settings, Path | None]:
@@ -1106,6 +1120,108 @@ def cmd_schedule_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_storage(args: argparse.Namespace) -> int:
+    """Disk use by category (postings, résumés/PDFs, screenshots, run logs, tracker, other) and free disk."""
+    from careeros.retention import human_bytes
+    from careeros.runs.storage import CATEGORIES, append_snapshot, measure
+    from careeros.runs.store import RunStore
+
+    s = _settings(args)
+    m = measure(s)
+    if args.snapshot:
+        append_snapshot(RunStore(s), m, trigger="manual")
+    if args.json:
+        print(json.dumps(m, indent=2))
+        return 0
+    for c in CATEGORIES:
+        share = m["bytes"][c] / m["total"] * 100 if m["total"] else 0
+        print(f"  {c:<13} {human_bytes(m['bytes'][c]):>10}  {share:5.1f}%")
+    d = m["disk"]
+    print(f"  {'total':<13} {human_bytes(m['total']):>10}\ndisk free: {human_bytes(d['free'])} of "
+          f"{human_bytes(d['total'])} ({d['free_pct']}%)" + ("\nsnapshot saved" if args.snapshot else ""))
+    return 0
+
+
+def cmd_advise(args: argparse.Namespace) -> int:
+    """Suggestions from storage history and run history. Never changes anything (see `advise apply`)."""
+    from datetime import timezone
+
+    from careeros.retention import human_bytes
+    from careeros.runs.advisor import advise
+
+    out = advise(_settings(args), datetime.now(timezone.utc))
+    if args.json:
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+    st, rn = out["storage"], out["runs"]
+    if st["ready"]:
+        p = st["projection"]
+        print(f"storage: {human_bytes(st['current'])} now, {human_bytes(p['30d'])} in 30 days, "
+              f"{human_bytes(p['90d'])} in 90 days (budget {human_bytes(st['budget'])})")
+    else:
+        print(f"storage: collecting data ({st['days']} of {st['need_days']} days of snapshots)")
+    if not rn["ready"]:
+        print(f"runs: collecting data (advice after {rn['min_runs']} runs of a kind)")
+    for kind, m in rn["metrics"].items():
+        print(f"{kind}: {m['runs']} runs, {m['attempts']} jobs, avg {m['avg_job_s']:.0f}s/job, "
+              f"failures {m['failure_rate']:.0%}, budget used {m['budget_used']:.0%}")
+    if not out["recommendations"]:
+        print("no recommendations")
+    for r in out["recommendations"]:
+        c = r["change"]
+        how = (f"  -> `careeros advise apply {r['id']}`: {c['path']}: {c['from']} -> {c['to']}" if c
+               else "  (advice only)")
+        print(f"[{r['severity']}] {r['id']}: {r['title']}. {r['why']}\n{how}")
+    return 0
+
+
+def _validate_root(root: Path) -> None:
+    """Every config check the CLI would run; ConfigError rolls `advise apply` back."""
+    from careeros import retention
+    from careeros.runs.advisor import load_advisor_config
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.schedule import load_schedule
+
+    s = Settings.load(root)
+    load_runs_config(s)
+    load_schedule(s)
+    retention.retention_config(s)
+    load_advisor_config(s.pipeline)
+
+
+def cmd_advise_apply(args: argparse.Namespace) -> int:
+    """Apply ONE recommendation's YAML change to config/pipeline.yaml (comments kept, validated, rolled back on error)."""
+    from datetime import timezone
+
+    from careeros.runs import yamledit
+    from careeros.runs.advisor import advise
+
+    s = _settings(args)
+    recs = {r["id"]: r for r in advise(s, datetime.now(timezone.utc))["recommendations"]}
+    rec = recs.get(args.id)
+    if rec is None:
+        print(f"advise apply: no current recommendation {args.id!r}" +
+              (f"; current: {', '.join(recs)}" if recs else "; run `careeros advise`"), file=sys.stderr)
+        return 1
+    c = rec["change"]
+    if not c:
+        print(f"advise apply: {args.id} is advice only; nothing to change", file=sys.stderr)
+        return 1
+    path = s.root / c["file"]
+    try:
+        from careeros.runs.advisor import effective_value
+
+        yamledit.apply_change(path, c["path"], c["to"], expect_from=c["from"],
+                              validate=lambda p: _validate_root(s.root),
+                              current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
+                                                                   c["path"]))
+    except (ConfigError, ValueError) as e:
+        print(f"advise apply: {e}; {c['file']} left unchanged", file=sys.stderr)
+        return 1
+    print(f"{c['file']}: {c['path']}: {c['from']} -> {c['to']}")
+    return 0
+
+
 def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--preset", choices=("small", "medium", "large", "max", "custom"),
                    help="budget preset from pipeline.yaml runs.presets (default: runs.preset)")
@@ -1339,6 +1455,17 @@ def build_parser() -> argparse.ArgumentParser:
     rst.add_argument("--json", action="store_true")
     rst.set_defaults(fn=cmd_run_status)
 
+    sto = sub.add_parser("storage", help="disk use by category + free disk; --snapshot records it for `advise`")
+    sto.add_argument("--snapshot", action="store_true", help="append this measurement to data/runs/storage.jsonl")
+    sto.add_argument("--json", action="store_true")
+    sto.set_defaults(fn=cmd_storage)
+    adv = sub.add_parser("advise", help="suggestions from storage + run history (never changes anything)")
+    adv.add_argument("--json", action="store_true")
+    adv.set_defaults(fn=cmd_advise)
+    advs = adv.add_subparsers(dest="advise_cmd")
+    ada = advs.add_parser("apply", help="apply one recommendation's change to config/pipeline.yaml (comments kept)")
+    ada.add_argument("id")
+    ada.set_defaults(fn=cmd_advise_apply)
     tk = sub.add_parser("tick", help="one scheduler tick: run what schedule.jobs says is due (launchd calls it)")
     tk.add_argument("--dry-run", action="store_true", help="show the decisions; run nothing")
     tk.add_argument("--json", action="store_true")
