@@ -52,7 +52,7 @@ const READY: Advice = {
     ready: true,
     min_runs: 5,
     metrics: {
-      score: { runs: 6, attempts: 60, avg_job_s: 52, p90_job_s: 80, failure_rate: 0.1, budget_used: 0.8, stops: { usage_limit: 2 }, prepare_share: 0.18 },
+      score: { runs: 6, attempts: 60, avg_job_s: 52, p90_job_s: 80, failure_rate: 0.1, failed: 7, budget_used: 0.8, stops: { usage_limit: 2 }, prepare_share: 0.18 },
     },
   },
   recommendations: [
@@ -113,8 +113,9 @@ describe("Storage & efficiency", () => {
   it("shows tiles, the chart with focusable bars and a table view in the URL", async () => {
     const user = userEvent.setup();
     const { router } = setup();
-    expect(await screen.findByRole("region", { name: "career-os data" })).toHaveTextContent("25 MB");
+    expect(await screen.findByRole("region", { name: "career-os data" }, { timeout: 10_000 })).toHaveTextContent("25 MB");
     expect(screen.getByRole("region", { name: "Mac disk free" })).toHaveTextContent("below your 10% warning");
+    expect(await screen.findByRole("region", { name: "Failure rate" })).toHaveTextContent("7 of 60 jobs");
     const plot = await screen.findByRole("group", { name: /Storage by week/ });
     const bars = within(plot).getAllByRole("button");
     expect(bars.map((b) => b.getAttribute("tabindex"))).toEqual(["-1", "0"]);

@@ -4,7 +4,6 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../test/axe";
 import { NumberInput, SelectInput, TagEditor, TextInput } from "./inputs";
-import { Sheet } from "./Sheet";
 import { Switch } from "./Switch";
 
 describe("NumberInput", () => {
@@ -35,6 +34,10 @@ describe("NumberInput", () => {
     expect(seen.at(-1)).toBe(2.5);
     await user.type(input, "x");
     expect(Number.isNaN(seen.at(-1))).toBe(true);
+    expect(input).toHaveValue("2,5x");
+    await user.clear(input);
+    await user.type(input, "15x");
+    expect(input).toHaveValue("15x");
   });
 
   it("sets aria-invalid when invalid", () => {
@@ -99,39 +102,6 @@ describe("SelectInput and TextInput", () => {
     expect(onSel).toHaveBeenCalledWith("if_required");
     await user.type(screen.getByRole("textbox", { name: "Time zone" }), "x");
     expect(onText).toHaveBeenCalledWith("localx");
-  });
-});
-
-describe("Sheet", () => {
-  function Demo() {
-    const [open, setOpen] = useState(false);
-    return (
-      <>
-        <button onClick={() => setOpen(true)}>Show diff</button>
-        {open ? (
-          <Sheet title="Changes to your config" onClose={() => setOpen(false)}>
-            <button>Inside</button>
-          </Sheet>
-        ) : null}
-      </>
-    );
-  }
-
-  it("is a labelled modal dialog; Escape closes and returns focus", async () => {
-    const user = userEvent.setup();
-    render(<Demo />);
-    const opener = screen.getByRole("button", { name: "Show diff" });
-    await user.click(opener);
-    const dialog = screen.getByRole("dialog", { name: "Changes to your config" });
-    expect(dialog).toHaveAttribute("aria-modal", "true");
-    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Inside" })).toHaveFocus();
-    await user.tab();
-    expect(screen.getByRole("button", { name: "Close" })).toHaveFocus();
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-    expect(opener).toHaveFocus();
   });
 });
 

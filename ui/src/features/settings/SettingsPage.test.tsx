@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { axeViolations } from "../../test/axe";
-import { type Call, autonomyData, mockApi, renderSettings, route, runsData, safetyData, sectionRoutes } from "./testing";
+import { type Call, SECTIONS, autonomyData, mockApi, renderSettings, route, runsData, safetyData, sectionRoutes } from "./testing";
 
 afterEach(() => vi.unstubAllGlobals());
 
@@ -200,6 +200,57 @@ describe("generic form", () => {
     await act(() => router.navigate("/runs"));
     await user.click(await screen.findByRole("button", { name: "Leave" }));
     expect(await screen.findByText("Runs page")).toBeInTheDocument();
+  });
+
+  it("keeps the version the drafts started from, so a save after a refetch still reports the conflict", async () => {
+    const user = userEvent.setup();
+    let version = "v1";
+    const calls = mockApi(
+      route("GET", "/api/settings", { sections: SECTIONS }),
+      route("GET", "/api/settings/autonomy", () => ({ ...autonomyData(), version })),
+      route("PUT", "/api/settings/autonomy", { detail: "The settings files changed since this page was opened; reload to see them." }, 409),
+    );
+    const { qc } = renderSettings("/settings/autonomy");
+    const perDay = await screen.findByRole("textbox", { name: "Applications per day" });
+    await user.clear(perDay);
+    await user.type(perDay, "20");
+    version = "v2";
+    await act(() => qc.invalidateQueries({ queryKey: ["settings"] }));
+    await waitFor(() => expect(calls.filter((c) => c.url === "/api/settings/autonomy").length).toBe(2));
+    expect(perDay).toHaveValue("20");
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    const put = await waitFor(() => calls.find((c) => c.method === "PUT")!);
+    expect((put.body as { version: string }).version).toBe("v1");
+    expect(await screen.findByRole("alert")).toHaveTextContent(/changed since this page was opened/);
+    // discard starts over from the fresh version
+    await user.click(screen.getByRole("button", { name: "Discard changes" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Discard" }));
+    await user.click(screen.getByRole("switch", { name: "Tailor by hand when you're already connected" }));
+    await user.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "PUT").length).toBe(2));
+    expect((calls.filter((c) => c.method === "PUT")[1]!.body as { version: string }).version).toBe("v2");
+  });
+
+  it("Reset to recommended asks before it turns auto-submit on; Cancel applies the other keys only", async () => {
+    const user = userEvent.setup();
+    mockApi(
+      ...sectionRoutes(autonomyData()),
+      route("POST", "/api/settings/autonomy/reset/tier_b", {
+        changes: { "targets:tiers.B.auto_submit": true, "targets:tiers.B.cover_letter": "if_required" },
+      }),
+    );
+    renderSettings("/settings/autonomy");
+    const b = await screen.findByRole("switch", { name: "Tier B: Auto-submit when you run Apply" });
+    await user.click(screen.getByRole("button", { name: "Reset to recommended: Tier B" }));
+    const ask = await screen.findByRole("alertdialog", { name: "Turn on auto-submit for Tier B?" });
+    await user.click(within(ask).getByRole("button", { name: "Cancel" }));
+    expect(b).toHaveAttribute("aria-checked", "false");
+    expect(screen.getByRole("combobox", { name: "Tier B: Cover letter" })).toHaveValue("if_required");
+    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Reset to recommended: Tier B" }));
+    await user.click(await screen.findByRole("button", { name: "Turn on" }));
+    expect(b).toHaveAttribute("aria-checked", "true");
+    expect(screen.getByText(/2 unsaved changes/)).toBeInTheDocument();
   });
 
   it("has no axe violations", async () => {

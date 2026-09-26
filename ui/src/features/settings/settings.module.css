@@ -603,3 +603,10 @@
     justify-content: flex-start;
   }
 }
+.groupHead,
+.tierFoot {
+  flex-wrap: wrap;
+}
+.resetConfirm {
+  flex-basis: 100%;
+}

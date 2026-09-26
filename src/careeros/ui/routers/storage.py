@@ -3,6 +3,7 @@
 a recorded step run). Everything goes through RunControl, the same code as the CLI."""
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
@@ -17,6 +18,14 @@ router = APIRouter(tags=["storage"])
 
 class PruneBody(BaseModel):
     dry_run: bool = True
+
+
+def relative_path(p: str, root: Path) -> str:
+    """A path shown to the browser: relative to the repo root (never the absolute home path)."""
+    try:
+        return Path(p).resolve().relative_to(Path(root).resolve()).as_posix()
+    except ValueError:
+        return Path(p).name
 
 
 def _rc(c: Any) -> Any:
@@ -41,7 +50,7 @@ def advise_apply(rec_id: str, c=Depends(ctx)) -> dict[str, Any]:
         out = _rc(c).advise_apply(rec_id)
     except LookupError as e:
         raise HTTPException(404, str(e)) from None
-    except ConfigError as e:
+    except ConfigError as e:  # before ValueError: ConfigError subclasses it
         raise HTTPException(422, str(e)) from None
     except ValueError as e:
         raise HTTPException(409, str(e)) from None
@@ -53,7 +62,11 @@ def advise_apply(rec_id: str, c=Depends(ctx)) -> dict[str, Any]:
 def prune(body: PruneBody, c=Depends(ctx)) -> dict[str, Any]:
     rc = _rc(c)
     if body.dry_run:
-        return rc.prune_plan()
+        plan = rc.prune_plan()
+        root = c.settings.root
+        for item in plan["items"]:
+            item["paths"] = [relative_path(p, root) for p in item.get("paths") or []]
+        return plan
     try:
         return rc.start_step("prune")
     except Busy as e:

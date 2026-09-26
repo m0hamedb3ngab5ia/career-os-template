@@ -119,7 +119,7 @@ export function SaveBar() {
     setConflict(null);
     if (!checkLocally()) return;
     save.mutate(
-      { changes: form.changes, version: form.data.version },
+      { changes: form.changes, version: form.baseVersion ?? form.data.version },
       {
         onSuccess: () => {
           form.discard();
@@ -198,16 +198,15 @@ export function SaveBar() {
             onCancel={() => setAskDiscard(false)}
             onConfirm={() => {
               setAskDiscard(false);
+              setConflict(null);
               form.discard();
             }}
           />
         ) : null}
       </div>
-      {diffs ? (
-        <Sheet title="Changes a save writes" onClose={() => setDiffs(null)}>
-          <DiffView diffs={diffs} files={form.data.files} />
-        </Sheet>
-      ) : null}
+      <Sheet open={diffs !== null} title="Changes a save writes" onClose={() => setDiffs(null)}>
+        {diffs ? <DiffView diffs={diffs} files={form.data.files} /> : null}
+      </Sheet>
       {blocker.state === "blocked" ? (
         <div className={styles.guard}>
           <ConfirmPanel

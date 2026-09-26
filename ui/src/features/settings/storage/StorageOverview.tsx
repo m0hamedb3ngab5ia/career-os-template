@@ -91,7 +91,7 @@ function RunEfficiency({ advice }: { advice: Advice }) {
     );
   }
   const attempts = kinds.reduce((a, k) => a + k.attempts, 0);
-  const failed = kinds.reduce((a, k) => a + Math.round(k.failure_rate * k.attempts), 0);
+  const failed = kinds.reduce((a, k) => a + (k.failed ?? Math.round(k.failure_rate * k.attempts)), 0);
   const runs = kinds.reduce((a, k) => a + k.runs, 0);
   const usage = kinds.reduce((a, k) => a + (k.stops.usage_limit ?? 0), 0);
   const budget = kinds.reduce((a, k) => a + k.budget_used * k.runs, 0) / Math.max(1, runs);

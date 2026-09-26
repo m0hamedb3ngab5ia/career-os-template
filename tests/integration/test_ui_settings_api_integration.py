@@ -183,6 +183,78 @@ def test_advice_apply_writes_the_change_and_refuses_unknown(client, data):
     assert client.post("/api/advise/nope/apply", headers=W).status_code == 404
 
 
+class _FakeRC:
+    """Stands in for RunControl in the router: each method raises what the test sets."""
+    raise_apply: Exception | None = None
+    raise_step: Exception | None = None
+
+    def __init__(self, settings, now):
+        pass
+
+    def advise_apply(self, rec_id):
+        raise type(self).raise_apply  # type: ignore[misc]
+
+    def start_step(self, kind):
+        raise type(self).raise_step  # type: ignore[misc]
+
+
+@pytest.fixture
+def fake_rc(monkeypatch):
+    monkeypatch.setattr(storage_router, "RunControl", _FakeRC)
+    yield _FakeRC
+    _FakeRC.raise_apply = _FakeRC.raise_step = None
+
+
+def test_advice_apply_error_mapping(client, fake_rc):
+    from careeros.config import ConfigError
+
+    assert issubclass(ConfigError, ValueError), "the router must catch ConfigError before ValueError"
+    fake_rc.raise_apply = ValueError("failures-score is advice only; nothing to change")
+    r = client.post("/api/advise/failures-score/apply", headers=W)
+    assert r.status_code == 409 and "advice only" in r.json()["detail"]
+    fake_rc.raise_apply = ConfigError("config/pipeline.yaml: retention.run_logs_days must be a number")
+    r = client.post("/api/advise/x/apply", headers=W)
+    assert r.status_code == 422 and "run_logs_days" in r.json()["detail"]
+    fake_rc.raise_apply = LookupError("no current recommendation 'x'")
+    assert client.post("/api/advise/x/apply", headers=W).status_code == 404
+
+
+def test_advice_only_recommendation_apply_is_409_end_to_end(client, data):
+    # a real advice-only recommendation: disk free under the warning level
+    _seed_snapshots(data["root"], data["settings"])
+    rs = RunStore(data["settings"])
+    lines = [json.loads(x) for x in (rs.dir / "storage.jsonl").read_text().splitlines()]
+    for x in lines:
+        x["disk"] = {"total": 100, "free": 1, "free_pct": 1.0}
+    (rs.dir / "storage.jsonl").write_text("".join(json.dumps(x) + "\n" for x in lines))
+    recs = client.get("/api/advise").json()["recommendations"]
+    advice_only = next(r for r in recs if r["change"] is None)
+    r = client.post(f"/api/advise/{advice_only['id']}/apply", headers=W)
+    assert r.status_code == 409 and "advice only" in r.json()["detail"]
+
+
+def test_prune_start_while_busy_is_409(client, fake_rc):
+    from careeros.ui.services.runs import Busy
+
+    fake_rc.raise_step = Busy({"owner": "step:x", "pid": 1}, "a prune step is already running")
+    r = client.post("/api/prune", json={"dry_run": False}, headers=W)
+    assert r.status_code == 409 and "already running" in r.json()["detail"]
+
+
+def test_prune_dry_run_paths_are_repo_relative(client, data):
+    root = data["root"]
+    assert client.put("/api/settings/storage", json={"changes": {
+        "pipeline:retention.screenshots_after_closed_days": 7}}, headers=W).status_code == 200
+    shots = root / "data" / "jobs" / data["jobs"]["rejected"] / "screenshots"
+    shots.mkdir(parents=True, exist_ok=True)
+    (shots / "001_form.png").write_bytes(b"x" * 10)
+    items = client.post("/api/prune", json={"dry_run": True}, headers=W).json()["items"]
+    paths = [p for it in items for p in it["paths"]]
+    assert paths, "the fixture should have something to prune"
+    assert not any(p.startswith(str(root)) for p in paths)
+    assert any(p.endswith("screenshots/001_form.png") for p in paths)
+
+
 def test_prune_dry_run_then_start(client, monkeypatch):
     plan = client.post("/api/prune", json={"dry_run": True}, headers=W)
     assert plan.status_code == 200

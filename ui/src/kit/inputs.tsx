@@ -56,7 +56,7 @@ export function NumberInput({
   const [text, setText] = useState(() => toText(value));
   const last = useRef(value);
   useEffect(() => {
-    if (value !== last.current) {
+    if (!Object.is(value, last.current)) {
       last.current = value;
       setText(toText(value));
     }

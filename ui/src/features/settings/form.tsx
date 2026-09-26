@@ -20,6 +20,9 @@ export interface SettingsForm {
   general: string[];
   setErrors: (fields: Record<string, string>, general?: string[]) => void;
   discard: () => void;
+  /** The version the first unsaved edit was made against; a save sends it so a change on disk since then is a
+   * 409, even after a refetch brought a newer version. Null when there are no drafts. */
+  baseVersion: string | null;
 }
 
 const FormContext = createContext<SettingsForm | null>(null);
@@ -46,6 +49,7 @@ export function SettingsFormProvider({ data, children }: { data: SectionData; ch
   const [drafts, setDrafts] = useState<Values>({});
   const [errors, setErrorState] = useState<Record<string, string>>({});
   const [general, setGeneral] = useState<string[]>([]);
+  const [baseVersion, setBaseVersion] = useState<string | null>(null);
 
   const fields = useMemo(
     () => data.section.groups.flatMap((g) => g.items.filter((i): i is FieldSchema => !isPolicy(i))),
@@ -74,17 +78,19 @@ export function SettingsFormProvider({ data, children }: { data: SectionData; ch
   const set = useCallback(
     (id: string, v: unknown) => {
       setDrafts((d) => ({ ...d, [id]: v }));
+      setBaseVersion((b) => b ?? data.version);
       clearError([id]);
     },
-    [clearError],
+    [clearError, data.version],
   );
 
   const setMany = useCallback(
     (values: Values) => {
       setDrafts((d) => ({ ...d, ...values }));
+      setBaseVersion((b) => b ?? data.version);
       clearError(Object.keys(values));
     },
-    [clearError],
+    [clearError, data.version],
   );
 
   const setErrors = useCallback((f: Record<string, string>, g: string[] = []) => {
@@ -94,6 +100,7 @@ export function SettingsFormProvider({ data, children }: { data: SectionData; ch
 
   const discard = useCallback(() => {
     setDrafts({});
+    setBaseVersion(null);
     setErrorState({});
     setGeneral([]);
   }, []);
@@ -114,8 +121,9 @@ export function SettingsFormProvider({ data, children }: { data: SectionData; ch
       general,
       setErrors,
       discard,
+      baseVersion,
     }),
-    [data, fields, byId, value, set, setMany, changes, errors, general, setErrors, discard],
+    [data, fields, byId, value, set, setMany, changes, errors, general, setErrors, discard, baseVersion],
   );
 
   return <FormContext value={api}>{children}</FormContext>;

@@ -137,6 +137,7 @@ export interface Recommendation {
 export interface RunMetrics {
   runs: number;
   attempts: number;
+  failed?: number;
   avg_job_s: number;
   p90_job_s: number;
   failure_rate: number;

@@ -110,7 +110,7 @@ export function FieldRow({ field, label, compact = false, namePrefix = "" }: Fie
         <div className={styles.rowText}>
           {LABELLABLE.has(field.control) ? (
             <label htmlFor={inputId} className={styles.rowLabel}>
-              {namePrefix ? <span className="sr-only">{namePrefix}</span> : null}
+              {namePrefix ? <span className="sr-only">{namePrefix.trimEnd()} </span> : null}{namePrefix ? " " : null}
               <RichText text={text} />
             </label>
           ) : (
