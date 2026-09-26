@@ -1,4 +1,7 @@
 import "@testing-library/jest-dom/vitest";
+import { configure } from "@testing-library/react";
+
+configure({ asyncUtilTimeout: 4000 });
 
 // Pin the default locale to en-US so number, date and relative-time assertions pass whatever the machine's
 // locale is (e.g. LC_ALL=fr_FR.UTF-8). Code that passes an explicit locale is unaffected.

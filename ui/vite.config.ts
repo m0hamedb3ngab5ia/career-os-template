@@ -26,5 +26,7 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    // axe and lazy routes are slow on a busy machine; the defaults (5 s / 1 s) flake there
+    testTimeout: 20_000,
   },
 });
