@@ -1,12 +1,14 @@
 import { Filter, Plus } from "lucide-react";
-import { useState, type CSSProperties } from "react";
+import { useEffect, useState, type CSSProperties } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
 import { Page } from "../../app/PageHeader";
+import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { SAFETY, STATUSES, describeCode, humanize } from "../../kit/labels";
 import { Listbox } from "../../kit/Listbox";
+import { Sheet } from "../../kit/Sheet";
 import type { MenuItem } from "../../kit/Menu";
 import { useToast } from "../../kit/Toast";
 import { UnavailableButton } from "../../kit/UnavailableButton";
@@ -20,6 +22,8 @@ import type { Card, Filters } from "./types";
 
 const ADD_JOB_REASON = "Adding jobs by hand isn't supported yet — run scout";
 const CLOSED = "Closed";
+// Applied records the date applied and counts toward the daily cap, so it is confirmed first and has no Undo.
+const APPLIED = "applied";
 const FILTER_KEYS = ["tier", "category", "safety", "location"] as const;
 
 function statusLabel(s: string): string {
@@ -46,6 +50,17 @@ export function PipelinePage() {
   const toast = useToast();
   const [dragged, setDragged] = useState<Card | null>(null);
   const [choosing, setChoosing] = useState<{ card: Card; target: Target } | null>(null);
+  const [confirmApplied, setConfirmApplied] = useState<Card | null>(null);
+  // A moved card remounts in its new column: once the board shows it there, focus its Move to… again.
+  const [refocus, setRefocus] = useState<{ jobId: string; status: string } | null>(null);
+  useEffect(() => {
+    if (!refocus || !board) return;
+    const moved = board.columns.flatMap((c) => c.cards).find((c) => c.job_id === refocus.jobId);
+    if (moved && moved.status !== refocus.status) return; // not refetched yet
+    const el = [...document.querySelectorAll<HTMLElement>("[data-job-id]")].find((n) => n.dataset.jobId === refocus.jobId);
+    el?.querySelector<HTMLElement>("[data-move] button")?.focus();
+    setRefocus(null);
+  }, [board, refocus]);
 
   function setParam(k: string, v: string) {
     setParams(
@@ -81,16 +96,21 @@ export function PipelinePage() {
       { jobId: card.job_id, status, note: `moved on the board to ${statusLabel(status)}` },
       {
         onSuccess: (r) => {
+          setRefocus({ jobId: card.job_id, status });
           toast.show({
             message: `Moved ${company} to ${statusLabel(status)}`,
             seconds: meta?.ui.undo_seconds,
-            onUndo: r.previous
-              ? () =>
-                  setStatus.mutate(
-                    { jobId: card.job_id, status: r.previous!, note: "undo: board move" },
-                    { onError: (e) => toast.show({ message: `Undo failed: ${problem(e)}` }) },
-                  )
-              : undefined,
+            onUndo:
+              r.previous && status !== APPLIED
+                ? () =>
+                    setStatus.mutate(
+                      { jobId: card.job_id, status: r.previous!, note: "undo: board move" },
+                      {
+                        onSuccess: () => setRefocus({ jobId: card.job_id, status: r.previous! }),
+                        onError: (e) => toast.show({ message: `Undo failed: ${problem(e)}` }),
+                      },
+                    )
+                : undefined,
           });
         },
         onError: (e) => toast.show({ message: `Couldn't move ${company}: ${problem(e)}` }),
@@ -98,10 +118,15 @@ export function PipelinePage() {
     );
   }
 
+  function go(card: Card, status: string) {
+    if (status === APPLIED) setConfirmApplied(card);
+    else move(card, status);
+  }
+
   function requestMove(card: Card, target: Target) {
     const options = target.statuses.filter((s) => s !== card.status);
     if (options.length === 0) return;
-    if (options.length === 1) move(card, options[0]!);
+    if (options.length === 1) go(card, options[0]!);
     else setChoosing({ card, target: { ...target, statuses: options } });
   }
 
@@ -220,9 +245,34 @@ export function PipelinePage() {
           onChoose={(s) => {
             const c = choosing.card;
             setChoosing(null);
-            move(c, s);
+            go(c, s);
           }}
         />
+      ) : null}
+      {confirmApplied ? (
+        <Sheet
+          open
+          title={`Mark ${confirmApplied.company || confirmApplied.job_id} applied?`}
+          closeLabel="Cancel"
+          onClose={() => setConfirmApplied(null)}
+          footer={
+            <Button
+              variant="primary"
+              onClick={() => {
+                const c = confirmApplied;
+                setConfirmApplied(null);
+                move(c, APPLIED);
+              }}
+            >
+              Mark applied
+            </Button>
+          }
+        >
+          <p>
+            This records today as the date applied and counts toward the daily application cap. There is no Undo; to
+            change it later, set the status again from the job.
+          </p>
+        </Sheet>
       ) : null}
     </Page>
   );

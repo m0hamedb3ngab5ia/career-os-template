@@ -19,6 +19,7 @@ from careeros.config import ConfigError, Settings
 from careeros.ui.events import Broker
 from careeros.ui.index import Index
 from careeros.ui.security import LOOPBACK, check_request
+from careeros.ui.services.job_actions import JobLocked
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -98,6 +99,10 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     @app.exception_handler(ValueError)
     async def bad_value(_: Request, e: ValueError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=400)
+
+    @app.exception_handler(JobLocked)
+    async def job_locked(_: Request, e: JobLocked) -> JSONResponse:
+        return JSONResponse({"detail": str(e)}, status_code=409)
 
     @app.exception_handler(ConfigError)
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:

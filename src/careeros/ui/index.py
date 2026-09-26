@@ -328,7 +328,7 @@ class Index:
                 [(str(it.get("ID")), _s(it.get("Created")), _s(it.get("JobID")), _s(it.get("Company")),
                   _s(it.get("Role")), _s(it.get("Type")), _s(it.get("What to do")), _s(it.get("Link")),
                   _s(it.get("Priority")), _s(it.get("Needs")), int(str(it.get("Done") or "N").upper() == "Y"),
-                  _s(it.get("DoneDate")), _s(it.get("Due")), _s(it.get("Due reason")))
+                  _s(it.get("DoneDate")), _due(it.get("Due")), _s(it.get("Due reason")))
                  for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
             return True
@@ -360,6 +360,13 @@ def read_action_items(path: Path) -> list[dict[str, Any]]:
         return [dict(zip(header, r)) for r in rows if r and r[0] not in (None, "")]
     finally:
         wb.close()
+
+
+def _due(v: Any) -> str | None:
+    """A typed Excel date comes back as a datetime at 00:00: keep only the date (due = the end of that day)."""
+    if isinstance(v, datetime) and v.time() == datetime.min.time() and v.tzinfo is None:
+        return v.date().isoformat()
+    return _s(v)
 
 
 def _s(v: Any) -> str | None:

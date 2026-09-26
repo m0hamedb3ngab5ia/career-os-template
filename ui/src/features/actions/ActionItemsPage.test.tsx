@@ -176,8 +176,43 @@ describe("Action Items", () => {
     expect(await screen.findByText("Blocked Obsidian Quant Partners")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() =>
-      expect(calls.find((c) => c.url === "/api/actions/scam/unblock-company")?.body).toEqual({ company: "Obsidian Quant Partners" }),
+      expect(calls.find((c) => c.url === "/api/actions/scam/unblock-company")?.body).toEqual({ company: "Obsidian Quant Partners", remove: true }),
     );
+  });
+
+  it("scam item: Undo after Block of an already-blocked company leaves the blocklist entry; queued says so", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    const { calls } = setup(view(), {
+      "POST /api/actions/scam/block-company": { company: "Obsidian Quant Partners", added: false, queued: true, job_id: "j5" },
+      "POST /api/actions/scam/unblock-company": { removed: false },
+    });
+    await user.click(await screen.findByRole("button", { name: "Block company" }));
+    await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Block company" }));
+    expect(await screen.findByText(/already blocked.*run careeros tracker flush/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Undo" }));
+    await waitFor(() =>
+      expect(calls.find((c) => c.url === "/api/actions/scam/unblock-company")?.body).toEqual({
+        company: "Obsidian Quant Partners", remove: false,
+      }),
+    );
+  });
+
+  it("Add date: focus lands on the row after the sheet closes; a queued write says so", async () => {
+    const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+    let saved = false;
+    const dated = { ...NODATE, due: "2026-10-01T23:59:59Z", due_date_only: true, bucket: "week", level: "later" } as ActionItem;
+    setup(() => view({ groups: [{ key: "nodate", count: 2, items: [saved ? dated : NODATE, SCAM] }] }), {
+      "POST /api/actions/nd/due": () => {
+        saved = true;
+        return { ok: [], queued: ["nd"], missing: [] };
+      },
+    });
+    await user.click(await screen.findByRole("button", { name: "Add date for Stark Industries" }));
+    const dialog = screen.getByRole("dialog", { name: "Add date" });
+    await user.type(within(dialog).getByLabelText("Date"), "2026-10-01");
+    await user.click(within(dialog).getByRole("button", { name: "Save date" }));
+    expect(await screen.findByText(/Date added for Stark Industries.*run careeros tracker flush/)).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Mark Stark Industries done" })).toHaveFocus());
   });
 
   it("scam item: Mark posting safe confirms, then undo sends back what the server returned", async () => {

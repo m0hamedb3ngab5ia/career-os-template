@@ -3,6 +3,7 @@ import { ApiError } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
 import { useToast } from "../../kit/Toast";
+import { QUEUED_NOTE } from "./queued";
 import { useBlockCompany, useMarkSafe, useUndoMarkSafe, useUnblockCompany } from "./api";
 import styles from "./ActionItems.module.css";
 import type { ActionItem } from "./types";
@@ -43,11 +44,13 @@ export function ScamControls({ item }: { item: ActionItem }) {
       onSuccess: (r) => {
         setAsk("idle");
         toast.show({
-          message: r.added ? `Blocked ${r.company}` : `${r.company} was already blocked; item marked done`,
+          message: (r.added ? `Blocked ${r.company}` : `${r.company} was already blocked; item marked done`) +
+            (r.queued ? QUEUED_NOTE : ""),
           seconds,
           onUndo: () =>
             unblock.mutate(
-              { id: item.id, company: r.company },
+              // already blocked before: Undo only reopens the item and leaves the user's own entry
+              { id: item.id, company: r.company, remove: r.added },
               { onError: (e) => toast.show({ message: `Undo failed: ${message(e)}` }) },
             ),
         });
@@ -61,7 +64,7 @@ export function ScamControls({ item }: { item: ActionItem }) {
       onSuccess: (r) => {
         setAsk("idle");
         toast.show({
-          message: `Marked ${r.company} posting safe`,
+          message: `Marked ${r.company} posting safe${r.queued ? QUEUED_NOTE : ""}`,
           seconds,
           onUndo: () =>
             undoSafe.mutate(

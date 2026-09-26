@@ -53,6 +53,7 @@ export function JobCard({ card, moveItems, dragging, pending, onDragStart, onDra
   return (
     <div
       className={styles.card}
+      data-job-id={card.job_id}
       draggable
       data-dragging={dragging || undefined}
       data-pending={pending || undefined}
@@ -99,7 +100,7 @@ export function JobCard({ card, moveItems, dragging, pending, onDragStart, onDra
           <Chip tone="red">QA failed</Chip>
         ) : null}
         {card.override ? <Chip tone="gray">Override: {card.override}</Chip> : null}
-        <span className={styles.move}>
+        <span className={styles.move} data-move>
           <Menu size="small" label={`Move ${company} to`} items={moveItems}>
             Move to… <span className="sr-only">({company})</span>
           </Menu>

@@ -97,11 +97,21 @@ describe("Pipeline", () => {
     await waitFor(() => expect(calls.some((c) => c.url === "/api/pipeline?tier=A&location=Remote")).toBe(true));
   });
 
-  it("Move to… (keyboard) moves a card to a one-status column, with undo", async () => {
+  it("Move to… (keyboard) moves a card to a one-status column, with undo, and keeps focus on the card", async () => {
     const user = userEvent.setup();
-    const { calls } = setup(board(), {
-      "POST /api/jobs/r1/status": ({ body }: { body: { status: string } }) => ({ job_id: "r1", status: body.status,
-        previous: body.status === "applied" ? "needs_review" : "applied" }),
+    let moved = false;
+    const b = () => {
+      const base = board();
+      if (!moved) return base;
+      const cols = base.columns.map((c) => ({ ...c, cards: c.cards.filter((x) => x.job_id !== "r1") }));
+      cols.find((c) => c.name === "Offer")!.cards.push({ ...REVIEW, status: "offer" });
+      return { ...base, columns: cols };
+    };
+    const { calls } = setup(b, {
+      "POST /api/jobs/r1/status": ({ body }: { body: { status: string } }) => {
+        moved = body.status === "offer";
+        return { job_id: "r1", status: body.status, previous: body.status === "offer" ? "needs_review" : "offer" };
+      },
     });
     const review = await columnNamed(/^Needs review/);
     const btn = within(review).getByRole("button", { name: "Move to… (Umbrella Labs)" });
@@ -109,12 +119,36 @@ describe("Pipeline", () => {
     await user.keyboard("{ArrowDown}");
     const menu = screen.getByRole("menu", { name: "Move Umbrella Labs to" });
     expect(within(menu).getByRole("menuitem", { name: "Needs review" })).toHaveAttribute("aria-disabled", "true");
-    within(menu).getByRole("menuitem", { name: "Applied" }).focus();
+    within(menu).getByRole("menuitem", { name: "Offer" }).focus();
     await user.keyboard("{Enter}");
-    expect(await screen.findByText("Moved Umbrella Labs to Applied")).toBeInTheDocument();
-    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ status: "applied" });
+    expect(await screen.findByText("Moved Umbrella Labs to Offer")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ status: "offer" });
+    const offer = await columnNamed(/^Offer/);
+    await waitFor(() =>
+      expect(within(offer).getByRole("button", { name: "Move to… (Umbrella Labs)" })).toHaveFocus(),
+    );
     await user.click(screen.getByRole("button", { name: "Undo" }));
     await waitFor(() => expect(calls.filter((c) => c.method === "POST").at(-1)!.body).toMatchObject({ status: "needs_review" }));
+  });
+
+  it("moving into Applied asks first and has no Undo (it records the date applied and counts to the cap)", async () => {
+    const user = userEvent.setup();
+    const { calls } = setup(board(), {
+      "POST /api/jobs/r1/status": { job_id: "r1", status: "applied", previous: "needs_review" },
+    });
+    const review = await columnNamed(/^Needs review/);
+    await user.click(within(review).getByRole("button", { name: "Move to… (Umbrella Labs)" }));
+    await user.click(screen.getByRole("menuitem", { name: "Applied" }));
+    const dialog = screen.getByRole("dialog", { name: "Mark Umbrella Labs applied?" });
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    await user.click(within(dialog).getByRole("button", { name: "Cancel" }));
+    expect(calls.some((c) => c.method === "POST")).toBe(false);
+    await user.click(within(review).getByRole("button", { name: "Move to… (Umbrella Labs)" }));
+    await user.click(screen.getByRole("menuitem", { name: "Applied" }));
+    await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark applied" }));
+    expect(await screen.findByText("Moved Umbrella Labs to Applied")).toBeInTheDocument();
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ status: "applied" });
+    expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
 
   it("moving into a column with several statuses asks which one", async () => {
@@ -143,6 +177,7 @@ describe("Pipeline", () => {
     fireEvent.dragOver(applied, { dataTransfer: dt });
     await waitFor(() => expect(applied).toHaveAttribute("data-drop"));
     fireEvent.drop(applied, { dataTransfer: dt });
+    await userEvent.setup().click(within(screen.getByRole("dialog", { name: "Mark Initech applied?" })).getByRole("button", { name: "Mark applied" }));
     await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ status: "applied" }));
   });
 

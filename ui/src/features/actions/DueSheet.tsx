@@ -7,10 +7,11 @@ import { useToast } from "../../kit/Toast";
 import styles from "./ActionItems.module.css";
 import { useSetDue } from "./api";
 import { dueValue } from "./dueValue";
+import { QUEUED_NOTE } from "./queued";
 import type { ActionItem } from "./types";
 
 /** "Add date": a real deadline the candidate knows about (never invented), with why it matters. */
-export function DueSheet({ item, onClose }: { item: ActionItem; onClose: () => void }) {
+export function DueSheet({ item, onClose, onSaved }: { item: ActionItem; onClose: () => void; onSaved?: (id: string) => void }) {
   const [date, setDate] = useState("");
   const [time, setTime] = useState("");
   const [reason, setReason] = useState("");
@@ -26,9 +27,10 @@ export function DueSheet({ item, onClose }: { item: ActionItem; onClose: () => v
     setDue.mutate(
       { id: item.id, due, due_reason: reason.trim() || null },
       {
-        onSuccess: () => {
-          toast.show({ message: `Date added for ${name}` });
+        onSuccess: (r) => {
+          toast.show({ message: `Date added for ${name}${r.queued.length ? QUEUED_NOTE : ""}` });
           onClose();
+          onSaved?.(item.id);
         },
       },
     );

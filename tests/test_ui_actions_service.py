@@ -30,6 +30,7 @@ def row(id: str, *, due: str | None = None, priority: str = "M", needs: str = "a
     ("2026-09-24T09:00:00-04:00", "overdue", "overdue"),        # earlier today: already past
     ("2026-09-24T18:00:00-04:00", "today", "soon"),
     ("2026-09-24", "today", "soon"),                            # a date alone means the end of that day
+    ("2026-09-24T00:00:00", "today", "soon"),                   # an Excel date cell (naive 00:00) = that date
     ("2026-09-25T15:00:00-04:00", "tomorrow", "soon"),
     ("2026-09-26T10:00:00-04:00", "week", "soon"),              # within 48 h
     ("2026-09-27T10:00:00-04:00", "week", "later"),

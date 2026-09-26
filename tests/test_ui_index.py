@@ -260,3 +260,23 @@ def test_legacy_qa_results_list_still_indexed(idx, data):
     idx.update_jobs([jid])
     row = _jobs(idx)[jid]
     assert row["qa_passed"] == 1 and row["qa_score"] == pytest.approx(7.0)
+
+
+def test_excel_date_cell_due_is_indexed_as_a_date(idx, data):
+    """Excel turns a typed date into a datetime at 00:00; that means the whole day, not midnight (overdue)."""
+    from openpyxl import load_workbook
+
+    from careeros.ui.services import actions as svc
+
+    st = data["settings"].paths["tracker_xlsx"]
+    wb = load_workbook(st)
+    ws = wb["Action Items"]
+    hdr = {c.value: c.column for c in ws[1] if c.value}
+    row = next(r for r in range(2, ws.max_row + 1) if ws.cell(r, hdr["ID"]).value == data["actions"]["medium"])
+    ws.cell(row, hdr["Due"]).value = datetime(2026, 9, 24)
+    wb.save(st)
+    os.utime(st, (st.stat().st_atime, st.stat().st_mtime + 5))
+    assert idx.update_tracker() is True
+    due = idx.query("SELECT due FROM action_items WHERE id = ?", (data["actions"]["medium"],))[0]["due"]
+    assert due == "2026-09-24"
+    assert svc.due_bucket(due, NOW, timezone.utc) == "today"

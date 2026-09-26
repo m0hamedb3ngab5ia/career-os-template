@@ -43,8 +43,8 @@ def due_at(due: str | None, tz: tzinfo) -> datetime | None:
         return None
     s = str(due).strip()
     try:
-        if len(s) == 10:
-            d = date.fromisoformat(s)
+        if len(s) == 10 or re.fullmatch(r"\d{4}-\d{2}-\d{2}[T ]00:00(:00)?", s):  # naive 00:00 = Excel date
+            d = date.fromisoformat(s[:10])
             return datetime.combine(d, time(23, 59, 59), tz)
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
     except ValueError:
@@ -296,13 +296,14 @@ def block_company(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
     return {"company": company, "added": added, "queued": done is None, "job_id": it["job_id"]}
 
 
-def unblock_company(settings: Any, ix: Any, aid: str, company: str) -> dict[str, Any]:
-    """Undo Block company: remove exactly that name from the blocklist and reopen the item."""
+def unblock_company(settings: Any, ix: Any, aid: str, company: str, remove: bool = True) -> dict[str, Any]:
+    """Undo Block company: remove exactly that name from the blocklist and reopen the item. `remove=False` (the
+    Block found it already blocked, `added: False`) only reopens the item and leaves the user's entry alone."""
     it = _scam_item(ix, aid)
     if company.strip().lower() != _company(settings, it).lower():
         raise ValueError("that company isn't this item's company")
     current = _current_blocklist(settings)
-    kept = [c for c in current if c.strip().lower() != company.strip().lower()]
+    kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
     if kept != current:
         _set_blocklist(settings, kept)
     done = _tracker(settings).reopen_action(aid)
@@ -320,7 +321,10 @@ def mark_safe(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
     from careeros.store import Store
     from careeros.tracker import set_status_both
 
+    from careeros.ui.services.job_actions import ensure_unlocked
+
     it = _scam_item(ix, aid)
+    ensure_unlocked(settings, it["job_id"])
     company = _company(settings, it)
     path = registry.default_path(settings)
     before = registry._find(registry.load(path), company)
@@ -339,8 +343,10 @@ def undo_mark_safe(settings: Any, ix: Any, aid: str, previous_status: str | None
     from careeros.models import STATUSES
     from careeros.safety import registry
     from careeros.tracker import set_status_both
+    from careeros.ui.services.job_actions import ensure_unlocked
 
     it = _scam_item(ix, aid)
+    ensure_unlocked(settings, it["job_id"])
     company = _company(settings, it)
     if registry_before is not None:
         if not isinstance(registry_before, dict) or \

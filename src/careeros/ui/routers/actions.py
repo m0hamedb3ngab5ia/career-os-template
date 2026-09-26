@@ -38,6 +38,7 @@ class Due(BaseModel):
 
 class Unblock(BaseModel):
     company: str
+    remove: bool = True  # False when the Block found it already blocked (added: False)
 
 
 class UndoSafe(BaseModel):
@@ -113,7 +114,7 @@ def block_company(aid: str, c=Depends(ctx)) -> dict[str, Any]:
 
 @router.post("/actions/{aid}/unblock-company")
 def unblock_company(aid: str, body: Unblock, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.unblock_company, c.settings, c.index, aid, body.company)
+    out = _run(svc.unblock_company, c.settings, c.index, aid, body.company, body.remove)
     after_write(c, tracker=True, config=True)
     return out
 

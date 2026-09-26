@@ -77,8 +77,8 @@ export function useBlockCompany() {
 }
 
 export function useUnblockCompany() {
-  return useWrite((v: { id: string; company: string }) =>
-    apiSend<unknown>("POST", `/api/actions/${enc(v.id)}/unblock-company`, { company: v.company }),
+  return useWrite((v: { id: string; company: string; remove: boolean }) =>
+    apiSend<unknown>("POST", `/api/actions/${enc(v.id)}/unblock-company`, { company: v.company, remove: v.remove }),
   );
 }
 

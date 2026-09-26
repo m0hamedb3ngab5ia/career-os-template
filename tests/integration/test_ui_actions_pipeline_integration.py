@@ -187,3 +187,45 @@ def test_set_status_moves_the_card(env, data):
     assert c.post(f"/api/jobs/{jid}/status", headers=W, json={"status": "queued"}).json()["previous"] == "needs_review"
     assert c.post(f"/api/jobs/{jid}/status", headers=W, json={"status": "launched"}).status_code == 400
     assert c.post("/api/jobs/nope00000000/status", headers=W, json={"status": "queued"}).status_code == 404
+
+
+def test_undo_block_leaves_an_existing_blocklist_entry(env, data):
+    c, _ = env
+    s, scam = data["settings"], data["scam"]
+    companies = s.root / "config" / "companies.yaml"
+    assert c.post(f"/api/actions/{scam['action_id']}/block-company", headers=W).json()["added"] is True
+    c.post(f"/api/actions/{scam['action_id']}/reopen", headers=W)
+    # the user already had it blocked: a second Block adds nothing, so its Undo must leave the entry alone
+    r = c.post(f"/api/actions/{scam['action_id']}/block-company", headers=W)
+    assert r.json()["added"] is False
+    before = companies.read_text()
+    r = c.post(f"/api/actions/{scam['action_id']}/unblock-company", headers=W,
+               json={"company": scam["company"], "remove": False})
+    assert r.status_code == 200 and r.json()["removed"] is False
+    assert companies.read_text() == before
+    assert scam["action_id"] in _items(c.get("/api/actions").json())
+
+
+def _hold_lock(s, job_id):  # noqa: ANN001, ANN202
+    import os
+
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    return locks.acquire(RunStore(s).job_lock_path(job_id), "run test", 600, pid=os.getpid(), note="preparing")
+
+
+def test_status_writes_refuse_a_locked_job(env, data):
+    c, _ = env
+    s, scam = data["settings"], data["scam"]
+    jid = data["jobs"]["queued"]
+    _hold_lock(s, jid)
+    r = c.post(f"/api/jobs/{jid}/status", headers=W, json={"status": "needs_review"})
+    assert r.status_code == 409 and "locked" in r.json()["detail"]
+    assert Store(s).get_status(jid) == "queued"
+    _hold_lock(s, scam["job_id"])
+    assert c.post(f"/api/actions/{scam['action_id']}/mark-safe", headers=W).status_code == 409
+    assert Store(s).get_status(scam["job_id"]) == "needs_review"
+    assert registry.is_flagged(registry.load(registry.default_path(s)), scam["company"]) is not None
+    r = c.post(f"/api/actions/{scam['action_id']}/mark-safe/undo", headers=W, json={"previous_status": "queued"})
+    assert r.status_code == 409

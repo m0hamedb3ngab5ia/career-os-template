@@ -121,3 +121,12 @@ def test_index_path_resolution(tmp_path, monkeypatch):
     assert default_path(St("idx/ui.db")) == (tmp_path / "repo" / "idx" / "ui.db").resolve()
     assert default_path(St(str(tmp_path / "abs.db"))) == tmp_path / "abs.db"
     assert default_path(St("~/x/ui.db")) == tmp_path / "home" / "x" / "ui.db"
+
+
+@pytest.mark.parametrize("names", [["Queued", "Queued"], ["Queued", " queued "], ["Applied", "APPLIED"]])
+def test_duplicate_column_names_fail_closed(names):
+    from careeros.config import ConfigError
+
+    cols = [{"name": names[0], "statuses": ["queued"]}, {"name": names[1], "statuses": ["applied"]}]
+    with pytest.raises(ConfigError, match="already"):
+        load_ui_config(S({"ui": {"pipeline": {"columns": cols}}}))

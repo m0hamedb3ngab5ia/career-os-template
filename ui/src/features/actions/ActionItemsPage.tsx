@@ -1,5 +1,5 @@
 import { Check, Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
@@ -17,6 +17,7 @@ import { ActionRow } from "./ActionRow";
 import { AddItemSheet } from "./AddItemSheet";
 import { useActions, useMarkDone, useReopen } from "./api";
 import { DueSheet } from "./DueSheet";
+import { QUEUED_NOTE } from "./queued";
 import type { ActionGroup, ActionItem, GroupBy, SortBy, Tab, WriteResult } from "./types";
 import { useUndoSeconds } from "./useUndoSeconds";
 
@@ -60,9 +61,7 @@ function problem(e: unknown): string {
 }
 
 function queuedNote(r: WriteResult): string {
-  return r.queued.length
-    ? " The tracker is open in Excel, so this was queued; run careeros tracker flush after closing it."
-    : "";
+  return r.queued.length ? QUEUED_NOTE : "";
 }
 
 export function ActionItemsPage() {
@@ -81,6 +80,15 @@ export function ActionItemsPage() {
   const [pendingIds, setPendingIds] = useState<Set<string>>(new Set());
   const [dateFor, setDateFor] = useState<ActionItem | null>(null);
   const [adding, setAdding] = useState(false);
+  // After Add date the row re-renders without its Add date button: put focus on that row's Mark done instead.
+  const [refocusRow, setRefocusRow] = useState<string | null>(null);
+  useEffect(() => {
+    if (!refocusRow) return;
+    const li = [...document.querySelectorAll<HTMLElement>("[data-action-id]")].find((n) => n.dataset.actionId === refocusRow);
+    if (li?.querySelector("[data-add-date]")) return; // still the old row: wait for the refetch
+    li?.querySelector<HTMLElement>("[data-row-focus] button")?.focus();
+    setRefocusRow(null);
+  }, [data, refocusRow]);
 
   function update(changes: Record<string, string | null>) {
     setParams(
@@ -225,7 +233,7 @@ export function ActionItemsPage() {
           <div className={styles.empty}>Nothing needs you right now. New items appear after the next run.</div>
         )}
       </div>
-      {dateFor ? <DueSheet item={dateFor} onClose={() => setDateFor(null)} /> : null}
+      {dateFor ? <DueSheet item={dateFor} onClose={() => setDateFor(null)} onSaved={setRefocusRow} /> : null}
       {adding ? <AddItemSheet onClose={() => setAdding(false)} /> : null}
     </Page>
   );

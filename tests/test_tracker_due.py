@@ -112,3 +112,36 @@ def test_set_due_on_old_workbook_migrates_first(tmp_path: Path):
     assert tr.set_action_due(aid, "2026-10-02", "saved form expires") is True
     it = {i["ID"]: i for i in tr.list_action_items()}[aid]
     assert it["Due"] == "2026-10-02" and it["Due reason"] == "saved form expires"
+
+
+def test_queued_reopen_due_and_add_replay_on_flush(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """Excel holds the workbook: reopen / set due / add-with-due queue to .pending.json and replay in order."""
+    import json
+
+    from openpyxl.workbook.workbook import Workbook
+
+    tr = Tracker(path=tmp_path / "t.xlsx")
+    tr.init()
+    aid = tr.add_action_item("essay")
+    assert tr.mark_action_done(aid) is True
+    real_save = Workbook.save
+
+    def locked(self, filename):  # noqa: ANN001, ANN202
+        raise PermissionError(13, "locked")
+
+    monkeypatch.setattr(Workbook, "save", locked)
+    with pytest.warns(UserWarning):
+        assert tr.reopen_action(aid) is None
+        assert tr.set_action_due(aid, "2026-10-03", "application deadline") is None
+        assert tr.add_action_item("captcha", id="a2", due="2026-10-04", due_reason="posting closes") == "a2"
+    q = json.loads(tr.pending_path.read_text())
+    assert [x["op"] for x in q] == ["reopen_action", "set_action_due", "add_action_item"]
+    assert q[2]["payload"]["due"] == "2026-10-04"
+    assert aid not in {i["ID"] for i in tr.list_action_items()}  # nothing written yet
+
+    monkeypatch.setattr(Workbook, "save", real_save)
+    assert tr.flush_pending() == 3 and tr.pending_count() == 0
+    items = {i["ID"]: i for i in tr.list_action_items()}
+    assert items[aid]["Done"] == "N" and items[aid]["Due"] == "2026-10-03"
+    assert items[aid]["Due reason"] == "application deadline"
+    assert items["a2"]["Due"] == "2026-10-04" and items["a2"]["Due reason"] == "posting closes"

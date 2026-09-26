@@ -28,12 +28,12 @@ export function ActionRow({ item, now, selected, pending, onSelectChange, onDone
   const name = titleOf(item);
   const due = formatDue(item.due, item.due_date_only, now);
   return (
-    <li className={styles.row} data-selected={selected || undefined} data-pending={pending || undefined}>
+    <li className={styles.row} data-action-id={item.id} data-selected={selected || undefined} data-pending={pending || undefined}>
       <label className={styles.select}>
         <input type="checkbox" checked={selected} onChange={(e) => onSelectChange(item.id, e.target.checked)} />
         <span className="sr-only">Select {name}</span>
       </label>
-      <span className={styles.doneSlot}>
+      <span className={styles.doneSlot} data-row-focus>
         <MarkDoneCircle done={false} itemName={name} onDoneChange={() => onDone(item)} />
       </span>
       <div className={styles.body}>
@@ -55,7 +55,7 @@ export function ActionRow({ item, now, selected, pending, onSelectChange, onDone
             </span>
           </div>
         ) : (
-          <button type="button" className={styles.dateButton} onClick={() => onAddDate(item)}>
+          <button type="button" data-add-date className={styles.dateButton} onClick={() => onAddDate(item)}>
             <Clock3 size={13} strokeWidth={1.7} aria-hidden="true" />
             Add date <span className="sr-only">for {name}</span>
           </button>

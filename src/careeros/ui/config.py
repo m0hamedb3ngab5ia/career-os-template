@@ -62,6 +62,7 @@ def _columns(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list) or not raw:
         raise _err("pipeline.columns must be a non-empty list of {name, statuses}")
     seen: set[str] = set()
+    names: set[str] = set()
     out = []
     for i, col in enumerate(raw):
         where = f"pipeline.columns[{i}]"
@@ -70,6 +71,9 @@ def _columns(raw: Any) -> list[dict[str, Any]]:
         name, statuses = col.get("name"), col.get("statuses")
         if not isinstance(name, str) or not name.strip():
             raise _err(f"{where}.name must be a non-empty string")
+        if name.strip().casefold() in names:
+            raise _err(f"{where}.name: {name.strip()!r} is already another column's name")
+        names.add(name.strip().casefold())
         if not isinstance(statuses, list) or not statuses:
             raise _err(f"{where}.statuses must be a non-empty list")
         for st in statuses:
