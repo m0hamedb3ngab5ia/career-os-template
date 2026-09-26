@@ -28,6 +28,8 @@ JOBS: dict[str, tuple[str, str, str, int | None, str | None, str | None, int, in
     "rejected":  ("Wayne Enterprises", "Data Engineer", "rejected", 77, "C", "pass", 30, 20),
     "skipped":   ("Vandelay Imports", "Sales Engineer", "skipped", 40, "C", "skip", 40, None),
 }
+# The smallest valid PNG (1x1, transparent): a screenshot stand-in.
+PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000""1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
 REVIEW_FLOW = ["found", "scored", "queued", "prepared", "needs_review"]
 
 
@@ -83,6 +85,23 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                 "regenerate_suggestions": [], "regenerations": 0})
             (store.job_dir(jid) / "resume.pdf").write_bytes(b"%PDF-1.4 fixture\n")
             (store.job_dir(jid) / "cover_letter.md").write_text("Hi,\n\nFixture letter.\n", encoding="utf-8")
+    # Job detail's Safety flags, Apply session timeline and screenshot for the needs-review job.
+    rid = ids["review"]
+    store._write(rid, "safety.json", {
+        "job_id": rid, "checked_at": iso(now - timedelta(days=5)), "verdict": "review", "runs": [],
+        "flags": [{"code": "GHOST_OLD_POST", "level": "review", "detail": "Posted 45 days ago",
+                   "evidence": ["https://boards.example.com/review"], "at": iso(now - timedelta(days=5))}]})
+    shots = store.job_dir(rid) / "screenshots"
+    shots.mkdir(exist_ok=True)
+    (shots / "01_form.png").write_bytes(PNG_1PX)
+    store._write(rid, "apply_session.json", {
+        "job_id": rid, "ats": "greenhouse", "started": iso(now - timedelta(days=1)),
+        "finished": iso(now - timedelta(days=1, minutes=-6)), "tier": "A", "auto_submit": False,
+        "steps": [{"time": iso(now - timedelta(days=1)), "action": "open_form", "ok": True, "note": ""},
+                  {"time": iso(now - timedelta(days=1, minutes=-5)), "action": "finish", "ok": False,
+                   "note": "needs_review: Tier A: you submit"}],
+        "screenshots": [str(shots / "01_form.png")], "outcome": "needs_review", "reason": "Tier A: you submit",
+        "submit_clicked": False, "status": "needs_review", "n_steps": 2})
     contacts = {"contacts": [
         {"name": "Pat Rivers", "role": "Engineering Manager", "linkedin": "https://www.linkedin.com/in/example-pat",
          "email": "pat@example.com", "linkedin_degree": 1},

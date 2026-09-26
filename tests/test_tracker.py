@@ -92,6 +92,18 @@ def test_action_items_and_contacts(tmp_path: Path):
     assert ws.max_row == 2
 
 
+def test_reopen_action_undoes_mark_done(tmp_path: Path):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    aid = tr.add_action_item("Solve captcha", type="captcha", job_id="j1", company="Acme", priority="H")
+    assert tr.mark_action_done(aid)
+    assert tr.list_action_items() == []
+    assert tr.reopen_action(aid) is True
+    [item] = tr.list_action_items()
+    assert item["ID"] == aid and item["Done"] == "N" and item["DoneDate"] in (None, "")
+    assert tr.reopen_action("nope") is False
+
+
 def test_locked_file_queues_and_flushes(tmp_path: Path, monkeypatch):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()

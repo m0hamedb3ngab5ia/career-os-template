@@ -105,6 +105,9 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
 
     for r in (health, meta, status, jobs, events):
         app.include_router(r.router, prefix="/api")
+    from careeros.ui.routers import runs_actions, today, tracker  # Today / Jobs / Job detail slice
+    for r in (today, runs_actions, tracker):
+        app.include_router(r.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:

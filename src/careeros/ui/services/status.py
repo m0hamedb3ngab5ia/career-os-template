@@ -38,6 +38,15 @@ def _job_row(j: dict[str, Any], detail: str, when: str | None) -> dict[str, Any]
     return {"job_id": j["job_id"], "company": j["company"], "role": j["title"], "detail": detail, "when": when}
 
 
+def _breakdown(window: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """The response-rate popover: applications in the window by how far they got (no_reply = still waiting)."""
+    out = []
+    for key in (*[s for s in ("interview", "screening", "offer") if s in RESPONDED], "rejected", "no_reply"):
+        js = [j for j in window if (j["status"] == key if key != "no_reply" else j["status"] not in RESPONDED)]
+        out.append({"status": key, "count": len(js), "companies": [j["company"] for j in js[:3]]})
+    return out
+
+
 def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
     from careeros.runs.policy import daily_cap
 
@@ -64,7 +73,8 @@ def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
                           "applied": len(window), "days": RESPONSE_DAYS,
                           "definition": f"applications in the last {RESPONSE_DAYS} days that reached "
                                         f"{', '.join(RESPONDED[:-1])} or {RESPONDED[-1]}",
-                          "rows": [_job_row(j, j["status"], j["applied_at"]) for j in responded[:ROWS]]},
+                          "rows": [_job_row(j, j["status"], j["applied_at"]) for j in responded[:ROWS]],
+                          "breakdown": _breakdown(window)},
     }
 
 

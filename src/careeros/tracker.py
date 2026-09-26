@@ -595,6 +595,20 @@ class Tracker:
 
         return self._mutate("mark_action_done", {"id": id}, fn)
 
+    def reopen_action(self, id: str) -> bool | None:
+        """Undo `mark_action_done` (the UI's Undo toast). True = reopened, False = no such id, None = queued."""
+        def fn(wb: Workbook) -> bool:
+            ws = wb["Action Items"]
+            hdr = _header_index(ws)
+            r = _find_row(ws, hdr["ID"], id)
+            if r is None:
+                return False
+            _put(ws, r, hdr["Done"], "N")
+            _put(ws, r, hdr["DoneDate"], "")
+            return True
+
+        return self._mutate("reopen_action", {"id": id}, fn)
+
     # --- contacts ----------------------------------------------------------
 
     def add_contact(
