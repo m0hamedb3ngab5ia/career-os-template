@@ -51,7 +51,7 @@ def test_config_defaults_when_missing(settings):
     settings.pipeline.pop("retention", None)
     cfg = retention.retention_config(settings)
     assert cfg == {"screenshots_after_closed_days": 30, "keep_confirmation_screenshot": True,
-                   "unprepared_posting_days": 90}
+                   "unprepared_posting_days": 90, "run_logs_days": 30, "run_summaries_days": 365}
 
 
 def test_config_reads_overrides(settings):
@@ -76,7 +76,8 @@ def test_example_pipeline_ships_retention_and_weekly_prune(example_settings):
     assert r["screenshots_after_closed_days"] == 30
     assert r["unprepared_posting_days"] == 90
     assert r["keep_confirmation_screenshot"] is True
-    assert example_settings.pipeline["schedule"]["prune"] == "0 3 * * 0"
+    assert r["run_logs_days"] == 30 and r["run_summaries_days"] == 365
+    assert example_settings.pipeline["schedule"]["jobs"]["prune"] == {"every_days": 7}
 
 
 # --- last change ----------------------------------------------------------------------------
@@ -267,4 +268,55 @@ def test_config_null_keep_confirmation_defaults_true(settings):
 def test_config_rejects_non_bool_keep_confirmation(settings, bad):
     settings.pipeline["retention"] = {"keep_confirmation_screenshot": bad}
     with pytest.raises(ConfigError, match="keep_confirmation_screenshot must be true/false"):
+        retention.retention_config(settings)
+
+
+# --- run history (data/runs) ---------------------------------------------------------------------------------
+
+def _run(settings, days_ago: int, status: str = "done") -> Path:
+    from careeros.runs.store import RunStore
+
+    rs = RunStore(settings)
+    start = NOW - timedelta(days=days_ago)
+    run = rs.new_run("score", "manual", {"preset": "medium"}, start, run_id=f"r{days_ago:04d}")
+    run.update(status=status, ended_at=start.isoformat())
+    rs.save_run(run)
+    rs.log(run["id"], "hello")
+    att = rs.run_dir(run["id"]) / "attempts"
+    att.mkdir(exist_ok=True)
+    (att / "001.json").write_text("{}")
+    (att / "001.stream.jsonl").write_text("{}\n" * 100)
+    return rs.run_dir(run["id"])
+
+
+def test_run_logs_go_after_30_days_summaries_after_365(settings):
+    young, mid, old = _run(settings, 5), _run(settings, 40), _run(settings, 400)
+    items = retention.plan(settings, now=NOW)
+    got = sorted((i.run_id, i.action) for i in items if i.run_id)
+    assert got == [("r0040", "delete_run_logs"), ("r0400", "delete_run")]
+    retention.execute(settings, items, now=NOW)
+    assert (young / "run.log").exists()
+    assert not (mid / "run.log").exists() and not (mid / "attempts" / "001.stream.jsonl").exists()
+    assert (mid / "run.json").exists() and (mid / "attempts" / "001.json").exists()
+    assert not old.exists()
+
+
+def test_a_run_still_going_is_never_pruned(settings):
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    _run(settings, 400, status="running")
+    locks.acquire(RunStore(settings).runner_lock_path, owner="run:r0400", ttl_seconds=600)
+    assert [i for i in retention.plan(settings, now=NOW) if i.run_id] == []
+
+
+def test_run_retention_zero_turns_it_off(settings):
+    _run(settings, 400)
+    settings.pipeline["retention"] = {"run_logs_days": 0, "run_summaries_days": 0}
+    assert [i for i in retention.plan(settings, now=NOW) if i.run_id] == []
+
+
+def test_summaries_window_must_cover_logs_window(settings):
+    settings.pipeline["retention"] = {"run_logs_days": 60, "run_summaries_days": 30}
+    with pytest.raises(ConfigError):
         retention.retention_config(settings)

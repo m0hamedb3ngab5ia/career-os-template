@@ -22,12 +22,22 @@ paths:
   resume_template_dir: templates/resume
   output_dir_per_job: true                 # data/jobs/<id>/{posting.json,score.json,resume.pdf,cover_letter.md,answers.json,qa.json,log.md}
 
-schedule:                                  # reusable default: fine to keep. For /schedule cloud routines or local cron
-  scout: "0 7 * * *"                       # daily 7am
-  score_and_prepare: "30 7 * * *"
-  inbox_sync: "0 8,18 * * *"
-  followups: "0 9 * * 1-5"
-  prune: "0 3 * * 0"                       # weekly, Sunday 3am: `careeros prune --yes` (see retention below)
+schedule:                                  # reusable default: fine to keep. `careeros schedule install` adds a macOS
+                                           # LaunchAgent that runs `careeros tick` every tick_minutes; the tick runs
+                                           # whatever is due below. Inbox sync and follow-ups are not scheduled here.
+  tick_minutes: 15                         # 15 (Recommended): how often launchd wakes `careeros tick`
+  timezone: local                          # local (Recommended) or an IANA name, e.g. America/New_York
+  quiet_hours: {start: "09:00", end: "18:00"}  # (Recommended) claude-using runs (score, prepare) never start
+                                           # inside this window; scout and prune ignore it. null = no quiet hours
+  missed_after_minutes: 60                 # 60 (Recommended): slots missed while the Mac slept or was off (by more
+                                           # than this) never auto-run; they collapse into ONE pending catch-up you
+                                           # start with `careeros run catch-up` (or dismiss with --dismiss)
+  jobs:
+    scout:   {every_hours: 3}              # 3 (Recommended: 2-3): `careeros scout --sync`; no quiet hours
+    score:   {every_hours: 6}              # 6 (Recommended): `careeros run score` with runs.preset (add preset: to override)
+    prepare: {every_hours: 12}             # 12 (Recommended): `careeros run prepare` with runs.preset; never applies
+    prune:   {every_days: 7}               # 7 = weekly (Recommended): `careeros prune --yes` (retention below)
+  launchd_label: com.careeros.tick
 
 llm:                                       # reusable default: fine to keep
   runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
@@ -87,6 +97,8 @@ retention:                                 # reusable default: fine to keep. `ca
   screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this
   keep_confirmation_screenshot: true       # ...but keep NN_confirmation.png as proof you applied
   unprepared_posting_days: 90              # found/scored/skipped postings: description trimmed to a short stub
+  run_logs_days: 30                        # 30 (Recommended): data/runs/<id>/run.log + raw stream output go after this
+  run_summaries_days: 365                  # 365 (Recommended): the whole run (run.json, attempts) goes after this
                                            # 0 turns a rule off. Never touched: active jobs, submitted/ copies,
                                            # seen.json, posting_history.json, the scam registries.
 

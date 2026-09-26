@@ -503,8 +503,15 @@ def test_check_runs_passes_on_the_example_pipeline():
     from careeros.doctor import check_runs
 
     cfg = yaml.safe_load((EXAMPLE_REPO / "config" / "pipeline.yaml").read_text())
-    (c,) = check_runs(cfg)
-    assert c.level == PASS and c.name == "runs"
+    checks = check_runs(cfg)
+    assert [(c.level, c.name) for c in checks] == [(PASS, "runs"), (PASS, "schedule")]
+
+
+def test_check_runs_fails_on_old_cron_schedule():
+    from careeros.doctor import check_runs
+
+    checks = check_runs({"schedule": {"scout": "0 7 * * *"}})
+    assert checks[-1].level == FAIL and checks[-1].name == "schedule" and "schedule.jobs" in checks[-1].detail
 
 
 def test_check_runs_fails_on_a_bad_budget():

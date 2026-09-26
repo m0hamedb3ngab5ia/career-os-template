@@ -187,7 +187,7 @@ replace a real (non-symlink) `profile/` or `config/`; move those into the privat
 
 ### Keeping data/ small
 
-`careeros prune` applies `config/pipeline.yaml: retention` (weekly via `schedule.prune`). It is a dry run
+`careeros prune` applies `config/pipeline.yaml: retention` (weekly via `schedule.jobs.prune` when `careeros schedule install` is set up). It is a dry run
 unless you pass `--yes`.
 - Closed jobs (rejected, withdrawn, ghosted) lose their apply step screenshots 30 days after closing; the
   confirmation screenshot stays (`keep_confirmation_screenshot` must be true or false).

@@ -399,7 +399,15 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
     if fmt != "stream-json" or "--verbose" not in cmd:
         return [Check(WARN, "runs", "llm.headless_cmd should use --output-format stream-json --verbose: "
                                     "`careeros run` reads the live event stream and its final result event")]
-    return [Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ...")]
+    from careeros.runs.schedule import load_schedule
+
+    try:
+        sched = load_schedule(type("_P", (), {"pipeline": pipeline})())
+    except ConfigError as e:
+        return [Check(FAIL, "schedule", str(e))]
+    on = [k for k, j in sched.jobs.items() if j.enabled]
+    return [Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ..."),
+            Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} (install: careeros schedule install)")]
 
 
 def check_voice(root: Path) -> Check:

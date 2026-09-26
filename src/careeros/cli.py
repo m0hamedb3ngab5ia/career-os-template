@@ -77,16 +77,9 @@ def cmd_scout(args: argparse.Namespace) -> int:
         for b in summary.errors:
             print(f"  - {b.company}: {b.error}")
     if args.sync and t["stored"]:
-        tr = Tracker(settings=s)
-        rows = []
-        for b in summary.boards:
-            for jid in b.stored_ids:
-                p = store.load_posting(jid)
-                if p:
-                    rows.append(TrackerRow.from_posting(p, folder=str(store.job_dir(jid))))
-        counts = tr.upsert_jobs(rows)
-        tr.set_config("last_scout", datetime.now().strftime("%Y-%m-%d %H:%M"))
-        print(f"tracker: {counts}")
+        from careeros.scout import sync_to_tracker
+
+        print(f"tracker: {sync_to_tracker(s, store, summary)}")
     return 0
 
 
@@ -657,10 +650,15 @@ def cmd_prune(args: argparse.Namespace) -> int:
         print("prune: nothing to remove")
         return 0
     for i in items:
+        if i.run_id:
+            what = "delete the whole run" if i.action == "delete_run" else f"delete {len(i.paths)} run log file(s)"
+            print(f"run {i.run_id}  {what}  ({retention.human_bytes(i.bytes)})")
+            continue
         what = (f"{len(i.paths)} screenshot(s): " + ", ".join(Path(p).name for p in i.paths[:4])
                 + (" ..." if len(i.paths) > 4 else "")) if i.action == "delete_screenshots" else "trim posting.json to a stub"
         print(f"{i.job_id}  {what}  ({retention.human_bytes(i.bytes)})")
-    total = f"{summary['jobs']} job(s), {summary['files']} file(s), {retention.human_bytes(summary['bytes'])}"
+    total = (f"{summary['jobs']} job(s), " + (f"{summary['runs']} run(s), " if summary.get("runs") else "")
+             + f"{summary['files']} file(s), {retention.human_bytes(summary['bytes'])}")
     if dry:
         print(f"\ndry run: would free {total}. Re-run with --yes to apply.")
         return 0
@@ -904,7 +902,20 @@ def _run_status_data(s: Settings) -> dict:
     auto = AutoSubmitPolicy.from_config(cfg.raw)
     return {"running": held if held.get("state") == "held" else None, "paused": rs.pause_state(now),
             "preset": cfg.preset, "last": last, "next": nxt, "cap": current_cap(s),
-            "auto_submit": {"enabled": auto.enabled, "allow": auto.allow, "manual": auto.manual}}
+            "auto_submit": {"enabled": auto.enabled, "allow": auto.allow, "manual": auto.manual},
+            "catch_up": _catch_up(rs), "schedule": _schedule_next(s)}
+
+
+def _catch_up(rs):
+    from careeros.runs.tick import load_catch_up
+
+    return load_catch_up(rs)
+
+
+def _schedule_next(s: Settings) -> dict:
+    from careeros.runs.tick import schedule_overview
+
+    return schedule_overview(s)["next"]
 
 
 _STATUS_QUEUE_KINDS = ("score", "prepare")
@@ -927,6 +938,9 @@ def cmd_run_status(args: argparse.Namespace) -> int:
     for kind, prev in data["last"].items():
         print(f"last {kind}: " + (f"{prev['id']} {prev['state']} stop={prev.get('stop_reason') or '-'}"
                                   if prev else "never"))
+    print("scheduled: " + ", ".join(f"{k} {v or 'off'}" for k, v in data["schedule"].items()))
+    if data["catch_up"]:
+        print("missed runs waiting: " + ", ".join(data["catch_up"]["kinds"]) + " -> `careeros run catch-up`")
     for kind, items in data["next"].items():
         print(f"next {kind} (preset {data['preset']}):" + ("" if items else " nothing waiting"))
         for i, it in enumerate(items, 1):
@@ -937,6 +951,155 @@ def cmd_run_status(args: argparse.Namespace) -> int:
 def _lock_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--lock-token", help="token of the job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
     p.add_argument("--force", action="store_true", help="change the job even while it is locked")
+
+
+def _parse_until(v: str | None):
+    """`+2h`, `+30m`, `+1d` or an ISO date/time (local when no offset) -> aware datetime; None = until resumed."""
+    import re
+    from datetime import timedelta, timezone
+
+    if not v:
+        return None
+    m = re.fullmatch(r"\+(\d+(?:\.\d+)?)([mhd])", v.strip())
+    if m:
+        n, unit = float(m[1]), m[2]
+        return datetime.now(timezone.utc) + timedelta(**{{"m": "minutes", "h": "hours", "d": "days"}[unit]: n})
+    dt = datetime.fromisoformat(v)
+    return dt if dt.tzinfo else dt.astimezone()
+
+
+def cmd_run_pause(args: argparse.Namespace) -> int:
+    """Pause every run: the running one stops before its next job (stop reason paused); ticks skip due slots."""
+    from datetime import timezone
+
+    from careeros.runs.store import RunStore
+
+    try:
+        until = _parse_until(args.until)
+    except ValueError:
+        print(f"run pause: --until {args.until!r}: use +2h, +30m, +1d or an ISO date/time", file=sys.stderr)
+        return 2
+    p = RunStore(_settings(args)).set_pause(until, args.reason or "", datetime.now(timezone.utc))
+    print(f"runs paused until {p['until'] or 'you run `careeros run resume`'}")
+    return 0
+
+
+def cmd_run_resume(args: argparse.Namespace) -> int:
+    from careeros.runs.store import RunStore
+
+    print("runs resumed" if RunStore(_settings(args)).clear_pause() else "runs were not paused")
+    return 0
+
+
+def cmd_run_catch_up(args: argparse.Namespace) -> int:
+    """Start the pending catch-up (missed scheduled slots, collapsed into one record), or --dismiss it."""
+    from careeros.runs.tick import load_catch_up, run_catch_up
+    from careeros.runs.store import RunStore
+
+    s = _settings(args)
+    if args.dry_run:
+        rec = load_catch_up(RunStore(s))
+        print(json.dumps(rec, indent=2) if args.json else (
+            "no missed runs" if not rec else "pending catch-up: " + ", ".join(
+                f"{k} ({v.get('slots')} slot(s) since {v.get('first_missed')})" for k, v in rec["kinds"].items())))
+        return 0
+    try:
+        res = run_catch_up(s, dismiss=args.dismiss, echo=(lambda line: None) if args.json else print)
+    except RuntimeError as e:
+        print(f"run catch-up: {e}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(res, indent=2, default=str))
+    elif args.dismiss:
+        print("catch-up dismissed" if res["dismissed"] else "no missed runs")
+    elif not res["ran"] and not res["left"]:
+        print("no missed runs")
+    else:
+        for k, r in res["results"].items():
+            print(f"{k}: {r['status']} {r['detail']}")
+        if res["left"]:
+            print(f"still pending (runner busy): {', '.join(res['left'])}")
+    return 0
+
+
+def cmd_tick(args: argparse.Namespace) -> int:
+    """One scheduler tick (launchd calls this every schedule.tick_minutes). Idempotent."""
+    from careeros.runs.tick import tick
+
+    out = tick(_settings(args), dry_run=args.dry_run, echo=(lambda line: None) if args.json else print)
+    if args.json:
+        print(json.dumps(out, indent=2, default=str))
+        return 0
+    if out["status"] == "busy":
+        print("tick: another tick is still running; nothing to do")
+        return 0
+    for d in out["decisions"]:
+        res = out["results"].get(d["kind"])
+        print(f"{d['kind']:<8} {d['action']:<12} " + (f"{res['status']}: {res['detail']}" if res else d["detail"]))
+    return 0
+
+
+def _schedule_env(s: Settings):
+    import os
+    import shutil
+
+    from careeros.runs.schedule import load_schedule
+    from careeros.runs.store import RunStore
+
+    sc = load_schedule(s)
+    claude = shutil.which("claude")
+    dirs = [os.path.dirname(p) for p in (claude, sys.executable) if p]
+    return sc, RunStore(s), claude, dirs
+
+
+def cmd_schedule_install(args: argparse.Namespace) -> int:
+    from careeros.runs import launchd
+
+    s = _settings(args)
+    sc, rs, claude, dirs = _schedule_env(s)
+    plist = launchd.build_plist(label=sc.launchd_label, python=sys.executable, root=s.root, runs_dir=rs.dir,
+                                tick_minutes=sc.tick_minutes, path_dirs=dirs)
+    try:
+        out = launchd.install(plist)
+    except RuntimeError as e:
+        print(f"schedule install: {e}", file=sys.stderr)
+        return 1
+    print(f"installed {out['plist']}: `careeros tick` every {sc.tick_minutes:g} min (logs in {rs.dir})")
+    if not claude:
+        print("warning: `claude` is not on PATH here; scheduled score/prepare runs will stop with doctor_failed",
+              file=sys.stderr)
+    return 0
+
+
+def cmd_schedule_uninstall(args: argparse.Namespace) -> int:
+    from careeros.runs import launchd
+
+    sc, _, _, _ = _schedule_env(_settings(args))
+    out = launchd.uninstall(sc.launchd_label)
+    print(f"removed {out['plist']}" if out["removed"] else f"not installed ({out['plist']})")
+    return 0
+
+
+def cmd_schedule_status(args: argparse.Namespace) -> int:
+    from careeros.runs import launchd
+    from careeros.runs.tick import schedule_overview
+
+    s = _settings(args)
+    sc, _, _, _ = _schedule_env(s)
+    data = {**launchd.status(sc.launchd_label), **schedule_overview(s)}
+    if args.json:
+        print(json.dumps(data, indent=2, default=str))
+        return 0
+    print(f"LaunchAgent {data['label']}: " + ("installed" if data["installed"] else "not installed")
+          + (", loaded" if data["loaded"] else "") + f" ({data['plist']})")
+    print(f"last tick: {data['last_tick'] or 'never'}" + ("   PAUSED" if data["paused"] else ""))
+    for kind, at in data["next"].items():
+        last = data["jobs"].get(kind) or {}
+        print(f"  {kind:<8} next {at or 'disabled':<27} last {last.get('last_run') or '-'} "
+              f"{last.get('last_status') or ''}")
+    if data["catch_up"]:
+        print("missed runs waiting: " + ", ".join(data["catch_up"]["kinds"]) + " -> `careeros run catch-up`")
+    return 0
 
 
 def _run_budget_args(p: argparse.ArgumentParser) -> None:
@@ -1158,9 +1321,32 @@ def build_parser() -> argparse.ArgumentParser:
     rsh.add_argument("--json", action="store_true", help="run.json plus its attempts")
     rsh.add_argument("--log", action="store_true", help="print run.log")
     rsh.set_defaults(fn=cmd_run_show)
+    rpz = rns.add_parser("pause", help="pause all runs (the current one stops before its next job; ticks skip)")
+    rpz.add_argument("--until", help="+2h, +30m, +1d or an ISO date/time (default: until `run resume`)")
+    rpz.add_argument("--reason")
+    rpz.set_defaults(fn=cmd_run_pause)
+    rns.add_parser("resume", help="lift `run pause`").set_defaults(fn=cmd_run_resume)
+    rcu = rns.add_parser("catch-up", help="run the missed scheduled slots (one pending record) now, or --dismiss")
+    rcu.add_argument("--dismiss", action="store_true", help="drop the pending catch-up without running it")
+    rcu.add_argument("--dry-run", action="store_true", help="show what is pending")
+    rcu.add_argument("--json", action="store_true")
+    rcu.set_defaults(fn=cmd_run_catch_up)
     rst = rns.add_parser("status", help="running run, pause, last run per kind, what goes next and why")
     rst.add_argument("--json", action="store_true")
     rst.set_defaults(fn=cmd_run_status)
+
+    tk = sub.add_parser("tick", help="one scheduler tick: run what schedule.jobs says is due (launchd calls it)")
+    tk.add_argument("--dry-run", action="store_true", help="show the decisions; run nothing")
+    tk.add_argument("--json", action="store_true")
+    tk.set_defaults(fn=cmd_tick)
+    sch = sub.add_parser("schedule", help="macOS LaunchAgent that runs `careeros tick`")
+    schs = sch.add_subparsers(dest="schedule_cmd", required=True)
+    schs.add_parser("install", help="write ~/Library/LaunchAgents/<label>.plist and load it").set_defaults(
+        fn=cmd_schedule_install)
+    schs.add_parser("uninstall", help="unload and remove the LaunchAgent").set_defaults(fn=cmd_schedule_uninstall)
+    sst = schs.add_parser("status", help="agent installed/loaded, last tick, next run per job, missed runs")
+    sst.add_argument("--json", action="store_true")
+    sst.set_defaults(fn=cmd_schedule_status)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p
