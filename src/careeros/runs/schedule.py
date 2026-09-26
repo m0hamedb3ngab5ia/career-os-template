@@ -262,7 +262,8 @@ def _next_slot(cfg: ScheduleConfig, job: JobSchedule, after: datetime) -> dateti
 
 def _reference(state: dict[str, Any], kind: str, now: datetime) -> tuple[datetime | None, datetime]:
     last = _parse(((state or {}).get("jobs") or {}).get(kind, {}).get("last_run"))
-    return last, last or _parse((state or {}).get("last_tick")) or now
+    since = _parse(((state or {}).get("jobs") or {}).get(kind, {}).get("since"))
+    return last, last or since or _parse((state or {}).get("last_tick")) or now
 
 
 def plan_tick(cfg: ScheduleConfig, state: dict[str, Any], now: datetime, paused: bool) -> list[Decision]:

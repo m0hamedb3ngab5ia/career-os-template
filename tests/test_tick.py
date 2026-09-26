@@ -135,3 +135,93 @@ def test_enabled_inbox_sync_runs_in_order_at_its_slot(s):
     a = Actions()
     tick(s, now=datetime(2026, 9, 26, 8, 5, tzinfo=UTC), actions=a)
     assert ("inbox_sync", "schedule") in a.calls
+
+
+class Clock:
+    def __init__(self, t):
+        self.t = t
+
+    def __call__(self):
+        return self.t
+
+
+def test_last_tick_is_stamped_at_the_end_so_a_long_run_is_not_sleep(s):
+    t0 = EVENING
+    st = {"last_tick": (t0 - timedelta(minutes=15)).isoformat(),
+          "jobs": {"prepare": {"last_run": (t0 - timedelta(hours=11)).isoformat()},
+                   "scout": {"last_run": t0.isoformat()}, "prune": {"last_run": t0.isoformat()}}}
+    from careeros.runs.tick import _write
+    _write(RunStore(s).dir / "schedule.json", st)
+    clock = Clock(t0)
+    a = Actions()
+    real_score = a["score"]
+
+    def slow_score(trigger):
+        clock.t += timedelta(hours=3)
+        return real_score(trigger)
+
+    a["score"] = slow_score
+    tick(s, clock=clock, actions=a)
+    assert load_state(RunStore(s))["last_tick"] == (t0 + timedelta(hours=3)).isoformat()
+    b = Actions()
+    out = tick(s, now=t0 + timedelta(hours=3, minutes=5), actions=b)
+    assert {d["kind"]: d["action"] for d in out["decisions"]}["prepare"] == "run"
+    assert ("prepare", "schedule") in b.calls
+
+
+def _at_noon(s):
+    s.pipeline["schedule"]["jobs"]["score"] = {"at": ["12:00"]}
+
+
+def test_first_time_of_day_slot_held_by_quiet_hours_runs_when_they_end(s):
+    _at_noon(s)
+    day = datetime(2026, 9, 26, tzinfo=UTC)
+    tick(s, now=day.replace(hour=11), actions=Actions())
+    a = Actions()
+    tick(s, now=day.replace(hour=12, minute=5), actions=a)
+    assert ("score", "schedule") not in a.calls  # quiet hours
+    for h in (13, 15, 17):
+        tick(s, now=day.replace(hour=h, minute=30), actions=Actions())
+    b = Actions()
+    tick(s, now=day.replace(hour=18, minute=5), actions=b)
+    assert ("score", "schedule") in b.calls
+
+
+def test_first_time_of_day_slot_that_found_the_runner_busy_runs_next_tick(s):
+    s.pipeline["schedule"]["quiet_hours"] = None
+    _at_noon(s)
+    day = datetime(2026, 9, 26, tzinfo=UTC)
+    tick(s, now=day.replace(hour=11), actions=Actions())
+    tick(s, now=day.replace(hour=12, minute=5), actions=Actions(busy=("score",)))
+    a = Actions()
+    tick(s, now=day.replace(hour=12, minute=20), actions=a)
+    assert ("score", "schedule") in a.calls
+
+
+def test_catch_up_is_busy_while_a_tick_holds_the_lock(s):
+    tick(s, now=EVENING, actions=Actions())
+    tick(s, now=EVENING + timedelta(days=1, hours=2), actions=Actions())
+    locks.acquire(RunStore(s).dir / "tick.lock", owner="tick", ttl_seconds=600, now=EVENING + timedelta(days=1, hours=3))
+    a = Actions()
+    res = run_catch_up(s, actions=a, now=EVENING + timedelta(days=1, hours=3))
+    assert res["status"] == "busy" and a.calls == []
+    assert load_catch_up(RunStore(s)) is not None
+
+
+def test_a_kind_missed_during_catch_up_survives(s):
+    tick(s, now=EVENING, actions=Actions())
+    tick(s, now=EVENING + timedelta(days=1, hours=2), actions=Actions())
+    rs = RunStore(s)
+    a = Actions()
+    real = a["scout"]
+
+    def scout_and_new_miss(trigger):
+        rec = load_catch_up(rs)
+        rec["kinds"]["prune"] = {"first_missed": "x", "slots": 1}
+        from careeros.runs.tick import _save_catch_up
+        _save_catch_up(rs, rec)
+        return real(trigger)
+
+    a["scout"] = scout_and_new_miss
+    run_catch_up(s, actions=a, now=EVENING + timedelta(days=1, hours=3))
+    assert set(load_catch_up(rs)["kinds"]) == {"prune"}

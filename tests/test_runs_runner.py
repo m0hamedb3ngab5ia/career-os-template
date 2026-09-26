@@ -270,3 +270,32 @@ def test_dream_company_ranks_first_even_when_older(settings, store):
     sel, _ = select_candidates(settings, "score", load_runs_config(settings), NOW)
     assert [c["job_id"] for c in sel] == [dream, plain]
     assert "dream company" in sel[0]["why"]
+
+
+def test_budget_caps_the_in_flight_job_and_stops_as_time_budget(settings, store):
+    add_job(store, 1)
+    seen = {}
+
+    def slow(cmd, cwd, env, timeout_s, stream_path):
+        seen["timeout_s"] = timeout_s
+        Path(stream_path).write_text("")
+        return HeadlessResult(timed_out=True, exit_code=-15)
+
+    rec = run(settings, slow, max_minutes=0.01)
+    assert seen["timeout_s"] == pytest.approx(0.6, abs=0.05)
+    assert rec["stop_reason"] == "time_budget"
+    (att,) = RunStore(settings).load_attempts(rec["id"])
+    assert att["outcome"] == "time_budget"
+
+
+def test_job_timeout_still_applies_when_the_budget_is_larger(settings, store):
+    add_job(store, 1)
+    seen = {}
+
+    def slow(cmd, cwd, env, timeout_s, stream_path):
+        seen["timeout_s"] = timeout_s
+        Path(stream_path).write_text("")
+        return HeadlessResult(timed_out=True, exit_code=-15)
+
+    rec = run(settings, slow, max_minutes=90)
+    assert seen["timeout_s"] == 10 * 60 and rec["stop_reason"] == "timeout"

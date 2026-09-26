@@ -260,3 +260,71 @@ def test_example_config_documents_advisor_defaults():
     assert advisor.load_advisor_config(data) == advisor.load_advisor_config({})
     block = text[text.index("\nstorage:"):text.index("\nnotify:")]
     assert block.count("(Recommended)") >= 8
+
+
+# --- review fixes ------------------------------------------------------------------------------------------
+
+def test_missing_retention_key_uses_the_effective_default_as_from():
+    rec = next(r for r in advisor.storage_advice([snap(21, 100), snap(0, 900)], {}, NOW)["recommendations"]
+               if r["id"] == "tighten-unprepared_posting_days")
+    assert rec["change"]["from"] == 90 and rec["change"]["to"] == 60
+
+
+def test_a_rule_that_is_off_is_never_told_to_tighten():
+    pipe = {"retention": {**PIPE["retention"], "unprepared_posting_days": None}}
+    recs = advisor.storage_advice([snap(21, 100), snap(0, 900)], pipe, NOW)["recommendations"]
+    assert not any(r["id"] == "tighten-unprepared_posting_days" for r in recs)
+    off = next(r for r in recs if r["id"] == "retention-off-unprepared_posting_days")
+    assert off["change"] is None
+
+
+def test_usage_limit_advice_waits_for_min_runs_of_a_kind():
+    runs = [run(stop="usage_limit") for _ in range(3)]  # 3 < min_runs 5
+    assert not any(r["id"].startswith("preset-down") for r in advisor.run_advice(runs, RUNS_CFG, NOW)["recommendations"])
+
+
+def test_inbox_sync_usage_limits_do_not_count():
+    runs = [run(kind="inbox_sync", stop="usage_limit") for _ in range(5)] + [run() for _ in range(5)]
+    assert not any(r["id"].startswith("preset-down") for r in advisor.run_advice(runs, RUNS_CFG, NOW)["recommendations"])
+
+
+def test_preset_change_targets_the_per_job_preset_when_set():
+    cfg = {"runs": {"preset": "medium"}, "schedule": {"jobs": {"score": {"at": ["01:00"], "preset": "large"}}}}
+    runs = [dict(run(stop="usage_limit"), budget={"preset": "large", "max_jobs": 50, "max_minutes": 180})
+            for _ in range(3)] + [dict(run(), budget={"preset": "large", "max_jobs": 50, "max_minutes": 180})
+                                  for _ in range(3)]
+    rec = next(r for r in advisor.run_advice(runs, cfg, NOW)["recommendations"] if r["id"].startswith("preset-down"))
+    assert rec["change"] == {"file": "config/pipeline.yaml", "path": "schedule.jobs.score.preset", "from": "large",
+                             "to": "medium"}
+
+
+def test_preset_up_is_one_recommendation_for_both_kinds():
+    runs = [run(kind=k, stop="budget_reached", attempted=25, ok=25, candidates=120, durations=(60,) * 25)
+            for k in ("score", "prepare") for _ in range(5)]
+    ups = [r for r in advisor.run_advice(runs, RUNS_CFG, NOW)["recommendations"] if r["id"].startswith("preset-up")]
+    assert len(ups) == 1 and "score" in ups[0]["why"] and "prepare" in ups[0]["why"]
+    assert ups[0]["change"]["path"] == "runs.preset"
+
+
+def test_scheduled_prune_survives_a_snapshot_error(settings, monkeypatch):
+    from careeros.runs import tick as tick_mod
+
+    def boom(*a, **k):
+        raise OSError("disk full")
+
+    monkeypatch.setattr("careeros.runs.storage.snapshot_after_prune", boom)
+    status, detail = tick_mod.default_actions(settings)["prune"]("schedule")
+    assert status == "ok" and "snapshot skipped" in detail
+
+
+def test_apply_compares_against_the_effective_value(tmp_path):
+    p = tmp_path / "pipeline.yaml"
+    p.write_text("retention:\n  run_logs_days: 30\n")
+    yamledit.apply_change(p, "retention.unprepared_posting_days", 60, expect_from=90, validate=lambda path: None,
+                          current=lambda data: advisor.effective_value(dict(data), "retention.unprepared_posting_days"))
+    assert "unprepared_posting_days: 60" in p.read_text()
+
+
+def test_effective_value_null_retention_is_off():
+    assert advisor.effective_value({"retention": {"run_logs_days": None}}, "retention.run_logs_days") == 0
+    assert advisor.effective_value({}, "runs.preset") == "medium"

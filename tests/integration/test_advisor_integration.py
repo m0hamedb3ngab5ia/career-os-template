@@ -94,3 +94,14 @@ def test_advise_then_apply_changes_only_that_key_and_keeps_comments(temp_root, h
 def test_advise_apply_unknown_or_advice_only(temp_root, home):
     seed_snapshots(temp_root)
     assert cli(temp_root, home, "advise", "apply", "no-such-id").returncode == 1
+
+
+def test_apply_writes_a_key_the_file_does_not_have_yet(temp_root, home):
+    cfg = temp_root / "config" / "pipeline.yaml"
+    data = yaml.safe_load(cfg.read_text())
+    data["retention"].pop("unprepared_posting_days", None)
+    cfg.write_text(yaml.safe_dump(data, sort_keys=False))
+    seed_snapshots(temp_root)
+    r = cli(temp_root, home, "advise", "apply", "tighten-unprepared_posting_days")
+    assert r.returncode == 0, r.stderr
+    assert yaml.safe_load(cfg.read_text())["retention"]["unprepared_posting_days"] == 60

@@ -28,7 +28,6 @@ STORAGE_DEFAULTS = {"budget_mb": 1024, "warn_at_pct": 80, "disk_free_warn_pct": 
 ADVISOR_DEFAULTS = {"advise_after_days": 14, "prune_idle_weeks": 4, "min_runs": 5, "window_days": 30,
                     "usage_limit_stops": 2, "failure_rate_warn": 0.3}
 PRESET_LADDER = ("small", "medium", "large", "max")
-RETENTION_DEFAULTS = {"screenshots_after_closed_days": 30, "unprepared_posting_days": 90, "run_logs_days": 30}
 # category -> (retention key, how to tighten it)
 TIGHTEN = {
     "postings": ("unprepared_posting_days", lambda d: max(14, d * 2 // 3)),
@@ -80,8 +79,10 @@ def _rec(rid: str, kind: str, severity: str, title: str, why: str, path: str | N
 
 
 def _retention(pipeline: dict[str, Any], key: str) -> int:
-    v = ((pipeline or {}).get("retention") or {}).get(key)
-    return RETENTION_DEFAULTS.get(key, 0) if v is None else int(v)
+    """The effective value, as `careeros prune` sees it: missing = retention.DEFAULTS, null / 0 = rule off (0)."""
+    from careeros import retention
+
+    return int(retention.retention_config(type("_P", (), {"pipeline": pipeline or {}})())[key])
 
 
 def storage_advice(snaps: list[dict[str, Any]], pipeline: dict[str, Any], now: datetime) -> dict[str, Any]:
@@ -110,10 +111,12 @@ def storage_advice(snaps: list[dict[str, Any]], pipeline: dict[str, Any], now: d
         if dominant in TIGHTEN:
             key, fn = TIGHTEN[dominant]
             cur = _retention(pipeline, key)
-            to = fn(cur) if cur else RETENTION_DEFAULTS[key]
-            if to != cur:
+            if not cur:  # the rule is off: turning it on is the candidate's call, not a "tighten"
+                recs.append(_rec(f"retention-off-{key}", "storage", "warn", f"{dominant} is filling the budget",
+                                 head + f"; retention.{key} is off (null / 0), so nothing prunes it"))
+            elif fn(cur) != cur:
                 recs.append(_rec(f"tighten-{key}", "storage", "warn", f"Prune {dominant} sooner",
-                                 head, f"retention.{key}", cur, to))
+                                 head, f"retention.{key}", cur, fn(cur)))
         else:
             recs.append(_rec(f"storage-{dominant}", "storage", "warn", f"{dominant} is filling the budget",
                              head + "; it has no retention rule (kept by design): raise storage.budget_mb or "
@@ -144,17 +147,41 @@ def _p90(xs: list[float]) -> float:
     return s[min(len(s) - 1, math.ceil(0.9 * len(s)) - 1)]
 
 
+def _preset_target(kind: str, runs_of_kind: list[dict[str, Any]], rcfg: Any, sched: Any) -> tuple[str, Any, str]:
+    """(yaml path, its current value, the preset the runs actually used). The per-job preset
+    (schedule.jobs.<kind>.preset) wins over runs.preset when it is set."""
+    job = sched.jobs.get(kind) if sched else None
+    path, cur = (f"schedule.jobs.{kind}.preset", job.preset) if job and job.preset else ("runs.preset", rcfg.preset)
+    used = Counter((r.get("budget") or {}).get("preset") for r in runs_of_kind).most_common(1)
+    return path, cur, (used[0][0] if used and used[0][0] else cur)
+
+
+def _step(preset: str, delta: int) -> str | None:
+    if preset not in PRESET_LADDER:
+        return None
+    i = PRESET_LADDER.index(preset) + delta
+    return PRESET_LADDER[i] if 0 <= i < len(PRESET_LADDER) else None
+
+
 def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: datetime) -> dict[str, Any]:
+    from careeros.config import ConfigError
     from careeros.runs.config import load_runs_config
+    from careeros.runs.schedule import load_schedule
 
     adv = load_advisor_config(pipeline)["advisor"]
-    rcfg = load_runs_config(type("_P", (), {"pipeline": pipeline})())
+    p = type("_P", (), {"pipeline": pipeline})()
+    rcfg = load_runs_config(p)
+    try:
+        sched = load_schedule(p)
+    except ConfigError:
+        sched = None
     since = now - timedelta(days=adv["window_days"])
     recent = [r for r in runs if r.get("status") != "running" and r.get("started_at")
               and datetime.fromisoformat(r["started_at"]) >= since]
     metrics: dict[str, Any] = {}
     recs: list[dict[str, Any]] = []
-    stops_all = Counter(r.get("stop_reason") for r in recent)
+    ready_runs: dict[str, list[dict[str, Any]]] = {}
+    backlog_kinds: list[str] = []
     for kind in ("score", "prepare"):
         rs = [r for r in recent if r.get("kind") == kind]
         if not rs:
@@ -175,6 +202,7 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
         metrics[kind] = m
         if len(rs) < adv["min_runs"]:
             continue
+        ready_runs[kind] = rs
         limit_s = float(rcfg.job_timeout_minutes[kind]) * 60
         timeouts = sum(1 for a in atts if a.get("outcome") == "timeout")
         if durs and (m["p90_job_s"] >= 0.8 * limit_s or timeouts):
@@ -193,25 +221,64 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
                              "(targets.yaml scout / categories) or review targets.yaml thresholds.min_fit_to_prepare"))
         backlog = [r for r in rs if r.get("stop_reason") == "budget_reached"
                    and (r.get("counters") or {}).get("candidates", 0) > 2 * ((r.get("budget") or {}).get("max_jobs") or 0)]
-        if len(backlog) >= 0.6 * len(rs) and not stops_all.get("usage_limit"):
-            i = PRESET_LADDER.index(rcfg.preset) if rcfg.preset in PRESET_LADDER else -1
-            if 0 <= i < len(PRESET_LADDER) - 1:
-                recs.append(_rec("preset-up", "runs", "info", "The queue outgrows the budget",
-                                 f"{len(backlog)} of {len(rs)} {kind} runs hit the job budget with over twice as many "
-                                 "jobs still waiting", "runs.preset", rcfg.preset, PRESET_LADDER[i + 1]))
-    if stops_all.get("usage_limit", 0) >= adv["usage_limit_stops"]:
-        i = PRESET_LADDER.index(rcfg.preset) if rcfg.preset in PRESET_LADDER else -1
-        why = (f"{stops_all['usage_limit']} runs in the last {adv['window_days']} days stopped at the subscription "
-               "usage limit")
-        recs = [r for r in recs if r["id"] != "preset-up"]
-        if i > 0:
-            recs.append(_rec("preset-down", "runs", "warn", "Runs hit the usage limit", why, "runs.preset",
-                             rcfg.preset, PRESET_LADDER[i - 1]))
-        else:
-            recs.append(_rec("usage-limit", "runs", "warn", "Runs hit the usage limit",
-                             why + "; run less often (fewer schedule.jobs.score / prepare times) or lower runs.custom"))
-    ready = any(m["runs"] >= adv["min_runs"] for m in metrics.values())
+        if len(backlog) >= 0.6 * len(rs):
+            backlog_kinds.append(kind)
+    # usage-limit stops: only score / prepare runs of kinds that reached min_runs count
+    limited = {k: sum(1 for r in rs if r.get("stop_reason") == "usage_limit") for k, rs in ready_runs.items()}
+    n_limited = sum(limited.values())
+    if n_limited >= adv["usage_limit_stops"]:
+        why = f"{n_limited} runs in the last {adv['window_days']} days stopped at the subscription usage limit"
+        recs += _preset_recs("down", [k for k, n in limited.items() if n], ready_runs, rcfg, sched,
+                             "Runs hit the usage limit", why, "warn")
+    elif backlog_kinds:
+        why = ("runs keep hitting the job budget with over twice as many jobs still waiting "
+               f"({', '.join(backlog_kinds)})")
+        recs += _preset_recs("up", backlog_kinds, ready_runs, rcfg, sched, "The queue outgrows the budget", why, "info")
+    ready = bool(ready_runs)
     return {"ready": ready, "min_runs": adv["min_runs"], "metrics": metrics, "recommendations": recs}
+
+
+def _preset_recs(direction: str, kinds: list[str], ready_runs: dict[str, list[dict[str, Any]]], rcfg: Any, sched: Any,
+                 title: str, why: str, severity: str) -> list[dict[str, Any]]:
+    """One recommendation per YAML key: both kinds on runs.preset share one `preset-<dir>`; a kind with its own
+    schedule.jobs.<kind>.preset gets `preset-<dir>-<kind>`."""
+    by_path: dict[str, dict[str, Any]] = {}
+    for k in kinds:
+        path, cur, used = _preset_target(k, ready_runs[k], rcfg, sched)
+        e = by_path.setdefault(path, {"cur": cur, "used": used, "kinds": []})
+        e["kinds"].append(k)
+    out = []
+    for path, e in by_path.items():
+        rid = f"preset-{direction}" if path == "runs.preset" else f"preset-{direction}-{e['kinds'][0]}"
+        to = _step(e["used"], -1 if direction == "down" else 1)
+        text = f"{why}; affects {', '.join(e['kinds'])}"
+        if to is None or to == e["cur"]:
+            hint = ("run less often (fewer schedule.jobs.score / prepare times) or lower runs.custom"
+                    if direction == "down" else "raise runs.custom")
+            out.append(_rec(rid if direction == "up" else "usage-limit", "runs", severity, title, f"{text}; {hint}"))
+        else:
+            out.append(_rec(rid, "runs", severity, title, text, path, e["cur"], to))
+    return out
+
+
+def effective_value(pipeline: dict[str, Any], path: str) -> Any:
+    """What the code uses for a recommendation path (defaults applied), so `advise apply` compares like with like:
+    a key missing from the file is its default, a null retention rule is 0 (off)."""
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.schedule import load_schedule
+    from careeros.runs.yamledit import get_path
+
+    parts = path.split(".")
+    p = type("_P", (), {"pipeline": pipeline or {}})()
+    if parts[0] == "retention" and len(parts) == 2:
+        return _retention(pipeline, parts[1])
+    if path == "runs.preset":
+        return load_runs_config(p).preset
+    if parts[:2] == ["runs", "job_timeout_minutes"] and len(parts) == 3:
+        return load_runs_config(p).job_timeout_minutes.get(parts[2])
+    if parts[:2] == ["schedule", "jobs"] and len(parts) == 4 and parts[3] == "preset":
+        return load_schedule(p).jobs[parts[2]].preset
+    return get_path(pipeline, path)
 
 
 def load_runs_history(settings: Any) -> list[dict[str, Any]]:

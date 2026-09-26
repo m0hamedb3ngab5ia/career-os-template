@@ -386,34 +386,41 @@ def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None =
 
 
 def check_runs(pipeline: dict[str, Any]) -> list[Check]:
-    """`pipeline.yaml: runs` and `llm` parse (careeros.runs.config); the headless command streams."""
+    """`pipeline.yaml: runs`, `llm`, `schedule`, `storage` / `advisor` parse; the headless command streams. Every
+    block is checked on its own, so one warning never hides another block's FAIL."""
     from careeros.config import ConfigError
     from careeros.runs.config import load_runs_config
-
-    try:
-        cfg = load_runs_config(type("_P", (), {"pipeline": pipeline})())
-    except ConfigError as e:
-        return [Check(FAIL, "runs", str(e))]
-    cmd = cfg.headless_cmd
-    fmt = cmd[cmd.index("--output-format") + 1] if "--output-format" in cmd[:-1] else "text"
-    if fmt != "stream-json" or "--verbose" not in cmd:
-        return [Check(WARN, "runs", "llm.headless_cmd should use --output-format stream-json --verbose: "
-                                    "`careeros run` reads the live event stream and its final result event")]
     from careeros.runs.schedule import load_schedule
 
+    p = type("_P", (), {"pipeline": pipeline})()
+    out: list[Check] = []
     try:
-        sched = load_schedule(type("_P", (), {"pipeline": pipeline})())
+        cfg = load_runs_config(p)
     except ConfigError as e:
-        return [Check(FAIL, "schedule", str(e))]
+        out.append(Check(FAIL, "runs", str(e)))
+    else:
+        cmd = cfg.headless_cmd
+        fmt = cmd[cmd.index("--output-format") + 1] if "--output-format" in cmd[:-1] else "text"
+        if fmt != "stream-json" or "--verbose" not in cmd:
+            out.append(Check(WARN, "runs", "llm.headless_cmd should use --output-format stream-json --verbose: "
+                                           "`careeros run` reads the live event stream and its final result event"))
+        else:
+            out.append(Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ..."))
+    try:
+        sched = load_schedule(p)
+    except ConfigError as e:
+        out.append(Check(FAIL, "schedule", str(e)))
+    else:
+        on = [k for k, j in sched.jobs.items() if j.enabled]
+        out.append(Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} "
+                                           "(install: careeros schedule install)"))
     from careeros.runs.advisor import load_advisor_config
 
     try:
         load_advisor_config(pipeline)
     except ConfigError as e:
-        return [Check(FAIL, "advisor", str(e))]
-    on = [k for k, j in sched.jobs.items() if j.enabled]
-    return [Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ..."),
-            Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} (install: careeros schedule install)")]
+        out.append(Check(FAIL, "advisor", str(e)))
+    return out
 
 
 def check_voice(root: Path) -> Check:

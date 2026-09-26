@@ -57,6 +57,9 @@ class Fake:
             return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": mode}))
         if mode == "lie":  # RESULT says queued, status.json was never updated
             return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued"}))
+        if mode == "lie_prepared":  # wrote a passing prepare.json but left status.json at scored
+            (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True, "status": "queued"}))
+            return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued"}))
         if mode == "garbage":
             return parse_stream(events(None))
         if mode == "usage_limit":
@@ -189,3 +192,44 @@ def test_daily_cap_stop_can_be_turned_off(settings, store):
     add_job(store, 2, company="B", fit=80)
     rec = batch(settings, "prepare", Fake(settings), prepare={"stop_at_daily_cap": False})
     assert rec["stop_reason"] == "completed"
+
+
+
+def test_failure_that_leaves_the_job_unselectable_is_an_action_item_at_once(settings, store):
+    jid = add_job(store, 1)
+    rec = batch(settings, "prepare", Fake(settings, default="lie_prepared"))
+    assert rec["counters"]["failed"] == 1
+    sel, _ = select_candidates(settings, "prepare", load_runs_config(settings), NOW)
+    assert sel == []  # prepare.json says qa_pass: no run will ever pick it again
+    items = Tracker(settings=settings).list_action_items()
+    assert len(items) == 1 and items[0]["JobID"] == jid and "by hand" in items[0]["What to do"]
+
+
+def test_gate_non_deferral_skips_the_job_with_the_reason(settings, store):
+    jid = add_job(store, 1, category="product_manager")  # excluded category -> not_similar
+    fake = Fake(settings)
+    rec = batch(settings, "prepare", fake)
+    assert fake.calls == [] and rec["counters"]["gated"] == 1
+    st = json.loads((store.job_dir(jid) / "status.json").read_text())
+    assert st["status"] == "skipped" and st["history"][-1]["note"].startswith("company not_similar")
+
+
+def test_gate_deferral_only_passes_over(settings, store):
+    add_job(store, 1, company="Acme", fit=90)
+    add_job(store, 2, company="Acme", fit=85)
+    c = add_job(store, 3, company="Acme", fit=80)
+    batch(settings, "prepare", Fake(settings))
+    assert store.get_status(c) == "scored"
+
+
+def test_prepare_warns_when_the_company_still_has_unscored_jobs(settings, store):
+    add_job(store, 1, company="Acme")
+    add_job(store, 2, company="Acme", decision=None, status="found")
+    lines = []
+    settings.pipeline = {**settings.pipeline, "runs": {"preflight_doctor": False}}
+    cfg = load_runs_config(settings)
+    rec = run_batch(settings, "prepare", budget_for(cfg, "prepare"), cfg=cfg, invoke=Fake(settings),
+                    now=lambda: NOW, echo=lines.append)
+    assert any("Acme" in w and "unscored" in w for w in rec["warnings"])
+    assert any("unscored" in line for line in lines)
+    assert "unscored" in RunStore(settings).read_log(rec["id"])

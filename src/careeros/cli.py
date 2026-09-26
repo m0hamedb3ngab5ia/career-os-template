@@ -1022,6 +1022,10 @@ def cmd_run_catch_up(args: argparse.Namespace) -> int:
     except RuntimeError as e:
         print(f"run catch-up: {e}", file=sys.stderr)
         return 1
+    if res.get("status") == "busy":
+        print(json.dumps(res) if args.json else "run catch-up: a tick is running; try again in a moment",
+              file=None if args.json else sys.stderr)
+        return RUN_BUSY_EXIT
     if args.json:
         print(json.dumps(res, indent=2, default=str))
     elif args.dismiss:
@@ -1205,8 +1209,12 @@ def cmd_advise_apply(args: argparse.Namespace) -> int:
         return 1
     path = s.root / c["file"]
     try:
+        from careeros.runs.advisor import effective_value
+
         yamledit.apply_change(path, c["path"], c["to"], expect_from=c["from"],
-                              validate=lambda p: _validate_root(s.root))
+                              validate=lambda p: _validate_root(s.root),
+                              current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
+                                                                   c["path"]))
     except (ConfigError, ValueError) as e:
         print(f"advise apply: {e}; {c['file']} left unchanged", file=sys.stderr)
         return 1

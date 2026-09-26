@@ -90,8 +90,12 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
 
         items = retention.plan(settings)
         freed = retention.execute(settings, items)
-        snapshot_after_prune(settings, freed)
-        return "ok", f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
+        detail = f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
+        try:
+            snapshot_after_prune(settings, freed)
+        except OSError as e:  # the prune worked; a missing snapshot only delays `careeros advise`
+            detail += f"; snapshot skipped ({e})"
+        return "ok", detail
 
     def inbox_sync(trigger: str) -> tuple[str, str]:
         from careeros.runs.service import run_skill
@@ -114,9 +118,14 @@ def _run_one(action: Action, trigger: str) -> tuple[str, str]:
         return "error", f"{type(e).__name__}: {e}"[:300]
 
 
-def tick(settings: Settings, *, now: datetime | None = None, actions: dict[str, Action] | None = None,
-         dry_run: bool = False, echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
-    now = now or _utcnow()
+def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[], datetime] | None = None,
+         actions: dict[str, Action] | None = None, dry_run: bool = False,
+         echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+    """`last_tick` is stamped when the tick ENDS (`clock()`), so a long score run inside a tick never looks like
+    the Mac was asleep to the next one. Each job also keeps a `since` anchor (first seen, then every run / missed /
+    paused skip) so a first time-of-day slot held back by quiet hours or a busy runner is not lost."""
+    clock = clock or ((lambda: now) if now is not None else _utcnow)
+    now = clock()
     cfg = load_schedule(settings)
     rs = RunStore(settings)
     state = load_state(rs)
@@ -137,10 +146,13 @@ def tick(settings: Settings, *, now: datetime | None = None, actions: dict[str, 
         _save_catch_up(rs, merge_catch_up(load_catch_up(rs), decisions, now))
         for d in decisions:
             entry = jobs.setdefault(d.kind, {})
+            entry.setdefault("since", now.isoformat())
             if d.action == "missed":
-                entry.update(last_run=now.isoformat(), last_status="missed", last_detail=d.detail)
+                entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status="missed",
+                             last_detail=d.detail)
             elif d.action == "skip_paused":
-                entry.update(last_run=now.isoformat(), last_status="paused", last_detail="runs paused")
+                entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status="paused",
+                             last_detail="runs paused")
             elif d.action == "run":
                 echo(f"tick: {d.kind}")
                 status, detail = _run_one(actions[d.kind], "schedule")
@@ -148,8 +160,9 @@ def tick(settings: Settings, *, now: datetime | None = None, actions: dict[str, 
                 if status == "busy":
                     entry.update(last_status="busy", last_detail=detail)
                 else:
-                    entry.update(last_run=now.isoformat(), last_status=status, last_detail=detail)
-        state["last_tick"] = now.isoformat()
+                    entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status=status,
+                                 last_detail=detail)
+        state["last_tick"] = clock().isoformat()
         _write(rs.dir / "schedule.json", state)
     finally:
         locks.release(rs.dir / "tick.lock", lk.token)
@@ -159,34 +172,41 @@ def tick(settings: Settings, *, now: datetime | None = None, actions: dict[str, 
 def run_catch_up(settings: Settings, *, actions: dict[str, Action] | None = None, now: datetime | None = None,
                  dismiss: bool = False, echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
     """Run each kind in the pending catch-up record once (trigger catch_up; quiet hours do not apply: the
-    candidate asked for it). Kinds that found the runner busy stay pending. RuntimeError while paused."""
+    candidate asked for it). Kinds that found the runner busy stay pending. RuntimeError while paused.
+    Holds tick.lock (status busy while a tick runs), and re-reads the record before saving, removing only the
+    kinds it ran, so a slot missed meanwhile is never lost."""
     now = now or _utcnow()
     rs = RunStore(settings)
-    rec = load_catch_up(rs)
-    if dismiss:
-        _save_catch_up(rs, None)
-        return {"dismissed": bool(rec), "ran": [], "left": []}
-    if rec is None:
-        return {"ran": [], "left": [], "results": {}, "pending": False}
-    if rs.pause_state(now):
-        raise RuntimeError("runs are paused; `careeros run resume` first")
-    actions = actions if actions is not None else default_actions(settings, echo)
-    ran, left, results = [], [], {}
-    kinds = dict(rec["kinds"])
-    for kind in JOB_KINDS:
-        if kind not in kinds:
-            continue
-        echo(f"catch-up: {kind}")
-        status, detail = _run_one(actions[kind], "catch_up")
-        results[kind] = {"status": status, "detail": detail}
-        if status == "busy":
-            left.append(kind)
-        else:
-            ran.append(kind)
-            kinds.pop(kind)
-    rec["kinds"] = kinds
-    _save_catch_up(rs, rec)
-    return {"ran": ran, "left": left, "results": results, "pending": bool(kinds)}
+    try:
+        lk = locks.acquire(rs.dir / "tick.lock", owner="catch-up", ttl_seconds=TICK_LOCK_SECONDS, pid=os.getpid(),
+                           now=now)
+    except locks.LockBusy:
+        return {"status": "busy", "ran": [], "left": [], "results": {}, "dismissed": False,
+                "pending": load_catch_up(rs) is not None}
+    try:
+        rec = load_catch_up(rs)
+        if dismiss:
+            _save_catch_up(rs, None)
+            return {"status": "ok", "dismissed": bool(rec), "ran": [], "left": []}
+        if rec is None:
+            return {"status": "ok", "ran": [], "left": [], "results": {}, "pending": False}
+        if rs.pause_state(now):
+            raise RuntimeError("runs are paused; `careeros run resume` first")
+        actions = actions if actions is not None else default_actions(settings, echo)
+        ran, left, results = [], [], {}
+        for kind in JOB_KINDS:
+            if kind not in rec["kinds"]:
+                continue
+            echo(f"catch-up: {kind}")
+            status, detail = _run_one(actions[kind], "catch_up")
+            results[kind] = {"status": status, "detail": detail}
+            (left if status == "busy" else ran).append(kind)
+        latest = load_catch_up(rs) or {"kinds": {}}
+        latest["kinds"] = {k: v for k, v in latest["kinds"].items() if k not in ran}
+        _save_catch_up(rs, latest)
+        return {"status": "ok", "ran": ran, "left": left, "results": results, "pending": bool(latest["kinds"])}
+    finally:
+        locks.release(rs.dir / "tick.lock", lk.token)
 
 
 def schedule_overview(settings: Settings, now: datetime | None = None) -> dict[str, Any]:
