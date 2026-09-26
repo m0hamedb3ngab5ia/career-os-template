@@ -338,7 +338,7 @@ def check_estimates(master: dict) -> list[Check]:
 
 def check_bold(master: dict) -> list[Check]:
     """FAIL for invalid `**bold**` markup in bullet text / variants / summary_variants, and for `**` in any other
-    field (render.py rejects both: markup.bold_allowed); WARN for `**` in narratives (cover letters and answers
+    field (render.py rejects both: markup.bold_allowed_at); WARN for `**` in narratives (cover letters and answers
     draw on them and must stay plain prose)."""
     ids: dict[str, str] = {}  # "experience[0].bullets[1]" -> bullet id, for readable messages
     for sec in ("experience", "projects", "leadership"):

@@ -6,7 +6,7 @@ import re
 import pytest
 from conftest import load_script
 
-from careeros.markup import bold_allowed, bold_allowed_at, bold_spans, has_markdown_bold, iter_strings, strip_bold, validate_bold
+from careeros.markup import bold_allowed_at, bold_spans, format_path, has_markdown_bold, iter_fields, strip_bold, validate_bold
 
 pytestmark = pytest.mark.unit
 
@@ -90,55 +90,70 @@ def test_lone_lowercase_marker_is_bold_not_code(text: str) -> None:
 
 # --- where `**` may appear: one table for doctor (master.yaml paths) and render.py (resume.json paths) ---------
 
-# (master.yaml path, allowed in master.yaml, resume.json path it becomes, allowed in resume.json)
+# (master.yaml key tuple, allowed in master.yaml, resume.json key tuple it becomes, allowed in resume.json).
+# Tuples, not dotted strings, so keys holding "." or "[" (long.v2, alt[1]) are covered the way the live code sees them.
+E = ("experience", 0, "bullets", 2)
 BOLD_PATHS = [
-    ("experience[0].bullets[2].text", True, "experience[0].bullets[2].text", True),
-    ("projects[1].bullets[0].text", True, "projects[1].bullets[0].text", True),
-    ("leadership[0].bullets[0].text", True, "leadership[0].bullets[0].text", True),
-    ("experience[0].bullets[2].variants.short", True, "experience[0].bullets[2].text", True),
-    ("experience[0].bullets[2].variants[1]", True, "experience[0].bullets[2].text", True),
-    ("summary_variants.general", True, "summary", True),
-    ("skills.programming[0]", False, "skills.programming[0]", False),
-    ("experience[0].title", False, "experience[0].title", False),
-    ("experience[0].stack[1]", False, "experience[0].stack[1]", False),
-    ("experience[0].bullets[2].id", False, "experience[0].bullets[2].id", False),
-    ("projects[0].name", False, "projects[0].name", False),
-    ("education[0].degree", False, "education[0].degree", False),
-    ("identity.name", False, "identity.name", False),
-    ("narratives[0].text", False, "meta.note", False),
-    ("skills.text", False, "skills.text", False),
+    ((*E, "text"), True, (*E, "text"), True),
+    (("projects", 1, "bullets", 0, "text"), True, ("projects", 1, "bullets", 0, "text"), True),
+    (("leadership", 0, "bullets", 0, "text"), True, ("leadership", 0, "bullets", 0, "text"), True),
+    ((*E, "variants", "short"), True, (*E, "text"), True),
+    ((*E, "variants", 1), True, (*E, "text"), True),
+    ((*E, "variants", "long.v2"), True, (*E, "text"), True),
+    ((*E, "variants", "alt[1]"), True, (*E, "text"), True),
+    (("summary_variants", "general"), True, ("summary",), True),
+    (("summary_variants", "backend.v2"), True, ("summary",), True),
+    (("skills", "programming", 0), False, ("skills", "programming", 0), False),
+    (("skills", "lang.v2", 0), False, ("skills", "lang.v2", 0), False),
+    (("experience", 0, "title"), False, ("experience", 0, "title"), False),
+    (("experience", 0, "stack", 1), False, ("experience", 0, "stack", 1), False),
+    ((*E, "id"), False, (*E, "id"), False),
+    (("projects", 0, "name"), False, ("projects", 0, "name"), False),
+    (("education", 0, "degree"), False, ("education", 0, "degree"), False),
+    (("identity", "name"), False, ("identity", "name"), False),
+    (("skills", "text"), False, ("skills", "text"), False),
 ]
 
 
-@pytest.mark.parametrize("master_path, in_master, resume_path, in_resume", BOLD_PATHS)
-def test_bold_allowed_table(master_path, in_master, resume_path, in_resume):
-    assert bold_allowed(master_path, "master") is in_master
-    assert bold_allowed(resume_path, "resume") is in_resume
-
-
-@pytest.mark.parametrize("master_path, in_master, resume_path, in_resume", BOLD_PATHS)
-def test_render_check_bold_agrees_with_table(master_path, in_master, resume_path, in_resume):
-    render = load_script("templates/resume/render.py")
-    data: dict = {}
-    node: object = data
-    parts = re.findall(r"[^.\[\]]+|\[\d+\]", resume_path)
-    for i, part in enumerate(parts):
-        last = i == len(parts) - 1
-        nxt = parts[i + 1] if not last else None
-        child = "**x**" if last else ([] if nxt.startswith("[") else {})
-        if part.startswith("["):
-            idx = int(part[1:-1])
-            node.extend([None] * (idx + 1 - len(node)))  # type: ignore[union-attr]
-            node[idx] = child  # type: ignore[index]
+def _tree(keys: tuple) -> dict:
+    """A minimal tree with "**x**" at `keys`."""
+    root: dict = {}
+    node: object = root
+    for i, k in enumerate(keys):
+        last = i == len(keys) - 1
+        child = "**x**" if last else ([] if isinstance(keys[i + 1], int) else {})
+        if isinstance(k, int):
+            node.extend([{}] * (k + 1 - len(node)))  # type: ignore[union-attr]
+            node[k] = child  # type: ignore[index]
         else:
-            node[part] = child  # type: ignore[index]
+            node[k] = child  # type: ignore[index]
         node = child
-    assert (render.check_bold(data) == []) is in_resume
+    return root
 
 
-def test_iter_strings_yields_every_string_with_its_path():
-    got = list(iter_strings({"a": ["x", {"b": "y", 3: "z"}], "n": 1, "c": None}))
-    assert got == [("a[0]", "x"), ("a[1].b", "y"), ("a[1].3", "z")]
+@pytest.mark.parametrize("master_keys, in_master, resume_keys, in_resume", BOLD_PATHS)
+def test_bold_allowed_table(master_keys, in_master, resume_keys, in_resume):
+    assert bold_allowed_at(master_keys, "master") is in_master
+    assert bold_allowed_at(resume_keys, "resume") is in_resume
+
+
+@pytest.mark.parametrize("master_keys, in_master, resume_keys, in_resume", BOLD_PATHS)
+def test_render_check_bold_agrees_with_table(master_keys, in_master, resume_keys, in_resume):
+    render = load_script("templates/resume/render.py")
+    assert (render.check_bold(_tree(resume_keys)) == []) is in_resume
+
+
+@pytest.mark.parametrize("master_keys, in_master, resume_keys, in_resume", BOLD_PATHS)
+def test_doctor_check_bold_agrees_with_table(master_keys, in_master, resume_keys, in_resume):
+    from careeros.doctor import FAIL, check_bold
+    fails = [c for c in check_bold(_tree(master_keys)) if c.level == FAIL]
+    assert (not fails) is in_master, fails
+
+
+def test_iter_fields_and_format_path():
+    got = list(iter_fields({"a": ["x", {"b.c": "y", 3: "z"}], "n": 1, "c": None}))
+    assert got == [(("a", 0), "x"), (("a", 1, "b.c"), "y"), (("a", 1, 3), "z")]
+    assert format_path(("a", 1, "b.c")) == "a[1].b.c"
 
 
 @pytest.mark.parametrize("keys,source,expected", [
