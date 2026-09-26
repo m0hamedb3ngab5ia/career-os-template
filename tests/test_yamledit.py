@@ -268,3 +268,68 @@ def test_examples_read_the_same_in_yaml_1_1_and_1_2():
         a = json.loads(json.dumps(yaml.safe_load(text), default=str))
         b = json.loads(json.dumps(yamledit._yaml().load(text), default=str))
         assert a == b, f.name
+
+
+# --- files PyYAML wrote (`- item` level with its key; tests/conftest make_temp_root writes these) ------------
+
+def test_unindented_block_lists_keep_their_indentation(tmp_path):
+    import yaml as pyyaml
+
+    p = tmp_path / "companies.yaml"
+    p.write_text(pyyaml.safe_dump({"blocklist": {"companies": ["Globex Bank"], "industries": ["gambling"]},
+                                   "boards": [{"company": "Acme", "notes": "a long note " * 8}]}, sort_keys=False))
+    before = p.read_text()
+    yamledit.apply_changes(p, [("blocklist.companies", ["Globex Bank", "Initrode"])], validate=lambda _p: None)
+    after = p.read_text()
+    assert pyyaml.safe_load(after)["blocklist"]["companies"] == ["Globex Bank", "Initrode"]
+    assert pyyaml.safe_load(after)["boards"] == pyyaml.safe_load(before)["boards"]
+    assert "  - Initrode" in after.splitlines() and "  - Globex Bank" in after.splitlines()
+
+
+def difflib_lines(a: str, b: str):
+    import difflib
+
+    return (x for x in difflib.unified_diff(a.splitlines(), b.splitlines(), lineterm="", n=0)
+            if x[:1] in "+-" and not x.startswith(("+++", "---")))
+
+
+def _list_value(f, current):
+    if f.control == "records":
+        return [*current, {"company": "Zeta Labs", "ats": "greenhouse", "slug": "zetalabs"}]
+    if f.control == "rule_list" and not f.pattern:
+        return [*current, {"if": "fit >= 60", "tier": "C"}]
+    if f.control == "rule_list":
+        return [*current, "fit_lt_40"]
+    if f.options and f.strict_options:
+        return [o for o in f.options if o not in current][:1] + list(current)
+    return [*current, "zz new item"]
+
+
+@pytest.mark.parametrize("file", ["targets", "companies", "pipeline", "qa"])
+def test_every_list_field_edits_cleanly_in_a_pyyaml_dumped_file(tmp_path, file):
+    from pathlib import Path
+
+    import yaml as pyyaml
+
+    from careeros.ui.settings_schema import SECTIONS
+
+    src = Path(__file__).resolve().parents[1] / "examples" / "config" / f"{file}.yaml"
+    dumped = pyyaml.safe_dump(pyyaml.safe_load(src.read_text()), sort_keys=False)
+    fields = {f.id: f for s in SECTIONS for f in s.fields()
+              if f.file == file and f.editable and f.control in ("tags", "rule_list", "records")}
+    assert fields or file == "qa"
+    for f in fields.values():
+        p = tmp_path / f"{file}.yaml"
+        p.write_text(dumped)
+        cur = pyyaml.safe_load(dumped)
+        for k in f.key.split("."):
+            cur = cur[k]
+        new = _list_value(f, list(cur or []))
+        yamledit.apply_changes(p, [(f.key, new)], validate=lambda _p: None)
+        after = p.read_text()
+        got = pyyaml.safe_load(after)
+        for k in f.key.split("."):
+            got = got[k]
+        assert got == new, f.id
+        changed = list(difflib_lines(dumped, after))
+        assert len(changed) <= 2 * (len(new) * 3 + 2), (f.id, changed)

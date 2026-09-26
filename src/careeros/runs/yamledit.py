@@ -28,11 +28,26 @@ from ruamel.yaml.scalarstring import DoubleQuotedScalarString, ScalarString
 _MISSING = object()
 
 
-def _yaml() -> YAML:
+_BLOCK_ITEM = re.compile(r"^( *)- ")
+_KEY_LINE = re.compile(r"^( *)[^\s#-][^#]*:\s*(#.*)?$")
+
+
+def _seq_offset(text: str) -> int:
+    """How far this file indents `- item` under its key: 2 (`key:` then `  - item`, the examples' style) or 0
+    (`- item` level with the key, PyYAML's style). The first block list decides."""
+    lines = text.splitlines()
+    for prev, line in zip(lines, lines[1:]):
+        k, m = _KEY_LINE.match(prev), _BLOCK_ITEM.match(line)
+        if k and m:
+            return 0 if len(m.group(1)) == len(k.group(1)) else 2
+    return 2
+
+
+def _yaml(offset: int = 2) -> YAML:
     y = YAML(typ="rt")
     y.preserve_quotes = True
     y.width = 4096
-    y.indent(mapping=2, sequence=4, offset=2)
+    y.indent(mapping=2, sequence=offset + 2, offset=offset)
     y.representer.add_representer(type(None), lambda r, _: r.represent_scalar("tag:yaml.org,2002:null", "null"))
     return y
 
@@ -132,7 +147,10 @@ def _styled(new: Any, old: Any) -> Any:
         out = CommentedMap()
         old_keys = {str(k): k for k in old} if isinstance(old, dict) else {}
         for k, v in new.items():
-            key = old_keys.get(str(k), _scalar(k, None) if isinstance(k, str) else k)
+            key = old_keys.get(str(k), k)
+            if isinstance(key, str) and not isinstance(key, ScalarString) and (key not in old_keys.values()
+                                                                               or _needs_quotes(key)):
+                key = _scalar(str(key), None)  # a new key, or an old unquoted one PyYAML misreads (ON -> true)
             out[key] = _styled(v, old.get(key) if isinstance(old, dict) else None)
         if isinstance(old, CommentedMap):
             if old.fa.flow_style() or not old:  # `{}` in the file is flow by definition
@@ -166,7 +184,7 @@ def _styled(new: Any, old: Any) -> Any:
 def render_changes(original: str, changes: list[tuple[str, Any]]) -> tuple[str, dict[str, Any]]:
     """The file text after setting each (dotted, value), creating missing mappings, and the old values (None when
     absent). Pure: nothing is written."""
-    y = _yaml()
+    y = _yaml(_seq_offset(original))  # keep the file's list indentation (PyYAML writes `- item` level with key)
     data = y.load(original) or CommentedMap()
     olds: dict[str, Any] = {}
     changed = False

@@ -95,11 +95,45 @@ def _ambiguous_strings(node: Any) -> list[str]:
     return [str(node)] if yamledit.has_ambiguous_plain(node) else []
 
 
+def _rebuild(rt: Any, py: Any, pick: list[bool], at: list[int]) -> Any:
+    """The CLI's reading `py` with each ambiguous plain leaf of the as-written `rt` (keys too) replaced by its
+    string when pick[i] is true. Both trees come from the same text, so they walk in step."""
+    if isinstance(rt, dict) and isinstance(py, dict):
+        out = {}
+        for (rk, rv), (pk, pv) in zip(rt.items(), py.items()):
+            key = pk
+            if yamledit.has_ambiguous_plain(rk):
+                key = str(rk) if pick[at[0]] else pk
+                at[0] += 1
+            out[key] = _rebuild(rv, pv, pick, at)
+        return out
+    if isinstance(rt, list) and isinstance(py, list):
+        return [_rebuild(a, b, pick, at) for a, b in zip(rt, py)]
+    if yamledit.has_ambiguous_plain(rt):
+        use = pick[at[0]]
+        at[0] += 1
+        return str(rt) if use else py
+    return py
+
+
+def _intended(f: Field, rt: Any, py: Any, n: int) -> Any:
+    """Per leaf: the string the author wrote where that makes the field valid, else the CLI's reading. Tries the
+    choices with the most strings first (up to 2^10 combinations; beyond that, the CLI's reading)."""
+    from itertools import product
+
+    if n <= 10:
+        for pick in sorted(product((True, False), repeat=n), key=lambda p: -sum(p)):
+            cand = _rebuild(rt, py, list(pick), [0])
+            if validate_value(f, cand) is None:
+                return cand
+    return py
+
+
 def unquoted_warnings(sec: Section, rt_docs: dict[str, Any],
-                      docs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+                      py_docs: dict[str, Any]) -> dict[str, dict[str, Any]]:
     """{field id: {message, intended}} for values written without quotes that PyYAML (the CLI) reads as something
-    else: `off` -> false, 10:30 -> 630, yes -> true. `intended` is what the author meant when that is a valid value
-    for the field (the YAML 1.2 reading), else the CLI's reading; saving it rewrites the value quoted."""
+    else: `off` -> false, 10:30 -> 630, yes -> true, a key ON -> true. `intended` picks, leaf by leaf, what the
+    author wrote when it is valid there, else the CLI's reading; saving it rewrites the value quoted."""
     out: dict[str, dict[str, Any]] = {}
     for f in sec.fields():
         node = _lookup(rt_docs.get(f.file) or {}, f.key)
@@ -108,8 +142,8 @@ def unquoted_warnings(sec: Section, rt_docs: dict[str, Any],
         bad = _ambiguous_strings(node)
         if not bad:
             continue
-        written = _plain(node)
-        intended = written if validate_value(f, written) is None else _lookup(docs.get(f.file) or {}, f.key)
+        py = _lookup(py_docs.get(f.file) or {}, f.key)
+        intended = _intended(f, node, py, len(bad))
         reads = ", ".join(f"{s} as {json.dumps(yaml.safe_load(s))}" for s in dict.fromkeys(bad))
         out[f.id] = {"message": f"Written without quotes, so the pipeline reads {reads}. Save this setting to "
                                 f"fix it.", "intended": intended}
@@ -144,8 +178,9 @@ def read_section(settings: Settings, section_id: str) -> dict[str, Any]:
     paths = _paths(settings, sec)
     docs = {file: _load(p) for file, p in paths.items()}
     rt_docs = {file: _load_rt(p) for file, p in paths.items()}
+    py_docs = {file: yaml.safe_load(p.read_text(encoding="utf-8")) or {} for file, p in paths.items()}
     return {"section": sec.to_dict(), "values": effective_values(sec, docs),
-            "warnings": unquoted_warnings(sec, rt_docs, docs),
+            "warnings": unquoted_warnings(sec, rt_docs, py_docs),
             "defaults": {f.id: f.default for f in sec.fields()},
             "files": {file: str(p) for file, p in paths.items()}, "version": _version(list(paths.values()))}
 

@@ -314,3 +314,46 @@ def test_the_shipped_examples_have_no_warnings(root):
 
     for sec in SECTIONS:
         assert settings_io.read_section(_s(root), sec.id)["warnings"] == {}, sec.id
+
+
+def test_saving_lists_into_pyyaml_written_config_files(tmp_path):
+    """make_temp_root writes companies.yaml / pipeline.yaml with PyYAML (`- item` level with its key)."""
+    import yaml
+
+    r = make_temp_root(tmp_path / "plain")
+    settings_io.save_section(_s(r), "companies", {"companies:blocklist.companies": ["Globex Bank", "Initrode"],
+                                                  "companies:dream_list": ["Stripe", "Zeta Labs"]})
+    settings_io.save_section(_s(r), "runs", {"pipeline:llm.allowed_tools": ["Read", "Grep"],
+                                             "pipeline:runs.auto_submit.manual": ["tier_a", "fit_gte_90"]})
+    c = yaml.safe_load((r / "config" / "companies.yaml").read_text())
+    assert c["blocklist"]["companies"] == ["Globex Bank", "Initrode"] and c["dream_list"] == ["Stripe", "Zeta Labs"]
+    vals = settings_io.read_section(_s(r), "runs")["values"]
+    assert vals["pipeline:llm.allowed_tools"] == ["Read", "Grep"]
+
+
+def test_intended_is_chosen_per_leaf(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, 'score:   {at: ["01:00"]}', "score:   {at: [10:30], enabled: no}")
+    fid = "pipeline:schedule.jobs.score"
+    w = settings_io.read_section(_s(root), "runs")["warnings"][fid]
+    assert w["intended"] == {"at": ["10:30"], "enabled": False}
+    settings_io.save_section(_s(root), "runs", {fid: w["intended"]})
+    job = load_schedule(_s(root)).jobs["score"]
+    assert job.at == [time(10, 30)] and job.enabled is False
+
+
+def test_an_unquoted_ambiguous_mapping_key_is_requoted_on_save(root):
+    import yaml
+
+    c = root / "config" / "companies.yaml"
+    _edit(c, "company_domains: {}", "company_domains: {ON: onsemi.com}")
+    fid = "companies:company_domains"
+    w = settings_io.read_section(_s(root), "companies")["warnings"][fid]
+    assert w["intended"] == {"ON": "onsemi.com"}
+    settings_io.save_section(_s(root), "companies", {fid: w["intended"]})
+    assert yaml.safe_load(c.read_text())["company_domains"] == {"ON": "onsemi.com"}
+    assert fid not in settings_io.read_section(_s(root), "companies")["warnings"]
