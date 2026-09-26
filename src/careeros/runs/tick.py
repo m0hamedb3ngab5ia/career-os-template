@@ -93,7 +93,16 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
         snapshot_after_prune(settings, freed)
         return "ok", f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
 
-    return {"scout": scout, "score": batch("score"), "prepare": batch("prepare"), "prune": prune}
+    def inbox_sync(trigger: str) -> tuple[str, str]:
+        from careeros.runs.service import run_skill
+
+        job = sched.jobs["inbox_sync"]
+        rec = run_skill(settings, "inbox_sync", "inbox-sync", mcp_servers=job.mcp_servers,
+                        allowed_tools_extra=job.allowed_tools_extra, trigger=trigger, echo=echo)
+        return str(rec["stop_reason"]), f"run {rec['id']}"
+
+    return {"scout": scout, "inbox_sync": inbox_sync, "score": batch("score"), "prepare": batch("prepare"),
+            "prune": prune}
 
 
 def _run_one(action: Action, trigger: str) -> tuple[str, str]:

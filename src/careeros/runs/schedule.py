@@ -3,7 +3,11 @@
 launchd calls `careeros tick` every `tick_minutes`. For each job (scout, score, prepare, prune) the planner
 decides, from the last run and `now`:
 
-- not_due      the interval has not passed
+Each job runs either every N hours / days (`every_hours`, `every_days`) or at times of day (`at: ["01:00"]`,
+local time). A time-of-day job never fires on the very first tick: its reference point is its last run, else the
+last tick, else now, and it runs once for the latest slot after that point.
+
+- not_due      the interval has not passed / no slot since the last run
 - run          due; runs now
 - wait_quiet   due, but a claude-using job (score, prepare) and `now` is inside quiet_hours: it runs when they end
 - missed       due while the Mac was asleep or off (the gap since the last tick is over missed_after_minutes)
@@ -25,14 +29,19 @@ from typing import Any
 
 from careeros.config import ConfigError
 
-JOB_KINDS = ("scout", "score", "prepare", "prune")
-CLAUDE_KINDS = ("score", "prepare")
+JOB_KINDS = ("scout", "inbox_sync", "score", "prepare", "prune")
+CLAUDE_KINDS = ("inbox_sync", "score", "prepare")
 SCHEDULE_KEYS = ("tick_minutes", "timezone", "quiet_hours", "missed_after_minutes", "jobs", "launchd_label")
-JOB_KEYS = ("enabled", "every_hours", "every_days", "preset")
+JOB_KEYS = ("enabled", "every_hours", "every_days", "at", "preset", "mcp_servers", "allowed_tools_extra")
 DEFAULT_JOBS: dict[str, dict[str, Any]] = {
     "scout": {"every_hours": 3},
-    "score": {"every_hours": 6},
-    "prepare": {"every_hours": 12},
+    # Off until the inbox-sync skill is finished. Needs the Gmail MCP logged in: a run whose init event reports it
+    # needs auth (or whose skill says gmail_mcp_unavailable) stops with auth_required.
+    "inbox_sync": {"at": ["08:00", "18:00"], "enabled": False, "mcp_servers": ["gmail"],
+                   "allowed_tools_extra": ["ToolSearch", "mcp__claude_ai_Gmail__search_threads",
+                                           "mcp__claude_ai_Gmail__get_thread"]},
+    "score": {"at": ["01:00"]},
+    "prepare": {"at": ["02:00"]},
     "prune": {"every_days": 7},
 }
 DEFAULT_QUIET = ("09:00", "18:00")
@@ -44,9 +53,12 @@ WHERE = "config/pipeline.yaml: schedule"
 @dataclass
 class JobSchedule:
     kind: str
-    every_minutes: float
+    every_minutes: float | None
     enabled: bool = True
     preset: str | None = None
+    at: list[time] | None = None
+    mcp_servers: list[str] = field(default_factory=list)
+    allowed_tools_extra: list[str] = field(default_factory=list)
 
     @property
     def claude(self) -> bool:
@@ -104,10 +116,26 @@ def _job(kind: str, raw: Any, presets: tuple[str, ...]) -> JobSchedule:
     for k in raw:
         if k not in JOB_KEYS:
             raise _err(f"{where}: unknown key {k!r}; valid: {', '.join(JOB_KEYS)}")
-    if ("every_hours" in raw) == ("every_days" in raw):
-        raise _err(f"{where} needs exactly one of every_hours / every_days")
-    minutes = (_pos(raw["every_hours"], f"{where}.every_hours") * 60 if "every_hours" in raw
-               else _pos(raw["every_days"], f"{where}.every_days") * 24 * 60)
+    if sum(k in raw for k in ("every_hours", "every_days", "at")) != 1:
+        raise _err(f"{where} needs exactly one of every_hours / every_days / at")
+    at = None
+    minutes = None
+    if "at" in raw:
+        times = raw["at"] if isinstance(raw["at"], list) else [raw["at"]]
+        if not times:
+            raise _err(f"{where}.at must list at least one \"HH:MM\"")
+        at = sorted({_hhmm(t, f"{where}.at") for t in times})
+    else:
+        minutes = (_pos(raw["every_hours"], f"{where}.every_hours") * 60 if "every_hours" in raw
+                   else _pos(raw["every_days"], f"{where}.every_days") * 24 * 60)
+    lists = {}
+    for key in ("mcp_servers", "allowed_tools_extra"):
+        v = raw.get(key, [])
+        if key in raw and kind not in CLAUDE_KINDS:
+            raise _err(f"{where}.{key} only applies to jobs that call Claude ({', '.join(CLAUDE_KINDS)})")
+        if not isinstance(v, list) or not all(isinstance(x, str) and x.strip() for x in v):
+            raise _err(f"{where}.{key} must be a list of names")
+        lists[key] = list(v)
     enabled = raw.get("enabled", True)
     if not isinstance(enabled, bool):
         raise _err(f"{where}.enabled must be true or false")
@@ -117,7 +145,7 @@ def _job(kind: str, raw: Any, presets: tuple[str, ...]) -> JobSchedule:
             raise _err(f"{where}.preset only applies to score and prepare")
         if preset not in presets:
             raise _err(f"{where}.preset must be one of {' | '.join(presets)}, got {preset!r}")
-    return JobSchedule(kind, minutes, enabled, preset)
+    return JobSchedule(kind, minutes, enabled, preset, at, **lists)
 
 
 def load_schedule(settings: Any) -> ScheduleConfig:
@@ -163,7 +191,15 @@ def load_schedule(settings: Any) -> ScheduleConfig:
         if k not in JOB_KINDS:
             raise _err(f".jobs: unknown job {k!r}; valid: {', '.join(JOB_KINDS)}")
     for kind in JOB_KINDS:
-        c.jobs[kind] = _job(kind, jobs.get(kind, DEFAULT_JOBS[kind]), PRESET_NAMES)
+        given = jobs.get(kind)
+        # a partial block (e.g. only `enabled: true`) keeps the default timing and extras
+        block = dict(DEFAULT_JOBS[kind]) if given is None else given
+        if isinstance(given, dict) and not any(k in given for k in ("every_hours", "every_days", "at")):
+            block = {**DEFAULT_JOBS[kind], **given}
+        elif isinstance(given, dict) and kind == "inbox_sync":
+            block = {**{k: v for k, v in DEFAULT_JOBS[kind].items() if k in ("mcp_servers", "allowed_tools_extra")},
+                     **given}
+        c.jobs[kind] = _job(kind, block, PRESET_NAMES)
     label = raw.get("launchd_label", DEFAULT_LABEL)
     if not isinstance(label, str) or not re.match(r"^[A-Za-z0-9._-]+$", label):
         raise _err(f".launchd_label must be a reverse-DNS name like {DEFAULT_LABEL}")
@@ -206,6 +242,29 @@ def effective_due(cfg: ScheduleConfig, job: JobSchedule, due: datetime) -> datet
 
 # --- planning ------------------------------------------------------------------------------------------------
 
+def _slots(cfg: ScheduleConfig, job: JobSchedule, start: datetime, end: datetime) -> list[datetime]:
+    """Time-of-day slots t with start < t <= end (aware datetimes, the schedule's time zone)."""
+    ls, le = _local(start, cfg.tz), _local(end, cfg.tz)
+    out = []
+    day = ls.date() - timedelta(days=1)
+    while day <= le.date():
+        for t in job.at or []:
+            dt = datetime.combine(day, t, tzinfo=ls.tzinfo)
+            if ls < dt <= le:
+                out.append(dt)
+        day += timedelta(days=1)
+    return sorted(out)
+
+
+def _next_slot(cfg: ScheduleConfig, job: JobSchedule, after: datetime) -> datetime:
+    return _slots(cfg, job, after, after + timedelta(days=2))[0]
+
+
+def _reference(state: dict[str, Any], kind: str, now: datetime) -> tuple[datetime | None, datetime]:
+    last = _parse(((state or {}).get("jobs") or {}).get(kind, {}).get("last_run"))
+    return last, last or _parse((state or {}).get("last_tick")) or now
+
+
 def plan_tick(cfg: ScheduleConfig, state: dict[str, Any], now: datetime, paused: bool) -> list[Decision]:
     last_tick = _parse((state or {}).get("last_tick"))
     miss = timedelta(minutes=cfg.missed_after_minutes)
@@ -216,16 +275,24 @@ def plan_tick(cfg: ScheduleConfig, state: dict[str, Any], now: datetime, paused:
         if not job.enabled:
             out.append(Decision(kind, "disabled"))
             continue
-        last = _parse(((state or {}).get("jobs") or {}).get(kind, {}).get("last_run"))
-        every = timedelta(minutes=job.every_minutes)
-        due = last + every if last else now
-        if now < due:
-            out.append(Decision(kind, "not_due", due))
-            continue
-        eff = effective_due(cfg, job, due)
+        last, ref = _reference(state, kind, now)
+        if job.at:
+            passed = _slots(cfg, job, ref, now)
+            if not passed:
+                out.append(Decision(kind, "not_due", _next_slot(cfg, job, now)))
+                continue
+            due, n_slots = passed[-1], len(passed)
+            eff = effective_due(cfg, job, due)
+        else:
+            every = timedelta(minutes=job.every_minutes or 0)
+            due = last + every if last else now
+            if now < due:
+                out.append(Decision(kind, "not_due", due))
+                continue
+            eff = effective_due(cfg, job, due)
+            n_slots = int(math.floor((now - eff) / every)) + 1
         if asleep and eff < now - miss:
-            slots = int(math.floor((now - eff) / every)) + 1
-            out.append(Decision(kind, "missed", eff, slots, f"{slots} slot(s) since {eff.isoformat()}"))
+            out.append(Decision(kind, "missed", eff, n_slots, f"{n_slots} slot(s) since {eff.isoformat()}"))
         elif paused:
             out.append(Decision(kind, "skip_paused", eff))
         elif job.claude and in_quiet(_local(now, cfg.tz).timetz().replace(tzinfo=None), cfg.quiet_start, cfg.quiet_end):
@@ -258,7 +325,11 @@ def next_runs(cfg: ScheduleConfig, state: dict[str, Any], now: datetime) -> dict
         if not job.enabled:
             out[kind] = None
             continue
-        last = _parse(((state or {}).get("jobs") or {}).get(kind, {}).get("last_run"))
-        due = max(last + timedelta(minutes=job.every_minutes), now) if last else now
-        out[kind] = effective_due(cfg, job, due).astimezone(now.tzinfo) if now.tzinfo else effective_due(cfg, job, due)
+        last, ref = _reference(state, kind, now)
+        if job.at:
+            due = now if _slots(cfg, job, ref, now) else _next_slot(cfg, job, now)
+        else:
+            due = max(last + timedelta(minutes=job.every_minutes or 0), now) if last else now
+        eff = effective_due(cfg, job, due)
+        out[kind] = eff.astimezone(now.tzinfo) if now.tzinfo else eff
     return out
