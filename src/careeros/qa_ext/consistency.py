@@ -20,7 +20,7 @@
   (clauses split on ";", ", and", ", while", " but ", dashes), and a number whose value the posting text or any
   artifact's `facts_used` states is a company fact, never a mismatch.
 - `numbers_paraphrased` (soft, only on findings): a vague or hedged restatement ("nearly half", "dozens of",
-  "nearly 40") of an exact bullet number. Hedging an `estimate: true` ("~") number is not reported.
+  "nearly 40") of an exact bullet number. Hedging a number the bullet itself hedges ("~2", "about 2") is not reported.
 
 Config (`config/qa.yaml: consistency`, all optional): enabled (true), min_overlap (3), year_window (40),
 role_nouns, seniority_words (lists; defaults below). Findings go to `ck.extras["consistency"]`:
@@ -79,7 +79,8 @@ DEGREE_RX = {
     "doctorate": re.compile(r"\bph\.?\s?d\b|\bdoctora(?:te|l)\b", re.I),
 }
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
-TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|[A-Za-z][A-Za-z'-]*|[(–-]")
+# a word may carry digits after its first letter, so product names (S3, EC2, K8s, OAuth2) never parse as numbers
+TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|[A-Za-z][A-Za-z0-9'-]*|[(–-]")
 # clause boundaries inside one sentence: a company fact and a bullet claim often share a sentence
 CLAUSE_SPLIT = re.compile(r";|,\s+(?:and|while|whereas)\s+|\s+but\s+|\s*—\s*|\s+–\s+|\s+--?\s+")
 YEAR_RE = re.compile(r"(?<![\w$.,])((?:19|20)\d{2})(?![\d%+]|[.,]\d|\w)")
@@ -172,6 +173,9 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
         if prev1 in ("a", "an") and start >= 2:  # "nearly a third", "about a dozen"
             prev1, prev2 = prev2, low[start - 3] if start >= 3 else ""
         hedged = prev1 in HEDGE_1 or (prev2, prev1) in HEDGE_2 or prev1 == "~"
+        hedge = ""
+        if hedged:
+            hedge = f"{prev2} {prev1}" if (prev2, prev1) in HEDGE_2 else prev1
         unit: list[str] = []
         k = j
         while k < len(toks) and len(unit) < 2 and k < j + 5:
@@ -182,7 +186,8 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
                 break
             k += 1
         out.append({"value": value, "kind": kind, "unit": set(unit), "hedged": hedged, "vague": vague,
-                    "estimate": prev1 == "~", "raw": " ".join(toks[start:j])})
+                    "estimate": prev1 == "~",
+                    "raw": (hedge + (" " if hedge != "~" else "") if hedge else "") + " ".join(toks[start:j])})
         i = j
     return out
 
@@ -505,7 +510,9 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
                     continue
                 equal = [r for r in paired if abs(r["value"] - p["value"]) < 1e-9]
                 if equal:
-                    if p["hedged"] and not any(r["estimate"] for r in equal):
+                    # hedging is a paraphrase only when the bullet states the number exactly; a bullet that
+                    # itself says "about 2 months" (or "~2") may be restated with a hedge
+                    if p["hedged"] and not any(r["estimate"] or r["hedged"] for r in equal):
                         para.append(item)
                 elif p["hedged"] and any(r["estimate"] for r in paired):
                     continue

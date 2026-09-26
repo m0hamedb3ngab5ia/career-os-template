@@ -11,7 +11,7 @@ from conftest import EXAMPLE_REPO, build_resume_json, make_temp_root
 from test_qa import COVER_LETTER, RESUME_TXT
 
 from careeros.qa import Checker
-from careeros.qa_ext.consistency import check_cross_doc
+from careeros.qa_ext.consistency import check_cross_doc, parse_numbers
 
 pytestmark = pytest.mark.unit
 
@@ -398,3 +398,52 @@ def test_top_level_followups_are_checked(tmp_path: Path) -> None:
     ck = run(make_job(tmp_path, outreach=out))
     chk = by_name(ck, "numbers_consistent")
     assert chk["ok"] is False and "followups" in chk["detail"]
+
+
+# --- hedged bullet numbers --------------------------------------------------------------------------
+def _hedged_root(tmp_path: Path, bullet_phrase: str) -> tuple[Path, dict]:
+    root = make_temp_root(tmp_path / "repo")
+    prof = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    prof["experience"][0]["bullets"].append({
+        "id": "acme.6",
+        "text": f"Deployed the reconciliation dashboard to production {bullet_phrase} of joining, running on Kubernetes"})
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(prof, sort_keys=False))
+    return root, prof
+
+
+def _hedged_job(tmp_path: Path, bullet_phrase: str, restated: str) -> Checker:
+    root, prof = _hedged_root(tmp_path, bullet_phrase)
+    text = f"At Acme I deployed the reconciliation dashboard to production {restated}, running on Kubernetes."
+    return run(make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                        answers=answer(text, ids=("acme.6",))))
+
+
+@pytest.mark.parametrize("restated", ["in about 2 months", "within roughly 2 months"])
+def test_hedge_copied_from_bullet_is_not_a_paraphrase(tmp_path: Path, restated: str) -> None:
+    # the bullet itself says "about 2 months": repeating that hedge is the bullet's own wording
+    ck = _hedged_job(tmp_path, "within about 2 months", restated)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert "numbers_paraphrased" not in names(ck), by_name(ck, "numbers_paraphrased")["detail"]
+
+
+def test_hedging_an_exact_bullet_number_still_warns_and_names_the_hedge(tmp_path: Path) -> None:
+    ck = _hedged_job(tmp_path, "within 2 months", "in about 2 months")
+    chk = by_name(ck, "numbers_paraphrased")
+    assert chk["ok"] is False and "'about 2'" in chk["detail"]
+    assert ck.extras["consistency"]["number_paraphrases"][0]["found"] == "about 2"
+
+
+def test_hedged_bullet_with_changed_number_is_still_hard(tmp_path: Path) -> None:
+    ck = _hedged_job(tmp_path, "within about 2 months", "in about 3 months")
+    assert by_name(ck, "numbers_consistent")["ok"] is False
+
+
+@pytest.mark.parametrize("text", ["AWS (Glue, Athena, S3)", "EC2 and K8s", "Web3 and OAuth2"])
+def test_product_names_are_not_numbers(text: str) -> None:
+    assert parse_numbers(text) == []
+
+
+@pytest.mark.parametrize("text,value", [("ran on 3 nodes", 3.0), ("Python 3.12", 3.12), ("cut latency 10x", 10.0),
+                                        ("2M events", 2_000_000.0)])
+def test_plain_numbers_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
