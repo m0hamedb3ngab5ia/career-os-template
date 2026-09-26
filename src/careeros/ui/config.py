@@ -13,7 +13,7 @@ from careeros.config import ConfigError
 from careeros.models import STATUSES
 
 UI_KEYS = ("port", "host", "open_browser", "theme", "undo_seconds", "page_size", "watch_debounce_ms", "index_path",
-           "pipeline")
+           "followup_after_apply_days", "followup_no_response_days", "pipeline")
 THEMES = ("system", "light", "dark")
 # The mockup's board: one column per stage; statuses left out (skipped, rejected, withdrawn, ghosted) are
 # counted in the "Closed" summary line under the board.
@@ -37,6 +37,9 @@ class UiConfig:
     page_size: int = 100
     watch_debounce_ms: int = 300
     index_path: str | None = None          # None: data/careeros.db next to data/jobs
+    # Inbox & follow-ups: when a follow-up shows as due (templates/followup_email/README.md windows)
+    followup_after_apply_days: int = 3     # after-applying note: same day to 3 days after applying
+    followup_no_response_days: int = 7     # status follow-up: 7 to 14 days after the last reply
     columns: list[dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_COLUMNS))
 
     @property
@@ -109,6 +112,10 @@ def load_ui_config(settings: Any) -> UiConfig:
         cfg.page_size = _int(raw["page_size"], "page_size", 20, 1000)
     if "watch_debounce_ms" in raw:
         cfg.watch_debounce_ms = _int(raw["watch_debounce_ms"], "watch_debounce_ms", 50, 10000)
+    if "followup_after_apply_days" in raw:
+        cfg.followup_after_apply_days = _int(raw["followup_after_apply_days"], "followup_after_apply_days", 0, 60)
+    if "followup_no_response_days" in raw:
+        cfg.followup_no_response_days = _int(raw["followup_no_response_days"], "followup_no_response_days", 1, 60)
     if raw.get("index_path") is not None:
         if not isinstance(raw["index_path"], str) or not raw["index_path"].strip():
             raise _err(f"index_path must be a file path or null, got {raw['index_path']!r}")

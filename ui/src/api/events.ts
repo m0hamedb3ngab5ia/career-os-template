@@ -26,11 +26,13 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["jobs"]);
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
+    add(["inbox"]); // outreach.json, log.md (inbox-sync lines) and the status history too
     add(["status"]);
   }
   if (p.runs?.length) {
     add(["runs"]);
     for (const id of p.runs) add(["run", id]);
+    add(["inbox"]); // "Last inbox sync" comes from inbox_sync runs
     add(["status"]);
   }
   if (p.actions) {
@@ -40,6 +42,8 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   if (p.config) {
     add(["meta"]);
     add(["settings"]);
+    add(["inbox"]); // follow-up due days (ui.followup_*_days)
+    add(["contacts"]); // outreach.manual_if_connected / manual_if_mutuals
     add(["status"]);
   }
   if (p.status) add(["status"]);

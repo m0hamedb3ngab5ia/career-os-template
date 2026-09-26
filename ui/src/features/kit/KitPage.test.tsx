@@ -42,4 +42,17 @@ describe("KitPage", () => {
     const { container } = renderKit();
     expect(await axeViolations(container)).toEqual([]);
   });
+
+  it("shows an unavailable control with its reason and opens a sheet", async () => {
+    const user = userEvent.setup();
+    renderKit();
+    const light = screen.getByRole("region", { name: "Light" });
+    expect(within(light).getByRole("button", { name: "Sync inbox" })).toHaveAccessibleDescription(
+      "Inbox sync isn't set up yet",
+    );
+    await user.click(within(light).getByRole("button", { name: "Open sheet" }));
+    expect(screen.getByRole("dialog", { name: "Mark connection" })).toBeInTheDocument();
+    await user.keyboard("{Escape}");
+    expect(within(light).getByRole("button", { name: "Open sheet" })).toHaveFocus();
+  });
 });

@@ -2,7 +2,8 @@
 
 Status: building. The mockup is signed off; Phase 2 is being built in slices. Built so far: the `careeros ui`
 server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/status`, `/api/jobs`, `/api/events`,
-`pipeline.yaml: ui`). Everything else in this file is not built yet unless it says so.
+`pipeline.yaml: ui`), and the Contacts and Inbox & follow-ups screens (`/api/contacts`, `/api/contacts/{job_id}/{name}/mark`,
+`/api/inbox`, `/api/inbox/{job_id}`; sending, inbox sync from the app and draft edits are shown off with a reason). Everything else in this file is not built yet unless it says so.
 
 ## Goals
 

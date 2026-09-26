@@ -1,0 +1,1 @@
+import{a as e,c as t}from"./Toast-C23VFF7s.js";var n=t();function r({href:t,children:r}){return(0,n.jsxs)(`a`,{href:t,target:`_blank`,rel:`noopener noreferrer`,className:e.external,children:[r,(0,n.jsx)(`span`,{"aria-hidden":`true`,children:` ↗`}),(0,n.jsx)(`span`,{className:`sr-only`,children:` (opens in a new tab)`})]})}export{r as t};

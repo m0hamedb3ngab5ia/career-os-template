@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatRelative } from "./format";
+import { formatCount, formatDate, formatDateTime, formatRelative } from "./format";
 
 describe("format", () => {
   const now = new Date("2026-09-26T12:00:00Z");
@@ -25,5 +25,13 @@ describe("format", () => {
 
   it("formats counts with grouping", () => {
     expect(formatCount(1736, en)).toBe("1,736");
+  });
+
+  it("formats dates and date-times with Intl in the given locale", () => {
+    expect(formatDate("2026-09-24T15:00:00Z", en)).toBe("Sep 24");
+    expect(formatDate("2026-09-24T15:00:00Z", "fr-FR")).toBe("24 sept.");
+    expect(formatDateTime("2026-09-22T16:41:00", en)).toBe("Sep 22, 4:41 PM");
+    expect(formatDate(null, en)).toBeNull();
+    expect(formatDateTime("nope", en)).toBeNull();
   });
 });

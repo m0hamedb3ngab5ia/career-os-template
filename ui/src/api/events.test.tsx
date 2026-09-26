@@ -31,17 +31,21 @@ describe("keysForChange", () => {
       ["job", "a1"],
       ["job", "b2"],
       ["contacts"],
+      ["inbox"],
       ["status"],
     ]);
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
+      ["inbox"],
       ["status"],
       ["actions"],
     ]);
     expect(keysForChange({ jobs: [], runs: [], actions: false, config: true, status: false })).toEqual([
       ["meta"],
       ["settings"],
+      ["inbox"],
+      ["contacts"],
       ["status"],
     ]);
     expect(keysForChange({ status: true })).toEqual([["status"]]);

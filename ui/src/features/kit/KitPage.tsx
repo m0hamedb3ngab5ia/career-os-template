@@ -17,8 +17,10 @@ import { ACTION_TYPES, NEEDS, PRIORITIES, SAFETY, STATUSES, STOP_REASONS, TIERS 
 import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
 import { Popover } from "../../kit/Popover";
 import { SegmentedControl } from "../../kit/SegmentedControl";
+import { Sheet } from "../../kit/Sheet";
 import { Switch } from "../../kit/Switch";
 import { useToast } from "../../kit/Toast";
+import { UnavailableButton } from "../../kit/UnavailableButton";
 import styles from "./KitPage.module.css";
 
 // Developer page for visual checks against the mockup's Components artboard, in both themes side by side.
@@ -52,6 +54,7 @@ function Interactive() {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
   const tile = useRef<HTMLButtonElement>(null);
 
   return (
@@ -162,6 +165,18 @@ function Interactive() {
           />
         ) : null}
         <p className={styles.note}>Reversible: act now, show Undo for 8 s. Irreversible: confirm first, name the outcome on the button.</p>
+      </section>
+
+      <section className={styles.stack}>
+        <h3 className={styles.h3}>Not built yet, and sheets</h3>
+        <div className={styles.row}>
+          <UnavailableButton reason="Inbox sync isn't set up yet">Sync inbox</UnavailableButton>
+          <Button onClick={() => setSheet(true)}>Open sheet</Button>
+        </div>
+        <Sheet open={sheet} onClose={() => setSheet(false)} title="Mark connection" closeLabel="Cancel">
+          <p>Sheets trap focus; Escape closes them and focus returns to the opener.</p>
+        </Sheet>
+        <p className={styles.note}>A feature with no backend stays focusable and says why it does nothing.</p>
       </section>
     </>
   );

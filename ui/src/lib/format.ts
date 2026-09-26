@@ -42,3 +42,32 @@ export function formatRelative(iso: string | null | undefined, now: Date = new D
 export function formatCount(n: number, locale?: string): string {
   return nf(locale).format(n);
 }
+
+const dfs = new Map<string, Intl.DateTimeFormat>();
+
+function df(style: "date" | "datetime", locale?: string): Intl.DateTimeFormat {
+  const k = `${style}|${locale ?? ""}`;
+  let f = dfs.get(k);
+  if (!f) {
+    const opts: Intl.DateTimeFormatOptions =
+      style === "date"
+        ? { month: "short", day: "numeric" }
+        : { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" };
+    dfs.set(k, (f = new Intl.DateTimeFormat(locale, opts)));
+  }
+  return f;
+}
+
+/** "Sep 24" (month and day in the viewer's locale); null for missing or unparseable input. */
+export function formatDate(iso: string | null | undefined, locale?: string): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : df("date", locale).format(t);
+}
+
+/** "Sep 22, 4:41 PM" (month, day and time in the viewer's locale). */
+export function formatDateTime(iso: string | null | undefined, locale?: string): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isNaN(t) ? null : df("datetime", locale).format(t);
+}

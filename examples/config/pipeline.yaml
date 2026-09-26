@@ -131,6 +131,10 @@ ui:                                        # reusable default: fine to keep. `ca
   page_size: 100                           # 100 (Recommended): rows per page in Jobs and Runs history (20 to 1000)
   watch_debounce_ms: 300                   # 300 (Recommended): the app refreshes once files are quiet this long
   index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
+  followup_after_apply_days: 3             # 3 (Recommended): Inbox shows the after-applying note as due this many
+                                           # days after you apply (0 = same day). Display only; nothing sends
+  followup_no_response_days: 7             # 7 (Recommended: 7 to 14): a status follow-up is due this long after the
+                                           # last reply (screening)
   pipeline:
     columns:                               # (Recommended) the six below. Each status sits in at most one column;
       - {name: Found, statuses: [found, scored]}          # statuses in no column (skipped, rejected, withdrawn,

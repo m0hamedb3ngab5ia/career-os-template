@@ -15,3 +15,9 @@ export interface StatusSummary {
     indexed_at?: string | null;
   };
 }
+
+/** GET /api/meta (src/careeros/ui/services/meta.py); only the fields the screens read so far. */
+export interface Meta {
+  statuses?: string[];
+  ui?: { theme?: string; undo_seconds?: number; page_size?: number };
+}

@@ -118,3 +118,60 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                                     else "usage_limit", "duration_s": 400, "session_id": "sess-1", "detail": ""})
         runs[name] = run["id"]
     return {"settings": s, "jobs": ids, "actions": actions, "runs": runs, "now": now}
+
+
+def add_outreach_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Opt-in extra for the Contacts and Inbox screens: contacts + outreach drafts (the find-contacts and
+    draft-outreach skills' shapes), an inbox-sync log line and a pending sync update. Kept out of build_ui_data so
+    the counts other tests assert stay as they are. All names and addresses are fictional (example.com)."""
+    s, ids, now = data["settings"], data["jobs"], data["now"]
+    store = Store(s)
+    hooli, stark = ids["applied"], ids["interview"]
+    (store.job_dir(hooli) / "contacts.json").write_text(json.dumps({"job_id": hooli, "company": "Hooli", "contacts": [
+        {"name": "Dana Cruz", "title": "Technical Recruiter", "role": "recruiter", "confidence": "high",
+         "linkedin": "https://www.linkedin.com/in/example-dana", "email": "dana.cruz@example.com",
+         "email_confidence": "verified", "email_candidates": ["dana.cruz@example.com"],
+         "linkedin_degree": None, "mutuals": None},
+    ]}, indent=2), encoding="utf-8")
+    base = {"linkedin_note_chars": 0, "bullet_ids": [], "narrative_ids": [], "facts_used": [],
+            "manual_tailor": False, "manual_reason": None, "send_after": None, "linkedin_send_after": None,
+            "auto_send": False, "sent": False, "sent_by": None, "followup_7d": None, "followup_14d": None}
+    (store.job_dir(hooli) / "outreach.json").write_text(json.dumps({
+        "job_id": hooli, "company": "Hooli", "drafted_at": iso(now - timedelta(days=1)),
+        "drafts": [{**base, "contact": "Dana Cruz", "role": "recruiter", "to": "dana.cruz@example.com",
+                    "to_confidence": "verified", "kind": "post_apply_outreach", "channel": "email",
+                    "linkedin_note": "Hi Dana, I applied to the New Grad Engineer role at Hooli.",
+                    "linkedin_message": None,
+                    "email": {"subject": "New Grad Engineer application",
+                              "body": "Hi Dana,\n\nI applied for the New Grad Engineer role this week. "
+                                      "[SPECIFIC CONNECTION]\n\nHappy to share more about "
+                                      "[MOST RELEVANT EXPERIENCE]. Thanks for reading.\n\nAlex"}}],
+        "followups": [], "review_required": True}, indent=2), encoding="utf-8")
+    (store.job_dir(stark) / "outreach.json").write_text(json.dumps({
+        "job_id": stark, "company": "Stark Industries", "drafted_at": iso(now - timedelta(days=9)),
+        "drafts": [
+            {**base, "contact": "Pat Rivers", "role": "hiring_manager", "to": "pat@example.com",
+             "to_confidence": "low", "kind": "cold_email", "channel": "linkedin", "manual_tailor": True,
+             "manual_reason": "LINKEDIN_CONNECTED", "linkedin_note": "Hi Pat, good to see the team growing.",
+             "linkedin_message": "Hi Pat,\n\nI applied to the Software Engineer role on your team.",
+             "email": {"subject": "Software Engineer", "body": "Hi Pat,\n\nShort note."}},
+            {**base, "contact": "Sam Lee", "role": "recruiter", "to": None, "to_confidence": "low",
+             "kind": "cold_email", "channel": "linkedin",
+             "linkedin_note": "Hi Sam, I applied to the Software Engineer role at Stark Industries.",
+             "linkedin_message": "Hi Sam,\n\nI applied to the Software Engineer role and would like to connect.",
+             "email": None},
+        ],
+        "followups": [{**base, "contact": "Pat Rivers", "kind": "post_interview_thanks", "channel": "email",
+                       "to": "pat@example.com", "to_confidence": "low",
+                       "email": {"subject": "Thank you", "body": "Hi Pat,\n\nThank you for [INTERVIEW DETAIL]."}}],
+        "review_required": True}, indent=2), encoding="utf-8")
+    invite_at = now - timedelta(days=2)
+    # the inbox-sync skill's log line (section 4), stamped at a fixed local time so tests are deterministic
+    with (store.job_dir(stark) / "log.md").open("a", encoding="utf-8") as f:
+        f.write(f"- {invite_at.astimezone().strftime('%Y-%m-%d %H:%M:%S')} [inbox-sync] interview_invite from "
+                f"recruiting@example.com {invite_at.date().isoformat()} -> status interview "
+                f"(https://mail.google.com/mail/u/0/#all/thread-stark-1)\n")
+    Path(s.paths["jobs_dir"]).parent.joinpath("sync_updates.json").write_text(json.dumps([
+        {"job_id": hooli, "company": "Hooli", "status": "screening", "note": "assessment invite",
+         "source_thread": "thread-hooli-1", "date": invite_at.date().isoformat(), "applied": False}]), encoding="utf-8")
+    return data
