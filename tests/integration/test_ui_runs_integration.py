@@ -100,7 +100,8 @@ def test_cancel_stops_a_hung_run_with_stop_reason_cancelled(root, env):
     with pytest.raises(Busy):
         rc.start("prepare")
     wait_for(lambda: any(e["type"] == "system" for e in rc.tail(cur["id"], follow=False)))  # claude is up
-    assert rc.cancel()["status"] == "cancelling"
+    got = rc.cancel()
+    assert got["status"] == "cancelling", got
     run = wait_for(lambda: finished(rc, "score"), timeout=30)
     assert run["stop_reason"] == "cancelled" and run["counters"]["attempted"] == 1 and rc.current() is None
 
@@ -117,7 +118,7 @@ def test_tracker_step_records_a_run(root, env):
 def claude_pids(fake_bin: str) -> list[int]:
     import subprocess
 
-    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
+    out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True).stdout  # macOS and Linux
     return [int(line.split(None, 1)[0]) for line in out.splitlines() if fake_bin in line]
 
 
@@ -136,7 +137,8 @@ def test_cancel_a_ui_catch_up_stops_the_batch_and_leaves_no_claude(root, env):
     wait_for(lambda: any(e["type"] == "system" for e in rc.tail(cur["id"], follow=False)))  # claude is up
     fake_bin = env["PATH"].split(os.pathsep)[0]
     assert claude_pids(fake_bin)
-    assert rc.cancel()["status"] == "cancelling"
+    got = rc.cancel()
+    assert got["status"] == "cancelling", got
     run = wait_for(lambda: finished(rc, "score"), timeout=30)
     assert run["stop_reason"] == "cancelled"
     wait_for(lambda: not claude_pids(fake_bin), timeout=15)

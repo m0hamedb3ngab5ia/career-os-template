@@ -69,6 +69,9 @@ def ps_started(pid: int) -> datetime | None:
 
 
 CANCELLABLE_RUNS = ("score", "prepare", "catch-up")
+# `ps lstart` is whole seconds and, on Linux, derived from boot time plus jiffies, which drifts by seconds on VMs.
+# A pid reused within a minute of the lock being taken AND running a careeros run or step is not a real case.
+START_SLACK_S = 60
 
 
 def _cli_kind(rest: list[str]) -> str | None:
@@ -241,7 +244,7 @@ class RunControl:
         if what not in ("run", "step"):
             return {"status": "refused", "run_id": rid, "detail": f"pid {pid} is not a careeros run or step"}
         began, acquired = self.started(pid), _parse_dt(held.get("acquired_at"))
-        if began and acquired and began > acquired + timedelta(seconds=1):
+        if began and acquired and began > acquired + timedelta(seconds=START_SLACK_S):
             return {"status": "refused", "run_id": rid,
                     "detail": f"pid {pid} started after the lock was taken (a reused pid)"}
         try:
