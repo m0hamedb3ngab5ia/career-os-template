@@ -205,6 +205,11 @@ def cmd_job_show(args: argparse.Namespace) -> int:
         print("\n" + p.description_text)
     else:
         print("\n" + p.description_text[:800] + ("..." if len(p.description_text) > 800 else ""))
+    from careeros.apply.snapshot import latest
+
+    snap = latest(store.job_dir(p.job_id))
+    if snap:
+        print(f"submitted: {snap['frozen_at']} ({snap['reason']}) -> {snap['dir']}")
     log = store.read_log(p.job_id)
     if log:
         print("\nlog:\n" + log.rstrip())
@@ -389,6 +394,37 @@ def cmd_job_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_job_freeze(args: argparse.Namespace) -> int:
+    """Freeze an as-submitted copy of the job's documents (and the form values, if given)."""
+    from careeros.apply.snapshot import freeze
+
+    store = Store(_settings(args))
+    if not store.exists(args.job_id):
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    answers = None
+    if args.answers_json:
+        raw = sys.stdin.read() if args.answers_json == "-" else Path(args.answers_json).read_text(encoding="utf-8")
+        try:
+            answers = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"job freeze: --answers-json is not valid JSON: {e}", file=sys.stderr)
+            return 2
+        if not isinstance(answers, (list, dict)):
+            print("job freeze: --answers-json must be a JSON list of {label, value, source} or an object",
+                  file=sys.stderr)
+            return 2
+    try:
+        out = freeze(store.job_dir(args.job_id), reason=args.reason, answers_entered=answers)
+    except ValueError as e:
+        print(f"job freeze: {e}", file=sys.stderr)
+        return 2
+    store.append_log(args.job_id, f"frozen as-submitted copy -> {out.relative_to(store.job_dir(args.job_id))}",
+                     component="snapshot")
+    print(f"{args.job_id}: frozen -> {out}")
+    return 0
+
+
 def cmd_action_list(args: argparse.Namespace) -> int:
     tr = Tracker(settings=_settings(args))
     items = tr.list_action_items(open_only=not args.all)
@@ -527,6 +563,12 @@ def build_parser() -> argparse.ArgumentParser:
     jst.add_argument("status", choices=STATUSES)
     jst.add_argument("--note")
     jst.set_defaults(fn=cmd_job_status)
+    jfz = jbs.add_parser("freeze", help="keep an as-submitted copy of the documents under submitted/<stamp>/")
+    jfz.add_argument("job_id")
+    jfz.add_argument("--reason", choices=("submitted", "assisted_stop", "manual"),
+                     help="default: from apply_session.json, else manual")
+    jfz.add_argument("--answers-json", help="file or - (stdin): [{label, value, source}] or {label: value}")
+    jfz.set_defaults(fn=cmd_job_freeze)
 
     act = sub.add_parser("action")
     acs = act.add_subparsers(dest="action_cmd", required=True)
