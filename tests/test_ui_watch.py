@@ -162,3 +162,20 @@ def test_plan_a_run_folder_moved_away_reindexes_that_run(roots):
     for state in ("queue-score.json", "pause.json", "catch_up.json", "runner.lock", "locks"):
         plan = plan_changes([r / state], roots)
         assert plan.status and not plan.runs, state
+
+
+@pytest.mark.parametrize("name", ["schedule.json", "storage.jsonl", "launchd.tick.log"])
+def test_plan_unknown_root_files_in_runs_mark_status(roots, name):
+    roots.runs.mkdir(parents=True)
+    (roots.runs / name).write_text("{}")
+    plan = plan_changes([roots.runs / name], roots)
+    assert plan.status
+    assert plan.runs == set()
+
+
+def test_plan_run_folder_existing_or_moved_away_is_a_run(roots):
+    rid = "20260924-020000-score-cd34"
+    (roots.runs / rid).mkdir(parents=True)
+    assert plan_changes([roots.runs / rid], roots).runs == {rid}
+    (roots.runs / rid).rmdir()
+    assert plan_changes([roots.runs / rid], roots).runs == {rid}
