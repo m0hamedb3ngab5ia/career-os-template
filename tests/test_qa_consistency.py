@@ -555,3 +555,31 @@ def test_glued_product_numbers_are_not_company_facts(tmp_path: Path, posting: st
     (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
                                                          "description_text": posting}))
     assert by_name(run(Checker(ck.job_dir, root)), "numbers_consistent")["ok"] is False
+
+
+# --- review fixes (#25, round 4): currency / hedge-glued amounts in the posting are still company facts ------
+@pytest.mark.parametrize("text,glued", [("USD5M", False), ("EUR2M", False), ("CAD300k", False), ("Top5%", False),
+                                        ("approx60%", False), ("USD5000", False), ("S3", True), ("EC2", True),
+                                        ("TLS1.3", True), ("H100", True)])
+def test_glued_flag_is_only_for_product_names(text: str, glued: bool) -> None:
+    [p] = parse_numbers(text)
+    assert p["glued"] is glued
+
+
+@pytest.mark.parametrize("posting,bullet,restated", [
+    ("We manage USD5M in annual cloud spend.",
+     "Saved USD 2M in annual cloud spend at Acme by rightsizing the payments cluster",
+     "At Acme I saved USD 2M in annual cloud spend by rightsizing the payments cluster, useful for a team "
+     "managing USD 5M in cloud spend."),
+    ("Nightly settlement runtime grew approx60% last year.",
+     "Cut nightly settlement runtime by 40% by batching PostgreSQL writes at Acme",
+     "At Acme I cut nightly settlement runtime by 40% by batching PostgreSQL writes; your settlement runtime "
+     "grew 60%."),
+])
+def test_currency_glued_posting_amount_is_a_company_fact(tmp_path: Path, posting: str, bullet: str,
+                                                          restated: str) -> None:
+    ck = _metric_job(tmp_path, bullet, restated)
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": posting}))
+    chk = by_name(run(Checker(ck.job_dir, ck.root)), "numbers_consistent")
+    assert chk["ok"], chk["detail"]

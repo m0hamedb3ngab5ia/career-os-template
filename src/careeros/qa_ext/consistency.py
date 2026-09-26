@@ -69,6 +69,10 @@ VAGUE_QTY = {"dozens", "hundreds", "thousands", "millions", "billions", "several
 HEDGE_1 = {"nearly", "almost", "about", "roughly", "around", "approximately", "over", "under", "~", "upwards",
            "approx", "some"}
 HEDGE_2 = {("more", "than"), ("less", "than"), ("fewer", "than"), ("close", "to"), ("up", "to"), ("north", "of")}
+# letters that, glued to a number, still mean an amount ("USD5000", "approx60", "top10"): not a product name
+AMOUNT_PREFIXES = {"usd", "eur", "gbp", "cad", "aud", "jpy", "chf", "inr", "cny", "sgd", "hkd", "nzd", "sek", "nok",
+                   "dkk", "brl", "mxn", "zar", "us", "approx", "about", "around", "over", "under", "top", "sub",
+                   "up", "nearly", "almost", "roughly"}
 # hedge direction: a restatement may repeat the bullet's own hedge class, never flip a bound ("up to 40%" -> "over 40%")
 HEDGE_LOWER = {"over", "upwards", "more than", "north of"}
 HEDGE_UPPER = {"under", "less than", "fewer than", "up to"}
@@ -132,9 +136,16 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
     `unit` = the next two content words (singular) after the number and its scale word."""
     spans = [(m.group(), m.start()) for m in TOKEN_RE.finditer(text or "")]
     toks = [t for t, _ in spans]
-    # a number glued to a preceding letter (S3, EC2, TLS1.3, USD5M): kept as a quantity everywhere, but never a
-    # company fact in _context_values, where a product name would excuse a changed bullet number
-    glued_at = {i for i, (_, pos) in enumerate(spans) if pos and text[pos - 1].isalpha()}
+    # a bare number glued to a product-name prefix (S3, EC2, TLS1.3, H100): kept as a quantity everywhere, but
+    # never a company fact in _context_values, where a product name would excuse a changed bullet number.
+    # Amounts stay facts: a suffix (USD5M, Top5%, 10x) or an amount prefix (USD5000, approx60) marks a quantity.
+    glued_at = set()
+    for i, (tok, pos) in enumerate(spans):
+        if not pos or not text[pos - 1].isalpha() or not re.fullmatch(r"\d[\d,]*(?:\.\d+)?", tok):
+            continue
+        prefix = re.search(r"[A-Za-z]+$", text[:pos]).group().lower()
+        if prefix not in AMOUNT_PREFIXES:
+            glued_at.add(i)
     low = [t.lower() for t in toks]
     out: list[dict[str, Any]] = []
     i = 0
