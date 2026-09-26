@@ -20,7 +20,16 @@ from careeros.runs.schedule import JOB_KINDS, load_schedule, merge_catch_up, nex
 from careeros.runs.store import RunStore
 
 Action = Callable[[str], tuple[str, str]]  # trigger -> (status, detail)
-TICK_LOCK_SECONDS = 12 * 3600  # a tick that runs score + prepare can take hours; a dead pid frees it sooner
+TICK_LOCK_SECONDS = 12 * 3600
+SOFT_CANCEL_KINDS = ("score", "prepare", "inbox_sync")  # they watch the cancel event and stop at a safe point
+
+
+class CancelFlag(threading.Event):
+    """The cancel event of `careeros run catch-up`. `soft` is True while a kind that watches it (a batch, the inbox
+    sync) is running: a signal then only sets it. Otherwise (scout, prune, between kinds) the signal handler raises
+    KeyboardInterrupt, since nothing would ever look at the flag."""
+
+    soft = False  # a tick that runs score + prepare can take hours; a dead pid frees it sooner
 
 
 def _utcnow() -> datetime:
@@ -200,19 +209,27 @@ def run_catch_up(settings: Settings, *, actions: dict[str, Action] | None = None
             raise RuntimeError("runs are paused; `careeros run resume` first")
         actions = actions if actions is not None else default_actions(settings, echo, cancel)
         ran, left, results = [], [], {}
-        for kind in JOB_KINDS:
-            if kind not in rec["kinds"]:
-                continue
-            if cancel is not None and cancel.is_set():
-                left.append(kind)
-                continue
-            echo(f"catch-up: {kind}")
-            status, detail = _run_one(actions[kind], "catch_up")
-            results[kind] = {"status": status, "detail": detail}
-            (left if status == "busy" else ran).append(kind)
-        latest = load_catch_up(rs) or {"kinds": {}}
-        latest["kinds"] = {k: v for k, v in latest["kinds"].items() if k not in ran}
-        _save_catch_up(rs, latest)
+        try:
+            for kind in JOB_KINDS:
+                if kind not in rec["kinds"]:
+                    continue
+                if cancel is not None and cancel.is_set():
+                    left.append(kind)
+                    continue
+                echo(f"catch-up: {kind}")
+                if isinstance(cancel, CancelFlag):
+                    cancel.soft = kind in SOFT_CANCEL_KINDS
+                try:
+                    status, detail = _run_one(actions[kind], "catch_up")
+                finally:
+                    if isinstance(cancel, CancelFlag):
+                        cancel.soft = False
+                results[kind] = {"status": status, "detail": detail}
+                (left if status == "busy" else ran).append(kind)
+        finally:  # also on an interrupt: what ran is done, the rest stays pending
+            latest = load_catch_up(rs) or {"kinds": {}}
+            latest["kinds"] = {k: v for k, v in latest["kinds"].items() if k not in ran}
+            _save_catch_up(rs, latest)
         return {"status": "ok", "ran": ran, "left": left, "results": results, "pending": bool(latest["kinds"])}
     finally:
         locks.release(rs.dir / "tick.lock", lk.token)

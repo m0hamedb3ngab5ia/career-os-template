@@ -22,9 +22,28 @@ from careeros.ui.services.runs import Busy, RunControl
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def root(temp_root: Path) -> Path:
-    return personalize(temp_root)  # doctor must pass: runs refuse to start on the example candidate
+@pytest.fixture(autouse=True)
+def _no_leftovers(tmp_path: Path):
+    """A failing test must not leave its detached run or fake claude behind (they would hang for 10 minutes)."""
+    yield
+    import signal
+    import subprocess
+
+    out = subprocess.run(["ps", "-ww", "-eo", "pid=,args="], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        pid, _, args = line.strip().partition(" ")
+        if str(tmp_path) in args or str(tmp_path.resolve()) in args:
+            try:
+                os.kill(int(pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, ValueError):
+                pass
+
+
+@pytest.fixture(params=["repo", "My Jobs/repo"], ids=["plain", "spaced"])
+def root(request, tmp_path: Path) -> Path:
+    from conftest import make_temp_root
+
+    return personalize(make_temp_root(tmp_path / request.param))  # doctor must pass on runs
 
 
 @pytest.fixture

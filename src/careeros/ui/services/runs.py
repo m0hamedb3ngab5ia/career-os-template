@@ -13,6 +13,7 @@ signalled: Pause all stops it before its next job.
 from __future__ import annotations
 
 import os
+import re
 import signal
 import subprocess
 import sys
@@ -50,13 +51,13 @@ def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
 
-def ps_cmdline(pid: int) -> str:
-    """The process's argv joined by spaces: /proc/<pid>/cmdline on Linux, else `ps -ww` (without -ww, procps cuts
-    the line at 80 columns when stdout is not a terminal)."""
+def ps_cmdline(pid: int) -> list[str] | str:
+    """The process's exact argv from /proc/<pid>/cmdline (Linux), else its command line from `ps -ww` (macOS; a
+    joined string, see classify_cmdline). Without -ww, procps cuts the line at 80 columns when not on a terminal."""
     proc = Path(f"/proc/{pid}/cmdline")
     try:
         if proc.exists():
-            return " ".join(a.decode("utf-8", "replace") for a in proc.read_bytes().split(b"\0") if a)
+            return [a.decode("utf-8", "replace") for a in proc.read_bytes().split(b"\0") if a]
         return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
                               timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
@@ -89,14 +90,13 @@ def _cli_kind(rest: list[str]) -> str | None:
     return None
 
 
-def classify_cmdline(cmd: str) -> str | None:
-    """What a process is, from its argv tokens: "run" (`careeros run score|prepare|catch-up`, as `-m careeros.cli`
-    or the `careeros` entry point), "step" (`-m careeros.ui.services.step <kind>`), "tick", or None (anything else,
-    including other careeros commands). Exact tokens, never a substring, so a reused pid is never mistaken."""
-    toks = cmd.split()
-    for i, t in enumerate(toks):
-        if t == "-m" and i + 1 < len(toks):
-            mod, rest = toks[i + 1], toks[i + 2:]
+def classify_argv(argv: list[str]) -> str | None:
+    """What a process is, from its exact argv: "run" (`careeros run score|prepare|catch-up`, as `-m careeros.cli`
+    or the `careeros` entry point), "step" (`-m careeros.ui.services.step <kind>`), "tick", or None (anything
+    else, including other careeros commands). Whole tokens, never a substring, so a reused pid is not mistaken."""
+    for i, t in enumerate(argv):
+        if t == "-m" and i + 1 < len(argv):
+            mod, rest = argv[i + 1], argv[i + 2:]
             if mod == "careeros.cli":
                 return _cli_kind(rest)
             if mod == "careeros.ui.services.step":
@@ -105,7 +105,27 @@ def classify_cmdline(cmd: str) -> str | None:
                 return "step" if len(rest) == 1 and rest[0] in STEP_KINDS else None
             return None
         if os.path.basename(t) == "careeros" and i <= 1:  # the entry point (possibly after its interpreter)
-            return _cli_kind(toks[i + 1:])
+            return _cli_kind(argv[i + 1:])
+    return None
+
+
+def classify_cmdline(cmd: str | list[str], root: Any = None) -> str | None:
+    """`classify_argv` for an exact argv (Linux /proc) or a joined command line (macOS `ps`, which loses argument
+    boundaries). For a joined line, `--root <root>` (the known repo root, which may contain spaces) is removed
+    first, and only the part after `-m <module>` or the `careeros` executable is split on spaces: the UI starts its
+    children with the root in CAREEROS_ROOT, so their arguments never contain a path."""
+    if isinstance(cmd, list):
+        return classify_argv(cmd)
+    if root:
+        cmd = cmd.replace(f" --root {root}", "")
+    m = re.search(r"(?:^|\s)-m (careeros\.cli|careeros\.ui\.services\.step)(?=\s|$)(.*)$", cmd)
+    if m:
+        return classify_argv(["python", "-m", m.group(1), *m.group(2).split()])
+    m = re.search(r"(?:^|/)careeros(?=\s|$)(.*)$", cmd)  # the entry point: .../bin/careeros <args>
+    if m:
+        before = cmd[:m.start()]  # "" or its directory, maybe after the interpreter (shebang scripts on macOS)
+        if before == "" or (before[:1] in "/.~" and " -" not in before):
+            return classify_argv(["careeros", *m.group(1).split()])
     return None
 
 
@@ -119,7 +139,8 @@ def _parse_dt(v: Any) -> datetime | None:
 class RunControl:
     def __init__(self, settings: Settings, *, popen: Callable[..., Any] = subprocess.Popen,
                  python: str = sys.executable, env: dict[str, str] | None = None,
-                 pid_alive: Callable[[int], bool] = locks.pid_alive, cmdline: Callable[[int], str] = ps_cmdline,
+                 pid_alive: Callable[[int], bool] = locks.pid_alive,
+                 cmdline: Callable[[int], list[str] | str] = ps_cmdline,
                  kill: Callable[[int, int], None] = os.kill, now: Callable[[], datetime] = _utcnow,
                  sleep: Callable[[float], None] = time.sleep, launchctl: Callable[..., Any] | None = None,
                  started: Callable[[int], datetime | None] = ps_started, agents_dir: Path | None = None,
@@ -160,8 +181,11 @@ class RunControl:
                 m.unlink(missing_ok=True)
         out = out_dir / f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{name}.out"
         root = str(self.settings.root)
+        # the root travels in CAREEROS_ROOT, not argv: macOS `ps` joins argv with spaces, and a root such as
+        # "~/My Jobs/career-os" would make the child's command line impossible to classify for Cancel
+        env = {**(self.env if self.env is not None else os.environ), "CAREEROS_ROOT": root}
         with out.open("ab") as fh:
-            proc = self.popen([self.python, "-m", *argv[:1], "--root", root, *argv[1:]], cwd=root, env=self.env,
+            proc = self.popen([self.python, "-m", *argv], cwd=root, env=env,
                               stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
         return {"started": True, "pid": proc.pid, "output": str(out)}
 
@@ -222,6 +246,10 @@ class RunControl:
         held = self._held(self.rs.runner_lock_path)
         if held and (run_id is None or held.get("owner") == f"run:{run_id}"):
             return str(held.get("owner", "")).partition(":")[2] or None, held
+        if run_id is None:  # a catch-up between batches (scout, prune) holds only tick.lock
+            tick = self._held(self.rs.dir / "tick.lock")
+            if tick and tick.get("owner") == "catch-up":
+                return "catch-up", tick
         if run_id:
             run = self.rs.load_run(run_id) or {}
             from careeros.ui.services.step import step_lock_path
@@ -242,7 +270,7 @@ class RunControl:
         marker = self.rs.dir / "ui" / f"cancel-{rid}"
         if marker.exists():
             return {"status": "already_stopping", "run_id": rid, "pid": pid}
-        what = classify_cmdline(self.cmdline(pid))
+        what = classify_cmdline(self.cmdline(pid), root=self.settings.root)
         if what == "tick":
             return {"status": "refused", "run_id": rid,
                     "detail": "started by the scheduler; use Pause all to stop it before its next job"}

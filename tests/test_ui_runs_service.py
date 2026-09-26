@@ -81,10 +81,9 @@ def running_run(rs: RunStore, kind: str = "score", rid: str | None = None, **ext
 def test_start_spawns_a_detached_cli_run_with_the_preset(rc):
     out = rc.start("score", preset="small")
     call = FakePopen.calls[0]
-    assert call["cmd"] == ["/venv/bin/python", "-m", "careeros.cli", "--root", str(rc.settings.root), "run", "score",
-                           "--preset", "small", "--json"]
+    assert call["cmd"] == ["/venv/bin/python", "-m", "careeros.cli", "run", "score", "--preset", "small", "--json"]
     assert call["start_new_session"] is True and call["cwd"] == str(rc.settings.root)
-    assert call["env"] == {"PATH": "/bin"}
+    assert call["env"] == {"PATH": "/bin", "CAREEROS_ROOT": str(rc.settings.root)}  # root via env: no spaces in argv
     assert out["pid"] == 4242 and out["kind"] == "score" and out["started"] is True
     assert Path(out["output"]).parent == RunStore(rc.settings).dir / "ui"
 
@@ -140,8 +139,8 @@ def test_launch_outputs_are_trimmed(rc):
 
 def test_start_step_spawns_the_step_runner(rc):
     out = rc.start_step("scout")
-    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "--root",
-                                         str(rc.settings.root), "scout"]
+    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "scout"]
+    assert FakePopen.calls[0]["env"]["CAREEROS_ROOT"] == str(rc.settings.root)
     assert FakePopen.calls[0]["start_new_session"] is True and out["kind"] == "scout"
 
 
@@ -596,8 +595,7 @@ def test_inbox_sync_paused(inbox_on):
 
 def test_inbox_sync_spawns_the_step(inbox_on):
     inbox_on.start_step("inbox_sync")
-    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "--root",
-                                         str(inbox_on.settings.root), "inbox_sync"]
+    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "inbox_sync"]
 
 
 def test_step_main_exit_codes(temp_root, monkeypatch, capsys):
@@ -659,3 +657,55 @@ def test_ps_cmdline_of_this_process_is_not_truncated():
     from careeros.ui.services.runs import ps_cmdline
 
     assert "pytest" in ps_cmdline(os.getpid())
+
+
+# --- review round 2 ------------------------------------------------------------------------------------------
+
+SPACED = "/Users/a/My Jobs/career-os"
+
+
+@pytest.mark.parametrize("cmd,root,want", [
+    ("/Users/a/My Jobs/career-os/.venv/bin/python -m careeros.cli run score --json", SPACED, "run"),
+    (f"/v/bin/python -m careeros.cli --root {SPACED} run prepare --json", SPACED, "run"),
+    (f"/v/bin/python -m careeros.ui.services.step --root {SPACED} scout", SPACED, "step"),
+    (f"/v/bin/python -m careeros.cli --root {SPACED} tick", SPACED, "tick"),
+    ("/Users/a/My Jobs/career-os/.venv/bin/careeros run catch-up", SPACED, "run"),
+    (["/v/bin/python", "-m", "careeros.cli", "--root", SPACED, "run", "score", "--json"], None, "run"),
+    (["/v/bin/python", "-m", "careeros.ui.services.step", "--root", SPACED, "prune"], None, "step"),
+    (["/v/bin/python", "-m", "careeros.cli", "--root", SPACED, "ui"], None, None),
+])
+def test_classify_with_a_root_that_has_spaces(cmd, root, want):
+    assert classify_cmdline(cmd, root=root) == want
+
+
+def test_tail_rereads_the_run_before_its_end_event(rc):
+    rs = RunStore(rc.settings)
+    run = running_run(rs)
+    hold_runner(rs, run["id"], pid=777)
+    calls = {"n": 0}
+
+    def alive(pid):  # the run finishes while tail checks the lock
+        calls["n"] += 1
+        rs.save_run({**run, "status": "done", "stop_reason": "completed"})
+        locks.release(rs.runner_lock_path, None, force=True)
+        return False
+
+    events = list(make_rc(rc.settings, pid_alive=alive).tail(run["id"], follow=True, poll_s=0))
+    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed"}
+
+
+def test_cancel_reaches_a_catch_up_between_batches(rc):
+    """A catch-up running scout or prune holds only tick.lock; Cancel must still reach it."""
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="catch-up", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/v/bin/python -m careeros.cli run catch-up --json")
+    out = rc2.cancel()
+    assert out["status"] == "cancelling" and sent == [(888, signal.SIGTERM)]
+
+
+def test_cancel_ignores_a_scheduled_tick_lock(rc):
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="tick", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    assert make_rc(rc.settings, kill=lambda *a: pytest.fail("no kill")).cancel()["status"] == "idle"

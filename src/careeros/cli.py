@@ -749,17 +749,28 @@ def _print_queue(items: list, limit: int) -> None:
 
 
 @contextmanager
-def _cancel_on_signals():
-    """SIGINT/SIGTERM set a threading.Event instead of killing the process, so a run stops at its next safe point
-    (stop reason cancelled) and its headless `claude` child is ended with it, never orphaned."""
+def _cancel_on_signals(hard: bool = False):
+    """SIGINT/SIGTERM set a cancel event instead of killing the process, so a run stops at its next safe point
+    (stop reason cancelled) and its headless `claude` child is ended with it, never orphaned. With `hard` (catch-up),
+    the event is a CancelFlag and a signal raises KeyboardInterrupt when nothing watches the flag (scout, prune,
+    between kinds) or when it is the second one."""
     import signal
-    import threading
 
-    cancel = threading.Event()
+    from careeros.runs.tick import CancelFlag
+
+    cancel = CancelFlag()
+    cancel.soft = not hard
+
+    def handler(*_):
+        if hard and (cancel.is_set() or not cancel.soft):
+            cancel.set()
+            raise KeyboardInterrupt
+        cancel.set()
+
     old = {}
     for sig in (signal.SIGINT, signal.SIGTERM):
         try:
-            old[sig] = signal.signal(sig, lambda *_: cancel.set())
+            old[sig] = signal.signal(sig, handler)
         except ValueError:  # not the main thread
             pass
     try:
@@ -969,12 +980,15 @@ def cmd_run_catch_up(args: argparse.Namespace) -> int:
                 f"{k} ({v.get('slots')} slot(s) since {v.get('first_missed')})" for k, v in rec["kinds"].items())))
         return 0
     try:
-        with _cancel_on_signals() as cancel:
+        with _cancel_on_signals(hard=True) as cancel:
             res = run_catch_up(s, dismiss=args.dismiss, echo=(lambda line: None) if args.json else print,
                                cancel=cancel)
     except RuntimeError as e:
         print(f"run catch-up: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("run catch-up: cancelled; missed runs that did not finish stay pending", file=sys.stderr)
+        return 130
     if res.get("status") == "busy":
         print(json.dumps(res) if args.json else "run catch-up: a tick is running; try again in a moment",
               file=None if args.json else sys.stderr)
