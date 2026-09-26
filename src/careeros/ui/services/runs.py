@@ -307,7 +307,10 @@ class RunControl:
         except PermissionError:
             return {"status": "refused", "run_id": rid, "detail": f"not allowed to signal pid {pid}"}
         marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(f"{holder}\n{self.now().isoformat()}\n")
+        # Write then rename, so _spawn never reads a half-written marker and prunes it.
+        tmp = marker.with_name(f".{marker.name}.{os.getpid()}.tmp")
+        tmp.write_text(f"{holder}\n{self.now().isoformat()}\n")
+        os.replace(tmp, marker)
         return {"status": "cancelling", "run_id": rid, "pid": pid}
 
     def pause(self, until: datetime | None = None, reason: str = "") -> dict[str, Any]:
