@@ -6,7 +6,7 @@ import re
 import pytest
 from conftest import load_script
 
-from careeros.markup import bold_allowed, bold_spans, has_markdown_bold, iter_strings, strip_bold, validate_bold
+from careeros.markup import bold_allowed, bold_allowed_at, bold_spans, has_markdown_bold, iter_strings, strip_bold, validate_bold
 
 pytestmark = pytest.mark.unit
 
@@ -139,3 +139,18 @@ def test_render_check_bold_agrees_with_table(master_path, in_master, resume_path
 def test_iter_strings_yields_every_string_with_its_path():
     got = list(iter_strings({"a": ["x", {"b": "y", 3: "z"}], "n": 1, "c": None}))
     assert got == [("a[0]", "x"), ("a[1].b", "y"), ("a[1].3", "z")]
+
+
+@pytest.mark.parametrize("keys,source,expected", [
+    (("summary_variants", "backend.v2"), "master", True),
+    (("experience", 0, "bullets", 2, "variants", "long.v2"), "master", True),
+    (("experience", 0, "bullets", 2, "variants", "alt[1]"), "master", True),
+    (("experience", 0, "bullets", 2, "text"), "master", True),
+    (("experience", 0, "bullets", 2, "id"), "master", False),
+    (("skills", "lang.v2", 0), "master", False),
+    (("summary",), "resume", True),
+    (("projects", 1, "bullets", 0, "text"), "resume", True),
+    (("projects", 1, "bullets", 0, "variants", "short"), "resume", False),
+])
+def test_bold_allowed_at_is_structural(keys, source, expected):
+    assert bold_allowed_at(keys, source) is expected

@@ -30,7 +30,8 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 
 try:
-    from careeros.markup import BULLET_SECTIONS, MARKER, bold_allowed, iter_strings, strip_bold, validate_bold
+    from careeros.markup import (BULLET_SECTIONS, MARKER, bold_allowed_at, format_path, iter_fields, strip_bold,
+                                  validate_bold)
 except ImportError:  # standalone checkout without the package installed: load the module file directly
     import importlib.util
 
@@ -38,7 +39,7 @@ except ImportError:  # standalone checkout without the package installed: load t
     _markup = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(_markup)  # type: ignore[union-attr]
     MARKER, strip_bold, validate_bold = _markup.MARKER, _markup.strip_bold, _markup.validate_bold
-    bold_allowed, iter_strings = _markup.bold_allowed, _markup.iter_strings
+    bold_allowed_at, format_path, iter_fields = _markup.bold_allowed_at, _markup.format_path, _markup.iter_fields
     BULLET_SECTIONS = _markup.BULLET_SECTIONS
 CATEGORIES_YAML = REPO / "config" / "categories.yaml"
 
@@ -163,12 +164,13 @@ def check_placeholders(data: dict[str, Any]) -> list[str]:
 
 def check_bold(data: dict[str, Any]) -> list[str]:
     """"<path>: <reason>" for invalid `**` markup in bullet text / summary, and for `**` in any other field
-    (bold is allowed only in bullet text and the summary: markup.bold_allowed)."""
+    (bold is allowed only in bullet text and the summary: markup.bold_allowed_at)."""
     errs: list[str] = []
-    for path, s in iter_strings(data):
+    for keys, s in iter_fields(data):
         if MARKER not in s:
             continue
-        if not bold_allowed(path, "resume"):
+        path = format_path(keys)
+        if not bold_allowed_at(keys, "resume"):
             errs.append(f"{path}: '**' is allowed only in bullet text and the summary")
         elif (err := validate_bold(s)):
             errs.append(f"{path}: {err}")

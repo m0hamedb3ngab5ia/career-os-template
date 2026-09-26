@@ -33,7 +33,7 @@ from typing import Any, Callable, Iterator
 
 import yaml
 
-from careeros.markup import MARKER, bold_allowed, iter_strings, strip_bold, validate_bold
+from careeros.markup import MARKER, bold_allowed_at, format_path, iter_fields, strip_bold, validate_bold
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
 
@@ -347,15 +347,17 @@ def check_bold(master: dict) -> list[Check]:
                 if isinstance(b, dict) and b.get("id") is not None:
                     ids[f"{sec}[{i}].bullets[{j}]"] = str(b.get("id"))
     fails: list[str] = []
-    for path, s in iter_strings(master):
-        if MARKER not in s or path.startswith("narratives["):
+    for keys, s in iter_fields(master):
+        if MARKER not in s or keys[:1] == ("narratives",):
             continue
-        if not bold_allowed(path, "master"):
+        path = format_path(keys)
+        if not bold_allowed_at(keys, "master"):
             fails.append(f"{path}: '**' is allowed only in bullet text, variants and summary_variants "
                          "(render.py rejects it anywhere else): drop it")
         elif (err := validate_bold(s)):
-            m = re.match(r"^(.*?\.bullets\[\d+\])\.(.+)$", path)
-            fails.append(f"{ids[m[1]]}.{m[2]}: {err}" if m and m[1] in ids else f"{path}: {err}")
+            head = format_path(keys[:4])
+            fails.append(f"{ids[head]}.{format_path(keys[4:])}: {err}" if len(keys) > 4 and head in ids
+                         else f"{path}: {err}")
     out = [Check(FAIL, "bold_markup", f"profile/master.yaml: {f}") for f in fails]
     narr = [str(n.get("id")) for n in master.get("narratives") or []
             if isinstance(n, dict) and MARKER in str(n.get("text") or "")]

@@ -41,6 +41,38 @@ def bold_allowed(path: str, source: Literal["master", "resume"]) -> bool:
     return bool(_BOLD_PATHS[source].match(path))
 
 
+def bold_allowed_at(keys: tuple[Any, ...], source: Literal["master", "resume"]) -> bool:
+    """Structural twin of `bold_allowed`: `keys` is the field's key/index tuple, so a dict key containing `.` or
+    `[` (`variants: {long.v2: ...}`) can't be mistaken for extra path segments."""
+    bullet = (len(keys) >= 5 and keys[0] in BULLET_SECTIONS and isinstance(keys[1], int)
+              and keys[2] == "bullets" and isinstance(keys[3], int))
+    if source == "resume":
+        return keys == ("summary",) or (bullet and keys[4:] == ("text",))
+    if keys[:1] == ("summary_variants",) and len(keys) >= 2:
+        return True
+    return bullet and (keys[4:] == ("text",) or (keys[4] == "variants" and len(keys) >= 6))
+
+
+def iter_fields(node: Any, keys: tuple[Any, ...] = ()) -> Iterator[tuple[tuple[Any, ...], str]]:
+    """(key/index tuple, value) for every string in a YAML/JSON tree: ("a", "b", 0, "c")."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from iter_fields(v, (*keys, k))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from iter_fields(v, (*keys, i))
+    elif isinstance(node, str):
+        yield keys, node
+
+
+def format_path(keys: tuple[Any, ...]) -> str:
+    """("a", "b", 0) -> "a.b[0]" (for messages)."""
+    out = ""
+    for k in keys:
+        out += f"[{k}]" if isinstance(k, int) else (f".{k}" if out else str(k))
+    return out
+
+
 def iter_strings(node: Any, path: str = "") -> Iterator[tuple[str, str]]:
     """(field path, value) for every string in a YAML/JSON tree: `a.b[0].c`."""
     if isinstance(node, dict):

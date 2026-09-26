@@ -471,3 +471,27 @@ def test_bold_in_narratives_only_warns(tmp_path: Path):
     _edit_master(root, lambda m: m["narratives"][0].update(text="Likes **owning** a product end to end."))
     levels = {c.level for c in doctor(root) if c.name == "bold_markup"}
     assert levels == {WARN}
+
+
+@pytest.mark.parametrize("where", ["variant", "summary", "variant_bracket"])
+def test_bold_in_dotted_variant_keys_passes(tmp_path: Path, where: str):
+    root = filled(tmp_path)
+
+    def edit(m):
+        b = m["experience"][0]["bullets"][1]
+        if where == "variant":
+            b["variants"] = {"long.v2": "Moved **three** services to Kubernetes"}
+        elif where == "variant_bracket":
+            b["variants"] = {"alt[1]": "Moved **three** services to Kubernetes"}
+        else:
+            m["summary_variants"]["backend.v2"] = "**Python** engineer shipping services."
+    _edit_master(root, edit)
+    checks = [c for c in doctor(root) if c.name == "bold_markup"]
+    assert [c.level for c in checks] == [PASS], checks
+
+
+def test_bold_in_a_skill_under_a_dotted_key_still_fails(tmp_path: Path):
+    root = filled(tmp_path)
+    _edit_master(root, lambda m: m.setdefault("skills", {}).update({"lang.v2": ["**Python**"]}))
+    fails = [c for c in doctor(root) if c.name == "bold_markup" and c.level == FAIL]
+    assert fails and "lang.v2" in fails[0].detail
