@@ -1222,6 +1222,74 @@ def cmd_advise_apply(args: argparse.Namespace) -> int:
     return 0
 
 
+def _sync_root(args: argparse.Namespace) -> Path:
+    from careeros.sync import git_root
+
+    return git_root(Path(args.root).resolve() if getattr(args, "root", None) else Path.cwd())
+
+
+def cmd_sync_status(args: argparse.Namespace) -> int:
+    """Exit 0 in sync, 1 behind the template, 2 drift (files to port to the template). Needs no setup."""
+    from careeros.sync import SyncError, compute_status, format_status
+
+    try:
+        st = compute_status(_sync_root(args), remote=args.remote, template_branch=args.template_branch,
+                            fetch=not args.no_fetch)
+    except SyncError as e:
+        print(f"sync status: {e}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps({"ref": st.ref, "behind": st.behind, "drift": st.drift, "exit_code": st.exit_code},
+                         indent=2))
+    else:
+        print("\n".join(format_status(st)))
+    return st.exit_code
+
+
+def cmd_sync_pull(args: argparse.Namespace) -> int:
+    from careeros.sync import SyncError, pull
+
+    try:
+        res = pull(_sync_root(args), remote=args.remote, template_branch=args.template_branch, base=args.base,
+                   branch=args.branch, checks=not args.no_checks)
+    except SyncError as e:
+        print(f"sync pull: {e}", file=sys.stderr)
+        return 1
+    if res.lines:
+        print("\n".join(res.lines))
+    if res.err:
+        print("\n".join(res.err), file=sys.stderr)
+    return res.code
+
+
+def cmd_sync_install_hook(args: argparse.Namespace) -> int:
+    from careeros.sync import SyncError, hook_path, install_hook
+
+    try:
+        hook = hook_path(_sync_root(args))
+        what = install_hook(hook, sys.executable, force=args.force)
+    except SyncError as e:
+        print(f"sync install-hook: {e}", file=sys.stderr)
+        return 1
+    print(f"{what}: {hook}")
+    return 0
+
+
+def cmd_sync_check_template_push(args: argparse.Namespace) -> int:
+    """pre-push hook body: reads the ref updates on stdin; exit 1 when personal paths would reach the template."""
+    from careeros.sync import SyncError, check_push
+
+    try:
+        errors = check_push(_sync_root(args), args.url, sys.stdin.read())
+    except SyncError as e:
+        print(f"BLOCKED: careeros push guard failed: {e}", file=sys.stderr)
+        return 1
+    if errors:
+        print("\n".join(errors), file=sys.stderr)
+        return 1
+    return 0
+
+
 def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--preset", choices=("small", "medium", "large", "max", "custom"),
                    help="budget preset from pipeline.yaml runs.presets (default: runs.preset)")
@@ -1478,6 +1546,34 @@ def build_parser() -> argparse.ArgumentParser:
     sst = schs.add_parser("status", help="agent installed/loaded, last tick, next run per job, missed runs")
     sst.add_argument("--json", action="store_true")
     sst.set_defaults(fn=cmd_schedule_status)
+
+    syn = sub.add_parser("sync", help="keep a private copy in sync with the public template (git remote `template`)")
+    syns = syn.add_subparsers(dest="sync_cmd", required=True)
+
+    def _sync_remote(q: argparse.ArgumentParser) -> None:
+        q.add_argument("--remote", default="template", help="git remote of the template (default: template)")
+        q.add_argument("--template-branch", default="main", help="template branch to follow (default: main)")
+
+    sys_ = syns.add_parser("status", help="template commits not merged + drift to port (exit 0 in sync, 1 behind, 2 drift)")
+    _sync_remote(sys_)
+    sys_.add_argument("--no-fetch", action="store_true", help="use the last fetched state (offline)")
+    sys_.add_argument("--json", action="store_true")
+    sys_.set_defaults(fn=cmd_sync_status)
+    spl = syns.add_parser("pull", help="merge the template on a sync/<date> branch, run local checks, print the PR "
+                                       "command (exit 3 = conflicts to resolve)")
+    _sync_remote(spl)
+    spl.add_argument("--base", default="main", help="branch to start from (default: main)")
+    spl.add_argument("--branch", help="sync branch name (default: sync/<YYYY-MM-DD>)")
+    spl.add_argument("--no-checks", action="store_true", help="skip pytest and the ui/ npm checks")
+    spl.set_defaults(fn=cmd_sync_pull)
+    sih = syns.add_parser("install-hook", help="pre-push guard: never push personal paths to a template URL "
+                                               "(git config careeros.templateUrlPattern / careeros.personalPaths)")
+    sih.add_argument("--force", action="store_true", help="replace a pre-push hook careeros did not write (kept as .bak)")
+    sih.set_defaults(fn=cmd_sync_install_hook)
+    sct = syns.add_parser("check-template-push", help="the guard itself (the pre-push hook calls it; reads stdin)")
+    sct.add_argument("remote_name")
+    sct.add_argument("url")
+    sct.set_defaults(fn=cmd_sync_check_template_push)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p
