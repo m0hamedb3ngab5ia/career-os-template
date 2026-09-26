@@ -1222,6 +1222,22 @@ def cmd_advise_apply(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_ui(args: argparse.Namespace) -> int:
+    """Local web app over the same files (docs/UI.md). Needs the optional extra: pip install -e ".[ui]"."""
+    try:
+        import fastapi  # noqa: F401
+        import uvicorn  # noqa: F401
+        import watchfiles  # noqa: F401
+    except ImportError as e:
+        print(f"careeros ui: missing {e.name}; install the UI extra: .venv/bin/pip install -e \".[ui]\"",
+              file=sys.stderr)
+        return 1
+    from careeros.ui.server import serve
+
+    return serve(_settings(args), port=args.port, host=args.host, reindex=args.reindex,
+                 open_browser=False if args.no_open else None)
+
+
 def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--preset", choices=("small", "medium", "large", "max", "custom"),
                    help="budget preset from pipeline.yaml runs.presets (default: runs.preset)")
@@ -1480,6 +1496,12 @@ def build_parser() -> argparse.ArgumentParser:
     sst.set_defaults(fn=cmd_schedule_status)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
+    ui = sub.add_parser("ui", help="local web app (http://127.0.0.1:8765): jobs, runs, action items, settings")
+    ui.add_argument("--port", type=int, help="default: pipeline.yaml ui.port (8765)")
+    ui.add_argument("--host", help="default: pipeline.yaml ui.host (127.0.0.1); only loopback for now")
+    ui.add_argument("--reindex", action="store_true", help="delete data/careeros.db and index everything again")
+    ui.add_argument("--no-open", action="store_true", help="don't open the browser")
+    ui.set_defaults(fn=cmd_ui)
     return p
 
 

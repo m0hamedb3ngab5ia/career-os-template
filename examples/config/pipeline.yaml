@@ -122,6 +122,24 @@ advisor:                                   # suggest-only: `careeros advise` nev
   usage_limit_stops: 2                     # 2 (Recommended): this many usage-limit stops -> suggest a smaller preset
   failure_rate_warn: 0.3                   # 0.3 (Recommended): warn when more than 30% of jobs fail
 
+ui:                                        # reusable default: fine to keep. `careeros ui` (needs pip install -e ".[ui]")
+  port: 8765                               # 8765 (Recommended); `careeros ui --port N` overrides
+  host: 127.0.0.1                          # 127.0.0.1 (Recommended): this Mac only. Other hosts are refused for now
+  open_browser: true                       # true (Recommended): open the app in your browser on start (--no-open)
+  theme: system                            # system (Recommended) | light | dark
+  undo_seconds: 8                          # 8 (Recommended): how long "Undo" stays on after Mark done, Send, Apply
+  page_size: 100                           # 100 (Recommended): rows per page in Jobs and Runs history (20 to 1000)
+  watch_debounce_ms: 300                   # 300 (Recommended): file changes within this window refresh the app once
+  index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
+  pipeline:
+    columns:                               # (Recommended) the six below. Each status sits in at most one column;
+      - {name: Found, statuses: [found, scored]}          # statuses in no column (skipped, rejected, withdrawn,
+      - {name: Queued, statuses: [queued, prepared]}      # ghosted) are counted in the "Closed" line
+      - {name: Needs review, statuses: [needs_review]}
+      - {name: Applied, statuses: [applied]}
+      - {name: Screening · Interview, statuses: [screening, interview]}
+      - {name: Offer, statuses: [offer]}
+
 notify:
   on_interview: push                       # push | none  (PushNotification tool from inbox-sync)
   on_offer: push

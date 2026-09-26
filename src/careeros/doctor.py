@@ -386,7 +386,7 @@ def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None =
 
 
 def check_runs(pipeline: dict[str, Any]) -> list[Check]:
-    """`pipeline.yaml: runs`, `llm`, `schedule`, `storage` / `advisor` parse; the headless command streams. Every
+    """`pipeline.yaml: runs`, `llm`, `schedule`, `storage` / `advisor`, `ui` parse; the headless command streams. Every
     block is checked on its own, so one warning never hides another block's FAIL."""
     from careeros.config import ConfigError
     from careeros.runs.config import load_runs_config
@@ -420,6 +420,12 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
         load_advisor_config(pipeline)
     except ConfigError as e:
         out.append(Check(FAIL, "advisor", str(e)))
+    from careeros.ui.config import load_ui_config
+
+    try:
+        load_ui_config(p)
+    except ConfigError as e:
+        out.append(Check(FAIL, "ui", str(e)))
     return out
 
 
