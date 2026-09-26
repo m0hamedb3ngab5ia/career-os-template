@@ -93,28 +93,11 @@ def cmd_tracker_init(args: argparse.Namespace) -> int:
 
 
 def cmd_tracker_sync(args: argparse.Namespace) -> int:
-    s = _settings(args)
-    store = Store(s)
-    tr = Tracker(settings=s)
-    tr.init()
-    rows = []
-    for jid in store.iter_job_ids():
-        p = store.load_posting(jid)
-        if not p:
-            continue
-        row = TrackerRow.from_posting(p, store.load_score(jid), folder=str(store.job_dir(jid)))
-        st = store.get_status(jid)
-        if st:
-            row.status = st  # type: ignore[assignment]
-        rows.append(row)
-    counts = tr.upsert_jobs(rows)
-    n = counts.get("created", 0) + counts.get("updated", 0)
-    jobs = store.list_jobs()
-    tr.set_config("last_sync", datetime.now().strftime("%Y-%m-%d %H:%M"))
-    tr.set_config("jobs_count", len(jobs))
-    tr.set_config("applied_count", sum(1 for j in jobs if j["status"] == "applied"))
-    pend = tr.pending_count()
-    print(f"synced {n} jobs -> {tr.path}" + (f" ({pend} ops queued, file locked)" if pend else ""))
+    from careeros.tracker import sync_all
+
+    out = sync_all(_settings(args))
+    pend = out["pending"]
+    print(f"synced {out['synced']} jobs -> {out['path']}" + (f" ({pend} ops queued, file locked)" if pend else ""))
     return 0
 
 
@@ -753,13 +736,9 @@ def _fmt_minutes(sec: float | None) -> str:
 
 
 def _run_state(rs, run: dict) -> str:
-    """run.json `status`, except a `running` run whose process no longer holds the runner lock: interrupted."""
-    from careeros.runs import locks
+    from careeros.runs.status import run_state
 
-    if run.get("status") != "running":
-        return str(run.get("status"))
-    held = locks.status(rs.runner_lock_path)
-    return "running" if held.get("state") == "held" and held.get("owner") == f"run:{run['id']}" else "interrupted"
+    return run_state(rs, run)
 
 
 def _print_queue(items: list, limit: int) -> None:
@@ -892,47 +871,9 @@ def cmd_run_show(args: argparse.Namespace) -> int:
 
 
 def _run_status_data(s: Settings) -> dict:
-    from datetime import timezone
+    from careeros.runs.status import status_data
 
-    from careeros.runs import locks
-    from careeros.runs.config import KINDS, load_runs_config
-    from careeros.runs.runner import select_candidates
-    from careeros.runs.store import RunStore
-
-    rs = RunStore(s)
-    now = datetime.now(timezone.utc)
-    held = locks.status(rs.runner_lock_path)
-    cfg = load_runs_config(s)
-    last, nxt = {}, {}
-    for kind in KINDS:
-        prev = rs.list_runs(kind=kind, limit=1)
-        last[kind] = ({k: prev[0].get(k) for k in ("id", "trigger", "stop_reason", "started_at", "ended_at",
-                                                    "counters")} | {"state": _run_state(rs, prev[0])}) if prev else None
-    for kind in _STATUS_QUEUE_KINDS:
-        ranked, _ = select_candidates(s, kind, cfg, now)
-        nxt[kind] = [{k: r[k] for k in ("job_id", "company", "title", "score", "why")} for r in ranked[:5]]
-    from careeros.runs.policy import AutoSubmitPolicy, current_cap
-
-    auto = AutoSubmitPolicy.from_config(cfg.raw)
-    return {"running": held if held.get("state") == "held" else None, "paused": rs.pause_state(now),
-            "preset": cfg.preset, "last": last, "next": nxt, "cap": current_cap(s),
-            "auto_submit": {"enabled": auto.enabled, "allow": auto.allow, "manual": auto.manual},
-            "catch_up": _catch_up(rs), "schedule": _schedule_next(s)}
-
-
-def _catch_up(rs):
-    from careeros.runs.tick import load_catch_up
-
-    return load_catch_up(rs)
-
-
-def _schedule_next(s: Settings) -> dict:
-    from careeros.runs.tick import schedule_overview
-
-    return schedule_overview(s)["next"]
-
-
-_STATUS_QUEUE_KINDS = ("score", "prepare")
+    return status_data(s)
 
 
 def cmd_run_status(args: argparse.Namespace) -> int:
@@ -1175,50 +1116,22 @@ def cmd_advise(args: argparse.Namespace) -> int:
     return 0
 
 
-def _validate_root(root: Path) -> None:
-    """Every config check the CLI would run; ConfigError rolls `advise apply` back."""
-    from careeros import retention
-    from careeros.runs.advisor import load_advisor_config
-    from careeros.runs.config import load_runs_config
-    from careeros.runs.schedule import load_schedule
-
-    s = Settings.load(root)
-    load_runs_config(s)
-    load_schedule(s)
-    retention.retention_config(s)
-    load_advisor_config(s.pipeline)
-
-
 def cmd_advise_apply(args: argparse.Namespace) -> int:
     """Apply ONE recommendation's YAML change to config/pipeline.yaml (comments kept, validated, rolled back on error)."""
     from datetime import timezone
 
-    from careeros.runs import yamledit
-    from careeros.runs.advisor import advise
+    from careeros.runs.advisor import apply_recommendation
 
-    s = _settings(args)
-    recs = {r["id"]: r for r in advise(s, datetime.now(timezone.utc))["recommendations"]}
-    rec = recs.get(args.id)
-    if rec is None:
-        print(f"advise apply: no current recommendation {args.id!r}" +
-              (f"; current: {', '.join(recs)}" if recs else "; run `careeros advise`"), file=sys.stderr)
-        return 1
-    c = rec["change"]
-    if not c:
-        print(f"advise apply: {args.id} is advice only; nothing to change", file=sys.stderr)
-        return 1
-    path = s.root / c["file"]
     try:
-        from careeros.runs.advisor import effective_value
-
-        yamledit.apply_change(path, c["path"], c["to"], expect_from=c["from"],
-                              validate=lambda p: _validate_root(s.root),
-                              current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
-                                                                   c["path"]))
-    except (ConfigError, ValueError) as e:
-        print(f"advise apply: {e}; {c['file']} left unchanged", file=sys.stderr)
+        out = apply_recommendation(_settings(args), args.id, datetime.now(timezone.utc))
+    except LookupError as e:
+        print(f"advise apply: {e.args[0]}", file=sys.stderr)
         return 1
-    print(f"{c['file']}: {c['path']}: {c['from']} -> {c['to']}")
+    except (ConfigError, ValueError) as e:
+        msg = str(e)
+        print(f"advise apply: {msg}" + ("" if "advice only" in msg else "; config left unchanged"), file=sys.stderr)
+        return 1
+    print(f"{out['file']}: {out['path']}: {out['from']} -> {out['to']}")
     return 0
 
 
