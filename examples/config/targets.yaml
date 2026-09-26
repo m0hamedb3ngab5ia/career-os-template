@@ -105,6 +105,8 @@ safety:
   # ATS families where auto-submit is allowed. Others → prepare + Action Item.
   auto_submit_ats: [greenhouse, lever, ashby]
   assisted_ats: [workday, icims, taleo, smartrecruiters, jobvite, successfactors, custom]
+  pause_auto_submit: false             # false (Recommended). true = nothing auto-submits: Apply fills forms and stops
+                                       # before Submit for you, on every tier and ATS, until you set it back
   pause_on:                            # always Action Item, never auto
     - captcha
     - account_creation_email_verify

@@ -63,15 +63,22 @@ the UI has to stand on its own as an application, without a Claude Code session 
   the example file's guidance survive. After each save the file is re-loaded with `Settings.load` (same
   `ConfigError` shape checks as the CLI); a failing save is rolled back and the error shown next to the field.
   - `targets.yaml`: candidate, location, categories, thresholds, `tiers` (auto_submit, cover_letter, outreach,
-    review_required), `tier_rules` (ordered), `volume`, `safety` (auto_submit_ats, assisted_ats, pause_on, ghost
-    thresholds, per-code `levels`), `scout` (sources, filters).
+    review_required), `tier_rules` (ordered), `volume`, `safety` (auto_submit_ats, assisted_ats, pause_on,
+    "Pause all auto-submit" `pause_auto_submit` (off, Recommended), ghost thresholds, per-code `levels`), `scout`
+    (sources, filters).
   - `companies.yaml`: dream_list, blocklist, company_domains, boards.
-  - `pipeline.yaml`: paths, notify, outreach (`manual_if_connected`, `manual_if_mutuals`), and the Runs and Storage
-    & efficiency groups below (`runs`, `schedule`, `llm.allowed_tools`, `retention`, `storage`, `advisor`).
+  - `pipeline.yaml`: paths, notify, outreach (`manual_if_connected`, `manual_if_mutuals`, "Minimum mutual
+    connections" `mutuals_threshold`: 1 (Recommended), 1 to 50), and the Runs and Storage & efficiency groups below
+    (`runs`, `schedule`, `llm.allowed_tools`, `retention`, `storage`, `advisor`).
   - `qa.yaml`: critic pass threshold, max regenerations, banned phrases.
 - Profile, voice and templates are edited outside the UI for now (they are free text, not settings).
 - Locked rows show policy that the system enforces and a form can't turn off: LinkedIn is draft-only; thank-you
-  notes after interviews are always written by hand; Tier A is never auto-submitted; runs never apply.
+  notes after interviews are always written by hand; Tier A is never auto-submitted; runs never apply; ghost-job
+  checks only flag a dream company, never skip it (Safety › Ghost jobs); manual commands share the per-job lock with
+  runs (Runs › Before each run).
+- Every row the Settings mockup shows is backed by a config key that code reads, or is one of those locked rows.
+  "Pause all auto-submit" (`targets.yaml: safety.pause_auto_submit`) makes `careeros safety check` record
+  `auto_submit_allowed: false` for every job, so apply-job fills forms and stops before Submit.
 - Every option shows its default with "(Recommended)" next to it, the same wording as the comments in
   `examples/config/pipeline.yaml`, and a "Reset to recommended" control per group.
 - **Built (schema + writes, no routes yet):** `src/careeros/ui/settings_schema/` declares every page as data (one
@@ -88,14 +95,14 @@ Writes `pipeline.yaml: runs`, `schedule` and `llm.allowed_tools`.
 | Group | Controls (default) |
 |---|---|
 | Budget | preset picker: small (10 score / 2 prepare jobs, 30 min) · **medium (Recommended)** (25 / 5, 90 min) · large (50 / 10, 180 min) · max (150 / 25, 480 min) · custom (three number fields, `runs.custom`). A run stops at whichever limit comes first |
-| Timeouts | per job: score 10 min (Recommended), prepare 45 min (Recommended); "Stop the run on a timeout" on (Recommended); stop after 3 failures in a row (Recommended) |
+| Timeouts | per job: score 10 min (Recommended), prepare 45 min (Recommended); "Stop the run on a timeout" on (Recommended); stop after 3 failures in a row (Recommended); "When Claude hits your usage limit" (`runs.on_usage_limit`): **stop (Recommended)**, the next scheduled run tries again · pause, stop and pause all runs until you resume |
 | Ranking weights | sliders with a live preview of the next 5 jobs and their "why": freshness 60, fresh for 48 h, stale at 30 days, dream bonus 25, deadline bonus 15 within 7 days, fit weight 0.5 (prepare only), retry bonus 30, each marked (Recommended) |
 | Retry | attempts per job 2 (Recommended: retry once), then an Action Item on (Recommended) |
 | Prepare | "Stop preparing at today's apply cap" on (Recommended); shows today's cap from `careeros run cap` |
 | Auto-submit | shown **off and read-only**: "Runs never apply in this version". The `allow` / `manual` rule lists are visible (manual: Tier A, fit ≥ 85 (Recommended), with the fit threshold editable) so the policy can be reviewed before an apply path exists |
-| Safety | "Run `careeros doctor` before every run" on (Recommended); required MCP servers for every run (empty (Recommended); the inbox sync job carries its own `gmail`); job lock expiry 120 min (Recommended) |
+| Safety | "Run `careeros doctor` before every run" on (Recommended); required MCP servers for every run (empty (Recommended); the inbox sync job carries its own `gmail`); job lock expiry 120 min (Recommended); locked row "Manual commands during a run: Share the job lock" (a manual command on a job a run holds stops and says so) |
 | Allowed tools | the `llm.allowed_tools` list as removable chips (the shipped list (Recommended)); a note that a tool missing here ends a run with "Tool not allowed", never a hang |
-| Quiet hours | on, 09:00 to 18:00 (Recommended); applies to score, prepare and inbox sync (they use Claude); scout and prune ignore it. Time zone: local (Recommended) |
+| Quiet hours and missed runs | on, 09:00 to 18:00 (Recommended); applies to score, prepare and inbox sync (they use Claude); prune ignores it. "Scout follows quiet hours" (`schedule.scout_quiet_hours`) off (Recommended: scout uses no Claude quota). Time zone: local (Recommended). "Missed runs" (`schedule.missed_runs`): **ask (Recommended)**, one catch-up prompt on Today and Runs · skip, missed slots are dropped. Missed runs never start on their own either way |
 | Schedule jobs | one row per job with an enable switch and either an interval or times of day: scout every 3 h (Recommended: 2 to 3), inbox sync at 08:00 and 18:00 (off (Recommended) until the inbox-sync skill is finished; shows "needs Gmail login" when its MCP is not authenticated), score nightly at 01:00 (Recommended), prepare nightly at 02:00 (Recommended), prune weekly (Recommended); score and prepare rows take an optional preset override. Tick every 15 min (Recommended); missed after 60 min (Recommended) |
 | Scheduler | Install / Uninstall buttons (`careeros schedule install`, `careeros schedule uninstall`) and the agent state from `careeros schedule status` (installed, loaded, last tick) |
 
@@ -159,7 +166,8 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    (rejection / assessment / interview / offer) and follow-up due dates; draft preview with Send / Edit / Skip.
    Auto-send only to a verified email; thank-you notes always manual.
 7. **Contacts**: name, title, company, LinkedIn, email + confidence, draft, sent, replied. A **Connected** or
-   **N mutuals** badge turns automation off for that person and shows "Tailor manually".
+   **N mutuals** badge (at least `outreach.mutuals_threshold`, 1 (Recommended)) turns automation off for that person
+   and shows "Tailor manually".
 8. **Runs**: live and past runs of scout (per-source and per-filter counts), score and prepare batches
    (`careeros run`), apply-job (step stream + latest screenshot), inbox-sync; log pane; cancel. Sections:
    - **Now**: the running batch (from the runner lock and its `run.json`): kind, trigger (manual / schedule /

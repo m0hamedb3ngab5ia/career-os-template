@@ -6,6 +6,8 @@
 - prepare runs: the company gate is checked before each call (a blocked job is passed over, not skipped: the
   skill would record the deferral itself), and with `runs.prepare.stop_at_daily_cap` the run stops once the jobs
   ready to submit (queued) reach today's daily apply cap: preparing more than can be sent today is wasted work.
+- usage limit: with `runs.on_usage_limit: pause` a run that stops on usage_limit also pauses all runs (the same
+  pause as `careeros run pause`) until the candidate runs `careeros run resume`; `stop` (Recommended) only stops.
 """
 from __future__ import annotations
 
@@ -90,6 +92,16 @@ def daily_cap_stop(settings: Settings) -> Callable[[], tuple[str, str] | None]:
     return check
 
 
+def pause_after_usage_limit(settings: Settings, cfg: RunsConfig, run: dict[str, Any], at: datetime) -> bool:
+    """`runs.on_usage_limit: pause`: a run that stopped on the usage limit pauses every later run until resumed."""
+    if cfg.on_usage_limit != "pause" or run.get("stop_reason") != "usage_limit" or run.get("dry_run"):
+        return False
+    rs = RunStore(settings)
+    rs.set_pause(None, "usage limit reached (runs.on_usage_limit: pause); `careeros run resume` when it resets", at)
+    rs.log(run["id"], "runs paused until `careeros run resume` (runs.on_usage_limit: pause)")
+    return True
+
+
 def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig | None = None,
               trigger: str = "manual", dry_run: bool = False, invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, clock: Callable[[], float] = time.monotonic, cancel=None,
@@ -141,6 +153,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         rs.save_run(run)
         for w in warnings:
             rs.log(run["id"], w)
+        pause_after_usage_limit(settings, cfg, run, now())
     return run
 
 
@@ -219,4 +232,5 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
         rs.save_run(run)
         rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
         locks.release(rs.runner_lock_path, lk.token)
+    pause_after_usage_limit(settings, cfg, run, now())
     return run
