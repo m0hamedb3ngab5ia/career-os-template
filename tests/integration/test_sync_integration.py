@@ -360,7 +360,9 @@ def test_hook_scans_full_history_when_another_remote_writes_under_template_refs(
     side = tmp_path / "side.git"
     git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(side))
     if nested == "name":
-        git(priv, env, "remote", "add", "template/bak", str(side))
+        # newer git refuses `remote add template/bak`, but older git and hand-edited config still allow it
+        git(priv, env, "config", "remote.template/bak.url", str(side))
+        git(priv, env, "config", "remote.template/bak.fetch", "+refs/heads/*:refs/remotes/template/bak/*")
     else:
         git(priv, env, "remote", "add", "side", str(side))
         git(priv, env, "config", "--replace-all", "remote.side.fetch", "+refs/heads/*:refs/remotes/template/bak/*")
