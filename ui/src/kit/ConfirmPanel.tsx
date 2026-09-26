@@ -34,7 +34,7 @@ export function ConfirmPanel({ question, cancelLabel, confirmLabel, onCancel, on
       <Button ref={cancelRef} size="small" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button size="small" variant="destructive-filled" onClick={onConfirm} pending={pending}>
+      <Button size="small" variant="destructive-filled" onClick={onConfirm} pending={pending} pendingLabel={`${confirmLabel}…`}>
         {confirmLabel}
       </Button>
     </div>
