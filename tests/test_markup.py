@@ -57,3 +57,16 @@ def test_validate_bold_non_string():
                                            ("plain text", False)])
 def test_has_markdown_bold(text: str, expected: bool) -> None:
     assert has_markdown_bold(text) is expected
+
+
+@pytest.mark.parametrize("text", ["Built **REST API**s for billing", "served **10**k users", "**5**th place",
+                                  "x**Python** scripts", "Built a **FastAPI service", "shipped **about 2 months** in",
+                                  "**abc**def"])
+def test_has_markdown_bold_catches_glued_and_lone_markers(text: str) -> None:
+    assert has_markdown_bold(text) is True
+
+
+@pytest.mark.parametrize("text", ["f(**kwargs, **opts)", "2**n + 3**m", "accepts *args and **kwargs",
+                                  "2**32 and 2**64", "x = y**2"])
+def test_has_markdown_bold_ignores_code(text: str) -> None:
+    assert has_markdown_bold(text) is False

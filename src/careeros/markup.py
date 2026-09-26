@@ -58,11 +58,16 @@ def bold_spans(text: Any) -> list[str]:
     return text.split(MARKER)[1::2]
 
 
-# a bold pair as markdown writes it: `**` not glued to a word on the outside, non-space just inside. Code such as
-# `**kwargs` (no closing pair) or `2**32` (glued to a digit) is not bold.
-_MD_BOLD = re.compile(r"(?<![\w*])\*\*(?=\S)[^*\n]+?(?<=\S)\*\*(?![\w*])")
+# A markdown bold pair, including one glued to a word ("**REST API**s", "**10**k"); not after a digit or `*`
+# (so exponents like `2**32 and 2**64` never pair up), non-space just inside each marker.
+_MD_BOLD = re.compile(r"(?<![\d*])\*\*(?=\S)[^*\n]+?(?<=\S)\*\*(?!\*)")
+# `**` that is code, not markup: an exponent (`2**32`, `y**2`, `2**n`) or keyword unpacking (`**kwargs`, `**opts`)
+_CODE_STARS = re.compile(r"(?<=[\w)\]])\*\*(?=[\w(])|(?<![\w*])\*\*(?=[a-z_][a-z0-9_]*\b)")
 
 
 def has_markdown_bold(text: Any) -> bool:
-    """True when `text` holds a markdown **bold** pair (what a copied bullet marker looks like)."""
-    return isinstance(text, str) and bool(_MD_BOLD.search(text))
+    """True when `text` holds markdown bold (a pair, even glued to a word) or a stray `**` that is not code.
+    Bullet markers copied into prose look like this; `**kwargs` and `2**32` do not."""
+    if not isinstance(text, str) or MARKER not in text:
+        return False
+    return bool(_MD_BOLD.search(text)) or MARKER in _CODE_STARS.sub("", text)
