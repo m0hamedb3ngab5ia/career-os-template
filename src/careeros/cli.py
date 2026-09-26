@@ -243,10 +243,13 @@ def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
 
 
 def cmd_safety_check(args: argparse.Namespace) -> int:
-    """Posting-level scam gate. Writes data/jobs/<id>/safety.json. Exit 3 on any hard flag (after opening a
-    `scam_suspected` Action Item, setting needs_review and recording the company in the registry)."""
+    """Posting gate: scam + company risk + ghost checks -> data/jobs/<id>/safety.json with a verdict
+    (pass | review | skip | block), every flag's reason code, evidence and timestamp, and a `runs` trail.
+    Exit 0 = pass or review (review turns auto-submit off), 3 = block (Action Item `scam_suspected`,
+    needs_review, company recorded in the registry), 4 = skip (dead posting, status skipped)."""
     from careeros.safety import registry
-    from careeros.safety.scam import auto_submit_allowed, check_posting, hard, registrable_domain
+    from careeros.safety.ghost import check_ghost, load_signals
+    from careeros.safety.scam import apply_levels, auto_submit_allowed, check_posting, registrable_domain, verdict
 
     s = _settings(args)
     store = Store(s)
@@ -255,47 +258,51 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
     reg_path = registry.default_path(s)
-    from careeros.safety.ghost import check_ghost, load_signals
-
-    scam_flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
-    ghost_flags = check_ghost(p, store.history_for(p), load_signals(s), s)
-    flags = scam_flags + ghost_flags
+    flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
+    flags += check_ghost(p, store.history_for(p), load_signals(s), s, company_history=store.load_history())
+    flags = apply_levels(flags, s)
+    v = verdict(flags)
     ok, why = auto_submit_allowed(p, s)
-    hard_flags = hard(scam_flags)
-    result = {"job_id": p.job_id, "checked_at": datetime.now().isoformat(timespec="seconds"),
-              "pass": not hard_flags, "flags": [f.to_dict() for f in flags],
-              "auto_submit_allowed": ok and not flags, "auto_submit_reason": why or ("soft flags" if flags else "")}
+    concerns = [f.code for f in flags if f.level != "info"]
+    prev = store._read(p.job_id, "safety.json") or {}
+    now = datetime.now().isoformat(timespec="seconds")
+    result = {"job_id": p.job_id, "checked_at": now, "verdict": v, "flags": [f.to_dict() for f in flags],
+              "auto_submit_allowed": ok and v == "pass",
+              "auto_submit_reason": why or ", ".join(dict.fromkeys(concerns)),
+              "runs": (prev.get("runs") or []) + [{"at": now, "verdict": v, "codes": [f.code for f in flags]}]}
     store._write(p.job_id, "safety.json", result)
     for f in flags:
-        print(f"  {f.severity.upper():<4}  {f.code:<20} {f.detail}")
-    if not hard_flags:
-        hard_ghost = hard(ghost_flags)
-        if hard_ghost:
-            codes = "; ".join(dict.fromkeys(f.code for f in hard_ghost))
-            _set_status_both(s, p.job_id, "skipped", f"ghost job: {hard_ghost[0].detail}"[:200])
-            print(f"{p.job_id}: GHOST SKIP ({codes})")
-            return GHOST_SKIP_EXIT
-        if ghost_flags and s.is_dream(p.company):
-            print(_add_action(s, f"possible ghost job at dream company: {'; '.join(f.detail for f in ghost_flags)}"[:300],
-                              "ghost_job", job_id=p.job_id, link=p.url or p.apply_url, priority="M",
-                              needs="anytime", dedupe=True))
-        print(f"{p.job_id}: safety pass" + (f" ({len(flags)} soft flag(s))" if flags else ""))
-        return 0
-    codes = "; ".join(dict.fromkeys(f.code for f in hard_flags))
-    registry.add_or_bump(reg_path, p.company, domain=registrable_domain(p.apply_url or p.url), reason=codes,
-                         job_id=p.job_id)
-    print(_add_action(s, f"scam gate: {codes} at {p.company} ({p.apply_url or p.url}); review by hand",
-                      "scam_suspected", job_id=p.job_id, link=p.apply_url or p.url, priority="H", needs="phone",
-                      dedupe=True))
-    _set_status_both(s, p.job_id, "needs_review", f"scam gate: {codes}")
-    store.append_log(p.job_id, f"scam gate hard flags: {codes}", component="safety")
-    print(f"{p.job_id}: SAFETY STOP ({codes})")
-    return SAFETY_HARD_EXIT
+        print(f"  {f.level.upper():<6} {f.code:<32} {f.detail}")
+    codes = "; ".join(dict.fromkeys(f.code for f in flags if f.level == v))
+    if v == "block":
+        registry.add_or_bump(reg_path, p.company, domain=registrable_domain(p.apply_url or p.url), reason=codes,
+                             job_id=p.job_id, confidence="high",
+                             evidence=[u for f in flags if f.level == "block" for u in f.evidence])
+        print(_add_action(s, f"scam gate BLOCK: {codes} at {p.company} ({p.apply_url or p.url}); see safety.json",
+                          "scam_suspected", job_id=p.job_id, link=p.apply_url or p.url, priority="H", needs="phone",
+                          dedupe=True))
+        _set_status_both(s, p.job_id, "needs_review", f"safety block: {codes}"[:200])
+        store.append_log(p.job_id, f"safety block: {codes}", component="safety")
+        print(f"{p.job_id}: BLOCK ({codes})")
+        return SAFETY_HARD_EXIT
+    if v == "skip":
+        _set_status_both(s, p.job_id, "skipped", f"ghost job: {codes}"[:200])
+        store.append_log(p.job_id, f"safety skip: {codes}", component="safety")
+        print(f"{p.job_id}: SKIP ({codes})")
+        return GHOST_SKIP_EXIT
+    ghosts = [f for f in flags if f.code.startswith("GHOST_") and f.level == "review"]
+    if ghosts and s.is_dream(p.company):
+        print(_add_action(s, f"possible ghost job at dream company: {'; '.join(f.detail for f in ghosts)}"[:300],
+                          "ghost_job", job_id=p.job_id, link=p.url or p.apply_url, priority="M",
+                          needs="anytime", dedupe=True))
+    store.append_log(p.job_id, f"safety {v}" + (f": {', '.join(concerns)}" if concerns else ""), component="safety")
+    print(f"{p.job_id}: {v.upper()}" + (f" ({', '.join(dict.fromkeys(concerns))}; auto-submit off)" if v == "review" else ""))
+    return 0
 
 
 def cmd_safety_fields(args: argparse.Namespace) -> int:
-    """Form-level gate: JSON list of visible labels (stdin with `-`). Exit 3 on a sensitive field."""
-    from careeros.safety.scam import check_form_fields
+    """Form gate: JSON list of visible labels (stdin with `-`). Exit 3 on any blocked field."""
+    from careeros.safety.scam import apply_levels, check_form_fields
 
     s = _settings(args)
     store = Store(s)
@@ -304,16 +311,17 @@ def cmd_safety_fields(args: argparse.Namespace) -> int:
         return 1
     raw = sys.stdin.read() if args.labels_json == "-" else Path(args.labels_json).read_text(encoding="utf-8")
     labels = [str(x) for x in json.loads(raw or "[]")]
-    flags = check_form_fields(labels, status=store.get_status(args.job_id))
+    flags = [f for f in apply_levels(check_form_fields(labels, status=store.get_status(args.job_id),
+                                                       page_url=args.page_url or ""), s) if f.level == "block"]
     if not flags:
         print(f"{args.job_id}: {len(labels)} field(s) ok")
         return 0
     for f in flags:
-        print(f"  HARD  {f.code:<20} {f.detail}")
-    what = "; ".join(f.detail for f in flags)[:300]
-    print(_add_action(s, f"scam gate (form): {what}", "scam_suspected", job_id=args.job_id, priority="H",
-                      needs="phone", dedupe=True))
-    _set_status_both(s, args.job_id, "needs_review", f"scam gate (form): {what}"[:200])
+        print(f"  BLOCK  {f.code:<26} {f.detail}")
+    what = "; ".join(f"{f.code}: {f.detail}" for f in flags)[:300]
+    print(_add_action(s, f"scam gate (form): {what}", "scam_suspected", job_id=args.job_id, link=args.page_url or "",
+                      priority="H", needs="phone", dedupe=True))
+    _set_status_both(s, args.job_id, "needs_review", f"safety block (form): {what}"[:200])
     return SAFETY_HARD_EXIT
 
 
@@ -321,9 +329,13 @@ def cmd_safety_verify(args: argparse.Namespace) -> int:
     from careeros.safety import registry
 
     s = _settings(args)
-    e = registry.add_verified(registry.verified_path(s), args.company, domain=args.domain or "",
-                              evidence=args.evidence)
-    print(f"verified: {e['company']} {e.get('domain') or ''} -> {registry.verified_path(s)}")
+    try:
+        e = registry.add_verified(registry.verified_path(s), args.company, risk=args.risk, domain=args.domain or "",
+                                  signals=args.signal or [], evidence=args.evidence or [])
+    except ValueError as err:
+        print(f"safety verify: {err}", file=sys.stderr)
+        return 2
+    print(f"verified: {e['company']} risk={e['risk']} signals={len(e['signals'])} -> {registry.verified_path(s)}")
     return 0
 
 
@@ -332,8 +344,8 @@ def cmd_safety_signal(args: argparse.Namespace) -> int:
     from careeros.safety.ghost import default_signals_path, save_signal
 
     s = _settings(args)
-    e = save_signal(s, args.company, args.kind, args.date, args.source)
-    print(f"signal: {args.company} {e['kind']} {e['date']} -> {default_signals_path(s)}")
+    e = save_signal(s, args.company, args.kind, args.date, args.source, scope=args.scope or "")
+    print(f"signal: {args.company} {e['kind']} {e['date']} scope={e['scope'] or '-'} -> {default_signals_path(s)}")
     return 0
 
 
@@ -342,8 +354,22 @@ def cmd_safety_flag(args: argparse.Namespace) -> int:
 
     s = _settings(args)
     e = registry.add_or_bump(registry.default_path(s), args.company, domain=args.domain or "",
-                             reason=args.reason or "manual", notes=args.notes or "")
-    print(f"flagged: {e['company']} {e.get('domain') or ''} (count {e['count']}) -> {registry.default_path(s)}")
+                             reason=args.reason or "manual", notes=args.notes or "", confidence=args.confidence,
+                             evidence=args.evidence or [], days=args.days)
+    print(f"flagged: {e['company']} {e.get('domain') or ''} ({e['confidence']}, until {e['expires_at'][:10]}) "
+          f"-> {registry.default_path(s)}")
+    return 0
+
+
+def cmd_safety_clear(args: argparse.Namespace) -> int:
+    from careeros.safety import registry
+
+    s = _settings(args)
+    e = registry.clear(registry.default_path(s), args.company, note=args.note or "")
+    if e is None:
+        print(f"{args.company}: not in the flagged registry", file=sys.stderr)
+        return 1
+    print(f"cleared: {e['company']} ({e['review_note']})")
     return 0
 
 
@@ -484,24 +510,28 @@ def build_parser() -> argparse.ArgumentParser:
     ad.add_argument("id")
     ad.set_defaults(fn=cmd_action_done)
 
-    sf = sub.add_parser("safety", help="scam + ghost-job gate (exit 3 = scam stop, 4 = ghost skip)")
+    sf = sub.add_parser("safety", help="scam + company + ghost-job gate (exit 3 = block, 4 = skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)
-    sck = sfs.add_parser("check", help="posting checks -> safety.json; hard flag = Action Item + needs_review")
+    sck = sfs.add_parser("check", help="posting checks -> safety.json verdict pass|review|skip|block")
     sck.add_argument("job_id")
     sck.set_defaults(fn=cmd_safety_check)
-    sfd = sfs.add_parser("fields", help="check visible form labels (JSON list) for identity/bank/fee fields")
+    sfd = sfs.add_parser("fields", help="check visible form labels (JSON list) for identity/bank/payment/credential fields")
     sfd.add_argument("job_id")
     sfd.add_argument("--labels-json", required=True, help="path to a JSON list of labels, or - for stdin")
+    sfd.add_argument("--page-url", help="URL of the page showing the fields (ATS account passwords are normal)")
     sfd.set_defaults(fn=cmd_safety_fields)
-    svf = sfs.add_parser("verify", help="mark a non-curated company as checked real (clears company_unverified)")
+    svf = sfs.add_parser("verify", help="record a company check: risk low|medium|high from independent signals")
     svf.add_argument("company")
+    svf.add_argument("--risk", choices=["low", "medium", "high"], required=True)
+    svf.add_argument("--signal", action="append", help="one independent signal checked (repeat; low needs 2+)")
+    svf.add_argument("--evidence", action="append", help="source URL (repeatable)")
     svf.add_argument("--domain")
-    svf.add_argument("--evidence", required=True, help="what was checked, e.g. careers page URL, LinkedIn size")
     svf.set_defaults(fn=cmd_safety_verify)
     ssg = sfs.add_parser("signal", help="record a hiring freeze / layoffs report for ghost-job checks")
     ssg.add_argument("company")
     ssg.add_argument("--kind", choices=["freeze", "layoffs", "none"], required=True)
     ssg.add_argument("--date", required=True, help="YYYY-MM-DD of the report (today for `none`)")
+    ssg.add_argument("--scope", help="what the freeze covers: company-wide, or teams/locations (e.g. \"engineering; NYC\")")
     ssg.add_argument("--source", required=True, help="URL of the report, or what was checked")
     ssg.set_defaults(fn=cmd_safety_signal)
     sfl = sfs.add_parser("flag", help="add a company (and domain) to data/flagged_registry.yaml by hand")
@@ -509,7 +539,15 @@ def build_parser() -> argparse.ArgumentParser:
     sfl.add_argument("--domain")
     sfl.add_argument("--reason")
     sfl.add_argument("--notes")
+    sfl.add_argument("--confidence", choices=["high", "medium"], default="high",
+                     help="high = block (scout drops it), medium = review")
+    sfl.add_argument("--evidence", action="append", help="source URL (repeatable)")
+    sfl.add_argument("--days", type=int, default=180, help="expire after this many days (default 180)")
     sfl.set_defaults(fn=cmd_safety_flag)
+    scl = sfs.add_parser("clear", help="mark a flagged company reviewed and cleared")
+    scl.add_argument("company")
+    scl.add_argument("--note")
+    scl.set_defaults(fn=cmd_safety_clear)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p

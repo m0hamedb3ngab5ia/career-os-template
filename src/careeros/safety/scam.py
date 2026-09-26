@@ -1,38 +1,69 @@
 """Scam / data-harvesting checks. Pure functions: they read a Posting and Settings and return flags.
 
-Hard flags stop the pipeline (Action Item `scam_suspected`, status needs_review, never auto). Soft flags
-lower fit and ask for review. Rules (TODO.md "Safety"):
-- apply URL must be on the company's own domain or a known ATS
-- no free-provider recruiter email, no scam phrases (WhatsApp/Telegram interviews, check deposits,
-  equipment you buy and get reimbursed for, fees, pay in crypto or gift cards)
-- no form field asking for identity documents or bank details before an offer, and never a fee
-- salary far above market is soft
+Every flag has a reason code (`SCAM_*`, `COMPANY_*`, `FIELD_*`; ghost checks add `GHOST_*`), a level and an
+evidence trail (URLs + timestamp). `verdict(flags)` gives the decision:
+
+    pass    normal: can auto-submit
+    review  uncertain or conflicting evidence: a human approves before anything is submitted
+    block   strong fraud / privacy violation: never submit (ghost checks may also `skip` a dead posting)
+    info    lowers confidence only (fit), never changes the verdict
+
+Only strong signals block: payment/gift cards/crypto/check deposits/buying equipment, remote-access
+requests, identity or bank data before an offer, credentials, brand impersonation, and a company whose
+name, site, recruiter and posting contradict each other. Weak or single signals (unfamiliar domain,
+free-provider recruiter email, chat-app interviews, a company nobody has checked yet) ask for review.
+Company priority (dream list) never softens a fraud signal.
 """
 from __future__ import annotations
 
 import re
-from dataclasses import asdict, dataclass
+from dataclasses import dataclass, field
 from typing import Any, Literal
 from urllib.parse import urlparse
 
-from careeros.config import Settings, normalize_company
-from careeros.models import Posting
+from careeros.config import Settings, _fuzzy_eq, normalize_company
+from careeros.models import Posting, now_iso
 
-Severity = Literal["hard", "soft"]
+Level = Literal["block", "skip", "review", "info"]
+Verdict = Literal["block", "skip", "review", "pass"]
+_RANK = {"block": 3, "skip": 2, "review": 1, "info": 0}
 
 
 @dataclass(frozen=True)
 class Flag:
     code: str
-    severity: Severity
+    level: Level
     detail: str = ""
+    evidence: tuple[str, ...] = ()
+    at: str = field(default_factory=now_iso)
 
-    def to_dict(self) -> dict[str, str]:
-        return asdict(self)
+    def to_dict(self) -> dict[str, Any]:
+        return {"code": self.code, "level": self.level, "detail": self.detail, "evidence": list(self.evidence),
+                "at": self.at}
 
     @classmethod
     def from_dict(cls, d: dict[str, Any]) -> "Flag":
-        return cls(str(d["code"]), d["severity"], str(d.get("detail") or ""))
+        return cls(str(d["code"]), d["level"], str(d.get("detail") or ""), tuple(d.get("evidence") or ()),
+                   str(d.get("at") or now_iso()))
+
+
+def apply_levels(flags: list[Flag], settings: Settings) -> list[Flag]:
+    """Per-code level overrides from `targets.yaml: safety.levels` ({CODE: block|skip|review|info|off}),
+    so a template user can make e.g. SCAM_FREE_EMAIL_RECRUITER a block, or GHOST_OLD_POST off."""
+    over = {str(k).upper(): str(v).lower() for k, v in
+            (((settings.targets.get("safety") or {}).get("levels")) or {}).items()}
+    out: list[Flag] = []
+    for f in flags:
+        lv = over.get(f.code)
+        if lv == "off":
+            continue
+        out.append(Flag(f.code, lv, f.detail, f.evidence, f.at) if lv in _RANK else f)  # type: ignore[arg-type]
+    return out
+
+
+def verdict(flags: list[Flag]) -> Verdict:
+    top = max((_RANK[f.level] for f in flags), default=0)
+    return {3: "block", 2: "skip", 1: "review", 0: "pass"}[top]  # type: ignore[return-value]
 
 
 # Registrable domain per ATS family (see src/careeros/apply/adapters.md). A posting whose apply URL is on
@@ -70,30 +101,49 @@ FREE_EMAIL_DOMAINS: frozenset[str] = frozenset({
 _TWO_LEVEL_SUFFIXES = {"co.uk", "ac.uk", "org.uk", "com.au", "co.in", "co.jp", "com.br", "co.nz", "com.sg", "com.mx"}
 _EMAIL_RE = re.compile(r"[A-Za-z0-9._%+-]+@([A-Za-z0-9-]+(?:\.[A-Za-z0-9-]+)+)")
 
-SCAM_PHRASES: list[tuple[str, re.Pattern[str]]] = [
-    ("messaging-app interview", re.compile(
-        r"\b(whats\s?app|telegram|signal app|google hangouts?|wickr)\b.{0,60}\b(interview|contact|message|chat|reach)"
-        r"|\b(interview|contact|message|chat|reach)\w*\b.{0,60}\b(whats\s?app|telegram|wickr)\b", re.I | re.S)),
-    ("check deposit", re.compile(r"\b(deposit|cash)\b.{0,30}\b(a|the|this) (check|cheque)\b"
-                                 r"|\b(check|cheque)s?\b.{0,20}\bto (deposit|cash)\b", re.I | re.S)),
-    ("buy equipment, get reimbursed", re.compile(
-        r"\b(purchase|buy)\b.{0,60}\b(equipment|laptop|software|supplies)\b.{0,80}\breimburs", re.I | re.S)),
-    ("fee to apply or train", re.compile(
+# (code, level, label, pattern) over the posting title + description.
+POSTING_PATTERNS: list[tuple[str, Level, str, re.Pattern[str]]] = [
+    ("SCAM_PAYMENT_REQUEST", "block", "fee to apply or train", re.compile(
         r"\b(application|training|registration|onboarding|processing|placement|background.check|starter kit)\s+fee\b"
         r"|\bpay\b.{0,20}\bto (apply|start|be considered)\b", re.I | re.S)),
-    ("paid in crypto or gift cards", re.compile(
-        r"\b(paid|payment|salary|compensation)\b.{0,30}\b(crypto(currency)?|bitcoin|btc|usdt|tether|gift cards?)\b", re.I | re.S)),
-    ("no interview, hired immediately", re.compile(r"\bno interview (required|needed)\b|\bhired (immediately|on the spot)\b", re.I)),
+    ("SCAM_PAYMENT_REQUEST", "block", "gift cards", re.compile(r"\b(purchase|buy|send)\b.{0,30}\bgift ?cards?\b", re.I | re.S)),
+    ("SCAM_PAYMENT_REQUEST", "block", "paid in crypto or gift cards", re.compile(
+        r"\b(paid|payment|salary|compensation)\b.{0,30}\b(crypto(currency)?|bitcoin|btc|usdt|tether|gift cards?)\b",
+        re.I | re.S)),
+    ("SCAM_PAYMENT_REQUEST", "block", "check deposit", re.compile(
+        r"\b(deposit|cash)\b.{0,30}\b(a|the|this) (check|cheque)\b|\b(check|cheque)s?\b.{0,20}\bto (deposit|cash)\b",
+        re.I | re.S)),
+    ("SCAM_PAYMENT_REQUEST", "block", "buy equipment, get reimbursed", re.compile(
+        r"\b(purchase|buy)\b.{0,60}\b(equipment|laptop|software|supplies)\b.{0,80}\b(reimburs|vendor)", re.I | re.S)),
+    ("SCAM_REMOTE_ACCESS_REQUEST", "block", "remote-access software", re.compile(
+        r"\b(install|download|run|grant|give)\b.{0,40}\b(anydesk|teamviewer|ultraviewer|rustdesk|remote (desktop|access))\b"
+        r"|\b(anydesk|teamviewer|ultraviewer|rustdesk)\s+(id|code)\b", re.I | re.S)),
+    ("SCAM_CHAT_ONLY_INTERVIEW", "review", "chat-app interview", re.compile(
+        r"\b(whats\s?app|telegram|signal app|google hangouts?|wickr)\b.{0,60}\b(interview|contact|message|chat|reach)"
+        r"|\b(interview|contact|message|chat|reach)\w*\b.{0,60}\b(whats\s?app|telegram|wickr)\b", re.I | re.S)),
+    ("SCAM_NO_INTERVIEW", "review", "no interview, hired immediately", re.compile(
+        r"\bno interview (required|needed)\b|\bhired (immediately|on the spot)\b", re.I)),
 ]
 
-# Form fields that must never be filled before an offer. Fees are refused at any stage.
-_FEE_FIELD_RE = re.compile(r"\b(application|training|processing|registration|onboarding)?\s*fee\b|\bpayment (method|details)\b",
-                           re.I)
+# Form fields. Remote access, payment and credentials for other accounts block at any stage; identity and
+# bank data block before an offer (onboarding paperwork after an offer is normal). Creating a password or
+# entering an emailed code on the ATS's own domain is normal account creation.
+_REMOTE_FIELD_RE = re.compile(r"\b(anydesk|teamviewer|ultraviewer|rustdesk|remote (access|desktop|control))\b", re.I)
+_PAYMENT_FIELD_RE = re.compile(
+    r"\b(application|training|processing|registration|onboarding)?\s*fee\b|\bpayment (method|details|info)\b|"
+    r"\b(credit|debit) card\b|\bcard number\b|\bcvv\b|\bgift ?card\b|\bcrypto wallet\b", re.I)
+_CREDENTIAL_FIELD_RE = re.compile(
+    r"\bpass(word|code|phrase)\b|\bsecurity (question|answer)\b|\b(verification|one.time|authentication|auth|2fa|mfa|otp)\s*code\b|"
+    r"\b\d.digit code\b|\bcode (we|that we) (sent|texted|emailed)\b|\botp\b", re.I)
+_OTHER_ACCOUNT_RE = re.compile(
+    r"\b(gmail|outlook|hotmail|yahoo|icloud|apple id|google|email|e-mail|bank(ing)?|linkedin|facebook)\s+"
+    r"(account\s+)?(password|passcode|login|pin|security)\b"
+    r"|\b(password|passcode|login)\s+(for|to|of)\s+your\s+(gmail|email|e-mail|bank|linkedin|apple id|google)", re.I)
 SENSITIVE_FIELD_RE = re.compile(
     r"\b(ssn|social security|social insurance|national (id|identity|insurance)|tax (id|identification)|\bitin\b|"
     r"date of birth|birth ?date|\bdob\b|place of birth|bank (account|name|details)|account number|routing (number|#)|"
-    r"\biban\b|swift|sort code|credit card|debit card|card number|cvv|passport|driver'?s? licen[cs]e|"
-    r"state id|government.?(issued )?id|photo id|id (card|upload|document)|mother'?s maiden)\b",
+    r"\biban\b|swift|sort code|passport|driver'?s? licen[cs]e|state id|government.?(issued )?id|photo id|"
+    r"id (card|upload|document)|mother'?s maiden)\b",
     re.I,
 )
 
@@ -158,17 +208,18 @@ def _curated_names(settings: Settings) -> list[str]:
     return [n for n in names if n]
 
 
-def company_trust(settings: Settings, company: str, verified: list[dict[str, Any]] | None = None) -> str:
-    """`curated` (on a board, the dream list, a prestige tier or company_domains), `verified` (in
-    data/verified_companies.yaml), else `unverified`: could be a made-up company."""
-    from careeros.config import _fuzzy_eq
-
+def company_risk(settings: Settings, company: str,
+                 verified: list[dict[str, Any]] | None = None) -> tuple[str, dict[str, Any] | None]:
+    """(`curated` | `low` | `medium` | `high` | `unchecked`, verified entry). Curated = on a board, the dream
+    list, a prestige tier or company_domains. Otherwise the latest `careeros safety verify` record decides;
+    a company nobody has checked yet is `unchecked` (review), never suspicious by itself."""
     key = normalize_company(company)
     if key and any(_fuzzy_eq(key, normalize_company(n)) for n in _curated_names(settings)):
-        return "curated"
-    if key and any(normalize_company(str(v.get("company") or "")) == key for v in verified or []):
-        return "verified"
-    return "unverified"
+        return "curated", None
+    for v in verified or []:
+        if key and normalize_company(str(v.get("company") or "")) == key:
+            return str(v.get("risk") or "medium"), v
+    return "unchecked", None
 
 
 def _lookalike_of(settings: Settings, company: str, apply_url: str) -> str | None:
@@ -192,6 +243,10 @@ def _posting_emails(p: Posting) -> list[str]:
     return [m.group(0) for m in _EMAIL_RE.finditer(text)]
 
 
+def _ev(*urls: Any) -> tuple[str, ...]:
+    return tuple(dict.fromkeys(str(u) for u in urls if u))
+
+
 def check_posting(p: Posting, settings: Settings, registry: list[dict[str, Any]] | None = None,
                   verified: list[dict[str, Any]] | None = None) -> list[Flag]:
     """All posting-level checks. `registry` / `verified` are the loaded `data/flagged_registry.yaml` and
@@ -200,53 +255,83 @@ def check_posting(p: Posting, settings: Settings, registry: list[dict[str, Any]]
 
     flags: list[Flag] = []
     apply_url = p.apply_url or p.url
+    src = _ev(p.url, apply_url if apply_url != p.url else None)
+
     hit = is_flagged(registry or [], p.company, apply_url)
     if hit:
-        flags.append(Flag("registry", "hard", f"in flagged registry: {hit.get('reason') or 'flagged'}"))
-    trust = company_trust(settings, p.company, verified)
-    brand = _lookalike_of(settings, p.company, apply_url) if trust == "unverified" else None
+        level: Level = "block" if hit.get("confidence", "high") == "high" else "review"
+        flags.append(Flag("SCAM_FLAGGED_BEFORE", level,
+                          f"flagged before ({hit.get('confidence', 'high')} confidence): {hit.get('reason') or '?'}",
+                          _ev(*(hit.get("evidence") or []))))
+
+    risk, entry = company_risk(settings, p.company, verified)
+    brand = _lookalike_of(settings, p.company, apply_url) if risk not in ("curated", "low") else None
     if brand:
-        flags.append(Flag("lookalike_company", "hard",
-                          f"\"{p.company}\" borrows the name {brand} but applies on {registrable_domain(apply_url) or '?'}"))
-    elif trust == "unverified":
-        flags.append(Flag("company_unverified", "soft",
-                          f"{p.company} is not on your boards, dream list or tiers; verify it is real "
-                          "(official site lists the role, LinkedIn page with real employees), then "
-                          "`careeros safety verify`"))
+        flags.append(Flag("SCAM_BRAND_DOMAIN_MISMATCH", "block",
+                          f"\"{p.company}\" uses the name {brand} but applies on {registrable_domain(apply_url) or '?'}",
+                          src))
+    ev = _ev(*((entry or {}).get("evidence") or [])) or src
+    if risk == "unchecked":
+        flags.append(Flag("COMPANY_NOT_YET_CHECKED", "review",
+                          f"{p.company} is not on your boards, dream list or tiers and has not been checked yet "
+                          "(unknown is not suspicious: /score-job verifies it)", src))
+    elif risk == "medium":
+        flags.append(Flag("COMPANY_SPARSE_PUBLIC_FOOTPRINT", "review",
+                          f"{p.company}: little public information; " + "; ".join((entry or {}).get("signals") or []), ev))
+    elif risk == "high":
+        flags.append(Flag("COMPANY_CONTRADICTIONS", "block",
+                          f"{p.company}: " + "; ".join((entry or {}).get("signals") or ["contradictory evidence"]), ev))
+
     if apply_url and not is_company_or_ats_domain(apply_url, p.company, settings):
-        flags.append(Flag("apply_domain", "hard",
-                          f"{registrable_domain(apply_url)} is neither {p.company}'s domain nor a known ATS "
-                          "(add it to companies.yaml: company_domains if it is theirs)"))
+        flags.append(Flag("SCAM_APPLY_DOMAIN_UNRECOGNIZED", "review",
+                          f"{registrable_domain(apply_url)} is neither {p.company}'s known domain nor a known ATS "
+                          "(add it to companies.yaml: company_domains if it is theirs)", src))
     for email in _posting_emails(p):
-        dom = email.rsplit("@", 1)[1].lower()
-        if dom in FREE_EMAIL_DOMAINS:
-            flags.append(Flag("free_email_contact", "hard", f"recruiter contact on a free provider: {email}"))
+        if email.rsplit("@", 1)[1].lower() in FREE_EMAIL_DOMAINS:
+            flags.append(Flag("SCAM_FREE_EMAIL_RECRUITER", "review",
+                              f"recruiter contact on a free provider: {email} (agencies and founders do this too)", src))
             break
     text = " ".join([p.title or "", p.description_text or ""])
-    for label, rx in SCAM_PHRASES:
+    for code, level, label, rx in POSTING_PATTERNS:
         m = rx.search(text)
         if m:
-            flags.append(Flag("scam_phrase", "hard", f"{label}: \"{m.group(0)[:80]}\""))
+            flags.append(Flag(code, level, f"{label}: \"{m.group(0)[:80]}\"", src))
+
     floor = (settings.targets.get("candidate") or {}).get("min_base_usd")
     mult = float(((settings.targets.get("safety") or {}).get("scam") or {}).get("salary_max_multiple", 3))
     top = p.salary_max or p.salary_min
     if floor and top and (p.salary_currency or "USD").upper() == "USD" and top > float(floor) * mult:
-        flags.append(Flag("salary_implausible", "soft", f"salary {int(top):,} is over {mult:g}x your floor {int(floor):,}"))
-    return flags
+        flags.append(Flag("SCAM_SALARY_IMPLAUSIBLE", "review",
+                          f"salary {int(top):,} is over {mult:g}x your floor {int(floor):,}", src))
+    # one flag per code+level keeps the trail readable (several payment phrases -> one SCAM_PAYMENT_REQUEST)
+    seen: set[tuple[str, str]] = set()
+    out: list[Flag] = []
+    for f in flags:
+        if (f.code, f.level) not in seen:
+            seen.add((f.code, f.level))
+            out.append(f)
+    return out
 
 
-def check_form_fields(labels: list[str], status: str | None = None) -> list[Flag]:
-    """Visible form labels/placeholders/upload prompts -> hard flags. Identity and bank fields are allowed
-    only once the job status is `offer` (onboarding paperwork); a fee is refused at any stage."""
+def check_form_fields(labels: list[str], status: str | None = None, page_url: str = "") -> list[Flag]:
+    """Visible form labels / placeholders / upload prompts -> block flags. `page_url` is the page showing
+    them: account passwords and emailed codes are normal on a known ATS domain."""
+    on_ats = registrable_domain(page_url) in KNOWN_ATS_DOMAINS if page_url else False
+    ev = _ev(page_url)
     flags: list[Flag] = []
     for label in labels:
         t = " ".join(str(label or "").split())
         if not t:
             continue
-        if _FEE_FIELD_RE.search(t) and not re.search(r"\bfee(s)?[- ]free\b", t, re.I):
-            flags.append(Flag("sensitive_field", "hard", f"asks for a fee or payment: {t}"))
+        if _REMOTE_FIELD_RE.search(t):
+            flags.append(Flag("FIELD_REMOTE_ACCESS", "block", f"asks for remote access: {t}", ev))
+        elif _PAYMENT_FIELD_RE.search(t) and not re.search(r"\bfee(s)?[- ]free\b", t, re.I):
+            flags.append(Flag("FIELD_PAYMENT", "block", f"asks for a fee or payment details: {t}", ev))
+        elif _CREDENTIAL_FIELD_RE.search(t) and (not on_ats or _OTHER_ACCOUNT_RE.search(t)):
+            flags.append(Flag("FIELD_CREDENTIALS", "block", f"asks for a password, security answer or code: {t}", ev))
         elif SENSITIVE_FIELD_RE.search(t) and status != "offer":
-            flags.append(Flag("sensitive_field", "hard", f"asks for identity or bank data before an offer: {t}"))
+            flags.append(Flag("FIELD_SENSITIVE_PRE_OFFER", "block",
+                              f"asks for identity or bank data before an offer: {t}", ev))
     return flags
 
 
@@ -268,5 +353,3 @@ def auto_submit_allowed(p: Posting, settings: Settings) -> tuple[bool, str]:
     return True, ""
 
 
-def hard(flags: list[Flag]) -> list[Flag]:
-    return [f for f in flags if f.severity == "hard"]

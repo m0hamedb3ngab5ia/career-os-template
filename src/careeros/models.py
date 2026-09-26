@@ -63,6 +63,8 @@ class Posting(BaseModel):
     ats: str
     ats_job_id: str | None = None
     posted_at: str | None = None
+    first_published: str | None = None   # when the ATS says the requisition first went live
+    last_updated: str | None = None      # last edit to the requisition (Greenhouse updated_at)
     description_text: str = ""
     description_html: str = ""
     departments: list[str] = Field(default_factory=list)

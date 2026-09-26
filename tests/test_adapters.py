@@ -255,3 +255,4 @@ def test_greenhouse_posted_at_prefers_first_published():
                      {"id": 2, "title": "SWE", "absolute_url": "https://y", "updated_at": "2026-09-20T00:00:00Z"}]}
     ps = GreenhouseAdapter().parse(data, {"company": "Acme", "slug": "acme"})
     assert ps[0].posted_at.startswith("2026-06-01") and ps[1].posted_at.startswith("2026-09-20")
+    assert ps[0].first_published.startswith("2026-06-01") and ps[0].last_updated.startswith("2026-09-20")

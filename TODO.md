@@ -28,13 +28,13 @@ belong in each candidate's own private repo, not here.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
 
 ## Ghost jobs
-- [x] Stale (30 flag / 45 skip days), reposted (3+ in 90 days), aggregator-only (not on the company's site),
-      hiring freeze (skip) / layoffs (flag) — `src/careeros/safety/ghost.py`, `data/posting_history.json`,
-      `careeros safety signal`. Dream companies only flagged. Greenhouse age now from `first_published`.
+- [x] Old (30 info / 45 review), skip only when old + not updated + company not posting + not evergreen/senior;
+      reposted (3+ requisitions in 90 days, edits counted separately); aggregator-only; freeze covering the role
+      (review) / layoffs (info). `src/careeros/safety/ghost.py`, `data/posting_history.json`, `careeros safety signal`.
 - [ ] Tracker `PostedDate` column (needs a Jobs-sheet column migration like Action Items `Needs`).
 
 ## Safety — scam / data-harvesting protection
-- [x] Scam gate in score-job + apply-job, before any form fill (`careeros safety check|fields`, `src/careeros/safety/scam.py`). Made-up companies: anything off the curated lists is `company_unverified` (no auto-submit) until /score-job verifies it (`careeros safety verify`); brand look-alikes on foreign domains are a hard stop. Hard stops (→ Action Item, never auto):
+- [x] Safety verdicts Pass / Review / Block with reason codes + evidence (`careeros safety check|fields`, `src/careeros/safety/scam.py`); per-code levels in `targets.yaml: safety.levels`. Unknown companies = review, not suspicious; `careeros safety verify --risk low|medium|high` from independent signals. Registry entries carry confidence, evidence, expiry and `careeros safety clear`. Made-up companies: anything off the curated lists is `company_unverified` (no auto-submit) until /score-job verifies it (`careeros safety verify`); brand look-alikes on foreign domains are a hard stop. Hard stops (→ Action Item, never auto):
       any field asking SSN / DOB / bank / passport / driver's license / ID upload / mother's maiden name; pay-to-apply or "training fee";
       apply URL domain ≠ company domain and ≠ known ATS (greenhouse/lever/ashby/workday/icims/smartrecruiters/…); contact email on free domain (gmail/outlook/yahoo);
       company has no resolvable website / LinkedIn page / < N employees; posting text hits scam patterns (WhatsApp/Telegram interview, "hiring immediately, no interview", crypto wallet, check-cashing, "equipment reimbursement");

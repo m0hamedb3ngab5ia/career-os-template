@@ -160,8 +160,9 @@ class Store:
             return {}
 
     def update_history(self, postings: list[Posting], today: str | None = None) -> dict[str, dict[str, Any]]:
-        """Record every fetched posting (seen or not) under its role key, so a role reposted under a new ATS
-        id is visible. Returns the touched entries by key."""
+        """Record every fetched posting (seen or not) under its role key. A new requisition id for the same
+        role is a repost (`times_reposted`); a changed `last_updated` on a known id is an edit
+        (`times_edited`). Returns the touched entries by key."""
         from careeros.safety.ghost import history_key
 
         hist = self.load_history()
@@ -169,17 +170,33 @@ class Store:
         touched: dict[str, dict[str, Any]] = {}
         for p in postings:
             key = history_key(p.company, p.title, p.location)
-            e = hist.setdefault(key, {"first_seen": now, "last_seen": now, "posted_at_min": None,
-                                      "ats_job_ids": [], "job_ids": [], "sightings": []})
+            e = hist.setdefault(key, {"first_seen": now, "last_seen": now, "first_published": None,
+                                      "last_updated": None, "times_seen": 0, "times_reposted": 0,
+                                      "times_edited": 0, "ats_job_ids": [], "job_ids": [], "sightings": [],
+                                      "updated_by_id": {}})
+            for k, v in (("times_seen", 0), ("times_reposted", 0), ("times_edited", 0), ("updated_by_id", {}),
+                         ("first_published", e.pop("posted_at_min", None)), ("last_updated", None)):
+                e.setdefault(k, v)
+            if key not in touched:
+                e["times_seen"] += 1
             e["last_seen"] = now
             pid = p.ats_job_id or p.url or p.job_id
+            published = (p.first_published or p.posted_at or "")[:10] or None
+            updated = (p.last_updated or "")[:10] or None
             if pid not in e["ats_job_ids"]:
                 e["ats_job_ids"].append(pid)
-                e["sightings"].append((p.posted_at or now)[:10])
+                e["sightings"].append(published or now[:10])
+            elif updated and e["updated_by_id"].get(pid) and e["updated_by_id"][pid] != updated:
+                e["times_edited"] += 1
+            if updated:
+                e["updated_by_id"][pid] = updated
+                if not e["last_updated"] or updated > e["last_updated"]:
+                    e["last_updated"] = updated
+            e["times_reposted"] = max(len(e["ats_job_ids"]) - 1, 0)
             if p.job_id not in e["job_ids"]:
                 e["job_ids"].append(p.job_id)
-            if p.posted_at and (not e["posted_at_min"] or p.posted_at[:10] < e["posted_at_min"]):
-                e["posted_at_min"] = p.posted_at[:10]
+            if published and (not e["first_published"] or published < e["first_published"]):
+                e["first_published"] = published
             touched[key] = e
         tmp = self.history_file.with_name(f"{self.history_file.name}.{os.getpid()}.tmp")
         tmp.write_text(json.dumps(hist, indent=1, sort_keys=True), encoding="utf-8")

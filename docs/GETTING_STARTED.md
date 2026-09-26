@@ -86,9 +86,20 @@ Later, when you have time: put 2-5 letters or emails you wrote in `profile/voice
 .venv/bin/careeros jobs list --status found
 ```
 
-Scout pulls every board in `config/companies.yaml`, drops senior / wrong-location / blocklisted titles,
-stores each posting in `data/jobs/<id>/` and creates the tracker `data/JobTracker.xlsx`. Nothing is
-sent anywhere.
+Scout pulls every board in `config/companies.yaml`, applies the prefilters enabled in
+`config/targets.yaml: scout.filters` (by default: title keywords, seniority, blocked countries, blocklist,
+flagged companies and ghost jobs), stores each posting in `data/jobs/<id>/` and creates the tracker
+`data/JobTracker.xlsx`. Nothing is sent anywhere.
+
+To change what scout keeps:
+
+| Want | Set in `config/targets.yaml` |
+|---|---|
+| only some job-board sources | `scout.sources: [greenhouse]` |
+| keep senior roles | `scout.filters.seniority: false` (or edit `seniority.exclude_title_keywords`) |
+| keep every title, no category filter | `scout.filters.title: false` |
+| never skip old postings | `scout.filters.ghost: false`, or tune `safety.ghost` thresholds |
+| treat a safety check differently | `safety.levels: {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}` |
 
 ## 7. Prepare one job
 

@@ -9,6 +9,7 @@ from careeros.models import Posting
 from careeros.safety import registry
 from careeros.safety.ghost import check_ghost, history_key, load_signals
 from careeros.safety.registry import is_flagged
+from careeros.safety.scam import apply_levels, verdict
 from careeros.scout.ashby import AshbyAdapter
 from careeros.scout.base import Adapter, BoardNotFound, FetchError
 from careeros.scout.greenhouse import GreenhouseAdapter
@@ -79,10 +80,34 @@ def _kw_regex(keywords: list[str]) -> re.Pattern[str] | None:
     return re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(k) for k in kws) + r")(?![a-z0-9])", re.I)
 
 
+SCOUT_FILTERS = ("blocklist", "flagged", "title", "seniority", "location", "ghost")
+
+
+def scout_config(settings: Settings) -> dict[str, Any]:
+    """`targets.yaml: scout` with defaults: every adapter source on, every filter on.
+
+    scout:
+      sources: [greenhouse, lever, ashby]   # ATS families to fetch; boards on others are skipped
+      filters:                              # set one to false to keep those postings
+        blocklist: true    # companies.yaml blocklist
+        flagged: true      # high-confidence entries in data/flagged_registry.yaml
+        title: true        # category title_keywords (off = keep every title, category unknown)
+        seniority: true    # targets.yaml seniority.exclude_title_keywords
+        location: true     # targets.yaml location.blocked_countries
+        ghost: true        # ghost-job skip (old, not updated, company not hiring, not evergreen)
+    """
+    raw = settings.targets.get("scout") or {}
+    sources = [str(x).lower() for x in (raw.get("sources") or list(ADAPTERS))]
+    filters = {k: bool((raw.get("filters") or {}).get(k, True)) for k in SCOUT_FILTERS}
+    return {"sources": sources, "filters": filters}
+
+
 class Prefilter:
-    def __init__(self, settings: Settings, flagged: list[dict[str, Any]] | None = None):
+    def __init__(self, settings: Settings, flagged: list[dict[str, Any]] | None = None,
+                 filters: dict[str, bool] | None = None):
         self.s = settings
-        self.flagged = flagged or []
+        self.flagged = [e for e in flagged or [] if str(e.get("confidence", "high")) == "high"]
+        self.on = filters or {k: True for k in SCOUT_FILTERS}
         self.active: dict[str, re.Pattern[str] | None] = {
             cat: _kw_regex(kws) for cat, kws in settings.title_keywords().items()
         }
@@ -127,16 +152,16 @@ class Prefilter:
 
     def check(self, p: Posting) -> tuple[bool, str, str | None]:
         """Return (passes, reason, category)."""
-        if self.s.is_blocklisted(p.company):
+        if self.on["blocklist"] and self.s.is_blocklisted(p.company):
             return False, "blocklist", None
-        if self.flagged and is_flagged(self.flagged, p.company, p.apply_url or p.url):
+        if self.on["flagged"] and self.flagged and is_flagged(self.flagged, p.company, p.apply_url or p.url):
             return False, "flagged", None
         cat = self.title_category(p.title)
-        if cat is None or self.title_excluded(p.title):
+        if self.on["title"] and (cat is None or self.title_excluded(p.title)):
             return False, "title", cat
-        if self.title_senior(p.title):
+        if self.on["seniority"] and self.title_senior(p.title):
             return False, "seniority", cat
-        if self.location_blocked(p):
+        if self.on["location"] and self.location_blocked(p):
             return False, "location", cat
         return True, "ok", cat
 
@@ -149,8 +174,9 @@ def run_scout(
 ) -> ScoutSummary:
     s = settings or get_settings()
     st = store or Store(s)
-    pf = Prefilter(s, flagged=registry.load(registry.default_path(s)))
-    if not any(pf.active.values()):
+    cfg = scout_config(s)
+    pf = Prefilter(s, flagged=registry.load(registry.default_path(s)), filters=cfg["filters"])
+    if cfg["filters"]["title"] and not any(pf.active.values()):
         # Every title would fail the prefilter and be marked seen for good; refuse instead.
         raise ConfigError("no active category has title_keywords in config/categories.yaml; refusing to scout")
     seen = st.load_seen()
@@ -166,6 +192,11 @@ def run_scout(
         res = BoardResult(company=company, ats=ats, slug=slug)
         summary.boards.append(res)
 
+        if ats not in cfg["sources"] and ats != "custom":
+            res.status = "skipped"
+            res.error = f"source {ats} disabled in targets.yaml scout.sources"
+            log(f"[scout] {company}: {res.error}")
+            continue
         if ats == "custom":
             res.status = "skipped"
             res.error = "custom scraper not implemented"
@@ -198,6 +229,7 @@ def run_scout(
 
         res.fetched = len(postings)
         history = st.update_history(postings)
+        full_history = st.load_history()
         new_ids: list[str] = []
         for p in postings:
             if p.job_id in seen:
@@ -207,10 +239,12 @@ def run_scout(
             if not ok:
                 setattr(res, f"filtered_{reason}", getattr(res, f"filtered_{reason}") + 1)
                 continue
-            ghost = check_ghost(p, history.get(history_key(p.company, p.title, p.location)), signals, s)
-            if any(f.severity == "hard" for f in ghost):
-                res.filtered_ghost += 1
-                continue
+            if cfg["filters"]["ghost"]:
+                ghost = apply_levels(check_ghost(p, history.get(history_key(p.company, p.title, p.location)),
+                                                 signals, s, company_history=full_history), s)
+                if verdict(ghost) in ("skip", "block"):
+                    res.filtered_ghost += 1
+                    continue
             p.raw["prefilter_category"] = cat
             st.save_posting(p)
             st.append_log(p.job_id, f"found via {ats}/{slug}; prefilter category={cat}", component="scout")
@@ -227,4 +261,4 @@ def run_scout(
     return summary
 
 
-__all__ = ["run_scout", "Prefilter", "ScoutSummary", "BoardResult", "ADAPTERS"]
+__all__ = ["run_scout", "Prefilter", "ScoutSummary", "BoardResult", "ADAPTERS", "scout_config", "SCOUT_FILTERS"]

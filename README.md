@@ -20,8 +20,13 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 
 ## How it works
 
-- **Scout** (`careeros scout --sync`): pulls Greenhouse, Lever and Ashby boards from `config/companies.yaml`,
-  drops senior, wrong-location and blocklisted titles, and stores each posting in `data/jobs/<id>/`.
+- **Scout** (`careeros scout --sync`): pulls the job boards listed in `config/companies.yaml` (Greenhouse,
+  Lever and Ashby adapters built in), runs the prefilters you turn on, and stores each posting in
+  `data/jobs/<id>/`. Everything is set in `config/targets.yaml: scout`: which sources to fetch, and which
+  filters apply (title keywords, seniority, blocked countries, blocklist, flagged companies, ghost jobs),
+  each with its own keywords or thresholds.
+- **Safety** (`careeros safety check`): every posting gets a verdict (pass, review or block) with reason codes
+  and evidence. Levels per code are yours to change in `config/targets.yaml: safety.levels`.
 - **Score** (`/score-job`): category, fit 0-100 and tier (A dream list, B strong fit, C volume) from `config/`.
 - **Tailor** (`/tailor-resume`, `/write-cover-letter`): builds a résumé and letter only from bullets in
   `profile/master.yaml`, cited by id, with numbers frozen.
