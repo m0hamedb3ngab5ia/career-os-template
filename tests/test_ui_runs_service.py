@@ -656,7 +656,8 @@ def test_tail_holds_back_a_half_written_line(rc):
 def test_ps_cmdline_of_this_process_is_not_truncated():
     from careeros.ui.services.runs import ps_cmdline
 
-    assert "pytest" in ps_cmdline(os.getpid())
+    got = ps_cmdline(os.getpid())  # an exact argv on Linux, a joined line on macOS
+    assert "pytest" in (" ".join(got) if isinstance(got, list) else got)
 
 
 # --- review round 2 ------------------------------------------------------------------------------------------
