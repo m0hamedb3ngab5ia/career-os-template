@@ -432,3 +432,66 @@ def test_yaml_alias_error_hints_to_quote_bold(tmp_path):
     p.write_text(p.read_text().replace("summary_variants:", "bad: **Python** first\nsummary_variants:", 1))
     msgs = [c.detail for c in run_doctor(root) if c.name == "yaml"]
     assert any("must be quoted" in m for m in msgs), msgs
+
+
+# `**` outside bullet text / variants / summary_variants: render.py exits 1 on it, so doctor must FAIL first
+@pytest.mark.parametrize("path, edit", [
+    ("skills.programming[0]", lambda m: m["skills"]["programming"].__setitem__(0, "**Python**")),
+    ("experience[0].title", lambda m: m["experience"][0].update(title="**Software** Engineer")),
+    ("experience[0].stack[1]", lambda m: m["experience"][0]["stack"].__setitem__(1, "**FastAPI**")),
+    ("education[0].degree", lambda m: m["education"][0].update(degree="**Bachelor** of Science")),
+    ("identity.name", lambda m: m["identity"].update(name="**Alex** Example")),
+])
+def test_bold_outside_bullets_and_summaries_fails_with_path(tmp_path: Path, path: str, edit):
+    root = filled(tmp_path)
+    _edit_master(root, edit)
+    fails = [c.detail for c in doctor(root) if c.name == "bold_markup" and c.level == FAIL]
+    assert any(path in f and "only in bullet text" in f for f in fails), fails
+
+
+@pytest.mark.parametrize("where", ["text", "variant", "summary"])
+def test_valid_bold_in_allowed_fields_passes(tmp_path: Path, where: str):
+    root = filled(tmp_path)
+
+    def edit(m):
+        b = m["experience"][0]["bullets"][1]
+        if where == "text":
+            b["text"] = "Shipped a **React** dashboard used by **40 analysts**"
+        elif where == "variant":
+            b["variants"] = {"short": "Shipped a **React** dashboard"}
+        else:
+            m["summary_variants"]["general"] = "Engineer shipping **Python** services."
+    _edit_master(root, edit)
+    checks = [c for c in doctor(root) if c.name == "bold_markup"]
+    assert [c.level for c in checks] == [PASS], checks
+
+
+def test_bold_in_narratives_only_warns(tmp_path: Path):
+    root = filled(tmp_path)
+    _edit_master(root, lambda m: m["narratives"][0].update(text="Likes **owning** a product end to end."))
+    levels = {c.level for c in doctor(root) if c.name == "bold_markup"}
+    assert levels == {WARN}
+
+
+@pytest.mark.parametrize("where", ["variant", "summary", "variant_bracket"])
+def test_bold_in_dotted_variant_keys_passes(tmp_path: Path, where: str):
+    root = filled(tmp_path)
+
+    def edit(m):
+        b = m["experience"][0]["bullets"][1]
+        if where == "variant":
+            b["variants"] = {"long.v2": "Moved **three** services to Kubernetes"}
+        elif where == "variant_bracket":
+            b["variants"] = {"alt[1]": "Moved **three** services to Kubernetes"}
+        else:
+            m["summary_variants"]["backend.v2"] = "**Python** engineer shipping services."
+    _edit_master(root, edit)
+    checks = [c for c in doctor(root) if c.name == "bold_markup"]
+    assert [c.level for c in checks] == [PASS], checks
+
+
+def test_bold_in_a_skill_under_a_dotted_key_still_fails(tmp_path: Path):
+    root = filled(tmp_path)
+    _edit_master(root, lambda m: m.setdefault("skills", {}).update({"lang.v2": ["**Python**"]}))
+    fails = [c for c in doctor(root) if c.name == "bold_markup" and c.level == FAIL]
+    assert fails and "lang.v2" in fails[0].detail
