@@ -18,6 +18,7 @@ import shlex
 import stat
 import subprocess
 import sys
+import unicodedata
 from dataclasses import dataclass, field
 from datetime import date
 from pathlib import Path
@@ -32,6 +33,10 @@ KEEP_FILE = ".template-sync-keep"
 HOOK_MARKER = "careeros-template-guard"
 CFG_PERSONAL = "careeros.personalPaths"
 CFG_URL_PATTERN = "careeros.templateUrlPattern"
+
+# Every git call runs with these, so user config can't change the output we parse.
+GIT_OVERRIDES: tuple[str, ...] = ("-c", "core.quotePath=false", "-c", "color.ui=never", "-c", "log.showSignature=false",
+                                  "-c", "core.pager=cat", "-c", "diff.noprefix=false", "-c", "diff.renames=false")
 
 EXIT_IN_SYNC, EXIT_BEHIND, EXIT_DRIFT, EXIT_CONFLICT = 0, 1, 2, 3
 ZERO_SHA = "0" * 40
@@ -52,6 +57,14 @@ def parse_personal_paths(value: str | None) -> tuple[str, ...]:
     return parts or DEFAULT_PERSONAL_PATHS
 
 
+def _norm(p: str) -> str:
+    """Compare form for personal paths: NFC, no leading ./ or /, lower case (macOS folders are case-insensitive)."""
+    p = unicodedata.normalize("NFC", p)
+    while p.startswith("./") or p.startswith("/"):
+        p = p[2:] if p.startswith("./") else p[1:]
+    return p.lower()
+
+
 def _path_matches(path: str, entry: str) -> bool:
     """`dir/` matches everything under it and the bare `dir` (e.g. a committed symlink); anything else matches
     exactly, as a directory prefix, or as a glob."""
@@ -62,8 +75,8 @@ def _path_matches(path: str, entry: str) -> bool:
 
 def is_personal(path: str, personal: Iterable[str]) -> bool:
     """Case-insensitive (fail closed): on a case-insensitive filesystem `Personal/` is the same folder."""
-    low = path.lower()
-    return any(_path_matches(low, e.lower()) for e in personal)
+    low = _norm(path)
+    return any(_path_matches(low, _norm(e)) for e in personal)
 
 
 def parse_keep(text: str) -> list[str]:
@@ -101,7 +114,7 @@ def sync_branch_name(today: date, existing: set[str]) -> str:
 
 
 def url_matches(url: str, pattern: str) -> bool:
-    return fnmatch.fnmatchcase(url, pattern)
+    return fnmatch.fnmatchcase(url.lower(), pattern.lower())
 
 
 def blocked_paths(paths: Iterable[str], personal: Iterable[str]) -> list[str]:
@@ -116,7 +129,9 @@ def hook_script(python: str) -> str:
 # git config {CFG_URL_PATTERN} (default {DEFAULT_URL_PATTERN}). Other remotes are never checked.
 remote="$1"; url="$2"
 pattern="$(git config --get {CFG_URL_PATTERN} || echo '{DEFAULT_URL_PATTERN}')"
-case "$url" in $pattern) ;; *) exit 0 ;; esac
+lurl="$(printf '%s' "$url" | tr '[:upper:]' '[:lower:]')"
+lpattern="$(printf '%s' "$pattern" | tr '[:upper:]' '[:lower:]')"
+case "$lurl" in $lpattern) ;; *) exit 0 ;; esac
 PY={shlex.quote(python)}
 [ -x "$PY" ] || PY="$(git rev-parse --show-toplevel)/.venv/bin/python"
 if [ ! -x "$PY" ]; then
@@ -184,7 +199,7 @@ class Git:
     root: Path
 
     def run(self, *args: str, check: bool = True, input: str | None = None) -> subprocess.CompletedProcess:
-        r = subprocess.run(["git", *args], cwd=self.root, capture_output=True, text=True, input=input,
+        r = subprocess.run(["git", *GIT_OVERRIDES, *args], cwd=self.root, capture_output=True, text=True, input=input,
                            encoding="utf-8", errors="surrogateescape")
         if check and r.returncode != 0:
             raise SyncError(f"git {' '.join(args)} failed: {(r.stderr or r.stdout).strip()}")
@@ -196,10 +211,10 @@ class Git:
     def lines(self, *args: str) -> list[str]:
         return [ln for ln in self.run(*args).stdout.splitlines() if ln.strip()]
 
-    def paths(self, *args: str) -> list[str]:
+    def paths(self, *args: str, input: str | None = None) -> list[str]:
         """Path output read with -z: NUL-separated and never quoted (core.quotePath would quote non-ASCII
         and special names like `"personal/CV \\342..."`, which no pattern would match)."""
-        return [p for p in self.run(args[0], "-z", *args[1:]).stdout.split("\0") if p.strip("\n")]
+        return [p for p in self.run(args[0], "-z", *args[1:], input=input).stdout.split("\0") if p.strip("\n")]
 
     def config(self, key: str) -> str | None:
         r = self.run("config", "--get", key, check=False)
@@ -210,7 +225,7 @@ class Git:
 
 
 def git_root(start: Path) -> Path:
-    r = subprocess.run(["git", "rev-parse", "--show-toplevel"], cwd=start, capture_output=True, text=True)
+    r = subprocess.run(["git", *GIT_OVERRIDES, "rev-parse", "--show-toplevel"], cwd=start, capture_output=True, text=True)
     if r.returncode != 0:
         raise SyncError(f"{start} is not inside a git repository")
     return Path(r.stdout.strip())
@@ -255,7 +270,7 @@ def compute_status(root: Path, remote: str = DEFAULT_REMOTE, template_branch: st
     ref = _fetch(g, remote, template_branch) if fetch else f"{remote}/{template_branch}"
     if not g.ref_exists(ref):
         raise SyncError(f"{ref} not found; fetch it first (drop --no-fetch)")
-    behind = g.lines("log", "--format=%h %s", f"HEAD..{ref}")
+    behind = g.lines("log", "--no-show-signature", "--no-color", "--format=%h %s", f"HEAD..{ref}")
     differs = set(g.paths("diff", "--name-only", ref, "HEAD"))
     # Only files changed on this side count as drift, not the template's own unmerged changes.
     mb = g.run("merge-base", ref, "HEAD", check=False).stdout.strip()
@@ -323,7 +338,7 @@ def pull(root: Path, *, remote: str = DEFAULT_REMOTE, template_branch: str = DEF
         return PullResult(1, [], [f"base branch {base!r} not found (pass --base)"])
     if g.run("merge-base", "--is-ancestor", ref, base, check=False).returncode == 0:
         return PullResult(0, [f"{base} is already up to date with {ref}; nothing to sync"])
-    commits = g.lines("log", "--format=%h %s", f"{base}..{ref}")
+    commits = g.lines("log", "--no-show-signature", "--no-color", "--format=%h %s", f"{base}..{ref}")
     existing = {b.strip() for b in g.lines("for-each-ref", "--format=%(refname:short)", "refs/heads/")}
     if branch is None:
         branch = sync_branch_name(today or date.today(), existing)
@@ -379,7 +394,12 @@ def pushed_paths(g: Git, remote: str, lsha: str, rsha: str) -> set[str]:
     exclude = ["--not", f"--remotes={remote}"]
     if rsha != ZERO_SHA and g.ref_exists(rsha):
         exclude.append(rsha)
-    paths = set(g.paths("log", "--format=", "--name-only", "--no-renames", "-m", lsha, *exclude))
+    # plumbing only: porcelain `log` output can carry signatures/decorations from user config
+    commits = g.lines("rev-list", lsha, *exclude)
+    paths: set[str] = set()
+    if commits:
+        paths.update(g.paths("diff-tree", "-r", "-m", "--root", "--no-commit-id", "--name-only", "--no-renames",
+                             "--stdin", input="\n".join(commits) + "\n"))
     paths.update(g.paths("ls-tree", "-r", "--name-only", lsha))
     return paths
 

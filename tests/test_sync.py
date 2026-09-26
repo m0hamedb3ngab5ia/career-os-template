@@ -163,18 +163,20 @@ class _FakeGit(sync.Git):
     def __init__(self, outputs: dict[str, str]):
         super().__init__(Path("."))
         self.outputs = outputs
+        self.calls: list = []
 
     def run(self, *args, check=True, input=None):
         import subprocess as sp
 
-        if args[0] in ("log", "ls-tree", "diff"):
+        if args[0] in ("ls-tree", "diff", "diff-tree"):
             assert "-z" in args, args
+        self.calls.append((args, input))
         return sp.CompletedProcess(["git", *args], 0, self.outputs.get(args[0], ""), "")
 
 
 def test_pushed_paths_reads_nul_separated_unquoted_names():
-    g = _FakeGit({"log": "src/a.py\0personal/résumé.md\0", "ls-tree": "src/a.py\0profile/my \"cv\".pdf\0",
-                  "rev-parse": ""})
+    g = _FakeGit({"rev-list": "c1\n", "diff-tree": "src/a.py\0personal/résumé.md\0",
+                  "ls-tree": "src/a.py\0profile/my \"cv\".pdf\0", "rev-parse": ""})
     got = sync.pushed_paths(g, "template", "a" * 40, sync.ZERO_SHA)
     assert got == {"src/a.py", "personal/résumé.md", 'profile/my "cv".pdf'}
     assert sync.blocked_paths(sorted(got), PERSONAL) == ["personal/résumé.md", 'profile/my "cv".pdf']
@@ -182,3 +184,43 @@ def test_pushed_paths_reads_nul_separated_unquoted_names():
 
 def test_keep_globs_match_unquoted_non_ascii_names():
     assert sync.compute_drift(["docs/Lebenslauf – alt.md", "src/ü.py"], PERSONAL, ["docs/Lebenslauf*"]) == ["src/ü.py"]
+
+
+def test_pushed_paths_uses_plumbing_not_log_so_signatures_cannot_corrupt_paths():
+    # log.showSignature=true makes porcelain `git log -z` prepend signature text without a NUL
+    sig = 'Good "git" signature for test@example.invalid with ED25519 key SHA256:abc\n'
+    g = _FakeGit({"log": sig + "personal/cv.md\0src/a.py\0", "rev-list": "c1\nc2\n",
+                  "diff-tree": "personal/cv.md\0src/a.py\0", "ls-tree": "src/a.py\0", "rev-parse": ""})
+    got = sync.pushed_paths(g, "template", "a" * 40, sync.ZERO_SHA)
+    assert got == {"personal/cv.md", "src/a.py"}
+    assert sync.blocked_paths(sorted(got), PERSONAL) == ["personal/cv.md"]
+    dt = [(a, i) for a, i in g.calls if a[0] == "diff-tree"]
+    assert dt and "--stdin" in dt[0][0] and "--root" in dt[0][0] and "-m" in dt[0][0]
+    assert dt[0][1].split() == ["c1", "c2"]
+
+
+def test_git_runs_with_output_neutralising_overrides():
+    for flag in ("core.quotePath=false", "color.ui=never", "log.showSignature=false"):
+        assert flag in sync.GIT_OVERRIDES
+
+
+@pytest.mark.parametrize("url", ["git@github.com:Someone/Career-OS-Template.git", "/tmp/CAREER-OS-TEMPLATE.git"])
+def test_url_matches_case_insensitive(url):
+    assert sync.url_matches(url, sync.DEFAULT_URL_PATTERN) is True
+    assert sync.url_matches(url.lower(), "*Career-OS-Template*") is True
+
+
+def test_hook_script_lowercases_url_and_pattern():
+    s = sync.hook_script("/usr/bin/python3")
+    assert "tr '[:upper:]' '[:lower:]'" in s
+
+
+@pytest.mark.parametrize("path,entries", [
+    ("personal/x.md", ("./personal/",)),
+    ("personal/x.md", ("/personal/",)),
+    ("./personal/x.md", ("personal/",)),
+    ("perso\u0308nlich/x.md", ("pers\u00f6nlich/",)),   # NFD path vs NFC entry
+    ("pers\u00f6nlich/x.md", ("perso\u0308nlich/",)),   # NFC path vs NFD entry
+])
+def test_is_personal_normalises_entries_and_paths(path, entries):
+    assert sync.is_personal(path, sync.parse_personal_paths(" ".join(entries))) is True

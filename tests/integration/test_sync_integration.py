@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import os
 import re
+import shutil
 import subprocess
 from pathlib import Path
 
@@ -275,6 +276,39 @@ def test_status_in_sync_with_non_ascii_personal_file_and_kept_file(repos, env):
                        ".template-sync-keep": "README.md  # private\ndocs/Notiz*  # private note\n"}, "more")
     r = cli(priv, env, "status")
     assert r.returncode == 0, r.stdout + r.stderr
+
+
+@pytest.mark.skipif(shutil.which("ssh-keygen") is None, reason="needs ssh-keygen for ssh-signed commits")
+def test_hook_blocks_history_with_signed_commits_and_show_signature(repos, env, tmp_path):
+    priv = repos["private"]
+    key = tmp_path / "signkey"
+    subprocess.run(["ssh-keygen", "-q", "-t", "ed25519", "-N", "", "-C", "test", "-f", str(key)], check=True,
+                   env=env, capture_output=True, timeout=60)
+    signers = tmp_path / "allowed_signers"
+    signers.write_text("test@example.invalid " + (tmp_path / "signkey.pub").read_text())
+    for k, v in (("gpg.format", "ssh"), ("user.signingkey", str(key)), ("commit.gpgsign", "true"),
+                 ("gpg.ssh.allowedSignersFile", str(signers)), ("log.showSignature", "true")):
+        git(priv, env, "config", k, v)
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "switch", "-q", "-c", "fix/s", "template/main")
+    commit(priv, env, {"personal/x.md": "secret\n"}, "signed: add personal")
+    git(priv, env, "rm", "-q", "personal/x.md")
+    git(priv, env, "commit", "-q", "-m", "signed: remove it")
+    assert "signature" in git(priv, env, "log", "-1").stdout.lower()  # the setting is really active
+    r = git(priv, env, "push", "template", "fix/s", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/x.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "fix/s").stdout.strip() == ""
+
+
+def test_hook_matches_template_url_case_insensitively(repos, env, tmp_path):
+    priv = repos["private"]
+    mixed = tmp_path / "other" / "Career-OS-Template.git"  # own dir: macOS tmp is case-insensitive
+    git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(mixed))
+    git(priv, env, "remote", "add", "tpl2", str(mixed))
+    assert cli(priv, env, "install-hook").returncode == 0
+    r = git(priv, env, "push", "tpl2", "HEAD:refs/heads/main", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr
+    assert git(mixed, env, "branch", "--list").stdout.strip() == ""
 
 
 def test_hook_pattern_and_personal_paths_from_git_config(repos, env):
