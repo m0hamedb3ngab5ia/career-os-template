@@ -38,6 +38,12 @@ blocklist:             # never apply
 # also carry `domain:`. A posting whose apply URL is on neither a known ATS nor one of these is a hard stop.
 company_domains: {}    # e.g. {"Two Sigma": twosigma.com, "Example Corp": [example.com, examplecareers.com]}
 
+# Per-company application caps (default: targets.yaml volume.max_per_company_per_90_days, 90 days).
+# Some large employers publish their own limit; check the company's own published limit before raising
+# one. aliases = other names the same employer posts under. Checked by `careeros company gate`.
+# company_caps:
+#   Example Corp: {max: 3, window_days: 30, aliases: [Example Labs]}
+
 # Hiring freezes / layoffs you know about (ghost-job check). score-job also records web findings in
 # data/company_signals.json; entries here win. kind: freeze (skip) | layoffs (flag) | none (clears).
 hiring_signals: []     # e.g. [{company: Example Corp, kind: layoffs, date: 2026-08-01, source: "https://..."}]

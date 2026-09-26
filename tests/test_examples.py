@@ -106,3 +106,13 @@ def test_reusable_defaults_are_labeled(rel: str, sections: list[str]):
         i = text.index(f"\n{sec}:")
         window = text[max(0, i - 300): i + 200]
         assert REUSABLE in window, f"{rel}: {sec} not labeled {REUSABLE!r}"
+
+
+def test_volume_documents_deadline_clusters_and_company_caps_example():
+    targets = yaml.safe_load((EXAMPLE_REPO / "config" / "targets.yaml").read_text(encoding="utf-8"))
+    assert targets["volume"]["deadline_cluster_days"] == 7
+    assert targets["volume"]["max_per_company_per_90_days"] == 2
+    assert targets["volume"]["same_company_cooldown_days"] == 30
+    text = (EXAMPLE_REPO / "config" / "companies.yaml").read_text(encoding="utf-8")
+    assert "# company_caps:" in text and "published limit" in text
+    assert "company_caps" not in yaml.safe_load(text)  # an example only: off by default

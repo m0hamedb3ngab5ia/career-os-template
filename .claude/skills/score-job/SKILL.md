@@ -163,6 +163,20 @@ elif fit >= thresholds.min_fit_to_prepare: decision=prepare
 else: decision=skip, skip_reason=below_min_fit
 ```
 
+**Company gate** (only when the decision above is `prepare`). Caps per company, the rejection cooldown
+and posting close dates are code (`src/careeros/company_policy.py`), not judgment:
+1. Write `JOB/score.json` (section 8) with `decision: "prepare"` first, so the gate sees this job's fit and category.
+2. Run `.venv/bin/careeros company gate <job_id> --json`.
+   - Exit 0: keep `prepare`. Copy `urgent`, `closes_at` and `action_note` into `score.json` as `company_gate`.
+   - Exit 3: `decision=skip`, `skip_reason` = the gate's `reason`: `company_cap` (the company's slots are
+     used: `volume.max_per_company_per_90_days` or its `company_caps` entry; higher-fit similar roles
+     hold the rest), `cooldown` (rejected there within `volume.same_company_cooldown_days` and this
+     posting does not close before the cooldown ends), or `not_similar` / `closed` / `unscored`. Put the
+     gate's `detail` in `fit_reasons`, then rewrite `score.json`.
+   `company_cap` and `cooldown` are deferrals, not verdicts: `careeros company requeue` re-checks every
+   job skipped for them (a slot frees up, the cooldown ends) and sets the open ones back to `scored` for
+   another /prepare-job. Never skip a job as `company_cap` / `cooldown` without the gate saying so.
+
 `profile_gap` (string or null): set it when either holds, naming the entry:
 - the category's `bullet_priority[0]` entry has no non-placeholder bullets (`placeholder: true` or text
   starting `[FILL IN`) -> `"<entry_id> bullets are placeholders; tailoring will use next entries"`;
@@ -184,6 +198,7 @@ If both apply, join the messages with `; `. Entries that mix usable and partial 
   "tier": "C", "decision": "prepare", "skip_reason": null,
   "salary_est": {"min": 135000, "max": 165000, "source": "posting"},
   "salary_ok": true, "location_ok": true, "profile_gap": null,
+  "company_gate": {"urgent": false, "closes_at": null, "action_note": ""},
   "scored_at": "<ISO8601 UTC>"
 }
 ```
@@ -194,4 +209,4 @@ Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [score-job] category=<c> fit=<n> 
 
 ## 9. Print the summary line (last line of output, single line)
 
-`RESULT: {"skill":"score-job","job_id":"...","category":"...","fit":78,"tier":"C","decision":"prepare","skip_reason":null,"hard_filter_fails":[],"profile_gap":null}`
+`RESULT: {"skill":"score-job","job_id":"...","category":"...","fit":78,"tier":"C","decision":"prepare","skip_reason":null,"hard_filter_fails":[],"profile_gap":null,"urgent":false,"closes_at":null}`

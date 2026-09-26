@@ -75,7 +75,8 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros init [--link DIR]          # create profile/ + config/ (copy examples, or symlink your private repo)
 .venv/bin/careeros doctor [--quiet]           # setup checklist; exit 1 on any FAIL
 .venv/bin/careeros scout --sync               # pull boards, prefilter, store, sync the tracker
-.venv/bin/careeros jobs list [--status queued]
+.venv/bin/careeros jobs list [--status queued ...] [--order urgent]
+.venv/bin/careeros company slots <company>    # also: company gate <id> | active <company> | requeue
 .venv/bin/careeros job show <id>              # also: job status <id> <status> [--note]
 .venv/bin/careeros action list                # also: action add "<what>" --type <t> --needs laptop|phone|anytime
 .venv/bin/careeros tracker sync               # also: tracker init | flush | applied-count | upsert
@@ -151,7 +152,28 @@ automatically when a job has none yet, so hand-submitted and Tier A jobs get one
 - Never click submit twice. Never solve CAPTCHAs; bot detection is logged in
   `src/careeros/apply/detection.yaml` and the company goes to manual apply.
 - Never apply to the blocklist (`config/companies.yaml`), the current employer, or blocked industries.
-- At most two applications per company per 90 days (`volume.max_per_company_per_90_days`).
+- At most two applications per company per 90 days (`volume.max_per_company_per_90_days`). See
+  "Applications per company" below.
+
+### Applications per company
+
+A few related, tailored applications to one company are fine; spraying unrelated roles gets flagged by
+the ATS. `careeros company gate <id>` (exit 0 allowed, 3 blocked) enforces it before prepare and submit:
+
+| Rule | Default | Where |
+|---|---|---|
+| Cap: submitted in the window + queued/prepared/needs_review (until the posting closes) | 2 per 90 days | `volume.max_per_company_per_90_days`; per company: `company_caps` in `config/companies.yaml` |
+| Only similar roles compete; best fit wins the slots | primary + secondary categories | `categories` in `config/targets.yaml` |
+| Cooldown after a rejection | 30 days | `volume.same_company_cooldown_days` |
+| Exception: the posting closes before the cooldown ends | apply now, urgent | close date from the ATS or the posting text |
+| Similar roles closing within N days of each other | apply to all now, urgent | `volume.deadline_cluster_days` (7) |
+
+Skipped `company_cap` / `cooldown` jobs are deferred: `careeros company requeue` re-queues them once a slot
+opens. A job skipped for any other reason (dead posting, safety, by hand) never holds a slot. Batches score
+every found job first, then gate and prepare in `--order urgent` order, so the best fit gets the slot even
+when a weaker role at the same company was found first. At apply time a closed or dissimilar job is marked
+skipped; only `company_cap` / `cooldown` stay queued for the next session. `careeros jobs list --order urgent` puts jobs that must go now first. On an interview or assessment,
+`/inbox-sync` adds "Also active at <Company>: ..." to the Action Item (`careeros company active`).
 
 ### Keeping your data private
 

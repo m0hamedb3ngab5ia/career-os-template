@@ -13,9 +13,16 @@ ATS_WITH_SLUG = ("greenhouse", "lever", "ashby")  # adapters that fetch by board
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
     "pipeline": ("paths", "outreach"),
-    "targets": ("candidate", "location", "seniority", "categories"),
-    "companies": ("blocklist", "prestige_scoring", "prestige_tiers"),
+    "targets": ("candidate", "location", "seniority", "categories", "volume"),
+    "companies": ("blocklist", "prestige_scoring", "prestige_tiers", "company_caps"),
 }
+# targets.yaml `volume` keys read by careeros.company_policy: key -> (default, minimum).
+VOLUME_INTS = {
+    "max_per_company_per_90_days": (2, 1),
+    "same_company_cooldown_days": (30, 0),
+    "deadline_cluster_days": (7, 0),
+}
+COMPANY_CAP_KEYS = ("max", "window_days", "aliases")
 
 _SUFFIX_RE = re.compile(
     r"\b(inc|llc|ltd|corp|corporation|co|plc|lp|l\.p\.|limited|holdings|group|technologies)\b\.?",
@@ -227,6 +234,8 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
         for key in MAPPING_KEYS.get(name, ()):
             if data.get(key) is not None and not isinstance(data[key], dict):
                 raise ConfigError(f"config/{name}.yaml: {key} must be a mapping, got {type(data[key]).__name__}")
+    _check_volume(cfg.get("targets", {}).get("volume"))
+    _check_company_caps(cfg.get("companies", {}).get("company_caps"))
     boards = cfg.get("companies", {}).get("boards")
     if boards is not None:
         if not isinstance(boards, list):
@@ -239,6 +248,44 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
             ats = str(b["ats"]).lower()
             if ats in ATS_WITH_SLUG and not str(b.get("slug") or "").strip():
                 raise ConfigError(f"config/companies.yaml: boards[{i}] ({ats}) needs a slug")
+
+
+def _whole(v: Any, minimum: int) -> bool:
+    return isinstance(v, int) and not isinstance(v, bool) and v >= minimum
+
+
+def _check_volume(volume: Any) -> None:
+    if volume is None:
+        return
+    if not isinstance(volume, dict):
+        raise ConfigError(f"config/targets.yaml: volume must be a mapping, got {type(volume).__name__}")
+    for key, (_, minimum) in VOLUME_INTS.items():
+        if key in volume and not _whole(volume[key], minimum):
+            raise ConfigError(f"config/targets.yaml: volume.{key} must be a whole number >= {minimum}, "
+                              f"got {volume[key]!r}")
+
+
+def _check_company_caps(caps: Any) -> None:
+    """companies.yaml `company_caps: {<Company>: {max: 3, window_days: 30, aliases: [..]}}`."""
+    if caps is None:
+        return
+    where = "config/companies.yaml: company_caps"
+    if not isinstance(caps, dict):
+        raise ConfigError(f"{where} must be a mapping of company -> {{max, window_days}}, got {type(caps).__name__}")
+    for name, cap in caps.items():
+        if not isinstance(cap, dict):
+            raise ConfigError(f"{where}.{name} must be a mapping like {{max: 3, window_days: 30}}, "
+                              f"got {type(cap).__name__}")
+        for k in cap:
+            if k not in COMPANY_CAP_KEYS:
+                raise ConfigError(f"{where}.{name}: unknown key {k!r}; valid: {', '.join(COMPANY_CAP_KEYS)}")
+        if "max" in cap and not _whole(cap["max"], 1):
+            raise ConfigError(f"{where}.{name}.max must be a whole number >= 1, got {cap['max']!r}")
+        if "window_days" in cap and not _whole(cap["window_days"], 1):
+            raise ConfigError(f"{where}.{name}.window_days must be a whole number >= 1, got {cap['window_days']!r}")
+        aliases = cap.get("aliases")
+        if aliases is not None and not (isinstance(aliases, list) and all(isinstance(a, str) for a in aliases)):
+            raise ConfigError(f"{where}.{name}.aliases must be a list of company names")
 
 
 def _fuzzy_eq(a: str, b: str) -> bool:

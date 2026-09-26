@@ -76,6 +76,12 @@ Record `{thread_id, date, from, subject, class, link}` where link = `https://mai
 | offer | -> `offer` | type `review`, priority H: "OFFER from <company> (<role>) <date> — <link>" + push |
 | other | none | type `other`, priority M if it asks the candidate to do something (document, form, survey) |
 
+Other applications at the same company (assessment and interview_invite): run
+`.venv/bin/careeros company active "<company>" --exclude <job_id> --json`. When its `note` is non-empty
+("Also active at <Company>: <role> (<status>), ... — mention these to the recruiter."), append it to the
+Action Item text after the link, so the candidate tells the recruiter about the other live applications
+(applied / screening / interview, or queued / prepared).
+
 Never move a status backwards (interview -> screening) and never change a status the user set to
 `withdrawn`. Multiple emails: apply the highest-ranked change (offer > interview > screening > applied > rejected... but a rejection AFTER an interview still wins by date).
 

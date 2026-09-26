@@ -85,11 +85,15 @@ tier_rules:                 # reusable default: fine to keep. First match wins; 
   - if: fit >= 70
     tier: C
 
-# reusable default: fine to keep. Daily and per-company caps.
+# reusable default: fine to keep. Daily and per-company caps (per-company: `careeros company gate`,
+# src/careeros/company_policy.py). Only similar roles (categories.primary/secondary) compete for a slot.
 volume:
   max_applications_per_day: 15
-  max_per_company_per_90_days: 2      # avoid spray flag
-  same_company_cooldown_days: 30      # after rejection
+  max_per_company_per_90_days: 2      # ATSs flag many applications to one company; override per company
+                                      # in companies.yaml company_caps
+  same_company_cooldown_days: 30      # after a rejection; a posting that closes before it ends goes now
+  deadline_cluster_days: 7            # 2+ selected similar roles at one company closing within this many
+                                      # days of each other: apply to all of them now, together (cooldown or not)
   season_multiplier:                  # month → multiplier on max/day
     "9": 2.0
     "10": 1.5

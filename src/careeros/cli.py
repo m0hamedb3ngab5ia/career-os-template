@@ -167,18 +167,29 @@ def cmd_tracker_upsert(args: argparse.Namespace) -> int:
 
 
 def cmd_jobs_list(args: argparse.Namespace) -> int:
-    store = Store(_settings(args))
-    jobs = store.list_jobs(args.status)
+    s = _settings(args)
+    store = Store(s)
+    wanted = args.status or []
+    jobs = store.list_jobs(wanted[0] if len(wanted) == 1 else None)
+    if len(wanted) > 1:
+        jobs = [j for j in jobs if j["status"] in wanted]
+    if getattr(args, "order", None) == "urgent":
+        from careeros.company_policy import Policy, load_records, order_jobs
+
+        jobs = order_jobs(jobs, records=load_records(s, store=store), policy=Policy.from_settings(s))
     if args.json:
         print(json.dumps(jobs, indent=2))
         return 0
     if not jobs:
-        print("no jobs" + (f" with status={args.status}" if args.status else ""))
+        print("no jobs" + (f" with status={','.join(args.status)}" if args.status else ""))
         return 0
     print(f"{'id':<12} {'status':<13} {'fit':>3} {'company':<20} {'title':<45} location")
     for j in jobs:
         fit = "" if j["fit"] is None else str(j["fit"])
-        print(f"{j['job_id']:<12} {j['status']:<13} {fit:>3} {j['company'][:20]:<20} {j['title'][:45]:<45} {j['location'][:30]}")
+        urgent = f"  URGENT closes {j['closes_at']}" if j.get("urgent") and j.get("closes_at") else (
+            "  URGENT" if j.get("urgent") else "")
+        print(f"{j['job_id']:<12} {j['status']:<13} {fit:>3} {j['company'][:20]:<20} {j['title'][:45]:<45} "
+              f"{j['location'][:30]}{urgent}")
     print(f"\n{len(jobs)} jobs")
     return 0
 
@@ -241,6 +252,103 @@ def cmd_action_add(args: argparse.Namespace) -> int:
 
 SAFETY_HARD_EXIT = 3
 GHOST_SKIP_EXIT = 4
+COMPANY_BLOCKED_EXIT = 3
+
+
+def _policy_inputs(s: Settings):
+    from careeros.company_policy import Policy, load_records
+
+    return Policy.from_settings(s), load_records(s)
+
+
+def cmd_company_slots(args: argparse.Namespace) -> int:
+    """Per-company slot use (cap window, reservations, cooldown) and how its candidate roles rank."""
+    from careeros.company_policy import rank_candidates, slots
+
+    policy, records = _policy_inputs(_settings(args))
+    sl = slots(args.company, records=records, policy=policy)
+    ranked = rank_candidates(args.company, records=records, policy=policy)
+    if args.json:
+        print(json.dumps({**sl, "candidates": ranked}, indent=2))
+        return 0
+    print(f"{args.company}: {sl['used']}/{sl['allowed']} used in {sl['window_days']} days "
+          f"(submitted {sl['submitted']}, reserved {sl['reserved']}); {sl['remaining']} left"
+          + (f"; cooldown until {sl['cooldown_until']}" if sl["cooldown_until"] else ""))
+    for c in ranked:
+        flag = "ALLOW" if c["allowed"] else "wait "
+        extra = (" URGENT" if c["urgent"] else "") + (f" closes {c['closes_at']}" if c["closes_at"] else "")
+        print(f"  {flag} {c['job_id']:<12} {c['status']:<12} {str(c['fit'] or ''):>3} {c['reason']:<12} "
+              f"{(c['title'] or '')[:40]}{extra}")
+    return 0
+
+
+def cmd_company_gate(args: argparse.Namespace) -> int:
+    """Exit 0 = may prepare/submit now, 3 = blocked (company_cap | cooldown | not_similar | closed |
+    unscored | already_applied), 1 = unknown job. Read-only: the calling skill records the decision."""
+    from careeros.company_policy import gate
+
+    policy, records = _policy_inputs(_settings(args))
+    try:
+        g = gate(args.job_id, records=records, policy=policy)
+    except KeyError:
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(g, indent=2))
+    else:
+        print(f"{args.job_id}: {'ALLOWED' if g['allowed'] else 'BLOCKED'} ({g['reason']}"
+              + (", urgent" if g["urgent"] else "") + f") {g['detail']}")
+    return 0 if g["allowed"] else COMPANY_BLOCKED_EXIT
+
+
+def cmd_company_active(args: argparse.Namespace) -> int:
+    """Other live applications at a company and the recruiter transparency note (inbox-sync)."""
+    from careeros.company_policy import active_applications, transparency_note
+
+    policy, records = _policy_inputs(_settings(args))
+    act = active_applications(args.company, records=records, exclude_job=args.exclude, policy=policy)
+    note = transparency_note(args.company, records=records, exclude_job=args.exclude, policy=policy)
+    if args.json:
+        print(json.dumps({"company": args.company, "active": act, "note": note}, indent=2))
+    else:
+        print(note or f"no other active applications at {args.company}")
+    return 0
+
+
+def cmd_company_requeue(args: argparse.Namespace) -> int:
+    """Jobs skipped as `company_cap` / `cooldown` whose gate is open now -> status `scored` (re-run
+    /prepare-job on them). Other skips, and deferred jobs whose posting retention pruned, are never touched."""
+    from careeros.company_policy import DEFERRED_REASONS, gate
+
+    s = _settings(args)
+    policy, records = _policy_inputs(s)
+    want = policy.company_key(args.company) if args.company else None
+    requeued, waiting = [], []
+    for r in records:
+        if r.status != "skipped" or r.skip_reason not in DEFERRED_REASONS or r.pruned:
+            continue  # a pruned posting is only a preview: prepare-job would refuse it
+        if want is not None and policy.company_key(r.company) != want:
+            continue
+        g = gate(r.job_id, records=records, policy=policy)
+        item = {"job_id": r.job_id, "company": r.company, "title": r.title, "was": r.skip_reason,
+                "reason": g["reason"], "urgent": g["urgent"], "closes_at": g["closes_at"], "until": g["until"]}
+        (requeued if g["allowed"] else waiting).append(item)
+    if not args.dry_run:
+        for it in requeued:
+            _set_status_both(s, it["job_id"], "scored", f"requeued: {it['was']} cleared")
+    if args.json:
+        print(json.dumps({"requeued": requeued, "still_deferred": waiting, "dry_run": args.dry_run}, indent=2))
+        return 0
+    verb = "would requeue" if args.dry_run else "requeued"
+    for it in requeued:
+        print(f"{verb} {it['job_id']} {it['company']} — {it['title']} (was {it['was']})"
+              + (" URGENT" if it["urgent"] else "") + f"; next: /prepare-job data/jobs/{it['job_id']}")
+    for it in waiting:
+        print(f"still deferred {it['job_id']} {it['company']} — {it['title']}: {it['reason']}"
+              + (f" until {it['until']}" if it["until"] else ""))
+    if not requeued and not waiting:
+        print("no deferred jobs")
+    return 0
 
 
 def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
@@ -581,9 +689,33 @@ def build_parser() -> argparse.ArgumentParser:
     jobs = sub.add_parser("jobs")
     js = jobs.add_subparsers(dest="jobs_cmd", required=True)
     jl = js.add_parser("list")
-    jl.add_argument("--status", choices=STATUSES)
+    jl.add_argument("--status", choices=STATUSES, action="append",
+                    help="repeat to list several statuses together (e.g. --status found --status scored)")
     jl.add_argument("--json", action="store_true")
+    jl.add_argument("--order", choices=["urgent"],
+                    help="urgent: jobs that must go now (deadline / cluster) first, then by close date, then fit")
     jl.set_defaults(fn=cmd_jobs_list)
+
+    co = sub.add_parser("company", help="per-company caps, rejection cooldown, close dates (exit 3 = blocked)")
+    cos = co.add_subparsers(dest="company_cmd", required=True)
+    csl = cos.add_parser("slots", help="applications used / allowed in the window, and how candidates rank")
+    csl.add_argument("company")
+    csl.add_argument("--json", action="store_true")
+    csl.set_defaults(fn=cmd_company_slots)
+    cgt = cos.add_parser("gate", help="may this job be prepared/submitted now? exit 0 allowed, 3 blocked")
+    cgt.add_argument("job_id")
+    cgt.add_argument("--json", action="store_true")
+    cgt.set_defaults(fn=cmd_company_gate)
+    cac = cos.add_parser("active", help="other live applications at a company + the recruiter note")
+    cac.add_argument("company")
+    cac.add_argument("--exclude", metavar="JOB_ID", help="the job the email is about")
+    cac.add_argument("--json", action="store_true")
+    cac.set_defaults(fn=cmd_company_active)
+    crq = cos.add_parser("requeue", help="skipped company_cap/cooldown jobs whose gate is open now -> scored")
+    crq.add_argument("--company")
+    crq.add_argument("--dry-run", action="store_true")
+    crq.add_argument("--json", action="store_true")
+    crq.set_defaults(fn=cmd_company_requeue)
 
     job = sub.add_parser("job")
     jbs = job.add_subparsers(dest="job_cmd", required=True)

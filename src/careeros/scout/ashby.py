@@ -67,4 +67,4 @@ class AshbyAdapter(Adapter):
                     },
                 )
             )
-        return out
+        return self.with_close_date(out)

@@ -333,6 +333,74 @@ def test_apply_job_follows_safety_verdict():
     assert "verdict" in text and "block" in text and "review" in text
 
 
+# --- company policy (caps, cooldown with deadline exception, transparency) --------------------------
+
+@pytest.mark.parametrize("skill", ["score-job", "prepare-job"])
+def test_prepare_path_runs_company_gate_before_preparing(skill: str):
+    text = _skill(skill)
+    assert "careeros company gate" in text
+    for reason in ("company_cap", "cooldown"):
+        assert reason in text, reason
+
+
+def test_score_job_gate_comes_before_the_final_decision_is_recorded():
+    text = _skill("score-job")
+    assert text.index("careeros company gate") > text.index("## 7. Decision")
+    assert "careeros company requeue" in text
+
+
+def test_prepare_job_gates_before_tailoring():
+    text = _skill("prepare-job")
+    assert text.index("careeros company gate") < text.index("## Step 2: resume")
+
+
+def test_apply_job_uses_company_gate_not_manual_lookups():
+    pre = _skill("apply-job").split("## 1.", 1)[1].split("### 1b", 1)[0]
+    assert "careeros company gate <job_id>" in pre
+    assert 'applied-count "<company>"' not in pre, "company cap now comes from `careeros company gate`"
+    assert "--status rejected" not in pre, "cooldown now comes from `careeros company gate`"
+    assert "applied-count --days 1" in pre, "the daily cap stays"
+
+
+@pytest.mark.parametrize("skill", ["prepare-job", "apply-job"])
+def test_urgent_jobs_go_first(skill: str):
+    text = _skill(skill)
+    assert "careeros jobs list --status queued --order urgent" in text
+    assert "action_note" in text
+
+
+def test_inbox_sync_adds_transparency_note():
+    text = _skill("inbox-sync")
+    assert "careeros company active" in text and "--exclude <job_id>" in text
+    assert "mention these to the recruiter" in text
+
+
+def test_prepare_job_batch_scores_everything_before_preparing():
+    text = _skill("prepare-job")
+    batch = text.split("Batches", 1)[1].split("## Step 2", 1)[0]
+    assert "Phase 1" in batch and "Phase 2" in batch
+    assert batch.index("score-job") < batch.index("Phase 2"), "score every found job before preparing any"
+    assert "careeros jobs list --status found --status scored --order urgent" in batch
+    assert "careeros company gate" in batch.split("Phase 2", 1)[1], "gate again right before each prepare"
+
+
+def test_prepare_job_gate_skip_note_starts_with_reason_and_deferrals_reach_the_gate():
+    text = _skill("prepare-job")
+    step1 = text.split("## Step 1: score", 1)[1].split("## Step 1b", 1)[0]
+    assert "company_cap" in step1 and "Step 1b" in step1, "a deferred score-job skip is re-decided by the gate"
+    step1b = text.split("## Step 1b", 1)[1].split("## Step 2", 1)[0]
+    assert '--note "<gate.reason>: <gate.detail>"' in step1b
+
+
+def test_apply_job_gate_exit_3_skips_permanent_reasons():
+    pre = _skill("apply-job").split("## 1.", 1)[1].split("### 1b", 1)[0]
+    row = next(line for line in pre.splitlines() if "careeros company gate <job_id>" in line)
+    assert "status unchanged" in row and "`company_cap` / `cooldown`" in row
+    assert 'careeros job status <job_id> skipped --note "company <reason>: <detail>"' in row
+    for reason in ("closed", "not_similar", "already_applied"):
+        assert reason in row, reason
+
+
 def test_draft_outreach_opens_one_action_item_per_job_for_manual_contacts():
     """`action add --dedupe` keys on job + type, so per-contact items would drop all but the first."""
     t = (ROOT / ".claude" / "skills" / "draft-outreach" / "SKILL.md").read_text(encoding="utf-8")

@@ -60,6 +60,19 @@ scout ──► data/jobs/<job_id>/posting.json
         outreach  ──► Contacts tab: name, LinkedIn URL, email (if found), draft msg
 ```
 
+## Applications per company (`src/careeros/company_policy.py`)
+
+Pure functions over job records (status.json, score.json, tracker DateApplied, posting close date):
+`slots` (submitted in the cap window + reservations whose posting has not closed), `rank_candidates`
+(candidates = scored `prepare` or gate-deferred `company_cap` / `cooldown`, read from score.json or the
+`skipped` status note; other skips, and postings `careeros prune` stubbed, never compete; similar roles by fit; during a
+rejection cooldown, roles that close before it ends first), `gate` (allowed, reason, urgent, closes_at),
+`transparency_note`. Close dates: Greenhouse `application_deadline` or a custom metadata field, else the
+description text ("apply by", "applications close", "deadline", "closing date", "no later than" + a
+date); Lever and Ashby have no deadline field, text only. Unknown = None, and the cooldown applies.
+Scout stores it as `closes_at` in posting.json. CLI: `careeros company slots|gate|active|requeue`;
+score-job and prepare-job gate before tailoring, apply-job before submitting.
+
 ## QA gate checks
 
 `python -m careeros.qa <job_dir>` (`src/careeros/qa.py`) runs every deterministic check and prints one JSON report;

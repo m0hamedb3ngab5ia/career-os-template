@@ -71,6 +71,15 @@ def guess_remote(*fields: str | None) -> bool | None:
 class Adapter(ABC):
     ats: str = ""
 
+    @staticmethod
+    def with_close_date(postings: list[Posting]) -> list[Posting]:
+        """Fill `closes_at` (YYYY-MM-DD) from the ATS field or the description text, when stated."""
+        from careeros.company_policy import closes_at_iso
+
+        for p in postings:
+            p.closes_at = closes_at_iso(p)
+        return postings
+
     @abstractmethod
     def fetch(self, board: dict[str, Any]) -> list[Posting]:
         ...

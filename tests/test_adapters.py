@@ -256,3 +256,30 @@ def test_greenhouse_posted_at_prefers_first_published():
     ps = GreenhouseAdapter().parse(data, {"company": "Acme", "slug": "acme"})
     assert ps[0].posted_at.startswith("2026-06-01") and ps[1].posted_at.startswith("2026-09-20")
     assert ps[0].first_published.startswith("2026-06-01") and ps[0].last_updated.startswith("2026-09-20")
+
+
+# --- closes_at (posting close date) ------------------------------------------------------------------
+
+DEADLINES = load_fixture("ats_deadlines.json")
+
+
+def test_greenhouse_closes_at_from_field_then_text():
+    ps = GreenhouseAdapter().parse(DEADLINES["greenhouse"], BOARD)
+    assert [p.closes_at for p in ps] == ["2026-10-16", "2026-12-16", None]
+    assert ps[0].raw["application_deadline"] == "2026-10-16T23:59:00-04:00"
+
+
+def test_lever_closes_at_from_text_lists():
+    ps = LeverAdapter().parse(DEADLINES["lever"], BOARD)
+    assert [p.closes_at for p in ps] == ["2026-10-30", None]
+
+
+def test_ashby_closes_at_from_text():
+    ps = AshbyAdapter().parse(DEADLINES["ashby"], BOARD)
+    assert [p.closes_at for p in ps] == ["2026-11-02", None]
+
+
+def test_existing_fixtures_have_no_close_date():
+    for adapter, name in ((GreenhouseAdapter, "greenhouse.json"), (LeverAdapter, "lever.json"),
+                          (AshbyAdapter, "ashby.json")):
+        assert all(p.closes_at is None for p in adapter().parse(load_fixture(name), BOARD))
