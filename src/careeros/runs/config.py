@@ -47,7 +47,8 @@ DEFAULT_USAGE_LIMIT_PATTERNS = [r"usage limit", r"hit your limit", r"limit reach
 DEFAULT_AUTH_PATTERNS = [r"/login", r"not logged in", r"invalid api key", r"oauth token", r"authenticat",
                          r"unauthori[sz]ed", r"credentials? (expired|missing|invalid)"]
 RUN_KEYS = ("preset", "presets", "custom", "job_timeout_minutes", "max_consecutive_failures", "stop_on_timeout",
-            "preflight_doctor", "ranking", "required_mcp_servers", "usage_limit_patterns", "auth_patterns")
+            "preflight_doctor", "ranking", "required_mcp_servers", "usage_limit_patterns", "auth_patterns",
+            "retry", "prepare", "auto_submit", "job_lock_minutes")
 
 
 @dataclass
@@ -68,6 +69,7 @@ class RunsConfig:
     max_consecutive_failures: int = 3
     stop_on_timeout: bool = True
     preflight_doctor: bool = True
+    job_lock_minutes: float = 120
     ranking: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_RANKING))
     required_mcp_servers: list[str] = field(default_factory=list)
     usage_limit_patterns: list[str] = field(default_factory=lambda: list(DEFAULT_USAGE_LIMIT_PATTERNS))
@@ -162,6 +164,8 @@ def load_runs_config(settings: Any) -> RunsConfig:
     if "max_consecutive_failures" in raw:
         cfg.max_consecutive_failures = _num(raw["max_consecutive_failures"], "runs.max_consecutive_failures",
                                             ge=1, whole=True)
+    if "job_lock_minutes" in raw:
+        cfg.job_lock_minutes = _num(raw["job_lock_minutes"], "runs.job_lock_minutes", gt=0)
     for key in ("stop_on_timeout", "preflight_doctor"):
         if key in raw:
             setattr(cfg, key, _bool(raw[key], f"runs.{key}"))
@@ -188,6 +192,11 @@ def load_runs_config(settings: Any) -> RunsConfig:
     if model is not None and not isinstance(model, str):
         raise _err("llm.model_hint must be a model name or null")
     cfg.model = model or None
+    from careeros.runs.policy import AutoSubmitPolicy, load_prepare_config, load_retry_config
+
+    load_retry_config(raw)
+    load_prepare_config(raw)
+    AutoSubmitPolicy.from_config(raw)
     return cfg
 
 

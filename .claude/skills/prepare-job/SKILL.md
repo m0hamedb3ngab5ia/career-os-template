@@ -21,6 +21,14 @@ anything. Print its FAIL lines, then the final RESULT with `status: skipped`, `s
 and `ACTION_ITEMS: ["setup: fix the careeros doctor FAIL lines (profile still has example data or a tool is missing)"]`.
 This keeps the fictional example candidate (Alex Example) out of every real application.
 
+Job lock (right after the doctor guard): `.venv/bin/careeros job lock <job_id> --owner prepare-job --json`.
+Exit 6 means a run or another session is working on this job: STOP and change nothing (no files, no status);
+print the final RESULT with `status: skipped`, `skip_reason: "locked: <owner from stderr>"`. On exit 0 keep
+`token` and `reentrant` from its JSON. `reentrant: true` means a `careeros run prepare` batch called this skill and already holds
+the lock (it passed the token in `CAREEROS_LOCK_TOKEN`). Every `careeros job status` below takes
+`--lock-token <token>`. Before printing the final RESULT, and on any stop after this point, release it with
+`.venv/bin/careeros job unlock <job_id> --token <token>` unless `reentrant` is true (then the run releases it).
+
 Pruned guard: if `JOB/posting.json` has `pruned: true` (retention cut the description to a preview), STOP:
 print the final RESULT with `status: skipped`, `skip_reason: "posting pruned by retention"`. Never score,
 tailor or safety-check a stub.
@@ -139,7 +147,7 @@ Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [prepare-job] status=<s> tier=<t>
 (format `- YYYY-MM-DD HH:MM:SS [<skill>] <message>`, local time, identical to `store.append_log`; e.g. `date '+%F %T'`).
 
 Then record the final status in both `JOB/status.json` and the tracker row:
-`.venv/bin/careeros job status <job_id> <queued|needs_review|skipped> --note "<reason, e.g. qa pass tier A | skip_reason>"`.
+`.venv/bin/careeros job status <job_id> <queued|needs_review|skipped> --note "<reason, e.g. qa pass tier A | skip_reason>" --lock-token <token>`.
 (If the tracker is locked the op is queued; `careeros tracker flush` later.)
 
 Before adding action items, run `.venv/bin/careeros action list` once and skip any item for which an

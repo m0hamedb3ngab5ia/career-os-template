@@ -670,3 +670,23 @@ def set_status_both(settings: Settings, job_id: str, status: str, note: str) -> 
 
     Store(settings).set_status(job_id, status, note)
     Tracker(settings=settings).set_status(job_id, status, note)
+
+
+def add_action(settings: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
+               link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False) -> str:
+    """Add an Action Item (company/role filled from the job's posting). `dedupe`: no-op when an open item with the
+    same job + type exists. Returns the line `careeros action add` prints."""
+    from careeros.store import Store
+
+    tr = Tracker(settings=settings)
+    if job_id and not (company and role):
+        p = Store(settings).load_posting(job_id)
+        if p:
+            company, role = company or p.company, role or p.title
+    if dedupe:
+        for it in tr.list_action_items(open_only=True):
+            if str(it.get("JobID") or "") == job_id and str(it.get("Type") or "") == type:
+                return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
+    aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
+                             role=role, link=link, priority=priority, needs=needs)
+    return f"action item {aid} added ({type}/{priority}/{needs})"

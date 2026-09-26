@@ -156,6 +156,8 @@ def cmd_tracker_upsert(args: argparse.Namespace) -> int:
         print("tracker upsert: give at least one --field key=value", file=sys.stderr)
         return 2
     s = _settings(args)
+    if "status" in data and (locked := _job_lock_guard(s, args.job_id, args)) is not None:
+        return locked
     if "status" in data:  # keep status.json in step, or the next `tracker sync` reverts the row
         store = Store(s)
         if store.exists(args.job_id):
@@ -229,18 +231,10 @@ def cmd_job_show(args: argparse.Namespace) -> int:
 
 def _add_action(s: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
                 link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False) -> str:
-    tr = Tracker(settings=s)
-    if job_id and not (company and role):
-        p = Store(s).load_posting(job_id)
-        if p:
-            company, role = company or p.company, role or p.title
-    if dedupe:
-        for it in tr.list_action_items(open_only=True):
-            if str(it.get("JobID") or "") == job_id and str(it.get("Type") or "") == type:
-                return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
-    aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
-                             role=role, link=link, priority=priority, needs=needs)
-    return f"action item {aid} added ({type}/{priority}/{needs})"
+    from careeros.tracker import add_action
+
+    return add_action(s, what, type, job_id=job_id, company=company, role=role, link=link, priority=priority,
+                      needs=needs, dedupe=dedupe)
 
 
 def cmd_action_add(args: argparse.Namespace) -> int:
@@ -492,6 +486,89 @@ def cmd_safety_clear(args: argparse.Namespace) -> int:
     return 0
 
 
+JOB_LOCKED_EXIT = 6
+DAILY_CAP_EXIT = 3
+
+
+def _lock_token(args: argparse.Namespace) -> str | None:
+    import os
+
+    return getattr(args, "lock_token", None) or getattr(args, "token", None) or os.environ.get("CAREEROS_LOCK_TOKEN")
+
+
+def _job_lock_guard(s: Settings, job_id: str, args: argparse.Namespace) -> int | None:
+    """None when this command may change the job; JOB_LOCKED_EXIT (after printing why) when a run or a skill
+    holds its lock. Matching --lock-token / CAREEROS_LOCK_TOKEN, a stale lock or --force let it through."""
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    if getattr(args, "force", False):
+        return None
+    st = locks.status(RunStore(s).job_lock_path(job_id))
+    if st["state"] != "held" or (_lock_token(args) and _lock_token(args) == st.get("token")):
+        return None
+    print(f"job {job_id} is locked by {st.get('owner')} until {st.get('expires_at')} ({st.get('note') or '-'}); "
+          "not changed. Wait for it, pass --lock-token <token>, or --force", file=sys.stderr)
+    return JOB_LOCKED_EXIT
+
+
+def cmd_job_lock(args: argparse.Namespace) -> int:
+    """Take the per-job lock (exit 6 if someone else holds it). The token from CAREEROS_LOCK_TOKEN (set by
+    `careeros run` for the skill it calls) re-enters the runner's lock: `reentrant: true`, nothing changes."""
+    import os
+
+    from careeros.runs import locks
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.store import RunStore
+
+    s = _settings(args)
+    if not Store(s).exists(args.job_id):
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    minutes = args.ttl_minutes if args.ttl_minutes is not None else load_runs_config(s).job_lock_minutes
+    try:
+        lk = locks.acquire(RunStore(s).job_lock_path(args.job_id), owner=args.owner, ttl_seconds=minutes * 60,
+                           token=_lock_token(args), note=args.note or "")
+    except locks.LockBusy as e:
+        h = e.holder
+        print(f"job {args.job_id} is locked by {h.get('owner')} until {h.get('expires_at')} ({h.get('note') or '-'})",
+              file=sys.stderr)
+        return JOB_LOCKED_EXIT
+    out = {"job_id": args.job_id, "acquired": not lk.reentrant, "reentrant": lk.reentrant,
+           "stale_taken": lk.stale_taken, "token": lk.token, "owner": lk.info.get("owner"),
+           "expires_at": lk.info.get("expires_at")}
+    if args.json:
+        print(json.dumps(out))
+    else:
+        print(f"{args.job_id}: " + ("already held by this run (reentrant)" if lk.reentrant else
+                                    f"locked by {args.owner} until {out['expires_at']}") + f"; token {lk.token}")
+    return 0
+
+
+def cmd_job_unlock(args: argparse.Namespace) -> int:
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    ok = locks.release(RunStore(_settings(args)).job_lock_path(args.job_id), _lock_token(args), force=args.force)
+    print(f"{args.job_id}: " + ("unlocked" if ok else "not unlocked (no lock, or the token does not match)"))
+    return 0 if ok else 1
+
+
+def cmd_job_check(args: argparse.Namespace) -> int:
+    """Exit 0 = free (or a stale lock anyone may take), 6 = held."""
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    st = locks.status(RunStore(_settings(args)).job_lock_path(args.job_id))
+    st.pop("token", None)
+    if args.json:
+        print(json.dumps({"job_id": args.job_id, **st}))
+    else:
+        print(f"{args.job_id}: {st['state']}" + (f" by {st.get('owner')} until {st.get('expires_at')}"
+                                                 if st["state"] != "free" else ""))
+    return JOB_LOCKED_EXIT if st["state"] == "held" else 0
+
+
 def cmd_job_status(args: argparse.Namespace) -> int:
     """Set a job's status in both data/jobs/<id>/status.json and the tracker row."""
     s = _settings(args)
@@ -499,6 +576,8 @@ def cmd_job_status(args: argparse.Namespace) -> int:
     if not store.exists(args.job_id):
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
+    if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
+        return locked
     store.set_status(args.job_id, args.status, args.note)
     tr = Tracker(settings=s)
     tr.set_status(args.job_id, args.status, args.note)
@@ -511,10 +590,13 @@ def cmd_job_freeze(args: argparse.Namespace) -> int:
     """Freeze an as-submitted copy of the job's documents (and the form values, if given)."""
     from careeros.apply.snapshot import freeze
 
-    store = Store(_settings(args))
+    s = _settings(args)
+    store = Store(s)
     if not store.exists(args.job_id):
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
+    if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
+        return locked
     answers = None
     if args.answers_json:
         raw = sys.stdin.read() if args.answers_json == "-" else Path(args.answers_json).read_text(encoding="utf-8")
@@ -679,7 +761,8 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     import threading
 
     from careeros.runs.config import budget_for, load_runs_config
-    from careeros.runs.runner import CLEAN_STOPS, RunBusy, execute_run
+    from careeros.runs.runner import CLEAN_STOPS, RunBusy
+    from careeros.runs.service import run_batch
 
     s = _settings(args)
     cfg = load_runs_config(s)
@@ -697,8 +780,8 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
             pass
     echo = (lambda line: None) if args.json else print
     try:
-        rec = execute_run(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
-                          echo=echo)
+        rec = run_batch(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
+                        echo=echo)
     except RunBusy as e:
         print(f"run {kind}: {e}; not started", file=sys.stderr)
         return RUN_BUSY_EXIT
@@ -727,6 +810,24 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
 def cmd_run_score(args: argparse.Namespace) -> int:
     """Score the best-ranked `found` jobs with /score-job, one headless call each, within a budget."""
     return _run_kind(args, "score")
+
+
+def cmd_run_prepare(args: argparse.Namespace) -> int:
+    """/prepare-job the best-ranked scored jobs (fit-first within a company, company gate before each call)."""
+    return _run_kind(args, "prepare")
+
+
+def cmd_run_cap(args: argparse.Namespace) -> int:
+    """Today's apply cap: volume.max_applications_per_day x season_multiplier. --check exits 3 when reached."""
+    from careeros.runs.policy import current_cap
+
+    st = current_cap(_settings(args))
+    if args.json:
+        print(json.dumps(st))
+    else:
+        print(f"{st['date']}: {st['applied']}/{st['cap']} applications today ({st['remaining']} left; "
+              f"{st['base']}/day x {st['multiplier']:g} this month)")
+    return DAILY_CAP_EXIT if args.check and st["reached"] else 0
 
 
 def cmd_run_list(args: argparse.Namespace) -> int:
@@ -798,11 +899,15 @@ def _run_status_data(s: Settings) -> dict:
     for kind in _STATUS_QUEUE_KINDS:
         ranked, _ = select_candidates(s, kind, cfg, now)
         nxt[kind] = [{k: r[k] for k in ("job_id", "company", "title", "score", "why")} for r in ranked[:5]]
+    from careeros.runs.policy import AutoSubmitPolicy, current_cap
+
+    auto = AutoSubmitPolicy.from_config(cfg.raw)
     return {"running": held if held.get("state") == "held" else None, "paused": rs.pause_state(now),
-            "preset": cfg.preset, "last": last, "next": nxt}
+            "preset": cfg.preset, "last": last, "next": nxt, "cap": current_cap(s),
+            "auto_submit": {"enabled": auto.enabled, "allow": auto.allow, "manual": auto.manual}}
 
 
-_STATUS_QUEUE_KINDS = ("score",)
+_STATUS_QUEUE_KINDS = ("score", "prepare")
 
 
 def cmd_run_status(args: argparse.Namespace) -> int:
@@ -816,6 +921,9 @@ def cmd_run_status(args: argparse.Namespace) -> int:
                          if r else "none"))
     p = data["paused"]
     print("paused: " + (f"yes, until {p.get('until') or 'resumed'} ({p.get('reason') or '-'})" if p else "no"))
+    c = data["cap"]
+    print(f"today: {c['applied']}/{c['cap']} applications ({c['remaining']} left); auto-submit "
+          + ("on" if data["auto_submit"]["enabled"] else "off (runs never apply)"))
     for kind, prev in data["last"].items():
         print(f"last {kind}: " + (f"{prev['id']} {prev['state']} stop={prev.get('stop_reason') or '-'}"
                                   if prev else "never"))
@@ -824,6 +932,11 @@ def cmd_run_status(args: argparse.Namespace) -> int:
         for i, it in enumerate(items, 1):
             print(f"  {i}. {it['job_id']} {it['company'][:18]} — {it['title'][:36]}: {it['why']}")
     return 0
+
+
+def _lock_args(p: argparse.ArgumentParser) -> None:
+    p.add_argument("--lock-token", help="token of the job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
+    p.add_argument("--force", action="store_true", help="change the job even while it is locked")
 
 
 def _run_budget_args(p: argparse.ArgumentParser) -> None:
@@ -873,6 +986,7 @@ def build_parser() -> argparse.ArgumentParser:
     tup.add_argument("job_id")
     tup.add_argument("--field", action="append", metavar="KEY=VALUE",
                      help="column header or snake_case key, e.g. DateApplied=today Status=applied ATS=greenhouse")
+    _lock_args(tup)
     tup.set_defaults(fn=cmd_tracker_upsert)
 
     jobs = sub.add_parser("jobs")
@@ -916,13 +1030,32 @@ def build_parser() -> argparse.ArgumentParser:
     jst.add_argument("job_id")
     jst.add_argument("status", choices=STATUSES)
     jst.add_argument("--note")
+    _lock_args(jst)
     jst.set_defaults(fn=cmd_job_status)
     jfz = jbs.add_parser("freeze", help="keep an as-submitted copy of the documents under submitted/<stamp>/")
     jfz.add_argument("job_id")
     jfz.add_argument("--reason", choices=("submitted", "assisted_stop", "manual"),
                      help="default: from apply_session.json, else manual")
     jfz.add_argument("--answers-json", help="file or - (stdin): [{label, value, source}] or {label: value}")
+    _lock_args(jfz)
     jfz.set_defaults(fn=cmd_job_freeze)
+    jlk = jbs.add_parser("lock", help="take the per-job lock (exit 6 if held): runs and prepare/apply skills use it")
+    jlk.add_argument("job_id")
+    jlk.add_argument("--owner", default="manual", help="who holds it, e.g. prepare-job")
+    jlk.add_argument("--ttl-minutes", type=float, help="expires after this long (default runs.job_lock_minutes)")
+    jlk.add_argument("--token", help="re-enter a lock you hold (default: $CAREEROS_LOCK_TOKEN)")
+    jlk.add_argument("--note")
+    jlk.add_argument("--json", action="store_true")
+    jlk.set_defaults(fn=cmd_job_lock)
+    jul = jbs.add_parser("unlock", help="release the per-job lock (needs its token, or --force)")
+    jul.add_argument("job_id")
+    jul.add_argument("--token", help="default: $CAREEROS_LOCK_TOKEN")
+    jul.add_argument("--force", action="store_true")
+    jul.set_defaults(fn=cmd_job_unlock)
+    jck = jbs.add_parser("check", help="is the job locked? exit 0 free, 6 held")
+    jck.add_argument("job_id")
+    jck.add_argument("--json", action="store_true")
+    jck.set_defaults(fn=cmd_job_check)
 
     act = sub.add_parser("action")
     acs = act.add_subparsers(dest="action_cmd", required=True)
@@ -1008,6 +1141,13 @@ def build_parser() -> argparse.ArgumentParser:
                                        f"{RUN_BUSY_EXIT} if a run is already going)")
     _run_budget_args(rsc)
     rsc.set_defaults(fn=cmd_run_score)
+    rpp = rns.add_parser("prepare", help="/prepare-job the best-ranked scored jobs (never applies)")
+    _run_budget_args(rpp)
+    rpp.set_defaults(fn=cmd_run_prepare)
+    rcp = rns.add_parser("cap", help="today's daily apply cap; --check exits 3 when it is reached")
+    rcp.add_argument("--check", action="store_true")
+    rcp.add_argument("--json", action="store_true")
+    rcp.set_defaults(fn=cmd_run_cap)
     rls = rns.add_parser("list", help="past and current runs, newest first")
     rls.add_argument("--kind", choices=("score", "prepare"))
     rls.add_argument("--limit", type=int, default=20)

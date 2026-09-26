@@ -94,11 +94,14 @@ def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], 
         if status != "found":
             return "status"
         return "already scored" if has_score else None
+    from careeros.company_policy import DEFERRED_REASONS
+
     if status not in ("found", "scored"):
         return "status"
     if not has_score:
         return "not scored"
-    if score.get("decision") != "prepare" and status != "scored":
+    requeued = status == "scored" and score.get("skip_reason") in DEFERRED_REASONS  # `company requeue`
+    if score.get("decision") != "prepare" and not requeued:
         return f"score decision {score.get('decision')}"
     return "already prepared" if prepared_ok else None
 
@@ -176,10 +179,11 @@ class _Loop:
     def __init__(self, settings: Settings, kind: str, budget: Budget, cfg: RunsConfig, rs: RunStore,
                  run: dict[str, Any], invoke: Callable[..., HeadlessResult], now: Callable[[], datetime],
                  clock: Callable[[], float], cancel: threading.Event | None, echo: Callable[[str], None],
-                 after_attempt: Callable[[dict[str, Any]], None] | None):
+                 after_attempt: Callable[[dict[str, Any]], None] | None,
+                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None):
         self.s, self.kind, self.budget, self.cfg, self.rs, self.run = settings, kind, budget, cfg, rs, run
         self.invoke, self.now, self.clock, self.cancel, self.echo = invoke, now, clock, cancel, echo
-        self.after_attempt = after_attempt
+        self.after_attempt, self.pre_attempt = after_attempt, pre_attempt
         self.store = Store(settings)
         self.c = run["counters"]
         self.durations: list[float] = []
@@ -207,6 +211,10 @@ class _Loop:
         result = parse_result_line(res.result_text) if res.saw_result else None
         if outcome == "ok" and self.kind == "score" and result:
             _record_score_verdict(self.s, self.store, jid, result, self.run["id"])
+        if outcome == "ok" and self.kind == "prepare" and result:
+            st = self.store.get_status(jid)
+            if st != result.get("status"):
+                outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
         att = {"n": n, "run_id": self.run["id"], "job_id": jid, "company": item.get("company"),
                "title": item.get("title"), "stage": self.kind, "rank": item.get("rank"), "why": item.get("why"),
                "session_id": res.session_id or sid, "outcome": outcome, "detail": detail, "result": result,
@@ -239,10 +247,17 @@ class _Loop:
         streak = 0
         for item in ranked:
             if self.c["attempted"] >= self.budget.max_jobs:
-                return "budget_reached", f"{self.budget.max_jobs} job(s) done; {len(ranked) - self.c['attempted'] - self.c['locked']} left for later"
+                left = len(ranked) - self.c["attempted"] - self.c["locked"] - self.c["gated"]
+                return "budget_reached", f"{self.budget.max_jobs} job(s) done; {left} left for later"
             stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
             if stop:
                 return stop
+            held_back = self.pre_attempt(item) if self.pre_attempt else None
+            if held_back:
+                self.c["gated"] += 1
+                self.rs.log(self.run["id"], f"skip {item['job_id']}: {held_back}")
+                self.echo(f"    {item['job_id']} passed over: {held_back}")
+                continue
             try:
                 att = self.attempt(item)
             except locks.LockBusy as e:
@@ -275,7 +290,8 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 echo: Callable[[str], None] = lambda s: None, retry_ids: set[str] | None = None,
                 skip_ids: dict[str, str] | None = None,
                 extra_stop: Callable[[], tuple[str, str] | None] | None = None,
-                after_attempt: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
+                after_attempt: Callable[[dict[str, Any]], None] | None = None,
+                pre_attempt: Callable[[dict[str, Any]], str | None] | None = None) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
     another run holds the global lock."""
     cfg = cfg or load_runs_config(settings)
@@ -300,10 +316,11 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
         raise RunBusy(e.holder) from None
     run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False,
                      cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>"),
-                     counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0},
+                     counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0,
+                               "gated": 0},
                      queue=[{k: r[k] for k in ("job_id", "rank", "score", "why")} for r in ranked[:budget.max_jobs]])
     rs.log(rid, f"start {kind} ({trigger}) budget={budget.to_dict()} candidates={len(ranked)}")
-    loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt)
+    loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt)
     loop.lock_token, loop.lock_ttl = glock.token, ttl
     status = "done"
     try:
