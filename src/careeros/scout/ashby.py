@@ -50,6 +50,8 @@ class AshbyAdapter(Adapter):
                     ats=self.ats,
                     ats_job_id=j.get("id"),
                     posted_at=j.get("publishedAt"),
+                    first_published=j.get("publishedAt"),
+                    last_updated=j.get("updatedAt"),
                     description_html=content_html,
                     description_text=j.get("descriptionPlain") or html_to_text(content_html),
                     departments=depts,

@@ -39,31 +39,60 @@ Add one string per hit to `hard_filter_fails`, wording exactly:
 | `title_excluded` | category resolves to one with `excluded: true` |
 | `salary_below_min` | `salary_max` is a number and `< candidate.min_base_usd`. Unknown salary = allowed. |
 | `already_applied_recent` | (company, role family) in `companies.already_applied` with date < 90 days ago |
-| `scam_<code>` | run `.venv/bin/careeros safety check <job_id>` first (it writes `JOB/safety.json`); one `scam_<code>` per **hard** flag, e.g. `scam_apply_domain`, `scam_free_email_contact`, `scam_phrase`, `scam_registry`. Exit 3 means the command already opened the `scam_suspected` Action Item and set `needs_review`; do not add another. Soft flags (`salary_implausible`, `company_unverified`) go in `reasons` and cost 10 fit points. `scam_lookalike_company` = a name borrowing a known brand on a foreign domain. |
+| `safety_block` / `safety_skip` | the safety verdict (below) is `block` or `skip` |
 
-**Ghost-job check** (same `safety.check` run; thresholds in `targets.yaml: safety.ghost`). Before it, when
-`data/company_signals.json` has no entry for the company or the entry's `checked_at` is over 30 days old,
-WebSearch `"<company>" layoffs OR "hiring freeze" <this year>` and record only what a dated, reputable
-source states: `.venv/bin/careeros safety signal "<company>" --kind freeze|layoffs|none --date <YYYY-MM-DD>
---source <url>` (`none` with today's date and the search you ran when nothing is found). Then:
-- hard `ghost_stale` (posted 45+ days ago) or `ghost_freeze` (freeze in the last 180 days): the command
-  exits 4 and sets status `skipped`; put `ghost_stale` / `ghost_freeze` in `hard_filter_fails`.
-- soft `ghost_stale` (30+ days), `ghost_reposted` (same role 3+ times in 90 days), `ghost_unlinked`
-  (aggregator posting not found on the company's own site), `ghost_layoffs`: add to `reasons`, 5 fit
-  points each; any of them turns auto-submit off for this job.
-- dream companies are never skipped: their hard flags come back soft, with a `ghost_job` Action Item.
+**Safety verdict** (run before fit): `.venv/bin/careeros safety check <job_id>` writes `JOB/safety.json`
+with `verdict` = **Pass** / **Review** / **Block** (or `skip` for a dead posting) and every flag's reason
+code, level, evidence URLs and timestamp. Levels are configurable per code in `targets.yaml: safety.levels`.
+- **Block** (exit 3; the CLI already opened the `scam_suspected` Action Item, set `needs_review` and
+  recorded the company): payment / gift cards / crypto / check deposits / buying equipment
+  (`SCAM_PAYMENT_REQUEST`), remote-access software (`SCAM_REMOTE_ACCESS_REQUEST`), brand impersonation
+  (`SCAM_BRAND_DOMAIN_MISMATCH`), contradictions (`COMPANY_CONTRADICTIONS`), a high-confidence registry
+  entry (`SCAM_FLAGGED_BEFORE`). Add `safety_block` to `hard_filter_fails`; do not add another item.
+- **Skip** (exit 4, status `skipped`): `GHOST_STALE_NO_ACTIVITY` = very old AND not updated recently AND
+  the company posts nothing new AND not an evergreen / senior role. Add `safety_skip`.
+- **Review**: score normally, but auto-submit is off (`safety.json: auto_submit_allowed: false`); the job
+  goes to assisted mode for human approval. Codes: `SCAM_APPLY_DOMAIN_UNRECOGNIZED`,
+  `SCAM_FREE_EMAIL_RECRUITER`, `SCAM_CHAT_ONLY_INTERVIEW`, `SCAM_NO_INTERVIEW`, `SCAM_SALARY_IMPLAUSIBLE`,
+  `COMPANY_NOT_YET_CHECKED`, `COMPANY_SPARSE_PUBLIC_FOOTPRINT`, `GHOST_OLD_POST` (45+ days with activity),
+  `GHOST_REPOSTED`, `GHOST_AGGREGATOR_ONLY`, `GHOST_HIRING_FREEZE` (only when the freeze covers the role).
+  List them in `reasons`, 5 fit points each.
+- **info** only lowers confidence: `GHOST_OLD_POST` (30+ days), `GHOST_RECENT_LAYOFFS`, a freeze that does
+  not cover the role. 3 fit points each; never changes the decision.
+- Company priority changes the review threshold, never a fraud judgment: a dream company is never skipped
+  (skip becomes review, with a `ghost_job` Action Item), but its Block flags still block.
 
-**Made-up company check** (only when `safety.json` has `company_unverified`: the company is on none of
-your boards, dream list, prestige tiers or `company_domains`). Verify with WebSearch/WebFetch, recording
-only what a source shows:
-1. An official website exists on a normal domain and its own careers page (or its ATS board) lists this role.
-2. A LinkedIn company page with real employees (dozens or more), or news / funding / SEC coverage.
-3. The site is not brand new or a template shell, and the recruiter's email domain matches the website.
+**Hiring signals.** When `data/company_signals.json` has no entry for the company or `checked_at` is over
+30 days old, WebSearch `"<company>" layoffs OR "hiring freeze" <this year>` and record only what a dated,
+reputable source states, including what the freeze covers:
+`.venv/bin/careeros safety signal "<company>" --kind freeze|layoffs|none --date <YYYY-MM-DD> --scope
+"<company-wide | teams; locations>" --source <url>` (`none` with today's date when nothing current is
+found, or when a freeze was lifted). Then rerun `safety check`.
 
-All hold → `.venv/bin/careeros safety verify "<company>" --domain <domain> --evidence "<urls, sizes>"`,
-then rerun `careeros safety check <job_id>`. Any fails, or nothing found → `careeros safety flag
-"<company>" --domain <domain> --reason "could not verify company"` and `scam_company_unverified` in
-`hard_filter_fails`. Tier A never applies here (dream companies are curated).
+**Company check** (when `safety.json` has `COMPANY_NOT_YET_CHECKED`). Do not reject a company because it
+is unfamiliar, small, new, or missing from known lists. Sparse information alone is not evidence of fraud.
+Gather independent signals with WebSearch/WebFetch, then record the risk level:
+
+- **Low** (normal scoring and auto-submit) when several hold: the role is on the company's careers page
+  or a reputable ATS / LinkedIn Jobs; a working official website that clearly describes the business; a
+  consistent LinkedIn presence with identifiable employees or founders; company domain, recruiter email,
+  posting and application URL agree; external references (Crunchbase, press, GitHub, accelerator,
+  customers, incorporation history).
+  `.venv/bin/careeros safety verify "<company>" --risk low --domain <domain> --signal "<signal 1>" --signal "<signal 2>" --evidence <url> ...` (two signals minimum).
+- **Medium** (score it, human approves before submit): very new or little public history; tiny or
+  founders-only team; role only on LinkedIn or an ATS, not the company site; minimal but consistent
+  website; a third-party recruiting firm; sparse information but no direct scam signal.
+  `... --risk medium --signal "<what was found>" --evidence <url>`.
+- **High** (block, explain exact red flags): the application domain impersonates or closely resembles
+  another company; a recruiter claims a company but uses an unrelated personal or suspicious domain with no
+  verifiable recruiting relationship; payment, gift cards, crypto, vendor equipment purchases, banking
+  credentials or SSN before legitimate onboarding; company name, website, recruiter and listing materially
+  contradict each other; the role cannot be found through any independent source and the company does not
+  appear connected to it; a domain recently created to impersonate a known company; chat-only interviews
+  with no verifiable company representative.
+  `... --risk high --signal "<each red flag>" --evidence <url>`.
+
+Use accumulated evidence, never one missing signal. Then rerun `safety check`.
 | `prestige_avoid` | company in `prestige_tiers.avoid`: skip, unless the fit **before** `prestige_bonus` (sum of the other components, section 5) is >= 90, then flag `needs_review_avoid` instead |
 
 ## 3. Category

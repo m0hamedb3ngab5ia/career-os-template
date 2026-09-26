@@ -318,12 +318,16 @@ def test_apply_job_scam_gate_runs_the_safety_cli():
     assert "no code yet" not in gate
 
 
-def test_score_job_skips_on_scam_flags():
+def test_score_job_uses_three_verdicts_and_reason_codes():
     text = _skill("score-job")
-    assert "careeros safety check" in text and "scam_" in text
+    assert "careeros safety check" in text and "careeros safety signal" in text
+    for word in ("Pass", "Review", "Block", "SCAM_", "GHOST_", "COMPANY_"):
+        assert word in text, word
+    # unknown is not suspicious: the made-up-company rubric has three risk levels and a two-signal minimum
+    assert "Sparse information alone is not evidence of fraud" in text
+    assert "--risk low" in text and "--risk medium" in text and "--risk high" in text
 
 
-def test_score_job_checks_ghost_signals():
-    text = _skill("score-job")
-    assert "ghost_stale" in text and "ghost_freeze" in text
-    assert "careeros safety signal" in text
+def test_apply_job_follows_safety_verdict():
+    text = _skill("apply-job")
+    assert "verdict" in text and "block" in text and "review" in text

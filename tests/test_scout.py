@@ -148,3 +148,31 @@ def test_run_scout_refuses_without_title_keywords_and_marks_nothing_seen(setting
     with pytest.raises(ConfigError, match="title_keywords"):
         run_scout(settings, store, log=lambda *_: None)
     assert store.load_seen() == set()
+
+
+def test_scout_sources_and_filters_are_configurable(settings, monkeypatch):
+    """targets.yaml `scout.sources` limits which ATS families are fetched; `scout.filters` turns single
+    prefilter steps off (a template user who wants senior roles sets seniority: false)."""
+    import careeros.scout as scout_mod
+
+    class Fake:
+        def fetch(self, board):
+            return [_p("Senior Software Engineer", company=board["company"], jid=board["slug"])]
+
+    monkeypatch.setattr(scout_mod, "ADAPTERS", {"greenhouse": Fake, "lever": Fake})
+    settings.companies["boards"] = [{"company": "Acme", "ats": "greenhouse", "slug": "a"},
+                                    {"company": "Beta", "ats": "lever", "slug": "b"}]
+    settings.targets["scout"] = {"sources": ["greenhouse"], "filters": {"seniority": False}}
+    summary = run_scout(settings, Store(settings), log=lambda *_: None)
+    status = {b.company: b.status for b in summary.boards}
+    assert status == {"Acme": "ok", "Beta": "skipped"}
+    assert summary.totals["stored"] == 1 and summary.totals["filtered_seniority"] == 0
+
+
+def test_scout_defaults_keep_every_filter_on(example_settings):
+    from careeros.scout import scout_config
+
+    cfg = scout_config(example_settings)
+    assert cfg["sources"] == ["greenhouse", "lever", "ashby"]
+    assert all(cfg["filters"].values()) and set(cfg["filters"]) == {
+        "blocklist", "flagged", "title", "seniority", "location", "ghost"}

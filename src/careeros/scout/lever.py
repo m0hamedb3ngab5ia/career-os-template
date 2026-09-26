@@ -52,6 +52,7 @@ class LeverAdapter(Adapter):
                     ats=self.ats,
                     ats_job_id=j.get("id"),
                     posted_at=_ms_to_iso(j.get("createdAt")),
+                    first_published=_ms_to_iso(j.get("createdAt")),
                     description_html=content_html,
                     description_text="\n\n".join(p.strip() for p in text_parts if p and p.strip()),
                     departments=[d for d in [cats.get("department"), cats.get("team")] if d],

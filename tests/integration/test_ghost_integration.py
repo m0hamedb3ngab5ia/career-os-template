@@ -46,12 +46,19 @@ def _scout(root: Path, monkeypatch, postings: list[dict]):
     return run_scout(s, Store(s), log=lambda *_: None), Store(s)
 
 
-def test_stale_posting_is_filtered_by_scout(temp_root: Path, monkeypatch):
-    summary, _ = _scout(temp_root, monkeypatch, [
-        {"title": "Software Engineer", "ats_job_id": "old", "posted_at": _days_ago(60)},
-        {"title": "Backend Engineer", "ats_job_id": "new", "posted_at": _days_ago(3)},
-    ])
-    assert summary.totals["stored"] == 1 and summary.totals["filtered_ghost"] == 1
+def _old(title: str, pid: str, ago: int) -> dict:
+    return {"title": title, "ats_job_id": pid, "posted_at": _days_ago(ago), "first_published": _days_ago(ago),
+            "last_updated": _days_ago(ago)}
+
+
+def test_old_posting_skipped_only_without_signs_of_hiring(temp_root: Path, monkeypatch):
+    summary, _ = _scout(temp_root, monkeypatch, [_old("Software Engineer", "a", 60), _old("Backend Engineer", "b", 70)])
+    assert summary.totals["stored"] == 0 and summary.totals["filtered_ghost"] == 2
+
+
+def test_old_posting_kept_when_company_is_still_hiring(temp_root: Path, monkeypatch):
+    summary, _ = _scout(temp_root, monkeypatch, [_old("Software Engineer", "a", 60), _old("Backend Engineer", "b", 3)])
+    assert summary.totals["stored"] == 2 and summary.totals["filtered_ghost"] == 0
 
 
 def test_repost_is_flagged_by_safety_check(temp_root: Path, home: Path, monkeypatch):
@@ -65,17 +72,20 @@ def test_repost_is_flagged_by_safety_check(temp_root: Path, home: Path, monkeypa
     r = _cli(temp_root, home, "safety", "check", jid)
     assert r.returncode == 0, r.stdout + r.stderr
     codes = {f["code"] for f in json.loads((temp_root / "data" / "jobs" / jid / "safety.json").read_text())["flags"]}
-    assert "ghost_reposted" in codes
+    assert "GHOST_REPOSTED" in codes
 
 
-def test_freeze_signal_skips_job(temp_root: Path, home: Path):
+def test_freeze_covering_role_is_review_not_skip(temp_root: Path, home: Path):
     s = Settings.load(temp_root)
     p = Posting(company="Acme", title="Software Engineer", ats="greenhouse", ats_job_id="9",
-                url="https://boards.greenhouse.io/acme/jobs/9", posted_at=_days_ago(2))
+                url="https://boards.greenhouse.io/acme/jobs/9", posted_at=_days_ago(2), departments=["Engineering"])
     Store(s).save_posting(p)
     r = _cli(temp_root, home, "safety", "signal", "Acme", "--kind", "freeze", "--date", _days_ago(20),
-             "--source", "https://news.example/acme-freeze")
+             "--scope", "engineering", "--source", "https://news.example/acme-freeze")
     assert r.returncode == 0, r.stderr
     r = _cli(temp_root, home, "safety", "check", p.job_id)
-    assert r.returncode == 4, r.stdout + r.stderr    # 4 = ghost skip
-    assert json.loads((temp_root / "data" / "jobs" / p.job_id / "status.json").read_text())["status"] == "skipped"
+    assert r.returncode == 0, r.stdout + r.stderr
+    out = json.loads((temp_root / "data" / "jobs" / p.job_id / "safety.json").read_text())
+    freeze = [f for f in out["flags"] if f["code"] == "GHOST_HIRING_FREEZE"]
+    assert out["verdict"] == "review" and freeze[0]["evidence"] == ["https://news.example/acme-freeze"]
+    assert json.loads((temp_root / "data" / "jobs" / p.job_id / "status.json").read_text())["status"] == "found"

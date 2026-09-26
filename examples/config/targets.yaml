@@ -110,10 +110,26 @@ safety:
     - file_upload_failed
     - qa_failed_twice
   scam:                                # careeros safety check (src/careeros/safety/scam.py)
-    salary_max_multiple: 3             # soft flag when posted salary > this x candidate.min_base_usd
-  ghost:                               # ghost-job detection (src/careeros/safety/ghost.py)
-    stale_flag_days: 30                # posted this many days ago -> flag (no auto-submit)
-    stale_skip_days: 45                # -> skip (dream companies only flagged)
+    salary_max_multiple: 3             # review when posted salary > this x candidate.min_base_usd
+  ghost:                               # ghost-job checks (src/careeros/safety/ghost.py)
+    old_post_days: 30                  # older -> lowers confidence only
+    very_old_post_days: 45             # older -> review; skip only if also not updated, company not
+    recent_update_days: 30             #   posting anything new, and not an evergreen/senior role
     repost_window_days: 90
-    repost_flag_count: 3               # same role reposted this many times in the window -> flag
-    layoff_window_days: 180            # freeze in window -> skip; layoffs in window -> flag
+    repost_flag_count: 3               # same role as this many separate requisitions -> review
+    freeze_window_days: 180            # freeze covering the role -> review; otherwise info
+    layoff_window_days: 180            # layoffs -> lowers confidence only
+  # Change any check's level: block | skip | review | info | off. Codes are listed in the docstrings of
+  # src/careeros/safety/scam.py and ghost.py, e.g.:
+  levels: {}                           # {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}
+
+# Scout: which job-board sources to fetch and which prefilters to apply. Defaults: all on.
+scout:
+  sources: [greenhouse, lever, ashby]  # ATS adapters to fetch; boards on others are skipped
+  filters:
+    blocklist: true                    # companies.yaml blocklist
+    flagged: true                      # high-confidence entries in data/flagged_registry.yaml
+    title: true                        # categories.yaml title_keywords (false = keep every title)
+    seniority: true                    # seniority.exclude_title_keywords (false = keep senior roles)
+    location: true                     # location.blocked_countries
+    ghost: true                        # ghost-job skip

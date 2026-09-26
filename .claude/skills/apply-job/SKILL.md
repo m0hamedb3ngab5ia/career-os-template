@@ -37,7 +37,7 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | `cover_letter.txt` exists when tier `cover_letter: always`, or posting requires one | job dir, targets.yaml | outcome failed, reason "cover letter missing" |
 | detected ATS (adapters.md table, from `posting.apply_url` or `url`) | posting.json | record in session |
 | tier from `score.json: tier`; the tracker `Override` column wins if set: read it with `.venv/bin/careeros tracker show <job_id> --json` (`Override` key; `A`/`B`/`C` replace the tier, `manual` or `skip` = no auto-submit) | score.json, tracker | if the command fails: `auto_submit` = false |
-| `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: `auto_submit_allowed` = allowlisted ATS on its own or the company's domain, reached from the company's board, no flags) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
+| `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: true only when the verdict is pass and the ATS is allowlisted on its own or the company's domain, reached from the company's board) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
 | daily cap: `.venv/bin/careeros tracker applied-count --days 1` (all companies, today) < `volume.max_applications_per_day` x `season_multiplier[month]` | tracker | outcome failed, reason "daily cap" |
 | company cap: `.venv/bin/careeros tracker applied-count "<company>" --days 90` < `volume.max_per_company_per_90_days` | tracker | outcome failed, reason "company cap" |
@@ -46,33 +46,35 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 `applied-count` prints one integer (0 when the tracker does not exist yet). Never open the workbook
 directly from this skill; every tracker read/write goes through the `careeros` CLI.
 
-### 1b. Scam / data-harvesting gate (hard stop, before any form fill)
+### 1b. Safety gate (before any form fill)
 
-Code: `src/careeros/safety/scam.py` (spec in `TODO.md` "Safety"). Run it after the preconditions above
-and again in section 3 as soon as the form's fields are visible, before typing anything. Exit 3 is a
-hard stop: never fill, never submit, never "just this once".
+Code: `src/careeros/safety/` (scam, company risk, ghost jobs). Every check yields a reason code, a level
+and evidence; the verdict is **pass**, **review** or **block** (`skip` for dead postings).
 
-1. Posting gate, before opening the browser: `.venv/bin/careeros safety check <job_id>`.
-   It checks the apply-URL domain (company's own or a known ATS), free-provider recruiter emails, scam
-   phrases (messaging-app interviews, check deposits, buy-equipment-get-reimbursed, fees, pay in crypto),
-   and the flagged registry (`data/flagged_registry.yaml`), and writes `safety.json`, including
-   `auto_submit_allowed` (see the preconditions table).
+1. Posting gate, before opening the browser: `.venv/bin/careeros safety check <job_id>`, then read
+   `safety.json`:
+   - `verdict` block (exit 3) or skip (exit 4): stop. The CLI already opened the Action Item / set the
+     status. Print `RESULT` with `outcome: failed`, reason `safety <verdict>: <codes>`.
+   - `verdict` review: continue in assisted mode only (`auto_submit` false; stop before submit with a
+     `review` Action Item naming the review codes). Never auto-submit a review job.
+   - `verdict` pass: `auto_submit_allowed` feeds the preconditions table.
 2. Field gate, on every page/step of the form: collect every visible field label, placeholder and upload
    prompt after `read_page`, then
-   `echo '<JSON list of labels>' | .venv/bin/careeros safety fields <job_id> --labels-json -`.
-   It stops on SSN / national ID, date of birth, bank or card numbers, passport or ID uploads, driver's
-   license, mother's maiden name (all allowed only once status is `offer`) and any fee (never).
-3. Also stop, by hand, when a page you land on after redirects is on a domain other than the posting's
-   apply URL, the company's, or a known ATS: run `careeros safety flag "<company>" --domain <host>
-   --reason "redirect to <host>"`, then the steps below.
+   `echo '<JSON list of labels>' | .venv/bin/careeros safety fields <job_id> --labels-json - --page-url <current url>`.
+   Exit 3 (block): SSN / national ID, date of birth, bank numbers, passport or ID uploads, driver's
+   license, mother's maiden name (allowed only once status is `offer`); any fee or card number; passwords,
+   security questions or codes for another account (creating a password or entering an emailed code on the
+   ATS's own domain is normal); remote-access software. Work-authorization questions are normal.
+3. A redirect to a domain other than the apply URL's, the company's or a known ATS: stop and run
+   `careeros safety flag "<company>" --domain <host> --confidence medium --reason "redirect to <host>" --evidence <url>`.
 
-On exit 3 the CLI has already opened the `scam_suspected` Action Item (H, phone) and set the status
-`needs_review`. Then:
+On exit 3 from step 2:
 1. Do not enter anything further.
-2. `s.step("scam_gate", False, "<first flag line>")`, save the session, print `RESULT` with
-   `outcome: failed`, reason `scam_suspected: <codes>`, then close the tab.
+2. `s.step("safety_gate", False, "<first flag line>")`, save the session, print `RESULT` with
+   `outcome: failed`, reason `safety block: <codes>`, then close the tab.
 
-The user reviews the item by hand; the gate is never overridden from inside this skill.
+The user reviews the item by hand; the gate is never overridden from inside this skill (clearing a
+company is `careeros safety clear <company> --note ...`, run by the user).
 
 Start the session record:
 

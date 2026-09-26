@@ -34,6 +34,8 @@ class GreenhouseAdapter(Adapter):
                     ats=self.ats,
                     ats_job_id=str(j.get("id")) if j.get("id") is not None else None,
                     posted_at=j.get("first_published") or j.get("updated_at"),  # updated_at resets on edit
+                    first_published=j.get("first_published"),
+                    last_updated=j.get("updated_at"),
                     description_html=content_html,
                     description_text=html_to_text(content_html),
                     departments=depts,
