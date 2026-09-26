@@ -174,7 +174,7 @@ describe("Jobs screen", () => {
     const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     const { api } = setup("/jobs?sel=nw01&cols=ats", {
       "POST /api/jobs/export": () =>
-        new Response(new Blob(["xlsx"]), {
+        new Response("xlsx", {
           headers: { "content-disposition": 'attachment; filename="careeros-jobs-20260926.xlsx"' },
         }),
     });
@@ -197,7 +197,7 @@ describe("Jobs screen", () => {
     vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => undefined);
     vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: () => "blob:y", revokeObjectURL: () => undefined }));
     const { api } = setup("/jobs?tab=applied&q=data&sort=company", {
-      "POST /api/jobs/export": () => new Response(new Blob(["x"])),
+      "POST /api/jobs/export": () => new Response("x"),
     });
     await userEvent.setup().click(await screen.findByRole("button", { name: "Export xlsx" }));
     await screen.findByText("Downloaded careeros-jobs.xlsx");
