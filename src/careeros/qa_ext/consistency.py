@@ -88,10 +88,7 @@ DEGREE_RX = {
     "doctorate": re.compile(r"\bph\.?\s?d\b|\bdoctora(?:te|l)\b", re.I),
 }
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
-# Letters glued to digits with no hyphen (S3, EC2, K8s, OAuth2, v2, Q3, H100) are product / version names, not
-# quantities, including a dotted version (TLS1.3, Python3.12). Percentiles (p99, p99.9) and hyphen compounds
-# (sub-100ms, top-10) still yield their number.
-TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|(?<![A-Za-z0-9])(?![pP]\d+(?![A-Za-z\d]))[A-Za-z]+\d[A-Za-z\d]*(?:\.\d+)*|[A-Za-z][A-Za-z'-]*|[(–-]")
+TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|[A-Za-z][A-Za-z'-]*|[(–-]")
 # clause boundaries inside one sentence: a company fact and a bullet claim often share a sentence
 CLAUSE_SPLIT = re.compile(r";|,\s+(?:and|while|whereas)\s+|\s+but\s+|\s*—\s*|\s+–\s+|\s+--?\s+")
 YEAR_RE = re.compile(r"(?<![\w$.,])((?:19|20)\d{2})(?![\d%+]|[.,]\d|\w)")
@@ -130,9 +127,14 @@ def _fmt(v: float) -> str:
 # --------------------------------------------------------------------------- #
 
 def parse_numbers(text: str) -> list[dict[str, Any]]:
-    """Quantities in `text`: [{value, kind ('%'|'$'|'x'|''), unit: set[str], raw, hedged, vague, estimate}].
+    """Quantities in `text`: [{value, kind ('%'|'$'|'x'|''), unit: set[str], raw, hedged, hedge, vague, estimate,
+    glued}].
     `unit` = the next two content words (singular) after the number and its scale word."""
-    toks = TOKEN_RE.findall(text or "")
+    spans = [(m.group(), m.start()) for m in TOKEN_RE.finditer(text or "")]
+    toks = [t for t, _ in spans]
+    # a number glued to a preceding letter (S3, EC2, TLS1.3, USD5M): kept as a quantity everywhere, but never a
+    # company fact in _context_values, where a product name would excuse a changed bullet number
+    glued_at = {i for i, (_, pos) in enumerate(spans) if pos and text[pos - 1].isalpha()}
     low = [t.lower() for t in toks]
     out: list[dict[str, Any]] = []
     i = 0
@@ -197,7 +199,7 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
                 break
             k += 1
         out.append({"value": value, "kind": kind, "unit": set(unit), "hedged": hedged, "vague": vague,
-                    "estimate": prev1 == "~", "hedge": hedge,
+                    "estimate": prev1 == "~", "hedge": hedge, "glued": start in glued_at,
                     "raw": (hedge + (" " if hedge != "~" else "") if hedge else "") + " ".join(toks[start:j])})
         i = j
     return out
@@ -468,7 +470,8 @@ def _context_values(ck: Any) -> set[float]:
         parts += _facts_text(d.get("facts_used"))
     data = outreach_data(ck) or {}
     parts += _facts_text(data.get("facts_used"))
-    return {p["value"] for p in parse_numbers("\n".join(parts)) if p["value"] is not None and not p["vague"]}
+    return {p["value"] for p in parse_numbers("\n".join(parts))
+            if p["value"] is not None and not p["vague"] and not p["glued"]}
 
 
 def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[str]]], cfg: dict[str, Any]) -> None:

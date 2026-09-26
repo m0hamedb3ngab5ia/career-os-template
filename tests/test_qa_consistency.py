@@ -438,9 +438,11 @@ def test_hedged_bullet_with_changed_number_is_still_hard(tmp_path: Path) -> None
     assert by_name(ck, "numbers_consistent")["ok"] is False
 
 
-@pytest.mark.parametrize("text", ["AWS (Glue, Athena, S3)", "EC2 and K8s", "Web3 and OAuth2"])
-def test_product_names_are_not_numbers(text: str) -> None:
-    assert parse_numbers(text) == []
+@pytest.mark.parametrize("text", ["AWS (Glue, Athena, S3)", "EC2 and K8s", "Web3 and OAuth2", "TLS1.3", "v2.3 API",
+                                  "Python3.12", "OAuth2.0", "H100 GPUs"])
+def test_product_names_are_flagged_glued(text: str) -> None:
+    nums = parse_numbers(text)
+    assert nums and all(p["glued"] for p in nums)
 
 
 @pytest.mark.parametrize("text,value", [("ran on 3 nodes", 3.0), ("Python 3.12", 3.12), ("cut latency 10x", 10.0),
@@ -456,9 +458,6 @@ def test_metric_compounds_still_parse(text: str, value: float) -> None:
     assert [p["value"] for p in parse_numbers(text)] == [value]
 
 
-@pytest.mark.parametrize("text", ["v2 API", "Q3 roadmap", "H100 GPUs", "IPv6 stack"])
-def test_versions_and_models_are_words(text: str) -> None:
-    assert parse_numbers(text) == []
 
 
 def _metric_job(tmp_path: Path, bullet: str, restated: str) -> Checker:
@@ -507,9 +506,6 @@ def test_same_class_hedge_is_silent(tmp_path: Path, bullet_phrase: str, restated
 
 
 # --- review fixes (#25, round 2) --------------------------------------------------------------------
-@pytest.mark.parametrize("text", ["TLS1.3", "v2.3 API", "Python3.12", "OAuth2.0", "Node v18.3"])
-def test_glued_dotted_versions_are_words(text: str) -> None:
-    assert parse_numbers(text) == []
 
 
 @pytest.mark.parametrize("text,value", [("p99.9 latency", 99.9), ("Python 3.12", 3.12)])
@@ -526,3 +522,36 @@ def test_glued_version_in_posting_does_not_excuse_changed_number(tmp_path: Path)
                                                          "description_text": "Our services speak TLS1.3 only."}))
     ck = run(Checker(ck.job_dir, root))
     assert by_name(ck, "numbers_consistent")["ok"] is False
+
+
+# --- review fixes (#25, round 3): the tokenizer is main's; glued numbers are only dropped from company facts ----
+@pytest.mark.parametrize("text,value,kind", [("USD5M savings", 5_000_000.0, ""), ("Top5% of teams", 5.0, "%"),
+                                             ("approx60% faster", 60.0, "%"), ("CAD300k budget", 300_000.0, "")])
+def test_glued_quantities_still_parse(text: str, value: float, kind: str) -> None:
+    [p] = parse_numbers(text)
+    assert (p["value"], p["kind"]) == (value, kind)
+
+
+@pytest.mark.parametrize("bullet,restated", [
+    ("Saved USD 2M in annual cloud spend at Acme by rightsizing the payments cluster",
+     "At Acme I saved USD5M in annual cloud spend by rightsizing the payments cluster."),
+    ("Ranked in the top 1% of Acme engineers for payments incident response",
+     "At Acme I ranked in the Top5% of engineers for payments incident response."),
+])
+def test_changed_glued_quantity_is_hard(tmp_path: Path, bullet: str, restated: str) -> None:
+    chk = by_name(_metric_job(tmp_path, bullet, restated), "numbers_consistent")
+    assert chk["ok"] is False
+
+
+@pytest.mark.parametrize("posting", ["We store reports in AWS S3.", "EC2 fleet", "Our services speak TLS1.3 only."])
+def test_glued_product_numbers_are_not_company_facts(tmp_path: Path, posting: str) -> None:
+    root, prof = _hedged_root(tmp_path, "within 2 months")
+    restated = "3" if "S3" in posting or "TLS" in posting else "2"
+    if restated == "2":  # EC2: restate a changed 2 -> must still fail when the bullet says a different number
+        root, prof = _hedged_root(tmp_path / "b", "within 4 months")
+    text = f"At Acme I deployed the reconciliation dashboard to production in {restated} months, running on Kubernetes."
+    ck = make_job(tmp_path / "j", root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                  answers=answer(text, ids=("acme.6",)))
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": posting}))
+    assert by_name(run(Checker(ck.job_dir, root)), "numbers_consistent")["ok"] is False
