@@ -7,12 +7,14 @@ interface PopoverProps {
   /** The control that opened it: focus returns here on Escape, and clicks on it don't count as outside. */
   anchorRef: RefObject<HTMLElement | null>;
   label: string;
+  /** For the anchor's aria-controls. */
+  id?: string;
   className?: string;
   children: ReactNode;
 }
 
 /** Non-modal dialog under its anchor (stat tile details). Escape and outside clicks close it. */
-export function Popover({ open, onClose, anchorRef, label, className, children }: PopoverProps) {
+export function Popover({ open, onClose, anchorRef, label, id, className, children }: PopoverProps) {
   const ref = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -40,6 +42,7 @@ export function Popover({ open, onClose, anchorRef, label, className, children }
   return (
     <div
       ref={ref}
+      id={id}
       role="dialog"
       aria-label={label}
       className={className ? `${styles.popover} ${className}` : styles.popover}

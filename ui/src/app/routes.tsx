@@ -1,5 +1,6 @@
 import type { RouteObject } from "react-router";
 import { NotFoundPage, PlaceholderPage } from "../features/placeholder/PlaceholderPage";
+import { TodayPage } from "../features/today/TodayPage";
 import { AppShell } from "./AppShell";
 
 // Screens land slice by slice (docs/UI.md). Paths follow the mockup's links between artboards.
@@ -8,7 +9,7 @@ export const routes: RouteObject[] = [
     path: "/",
     element: <AppShell />,
     children: [
-      { index: true, element: <PlaceholderPage title="Today" /> },
+      { index: true, element: <TodayPage /> },
       { path: "pipeline", element: <PlaceholderPage title="Pipeline" /> },
       { path: "jobs", element: <PlaceholderPage title="Jobs" /> },
       { path: "jobs/:jobId", element: <PlaceholderPage title="Job detail" /> },

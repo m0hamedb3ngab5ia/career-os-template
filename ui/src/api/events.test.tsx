@@ -32,11 +32,13 @@ describe("keysForChange", () => {
       ["job", "b2"],
       ["contacts"],
       ["status"],
+      ["today"],
     ]);
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
       ["status"],
+      ["today"],
       ["actions"],
     ]);
     expect(keysForChange({ jobs: [], runs: [], actions: false, config: true, status: false })).toEqual([
@@ -44,8 +46,19 @@ describe("keysForChange", () => {
       ["settings"],
       ["status"],
     ]);
-    expect(keysForChange({ status: true })).toEqual([["status"]]);
+    expect(keysForChange({ status: true })).toEqual([["status"], ["today"]]);
     expect(keysForChange({})).toEqual([]);
+  });
+
+  it("refreshes Today on action, job, run and status changes, not on config", () => {
+    const today = (p: Parameters<typeof keysForChange>[0]) =>
+      keysForChange(p).filter((k) => JSON.stringify(k) === '["today"]').length;
+    expect(today({ actions: true })).toBe(1);
+    expect(today({ jobs: ["a1"] })).toBe(1);
+    expect(today({ runs: ["r1"] })).toBe(1);
+    expect(today({ status: true })).toBe(1);
+    expect(today({ jobs: ["a1"], runs: ["r1"], actions: true, status: true })).toBe(1);
+    expect(today({ config: true })).toBe(0);
   });
 });
 

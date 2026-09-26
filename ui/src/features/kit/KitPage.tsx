@@ -16,6 +16,7 @@ import { ExternalLink } from "../../kit/ExternalLink";
 import { ACTION_TYPES, NEEDS, PRIORITIES, SAFETY, STATUSES, STOP_REASONS, TIERS } from "../../kit/labels";
 import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
 import { Popover } from "../../kit/Popover";
+import { PillGroup } from "../../kit/PillGroup";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Switch } from "../../kit/Switch";
 import { useToast } from "../../kit/Toast";
@@ -48,6 +49,7 @@ function Interactive() {
   const [on, setOn] = useState(true);
   const [off, setOff] = useState(false);
   const [sort, setSort] = useState("priority");
+  const [filter, setFilter] = useState("all");
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
@@ -114,6 +116,15 @@ function Interactive() {
           <SegmentedControl.Option value="az">A–Z</SegmentedControl.Option>
           <SegmentedControl.Option value="new">Newest</SegmentedControl.Option>
         </SegmentedControl>
+      </section>
+
+      <section className={styles.stack}>
+        <h3 className={styles.h3}>Filter pills</h3>
+        <PillGroup label="Filter" value={filter} onValueChange={setFilter}>
+          <PillGroup.Pill value="all">All</PillGroup.Pill>
+          <PillGroup.Pill value="overdue">Overdue</PillGroup.Pill>
+          <PillGroup.Pill value="high">High priority</PillGroup.Pill>
+        </PillGroup>
       </section>
 
       <section className={styles.stack}>

@@ -27,22 +27,28 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
     add(["status"]);
+    add(["today"]);
   }
   if (p.runs?.length) {
     add(["runs"]);
     for (const id of p.runs) add(["run", id]);
     add(["status"]);
+    add(["today"]); // recent runs, catch-up and the prepare queue
   }
   if (p.actions) {
     add(["status"]);
     add(["actions"]);
+    add(["today"]);
   }
   if (p.config) {
     add(["meta"]);
     add(["settings"]);
     add(["status"]);
   }
-  if (p.status) add(["status"]);
+  if (p.status) {
+    add(["status"]);
+    add(["today"]);
+  }
   return keys;
 }
 
