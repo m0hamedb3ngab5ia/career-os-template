@@ -82,8 +82,13 @@
 \textit{Activities:} (((ed.activities | join(", ")))) \par
 ((* endif *))
 ((* endfor *))
+((* elif sec.type == "skills" and skill_groups *))
+\section{(((skills_heading)))}
+((* for g in skill_groups *))
+\textbf{(((g.label))):} (((g["items"] | join(", "))))\par
+((* endfor *))
 ((* elif sec.type == "skills" and skills *))
-\section{Skills}
+\section{(((skills_heading)))}
 ((* if skills.programming *))\textbf{Programming:} (((skills.programming | join(", "))))\par
 ((* endif *))
 ((* if skills.frameworks *))\textbf{Frameworks \& Libraries:} (((skills.frameworks | join(", "))))\par

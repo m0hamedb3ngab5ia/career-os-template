@@ -96,6 +96,8 @@ Rules:
 | `experience[].end` | yes | Use `Present` for current roles. |
 | `projects[].link` | no | Rendered as a hyperlink on the project name. |
 | `education[].location` | no | |
+| `skill_groups` | no | `[{label, items}]` copied in order from `profile.skill_groups`; when present it replaces `skills`. Empty groups are omitted. |
+| `skills_heading` | no | Section heading for skills (default `Skills`; from `profile.skills_heading`). |
 | `skills.*` | no | Empty lists omit the line. Every term must exist in `profile.skills` or a cited bullet (QA `no_new_tools`). |
 | `meta.template` | no | Overrides the template name (default: `categories.yaml[category].resume_template`, else `default`). |
 | `meta.resume_version` | yes | Goes to the tracker `ResumeVersion` column. |

@@ -583,6 +583,29 @@ def test_skills_traced(tmp_path: Path, skills: dict, ok: bool) -> None:
     assert c["ok"] is ok, c["detail"]
 
 
+@pytest.mark.parametrize("groups,ok", [
+    ([{"label": "Languages", "items": ["Python", "SQL"]}, {"label": "Tools", "items": ["docker"]}], True),
+    ([{"label": "Cloud", "items": ["Terraform"]}], False),
+])
+def test_skills_traced_with_groups(tmp_path: Path, groups: list, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), skills={}, skill_groups=groups)
+    c = by_name(run(job), "skills_traced")
+    assert c["ok"] is ok, c["detail"]
+
+
+@pytest.mark.parametrize("order,ok", [
+    (["experience", "projects", "education", "skills"], True),
+    (["experience", "education", "skills"], True),                 # a missing section is fine
+    (["summary", "experience", "projects", "education", "skills"], True),
+    (["experience", "skills", "projects", "education"], False),    # skills not last
+    (["skills", "experience", "projects", "education"], False),
+])
+def test_section_order(tmp_path: Path, order: list, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), sections=[{"type": t, "order": i} for i, t in enumerate(order, 1)])
+    c = by_name(run(job), "section_order")
+    assert c["ok"] is ok, c["detail"]
+
+
 # --- standard answers (profile/standard_answers.yaml) ------------------------------------------------
 
 @pytest.mark.parametrize("entry,ok", [
