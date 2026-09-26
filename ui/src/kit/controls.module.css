@@ -137,6 +137,14 @@
 .confirmQuestion {
   flex-grow: 1;
 }
+.confirmTitle {
+  display: block;
+  font-weight: 600;
+}
+.confirmDescription {
+  display: block;
+  font-size: var(--fs-caption);
+}
 
 /* Mark done */
 .done {

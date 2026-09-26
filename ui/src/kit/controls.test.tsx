@@ -161,6 +161,24 @@ describe("ConfirmPanel", () => {
   });
 });
 
+describe("ConfirmPanel description", () => {
+  it("adds an optional second line as the accessible description", () => {
+    render(
+      <ConfirmPanel
+        question="Withdraw from Acme?"
+        description="career-os stops all work on this job."
+        cancelLabel="Keep application"
+        confirmLabel="Withdraw"
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("alertdialog", { name: "Withdraw from Acme?" })).toHaveAccessibleDescription(
+      "career-os stops all work on this job.",
+    );
+  });
+});
+
 describe("MarkDoneCircle", () => {
   it("is a checkbox named after the item", () => {
     const onChange = vi.fn();

@@ -10,8 +10,8 @@ export const routes: RouteObject[] = [
     children: [
       { index: true, element: <PlaceholderPage title="Today" /> },
       { path: "pipeline", element: <PlaceholderPage title="Pipeline" /> },
-      { path: "jobs", element: <PlaceholderPage title="Jobs" /> },
-      { path: "jobs/:jobId", element: <PlaceholderPage title="Job detail" /> },
+      { path: "jobs", lazy: () => import("../features/jobs/JobsPage").then((m) => ({ Component: m.JobsPage })) },
+      { path: "jobs/:jobId", lazy: () => import("../features/job-detail/JobDetailPage").then((m) => ({ Component: m.JobDetailPage })) },
       { path: "actions", element: <PlaceholderPage title="Action Items" /> },
       { path: "inbox", element: <PlaceholderPage title="Inbox & Follow-ups" /> },
       { path: "inbox/:jobId", element: <PlaceholderPage title="Inbox & Follow-ups" /> },
