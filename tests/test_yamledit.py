@@ -333,3 +333,19 @@ def test_every_list_field_edits_cleanly_in_a_pyyaml_dumped_file(tmp_path, file):
         assert got == new, f.id
         changed = list(difflib_lines(dumped, after))
         assert len(changed) <= 2 * (len(new) * 3 + 2), (f.id, changed)
+
+
+@pytest.mark.parametrize("via_symlink", [False, True])
+def test_a_save_keeps_the_target_file_mode(tmp_path, via_symlink):
+    real = tmp_path / "private" / "pipeline.yaml"
+    real.parent.mkdir()
+    real.write_text(YAML)
+    real.chmod(0o600)
+    target = real
+    if via_symlink:
+        target = tmp_path / "config" / "pipeline.yaml"
+        target.parent.mkdir()
+        target.symlink_to(real)
+    yamledit.apply_changes(target, [("runs.preset", "large")], validate=lambda path: None)
+    assert "preset: large" in real.read_text()
+    assert (real.stat().st_mode & 0o777) == 0o600

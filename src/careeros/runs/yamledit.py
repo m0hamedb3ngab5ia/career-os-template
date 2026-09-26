@@ -65,6 +65,10 @@ def _write_atomic(real: Path, text: str) -> None:
     tmp = real.with_name(f".{real.name}.{os.getpid()}.tmp")
     try:
         tmp.write_text(text, encoding="utf-8")
+        try:    # keep the target's permissions (a 0600 private config must not become 0644)
+            os.chmod(tmp, os.stat(real).st_mode & 0o7777)
+        except FileNotFoundError:
+            pass
         os.replace(tmp, real)
     finally:
         tmp.unlink(missing_ok=True)

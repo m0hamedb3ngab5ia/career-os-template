@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from careeros import retention
+from careeros.doctor import KNOWN_ATS
 from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
@@ -78,11 +79,17 @@ def _domains(v: dict[Any, Any]) -> str | None:
     return None
 
 
+def _file_path(v: Any) -> str | None:
+    return "Enter a file path, e.g. data/JobTracker.xlsx." if not str(v or "").strip() else None
+
+
 def _boards(v: list[dict[str, Any]]) -> str | None:
     for i, b in enumerate(v, 1):
         if not b.get("company") or not b.get("ats"):
             return f"Board {i} needs a company and an ATS."
         ats = str(b["ats"]).lower()
+        if ats not in KNOWN_ATS:
+            return f"Board {i} ({b['company']}): unknown ATS {b['ats']}. Use one of {', '.join(sorted(KNOWN_ATS))}."
         if ats in ATS_WITH_SLUG and not str(b.get("slug") or "").strip():
             return f"Board {i} ({b['company']}) needs a {ats} slug."
         if ats not in ATS_WITH_SLUG and not str(b.get("url") or "").strip():
@@ -174,6 +181,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("general", "General", (
         Group("files", "Files", (
             Field(P, "paths.tracker_xlsx", "text", "Tracker spreadsheet", default="data/JobTracker.xlsx",
+                  check=_file_path,
                   help="Where JobTracker.xlsx is exported. Relative to the repo, or ~/… for anywhere."),
         )),
         Group("claude", "Claude", (

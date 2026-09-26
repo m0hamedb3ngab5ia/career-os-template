@@ -357,3 +357,26 @@ def test_an_unquoted_ambiguous_mapping_key_is_requoted_on_save(root):
     settings_io.save_section(_s(root), "companies", {fid: w["intended"]})
     assert yaml.safe_load(c.read_text())["company_domains"] == {"ON": "onsemi.com"}
     assert fid not in settings_io.read_section(_s(root), "companies")["warnings"]
+
+
+# --- review fixes: tracker path, board ATS -------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", ["", "   ", "data"])
+def test_a_blank_or_directory_tracker_path_is_refused(root, value):
+    (root / "data").mkdir(exist_ok=True)
+    p = root / "config" / "pipeline.yaml"
+    before = p.read_text()
+    with pytest.raises(SettingsInvalid) as e:
+        settings_io.save_section(_s(root), "general", {"pipeline:paths.tracker_xlsx": value})
+    assert "pipeline:paths.tracker_xlsx" in e.value.fields
+    assert p.read_text() == before
+
+
+def test_a_board_with_an_ats_doctor_does_not_know_is_refused(root):
+    c = root / "config" / "companies.yaml"
+    before = c.read_text()
+    with pytest.raises(SettingsInvalid) as e:
+        settings_io.save_section(_s(root), "companies", {"companies:boards": [
+            {"company": "Acme", "ats": "workday", "url": "https://acme.example/careers"}]})
+    assert "workday" in e.value.fields["companies:boards"]
+    assert c.read_text() == before
