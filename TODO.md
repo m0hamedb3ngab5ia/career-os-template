@@ -11,6 +11,7 @@ belong in each candidate's own private repo, not here.
 - [ ] P3 applier: Chrome adapters greenhouse → lever → ashby; bot-detection heuristics; screenshot on every submit
 - [ ] P4 inbox-sync (Gmail MCP) + push notify + follow-up drafts
 - [ ] P5 find-contacts + draft-outreach (LinkedIn URL, email guess w/ verification, message)
+- [x] Outreach relationship gate: connected (1st degree) or mutuals → never automated, `send_linkedin` "tailor manually" (`careeros outreach check|mark`, `pipeline.yaml: outreach`)
 - [ ] P6 custom scrapers for `ats: custom` boards (company career pages without a public ATS API)
 - [ ] P7 LinkedIn Jobs discovery (never Easy Apply)
 - [ ] Workday adapter (assisted mode)
@@ -24,7 +25,7 @@ belong in each candidate's own private repo, not here.
 ## Future (not now)
 - [ ] Action Items redesign: group by `Type` + `Needs` column = `laptop` (Chrome/Handshake/Workday session, candidate present) | `phone` (approve/send from anywhere) | `anytime`; sort by Priority then NextActionDate; separate "Today" view. Tier A submits, Handshake, Workday review pages = `laptop`. LinkedIn sends, email approvals, cover-letter reviews = `phone`.
 - [ ] Handshake apply sessions: candidate logged in + present; system drives Chrome, candidate debugs live. Assisted mode only.
-- [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats). Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
+- [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats). Design spec: `docs/UI.md`. Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
 
 ## Ghost jobs

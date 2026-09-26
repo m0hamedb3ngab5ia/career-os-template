@@ -10,6 +10,7 @@ from pathlib import Path
 from careeros.bootstrap import EDIT_HINTS, InitError, copy_examples, link_private
 from careeros.config import ConfigError, Settings, SetupError, find_repo_root, get_settings
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, TrackerRow
+from careeros.outreach import OutreachPolicy, check_contacts, manual_action_text, mark_contact
 from careeros.scout import run_scout
 from careeros.store import Store
 from careeros.tracker import Tracker, parse_field_args
@@ -445,6 +446,44 @@ def cmd_action_done(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def _contacts_path(args: argparse.Namespace) -> tuple[Settings, Path | None]:
+    s = _settings(args)
+    f = Store(s).job_dir(args.job_id) / "contacts.json"
+    if not f.exists():
+        print(f"no contacts.json for job {args.job_id}; run /find-contacts first", file=sys.stderr)
+        return s, None
+    return s, f
+
+
+def cmd_outreach_check(args: argparse.Namespace) -> int:
+    s, f = _contacts_path(args)
+    if f is None:
+        return 1
+    rows = check_contacts(json.loads(f.read_text(encoding="utf-8")), OutreachPolicy.from_settings(s))
+    print(json.dumps({"job_id": args.job_id, "manual": sum(r["manual"] for r in rows),
+                      "action_text": manual_action_text(rows), "contacts": rows}, indent=2))
+    return 0
+
+
+def cmd_outreach_mark(args: argparse.Namespace) -> int:
+    if args.degree is None and args.mutuals is None:
+        print("outreach mark: give --degree and/or --mutuals", file=sys.stderr)
+        return 2
+    _, f = _contacts_path(args)
+    if f is None:
+        return 1
+    try:
+        c = mark_contact(f, args.name, degree=args.degree, mutuals=args.mutuals)
+    except KeyError:
+        print(f"no contact named {args.name!r} in {f}", file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"outreach mark: {e}", file=sys.stderr)
+        return 2
+    print(f"{c.get('name')}: degree={c.get('linkedin_degree')} mutuals={c.get('mutuals')}")
+    return 0
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     s = _settings(args)
     store = Store(s)
@@ -590,6 +629,18 @@ def build_parser() -> argparse.ArgumentParser:
     scl.add_argument("company")
     scl.add_argument("--note")
     scl.set_defaults(fn=cmd_safety_clear)
+
+    out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
+    outs = out.add_subparsers(dest="outreach_cmd", required=True)
+    och = outs.add_parser("check", help="JSON per contact: manual (never automated) + reason code; action_text for the one Action Item")
+    och.add_argument("job_id")
+    och.set_defaults(fn=cmd_outreach_check)
+    omk = outs.add_parser("mark", help="record what LinkedIn shows for a contact (degree 1 = connected, mutual count)")
+    omk.add_argument("job_id")
+    omk.add_argument("name")
+    omk.add_argument("--degree", type=int)
+    omk.add_argument("--mutuals", type=int)
+    omk.set_defaults(fn=cmd_outreach_mark)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p

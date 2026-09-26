@@ -31,7 +31,11 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 - **Tailor** (`/tailor-resume`, `/write-cover-letter`): builds a résumé and letter only from bullets in
   `profile/master.yaml`, cited by id, with numbers frozen.
 - **QA** (`python -m careeros.qa`, `/qa-review`): fabrication audit, banned phrases, confidential terms,
-  the example-identity guard and a critic score; one regeneration, then an Action Item.
+  the example-identity guard and a critic score; one regeneration, then an Action Item. It also catches another
+  company's name left in a letter, answer or outreach draft, titles/years/numbers that disagree across documents,
+  outreach that breaks the send policy (LinkedIn draft-only, notes over 300 chars, auto-send only to a verified
+  email, thank-yous always manual) and a `resume.pdf` whose links, text or metadata differ from the reviewed résumé
+  (see ARCHITECTURE.md, "QA gate checks").
 - **Apply** (`/apply-job`): fills the form in Chrome with your standard answers only. Tier B/C on
   Greenhouse/Lever/Ashby submit after QA; Tier A and every other ATS stop before submit for you.
 - **Track** (`data/JobTracker.xlsx`, `/inbox-sync`): statuses, Action Items for anything uncertain, and
@@ -59,7 +63,8 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 - `config/companies.yaml`: the starter `boards` list, prestige tiers and scoring
 - `config/targets.yaml`: seniority filter, thresholds, tiers, tier rules, volume caps, safety lists
 - `config/qa.yaml`: every QA rule and the banned-phrases list
-- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`
+- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`, `outreach` (people you are connected to
+  on LinkedIn, or share mutuals with, are never messaged automatically; record with `careeros outreach mark`)
 - `templates/`, `.claude/skills/`, `src/careeros/`: the code, the same for everyone
 
 ## Reference

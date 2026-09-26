@@ -91,3 +91,41 @@ style_rules:
   - no_tricolon_lists_of_adjectives   # "fast, reliable, and scalable"
   - contractions_ok: true
   - first_person_ok: true
+
+# ---- extended checks (careeros.qa_ext.*): every key optional; the values shown are the defaults. ----
+# Uncomment a block only to change something.
+
+# consistency:                     # cross-document checks + wrong-company leftovers
+#   enabled: true                  # false -> letter_experiences_on_resume / employer_title_consistent / numbers_consistent skipped
+#   min_overlap: 3                 # shared content words before a sentence counts as restating a bullet
+#   year_window: 40                # chars between a year ("in 2024") and the employer/school it dates
+#   role_nouns: [engineer, developer, intern, analyst, scientist, manager, designer, architect, consultant,
+#                researcher, assistant, lead, director, specialist, administrator, associate, fellow, co-op,
+#                programmer, technician, treasurer, president, officer, founder, tutor, instructor]
+#   seniority_words: [senior, sr, staff, principal, lead, junior, jr, head, chief, director, manager, vp,
+#                     ii, iii, iv, distinguished, executive]
+#   wrong_company: true            # false -> wrong_company skipped
+#   company_aliases: {}            # {<company>: [alias, ...]}; also accepted by cover_letter_names_company
+#   ignore_names: []               # never flagged as a wrong company (LinkedIn, GitHub always ignored)
+#   common_word_names: []          # company names that are also ordinary words (Scale, Square, ... built in)
+#   min_name_length: 3
+#   scan_job_dirs: true            # other job dirs' posting.json company counts as a candidate name
+#   allow_posting_mentions: true   # a company this job's posting mentions is not a leftover
+
+# outreach:                        # outreach.json policy (skipped when a job has no outreach.json)
+#   linkedin_note_max_chars: 300   # hard: LinkedIn truncates connection notes
+#   cold_email_max_words: 150      # soft word limits below
+#   after_apply_max_words: 120
+#   status_followup_max_words: 80
+#   thank_you_max_words: 120
+#   linkedin_message_max_words: 120
+#   autosend_email_confidence: [verified]   # contacts.json email_confidence allowed on a scheduled email
+
+# pdf:                             # resume.pdf fidelity
+#   links_required: [email, linkedin, github, website]   # identity fields that must be clickable (when set)
+#   text_recall_hard: 0.97         # share of resume.txt words found in the PDF text; below text_recall_soft = hard fail
+#   text_recall_soft: 0.9
+#   extra_tokens_max: 0            # PDF-only words tolerated before pdf_hidden_text warns
+#   missing_sample: 15             # cap on sampled missing/extra/split words in details
+#   metadata_placeholders: [latex, untitled, anonymous, author, title, document, name, your name,
+#                           microsoft word, resume.tex, main.tex]
