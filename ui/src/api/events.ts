@@ -24,6 +24,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   };
   if (p.jobs?.length) {
     add(["jobs"]);
+    add(["jobs-tabs"]); // Jobs screen filter-tab counts
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
     add(["status"]);

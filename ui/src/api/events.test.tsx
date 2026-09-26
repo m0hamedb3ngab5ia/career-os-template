@@ -28,6 +28,7 @@ describe("keysForChange", () => {
   it("maps a changed payload to the query keys it makes stale", () => {
     expect(keysForChange({ jobs: ["a1", "b2"], runs: [], actions: false, config: false, status: false })).toEqual([
       ["jobs"],
+      ["jobs-tabs"],
       ["job", "a1"],
       ["job", "b2"],
       ["contacts"],
@@ -59,6 +60,13 @@ describe("keysForChange", () => {
     expect(today({ status: true })).toBe(1);
     expect(today({ jobs: ["a1"], runs: ["r1"], actions: true, status: true })).toBe(1);
     expect(today({ config: true })).toBe(0);
+  });
+});
+
+describe("keysForChange: Jobs screen", () => {
+  it("a jobs change also refreshes the Jobs filter-tab counts", () => {
+    expect(keysForChange({ jobs: ["a1"] })).toContainEqual(["jobs-tabs"]);
+    expect(keysForChange({ runs: ["r1"] })).not.toContainEqual(["jobs-tabs"]);
   });
 });
 
