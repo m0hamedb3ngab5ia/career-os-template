@@ -249,3 +249,33 @@ Every run is a subprocess the server owns, one row in the `runs` table, and a st
 - Sheets for edits and confirmations, not modal dialogs; destructive actions in red and always confirmed.
 - Controls at least 44 px on phone; keyboard shortcuts on desktop (⌘K search, ⌘R run, space to preview).
 - Follows the system light/dark setting.
+
+## Accessibility and build checklist
+
+The mockups were audited against the [Vercel Web Interface Guidelines](https://github.com/vercel-labs/web-interface-guidelines).
+Design-level fixes are in the mockup: focus and hover states, 44 pt phone targets, confirm or undo on destructive
+actions, plain-language labels in place of raw codes, and real tables and headings. These items can only be met in
+the React build:
+
+- **Formatting:** dates, times and relative times through `Intl.DateTimeFormat` / `Intl.RelativeTimeFormat`, and
+  numbers, percentages and sizes through `Intl.NumberFormat`. Hardcoded examples in the mockup ("Mon 16:40",
+  "12 s ago", "1.8 MB / week") are placeholders. Render times on the client, or guard them against hydration mismatch.
+- **URL state:** sort, filters, tabs, grouping, the selected Inbox thread, the Runs kind and budget, the Settings
+  section and "Show as table" are kept in the query string, so views can be deep-linked and survive a reload.
+- **Long lists:** virtualize Jobs (all), Pipeline › Found, the Runs history and the live run log.
+- **Keyboard:** roving tabindex with arrow keys for tab lists, radio groups and segmented controls. Escape closes
+  menus and sheets and returns focus to where it came from. On Save, focus moves to the first invalid field.
+- **Forms:** controlled inputs have `onChange` (or use `defaultValue`). Unsaved Settings changes are guarded with
+  `beforeunload` and a router guard. Buttons stay enabled until the request starts, then read "Saving…" or
+  "Starting…".
+- **Async feedback:** Mark done, Apply, Save and Send confirm through an `aria-live="polite"` toast with a 5–10 s
+  undo window.
+- **Platform:**
+  - `touch-action: manipulation` and a deliberate `-webkit-tap-highlight-color` on phone.
+  - `env(safe-area-inset-*)` padding.
+  - A `<meta name="theme-color">` for each theme.
+  - `color-scheme` set on `<html>`.
+  - Sheets and toasts honour `prefers-reduced-motion`.
+- **Screenshots:** apply-step images get `alt` text, explicit `width` and `height`, `loading="lazy"`, and a viewer
+  that opens from the keyboard.
+- **Review:** run the `web-design-guidelines` review on each UI PR.
