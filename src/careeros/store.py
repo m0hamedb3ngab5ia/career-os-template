@@ -237,6 +237,8 @@ class Store:
             return
         strays: list[str] = []
         for d in sorted(self.jobs_dir.iterdir()):
+            if d.name.startswith("_"):  # fixtures such as data/jobs/_example: never a real job
+                continue
             if _is_finder_copy(d.name):
                 strays.append(d.name)
                 continue
