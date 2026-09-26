@@ -28,6 +28,10 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros scout --sync` — pull boards, prefilter, store, sync tracker
 - `.venv/bin/careeros jobs list [--status queued]`, `job show <id>`, `job status <id> <status> [--note]` (status.json + tracker), `stats`, `action list`, `action add "<what>" --type <t> --needs laptop|phone|anytime`
 - `.venv/bin/careeros tracker applied-count [<company>] [--days N]`, `tracker upsert <job_id> --field Header=value ...`, `tracker sync|flush|init`
+- `.venv/bin/careeros run score|prepare [--preset small|medium|large|max|custom] [--max-jobs N] [--max-minutes M] [--dry-run] [--json]` — budgeted batches, one headless skill call per job, never applies
+- `.venv/bin/careeros run list|show <id> [--json|--log]|status|cap [--check]|pause [--until +2h|ISO] [--reason]|resume|catch-up [--dry-run|--dismiss]`
+- `.venv/bin/careeros job lock|unlock|check <id>` (exit 6 = held), `tick [--dry-run]`, `schedule install|uninstall|status` (LaunchAgent → `careeros tick`)
+- `.venv/bin/careeros prune [--yes]`, `storage [--json] [--snapshot]`, `advise [--json]`, `advise apply <id>` (suggest-only; writes config/pipeline.yaml only on apply)
 - `.venv/bin/python -m careeros.qa data/jobs/<id>` — deterministic QA
 - `.venv/bin/python templates/resume/render.py data/jobs/<id>/resume.json` — tex+pdf+txt
 - `.venv/bin/python -m pytest -q`
