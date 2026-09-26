@@ -224,3 +224,13 @@ def test_hook_script_lowercases_url_and_pattern():
 ])
 def test_is_personal_normalises_entries_and_paths(path, entries):
     assert sync.is_personal(path, sync.parse_personal_paths(" ".join(entries))) is True
+
+
+@pytest.mark.parametrize("path,globs", [("./src/x", ["src/x"]), ("src/x", ["./src/x"]), ("src/x/a.py", ["./src/x/"])])
+def test_matches_keep_normalises_both_sides(path, globs):
+    assert sync.matches_keep(path, globs) is True
+
+
+def test_hook_script_falls_back_to_default_on_empty_pattern():
+    s = sync.hook_script("/usr/bin/python3")
+    assert f"[ -n \"$pattern\" ] || pattern='{sync.DEFAULT_URL_PATTERN}'" in s

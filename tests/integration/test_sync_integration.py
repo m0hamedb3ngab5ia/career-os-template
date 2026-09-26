@@ -333,3 +333,36 @@ def test_check_template_push_directly(repos, env):
     assert cli(priv, env, "check-template-push", "origin", str(repos["origin"]), stdin=line).returncode == 0
     delete = f"(delete) {zero} refs/heads/old {sha}\n"
     assert cli(priv, env, "check-template-push", "template", url, stdin=delete).returncode == 0
+
+
+def test_hook_scans_full_history_when_remote_also_pushes_elsewhere(repos, env):
+    # origin pushes to the private copy AND the template: its tracking refs must not hide history from the scan
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "switch", "-q", "-c", "fix/h", "template/main")
+    commit(priv, env, {"personal/a.md": "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", "personal/a.md")
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    assert git(priv, env, "push", "origin", "fix/h", check=False).returncode == 0  # private only: allowed
+    git(priv, env, "remote", "set-url", "--add", "--push", "origin", str(repos["origin"]))
+    git(priv, env, "remote", "set-url", "--add", "--push", "origin", str(repos["bare"]))
+    r = git(priv, env, "push", "origin", "fix/h", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/a.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "fix/h").stdout.strip() == ""
+
+
+def test_hook_empty_pattern_config_falls_back_to_default(repos, env):
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "config", "careeros.templateUrlPattern", "")
+    r = git(priv, env, "push", "template", "HEAD:refs/heads/leak", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
+
+
+def test_status_reads_keep_file_from_head_not_working_tree(repos, env):
+    priv = repos["private"]
+    commit(priv, env, {"src/app.py": "VALUE = 99\n"}, "code change")
+    (priv / ".template-sync-keep").write_text("README.md  # private\nsrc/app.py  # uncommitted\n")
+    r = cli(priv, env, "status")
+    assert r.returncode == 2 and "src/app.py" in r.stdout, r.stdout + r.stderr

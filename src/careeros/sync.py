@@ -89,7 +89,8 @@ def parse_keep(text: str) -> list[str]:
 
 
 def matches_keep(path: str, globs: Iterable[str]) -> bool:
-    return any(_path_matches(path, g) for g in globs)
+    low = _norm(path)
+    return any(_path_matches(low, _norm(g)) for g in globs)
 
 
 def compute_drift(changed: Iterable[str], personal: Iterable[str], keep: Iterable[str]) -> list[str]:
@@ -128,7 +129,8 @@ def hook_script(python: str) -> str:
 # Refuses to push personal paths (git config {CFG_PERSONAL}) to a remote whose URL matches
 # git config {CFG_URL_PATTERN} (default {DEFAULT_URL_PATTERN}). Other remotes are never checked.
 remote="$1"; url="$2"
-pattern="$(git config --get {CFG_URL_PATTERN} || echo '{DEFAULT_URL_PATTERN}')"
+pattern="$(git config --get {CFG_URL_PATTERN})"
+[ -n "$pattern" ] || pattern='{DEFAULT_URL_PATTERN}'
 lurl="$(printf '%s' "$url" | tr '[:upper:]' '[:lower:]')"
 lpattern="$(printf '%s' "$pattern" | tr '[:upper:]' '[:lower:]')"
 case "$lurl" in $lpattern) ;; *) exit 0 ;; esac
@@ -260,8 +262,9 @@ class Status:
 
 
 def _keep_globs(root: Path) -> list[str]:
-    f = root / KEEP_FILE
-    return parse_keep(f.read_text()) if f.exists() else []
+    """The committed keep list (HEAD), not the working tree: an uncommitted edit can't hide drift. Missing = none."""
+    r = Git(root).run("show", f"HEAD:{KEEP_FILE}", check=False)
+    return parse_keep(r.stdout) if r.returncode == 0 else []
 
 
 def compute_status(root: Path, remote: str = DEFAULT_REMOTE, template_branch: str = DEFAULT_TEMPLATE_BRANCH,
@@ -388,14 +391,28 @@ def hook_path(root: Path) -> Path:
     return p if p.is_absolute() else root / p
 
 
-def pushed_paths(g: Git, remote: str, lsha: str, rsha: str) -> set[str]:
-    """Every path touched by the commits this update sends (not on `remote`'s tracking refs, not under rsha),
-    plus the tip tree. A raw URL has no tracking refs, so the whole history is scanned (fail closed)."""
-    exclude = ["--not", f"--remotes={remote}"]
+def remote_is_template_only(g: Git, remote: str, pattern: str) -> bool:
+    """True only for a configured remote whose fetch URL(s) and every push URL match the template pattern."""
+    fetch = g.run("remote", "get-url", "--all", remote, check=False)
+    push = g.run("remote", "get-url", "--push", "--all", remote, check=False)
+    if fetch.returncode != 0 or push.returncode != 0:
+        return False
+    urls = [u.strip() for u in (fetch.stdout + push.stdout).splitlines() if u.strip()]
+    return bool(urls) and all(url_matches(u, pattern) for u in urls)
+
+
+def pushed_paths(g: Git, remote: str, lsha: str, rsha: str, pattern: str = DEFAULT_URL_PATTERN) -> set[str]:
+    """Every path touched by the commits this update sends (not under rsha, and not on `remote`'s tracking refs
+    when that remote only ever points at the template), plus the tip tree. A raw URL, or a remote that also
+    fetches/pushes elsewhere (its tracking refs may hold history the template never got), is scanned in full
+    (fail closed)."""
+    exclude = ["--not"]
+    if remote_is_template_only(g, remote, pattern):
+        exclude.append(f"--remotes={remote}")
     if rsha != ZERO_SHA and g.ref_exists(rsha):
         exclude.append(rsha)
     # plumbing only: porcelain `log` output can carry signatures/decorations from user config
-    commits = g.lines("rev-list", lsha, *exclude)
+    commits = g.lines("rev-list", lsha, *exclude) if len(exclude) > 1 else g.lines("rev-list", lsha)
     paths: set[str] = set()
     if commits:
         paths.update(g.paths("diff-tree", "-r", "-m", "--root", "--no-commit-id", "--name-only", "--no-renames",
@@ -417,7 +434,7 @@ def check_push(root: Path, url: str, updates: str, remote: str = "") -> list[str
         if len(parts) != 4 or parts[1] == ZERO_SHA:
             continue
         lref, lsha, rsha = parts[0], parts[1], parts[3]
-        bad = sorted(blocked_paths(pushed_paths(g, remote or url, lsha, rsha), personal))
+        bad = sorted(blocked_paths(pushed_paths(g, remote or url, lsha, rsha, pattern), personal))
         if bad:
             shown = [f"  {p}" for p in bad[:10]] + ([f"  ... and {len(bad) - 10} more"] if len(bad) > 10 else [])
             return [f"BLOCKED: {lref} contains personal paths (tip or history); never push them to the template ({url}):", *shown,
