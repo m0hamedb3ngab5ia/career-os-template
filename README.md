@@ -47,7 +47,8 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
   dream companies, closing dates, fit) and enforces a budget preset (small, medium (Recommended), large, max,
   custom); each job is one headless `/score-job` or `/prepare-job` call. Runs never apply.
 - **Schedule** (`careeros schedule install`): a macOS LaunchAgent runs `careeros tick` every 15 minutes, which runs
-  scout, score, prepare and a weekly prune when they are due, outside quiet hours for anything that uses Claude.
+  scout (every 3 h), score (01:00) and prepare (02:00) nightly, and a weekly prune, outside quiet hours for
+  anything that uses Claude. A twice-daily inbox sync job is there but off until the inbox-sync skill is finished.
   Missed slots wait for `careeros run catch-up`; `careeros run pause` stops everything.
 - **Storage and advice** (`careeros storage`, `careeros advise`): what `data/` holds and how it grows, plus
   suggestions for retention, budgets and timeouts. A suggestion changes `config/pipeline.yaml` only when you run

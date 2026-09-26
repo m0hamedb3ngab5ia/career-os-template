@@ -189,15 +189,21 @@ reached). Prepare runs stop with `daily_cap` once the jobs ready to submit fill 
 
 **Auto-submit is config only.** `runs.auto_submit` (`enabled: false` (Recommended), `allow`, `manual`) is parsed and
 validated, and `auto_submit_decision` is the pure rule a future apply path will call (Tier A and a non-pass safety
-verdict are always manual, whatever the config says). Runs never apply in this version.
+verdict are always manual, whatever the config says; `manual: [tier_a, fit_gte_85]` (Recommended) keeps your best
+matches manual, and the fit threshold is yours to change). Runs never apply in this version.
 
 **Scheduler.** `careeros schedule install` writes a LaunchAgent (`~/Library/LaunchAgents/<schedule.launchd_label>.plist`,
 absolute paths, a PATH with the `claude` it found, logs to `data/runs/launchd.out.log` / `launchd.err.log`) that
 runs `careeros tick` every `schedule.tick_minutes` (15, Recommended). It is a per-user agent, not a daemon: it runs
 as the candidate, with their Claude Code login, and only while they are logged in. A tick is idempotent
-(`data/runs/tick.lock`, never waits) and runs what `schedule.jobs` says is due, in order: scout (every 3 h), score
-(6 h), prepare (12 h), prune (weekly), all Recommended. Quiet hours (09:00 to 18:00, Recommended) hold back only
-the claude-using runs (score, prepare). Slots missed while the Mac slept or was off (more than
+(`data/runs/tick.lock`, never waits) and runs what `schedule.jobs` says is due, in order: scout (every 3 h),
+inbox_sync (08:00 and 18:00, **off** until the inbox-sync skill is finished), score (nightly 01:00), prepare (nightly
+02:00), prune (weekly), all Recommended. A job runs every N hours / days or at times of day (`at: ["HH:MM"]`, local);
+a time-of-day job never fires on the first tick after install, only at its next slot. Quiet hours (09:00 to 18:00,
+Recommended) hold back only the claude-using runs (inbox_sync, score, prepare). inbox_sync is one headless
+`/inbox-sync` call (`service.run_skill`) whose `mcp_servers` (Gmail) must be logged in: a Gmail MCP reported
+needs-auth, or the skill's `gmail_mcp_unavailable`, stops it with `auth_required` (it stops with `error` on any other
+failure). Slots missed while the Mac slept or was off (more than
 `missed_after_minutes` late) never auto-run: they collapse into one pending record (`data/runs/catch_up.json`) that
 the candidate starts with `careeros run catch-up` or drops with `--dismiss`. `careeros run pause [--until +2h|ISO]`
 stops the current batch before its next job and makes ticks skip due slots (not stored up); `careeros run resume`

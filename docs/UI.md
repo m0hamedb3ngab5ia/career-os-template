@@ -85,11 +85,11 @@ Writes `pipeline.yaml: runs`, `schedule` and `llm.allowed_tools`.
 | Ranking weights | sliders with a live preview of the next 5 jobs and their "why": freshness 60, fresh for 48 h, stale at 30 days, dream bonus 25, deadline bonus 15 within 7 days, fit weight 0.5 (prepare only), retry bonus 30, each marked (Recommended) |
 | Retry | attempts per job 2 (Recommended: retry once), then an Action Item on (Recommended) |
 | Prepare | "Stop preparing at today's apply cap" on (Recommended); shows today's cap from `careeros run cap` |
-| Auto-submit | shown **off and read-only**: "Runs never apply in this version". The `allow` / `manual` rule lists are visible (manual: Tier A, fit 90+ (Recommended)) so the policy can be reviewed before an apply path exists |
-| Safety | "Run `careeros doctor` before every run" on (Recommended); required MCP servers (empty (Recommended); e.g. gmail once inbox work is scheduled); job lock expiry 120 min (Recommended) |
+| Auto-submit | shown **off and read-only**: "Runs never apply in this version". The `allow` / `manual` rule lists are visible (manual: Tier A, fit ≥ 85 (Recommended), with the fit threshold editable) so the policy can be reviewed before an apply path exists |
+| Safety | "Run `careeros doctor` before every run" on (Recommended); required MCP servers for every run (empty (Recommended); the inbox sync job carries its own `gmail`); job lock expiry 120 min (Recommended) |
 | Allowed tools | the `llm.allowed_tools` list as removable chips (the shipped list (Recommended)); a note that a tool missing here ends a run with "Tool not allowed", never a hang |
 | Quiet hours | on, 09:00 to 18:00 (Recommended); applies to score and prepare runs only (they use Claude); scout and prune ignore it. Time zone: local (Recommended) |
-| Schedule jobs | one row per job with an enable switch and interval: scout every 3 h (Recommended: 2 to 3), score every 6 h (Recommended), prepare every 12 h (Recommended), prune weekly (Recommended); score and prepare rows take an optional preset override. Tick every 15 min (Recommended); missed after 60 min (Recommended) |
+| Schedule jobs | one row per job with an enable switch and either an interval or times of day: scout every 3 h (Recommended: 2 to 3), inbox sync at 08:00 and 18:00 (off (Recommended) until the inbox-sync skill is finished; shows "needs Gmail login" when its MCP is not authenticated), score nightly at 01:00 (Recommended), prepare nightly at 02:00 (Recommended), prune weekly (Recommended); score and prepare rows take an optional preset override. Tick every 15 min (Recommended); missed after 60 min (Recommended) |
 | Scheduler | Install / Uninstall buttons (`careeros schedule install`, `careeros schedule uninstall`) and the agent state from `careeros schedule status` (installed, loaded, last tick) |
 
 ### Settings › Storage & efficiency

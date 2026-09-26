@@ -214,8 +214,11 @@ with a stop reason: `completed`, `budget_reached`, `time_budget`, `daily_cap` an
 .venv/bin/careeros schedule uninstall   # remove it
 ```
 
-The tick runs what is due in `config/pipeline.yaml: schedule.jobs`: scout every 3 hours, score every 6, prepare
-every 12, prune weekly (all Recommended). Score and prepare never start inside quiet hours (09:00 to 18:00,
+The tick runs what is due in `config/pipeline.yaml: schedule.jobs`: scout every 3 hours, score nightly at 01:00,
+prepare nightly at 02:00, prune weekly (all Recommended). Each job takes `every_hours`, `every_days` or times of day
+(`at: ["01:00"]`). A nightly job waits for its time after you install the schedule; it does not run at once.
+`inbox_sync` (08:00 and 18:00) is in the file but `enabled: false` until the inbox-sync skill is finished; once you
+turn it on it needs the Gmail MCP logged in (step 2 above), or it stops with `auth_required`. Score and prepare never start inside quiet hours (09:00 to 18:00,
 Recommended); scout and prune ignore them. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
 Code login, only while you are logged in to your Mac. Nothing runs while the Mac sleeps, is off or you are logged out.
 

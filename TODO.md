@@ -24,7 +24,8 @@ belong in each candidate's own private repo, not here.
 - [ ] SQLite run index (`data/careeros.db` `runs` table) for the UI, rebuilt from `data/runs/` (`docs/UI.md`)
 - [ ] Scheduled apply path: honour `runs.auto_submit.enabled`, gated by the daily cap (`careeros run cap --check`)
       and `auto_submit_decision` (Tier A and non-pass safety always manual); off by default
-- [ ] Inbox-sync and follow-ups in the scheduler (`schedule.jobs`), with `runs.required_mcp_servers: [gmail]`
+- [ ] Finish the inbox-sync skill, then set `schedule.jobs.inbox_sync.enabled: true` (the job, 08:00 + 18:00 with a
+      Gmail MCP auth preflight, is already in the scheduler). Follow-ups in the scheduler: still to do
 - [ ] `/schedule` cloud routines as an alternative to the LaunchAgent (runs while the Mac is off; needs the repo and
       data reachable from the cloud session) for scout + inbox-sync
 - [ ] Weekly self-review report: acceptance rate by category/tier, QA fail reasons, time saved
