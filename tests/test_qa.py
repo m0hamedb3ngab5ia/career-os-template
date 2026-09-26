@@ -1109,7 +1109,7 @@ def test_no_markdown_bold_checks_per_draft_followups(tmp_path: Path) -> None:
     assert not c["ok"] and "followups[0]" in c["detail"]
 
 
-@pytest.mark.parametrize("answer", ["I refactored the handler to accept *args and **kwargs.",
+@pytest.mark.parametrize("answer", ["I refactored the handler to take f(*args, **kwargs).",
                                     "The hash space is 2**32 and later 2**64 buckets."])
 def test_code_double_star_is_not_markdown_bold(tmp_path: Path, answer: str) -> None:
     answers = [{"question": "Describe a project", "type": "generated", "bullet_ids": ["acme.1"],
@@ -1119,6 +1119,16 @@ def test_code_double_star_is_not_markdown_bold(tmp_path: Path, answer: str) -> N
 
 @pytest.mark.parametrize("text", ["I built **REST API**s for billing.", "It served **10**k users."])
 def test_glued_bold_in_answers_and_outreach_is_hard(tmp_path: Path, text: str) -> None:
+    answers = [{"question": "Describe a project", "type": "generated", "bullet_ids": ["acme.1"],
+                "answer": text, "needs_review": False}]
+    job = make_job(tmp_path, answers=answers)
+    (job / "outreach.json").write_text(json.dumps({"drafts": [{"linkedin_note": text, "bullet_ids": ["acme.1"]}]}))
+    c = by_name(run(job), "no_markdown_bold")
+    assert not c["ok"] and "answers.json#0" in c["detail"] and "outreach.json" in c["detail"]
+
+
+@pytest.mark.parametrize("text", ["I built **python services for billing.", "We shipped **about 2 months in."])
+def test_lone_lowercase_marker_in_answers_and_outreach_is_hard(tmp_path: Path, text: str) -> None:
     answers = [{"question": "Describe a project", "type": "generated", "bullet_ids": ["acme.1"],
                 "answer": text, "needs_review": False}]
     job = make_job(tmp_path, answers=answers)

@@ -61,8 +61,9 @@ def bold_spans(text: Any) -> list[str]:
 # A markdown bold pair, including one glued to a word ("**REST API**s", "**10**k"); not after a digit or `*`
 # (so exponents like `2**32 and 2**64` never pair up), non-space just inside each marker.
 _MD_BOLD = re.compile(r"(?<![\d*])\*\*(?=\S)[^*\n]+?(?<=\S)\*\*(?!\*)")
-# `**` that is code, not markup: an exponent (`2**32`, `y**2`, `2**n`) or keyword unpacking (`**kwargs`, `**opts`)
-_CODE_STARS = re.compile(r"(?<=[\w)\]])\*\*(?=[\w(])|(?<![\w*])\*\*(?=[a-z_][a-z0-9_]*\b)")
+# `**` that is code, not markup: an exponent (`2**32`, `y**2`, `2**n`) or unpacking right after `(`, `,` or `{`
+# (`f(**kwargs)`, `{**a, **b}`). A lone `**` anywhere else counts as markup: a false alarm beats a pasted marker.
+_CODE_STARS = re.compile(r"(?<=[\w)\]])\*\*(?=[\w(])|(?:(?<=[(,{])|(?<=[(,{]\s))\*\*(?=[A-Za-z_]\w*\b)")
 
 
 def has_markdown_bold(text: Any) -> bool:
