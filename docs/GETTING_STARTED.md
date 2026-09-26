@@ -253,6 +253,54 @@ Your data is gitignored (or lives in your private repo), so a pull never conflic
 show up in `examples/`; compare with your copy (`diff examples/config/targets.yaml config/targets.yaml`)
 and let `careeros doctor` tell you if a required key is missing.
 
+## Keeping a private copy in sync
+
+Step 9 keeps only your data private. Some people instead keep a whole **private copy** of this repo: the same
+code plus a committed `personal/` folder (profile, config, `CLAUDE.local.md`, linked with
+`careeros init --link personal`). The rule for such a copy: code, docs and skill changes land in the public
+template first, then get merged into the private copy; only personal values are committed privately.
+
+One-time setup in the private copy:
+
+```sh
+git remote add template https://github.com/<you>/career-os-template.git   # the public template
+.venv/bin/careeros sync install-hook      # pre-push guard: personal paths never go to a template URL
+```
+
+List the files your copy keeps different on purpose in a committed `.template-sync-keep` (one glob per line,
+with a reason), so they don't show up as drift:
+
+```text
+README.md        # my own README
+.gitattributes   # LFS rules for my data
+```
+
+Day to day:
+
+```sh
+.venv/bin/careeros sync status     # exit 0 in sync, 1 template commits not merged yet, 2 drift
+.venv/bin/careeros sync pull       # sync/<date> branch from main, merge the template (no fast-forward),
+                                   # run pytest (+ ui/ npm ci, test, build), print the push + `gh pr create` commands
+```
+
+- **Drift** = files that differ from the template outside personal paths and `.template-sync-keep`. They are
+  changes that belong in the template: branch from `template/main`, apply them there, open the PR, then
+  `careeros sync pull`.
+- `pull` refuses on uncommitted changes. On conflicts it stops (exit 3) with the files to resolve and the
+  commands to finish (`git add`, `git commit --no-edit`) or abort (`git merge --abort`). `--no-checks` skips the
+  local checks, `--branch` names the branch, `--remote` / `--template-branch` pick another remote or branch.
+- The checks run locally, so a private repo does not need its own CI minutes.
+
+Settings (git config in the private copy):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `careeros.personalPaths` | `personal/ profile/ config/ CLAUDE.local.md data/` (Recommended) | paths that never go to the template and never count as drift (comma or space separated) |
+| `careeros.templateUrlPattern` | `*career-os-template*` (Recommended) | remote URLs the pre-push guard protects (shell glob) |
+
+`install-hook` is idempotent and will not replace a pre-push hook it did not write unless you pass `--force`
+(the old one is kept as `pre-push.bak`).
+
 ## FAQ
 
 **What does it cost?** Nothing beyond your Claude Code subscription. All LLM work runs through Claude

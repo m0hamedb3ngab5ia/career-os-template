@@ -32,6 +32,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros run list|show <id> [--json|--log]|status|cap [--check]|pause [--until +2h|ISO] [--reason]|resume|catch-up [--dry-run|--dismiss]`
 - `.venv/bin/careeros job lock|unlock|check <id>` (exit 6 = held), `tick [--dry-run]`, `schedule install|uninstall|status` (LaunchAgent → `careeros tick`)
 - `.venv/bin/careeros prune [--yes]`, `storage [--json] [--snapshot]`, `advise [--json]`, `advise apply <id>` (suggest-only; writes config/pipeline.yaml only on apply)
+- `.venv/bin/careeros sync status [--remote template] [--no-fetch] [--json]|pull [--branch B] [--no-checks]|install-hook [--force]` — private copy vs the public template (status exit 0 in sync, 1 behind, 2 drift; pull exit 3 = conflicts; `.template-sync-keep` lists intentional differences)
 - `.venv/bin/python -m careeros.qa data/jobs/<id>` — deterministic QA
 - `.venv/bin/python templates/resume/render.py data/jobs/<id>/resume.json` — tex+pdf+txt
 - `.venv/bin/python -m pytest -q`
