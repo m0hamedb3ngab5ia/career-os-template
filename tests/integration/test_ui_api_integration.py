@@ -201,7 +201,7 @@ def test_cli_refuses_a_non_loopback_host(data, tmp_path):
 
 def test_cli_reindex_flag_rebuilds(data, tmp_path):
     db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
-    db.write_bytes(b"not a database")
+    db.write_bytes(b"SQLite format 3\x00" + b"damaged" * 100)
     home = tmp_path / "h3"
     home.mkdir()
     port = _free_port()
@@ -239,7 +239,6 @@ class _Broker:
 def test_watcher_watches_a_tracker_outside_the_data_dirs(tmp_path):
     import yaml
 
-    from careeros.config import Settings
     from careeros.tracker import Tracker
     from careeros.ui.watch import Watcher
 
@@ -314,3 +313,28 @@ def test_reload_rejects_a_broken_schedule_or_advisor(data, client, block):
     ctx.reload_settings()
     assert ctx.settings is old and ctx.config_error and ("schedule" in ctx.config_error or
                                                           "advis" in ctx.config_error)
+
+
+@pytest.mark.parametrize("change", [{"watch_debounce_ms": 900}, {"port": 9100}, {"host": "localhost"}])
+def test_reload_keeps_settings_when_server_keys_change(data, client, change):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["ui"] = change
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "restart careeros ui" in ctx.config_error
+
+
+def test_cli_refuses_to_replace_a_foreign_file_at_the_index_path(data, tmp_path):
+    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
+    db.write_bytes(b"not a database")
+    home = tmp_path / "h4"
+    home.mkdir()
+    r = subprocess.run([sys.executable, "-m", "careeros.cli", "ui", "--no-open", "--reindex"],
+                       env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
+    assert r.returncode == 1 and "not an SQLite index" in r.stderr
+    assert db.read_bytes() == b"not a database"

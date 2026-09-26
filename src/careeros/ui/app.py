@@ -57,8 +57,16 @@ class Context:
         except ConfigError as e:
             self.config_error = str(e)
             return
-        if fresh.paths != self.settings.paths or default_path(fresh) != default_path(self.settings):
-            self.config_error = "paths changed in config/pipeline.yaml: restart careeros ui to use them"
+        try:
+            moved = fresh.paths != self.settings.paths or default_path(fresh) != default_path(self.settings)
+        except ConfigError as e:
+            self.config_error = str(e)
+            return
+        server = ("host", "port", "watch_debounce_ms")
+        new_ui, old_ui = load_ui_config(fresh), load_ui_config(self.settings)
+        if moved or any(getattr(new_ui, k) != getattr(old_ui, k) for k in server):
+            self.config_error = ("paths, ui.index_path, ui.host, ui.port or ui.watch_debounce_ms changed in "
+                                 "config/pipeline.yaml: restart careeros ui to use them")
             return
         self.settings, self.config_error = fresh, None
 

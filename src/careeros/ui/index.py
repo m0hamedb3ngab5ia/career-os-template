@@ -13,12 +13,14 @@ data/action_items.json). Every table is derived; the index never writes back. A 
 from __future__ import annotations
 
 import json
+import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
 SCHEMA_VERSION = 1
@@ -85,14 +87,39 @@ def _dir_sig(d: Path) -> str:
         return ""
 
 
+SQLITE_HEADER = b"SQLite format 3\x00"
+
+
 def default_path(settings: Any) -> Path:
+    """data/careeros.db, or `ui.index_path`. The index is deleted and rebuilt at will, so a path that is (or is
+    inside) something the candidate keeps is refused: a configured file, a folder, config/ or profile/."""
     from careeros.ui.config import load_ui_config
 
     cfg = load_ui_config(settings)
-    if cfg.index_path:
-        p = Path(cfg.index_path).expanduser()
-        return p if p.is_absolute() else (Path(settings.root) / p).resolve()
-    return Path(settings.paths["jobs_dir"]).parent / "careeros.db"
+    if not cfg.index_path:
+        return Path(settings.paths["jobs_dir"]).parent / "careeros.db"
+    p = Path(cfg.index_path).expanduser()
+    p = p if p.is_absolute() else (Path(settings.root) / p).resolve()
+    real = Path(os.path.realpath(p))
+    root = Path(settings.root)
+    kept = {Path(os.path.realpath(v)) for v in settings.paths.values()}
+    guarded = [Path(os.path.realpath(root / d)) for d in ("config", "profile")]
+    if real in kept or real.is_dir() or any(real.is_relative_to(g) for g in guarded):
+        raise ConfigError(f"config/pipeline.yaml: ui.index_path {cfg.index_path!r} points at your own files "
+                          "(a path under paths:, a folder, config/ or profile/); use a new file such as "
+                          "data/careeros.db, or null")
+    return p
+
+
+def _check_replaceable(path: Path) -> None:
+    """Raise ConfigError unless `path` is absent, empty or an SQLite file: the only things the index may delete."""
+    if path.is_dir():
+        raise ConfigError(f"UI index path {path} is a folder; set ui.index_path to a file (or null)")
+    if path.exists() and path.stat().st_size:
+        with path.open("rb") as f:
+            if f.read(len(SQLITE_HEADER)) != SQLITE_HEADER:
+                raise ConfigError(f"UI index path {path} holds a file that is not an SQLite index; refusing to "
+                                  "replace it. Move it away or set ui.index_path (null = data/careeros.db)")
 
 
 class Index:
@@ -106,10 +133,13 @@ class Index:
         self.path = Path(path) if path else default_path(settings)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self.con: sqlite3.Connection | None = None
+        _check_replaceable(self.path)
         try:
             self._open()
-        except sqlite3.DatabaseError:        # not a database (or damaged): it is derived, so start over
-            self.con.close()
+        except sqlite3.DatabaseError:        # a damaged index: it is derived, so start over
+            if self.con is not None:
+                self.con.close()
             self.remove_files(self.path)
             self._open()
 
@@ -121,7 +151,8 @@ class Index:
 
     @staticmethod
     def remove_files(path: Path) -> None:
-        """Delete the index and its WAL side files (`careeros ui --reindex`)."""
+        """Delete the index and its WAL side files (`careeros ui --reindex`); refuses anything but an index."""
+        _check_replaceable(path)
         for suffix in ("", "-wal", "-shm", "-journal"):
             path.with_name(path.name + suffix).unlink(missing_ok=True)
 
@@ -288,6 +319,8 @@ class Index:
                     continue
                 self._index_run(rid, _obj(d / "run.json"), att_files, sig)
                 changed.append(rid)
+            if changed:
+                self.set_meta("indexed_at", _now())
         return changed
 
     def _index_run(self, rid: str, run: dict[str, Any], att_files: list[Path], sig: str) -> None:
@@ -330,6 +363,7 @@ class Index:
                   _s(it.get("Priority")), _s(it.get("Needs")), int(str(it.get("Done") or "N").upper() == "Y"),
                   _s(it.get("DoneDate"))) for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
+            self.set_meta("indexed_at", _now())
             return True
 
 

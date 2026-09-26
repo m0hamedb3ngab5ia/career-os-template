@@ -183,17 +183,68 @@ def test_contacts_json_parse_errors_are_skipped(idx, data):
     assert idx.query("SELECT COUNT(*) AS n FROM contacts")[0]["n"] == 0
 
 
-def test_corrupt_index_file_is_replaced(data):
+def test_damaged_sqlite_index_is_replaced(data):
     path = Index(data["settings"]).path
-    for suffix in ("", "-wal", "-shm"):
-        p = path.with_name(path.name + suffix)
-        if p.exists():
-            p.unlink()
-    path.write_bytes(b"not a database at all, just bytes" * 10)
+    Index.remove_files(path)
+    path.write_bytes(b"SQLite format 3\x00" + b"damaged page" * 50)
     ix = Index(data["settings"])
     ix.sync()
     assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
     ix.close()
+
+
+def test_a_non_sqlite_file_at_the_index_path_is_never_deleted(data):
+    from careeros.config import ConfigError
+
+    path = Index(data["settings"]).path
+    Index.remove_files(path)
+    path.write_bytes(b"someone's notes, not a database")
+    with pytest.raises(ConfigError):
+        Index(data["settings"])
+    with pytest.raises(ConfigError):
+        Index.remove_files(path)
+    assert path.read_bytes() == b"someone's notes, not a database"
+
+
+def _with_index_path(data, value):
+    s = data["settings"]
+    s.pipeline.setdefault("ui", {})["index_path"] = value
+    return s
+
+
+@pytest.mark.parametrize("target", ["tracker", "folder", "config", "profile", "jobs_dir"])
+def test_index_path_may_not_point_at_user_files(data, target):
+    from careeros.config import ConfigError
+    from careeros.ui.index import default_path
+
+    s = data["settings"]
+    tracker = s.paths["tracker_xlsx"]
+    before = tracker.read_bytes()
+    value = {"tracker": str(tracker), "folder": str(s.root / "data"), "config": "config/ui.db",
+             "profile": "profile/ui.db", "jobs_dir": str(s.paths["jobs_dir"])}[target]
+    _with_index_path(data, value)
+    with pytest.raises(ConfigError):
+        default_path(s)
+    with pytest.raises(ConfigError):
+        Index(s)
+    assert tracker.read_bytes() == before
+
+
+def test_runs_and_tracker_updates_bump_indexed_at(idx, data):
+    from careeros.runs.store import RunStore
+
+    idx.set_meta("indexed_at", "old")
+    rs = RunStore(data["settings"])
+    run = rs.load_run(data["runs"]["score"])
+    run["detail"] = "edited"
+    rs.save_run(run)
+    assert idx.update_runs([run["id"]]) and idx.get_meta("indexed_at") != "old"
+    idx.set_meta("indexed_at", "old")
+    st = data["settings"].paths["tracker_xlsx"]
+    os.utime(st, (st.stat().st_atime, st.stat().st_mtime + 9))
+    assert idx.update_tracker() and idx.get_meta("indexed_at") != "old"
+    idx.set_meta("indexed_at", "old")
+    assert idx.update_runs([run["id"]]) == [] and idx.get_meta("indexed_at") == "old"
 
 
 def test_deleted_run_folder_leaves_the_index(idx, data):

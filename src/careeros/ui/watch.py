@@ -1,7 +1,7 @@
 """Live updates: watch the data and config folders, re-index what changed, tell the browser once per batch.
 
-watchfiles groups changes into one batch until the files have been quiet for `ui.watch_debounce_ms`; plan_changes() turns the
-batch into job ids, run ids and flags; handle() re-indexes those (skipping files whose signature is unchanged)
+watchfiles groups changes into one batch until the files have been quiet for `ui.watch_debounce_ms`;
+plan_changes() turns the batch into job ids, run ids and flags; handle() re-indexes those (skipping files whose signature is unchanged)
 and publishes one `changed` SSE event, or nothing when the batch changed nothing the UI shows. A scout run that
 writes hundreds of files therefore costs a few events, not hundreds.
 """
