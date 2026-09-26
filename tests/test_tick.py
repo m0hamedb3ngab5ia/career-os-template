@@ -29,7 +29,7 @@ class Actions(dict):
     def __init__(self, busy=()):
         super().__init__()
         self.calls = []
-        for k in ("scout", "score", "prepare", "prune"):
+        for k in ("scout", "inbox_sync", "score", "prepare", "prune"):
             self[k] = self._make(k, k in busy)
 
     def _make(self, kind, busy):
@@ -127,3 +127,11 @@ def test_catch_up_refuses_while_paused_and_dismiss_clears(s):
         run_catch_up(s, actions=Actions(), now=EVENING + timedelta(days=1, hours=3))
     assert run_catch_up(s, actions=Actions(), now=EVENING, dismiss=True)["dismissed"]
     assert load_catch_up(RunStore(s)) is None
+
+
+def test_enabled_inbox_sync_runs_in_order_at_its_slot(s):
+    s.pipeline["schedule"]["jobs"]["inbox_sync"] = {"enabled": True}  # default times 08:00 and 18:00
+    tick(s, now=datetime(2026, 9, 26, 7, 50, tzinfo=UTC), actions=Actions())
+    a = Actions()
+    tick(s, now=datetime(2026, 9, 26, 8, 5, tzinfo=UTC), actions=a)
+    assert ("inbox_sync", "schedule") in a.calls

@@ -54,6 +54,8 @@ def root(temp_root: Path) -> Path:
     data = yaml.safe_load(p.read_text())
     data["schedule"]["jobs"]["scout"]["enabled"] = False  # scout does HTTP; no network in tests
     data["schedule"]["quiet_hours"] = None
+    data["schedule"]["jobs"]["score"] = {"every_hours": 6}      # interval jobs fire on the first tick
+    data["schedule"]["jobs"]["prepare"] = {"every_hours": 12}
     p.write_text(yaml.safe_dump(data, sort_keys=False))
     return r
 
@@ -104,7 +106,7 @@ def test_tick_runs_due_jobs_then_is_idempotent(root, env):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     acts = {d["kind"]: d["action"] for d in out["decisions"]}
-    assert acts == {"scout": "disabled", "score": "run", "prepare": "run", "prune": "run"}
+    assert acts == {"scout": "disabled", "inbox_sync": "disabled", "score": "run", "prepare": "run", "prune": "run"}
     assert json.loads((root / "data" / "jobs" / jid / "status.json").read_text())["status"] == "queued"
     runs = json.loads(cli(root, env, "run", "list", "--json").stdout)
     assert {r["trigger"] for r in runs} == {"schedule"}
@@ -137,3 +139,15 @@ def test_pause_resume_and_catch_up(root, env):
     assert r.returncode == 0, r.stderr
     assert "score" in json.loads(r.stdout)["ran"]
     assert json.loads(cli(root, env, "run", "status", "--json").stdout)["catch_up"] is None
+
+
+def test_default_nightly_score_and_prepare_wait_for_their_time(temp_root, home, fake_bin, tmp_path):
+    root = personalize(temp_root)  # the example schedule as shipped
+    e = subprocess_env(root, home)
+    e["PATH"] = f"{fake_bin}{os.pathsep}{e['PATH']}"
+    out = json.loads(cli(root, e, "tick", "--dry-run", "--json").stdout)
+    d = {x["kind"]: x for x in out["decisions"]}
+    assert d["score"]["action"] == "not_due" and d["prepare"]["action"] == "not_due"
+    assert d["inbox_sync"]["action"] == "disabled"
+    assert datetime.fromisoformat(d["score"]["due_at"]).astimezone().strftime("%H:%M") == "01:00"
+    assert datetime.fromisoformat(d["prepare"]["due_at"]).astimezone().strftime("%H:%M") == "02:00"

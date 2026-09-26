@@ -24,7 +24,7 @@ paths:
 
 schedule:                                  # reusable default: fine to keep. `careeros schedule install` adds a macOS
                                            # LaunchAgent that runs `careeros tick` every tick_minutes; the tick runs
-                                           # whatever is due below. Inbox sync and follow-ups are not scheduled here.
+                                           # whatever is due below. Follow-ups are not scheduled here.
   tick_minutes: 15                         # 15 (Recommended): how often launchd wakes `careeros tick`
   timezone: local                          # local (Recommended) or an IANA name, e.g. America/New_York
   quiet_hours: {start: "09:00", end: "18:00"}  # (Recommended) claude-using runs (score, prepare) never start
@@ -32,10 +32,15 @@ schedule:                                  # reusable default: fine to keep. `ca
   missed_after_minutes: 60                 # 60 (Recommended): slots missed while the Mac slept or was off (by more
                                            # than this) never auto-run; they collapse into ONE pending catch-up you
                                            # start with `careeros run catch-up` (or dismiss with --dismiss)
-  jobs:
+  jobs:                                    # each job: every_hours: N | every_days: N | at: ["HH:MM", ...] (local time)
     scout:   {every_hours: 3}              # 3 (Recommended: 2-3): `careeros scout --sync`; no quiet hours
-    score:   {every_hours: 6}              # 6 (Recommended): `careeros run score` with runs.preset (add preset: to override)
-    prepare: {every_hours: 12}             # 12 (Recommended): `careeros run prepare` with runs.preset; never applies
+    inbox_sync:                            # /inbox-sync (Gmail) twice a day. OFF until the inbox-sync skill is finished
+      at: ["08:00", "18:00"]               # (Recommended) once enabled
+      enabled: false                       # false (Recommended for now)
+      mcp_servers: [gmail]                 # must be logged in (run `claude`, /mcp, once): else the run stops auth_required
+      allowed_tools_extra: [ToolSearch, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__get_thread]
+    score:   {at: ["01:00"]}               # nightly 01:00 (Recommended): `careeros run score` with runs.preset
+    prepare: {at: ["02:00"]}               # nightly 02:00 (Recommended): `careeros run prepare`; never applies
     prune:   {every_days: 7}               # 7 = weekly (Recommended): `careeros prune --yes` (retention below)
   launchd_label: com.careeros.tick
 
@@ -66,7 +71,7 @@ runs:                                      # reusable default: fine to keep. `ca
     large:  {max_score_jobs: 50, max_prepare_jobs: 10, max_minutes: 180}
     max:    {max_score_jobs: 150, max_prepare_jobs: 25, max_minutes: 480}
   custom: {max_score_jobs: 25, max_prepare_jobs: 5, max_minutes: 90}       # used when preset: custom
-  job_timeout_minutes: {score: 10, prepare: 45}   # (Recommended) one skill call is killed after this
+  job_timeout_minutes: {score: 10, prepare: 45, inbox_sync: 20}   # (Recommended) one skill call is killed after this
   stop_on_timeout: true                    # true (Recommended): a hung call usually means a prompt or auth wait
   max_consecutive_failures: 3              # 3 (Recommended): stop after this many failed jobs in a row
   preflight_doctor: true                   # true (Recommended): never run on example data or a broken setup

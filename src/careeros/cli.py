@@ -1312,7 +1312,7 @@ def build_parser() -> argparse.ArgumentParser:
     rcp.add_argument("--json", action="store_true")
     rcp.set_defaults(fn=cmd_run_cap)
     rls = rns.add_parser("list", help="past and current runs, newest first")
-    rls.add_argument("--kind", choices=("score", "prepare"))
+    rls.add_argument("--kind", choices=("score", "prepare", "inbox_sync"))
     rls.add_argument("--limit", type=int, default=20)
     rls.add_argument("--json", action="store_true")
     rls.set_defaults(fn=cmd_run_list)
