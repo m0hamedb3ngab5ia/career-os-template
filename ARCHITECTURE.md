@@ -29,7 +29,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 | 7 | Applier | `src/careeros/apply/` + Chrome (Claude in Chrome) | apply session | one adapter per ATS |
 | 8 | Tracker | `src/careeros/tracker.py` → `data/JobTracker.xlsx` (configurable) | always | tabs: Jobs, Action Items, Contacts, Log, Config |
 | 9 | Inbox sync | `.claude/skills/inbox-sync/` (Gmail MCP) | daily | status updates + push on interview |
-| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed |
+| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed; connected / mutuals → tailored by hand (`careeros outreach`) |
 
 ## Data flow
 
