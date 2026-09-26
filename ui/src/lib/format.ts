@@ -89,7 +89,7 @@ export function formatBytes(n: number, locale?: string): string {
   return new Intl.NumberFormat(locale, {
     style: "unit",
     unit,
-    unitDisplay: "short",
+    unitDisplay: unit === "byte" ? "long" : "short", // "17 bytes", "48 kB"
     maximumFractionDigits: value < 10 && unit !== "byte" ? 1 : 0,
   }).format(value);
 }

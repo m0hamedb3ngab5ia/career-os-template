@@ -35,5 +35,7 @@ export default defineConfig({
     setupFiles: ["./src/test/setup.ts"],
     css: false,
     pool: "forks",
+    // whole-screen tests with axe run several seconds on a loaded laptop; 5 s flaked
+    testTimeout: 20_000,
   },
 });

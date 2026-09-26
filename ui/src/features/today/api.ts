@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
-import type { ActionItem, CatchUpResult, Meta, RunStarted, TodayData, TodayStatus } from "./types";
+import type { ActionItem, CatchUpResult, RunStarted, TodayData, TodayStatus } from "./types";
 
 /** The server's `detail` (ApiError carries it as the message) or the error's own message. */
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -23,13 +23,7 @@ export function useToday() {
   });
 }
 
-export function useMeta() {
-  return useQuery({
-    queryKey: ["meta"],
-    queryFn: () => apiFetch<Meta>("/api/meta"),
-    staleTime: 5 * 60_000,
-  });
-}
+export { useMeta } from "../../api/meta";
 
 function useRefreshToday() {
   const qc = useQueryClient();

@@ -47,7 +47,7 @@ describe("dates, decimals and sizes", () => {
     expect(formatDecimal(8.6, 1, en)).toBe("8.6");
     expect(formatDecimal(8.6, 1, "fr-FR")).toBe("8,6");
     expect(formatDecimal(8, 1, en)).toBe("8.0");
-    expect(formatBytes(512, en)).toBe("512 byte");
+    expect(formatBytes(512, en)).toBe("512 bytes");
     expect(formatBytes(48_300, en)).toBe("48 kB");
     expect(formatBytes(1_800_000, en)).toBe("1.8 MB");
   });

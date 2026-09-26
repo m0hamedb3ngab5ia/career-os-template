@@ -166,6 +166,10 @@
   letter-spacing: -0.5px;
   color: var(--label);
 }
+/* data-tone also matches the kit's global chip rule; the number keeps only its colour */
+.tileValue[data-tone] {
+  background: none;
+}
 .tileValue[data-tone="orange"] {
   color: var(--orange);
 }
@@ -550,6 +554,7 @@
 .barFill[data-tone="purple"] { background: var(--purple); }
 .barFill[data-tone="blue"] { background: var(--blue); }
 .barFill[data-tone="teal"] { background: var(--teal); }
+.barFill[data-tone="gray"] { background: var(--gray); } /* beats the kit's global [data-tone] chip rule */
 .barValue {
   min-width: 28px;
   text-align: right;

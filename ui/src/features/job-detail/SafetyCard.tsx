@@ -119,7 +119,7 @@ export function SafetyCard({ jobId, company, tier, safety, registry }: Props) {
             Clear flag…
           </Button>
         ) : null}
-        {runs !== null ? <span className={styles.caption}>Checked {formatCount(runs)} times</span> : null}
+        {runs ? <span className={styles.caption}>Checked {formatCount(runs)} times</span> : null}
       </div>
       {confirmClear ? (
         <ConfirmPanel
