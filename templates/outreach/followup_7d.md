@@ -7,7 +7,8 @@ Same thread (reply to your own email, or LinkedIn message under the first). 40 t
 - Do not apologize for following up. Do not say "just checking in" or "bumping this".
 - Add one new thing: a link, a short fact, a result. Gives them a reason to answer now.
 - Repeat the ask in fewer words.
-- One follow-up at day 7, one at day 14, then stop (`followup_14d.md`).
+- One follow-up at day 7. The day-14 follow-up (`followup_14d.md`) only when the contact has replied before;
+  a cold application with zero contact gets one outreach plus at most one follow-up.
 
 ## Skeleton
 
