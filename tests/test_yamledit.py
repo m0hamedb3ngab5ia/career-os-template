@@ -243,3 +243,28 @@ def test_aligned_flow_mappings_keep_their_spacing(tmp_path):
     p.write_text("presets:\n  small:  {a: 1}\n  medium: {a: 2}\npreset: small\n")
     yamledit.apply_changes(p, [("preset", "medium")], validate=lambda path: None)
     assert p.read_text() == "presets:\n  small:  {a: 1}\n  medium: {a: 2}\npreset: medium\n"
+
+
+def test_saving_the_same_string_over_an_unquoted_ambiguous_one_rewrites_it_quoted(tmp_path):
+    import yaml
+
+    p = tmp_path / "t.yaml"
+    p.write_text("levels: {GHOST_OLD_POST: off}   # c\nat: [10:30]\nname: plain\n")
+    yamledit.apply_changes(p, [("levels", {"GHOST_OLD_POST": "off"}), ("at", ["10:30"]), ("name", "plain")],
+                           validate=lambda path: None)
+    assert yaml.safe_load(p.read_text()) == {"levels": {"GHOST_OLD_POST": "off"}, "at": ["10:30"], "name": "plain"}
+    assert "# c" in p.read_text() and "name: plain\n" in p.read_text()
+
+
+def test_examples_read_the_same_in_yaml_1_1_and_1_2():
+    """The shipped config must mean the same to PyYAML (the CLI) and ruamel (the writer)."""
+    import json
+    from pathlib import Path
+
+    import yaml
+
+    for f in (Path(__file__).resolve().parents[1] / "examples" / "config").glob("*.yaml"):
+        text = f.read_text()
+        a = json.loads(json.dumps(yaml.safe_load(text), default=str))
+        b = json.loads(json.dumps(yamledit._yaml().load(text), default=str))
+        assert a == b, f.name

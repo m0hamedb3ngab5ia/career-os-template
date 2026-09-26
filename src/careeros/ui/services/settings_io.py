@@ -15,9 +15,11 @@ from datetime import date
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from careeros.config import ConfigError, Settings
 from careeros.runs import yamledit
-from careeros.ui.settings_schema import Section, get_section, reset_group, validate_value
+from careeros.ui.settings_schema import Field, Section, get_section, reset_group, validate_value
 
 _MISSING = object()
 
@@ -50,8 +52,13 @@ def _plain(v: Any) -> Any:
 
 
 def _load(path: Path) -> dict[str, Any]:
-    data = yamledit._yaml().load(path.read_text(encoding="utf-8"))
-    return _plain(data) or {}
+    """The file as the CLI reads it (PyYAML, YAML 1.1): the UI shows what the pipeline actually applies."""
+    return _plain(yaml.safe_load(path.read_text(encoding="utf-8"))) or {}
+
+
+def _load_rt(path: Path) -> Any:
+    """The file as written (ruamel, YAML 1.2): unquoted `off` stays the string the author meant."""
+    return yamledit._yaml().load(path.read_text(encoding="utf-8")) or {}
 
 
 def _lookup(data: Any, dotted: str) -> Any:
@@ -63,12 +70,49 @@ def _lookup(data: Any, dotted: str) -> Any:
     return cur
 
 
+def _as_applied(f: Field, v: Any) -> Any:
+    """Display the value the way the pipeline applies it. A check level PyYAML read as a bool (`off` unquoted ->
+    False) is ignored by safety.apply_levels, so the check keeps its built-in level: drop it from the map."""
+    if f.control == "reason_levels" and isinstance(v, dict):
+        return {k: lv for k, lv in v.items() if isinstance(lv, str)}
+    return v
+
+
 def effective_values(sec: Section, docs: dict[str, dict[str, Any]]) -> dict[str, Any]:
-    """{field id: value in the file, else the field's default}. An explicit null stays null."""
+    """{field id: value in the file as the CLI reads it, else the field's default}. An explicit null stays null."""
     out: dict[str, Any] = {}
     for f in sec.fields():
         v = _lookup(docs.get(f.file) or {}, f.key)
-        out[f.id] = f.default if v is _MISSING else v
+        out[f.id] = f.default if v is _MISSING else _as_applied(f, v)
+    return out
+
+
+def _ambiguous_strings(node: Any) -> list[str]:
+    if isinstance(node, dict):
+        return [s for k, v in node.items() for s in _ambiguous_strings(k) + _ambiguous_strings(v)]
+    if isinstance(node, list):
+        return [s for v in node for s in _ambiguous_strings(v)]
+    return [str(node)] if yamledit.has_ambiguous_plain(node) else []
+
+
+def unquoted_warnings(sec: Section, rt_docs: dict[str, Any],
+                      docs: dict[str, dict[str, Any]]) -> dict[str, dict[str, Any]]:
+    """{field id: {message, intended}} for values written without quotes that PyYAML (the CLI) reads as something
+    else: `off` -> false, 10:30 -> 630, yes -> true. `intended` is what the author meant when that is a valid value
+    for the field (the YAML 1.2 reading), else the CLI's reading; saving it rewrites the value quoted."""
+    out: dict[str, dict[str, Any]] = {}
+    for f in sec.fields():
+        node = _lookup(rt_docs.get(f.file) or {}, f.key)
+        if node is _MISSING:
+            continue
+        bad = _ambiguous_strings(node)
+        if not bad:
+            continue
+        written = _plain(node)
+        intended = written if validate_value(f, written) is None else _lookup(docs.get(f.file) or {}, f.key)
+        reads = ", ".join(f"{s} as {json.dumps(yaml.safe_load(s))}" for s in dict.fromkeys(bad))
+        out[f.id] = {"message": f"Written without quotes, so the pipeline reads {reads}. Save this setting to "
+                                f"fix it.", "intended": intended}
     return out
 
 
@@ -94,11 +138,14 @@ def _paths(settings: Settings, sec: Section) -> dict[str, Path]:
 
 
 def read_section(settings: Settings, section_id: str) -> dict[str, Any]:
-    """{section: schema, values: effective, defaults, files: {file: path}, version}."""
+    """{section: schema, values: effective (as the CLI reads them), warnings: unquoted values the CLI misreads,
+    defaults, files: {file: path}, version}."""
     sec = _section(section_id)
     paths = _paths(settings, sec)
     docs = {file: _load(p) for file, p in paths.items()}
+    rt_docs = {file: _load_rt(p) for file, p in paths.items()}
     return {"section": sec.to_dict(), "values": effective_values(sec, docs),
+            "warnings": unquoted_warnings(sec, rt_docs, docs),
             "defaults": {f.id: f.default for f in sec.fields()},
             "files": {file: str(p) for file, p in paths.items()}, "version": _version(list(paths.values()))}
 

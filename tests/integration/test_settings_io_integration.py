@@ -252,3 +252,65 @@ def test_every_option_of_every_string_field_round_trips_through_the_loaders(root
                 for k in f.key.split("."):
                     cur = cur[k]
                 assert cur == v, (f.id, v, cur)
+
+
+# --- files hand-written with unquoted YAML-1.1-ambiguous values ---------------------------------------------
+
+def _edit(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    assert old in text, old
+    path.write_text(text.replace(old, new, 1))
+
+
+def test_unquoted_off_level_reads_as_the_cli_applies_it_and_saving_repairs_it(root):
+    from careeros.safety.scam import Flag, apply_levels
+
+    t = root / "config" / "targets.yaml"
+    _edit(t, "  levels: {}", "  levels: {GHOST_OLD_POST: off}")
+    flags = [Flag("GHOST_OLD_POST", "info", "old")]
+    assert [f.code for f in apply_levels(flags, _s(root))] == ["GHOST_OLD_POST"]  # the CLI keeps the check
+    out = settings_io.read_section(_s(root), "safety")
+    fid = "targets:safety.levels"
+    assert out["values"][fid] == {}  # not off: the check runs at its built-in level, as the CLI does
+    w = out["warnings"][fid]
+    assert "off" in w["message"] and "quotes" in w["message"] and w["intended"] == {"GHOST_OLD_POST": "off"}
+    settings_io.save_section(_s(root), "safety", {fid: w["intended"]})
+    assert apply_levels(flags, _s(root)) == []
+    after = settings_io.read_section(_s(root), "safety")
+    assert after["values"][fid] == {"GHOST_OLD_POST": "off"} and fid not in after["warnings"]
+
+
+def test_unquoted_yes_switch_reads_true_and_saving_writes_true(root):
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, "  stop_on_timeout: true", "  stop_on_timeout: yes")
+    out = settings_io.read_section(_s(root), "runs")
+    fid = "pipeline:runs.stop_on_timeout"
+    assert out["values"][fid] is True and out["warnings"][fid]["intended"] is True
+    settings_io.save_section(_s(root), "runs", {fid: True})
+    assert "stop_on_timeout: true" in p.read_text()
+    assert fid not in settings_io.read_section(_s(root), "runs")["warnings"]
+
+
+def test_unquoted_time_after_ten_is_flagged_and_saving_the_same_time_repairs_it(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, 'score:   {at: ["01:00"]}', "score:   {at: [10:30]}")
+    with pytest.raises(ConfigError):
+        load_schedule(_s(root))  # PyYAML read 630
+    out = settings_io.read_section(_s(root), "runs")
+    fid = "pipeline:schedule.jobs.score"
+    assert out["values"][fid] == {"at": [630]}
+    assert out["warnings"][fid]["intended"] == {"at": ["10:30"]} and "10:30" in out["warnings"][fid]["message"]
+    settings_io.save_section(_s(root), "runs", {fid: {"at": ["10:30"]}})
+    assert load_schedule(_s(root)).jobs["score"].at == [time(10, 30)]
+    assert fid not in settings_io.read_section(_s(root), "runs")["warnings"]
+
+
+def test_the_shipped_examples_have_no_warnings(root):
+    from careeros.ui.settings_schema import SECTIONS
+
+    for sec in SECTIONS:
+        assert settings_io.read_section(_s(root), sec.id)["warnings"] == {}, sec.id

@@ -108,6 +108,15 @@ def _needs_quotes(s: str) -> bool:
         return True
 
 
+def has_ambiguous_plain(node: Any) -> bool:
+    """A plain (unquoted) string somewhere in `node` that PyYAML reads as something else (`off`, 10:30)."""
+    if isinstance(node, dict):
+        return any(has_ambiguous_plain(k) or has_ambiguous_plain(v) for k, v in node.items())
+    if isinstance(node, list):
+        return any(has_ambiguous_plain(v) for v in node)
+    return isinstance(node, str) and not isinstance(node, ScalarString) and _needs_quotes(node)
+
+
 def _scalar(new: str, old: Any) -> Any:
     if isinstance(old, ScalarString):
         return type(old)(new)  # keep the file's quote style
@@ -176,7 +185,8 @@ def render_changes(original: str, changes: list[tuple[str, Any]]) -> tuple[str, 
             raise ValueError(f"can't set {dotted}: its parent is not a mapping")
         old = cur.get(keys[-1])
         olds[dotted] = _plain(old)
-        if keys[-1] in cur and _plain(old) == value and type(_plain(old)) is type(value):
+        if (keys[-1] in cur and _plain(old) == value and type(_plain(old)) is type(value)
+                and not has_ambiguous_plain(old)):  # same value, but unquoted `off` / 10:30: rewrite it quoted
             continue
         cur[keys[-1]] = _styled(value, old)
         changed = True
