@@ -115,6 +115,7 @@ describe("Runs page", () => {
     expect(await screen.findByRole("heading", { name: "Nothing running" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "No runs yet" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Nothing to score" })).toBeInTheDocument();
+    expect(screen.getByText(/nothing is skipped/)).toBeInTheDocument();
     expect(screen.getByText("Scheduler not installed: nothing runs on its own")).toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
   });
@@ -149,6 +150,14 @@ describe("Runs page", () => {
     expect(post.url).toBe("/api/runs/cancel");
     expect(post.body).toEqual({ run_id: "20260926-020000-prepare-ab12" });
     expect(post.headers["X-CareerOS"]).toBe("1");
+  });
+
+  it("returns focus to Cancel run when the confirm is dismissed with Escape", async () => {
+    const user = userEvent.setup();
+    open({ current: current() });
+    await user.click(await screen.findByRole("button", { name: "Cancel run" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Cancel run" })).toHaveFocus();
   });
 
   it("offers Pause all instead of Cancel for a scheduled batch", async () => {
@@ -214,6 +223,31 @@ describe("Runs page", () => {
     expect(screen.getByText(/Never applies/)).toBeInTheDocument();
   });
 
+  it("forgets a dry-run selection when the custom limits change", async () => {
+    const user = userEvent.setup();
+    const selection = { dry_run: true, kind: "score", budget: {}, candidates: 1, selected: [] };
+    const { api } = open({ post: { "/api/runs": selection } }, "/runs?kind=score&budget=custom");
+    await user.type(await screen.findByRole("spinbutton", { name: "Jobs" }), "3");
+    await user.click(screen.getByRole("button", { name: "Show the selection" }));
+    expect(await screen.findByRole("region", { name: "Dry run selection" })).toBeInTheDocument();
+    await user.type(screen.getByRole("spinbutton", { name: "Jobs" }), "0");
+    expect(screen.queryByRole("region", { name: "Dry run selection" })).toBeNull();
+    expect(screen.getByRole("button", { name: "Show the selection" })).toBeEnabled();
+    await user.type(screen.getByRole("spinbutton", { name: "Minutes" }), "5");
+    expect(api.posts()).toHaveLength(1);
+  });
+
+  it("refuses a fractional job count before asking the server", async () => {
+    const user = userEvent.setup();
+    const { api } = open({ post: { "/api/runs": { started: true } } }, "/runs?kind=score&budget=custom");
+    const jobs = await screen.findByRole("spinbutton", { name: "Jobs" });
+    expect(jobs).toHaveAttribute("step", "1");
+    await user.type(jobs, "2.5");
+    await user.click(screen.getByRole("button", { name: "Show the selection" }));
+    expect(await screen.findByText("Jobs must be a whole number, 1 or more.")).toBeInTheDocument();
+    expect(api.posts()).toHaveLength(0);
+  });
+
   it("disables Inbox with a reason until inbox sync is set up; steps start directly", async () => {
     const user = userEvent.setup();
     const { api } = open({ post: { "/api/runs/steps/scout": { kind: "scout", started: true, pid: 3 } } }, "/runs?kind=inbox");
@@ -248,6 +282,8 @@ describe("Runs page", () => {
     await user.click(button);
     const dialog = screen.getByRole("dialog", { name: "Pause all runs" });
     expect(within(dialog).getByRole("radio", { name: /Until I resume/ })).toBeChecked();
+    // ui.pause_until_tomorrow_at from /api/meta ("08:00" here), shown in the locale's clock style
+    expect(within(dialog).getByRole("radio", { name: /^Until tomorrow, 0?8:00( AM)?$/ })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("dialog")).toBeNull();
     expect(button).toHaveFocus();
@@ -281,6 +317,9 @@ describe("Runs page", () => {
     expect(within(banner).getByText("Missed 2 runs while your Mac was off")).toBeInTheDocument();
     await user.click(within(banner).getByRole("button", { name: "Catch up now" }));
     await waitFor(() => expect(api.posts()[0]?.body).toEqual({ dismiss: false }));
+    await user.click(within(banner).getByRole("button", { name: "Skip missed runs" }));
+    await user.keyboard("{Escape}");
+    expect(within(banner).getByRole("button", { name: "Skip missed runs" })).toHaveFocus();
     await user.click(within(banner).getByRole("button", { name: "Skip missed runs" }));
     await user.click(within(screen.getByRole("alertdialog")).getByRole("button", { name: "Skip missed runs" }));
     await waitFor(() => expect(api.posts()[1]?.body).toEqual({ dismiss: true }));
@@ -345,6 +384,7 @@ describe("Runs page", () => {
     expect(within(table).getByText("Dream company +25")).toBeInTheDocument();
     expect(within(table).getByText("85")).toBeInTheDocument();
     expect(screen.getByText("Not in queue (1)")).toBeInTheDocument();
+    expect(screen.queryByText(/nothing is skipped/)).toBeNull();
     expect(screen.getByText("pruned")).not.toBeVisible();
   });
 
@@ -355,6 +395,9 @@ describe("Runs page", () => {
     expect(screen.getByText(/Every 3 h/)).toBeInTheDocument();
     expect(screen.getByText(/off until inbox sync is ready/)).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Edit schedule" })).toHaveAttribute("href", "/settings/runs");
+    await user.click(screen.getByRole("button", { name: "Install" }));
+    await user.keyboard("{Escape}");
+    expect(screen.getByRole("button", { name: "Install" })).toHaveFocus();
     await user.click(screen.getByRole("button", { name: "Install" }));
     await user.click(within(screen.getByRole("alertdialog", { name: /Install the scheduler/ })).getByRole("button", { name: "Install" }));
     await waitFor(() => expect(api.posts()[0]?.url).toBe("/api/schedule/install"));

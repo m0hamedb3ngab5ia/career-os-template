@@ -75,10 +75,18 @@ def test_overrides_and_custom_columns():
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"]}, {"name": "B", "statuses": ["found"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"], "x": 1}]}}},
     {"ui": {"pipeline": {"nope": 1}}},
+    {"ui": {"pause_until_tomorrow_at": "8:00"}},
+    {"ui": {"pause_until_tomorrow_at": "24:00"}},
+    {"ui": {"pause_until_tomorrow_at": 800}},
 ])
 def test_invalid_config_fails_closed(bad):
     with pytest.raises(ConfigError):
         load_ui_config(S(bad))
+
+
+def test_pause_until_tomorrow_at_defaults_to_eight_and_takes_hh_mm():
+    assert load_ui_config(S({})).pause_until_tomorrow_at == "08:00"
+    assert load_ui_config(S({"ui": {"pause_until_tomorrow_at": "06:30"}})).pause_until_tomorrow_at == "06:30"
 
 
 def test_default_columns_are_not_shared_state():

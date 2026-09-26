@@ -34,9 +34,11 @@ export function LogPane({ label, lines, empty }: LogPaneProps) {
     getItemKey: (i) => lines[i]!.key,
   });
 
+  // Follow on every new last line, not on the count: once the buffer is full the count stops changing.
+  const lastKey = lines.at(-1)?.key;
   useEffect(() => {
-    if (stick.current && lines.length) v.scrollToIndex(lines.length - 1, { align: "end" });
-  }, [lines.length, v]);
+    if (stick.current && lastKey !== undefined) v.scrollToIndex(lines.length - 1, { align: "end" });
+  }, [lastKey, lines.length, v]);
 
   return (
     <div

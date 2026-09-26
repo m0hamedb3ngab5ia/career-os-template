@@ -157,3 +157,14 @@ def test_detail_names_the_jobs_of_its_attempts(rc):
     assert view.detail_view(rc, "20260101-000000-score-ffff") is None
     with pytest.raises(ValueError):
         view.detail_view(rc, "../config")
+
+
+@pytest.mark.parametrize("bad", ["../x", "a.b", "", "..", "x/y", "a" * 90])
+def test_check_run_id_refuses_anything_but_a_plain_id(bad):
+    with pytest.raises(ValueError):
+        view.check_run_id(bad)
+
+
+def test_check_run_id_accepts_run_and_step_ids():
+    for ok in ("20260926-120000-score-ab12", "20260926-120000-inbox_sync-00ff"):
+        assert view.check_run_id(ok) == ok

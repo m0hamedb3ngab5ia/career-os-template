@@ -103,7 +103,13 @@ def test_detail_has_attempts_with_names_and_the_log(client, data):
     assert d["attempts"][0]["company"] == "Initech" and d["attempts"][0]["outcome"] == "usage_limit"
     assert "log" in d
     assert client.get("/api/runs/20200101-000000-score-ffff").status_code == 404
-    assert client.get("/api/runs/..%2Fconfig").status_code in (404, 422)
+    assert client.get("/api/runs/bad.id").status_code == 422
+
+
+def test_bad_run_ids_are_refused_with_422(client):
+    assert client.get("/api/runs", params={"cursor": "bad.id"}).status_code == 422
+    assert client.post("/api/runs/cancel", json={"run_id": "bad.id"}, headers=W).status_code == 422
+    assert client.get("/api/runs/bad.id/stream").status_code == 422
 
 
 def test_current_is_null_when_idle_then_shows_the_batch(client, data):
@@ -206,6 +212,25 @@ def test_catch_up_start_and_dismiss(client, data, fakes):
     assert gone["dismissed"] is True and client.get("/api/schedule").json()["catch_up"] is None
 
 
+def test_catch_up_while_the_scheduler_ticks_is_a_plain_409(client, data):
+    import os
+
+    rs = RunStore(data["settings"])
+    (rs.dir / "catch_up.json").write_text(json.dumps({"created_at": NOW.isoformat(), "kinds": {
+        "score": {"first_missed": NOW.isoformat(), "slots": 1}}}))
+    locks.acquire(rs.dir / "tick.lock", owner="tick", ttl_seconds=600, pid=os.getpid())
+    r = client.post("/api/runs/catch-up", json={"dismiss": True}, headers=W)
+    assert r.status_code == 409 and "scheduler is ticking" in r.json()["detail"]
+
+
+def test_validation_errors_are_one_plain_sentence(client):
+    r = client.post("/api/runs", json={"kind": "score", "preset": "custom", "max_jobs": 2.5}, headers=W)
+    assert r.status_code == 422
+    detail = r.json()["detail"]
+    assert isinstance(detail, str) and "max_jobs" in detail and "whole number" in detail
+    assert client.get("/api/runs", params={"limit": 0}).json()["detail"].startswith("limit")
+
+
 def test_schedule_install_and_uninstall_use_launchctl(client, fakes):
     r = client.post("/api/schedule/install", headers=W)
     assert r.status_code == 200 and r.json()["loaded"] is True
@@ -234,3 +259,61 @@ def test_stream_replays_the_log_and_ends(client, data):
     assert "Scoring Initech" in body and "start score" in body
     assert "event: end" in body and '"state": "done"' in body
     assert client.get("/api/runs/20200101-000000-score-ffff/stream").status_code == 404
+
+
+def test_stream_disconnect_during_a_quiet_run_stops_the_tail_promptly(data, fakes):
+    """A client that goes away while the run is silent must not leave the tail thread polling until the run
+    ends: cancelling the stream wakes the worker within about a second."""
+    import asyncio
+    import threading
+    import time
+
+    from careeros.ui.routers import runs as runs_router
+
+    done = threading.Event()
+
+    class Probe(RunControl):
+        def tail(self, run_id, **kw):
+            try:
+                yield from super().tail(run_id, **kw)
+            finally:
+                done.set()
+
+    def factory(settings, **kw):
+        base = dict(popen=fakes.popen, pid_alive=lambda pid: True, now=lambda: NOW, launchctl=fakes.launchctl)
+        return Probe(settings, **{**base, **kw})
+
+    run = running(data)
+
+    class Req:
+        app = type("A", (), {"state": type("S", (), {"run_control": staticmethod(factory)})()})()
+
+        async def is_disconnected(self):
+            return False
+
+    ctx = type("C", (), {"settings": data["settings"]})()
+
+    result: dict[str, float] = {}
+
+    async def scenario() -> None:
+        import anyio
+
+        resp = await runs_router.stream(run["id"], Req(), ctx)
+        it = resp.body_iterator
+        await it.__anext__()  # the retry frame
+        with anyio.move_on_after(0.3):  # the way Starlette cancels a stream whose client went away
+            await it.__anext__()  # blocks: the run is quiet
+        result["cancelled_after"] = time.monotonic()
+        await it.aclose()
+
+    def go() -> None:
+        import anyio
+
+        anyio.run(scenario)
+
+    t = threading.Thread(target=go, daemon=True)
+    t0 = time.monotonic()
+    t.start()
+    assert done.wait(3), "the tail thread kept polling after the client went away"
+    t.join(3)
+    assert "cancelled_after" in result and result["cancelled_after"] - t0 < 1.5

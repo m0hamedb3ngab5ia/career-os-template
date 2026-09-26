@@ -7,15 +7,14 @@ Tests (and nothing else) swap the process edges by setting `app.state.run_contro
 """
 from __future__ import annotations
 
-import asyncio
 import threading
 from contextlib import contextmanager
 from typing import Any, AsyncIterator, Iterator, Literal
 
+import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel, Field
-from starlette.concurrency import run_in_threadpool
 
 from careeros.ui.events import format_sse
 from careeros.ui.routers import ctx
@@ -132,14 +131,14 @@ async def stream(run_id: str, request: Request, c=Depends(ctx)) -> StreamingResp
         try:
             yield "retry: 3000\n\n"
             while True:
-                item = await run_in_threadpool(step)
+                # abandon_on_cancel: a client that goes away cancels this await at once, so `finally` sets
+                # `stop` and the worker, asleep between polls, wakes and returns instead of polling on.
+                item = await anyio.to_thread.run_sync(step, abandon_on_cancel=True)
                 if item is done:
                     return
                 yield format_sse("end" if item.get("type") == "end" else "event", item)
                 if await request.is_disconnected():
                     return
-        except asyncio.CancelledError:
-            raise
         finally:
             stop.set()
 

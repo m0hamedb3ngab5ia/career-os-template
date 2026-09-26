@@ -34,7 +34,8 @@ export function UpNextCard() {
         </SegmentedControl>
         {data ? (
           <span className={styles.caption}>
-            {formatCount(data.total)} in the queue · no Claude usage to rank · nothing is skipped
+            {formatCount(data.total)} in the queue · no Claude usage to rank
+            {data.excluded_total === 0 ? " · nothing is skipped" : ""}
           </span>
         ) : null}
       </div>

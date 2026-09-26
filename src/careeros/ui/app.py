@@ -13,6 +13,7 @@ from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from careeros.config import ConfigError, Settings
@@ -63,6 +64,24 @@ class Context:
         self.settings, self.config_error = fresh, None
 
 
+_WHAT = {"int_parsing": "must be a whole number", "int_from_float": "must be a whole number",
+         "float_parsing": "must be a number", "bool_parsing": "must be true or false",
+         "missing": "is required", "greater_than_equal": "is too small", "less_than_equal": "is too large",
+         "string_type": "must be text", "json_invalid": "is not valid JSON"}
+
+
+def plain_validation(errors: Any) -> str:
+    """FastAPI's validation errors as one sentence ("max_jobs must be a whole number, got 2.5.")."""
+    parts = []
+    for err in list(errors)[:3]:
+        loc = [str(x) for x in err.get("loc", ()) if x not in ("body", "query", "path", "header")]
+        field = ".".join(loc) or "the request"
+        what = _WHAT.get(err.get("type", ""), str(err.get("msg", "is not valid")).lower())
+        got = f", got {err['input']!r}" if "input" in err and err.get("type") != "missing" else ""
+        parts.append(f"{field} {what}{got}")
+    return ("; ".join(parts) or "The request is not valid") + "."
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -98,6 +117,10 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     @app.exception_handler(ValueError)
     async def bad_value(_: Request, e: ValueError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=400)
+
+    @app.exception_handler(RequestValidationError)
+    async def bad_request(_: Request, e: RequestValidationError) -> JSONResponse:
+        return JSONResponse({"detail": plain_validation(e.errors())}, status_code=422)
 
     @app.exception_handler(ConfigError)
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:

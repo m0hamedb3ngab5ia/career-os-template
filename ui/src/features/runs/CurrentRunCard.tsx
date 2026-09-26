@@ -1,5 +1,5 @@
 import { Check, Square } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
@@ -62,6 +62,7 @@ export function CurrentRunCard({ run }: { run: CurrentRun | null | undefined }) 
   const { lines } = useRunStream(run?.id, Boolean(run));
   const cancel = useCancelRun();
   const [asking, setAsking] = useState(false);
+  const cancelButton = useRef<HTMLButtonElement>(null);
   if (!run) {
     return (
       <section className={`${styles.card} ${styles.grow}`} aria-labelledby="now-h">
@@ -103,6 +104,7 @@ export function CurrentRunCard({ run }: { run: CurrentRun | null | undefined }) 
             <span className={styles.note}>Use Pause all to stop a scheduled run</span>
           ) : stopping || asking ? null : (
             <Button
+              ref={cancelButton}
               size="small"
               icon={<Square size={14} strokeWidth={1.7} aria-hidden="true" />}
               onClick={() => setAsking(true)}
@@ -119,6 +121,7 @@ export function CurrentRunCard({ run }: { run: CurrentRun | null | undefined }) 
             cancelLabel="Keep running"
             confirmLabel="Cancel run"
             pending={cancel.isPending}
+            returnFocusRef={cancelButton}
             onCancel={() => setAsking(false)}
             onConfirm={() => cancel.mutate(run.id, { onSettled: () => setAsking(false) })}
           />

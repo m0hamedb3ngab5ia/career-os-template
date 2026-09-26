@@ -57,10 +57,18 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
   const info = START_KINDS.find((k) => k.value === kind)!;
   const inboxOff = kind === "inbox" && !schedule?.inbox_ready;
 
-  function set(key: string, value: string) {
+  const [invalid, setInvalid] = useState<string | null>(null);
+
+  /** Any change to what would run drops the dry-run selection and the last answer. */
+  function forget() {
     setSelection(null);
+    setInvalid(null);
     start.reset();
     step.reset();
+  }
+
+  function set(key: string, value: string) {
+    forget();
     const next = new URLSearchParams(params);
     next.set(key, value);
     setParams(next, { replace: true });
@@ -82,7 +90,19 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
   const label = `Start ${info.label.toLowerCase()} run`;
   const started = (what: string) => toast.show({ message: `${what} run started.` });
 
+  function customProblem(): string | null {
+    if (preset !== "custom") return null;
+    if (jobs && !(Number.isInteger(Number(jobs)) && Number(jobs) >= 1)) return "Jobs must be a whole number, 1 or more.";
+    if (minutes && !(Number(minutes) > 0)) return "Minutes must be more than 0.";
+    return null;
+  }
+
   function onStart() {
+    if (batch) {
+      const problem = customProblem();
+      setInvalid(problem);
+      if (problem) return;
+    }
     if (!batch) {
       step.mutate(STEP_OF[kind]!, { onSuccess: () => started(info.label) });
       return;
@@ -158,7 +178,12 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
                     (kind === "score" ? custom?.max_score_jobs : custom?.max_prepare_jobs) ?? "",
                   )}
                   value={jobs}
-                  onChange={(e) => setJobs(e.target.value)}
+                  step={1}
+                  aria-invalid={invalid?.startsWith("Jobs") || undefined}
+                  onChange={(e) => {
+                    forget();
+                    setJobs(e.target.value);
+                  }}
                 />
               </label>
               <label htmlFor={ids.minutes} className={styles.field}>
@@ -173,10 +198,19 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
                   className={styles.input}
                   placeholder={String(custom?.max_minutes ?? "")}
                   value={minutes}
-                  onChange={(e) => setMinutes(e.target.value)}
+                  aria-invalid={invalid?.startsWith("Minutes") || undefined}
+                  onChange={(e) => {
+                    forget();
+                    setMinutes(e.target.value);
+                  }}
                 />
               </label>
             </div>
+          ) : null}
+          {invalid ? (
+            <p role="alert" className={styles.fix}>
+              {invalid}
+            </p>
           ) : null}
           <div className={styles.switchLine}>
             <Switch

@@ -1,4 +1,6 @@
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { useRef, useState } from "react";
 import { describe, expect, it } from "vitest";
 import { axeViolations } from "../test/axe";
 import { ConfirmPanel } from "./ConfirmPanel";
@@ -38,5 +40,43 @@ describe("ConfirmPanel variant", () => {
     );
     expect(screen.getByRole("button", { name: "Install" })).toHaveAttribute("data-variant", "primary");
     expect(screen.getByRole("alertdialog")).toHaveAttribute("data-variant", "primary");
+  });
+});
+
+describe("ConfirmPanel focus return", () => {
+  function Demo() {
+    const trigger = useRef<HTMLButtonElement>(null);
+    const [open, setOpen] = useState(false);
+    return (
+      <>
+        {open ? null : (
+          <button ref={trigger} type="button" onClick={() => setOpen(true)}>
+            Uninstall
+          </button>
+        )}
+        {open ? (
+          <ConfirmPanel
+            question="Uninstall the scheduler?"
+            cancelLabel="Keep it"
+            confirmLabel="Uninstall"
+            returnFocusRef={trigger}
+            onCancel={() => setOpen(false)}
+            onConfirm={() => setOpen(false)}
+          />
+        ) : null}
+      </>
+    );
+  }
+
+  it("hands focus back to the trigger on Escape, Cancel and after confirming", async () => {
+    const user = userEvent.setup();
+    render(<Demo />);
+    for (const close of ["{Escape}", "cancel", "confirm"] as const) {
+      await user.click(screen.getByRole("button", { name: "Uninstall" }));
+      expect(screen.getByRole("button", { name: "Keep it" })).toHaveFocus();
+      if (close === "{Escape}") await user.keyboard(close);
+      else await user.click(screen.getByRole("button", { name: close === "cancel" ? "Keep it" : "Uninstall" }));
+      expect(screen.getByRole("button", { name: "Uninstall" })).toHaveFocus();
+    }
   });
 });

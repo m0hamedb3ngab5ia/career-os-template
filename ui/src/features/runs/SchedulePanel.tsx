@@ -1,5 +1,5 @@
 import { Moon } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "../../kit/Button";
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
@@ -23,6 +23,7 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
   const action = useScheduleAction();
   const toast = useToast();
   const [asking, setAsking] = useState<"install" | "uninstall" | null>(null);
+  const trigger = useRef<HTMLButtonElement>(null); // Install or Uninstall, whichever is shown
 
   function run(which: "install" | "uninstall") {
     action.mutate(which, {
@@ -88,11 +89,11 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
           </div>
           {asking === null ? (
             schedule.installed ? (
-              <Button size="small" variant="destructive" onClick={() => setAsking("uninstall")}>
+              <Button ref={trigger} size="small" variant="destructive" onClick={() => setAsking("uninstall")}>
                 Uninstall
               </Button>
             ) : (
-              <Button size="small" onClick={() => setAsking("install")}>
+              <Button ref={trigger} size="small" onClick={() => setAsking("install")}>
                 Install
               </Button>
             )
@@ -106,6 +107,7 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
           confirmLabel="Install"
           confirmVariant="primary"
           pending={action.isPending}
+          returnFocusRef={trigger}
           onCancel={() => setAsking(null)}
           onConfirm={() => run("install")}
         />
@@ -116,6 +118,7 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
           cancelLabel="Keep it"
           confirmLabel="Uninstall"
           pending={action.isPending}
+          returnFocusRef={trigger}
           onCancel={() => setAsking(null)}
           onConfirm={() => run("uninstall")}
         />

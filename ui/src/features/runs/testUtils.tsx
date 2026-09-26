@@ -29,7 +29,7 @@ export const META: Meta = {
     recommended: "medium",
     current: "medium",
   },
-  ui: { theme: "system", undo_seconds: 8, page_size: 100 },
+  ui: { theme: "system", undo_seconds: 8, page_size: 100, pause_until_tomorrow_at: "08:00" },
 };
 
 export function schedule(over: Partial<Schedule> = {}): Schedule {

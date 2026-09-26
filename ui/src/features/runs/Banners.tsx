@@ -5,23 +5,26 @@ import { Chip } from "../../kit/chips";
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
 import { Popover } from "../../kit/Popover";
 import { useToast } from "../../kit/Toast";
-import { formatCount, formatWhen } from "../../lib/format";
+import { formatClock, formatCount, formatWhen } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
-import { useCatchUp, usePause, useResume } from "./api";
+import { useCatchUp, useMeta, usePause, useResume } from "./api";
 import { kindLabel } from "./labels";
 import styles from "./Runs.module.css";
 import type { CatchUp, Pause } from "./types";
 
 type PauseChoice = "hour" | "tomorrow" | "resume";
 
-/** Start of the next local day: "Until tomorrow" lifts the pause at midnight. */
-export function startOfTomorrow(now: Date): Date {
-  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 0);
+const DEFAULT_TOMORROW_AT = "08:00"; // pipeline.yaml: ui.pause_until_tomorrow_at (Recommended)
+
+/** Tomorrow at `hhmm` local time. Built from the calendar date, so a DST change overnight keeps the wall clock. */
+export function tomorrowAt(now: Date, hhmm: string): Date {
+  const m = /^([01]\d|2[0-3]):([0-5]\d)$/.exec(hhmm) ?? /^(\d\d):(\d\d)$/.exec(DEFAULT_TOMORROW_AT)!;
+  return new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, Number(m[1]), Number(m[2]), 0, 0);
 }
 
-export function untilFor(choice: PauseChoice, now: Date): string | null {
+export function untilFor(choice: PauseChoice, now: Date, tomorrow: string): string | null {
   if (choice === "hour") return "+1h";
-  if (choice === "tomorrow") return startOfTomorrow(now).toISOString();
+  if (choice === "tomorrow") return tomorrowAt(now, tomorrow).toISOString();
   return null;
 }
 
@@ -34,7 +37,7 @@ export function PauseAllControl({ paused }: { paused: Pause | null | undefined }
   const resume = useResume();
   const toast = useToast();
   const name = useId();
-  const now = useNow(60_000);
+  const tomorrow = useMeta().data?.ui.pause_until_tomorrow_at ?? DEFAULT_TOMORROW_AT;
 
   if (paused) {
     return (
@@ -50,7 +53,7 @@ export function PauseAllControl({ paused }: { paused: Pause | null | undefined }
   }
   const options: { value: PauseChoice; label: string; rec?: boolean }[] = [
     { value: "hour", label: "For 1 hour" },
-    { value: "tomorrow", label: `Until tomorrow (${formatWhen(startOfTomorrow(now).toISOString(), now)})` },
+    { value: "tomorrow", label: `Until tomorrow, ${formatClock(tomorrow)}` },
     { value: "resume", label: "Until I resume", rec: true },
   ];
   return (
@@ -87,7 +90,7 @@ export function PauseAllControl({ paused }: { paused: Pause | null | undefined }
           pending={pause.isPending}
           pendingLabel="Pausing…"
           onClick={() =>
-            pause.mutate(untilFor(choice, new Date()), {
+            pause.mutate(untilFor(choice, new Date(), tomorrow), {
               onSuccess: () => {
                 setOpen(false);
                 anchor.current?.focus();
@@ -148,6 +151,7 @@ export function CatchUpBanner({ record }: { record: CatchUp }) {
   const toast = useToast();
   const now = useNow(60_000);
   const [asking, setAsking] = useState(false);
+  const skipButton = useRef<HTMLButtonElement>(null);
   const { title, detail } = catchUpText(record, now);
   return (
     <div role="region" aria-label="Missed runs" className={styles.banner} data-kind="orange">
@@ -164,6 +168,7 @@ export function CatchUpBanner({ record }: { record: CatchUp }) {
               cancelLabel="Keep them"
               confirmLabel="Skip missed runs"
               pending={catchUp.isPending}
+              returnFocusRef={skipButton}
               onCancel={() => setAsking(false)}
               onConfirm={() =>
                 catchUp.mutate(true, {
@@ -182,7 +187,7 @@ export function CatchUpBanner({ record }: { record: CatchUp }) {
       </div>
       {asking ? null : (
         <>
-          <Button size="small" onClick={() => setAsking(true)}>
+          <Button ref={skipButton} size="small" onClick={() => setAsking(true)}>
             Skip missed runs
           </Button>
           <Button

@@ -178,7 +178,7 @@ export interface Meta {
     recommended: string;
     current: string;
   };
-  ui: { theme: string; undo_seconds: number; page_size: number };
+  ui: { theme: string; undo_seconds: number; page_size: number; pause_until_tomorrow_at?: string };
 }
 
 export interface StreamLine {

@@ -131,6 +131,7 @@ ui:                                        # reusable default: fine to keep. `ca
   page_size: 100                           # 100 (Recommended): rows per page in Jobs and Runs history (20 to 1000)
   watch_debounce_ms: 300                   # 300 (Recommended): the app refreshes once files are quiet this long
   index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
+  pause_until_tomorrow_at: "08:00"         # "08:00" (Recommended): Runs › Pause all › "Until tomorrow" ends then (local)
   pipeline:
     columns:                               # (Recommended) the six below. Each status sits in at most one column;
       - {name: Found, statuses: [found, scored]}          # statuses in no column (skipped, rejected, withdrawn,
