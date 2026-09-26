@@ -75,6 +75,8 @@ def test_scout_to_disk_to_tracker_sync(temp_root: Path, home: Path, recorded_htt
     (temp_root / "config" / "companies.yaml").write_text(yaml.safe_dump(companies))
     targets = yaml.safe_load((temp_root / "config" / "targets.yaml").read_text())
     targets["location"]["blocked_countries"] = ["DE"]  # the example blocks nothing; exercise the filter
+    # recorded payloads carry fixed dates; keep the stale check out of this test (test_ghost_integration covers it)
+    targets.setdefault("safety", {})["ghost"] = {"stale_flag_days": 100000, "stale_skip_days": 100000}
     (temp_root / "config" / "targets.yaml").write_text(yaml.safe_dump(targets))
 
     s = Settings.load(temp_root)

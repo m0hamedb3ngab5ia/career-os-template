@@ -65,7 +65,8 @@ def cmd_scout(args: argparse.Namespace) -> int:
     t = summary.totals
     print()
     print(f"scout done: fetched={t['fetched']} new={t['new']} stored={t['stored']} "
-          f"filtered(title={t['filtered_title']} location={t['filtered_location']} blocklist={t['filtered_blocklist']})")
+          f"filtered(title={t['filtered_title']} location={t['filtered_location']} blocklist={t['filtered_blocklist']} "
+          f"flagged={t['filtered_flagged']} ghost={t['filtered_ghost']})")
     if summary.bad_slugs:
         print("\nbad slugs (404) — fix in config/companies.yaml:")
         for b in summary.bad_slugs:
@@ -233,6 +234,7 @@ def cmd_action_add(args: argparse.Namespace) -> int:
 
 
 SAFETY_HARD_EXIT = 3
+GHOST_SKIP_EXIT = 4
 
 
 def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
@@ -253,9 +255,13 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
     reg_path = registry.default_path(s)
-    flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
+    from careeros.safety.ghost import check_ghost, load_signals
+
+    scam_flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
+    ghost_flags = check_ghost(p, store.history_for(p), load_signals(s), s)
+    flags = scam_flags + ghost_flags
     ok, why = auto_submit_allowed(p, s)
-    hard_flags = hard(flags)
+    hard_flags = hard(scam_flags)
     result = {"job_id": p.job_id, "checked_at": datetime.now().isoformat(timespec="seconds"),
               "pass": not hard_flags, "flags": [f.to_dict() for f in flags],
               "auto_submit_allowed": ok and not flags, "auto_submit_reason": why or ("soft flags" if flags else "")}
@@ -263,6 +269,16 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
     for f in flags:
         print(f"  {f.severity.upper():<4}  {f.code:<20} {f.detail}")
     if not hard_flags:
+        hard_ghost = hard(ghost_flags)
+        if hard_ghost:
+            codes = "; ".join(dict.fromkeys(f.code for f in hard_ghost))
+            _set_status_both(s, p.job_id, "skipped", f"ghost job: {hard_ghost[0].detail}"[:200])
+            print(f"{p.job_id}: GHOST SKIP ({codes})")
+            return GHOST_SKIP_EXIT
+        if ghost_flags and s.is_dream(p.company):
+            print(_add_action(s, f"possible ghost job at dream company: {'; '.join(f.detail for f in ghost_flags)}"[:300],
+                              "ghost_job", job_id=p.job_id, link=p.url or p.apply_url, priority="M",
+                              needs="anytime", dedupe=True))
         print(f"{p.job_id}: safety pass" + (f" ({len(flags)} soft flag(s))" if flags else ""))
         return 0
     codes = "; ".join(dict.fromkeys(f.code for f in hard_flags))
@@ -308,6 +324,16 @@ def cmd_safety_verify(args: argparse.Namespace) -> int:
     e = registry.add_verified(registry.verified_path(s), args.company, domain=args.domain or "",
                               evidence=args.evidence)
     print(f"verified: {e['company']} {e.get('domain') or ''} -> {registry.verified_path(s)}")
+    return 0
+
+
+def cmd_safety_signal(args: argparse.Namespace) -> int:
+    """Record a hiring freeze / layoffs report (or `none` after a clean check) for ghost-job detection."""
+    from careeros.safety.ghost import default_signals_path, save_signal
+
+    s = _settings(args)
+    e = save_signal(s, args.company, args.kind, args.date, args.source)
+    print(f"signal: {args.company} {e['kind']} {e['date']} -> {default_signals_path(s)}")
     return 0
 
 
@@ -458,7 +484,7 @@ def build_parser() -> argparse.ArgumentParser:
     ad.add_argument("id")
     ad.set_defaults(fn=cmd_action_done)
 
-    sf = sub.add_parser("safety", help="scam / data-harvesting gate (exit 3 = hard stop)")
+    sf = sub.add_parser("safety", help="scam + ghost-job gate (exit 3 = scam stop, 4 = ghost skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)
     sck = sfs.add_parser("check", help="posting checks -> safety.json; hard flag = Action Item + needs_review")
     sck.add_argument("job_id")
@@ -472,6 +498,12 @@ def build_parser() -> argparse.ArgumentParser:
     svf.add_argument("--domain")
     svf.add_argument("--evidence", required=True, help="what was checked, e.g. careers page URL, LinkedIn size")
     svf.set_defaults(fn=cmd_safety_verify)
+    ssg = sfs.add_parser("signal", help="record a hiring freeze / layoffs report for ghost-job checks")
+    ssg.add_argument("company")
+    ssg.add_argument("--kind", choices=["freeze", "layoffs", "none"], required=True)
+    ssg.add_argument("--date", required=True, help="YYYY-MM-DD of the report (today for `none`)")
+    ssg.add_argument("--source", required=True, help="URL of the report, or what was checked")
+    ssg.set_defaults(fn=cmd_safety_signal)
     sfl = sfs.add_parser("flag", help="add a company (and domain) to data/flagged_registry.yaml by hand")
     sfl.add_argument("company")
     sfl.add_argument("--domain")

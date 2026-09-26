@@ -145,6 +145,52 @@ class Store:
         self.save_seen(seen)
         return seen
 
+    # --- posting history (ghost jobs) ------------------------------------------
+
+    @property
+    def history_file(self) -> Path:
+        return self.seen_file.parent / "posting_history.json"
+
+    def load_history(self) -> dict[str, dict[str, Any]]:
+        if not self.history_file.exists():
+            return {}
+        try:
+            return json.loads(self.history_file.read_text(encoding="utf-8")) or {}
+        except (json.JSONDecodeError, TypeError):
+            return {}
+
+    def update_history(self, postings: list[Posting], today: str | None = None) -> dict[str, dict[str, Any]]:
+        """Record every fetched posting (seen or not) under its role key, so a role reposted under a new ATS
+        id is visible. Returns the touched entries by key."""
+        from careeros.safety.ghost import history_key
+
+        hist = self.load_history()
+        now = today or now_iso()
+        touched: dict[str, dict[str, Any]] = {}
+        for p in postings:
+            key = history_key(p.company, p.title, p.location)
+            e = hist.setdefault(key, {"first_seen": now, "last_seen": now, "posted_at_min": None,
+                                      "ats_job_ids": [], "job_ids": [], "sightings": []})
+            e["last_seen"] = now
+            pid = p.ats_job_id or p.url or p.job_id
+            if pid not in e["ats_job_ids"]:
+                e["ats_job_ids"].append(pid)
+                e["sightings"].append((p.posted_at or now)[:10])
+            if p.job_id not in e["job_ids"]:
+                e["job_ids"].append(p.job_id)
+            if p.posted_at and (not e["posted_at_min"] or p.posted_at[:10] < e["posted_at_min"]):
+                e["posted_at_min"] = p.posted_at[:10]
+            touched[key] = e
+        tmp = self.history_file.with_name(f"{self.history_file.name}.{os.getpid()}.tmp")
+        tmp.write_text(json.dumps(hist, indent=1, sort_keys=True), encoding="utf-8")
+        tmp.replace(self.history_file)
+        return touched
+
+    def history_for(self, p: Posting) -> dict[str, Any] | None:
+        from careeros.safety.ghost import history_key
+
+        return self.load_history().get(history_key(p.company, p.title, p.location))
+
     # --- listing -----------------------------------------------------------
 
     def iter_job_ids(self) -> Iterator[str]:

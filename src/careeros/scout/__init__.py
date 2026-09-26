@@ -7,6 +7,7 @@ from typing import Any
 from careeros.config import ConfigError, Settings, get_settings
 from careeros.models import Posting
 from careeros.safety import registry
+from careeros.safety.ghost import check_ghost, history_key, load_signals
 from careeros.safety.registry import is_flagged
 from careeros.scout.ashby import AshbyAdapter
 from careeros.scout.base import Adapter, BoardNotFound, FetchError
@@ -47,6 +48,7 @@ class BoardResult:
     filtered_blocklist: int = 0
     filtered_seniority: int = 0
     filtered_flagged: int = 0
+    filtered_ghost: int = 0
     error: str = ""
     stored_ids: list[str] = field(default_factory=list)
 
@@ -66,7 +68,7 @@ class ScoutSummary:
     @property
     def totals(self) -> dict[str, int]:
         keys = ("fetched", "new", "stored", "filtered_title", "filtered_location", "filtered_blocklist", "filtered_seniority",
-                "filtered_flagged")
+                "filtered_flagged", "filtered_ghost")
         return {k: sum(getattr(b, k) for b in self.boards) for k in keys}
 
 
@@ -152,6 +154,7 @@ def run_scout(
         # Every title would fail the prefilter and be marked seen for good; refuse instead.
         raise ConfigError("no active category has title_keywords in config/categories.yaml; refusing to scout")
     seen = st.load_seen()
+    signals = load_signals(s)
     summary = ScoutSummary()
 
     for board in s.boards:
@@ -194,6 +197,7 @@ def run_scout(
             continue
 
         res.fetched = len(postings)
+        history = st.update_history(postings)
         new_ids: list[str] = []
         for p in postings:
             if p.job_id in seen:
@@ -202,6 +206,10 @@ def run_scout(
             ok, reason, cat = pf.check(p)
             if not ok:
                 setattr(res, f"filtered_{reason}", getattr(res, f"filtered_{reason}") + 1)
+                continue
+            ghost = check_ghost(p, history.get(history_key(p.company, p.title, p.location)), signals, s)
+            if any(f.severity == "hard" for f in ghost):
+                res.filtered_ghost += 1
                 continue
             p.raw["prefilter_category"] = cat
             st.save_posting(p)
@@ -213,7 +221,7 @@ def run_scout(
         st.save_seen(seen)
         log(
             f"[scout] {company:<22} {ats:<10} fetched={res.fetched:<4} new={res.new:<4} stored={res.stored:<3} "
-            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority} flagged-{res.filtered_flagged})"
+            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority} flagged-{res.filtered_flagged} ghost-{res.filtered_ghost})"
         )
 
     return summary

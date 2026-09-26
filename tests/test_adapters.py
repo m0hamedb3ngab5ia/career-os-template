@@ -244,3 +244,14 @@ def test_lever_remote_secondary_location_without_workplace_type():
              "categories": {"location": "New York", "allLocations": ["New York", "Remote"]}}]
     p = LeverAdapter().parse(data, BOARD)[0]
     assert p.location == "New York, Remote" and p.remote is True
+
+
+def test_greenhouse_posted_at_prefers_first_published():
+    """`updated_at` resets on every edit; the real age comes from `first_published`."""
+    from careeros.scout.greenhouse import GreenhouseAdapter
+
+    data = {"jobs": [{"id": 1, "title": "SWE", "absolute_url": "https://x", "updated_at": "2026-09-20T00:00:00Z",
+                      "first_published": "2026-06-01T00:00:00Z"},
+                     {"id": 2, "title": "SWE", "absolute_url": "https://y", "updated_at": "2026-09-20T00:00:00Z"}]}
+    ps = GreenhouseAdapter().parse(data, {"company": "Acme", "slug": "acme"})
+    assert ps[0].posted_at.startswith("2026-06-01") and ps[1].posted_at.startswith("2026-09-20")

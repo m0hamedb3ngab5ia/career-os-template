@@ -33,7 +33,7 @@ class GreenhouseAdapter(Adapter):
                     apply_url=j.get("absolute_url") or "",
                     ats=self.ats,
                     ats_job_id=str(j.get("id")) if j.get("id") is not None else None,
-                    posted_at=j.get("updated_at") or j.get("first_published"),
+                    posted_at=j.get("first_published") or j.get("updated_at"),  # updated_at resets on edit
                     description_html=content_html,
                     description_text=html_to_text(content_html),
                     departments=depts,

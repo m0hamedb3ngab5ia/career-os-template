@@ -321,3 +321,9 @@ def test_apply_job_scam_gate_runs_the_safety_cli():
 def test_score_job_skips_on_scam_flags():
     text = _skill("score-job")
     assert "careeros safety check" in text and "scam_" in text
+
+
+def test_score_job_checks_ghost_signals():
+    text = _skill("score-job")
+    assert "ghost_stale" in text and "ghost_freeze" in text
+    assert "careeros safety signal" in text
