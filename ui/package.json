@@ -1,0 +1,39 @@
+{
+  "name": "careeros-ui",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "description": "career-os local web UI. Built into src/careeros/ui/static and served by `careeros ui`.",
+  "engines": {
+    "node": ">=22.22"
+  },
+  "scripts": {
+    "check-node": "node scripts/check-node.mjs",
+    "dev": "vite",
+    "typecheck": "tsc -b --noEmit",
+    "test": "vitest",
+    "prebuild": "node scripts/check-node.mjs",
+    "build": "tsc -b --noEmit && vite build"
+  },
+  "dependencies": {
+    "@tanstack/react-query": "5.104.0",
+    "lucide-react": "1.48.0",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
+    "react-router": "8.4.0"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "7.0.1",
+    "@testing-library/react": "16.3.3",
+    "@testing-library/user-event": "14.6.7",
+    "@types/node": "26.6.3",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.1",
+    "axe-core": "4.13.0",
+    "jsdom": "30.1.1",
+    "typescript": "7.0.2",
+    "vite": "8.3.1",
+    "vitest": "5.0.2"
+  }
+}
