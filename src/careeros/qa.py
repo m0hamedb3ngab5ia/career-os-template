@@ -61,6 +61,7 @@ TOOL_ALLOWLIST = {
     "summary", "experience", "projects", "project", "education", "skills", "technical",
     "leadership", "languages", "frameworks", "tools", "concepts", "programming", "coursework",
     "relevant", "activities", "certifications", "awards", "honors", "interests", "libraries", "platforms",
+    "technologies", "technology", "databases", "cloud", "devops", "messaging", "scheduling", "testing", "ci",
     "gpa", "b.e", "b.e.", "b.s", "b.s.", "bs", "be", "bachelor", "bachelors", "bachelor's",
     "master", "masters", "degree", "university", "institute", "college", "school",
     "us", "usa", "u.s", "u.s.", "nj", "ny", "ct", "ma", "pa", "remote", "hybrid",
@@ -305,9 +306,17 @@ class ProfileIndex:
     def summary_text(self) -> str:
         return " ".join(str(v) for v in (self.profile.get("summary_variants", {}) or {}).values())
 
-    def skills_text(self) -> str:
+    def skill_terms(self) -> list[str]:
+        """`skills.*` lists plus `skill_groups[].items` (the master résumé's grouped skills)."""
         sk = self.profile.get("skills", {}) or {}
-        return " ".join(str(x) for vals in sk.values() for x in (vals or []))
+        terms = [str(x) for vals in sk.values() if isinstance(vals, list) for x in vals]
+        for g in self.profile.get("skill_groups") or []:
+            if isinstance(g, dict):
+                terms += [str(x) for x in g.get("items") or []]
+        return terms
+
+    def skills_text(self) -> str:
+        return " ".join(self.skill_terms())
 
     def stacks_text(self) -> str:
         parts = []
@@ -858,20 +867,38 @@ class Checker:
     def check_skills_traced(self) -> None:
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         skills = (rj or {}).get("skills")
-        if not isinstance(skills, dict) or not any(skills.values()):
+        terms = [t for vals in (skills.values() if isinstance(skills, dict) else []) for t in (vals or [])]
+        terms += [t for g in ((rj or {}).get("skill_groups") or []) if isinstance(g, dict) for t in (g.get("items") or [])]
+        if not terms:
             self.skip("skills_traced", "hard", "resume.json has no skills")
             return
-        allowed = {str(x).strip().lower() for vals in (self.profile.profile.get("skills") or {}).values()
-                   for x in (vals or [])}
+        allowed = {x.strip().lower() for x in self.profile.skill_terms()}
         for e in self._resume_entries():
             parent = self.profile.parents.get(str(e.get("id") or ""), {})
             allowed |= {str(x).strip().lower() for x in parent.get("stack") or []}
         cited = " ".join(self.profile.bullet_text(b) for b in self._cited_ids().get("resume.json", set()))
-        unknown = [str(t) for vals in skills.values() for t in (vals or [])
+        unknown = [str(t) for t in terms
                    if str(t).strip().lower() not in allowed and not _term_in_text(str(t).strip(), cited)]
         self.add("skills_traced", "hard", not unknown,
                  "all skills in profile skills/stack/cited bullets" if not unknown
                  else f"not in profile: {', '.join(unknown)}")
+
+    def check_section_order(self) -> None:
+        """resume.json sections follow `qa.yaml: resume.hard.section_order` (summary may lead); sections a
+        résumé leaves out are fine. Keeps skills at the end, as on the master résumé."""
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        want = [str(x) for x in (((self.qa_cfg.get("resume") or {}).get("hard") or {}).get("section_order") or [])]
+        secs = (rj or {}).get("sections")
+        if not want or not isinstance(secs, list):
+            self.skip("section_order", "hard", "no section_order in qa.yaml or no sections in resume.json")
+            return
+        got = [str(x.get("type")) for x in sorted(secs, key=lambda x: x.get("order", 99)) if isinstance(x, dict)]
+        got = [t for t in got if t != "summary"]
+        expected = [t for t in want if t in got]
+        ours = [t for t in got if t in want]
+        self.add("section_order", "hard", ours == expected,
+                 f"sections in order: {', '.join(ours)}" if ours == expected
+                 else f"sections {', '.join(ours)} must follow {', '.join(want)}")
 
     def check_standard_answers(self) -> None:
         """type=standard answers equal profile/standard_answers.yaml verbatim (by standard_key; null stays
@@ -1135,6 +1162,7 @@ class Checker:
         self.check_bullet_fidelity()
         self.check_entry_headers()
         self.check_skills_traced()
+        self.check_section_order()
         self.check_standard_answers()
         self.check_numbers()
         self.check_estimates()

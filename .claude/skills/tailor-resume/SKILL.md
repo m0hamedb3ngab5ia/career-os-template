@@ -71,8 +71,13 @@ Procedure:
 3. Education: always every `education[]` entry (most recent first); include `gpa`; include up to 6 `coursework` items, prioritizing ones
    that echo posting terms (e.g. Database Systems, Machine Learning); include `activities` only if the
    budget allows.
-4. Skills: reorder each list so terms in `required_skills` come first; drop terms irrelevant to the
-   category if over budget (never add). Keep the four keys `programming, frameworks, tools, concepts`.
+4. Skills, always the last section, formatted like the master résumé:
+   - When `profile.skill_groups` exists, copy it to `resume.json.skill_groups` in the same group order with
+     the same labels, and copy `profile.skills_heading` to `resume.json.skills_heading` (e.g.
+     "Languages & Technologies"). Set `skills` to `{}`. Within each group, move terms in `required_skills`
+     first; if over budget drop the least relevant terms, then whole groups irrelevant to the category
+     (e.g. CAD tools for a backend role). Never add a term or a group, never rename a label.
+   - Otherwise, the four keys `programming, frameworks, tools, concepts`, same reorder/drop rules.
 5. Summary: pick the `profile.summary_variants` key by category:
    - `backend` -> `swe_backend`, `swe_platform`, `quant_dev`, `sre_devops`
    - `data` -> `data_engineering`

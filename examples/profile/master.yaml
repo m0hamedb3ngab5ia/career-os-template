@@ -124,6 +124,13 @@ skills:                      # QA rejects any tool in a résumé that is not lis
   frameworks: [FastAPI, React, SwiftUI, Node.js]                     # INSERT: frameworks and libraries
   tools: [PostgreSQL, Kafka, Docker, AWS, Airflow, Git, Supabase, XCTest]   # INSERT: databases, cloud, tools
   concepts: [REST APIs, ETL Pipelines, Microservices, CI/CD]         # INSERT: concepts and practices
+# Optional: the exact skills block of your master résumé (group order and labels). When set, tailored
+# résumés copy it, last, under `skills_heading`, instead of the four keys above. Terms here count as known
+# skills for QA too.
+# skills_heading: "Languages & Technologies"
+# skill_groups:
+#   - {label: Languages, items: [Python, SQL, TypeScript]}
+#   - {label: Databases, items: [PostgreSQL, Supabase]}
 
 leadership:
   - id: acm                                       # INSERT: short unique id, or delete the whole section

@@ -319,3 +319,39 @@ def test_cover_txt_only_without_profile_fails(tmp_path: Path, monkeypatch):
     p = _cl(tmp_path, "Body.\n")
     assert cover.main([p.as_posix(), "--txt-only"]) == 1
     assert not (tmp_path / "cover_letter.txt").exists()
+
+
+# --- skill groups (match the master résumé's skills block) -----------------------------------------------
+
+GROUPS = [{"label": "Languages", "items": ["Python", "SQL"]},
+          {"label": "Cloud & DevOps", "items": ["Docker"]},
+          {"label": "Empty", "items": []}]
+
+
+def test_txt_skill_groups_replace_fixed_keys(tmp_path: Path):
+    lines = _txt(tmp_path, {"identity": {"name": "A"}, "skills": {"tools": ["Git"]}, "skill_groups": GROUPS,
+                            "skills_heading": "Languages & Technologies", "sections": None})
+    assert "LANGUAGES & TECHNOLOGIES" in lines and "SKILLS" not in lines
+    assert "Languages: Python, SQL" in lines and "Cloud & DevOps: Docker" in lines
+    assert not any(line.startswith("Empty") for line in lines) and "Tools & Platforms: Git" not in lines
+    assert lines.index("LANGUAGES & TECHNOLOGIES") > max(i for i, x in enumerate(lines) if x.startswith("A"))
+
+
+def test_tex_skill_groups_render_last_with_heading(tmp_path: Path):
+    data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()), ["acme.1"])
+    data["skill_groups"] = GROUPS
+    data["skills_heading"] = "Languages & Technologies"
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(data))
+    tex = resume.render(p, pdf=False).read_text()
+    assert r"\section{Languages \& Technologies}" in tex and r"\section{Skills}" not in tex
+    assert r"\textbf{Cloud \& DevOps:} Docker" in tex and r"\textbf{Empty" not in tex
+    assert tex.rindex(r"\section{") == tex.index(r"\section{Languages \& Technologies}")
+
+
+def test_tex_legacy_skills_still_render(tmp_path: Path):
+    data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()), ["acme.1"])
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(data))
+    tex = resume.render(p, pdf=False).read_text()
+    assert r"\section{Skills}" in tex and r"\textbf{Programming:}" in tex

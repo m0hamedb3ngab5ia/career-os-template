@@ -105,6 +105,10 @@ def load_resume(path: Path) -> dict[str, Any]:
     data.setdefault("projects", [])
     data.setdefault("education", [])
     data.setdefault("skills", {})
+    # Optional: ordered skill groups copied from the profile (the master résumé's categories). When present
+    # they replace the four fixed `skills` keys; `skills_heading` names the section (default "Skills").
+    data["skill_groups"] = [g for g in data.get("skill_groups") or [] if isinstance(g, dict) and g.get("items")]
+    data["skills_heading"] = data.get("skills_heading") or "Skills"
     data.setdefault("meta", {})
     secs = data.get("sections") or [{"type": t, "order": i} for i, t in enumerate(SECTION_ORDER_DEFAULT, 1)]
     data["sections"] = sorted(secs, key=lambda s: s.get("order", 99))
@@ -303,8 +307,13 @@ def render_txt(resume_json_path: str | Path) -> Path:
                 if ed.get("activities"):
                     lines.append("Activities: " + ", ".join(ed["activities"]))
                 lines.append("")
+        elif t == "skills" and d["skill_groups"]:
+            lines.append(d["skills_heading"].upper())
+            for g in d["skill_groups"]:
+                lines.append(f"{g.get('label', '')}: " + ", ".join(str(x) for x in g["items"]))
+            lines.append("")
         elif t == "skills" and d["skills"]:
-            lines.append("SKILLS")
+            lines.append(d["skills_heading"].upper())
             for key, label in (("programming", "Programming"), ("frameworks", "Frameworks & Libraries"),
                                ("tools", "Tools & Platforms"), ("concepts", "Concepts")):
                 if d["skills"].get(key):

@@ -173,3 +173,28 @@ def test_candidate_estimate_keeps_its_tilde_through_render_and_qa(temp_root: Pat
     assert code == 1 and res["pass"] is False
     assert checks["bullet_fidelity"]["ok"] and checks["number_audit:resume.txt"]["ok"]
     assert any(r.startswith("estimate_marked: resume.txt: acme.2 estimate 40 shown without ~") for r in res["fail_reasons"])
+
+
+def test_skill_groups_render_last_and_pass_qa(temp_root: Path, home: Path, job_dir: Path):
+    """Profile with master-style skill groups -> resume.json copies them -> rendered last under the
+    configured heading -> strict QA passes; moving skills up fails section_order."""
+    prof_path = temp_root / "profile" / "master.yaml"
+    prof = yaml.safe_load(prof_path.read_text())
+    groups = [{"label": "Languages", "items": list(prof["skills"]["programming"][:3])},
+              {"label": "Tools & Platforms", "items": list(prof["skills"]["tools"][:2])}]
+    prof["skill_groups"], prof["skills_heading"] = groups, "Languages & Technologies"
+    prof_path.write_text(yaml.safe_dump(prof, sort_keys=False))
+    rj = json.loads((job_dir / "resume.json").read_text())
+    rj["skill_groups"], rj["skills_heading"], rj["skills"] = groups, "Languages & Technologies", {}
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    args = ["templates/resume/render.py", str(job_dir / "resume.json")] + ([] if HAS_ENGINE else ["--no-pdf"])
+    assert _run(temp_root, home, *args).returncode == 0
+    txt = (job_dir / "resume.txt").read_text().splitlines()
+    assert "LANGUAGES & TECHNOLOGIES" in txt and txt.index("LANGUAGES & TECHNOLOGIES") > txt.index("EDUCATION")
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 0 and res["pass"] is True, res["fail_reasons"]
+
+    rj["sections"] = [{"type": t, "order": i} for i, t in enumerate(["skills", "experience", "projects", "education"], 1)]
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 1 and any(r.startswith("section_order") for r in res["fail_reasons"])
