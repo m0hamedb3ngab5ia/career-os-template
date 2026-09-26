@@ -6,7 +6,10 @@ import { routes } from "../app/routes";
 import { ToastProvider } from "../kit/Toast";
 import { FakeEventSource } from "./fakeEventSource";
 
-/** Render the whole app (shell + routes) at `path` with a fresh query cache. Mock fetch first (apiMock). */
+/**
+ * Render the whole app (shell + routes) at `path` with a fresh query cache. Mock fetch first (apiMock).
+ * Screen routes are lazy-loaded: the first `findBy…` should allow a few seconds on a busy test runner.
+ */
 export function renderApp(path: string) {
   FakeEventSource.instances = [];
   vi.stubGlobal("EventSource", FakeEventSource);

@@ -75,7 +75,9 @@ describe("AppShell", () => {
 
   it("job detail and settings sub-routes resolve", async () => {
     renderAt("/jobs/a3f91c02d7e4");
-    expect(await screen.findByRole("link", { name: /^Jobs/ })).toHaveAttribute("aria-current", "page");
+    // the Job detail route is lazy-loaded
+    const nav = await screen.findByRole("navigation", { name: "Sections" }, { timeout: 5000 });
+    expect(within(nav).getByRole("link", { name: /^Jobs/ })).toHaveAttribute("aria-current", "page");
   });
 
   it("unknown routes show a not-found page inside the shell", () => {
@@ -103,7 +105,7 @@ describe("AppShell", () => {
     it("on Jobs it keeps the other view settings, mirrors q, and an empty search clears it", async () => {
       const user = userEvent.setup();
       const { router } = renderAt("/jobs?tab=review&q=globex");
-      const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
+      const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
       expect(box).toHaveValue("globex");
       await user.clear(box);
       await user.type(box, "initech{Enter}");

@@ -50,7 +50,7 @@ describe.each(["dialog", "sheet"] as const)("%s", (kind) => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("has no axe violations", async () => {
+  it("has no axe violations", { timeout: 20_000 }, async () => {
     const user = userEvent.setup();
     render(<Demo kind={kind} />);
     await user.click(screen.getByRole("button", { name: "Evidence" }));

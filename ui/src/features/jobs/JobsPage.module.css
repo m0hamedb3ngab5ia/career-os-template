@@ -103,6 +103,9 @@
 .row[data-selected] .td {
   background: var(--selected);
 }
+.row :focus-visible {
+  scroll-margin-top: 44px; /* keep focused cells clear of the sticky header */
+}
 .spacer td {
   padding: 0;
   border: 0;

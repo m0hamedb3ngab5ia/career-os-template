@@ -22,7 +22,6 @@ export function Empty({ sr }: { sr: string }) {
 export interface Column {
   key: string;
   label: string;
-  /** Header text for screen readers when the visible one is short. */
   width?: number;
   sort?: SortKey;
   /** Field name sent to POST /api/jobs/export. */
@@ -42,7 +41,7 @@ export const COLUMNS: Column[] = [
     exportField: "company",
     title: (j) => j.company ?? undefined,
     cell: (j) => (
-      <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company}>
+      <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
         {j.company || j.job_id}
       </Link>
     ),

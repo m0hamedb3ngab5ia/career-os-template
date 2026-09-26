@@ -37,7 +37,7 @@ afterEach(() => {
 describe("Jobs screen", () => {
   it("shows the header, tabs with counts and the first page of the live table", async () => {
     const { api } = setup();
-    expect(await screen.findByRole("heading", { level: 1, name: "Jobs" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Jobs" }, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText(/same columns as the Jobs tab in JobTracker.xlsx/)).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Tracked jobs, sorted by fit, highest first" });
     expect(within(table).getByRole("rowheader", { name: "Northwind Labs" })).toBeInTheDocument();
@@ -259,7 +259,7 @@ describe("Jobs screen", () => {
     expect(side).toHaveValue("globex");
   });
 
-  it("has no axe violations", async () => {
+  it("has no axe violations", { timeout: 20_000 }, async () => {
     const { container } = setup("/jobs?sel=nw01");
     await screen.findByRole("table");
     await screen.findByRole("tab", { name: "Active (59)" });

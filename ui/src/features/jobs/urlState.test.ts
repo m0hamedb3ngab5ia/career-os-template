@@ -20,8 +20,8 @@ describe("Jobs URL state", () => {
   });
 
   it("writes only non-default values, keeping unrelated params", () => {
-    const p = writeView(new URLSearchParams("x=1&tab=review"), { tab: "active", q: "ramp", sort: "-fit" });
-    expect(p.toString()).toBe("x=1&q=ramp");
+    const p = writeView(new URLSearchParams("x=1&tab=review"), { tab: "active", q: "globex", sort: "-fit" });
+    expect(p.toString()).toBe("x=1&q=globex");
     expect(writeView(new URLSearchParams(), { hidden: ["ats"], selected: ["a1", "b2"] }).toString()).toBe(
       "cols=ats&sel=a1%2Cb2",
     );
