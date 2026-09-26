@@ -209,7 +209,7 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
                              rcfg.preset, PRESET_LADDER[i - 1]))
         else:
             recs.append(_rec("usage-limit", "runs", "warn", "Runs hit the usage limit",
-                             why + "; run less often (schedule.jobs.score / prepare every_hours)"))
+                             why + "; run less often (fewer schedule.jobs.score / prepare times) or lower runs.custom"))
     ready = any(m["runs"] >= adv["min_runs"] for m in metrics.values())
     return {"ready": ready, "min_runs": adv["min_runs"], "metrics": metrics, "recommendations": recs}
 
