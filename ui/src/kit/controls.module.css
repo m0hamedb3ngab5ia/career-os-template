@@ -251,3 +251,35 @@
     transform: translateY(6px);
   }
 }
+
+/* Meter */
+.meter {
+  min-width: 0;
+}
+.meterHead {
+  display: flex;
+  justify-content: space-between;
+  gap: var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.meterValue {
+  color: var(--label);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.meterTrack {
+  height: 6px;
+  margin-top: 5px;
+  border-radius: 3px;
+  background: var(--fill);
+  overflow: hidden;
+}
+.meterFill {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--accent);
+}
+.confirm[data-variant="primary"] {
+  background: var(--blue-bg);
+}

@@ -39,10 +39,14 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   }
   if (p.config) {
     add(["meta"]);
+    add(["runs"]); // schedule, presets, inbox sync on/off
     add(["settings"]);
     add(["status"]);
   }
-  if (p.status) add(["status"]);
+  if (p.status) {
+    add(["status"]);
+    add(["runs"]); // pause, catch-up, queue, locks and the scheduler's state live in data/runs/
+  }
   return keys;
 }
 

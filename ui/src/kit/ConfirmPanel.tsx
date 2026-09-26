@@ -1,5 +1,5 @@
 import { useEffect, useId, useRef, type KeyboardEvent } from "react";
-import { Button } from "./Button";
+import { Button, type ButtonVariant } from "./Button";
 import styles from "./controls.module.css";
 
 interface ConfirmPanelProps {
@@ -11,10 +11,20 @@ interface ConfirmPanelProps {
   onCancel: () => void;
   onConfirm: () => void;
   pending?: boolean;
+  /** Irreversible and destructive (default) or just consequential ("Install the scheduler?"): primary. */
+  confirmVariant?: Extract<ButtonVariant, "destructive-filled" | "primary">;
 }
 
 /** Inline confirm for irreversible actions. Focus starts on the safe choice; Escape cancels. */
-export function ConfirmPanel({ question, cancelLabel, confirmLabel, onCancel, onConfirm, pending }: ConfirmPanelProps) {
+export function ConfirmPanel({
+  question,
+  cancelLabel,
+  confirmLabel,
+  onCancel,
+  onConfirm,
+  pending,
+  confirmVariant = "destructive-filled",
+}: ConfirmPanelProps) {
   const id = useId();
   const cancelRef = useRef<HTMLButtonElement>(null);
   useEffect(() => cancelRef.current?.focus(), []);
@@ -27,14 +37,20 @@ export function ConfirmPanel({ question, cancelLabel, confirmLabel, onCancel, on
   }
 
   return (
-    <div role="alertdialog" aria-labelledby={id} className={styles.confirm} onKeyDown={onKeyDown}>
+    <div
+      role="alertdialog"
+      aria-labelledby={id}
+      className={styles.confirm}
+      data-variant={confirmVariant}
+      onKeyDown={onKeyDown}
+    >
       <span id={id} className={styles.confirmQuestion}>
         {question}
       </span>
       <Button ref={cancelRef} size="small" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button size="small" variant="destructive-filled" onClick={onConfirm} pending={pending}>
+      <Button size="small" variant={confirmVariant} onClick={onConfirm} pending={pending}>
         {confirmLabel}
       </Button>
     </div>
