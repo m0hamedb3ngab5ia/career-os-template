@@ -205,6 +205,13 @@ Plus a **components sheet**: the 13 status chips, safety badges, tier chips, the
 
 Every run is a subprocess the server owns, one row in the `runs` table, and a stream of events on SSE.
 
+Built: `careeros.ui.services.runs.RunControl` (no web layer yet). Batches start as a detached
+`careeros run <kind> --json` (own session, output in `data/runs/ui/`), so they outlive a UI restart; scout, tracker
+sync, prune and inbox sync start as `python -m careeros.ui.services.step <kind>` and record a run (kind `scout`,
+`tracker`, `prune`) with the same `run.json` + `run.log` shape, one per kind at a time (`data/runs/step-<kind>.lock`).
+Cancel sends SIGTERM only to a careeros run or step process; a batch started by the scheduler (`careeros tick`) is
+stopped with Pause all instead. A `running` run whose process no longer holds its lock reads as `interrupted`.
+
 - CLI steps (`careeros scout`, `careeros tracker sync`, `careeros safety check`): stdout lines stream to the log
   pane; the exit code sets the result (3 = block, 4 = skip for safety).
 - Score and prepare batches: the server calls the same code as `careeros run score|prepare`

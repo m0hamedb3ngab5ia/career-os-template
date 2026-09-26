@@ -299,3 +299,40 @@ def advise(settings: Any, now: datetime) -> dict[str, Any]:
     s = storage_advice(load_snapshots(RunStore(settings)), settings.pipeline, now)
     r = run_advice(load_runs_history(settings), settings.pipeline, now)
     return {"storage": s, "runs": r, "recommendations": s["recommendations"] + r["recommendations"]}
+
+
+def validate_root(root: Any) -> None:
+    """Every config check the CLI would run on `root`; ConfigError rolls a config write back."""
+    from careeros import retention
+    from careeros.config import Settings
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.schedule import load_schedule
+
+    s = Settings.load(root)
+    load_runs_config(s)
+    load_schedule(s)
+    retention.retention_config(s)
+    load_advisor_config(s.pipeline)
+
+
+def apply_recommendation(settings: Any, rec_id: str, now: datetime) -> dict[str, Any]:
+    """Apply ONE current recommendation's YAML change (comments kept, validated, rolled back on error): the code
+    behind `careeros advise apply <id>` and the UI's Apply button. LookupError: no such recommendation now;
+    ValueError: advice only, or the value changed since it was computed; ConfigError: the result did not validate."""
+    import json
+
+    from careeros.runs import yamledit
+
+    recs = {r["id"]: r for r in advise(settings, now)["recommendations"]}
+    rec = recs.get(rec_id)
+    if rec is None:
+        raise LookupError(f"no current recommendation {rec_id!r}" +
+                          (f"; current: {', '.join(recs)}" if recs else "; run `careeros advise`"))
+    c = rec["change"]
+    if not c:
+        raise ValueError(f"{rec_id} is advice only; nothing to change")
+    yamledit.apply_change(settings.root / c["file"], c["path"], c["to"], expect_from=c["from"],
+                          validate=lambda p: validate_root(settings.root),
+                          current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
+                                                               c["path"]))
+    return {"id": rec_id, "file": c["file"], "path": c["path"], "from": c["from"], "to": c["to"]}
