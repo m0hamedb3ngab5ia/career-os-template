@@ -37,13 +37,19 @@ def resolve_tz(name: str | None) -> tzinfo:
         raise ValueError(f"unknown time zone {name!r}") from None
 
 
+def is_date_only(due: str | None) -> bool:
+    """A date with no time: "YYYY-MM-DD", or a naive 00:00 (how Excel stores a typed date)."""
+    s = str(due or "").strip()
+    return len(s) == 10 or re.fullmatch(r"\d{4}-\d{2}-\d{2}[T ]00:00(:00)?", s) is not None
+
+
 def due_at(due: str | None, tz: tzinfo) -> datetime | None:
     """The moment an item is due, or None. A date alone is the end of that day in `tz`; a naive time is in `tz`."""
     if not due:
         return None
     s = str(due).strip()
     try:
-        if len(s) == 10 or re.fullmatch(r"\d{4}-\d{2}-\d{2}[T ]00:00(:00)?", s):  # naive 00:00 = Excel date
+        if is_date_only(s):
             d = date.fromisoformat(s[:10])
             return datetime.combine(d, time(23, 59, 59), tz)
         dt = datetime.fromisoformat(s.replace("Z", "+00:00"))
@@ -85,7 +91,7 @@ def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> dict
         "company": r.get("company") or "", "role": r.get("role") or "", "type": r.get("type") or "other",
         "what": r.get("what") or "", "link": r.get("link") or "", "priority": r.get("priority") or "",
         "needs": r.get("needs") or "", "done": bool(r.get("done")), "done_date": r.get("done_date"),
-        "due": at.isoformat() if at else None, "due_date_only": bool(at and len(str(r.get("due")).strip()) == 10),
+        "due": at.isoformat() if at else None, "due_date_only": bool(at and is_date_only(r.get("due"))),
         "due_reason": r.get("due_reason") if at else None,
         "bucket": due_bucket(r.get("due"), now, tz), "level": due_level(r.get("due"), now, tz, soon_hours),
         # Block company / Mark posting safe act on the item's job, so they need one

@@ -157,3 +157,13 @@ def test_new_item_validation():
     got = svc.validate_new_item({"what": " x ", "due": "2026-10-01", "due_reason": " posting closes "})
     assert got["what"] == "x" and got["due"] == "2026-10-01" and got["due_reason"] == "posting closes"
     assert got["type"] == "other" and got["needs"] == "anytime" and got["priority"] == "M"
+
+
+def test_a_naive_midnight_due_is_date_only():
+    from careeros.ui.services.actions import is_date_only
+    assert is_date_only("2026-10-03")
+    assert is_date_only("2026-10-03 00:00:00")
+    assert is_date_only("2026-10-03T00:00")
+    assert not is_date_only("2026-10-03T00:00:00Z")
+    assert not is_date_only("2026-10-03T09:30:00")
+    assert not is_date_only(None)
