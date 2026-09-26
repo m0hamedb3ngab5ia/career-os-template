@@ -8,7 +8,7 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import PY, build_resume_json, subprocess_env, tectonic_cache
+from conftest import EXAMPLE_REPO, PY, build_resume_json, subprocess_env, tectonic_cache
 
 pytestmark = pytest.mark.integration
 
@@ -60,6 +60,7 @@ def test_resume_no_pdf_writes_tex_and_txt(temp_root: Path, home: Path, resume_js
     tex = (d / "resume.tex").read_text()
     assert r"\begin{document}" in tex and r"{\Large\bfseries Alex Example}" in tex
     assert r"R\&D, 100\% on-call\_rotation \#1" in tex
+    assert r"\hypersetup{pdftitle={Alex Example Resume}, pdfauthor={Alex Example}}" in tex  # PDF metadata
     assert tex.index(r"\section{Experience}") < tex.index(r"\section{Projects}") < tex.index(r"\section{Education}")
     assert not (d / "resume.pdf").exists()
     txt = (d / "resume.txt").read_text()
@@ -81,6 +82,25 @@ def test_resume_compiles_to_one_page_pdf(temp_root: Path, home: Path, resume_jso
     for s in ("AlexExample", "alex@example.com", "555-010-0199"):
         assert s in squashed
     assert not list(d.glob("*.aux")) and not list(d.glob("*.log"))  # build artefacts cleaned
+    import pypdf
+
+    meta = pypdf.PdfReader(str(pdf)).metadata
+    assert meta.title == "Alex Example Resume" and meta.author == "Alex Example"
+
+
+@needs_engine
+def test_resume_pdf_passes_fidelity_checks(temp_root: Path, home: Path, resume_json: Path):
+    """Rendered PDF: clickable identity links, metadata set, no words split by kerning ("A WS", "EDUCA TION")."""
+    assert _run(temp_root, home, "templates/resume/render.py", str(resume_json)).returncode == 0
+    # --root examples/: the shipped example repo, so the example candidate's name is not flagged as a placeholder
+    r = subprocess.run([PY, "-m", "careeros.qa", str(resume_json.parent), "--root", str(EXAMPLE_REPO)], capture_output=True,
+                       text=True, cwd=temp_root, env=subprocess_env(temp_root, home), timeout=300)
+    res = json.loads(r.stdout)
+    checks = {c["check"]: c for c in res["checks"]}
+    for name in ("pdf_links_clickable", "pdf_text_matches_resume", "pdf_fonts_embedded", "pdf_metadata"):
+        assert checks[name]["ok"], (name, checks[name]["detail"])
+    assert "pdf_text_split_words" not in checks, checks.get("pdf_text_split_words")
+    assert res["pdf_fidelity"]["split_tokens"] == []
 
 
 def test_resume_placeholder_exits_nonzero(temp_root: Path, home: Path, resume_json: Path):

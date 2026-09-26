@@ -26,6 +26,11 @@ Output schema (dict / JSON):
       # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
       #   about/approximately/roughly/around) wherever an artifact citing that bullet shows it
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
+      # extended checks (careeros.qa_ext.*; see each module's docstring):
+      "wrong_company_hits": [ {file, name, context} ],   # company.check_wrong_company
+      "consistency": {...},              # consistency.check_cross_doc: titles/years/numbers across documents
+      "outreach_policy": {...},          # outreach_policy.check_outreach_policy: outreach.json send policy
+      "pdf_fidelity": {...},             # pdf_fidelity.check_pdf_fidelity: links, text, fonts, metadata of resume.pdf
     }
 
 A check that cannot run because its input artifact is missing is reported with
@@ -112,6 +117,25 @@ def _load_yaml(p: Path) -> Any:
         return yaml.safe_load(f) or {}
 
 
+def _parse_json(raw: str | None) -> tuple[Any, str | None]:
+    """(parsed value, error message). A missing file (raw None) is (None, None)."""
+    if raw is None:
+        return None, None
+    try:
+        return json.loads(raw), None
+    except json.JSONDecodeError as e:
+        return None, str(e)
+
+
+def _safe_yaml(p: Path) -> dict[str, Any]:
+    """_load_yaml that never raises: a missing, unreadable or non-mapping file is {}."""
+    try:
+        data = _load_yaml(p)
+    except (OSError, yaml.YAMLError):
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
 def find_root(start: Path) -> Path:
     """Repo root = nearest ancestor containing config/pipeline.yaml. Falls back to careeros.config."""
     for p in (start.resolve(), *start.resolve().parents):
@@ -164,6 +188,10 @@ def _term_in_text(term: str, text: str) -> bool:
 def _count_words(text: str) -> int:
     return len(re.findall(r"\S+", text or ""))
 
+
+# public names for careeros.qa_ext.* (the underscored ones stay for existing callers)
+load_yaml = _load_yaml
+count_words = _count_words
 
 _FID_TOKEN = re.compile(r"[a-z0-9$%+#]+(?:[.'/-][a-z0-9$%+#]+)*")
 
@@ -400,12 +428,20 @@ def cited_ids_cover_letter(fm: dict[str, Any]) -> set[str]:
 
 
 class Checker:
+    OPTIONAL_ARTIFACTS = ("resume.pdf", "outreach.json")
+
     def __init__(self, job_dir: Path, root: Path):
         self.job_dir = job_dir
         self.root = root
         self.qa_cfg = _load_yaml(root / "config" / "qa.yaml")
         pipeline = _load_yaml(root / "config" / "pipeline.yaml")
-        paths = (pipeline.get("paths") or {}) if isinstance(pipeline, dict) else {}
+        # shared inputs for careeros.qa_ext.* (loaded once here, read by the extended checks)
+        self.pipeline_cfg: dict[str, Any] = pipeline if isinstance(pipeline, dict) else {}
+        self.companies_cfg: dict[str, Any] = _safe_yaml(root / "config" / "companies.yaml")
+        paths = self.pipeline_cfg.get("paths") or {}
+        paths = paths if isinstance(paths, dict) else {}
+        jobs_dir = Path(str(paths.get("jobs_dir") or "data/jobs")).expanduser()
+        self.jobs_dir = (jobs_dir if jobs_dir.is_absolute() else root / jobs_dir).resolve()
         prof_path = Path(paths.get("profile", "profile/master.yaml"))
         if not prof_path.is_absolute():
             prof_path = root / prof_path
@@ -427,6 +463,9 @@ class Checker:
         self.answers = _read_json(job_dir / "answers.json")
         self.answers_raw = _read_text(job_dir / "answers.json")
         self.outreach_raw = _read_text(job_dir / "outreach.json")
+        # parsed outreach.json / contacts.json: None when missing or unparseable (outreach_error says why)
+        self.outreach, self.outreach_error = _parse_json(self.outreach_raw)
+        self.contacts, _ = _parse_json(_read_text(job_dir / "contacts.json"))
         self.pdf_path = job_dir / "resume.pdf"
         self.artifacts = {
             "posting.json": self.posting is not None,
@@ -436,6 +475,7 @@ class Checker:
             "cover_letter.md": self.cover_md is not None,
             "answers.json": self.answers is not None,
             "resume.pdf": self.pdf_path.exists(),
+            "outreach.json": self.outreach_raw is not None,
         }
         if self.cover_md is not None:
             self.cover_fm, self.cover_body = split_frontmatter(self.cover_md)
@@ -458,7 +498,8 @@ class Checker:
         # tailor-resume writes both before any QA run; a dir without them has nothing to gate
         self.add("resume_present", "hard", not req, "resume.json + resume.txt present" if not req
                  else f"missing: {', '.join(req)}")
-        missing = [k for k, v in self.artifacts.items() if not v and k != "resume.pdf"]
+        # resume.pdf is built late and outreach.json exists only for tier A/B jobs: neither is "missing"
+        missing = [k for k, v in self.artifacts.items() if not v and k not in self.OPTIONAL_ARTIFACTS]
         self.add("artifacts_present", "soft", not missing,
                  "all artifacts present" if not missing else f"missing: {', '.join(missing)}")
         for name, obj in (("posting.json", self.posting), ("score.json", self.score),
@@ -1068,14 +1109,21 @@ class Checker:
         self.add("cover_letter_company_facts", "hard", len(facts) >= min_facts,
                  f"{len(facts)} facts_used (min {min_facts})")
         if isinstance(self.posting, dict) and cl_cfg.get("names_role_and_company", True):
+            from careeros.qa_ext.company import company_spellings, names_company
+
             body_low = self.cover_body.lower()
-            company = str(self.posting.get("company", "")).lower()
+            company = str(self.posting.get("company", "")).strip()
             role = str(self.posting.get("title", "")).lower()
-            ok_company = bool(company) and company in body_low
+            # the posting's name, or a configured alias / domain stem (qa.yaml consistency.company_aliases,
+            # companies.yaml company_domains), any case
+            named = names_company(self.cover_body, company_spellings(self, company)) if company else None
+            ok_company = named is not None
             # role match: full title, or the core noun phrase (strip parentheticals / level suffixes)
             role_core = re.sub(r"\(.*?\)", "", role).split(",")[0].strip()
             ok_role = bool(role) and (role in body_low or (role_core and role_core in body_low))
-            self.add("cover_letter_names_company", "hard", ok_company, f"company '{self.posting.get('company')}' mentioned" if ok_company else "company name not found in body")
+            self.add("cover_letter_names_company", "hard", ok_company,
+                     (f"company '{company}' mentioned" + (f" (as '{named}')" if named != company else ""))
+                     if ok_company else f"company '{company}' (or a configured alias) not found in body")
             self.add("cover_letter_names_role", "hard", ok_role, "role named" if ok_role else f"role '{self.posting.get('title')}' not found in body")
         if self.cover_fm.get("voice_verified") is False:
             self.add("voice_verified", "soft", False, "voice_verified=false (no voice samples yet)")
@@ -1152,6 +1200,12 @@ class Checker:
 
     # ---- run -------------------------------------------------------------
     def run(self) -> dict[str, Any]:
+        # careeros.qa_ext imports names from this module: import at call time, not at module load
+        from careeros.qa_ext.company import check_wrong_company
+        from careeros.qa_ext.consistency import check_cross_doc
+        from careeros.qa_ext.outreach_policy import check_outreach_policy
+        from careeros.qa_ext.pdf_fidelity import check_pdf_fidelity
+
         self.check_artifacts()
         self.check_banned()
         self.check_confidential()
@@ -1169,10 +1223,14 @@ class Checker:
         self.check_tools()
         self.check_contact()
         self.check_pdf()
+        check_pdf_fidelity(self)
         self.check_keyword_coverage()
         self.check_bullet_shape()
         self.check_cover_letter_structure()
         self.check_close_variant()
+        check_wrong_company(self)
+        check_cross_doc(self)
+        check_outreach_policy(self)
         self.check_answers_review()
         hard_fail = [c for c in self.checks if c["level"] == "hard" and not c["ok"]]
         soft_fail = [c for c in self.checks if c["level"] == "soft" and not c["ok"]]
@@ -1193,6 +1251,10 @@ class Checker:
             "banned_hits": self.extras["banned_hits"],
             "confidential_hits": self.extras.get("confidential_hits", []),
             "bullet_shape": self.extras.get("bullet_shape", []),
+            "wrong_company_hits": self.extras.get("wrong_company_hits", []),
+            "consistency": self.extras.get("consistency", {}),
+            "outreach_policy": self.extras.get("outreach_policy", {}),
+            "pdf_fidelity": self.extras.get("pdf_fidelity", {}),
         }
 
 
@@ -1206,7 +1268,7 @@ def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> di
             "summary": {"hard_fail": 1, "soft_fail": 0, "skipped": 0},
             "fail_reasons": [f"job_dir_exists: {job_dir} does not exist"], "warnings": [],
             "keyword_coverage": None, "orphan_numbers": [], "unknown_tools": [], "banned_hits": [], "confidential_hits": [],
-            "bullet_shape": [],
+            "bullet_shape": [], "wrong_company_hits": [], "consistency": {}, "outreach_policy": {}, "pdf_fidelity": {},
         }
     return Checker(job_dir, root_path).run()
 

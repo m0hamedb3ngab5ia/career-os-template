@@ -9,12 +9,24 @@
 \documentclass[10pt,letterpaper]{article}
 
 \usepackage[margin=0.5in]{geometry}
-\usepackage[T1]{fontenc}
-\usepackage[utf8]{inputenc}
-\usepackage{lmodern}
+\usepackage{iftex}
+((= Tectonic (the default engine) is XeTeX: load Latin Modern as OpenType with kerning off. With kerning on,
+    PDF text extraction (pypdf, many ATS parsers) splits kerned pairs into two words: "A WS", "EDUCA TION",
+    "T ools". pdflatex keeps the classic T1 Latin Modern setup. =))
+\ifXeTeX
+  \usepackage{fontspec}
+  \setmainfont{lmroman10}[Extension=.otf, UprightFont=*-regular, BoldFont=*-bold, ItalicFont=*-italic,
+    BoldItalicFont=*-bolditalic, Kerning=Off]
+\else
+  \usepackage[T1]{fontenc}
+  \usepackage[utf8]{inputenc}
+  \usepackage{lmodern}
+\fi
 \usepackage{enumitem}
 \usepackage{titlesec}
-\usepackage[hidelinks,pdfusetitle]{hyperref}
+\usepackage[hidelinks]{hyperref}
+((= PDF /Title and /Author (what a recruiter's viewer and some ATSs show), from profile identity.name =))
+\hypersetup{pdftitle={(((identity.name))) Resume}, pdfauthor={(((identity.name)))}}
 
 \pagestyle{empty}
 \setlength{\tabcolsep}{0pt}

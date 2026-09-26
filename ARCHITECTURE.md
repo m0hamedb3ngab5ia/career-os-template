@@ -59,6 +59,26 @@ scout ──► data/jobs/<job_id>/posting.json
         outreach  ──► Contacts tab: name, LinkedIn URL, email (if found), draft msg
 ```
 
+## QA gate checks
+
+`python -m careeros.qa <job_dir>` (`src/careeros/qa.py`) runs every deterministic check and prints one JSON report;
+`pass` is false when any hard check fails. The core checks (truth trace, bullet fidelity, number/tool audits,
+banned phrases, confidential terms, contact, page count, keyword coverage) live in `qa.py`. The extended checks live
+in `src/careeros/qa_ext/` and read the Checker's shared inputs (`pipeline_cfg`, `companies_cfg`, `jobs_dir`,
+`outreach`, `contacts`); each writes its findings to an extra report key:
+
+| module | hard checks | soft checks | report key |
+|---|---|---|---|
+| `company.py` | `wrong_company`: a known company (companies.yaml, other job dirs) that is not this job's, in the letter, a generated answer or an outreach draft | — | `wrong_company_hits` |
+| `consistency.py` | `employer_title_consistent` (title/degree/year vs the résumé header), `numbers_consistent` (a restated bullet number) | `letter_experiences_on_resume`, `employer_title_uncertain`, `numbers_paraphrased` | `consistency` |
+| `outreach_policy.py` | `outreach_manual_contacts`, `linkedin_draft_only`, `linkedin_note_length` (> 300 chars), `email_autosend_verified`, `thank_you_manual`, `outreach_cold_limit`, `outreach_json_valid` | `outreach_word_counts` | `outreach_policy` |
+| `pdf_fidelity.py` | `pdf_links_clickable`, `pdf_text_matches_resume` | `pdf_text_split_words`, `pdf_hidden_text`, `pdf_fonts_embedded`, `pdf_metadata` | `pdf_fidelity` |
+
+`cover_letter_names_company` (hard, in `qa.py`) accepts the company's configured aliases and domain stems. Every
+threshold is optional config in `config/qa.yaml` (`consistency:`, `outreach:`, `pdf:`; defaults commented in
+`examples/config/qa.yaml`). A job without `outreach.json` or `resume.pdf` skips those checks. `/qa-review` caps
+`ats_safety` on the PDF checks and routes each failure to the writer skill that fixes it.
+
 ## Job lifecycle (tracker `Status` column)
 
 `found → scored → skipped | queued → prepared → needs_review → applied → screening → interview → offer | rejected | withdrawn | ghosted`

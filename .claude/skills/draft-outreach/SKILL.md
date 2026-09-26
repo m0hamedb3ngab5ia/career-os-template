@@ -77,15 +77,35 @@ For each contact `outreach check` marks `manual: true`:
   "job_id": "...", "company": "...", "drafted_at": "<ISO>", "templates_used": ["linkedin_note.md", "..."] ,
   "drafts": [
     {"contact": "Jane Doe", "role": "recruiter", "linkedin": "...", "to": "jane.doe@x.com", "to_confidence": "low",
+     "kind": "cold_email", "channel": "email",
      "linkedin_note": "...", "linkedin_note_chars": 287,
      "linkedin_message": "...", "email": {"subject": "...", "body": "..."},
-     "followup_7d": "...", "followup_14d": "...",
+     "followup_7d": "...", "followup_14d": null,
      "bullet_ids": ["acme.1"], "narrative_ids": ["n.data"], "facts_used": [{"fact": "...", "source": "posting"}],
-     "manual_tailor": false, "manual_reason": null, "send_after": null, "sent": false}
+     "manual_tailor": false, "manual_reason": null, "send_after": null, "linkedin_send_after": null,
+     "auto_send": false, "sent": false, "sent_by": null}
   ],
+  "followups": [],
   "review_required": true
 }
 ```
+Fields the deterministic gate reads (`python -m careeros.qa`, `careeros.qa_ext.outreach_policy`; qa-review fails the
+job on a hard violation), so write every one:
+- `kind`: `cold_email` | `post_apply_outreach` (job already applied) | `status_followup` | `post_interview_thanks`.
+  It picks the word limit (`config/qa.yaml: outreach`: cold 150, after-apply 120, status 80, thank-you 120) and the
+  rules below. `channel`: `email` | `linkedin` (the channel the first touch goes out on).
+- `linkedin_note`: at most 300 characters (`linkedin_note_length` is a hard fail: LinkedIn truncates the note);
+  `linkedin_note_chars` = its exact `len()`, or the gate warns.
+- `send_after` / `linkedin_send_after` / `auto_send`: always null / null / false here. LinkedIn is draft-only
+  (`linkedin_send_after` set, or a scheduled or system-sent LinkedIn draft, is a hard fail); an email may only be
+  scheduled later by the follow-up scheduler, and only to the contact's own `email` with `email_confidence: verified`.
+- `sent` / `sent_by`: `sent: false`, `sent_by: null` when drafting. Whoever records a send sets `sent_by`
+  (`candidate` when the candidate sent it by hand); `sent: true` with any other `sent_by` counts as system-sent.
+- `manual_tailor` (+ `manual_reason`): true for every contact step 3a marks manual; then no `send_after`, no
+  `followup_7d`/`followup_14d`, never system-sent.
+- `followup_7d` / `followup_14d` / per-draft `followups[]`: a cold contact (never replied, no interview) gets one
+  outreach + at most one follow-up in total. Top-level `followups[]` holds later messages written for this job
+  (status follow-ups, thank-yous), same fields plus `kind`; a `post_interview_thanks` is never scheduled or auto-sent.
 `review_required` is always true for tier A, and true for tier B until the user confirms a template
 (`TODO.md`: "Confirm follow-up email template"). Set `send_after` null; the follow-up scheduler fills it.
 
