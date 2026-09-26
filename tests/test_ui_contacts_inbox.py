@@ -276,3 +276,57 @@ def test_marking_a_contact_connected_makes_its_inbox_draft_manual(data, idx):
     contacts_svc.mark(data["settings"], jid, "Dana Cruz", degree=2, mutuals=3)
     d = inbox_svc.inbox_detail(data["settings"], idx, jid, NOW)
     assert d["drafts"][d["primary"]]["mode"] == "manual"
+
+
+# --- review round 2 --------------------------------------------------------------------------------------------
+
+def _outreach(data, key):
+    from pathlib import Path
+
+    return Path(data["settings"].paths["jobs_dir"]) / data["jobs"][key] / "outreach.json"
+
+
+def _log_email(data, key, at, cls="other"):
+    from pathlib import Path
+
+    f = Path(data["settings"].paths["jobs_dir"]) / data["jobs"][key] / "log.md"
+    ts = at.astimezone().strftime("%Y-%m-%d %H:%M:%S")
+    line = f"- {ts} [inbox-sync] {cls} from hr@example.com -> status screening (https://mail.google.com/x)\n"
+    f.write_text((f.read_text() if f.exists() else "") + line)
+
+
+def test_screening_followup_due_counts_from_the_latest_email_after_the_status_change(data, idx):
+    t0 = NOW - timedelta(days=6)
+    jid = _set_status(data, "applied", "screening", t0)
+    _log_email(data, "applied", t0 + timedelta(days=5))
+    idx.update_jobs([jid])
+    s = data["settings"]
+    s.pipeline.setdefault("ui", {})["followup_no_response_days"] = 7
+    row = next(r for r in inbox_svc.list_inbox(s, idx, NOW)["items"] if r["job_id"] == jid)
+    assert datetime.fromisoformat(row["next"]["due"]) == t0 + timedelta(days=12)
+
+
+def test_a_sent_thank_you_moves_interview_next_to_a_status_followup_with_a_due_date(data, idx):
+    f = _outreach(data, "interview")
+    o = json.loads(f.read_text())
+    for d in o["followups"]:
+        d["sent"], d["sent_date"] = True, (NOW - timedelta(days=1)).isoformat()
+    f.write_text(json.dumps(o))
+    jid = data["jobs"]["interview"]
+    row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"]["kind"] == "status_followup" and row["next"]["due"] is not None
+
+
+def test_bare_list_outreach_and_nested_followups_are_read_like_qa_ext(data):
+    from pathlib import Path
+
+    f = _outreach(data, "applied")
+    o = json.loads(f.read_text())
+    first = o["drafts"][0]
+    nested = {"kind": "status_followup", "email": {"subject": "Checking in", "body": "Hi again"}}
+    f.write_text(json.dumps([{**first, "followups": [nested]}]))
+    got = inbox_svc.job_drafts(Path(f).parent)
+    assert [d["kind"] for d in got] == [first["kind"], "status_followup"]
+    assert got[1]["contact"] == first["contact"] and got[1]["body"] == "Hi again"
+    f.write_text(json.dumps({"drafts": [{**first, "followups": [nested]}], "followups": []}))
+    assert len(inbox_svc.job_drafts(Path(f).parent)) == 2

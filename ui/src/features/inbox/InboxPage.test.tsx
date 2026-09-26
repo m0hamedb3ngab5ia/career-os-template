@@ -191,4 +191,25 @@ describe("InboxPage", () => {
     expect(within(note).queryByRole("button", { name: "Send now" })).toBeNull();
     expect(within(note).queryByRole("button", { name: "Pause auto-send" })).toBeNull();
   });
+  it("a LinkedIn draft is draft-only: no Send now, no auto-send, says to send it yourself", async () => {
+    const li = draft({ mode: "linkedin", to: null, verified: false, placeholders: [] });
+    mockApi({ "GET /api/inbox": LIST, "GET /api/inbox/hooli0000001": { ...HOOLI, drafts: [li] } });
+    renderRoutes(routes, "/inbox/hooli0000001");
+    const note = await screen.findByRole("region", { name: "Hooli · after-apply note" });
+    expect(within(note).getByText("LinkedIn is draft-only: copy it and send it yourself")).toBeInTheDocument();
+    expect(within(note).queryByText(/Auto-send/)).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Send now" })).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Pause auto-send" })).toBeNull();
+  });
+
+  it("a sent draft offers no Send now or auto-send", async () => {
+    const sent = draft({ mode: "sent", sent: true, placeholders: [] });
+    mockApi({ "GET /api/inbox": LIST, "GET /api/inbox/hooli0000001": { ...HOOLI, drafts: [sent] } });
+    renderRoutes(routes, "/inbox/hooli0000001");
+    const note = await screen.findByRole("region", { name: "Hooli · after-apply note" });
+    expect(within(note).getByText("Already sent")).toBeInTheDocument();
+    expect(within(note).queryByText(/Auto-send/)).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Send now" })).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Pause auto-send" })).toBeNull();
+  });
 });

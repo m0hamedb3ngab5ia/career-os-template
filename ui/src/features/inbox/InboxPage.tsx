@@ -165,12 +165,28 @@ function noDraftText(kind: string): string {
   }
 }
 
+function policyText(mode: string): string {
+  switch (mode) {
+    case "sent":
+      return "Already sent";
+    case "always_manual":
+      return "Thank-you notes are always manual: you send them yourself";
+    case "manual":
+      return "You know this person: tailor the note and send it yourself";
+    case "verified_email":
+      return "Auto-send will only ever go to a verified email; otherwise it becomes a LinkedIn draft";
+    default:
+      return "LinkedIn is draft-only: copy it and send it yourself";
+  }
+}
+
 function NotePane({ d, sendingReason }: { d: InboxDetailResponse; sendingReason: string }) {
   const [sheet, setSheet] = useState<number | null>(null);
   const draft: Draft | null = d.primary !== null ? (d.drafts[d.primary] ?? null) : null;
   const others = d.drafts.map((x, i) => ({ x, i })).filter(({ i }) => i !== d.primary);
   const heading = `${d.company ?? "Unknown company"} · ${kindLabel(draft?.kind ?? d.next.kind).toLowerCase()}`;
-  const manualOnly = draft ? draft.mode === "always_manual" || draft.mode === "manual" : true;
+  // Send now / Pause auto-send only ever apply to a verified email; LinkedIn is draft-only, never automated
+  const autoSendable = draft?.mode === "verified_email";
   const count = draft?.placeholders.length ?? 0;
   const opened = sheet !== null ? d.drafts[sheet] : undefined;
 
@@ -233,20 +249,16 @@ function NotePane({ d, sendingReason }: { d: InboxDetailResponse; sendingReason:
             <DraftText text={draft.body} />
           </div>
           <div className={styles.noteActions}>
-            {manualOnly ? null : (
+            {!autoSendable ? null : (
               <UnavailableButton variant="primary" reason={sendingReason} icon={<Mail size={14} aria-hidden="true" />}>
                 Send now
               </UnavailableButton>
             )}
             <Button onClick={() => setSheet(d.primary)}>Edit note</Button>
-            {manualOnly ? null : <UnavailableButton reason={sendingReason}>Pause auto-send</UnavailableButton>}
+            {!autoSendable ? null : <UnavailableButton reason={sendingReason}>Pause auto-send</UnavailableButton>}
             <UnavailableButton reason={SKIP_REASON}>Skip this note</UnavailableButton>
             <span className={styles.policy}>
-              {draft.mode === "always_manual"
-                ? "Thank-you notes are always manual: you send them yourself"
-                : draft.mode === "manual"
-                  ? "You know this person: tailor the note and send it yourself"
-                  : "Auto-send will only ever go to a verified email; otherwise it becomes a LinkedIn draft"}
+              {policyText(draft.mode)}
             </span>
           </div>
         </>

@@ -122,21 +122,38 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
     }
 
 
-def job_drafts(job_dir: Path, contacts: list[dict[str, Any]] | None = None, policy: Any = None
-               ) -> list[dict[str, Any]]:
-    """Every draft in the job's outreach.json (drafts[] then followups[]); none when the file is missing or broken.
-    Pass the job's contacts and the OutreachPolicy so the relationship gate applies to each draft."""
-    data = _json(job_dir / "outreach.json")
+def _outreach_items(data: Any) -> list[dict[str, Any]]:
+    """Every outreach item in reading order, normalized like careeros.qa_ext.outreach_data()/outreach_texts(): a
+    bare list is read as `drafts`, and each draft's own `followups[]` come right after it, inheriting its contact
+    and role (a plain-string follow-up becomes its body)."""
+    if isinstance(data, list):
+        data = {"drafts": data}
     if not isinstance(data, dict):
         return []
-    by_name = {str(c.get("name", "")).strip().lower(): c for c in contacts or [] if isinstance(c, dict)}
-    out = []
+    out: list[dict[str, Any]] = []
     for key in ("drafts", "followups"):
         items = data.get(key)
         for d in items if isinstance(items, list) else []:
-            if isinstance(d, dict):
-                out.append(draft_view(d, by_name.get(str(d.get("contact", "")).strip().lower()), policy))
+            if not isinstance(d, dict):
+                continue
+            out.append(d)
+            nested = d.get("followups")
+            for f in nested if isinstance(nested, list) else []:
+                if isinstance(f, str) and f.strip():
+                    f = {"body": f}
+                if isinstance(f, dict):
+                    out.append({"contact": d.get("contact"), "role": d.get("role"), **f})
     return out
+
+
+def job_drafts(job_dir: Path, contacts: list[dict[str, Any]] | None = None, policy: Any = None
+               ) -> list[dict[str, Any]]:
+    """Every draft in the job's outreach.json (drafts[], each with its own followups[], then top-level followups[]);
+    none when the file is missing or broken. Pass the job's contacts and the OutreachPolicy so the relationship gate
+    applies to each draft."""
+    by_name = {str(c.get("name", "")).strip().lower(): c for c in contacts or [] if isinstance(c, dict)}
+    return [draft_view(d, by_name.get(str(d.get("contact", "")).strip().lower()), policy)
+            for d in _outreach_items(_json(job_dir / "outreach.json"))]
 
 
 def _contacts(job_dir: Path) -> list[dict[str, Any]]:
@@ -172,6 +189,16 @@ def _primary(status: str, drafts: list[dict[str, Any]]) -> int | None:
     return 0 if drafts else None
 
 
+def _status_followup(ix: Any, job: dict[str, Any], cfg: Any, mode: str, last_email: dict[str, Any] | None,
+                     status: str, *more: datetime | None) -> dict[str, Any]:
+    """A status follow-up due `followup_no_response_days` after the latest of: entering `status`, the last synced
+    email, and any extra anchors (a sent thank-you)."""
+    anchors = [_status_since(ix, job["job_id"], status), _parse((last_email or {}).get("at")), *more]
+    since = max((a for a in anchors if a), default=None)
+    due = since + timedelta(days=cfg.followup_no_response_days) if since else None
+    return {"kind": "status_followup", "due": _iso(due), "mode": mode}
+
+
 def _next(job: dict[str, Any], ix: Any, cfg: Any, drafts: list[dict[str, Any]], primary: int | None,
           last_email: dict[str, Any] | None) -> dict[str, Any]:
     status = job["status"]
@@ -180,14 +207,17 @@ def _next(job: dict[str, Any], ix: Any, cfg: Any, drafts: list[dict[str, Any]], 
     if status == "offer":
         return {"kind": "offer_reply", "due": None, "mode": "you_reply"}
     if status == "interview":
-        has_thanks = any(d["kind"] == THANKS for d in drafts)
-        if not has_thanks and last_email and last_email["class"] == "interview_invite":
+        thanks = [d for d in drafts if d["kind"] == THANKS]
+        if any(not d["sent"] for d in thanks):
+            return {"kind": THANKS, "due": None, "mode": "always_manual"}
+        if thanks:  # thank-you sent: next is a status check, counted from the last thing that happened
+            sent = [_parse(d["sent_date"]) for d in thanks]
+            return _status_followup(ix, job, cfg, mode, last_email, "interview", *sent)
+        if last_email and last_email["class"] == "interview_invite":
             return {"kind": "reply_with_slot", "due": None, "mode": "you_reply"}
         return {"kind": THANKS, "due": None, "mode": "always_manual"}
     if status == "screening":
-        since = _status_since(ix, job["job_id"], "screening")
-        due = since + timedelta(days=cfg.followup_no_response_days) if since else None
-        return {"kind": "status_followup", "due": _iso(due), "mode": mode}
+        return _status_followup(ix, job, cfg, mode, last_email, "screening")
     applied = _parse(job["applied_at"])
     sent = draft is not None and draft["sent"]
     due = applied + timedelta(days=cfg.followup_after_apply_days) if applied and not sent else None
