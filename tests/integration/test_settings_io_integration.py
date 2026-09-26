@@ -145,9 +145,9 @@ def test_writes_go_through_a_symlinked_config(root, tmp_path):
     (root / "config").mkdir()
     for f in private.iterdir():
         (root / "config" / f.name).symlink_to(f)
-    settings_io.save_section(_s(root), "notifications", {"pipeline:notify.daily_digest": False})
+    settings_io.save_section(_s(root), "outreach", {"pipeline:outreach.manual_if_mutuals": False})
     assert (root / "config" / "pipeline.yaml").is_symlink()
-    assert "daily_digest: false" in (private / "pipeline.yaml").read_text()
+    assert "manual_if_mutuals: false" in (private / "pipeline.yaml").read_text()
 
 
 def test_a_stale_version_is_refused(root):
@@ -183,3 +183,72 @@ def test_reset_group_then_save_restores_recommended(root):
 def test_unknown_section():
     with pytest.raises(KeyError):
         settings_io.read_section(None, "nope")  # type: ignore[arg-type]
+
+
+# --- values the CLI's PyYAML loaders would misread if written unquoted -----------------------------------
+
+def test_quiet_hours_after_ten_load_as_times(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.quiet_hours": {"start": "22:00", "end": "07:00"}})
+    cfg = load_schedule(_s(root))
+    assert (cfg.quiet_start, cfg.quiet_end) == (time(22, 0), time(7, 0))
+
+
+def test_a_schedule_time_after_ten_round_trips(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.jobs.score": {"at": ["11:15"]}})
+    assert load_schedule(_s(root)).jobs["score"].at == [time(11, 15)]
+    assert settings_io.read_section(_s(root), "runs")["values"]["pipeline:schedule.jobs.score"] == {"at": ["11:15"]}
+
+
+def test_level_off_turns_the_check_off(root):
+    from careeros.safety.scam import Flag, apply_levels
+
+    settings_io.save_section(_s(root), "safety", {"targets:safety.levels": {"GHOST_OLD_POST": "off"}})
+    flags = [Flag("GHOST_OLD_POST", "info", "old"), Flag("SCAM_NO_INTERVIEW", "review", "x")]
+    assert [f.code for f in apply_levels(flags, _s(root))] == ["SCAM_NO_INTERVIEW"]
+
+
+def test_reset_schedule_to_recommended_saves(root):
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.jobs.score": {"at": ["11:15"]}})
+    settings_io.save_section(_s(root), "runs", settings_io.reset_changes("runs", "schedule"))
+    settings_io.save_section(_s(root), "runs", settings_io.reset_changes("runs", "quiet"))
+    vals = settings_io.read_section(_s(root), "runs")["values"]
+    assert vals["pipeline:schedule.jobs.score"] == {"at": ["01:00"]}
+
+
+def test_every_option_of_every_string_field_round_trips_through_the_loaders(root):
+    """Property-style: each select option, tag option and reason level, saved into its field, reads back the
+    same through PyYAML (the CLI's reader), whatever YAML 1.1 would make of it unquoted."""
+    import yaml
+
+    from careeros.ui.settings_schema import SECTIONS
+
+    for sec in SECTIONS:
+        for f in sec.fields():
+            if not f.editable or f.control not in ("select", "tags", "reason_levels", "text"):
+                continue
+            if f.control == "select":
+                samples = list(f.options)
+            elif f.control == "tags":
+                samples = [list(f.options)] if f.options else [["off", "10:30", "yes", "12"]]
+            elif f.control == "reason_levels":
+                samples = [{code: lvl} for code, lvl in zip(f.options, ("off", "block", "skip", "review", "info"))]
+            else:
+                samples = ["off", "10:30"] if not f.pattern else []
+            for v in samples:
+                try:
+                    settings_io.save_section(_s(root), sec.id, {f.id: v})
+                except settings_io.SettingsInvalid:
+                    continue  # the loaders refuse this value for this key; that's a checked failure, not a misread
+                data = yaml.safe_load(settings_io.config_path(_s(root), f.file).read_text())
+                cur = data
+                for k in f.key.split("."):
+                    cur = cur[k]
+                assert cur == v, (f.id, v, cur)
