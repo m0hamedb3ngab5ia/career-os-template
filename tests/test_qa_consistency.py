@@ -504,3 +504,25 @@ def test_same_class_hedge_is_silent(tmp_path: Path, bullet_phrase: str, restated
     ck = _metric_job(tmp_path, b, r)
     assert by_name(ck, "numbers_consistent")["ok"]
     assert "numbers_paraphrased" not in names(ck), by_name(ck, "numbers_paraphrased")["detail"]
+
+
+# --- review fixes (#25, round 2) --------------------------------------------------------------------
+@pytest.mark.parametrize("text", ["TLS1.3", "v2.3 API", "Python3.12", "OAuth2.0", "Node v18.3"])
+def test_glued_dotted_versions_are_words(text: str) -> None:
+    assert parse_numbers(text) == []
+
+
+@pytest.mark.parametrize("text,value", [("p99.9 latency", 99.9), ("Python 3.12", 3.12)])
+def test_dotted_numbers_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+def test_glued_version_in_posting_does_not_excuse_changed_number(tmp_path: Path) -> None:
+    root, prof = _hedged_root(tmp_path, "within 2 months")
+    text = "At Acme I deployed the reconciliation dashboard to production in 3 months, running on Kubernetes."
+    ck = make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                  answers=answer(text, ids=("acme.6",)))
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": "Our services speak TLS1.3 only."}))
+    ck = run(Checker(ck.job_dir, root))
+    assert by_name(ck, "numbers_consistent")["ok"] is False

@@ -89,8 +89,9 @@ DEGREE_RX = {
 }
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
 # Letters glued to digits with no hyphen (S3, EC2, K8s, OAuth2, v2, Q3, H100) are product / version names, not
-# quantities. Percentiles (p99) and hyphen compounds (sub-100ms, top-10) still yield their number.
-TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|(?<![A-Za-z0-9])(?![pP]\d+(?![A-Za-z\d]))[A-Za-z]+\d[A-Za-z\d]*|[A-Za-z][A-Za-z'-]*|[(–-]")
+# quantities, including a dotted version (TLS1.3, Python3.12). Percentiles (p99, p99.9) and hyphen compounds
+# (sub-100ms, top-10) still yield their number.
+TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|(?<![A-Za-z0-9])(?![pP]\d+(?![A-Za-z\d]))[A-Za-z]+\d[A-Za-z\d]*(?:\.\d+)*|[A-Za-z][A-Za-z'-]*|[(–-]")
 # clause boundaries inside one sentence: a company fact and a bullet claim often share a sentence
 CLAUSE_SPLIT = re.compile(r";|,\s+(?:and|while|whereas)\s+|\s+but\s+|\s*—\s*|\s+–\s+|\s+--?\s+")
 YEAR_RE = re.compile(r"(?<![\w$.,])((?:19|20)\d{2})(?![\d%+]|[.,]\d|\w)")
