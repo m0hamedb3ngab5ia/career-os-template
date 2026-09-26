@@ -15,6 +15,7 @@ from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
 from careeros.safety import ghost
+from careeros.ui import config as ui_cfg
 from careeros.ui.settings_schema.model import Field, Group, Policy, Section
 
 P, T, C, Q = "pipeline", "targets", "companies", "qa"
@@ -46,6 +47,14 @@ def _schedule_check(kind: str):
             return str(e).split(": ", 1)[-1].replace("config/pipeline.yaml: schedule", "schedule")
         return None
     return check
+
+
+def _ui_columns(v: Any) -> str | None:
+    try:
+        ui_cfg._columns(v)
+    except ConfigError as e:
+        return str(e).split("ui.", 1)[-1].split(" (see ", 1)[0]
+    return None
 
 
 def _tier_rules(v: list[dict[str, Any]]) -> str | None:
@@ -173,6 +182,23 @@ SECTIONS: tuple[Section, ...] = (
         Group("files", "Files", (
             Field(P, "paths.tracker_xlsx", "text", "Tracker spreadsheet", default="data/JobTracker.xlsx",
                   help="Where JobTracker.xlsx is exported. Relative to the repo, or ~/… for anywhere."),
+        )),
+        Group("app", "App", (
+            Field(P, "ui.port", "number", "Port", default=ui_cfg.UiConfig.port, min=1, max=65535, integer=True,
+                  help="`careeros ui --port N` overrides it. Takes effect the next time the app starts."),
+            Field(P, "ui.host", "text", "Address", default=ui_cfg.UiConfig.host, readonly=True,
+                  note="This Mac only for now; LAN mode with a token comes in a later version."),
+            Field(P, "ui.open_browser", "switch", "Open the app in your browser on start",
+                  default=ui_cfg.UiConfig.open_browser),
+            Field(P, "ui.theme", "select", "Appearance", default=ui_cfg.UiConfig.theme, options=ui_cfg.THEMES),
+            Field(P, "ui.undo_seconds", "number", "Undo stays on for", default=ui_cfg.UiConfig.undo_seconds,
+                  min=1, max=60, integer=True, unit="s"),
+            Field(P, "ui.page_size", "number", "Rows per page", default=ui_cfg.UiConfig.page_size, min=20, max=1000,
+                  integer=True, help="Jobs and Runs history."),
+            Field(P, "ui.watch_debounce_ms", "number", "Refresh after files are quiet for",
+                  default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
+            Field(P, "ui.pipeline.columns", "records", "Pipeline columns", default=ui_cfg.DEFAULT_COLUMNS,
+                  check=_ui_columns, help="One column per stage; statuses in no column count as Closed."),
         )),
         Group("claude", "Claude", (
             Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),
@@ -492,6 +518,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "paths.voice_dir"): "Profile files are edited outside the UI (free text, not settings).",
     (P, "paths.resume_template_dir"): "Templates are edited outside the UI (LaTeX, not settings).",
     (P, "paths.output_dir_per_job"): "Layout switch the code assumes is on; not a preference.",
+    (P, "ui.index_path"): "Index location; rebuildable, change it only when data/ is on a slow or synced disk.",
     (P, "schedule.launchd_label"): "LaunchAgent id; change it only after `careeros schedule uninstall`.",
     (P, "llm.runner"): "Shown as a locked row: runs use the Claude Code subscription; the API is not enabled.",
     (P, "llm.headless_cmd"): "The exact claude command line; a wrong flag breaks every run.",
