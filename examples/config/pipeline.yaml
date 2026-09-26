@@ -81,7 +81,8 @@ runs:                                      # reusable default: fine to keep. `ca
   auto_submit:                             # config only for now: runs NEVER apply in this version
     enabled: false                         # false (Recommended)
     allow: [tier_c, tier_b]                # rules: tier_a|tier_b|tier_c, fit_gte_<n>, fit_lt_<n>, dream, category_<name>
-    manual: [tier_a, fit_gte_90]           # (Recommended) always manual; wins over allow. Tier A is manual regardless
+    manual: [tier_a, fit_gte_85]           # (Recommended) always manual; wins over allow. Tier A is manual regardless.
+                                           # fit_gte_<n> threshold is yours: 85 (Recommended) = your best matches stay manual
 
 retention:                                 # reusable default: fine to keep. `careeros prune` (dry run unless --yes)
   screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this

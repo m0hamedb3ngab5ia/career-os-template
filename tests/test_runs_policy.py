@@ -138,3 +138,21 @@ def test_example_config_documents_the_defaults():
     assert {"enabled": p.enabled, "allow": p.allow, "manual": p.manual} == DEFAULT_AUTO_SUBMIT
     assert load_retry_config(runs) == DEFAULT_RETRY
     assert load_prepare_config(runs) == load_prepare_config({})
+
+
+def test_default_manual_rule_is_fit_85_and_configurable():
+    from careeros.runs.policy import DEFAULT_AUTO_SUBMIT
+
+    assert DEFAULT_AUTO_SUBMIT["manual"] == ["tier_a", "fit_gte_85"]
+    p = pol(enabled=True, allow=["tier_b", "tier_c"])  # manual left at the default
+    assert auto_submit_decision(job(tier="B", fit=85), p) == (False, "manual: fit_gte_85")
+    assert auto_submit_decision(job(tier="B", fit=84), p) == (True, "allowed: tier_b")
+    p2 = pol(enabled=True, allow=["tier_b"], manual=["tier_a", "fit_gte_95"])
+    assert auto_submit_decision(job(tier="B", fit=90), p2)[0] is True
+
+
+def test_daily_cap_stop_defaults_on_and_is_configurable():
+    from careeros.runs.policy import load_prepare_config
+
+    assert load_prepare_config({}) == {"stop_at_daily_cap": True}
+    assert load_prepare_config({"prepare": {"stop_at_daily_cap": False}}) == {"stop_at_daily_cap": False}
