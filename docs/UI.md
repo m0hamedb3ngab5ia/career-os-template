@@ -73,6 +73,12 @@ the UI has to stand on its own as an application, without a Claude Code session 
   notes after interviews are always written by hand; Tier A is never auto-submitted; runs never apply.
 - Every option shows its default with "(Recommended)" next to it, the same wording as the comments in
   `examples/config/pipeline.yaml`, and a "Reset to recommended" control per group.
+- **Built (schema + writes, no routes yet):** `src/careeros/ui/settings_schema/` declares every page as data (one
+  `Field` per YAML key: control, range, default, "(Recommended)", locked/read-only, help), and one generic form
+  renderer draws them all. `src/careeros/ui/services/settings_io.py` reads a page's effective values, previews a
+  change as a diff, and saves several keys across files at once (`runs/yamledit.apply_changes_many`): per-field
+  errors first, then the CLI's own loaders; any failure restores every file. A test fails when a key in
+  `examples/config` has neither a field nor a reasoned entry in `NOT_IN_UI`.
 
 ### Settings › Runs
 
@@ -228,8 +234,8 @@ Every run is a subprocess the server owns, one row in the `runs` table, and a st
   dependencies. `ruamel.yaml` is already a core dependency (`careeros advise apply` writes config with it), so the
   UI's settings forms reuse that round-trip code instead of adding it.
 - `src/careeros/ui/`: `app.py` (FastAPI routes + SSE), `index.py` (SQLite schema + indexer from `Store`),
-  `runs.py` (starts `careeros.runs` batches and other steps, `RESULT:` parsing), `settings_io.py` (ruamel
-  round-trip + validate + rollback, shared with `careeros advise apply`), `static/` (built frontend).
+  `runs.py` (starts `careeros.runs` batches and other steps, `RESULT:` parsing), `services/settings_io.py`
+  + `settings_schema/` (ruamel round-trip + validate + rollback, shared with `careeros advise apply`; built), `static/` (built frontend).
 - Frontend: React + TypeScript, built to static files and served by FastAPI; no Node needed at runtime.
 - Phone: the same app, responsive. The default bind stays `127.0.0.1`, so the phone path is a tunnel of the
   candidate's choice to that loopback port (e.g. an SSH tunnel or a private-network VPN such as Tailscale). An opt-in
