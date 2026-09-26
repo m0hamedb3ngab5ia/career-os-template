@@ -26,9 +26,13 @@ RESULT again (status unchanged) and stop. `--force` re-prepares from Step 1.
 
 ## Step 1: score
 
-Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `steps.score`.
+Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `steps.score`. (Batch phase 2,
+below: `JOB/score.json` from phase 1 is the score; use it instead of scoring again.)
 - If it errored: final status `skipped`, reason `score_error`, go to Finish.
-- If `decision == "skip"`: final status `skipped`, reason = `skip_reason` (or first hard filter). Go to Finish.
+- If `decision == "skip"` with `skip_reason` `company_cap` or `cooldown`: a gate deferral, not a verdict
+  (the gate may have run before other jobs at the company were scored). Go to Step 1b and let the gate
+  decide; on exit 0 rewrite `JOB/score.json` with `decision: "prepare"`, `skip_reason: null`.
+- If `decision == "skip"` for any other reason: final status `skipped`, reason = `skip_reason` (or first hard filter). Go to Finish.
 - If `profile_gap` is set: `action_items.append("profile_gap: " + profile_gap)` (priority M, once per gap).
 
 `tier` = score.tier. `tier_cfg` = `targets.tiers[tier]` (tier null -> treat as C).
@@ -38,15 +42,24 @@ Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `step
 Run `.venv/bin/careeros company gate <job_id> --json` again (score-job ran it; a rejection or a new
 reservation may have landed since, and a re-run with `--force` skips nothing). Keep its JSON as `gate`.
 - Exit 3: final status `skipped`, reason = `gate.reason` (`company_cap`, `cooldown`, `not_similar`,
-  `closed`), note `gate.detail`. Go to Finish. `company_cap` / `cooldown` are deferred, not dropped:
+  `closed`). Record it with `--note "<gate.reason>: <gate.detail>"` (the note must start with the reason:
+  score.json may still say `prepare`, and the note is how the gate and `requeue` know this is a deferral). Go to Finish. `company_cap` / `cooldown` are deferred, not dropped:
   `careeros company requeue` sets them back to `scored` once a slot opens or the cooldown ends.
 - Exit 0: continue. If `gate.urgent`, this job goes first (a close date before the cooldown ends, or a
   cluster of similar roles at the company closing together): every Action Item for it below gets
   `gate.action_note` appended and priority H, and run
   `.venv/bin/careeros tracker upsert <job_id> --field NextActionDate=<gate.closes_at>` when `closes_at` is set.
 
-Batches: prepare jobs in `careeros jobs list --status found --order urgent` order (urgent first, then the
-earliest close date, then fit), and hand off in `careeros jobs list --status queued --order urgent` order.
+Batches run in two phases, so the gate ranks every candidate by fit before any slot is reserved (scoring
+and preparing one job at a time would let a lower-fit job reserved first beat a higher-fit one found later):
+- Phase 1: follow `.claude/skills/score-job/SKILL.md` (gate included) for every job in
+  `careeros jobs list --status found`. Prepare nothing yet.
+- Phase 2: for each job in `careeros jobs list --status found --status scored --order urgent` order (urgent
+  first, then the earliest close date, then fit; `scored` = requeued deferrals), re-run
+  `careeros company gate <job_id> --json` right before preparing it: exit 0 -> run this skill on it
+  (Step 1 reuses the phase 1 `score.json`: do not re-score); exit 3 -> record it as in Step 1b and move on.
+  A job prepared earlier in the phase holds its slot, so the ranking stays correct as slots fill.
+Hand off in `careeros jobs list --status queued --order urgent` order.
 
 ## Step 2: resume
 

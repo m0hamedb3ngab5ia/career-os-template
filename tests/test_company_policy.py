@@ -246,6 +246,49 @@ def test_deferred_jobs_compete_again(policy):
     assert ranked[0]["job_id"] == "c1" and ranked[0]["allowed"]
 
 
+def test_skipped_dead_job_does_not_hold_a_slot(policy):
+    # A high-fit job skipped for its own reasons (ghost / dead posting, safety, manual) keeps score.json
+    # `decision: prepare` but must not compete: `requeue` would never clear it.
+    records = [rec("a1", "applied", date_applied=d(-10)),
+               rec("ghost", "skipped", fit=95, decision="prepare", skip_reason=None),
+               rec("y", "scored", fit=85)]
+    assert gate("y", records=records, policy=policy, today=TODAY)["allowed"] is True
+    assert "ghost" not in {r["job_id"] for r in rank_candidates("Acme", records=records, policy=policy, today=TODAY)}
+
+
+@pytest.mark.parametrize("reason", ["company_cap", "cooldown"])
+def test_deferred_skip_still_outranks_lower_fit(policy, reason):
+    records = [rec("a1", "applied", date_applied=d(-10)),
+               rec("def1", "skipped", fit=95, decision="skip", skip_reason=reason),
+               rec("y", "scored", fit=85)]
+    assert gate("y", records=records, policy=policy, today=TODAY)["reason"] == "company_cap"
+    assert gate("def1", records=records, policy=policy, today=TODAY)["allowed"] is True
+
+
+def test_requeued_deferred_job_competes_from_scored(policy):
+    # `company requeue` sets status back to `scored`; score.json still says decision skip / company_cap.
+    records = [rec("a1", "applied", date_applied=d(-10)),
+               rec("rq", "scored", fit=95, decision="skip", skip_reason="company_cap"),
+               rec("y", "scored", fit=85)]
+    assert gate("y", records=records, policy=policy, today=TODAY)["reason"] == "company_cap"
+    assert gate("rq", records=records, policy=policy, today=TODAY)["allowed"] is True
+
+
+def test_scored_skip_for_other_reasons_does_not_compete(policy):
+    records = [rec("a1", "applied", date_applied=d(-10)),
+               rec("low", "scored", fit=95, decision="skip", skip_reason="salary_below_floor"),
+               rec("y", "scored", fit=85)]
+    assert gate("y", records=records, policy=policy, today=TODAY)["allowed"] is True
+
+
+def test_reserved_job_past_its_close_date_frees_its_slot(policy):
+    records = [rec("q1", "queued", closes_at=d(-1)), rec("q2", "queued"), rec("y", "scored", fit=70)]
+    got = slots("Acme", records=records, policy=policy, today=TODAY)
+    assert (got["reserved"], got["used"], got["remaining"]) == (1, 1, 1)
+    assert gate("y", records=records, policy=policy, today=TODAY)["allowed"] is True
+    assert gate("q1", records=records, policy=policy, today=TODAY)["reason"] == "closed"
+
+
 def test_closed_posting_is_blocked(policy):
     ranked = rank_candidates("Acme", records=[rec("c1", closes_at=d(-1))], policy=policy, today=TODAY)
     assert ranked[0]["reason"] == "closed" and not ranked[0]["allowed"]

@@ -208,3 +208,57 @@ def test_load_records_reads_store_and_tracker(temp_root: Path):
     assert recs[jid].date_applied == date.today() - timedelta(days=12)
     assert recs[jid].rejected_at == date.today() and recs[jid].category == "swe_backend"
     assert recs["legacy0001"].status == "applied" and recs["legacy0001"].company == "Acme"
+
+
+def test_gate_deferral_recorded_only_in_status_note_still_competes(temp_root: Path, home: Path):
+    # prepare-job Step 1b skips via `careeros job status <id> skipped --note "<reason>: <detail>"` and leaves
+    # score.json at decision prepare / skip_reason null; a ghost skip leaves the same score.json.
+    s = Settings.load(temp_root)
+    store = Store(s)
+    deferred = _job(store, "1", "Backend Engineer", fit=95)
+    ghost = _job(store, "2", "Platform Engineer", fit=96)
+    r = _cli(temp_root, home, "job", "status", deferred, "skipped", "--note", "company_cap: 2/2 slots used at Acme")
+    assert r.returncode == 0, r.stderr
+    r = _cli(temp_root, home, "job", "status", ghost, "skipped", "--note", "ghost job: GHOST_STALE_NO_ACTIVITY")
+    assert r.returncode == 0, r.stderr
+    recs = {r.job_id: r for r in load_records(s)}
+    assert recs[deferred].skip_reason == "company_cap"
+    assert recs[ghost].skip_reason is None
+
+    r = _cli(temp_root, home, "company", "requeue", "--dry-run", "--json")
+    assert [j["job_id"] for j in json.loads(r.stdout)["requeued"]] == [deferred]
+
+
+def test_batch_scores_all_then_gates_so_higher_fit_wins(temp_root: Path, home: Path):
+    # One slot left at Acme. Phase 1 (score-job on every found job) meets the lower-fit job first: its gate
+    # passes because the other job has no score yet. Phase 2 (gate + prepare in --order urgent order) must
+    # still give the slot to the higher-fit job.
+    store = Store(Settings.load(temp_root))
+    a1 = _job(store, "1", "Backend Engineer")
+    _applied(temp_root, store, a1, days_ago=10)
+    lo = _job(store, "2", "Data Engineer", fit=72, category="data_engineering")
+    hi_p = Posting(company="Acme", title="Platform Engineer", ats="greenhouse", ats_job_id="3",
+                   first_published=_days(-5), posted_at=_days(-5))
+    store.save_posting(hi_p)  # found, not scored yet
+    hi = hi_p.job_id
+
+    r = _cli(temp_root, home, "company", "gate", lo, "--json")  # phase 1, lower-fit job scored first
+    assert r.returncode == 0, r.stdout
+    store._write(hi, "score.json", {"job_id": hi, "category": "swe_platform", "fit": 93, "tier": "C",
+                                    "decision": "prepare", "skip_reason": None})
+    requeued = _job(store, "4", "Backend Engineer II", fit=60, status="scored")  # found + scored both listed
+
+    r = _cli(temp_root, home, "jobs", "list", "--status", "found", "--status", "scored", "--order", "urgent",
+             "--json")
+    assert r.returncode == 0, r.stderr
+    order = [j["job_id"] for j in json.loads(r.stdout)]
+    assert order == [hi, lo, requeued]
+
+    outcome = {}
+    for jid in order:  # phase 2: re-run the gate right before each prepare
+        r = _cli(temp_root, home, "company", "gate", jid, "--json")
+        g = json.loads(r.stdout)
+        outcome[jid] = g["reason"]
+        if r.returncode == 0:
+            store.set_status(jid, "queued", "prepared")  # prepare-job reserves the slot
+    assert outcome == {hi: "ok", lo: "company_cap", requeued: "company_cap"}

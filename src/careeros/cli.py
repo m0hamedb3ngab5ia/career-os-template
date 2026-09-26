@@ -168,7 +168,10 @@ def cmd_tracker_upsert(args: argparse.Namespace) -> int:
 def cmd_jobs_list(args: argparse.Namespace) -> int:
     s = _settings(args)
     store = Store(s)
-    jobs = store.list_jobs(args.status)
+    wanted = args.status or []
+    jobs = store.list_jobs(wanted[0] if len(wanted) == 1 else None)
+    if len(wanted) > 1:
+        jobs = [j for j in jobs if j["status"] in wanted]
     if getattr(args, "order", None) == "urgent":
         from careeros.company_policy import Policy, load_records, order_jobs
 
@@ -177,7 +180,7 @@ def cmd_jobs_list(args: argparse.Namespace) -> int:
         print(json.dumps(jobs, indent=2))
         return 0
     if not jobs:
-        print("no jobs" + (f" with status={args.status}" if args.status else ""))
+        print("no jobs" + (f" with status={','.join(args.status)}" if args.status else ""))
         return 0
     print(f"{'id':<12} {'status':<13} {'fit':>3} {'company':<20} {'title':<45} location")
     for j in jobs:
@@ -578,7 +581,8 @@ def build_parser() -> argparse.ArgumentParser:
     jobs = sub.add_parser("jobs")
     js = jobs.add_subparsers(dest="jobs_cmd", required=True)
     jl = js.add_parser("list")
-    jl.add_argument("--status", choices=STATUSES)
+    jl.add_argument("--status", choices=STATUSES, action="append",
+                    help="repeat to list several statuses together (e.g. --status found --status scored)")
     jl.add_argument("--json", action="store_true")
     jl.add_argument("--order", choices=["urgent"],
                     help="urgent: jobs that must go now (deadline / cluster) first, then by close date, then fit")

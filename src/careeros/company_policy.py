@@ -5,7 +5,11 @@ Rules (config: targets.yaml `volume`, companies.yaml `company_caps`):
 - Cap. At most `volume.max_per_company_per_90_days` applications per company in a rolling window, or the
   company's own `company_caps: {<Company>: {max, window_days, aliases}}`. A slot is used by every
   application submitted in the window (DateApplied; the outcome does not matter: the ATS still saw it) and
-  by every reservation (queued / prepared / needs_review: materials exist, submit pending).
+  by every reservation (queued / prepared / needs_review: materials exist, submit pending) whose posting
+  has not closed.
+- Candidates. Jobs scored `prepare` and not yet reserved, plus jobs the gate deferred (`company_cap` /
+  `cooldown`, from score.json or the `skipped` status note). A job skipped for anything else (dead
+  posting, safety, by hand) never holds a slot.
 - Similar roles only. Only roles in `targets.yaml categories.primary` or `secondary` compete for a slot;
   an excluded, unknown or other category never does (no spraying unrelated roles at one company).
 - Ranking. Reservations keep their slots; the remaining slots go to candidates by fit (desc), then the
@@ -237,6 +241,18 @@ def _int(v: Any) -> int | None:
         return None
 
 
+def _deferral_note(hist: list[dict[str, Any]]) -> str | None:
+    """The deferral reason of the latest `skipped` entry in status history, if its note names one.
+
+    prepare-job Step 1b and apply-job record a gate deferral only as a status note that starts with the
+    reason (`company_cap: ...`, `company cooldown: ...`); score.json may still say `decision: prepare`."""
+    last = next((h for h in reversed(hist) if h.get("status") == "skipped"), None)
+    note = str((last or {}).get("note") or "").strip().lower()
+    note = note[len("company "):] if note.startswith("company ") else note
+    head = re.split(r"[:\s]", note, maxsplit=1)[0]
+    return head if head in DEFERRED_REASONS else None
+
+
 def load_records(settings: Settings, store: Any = None, tracker: Any = None) -> list[JobRecord]:
     """One record per job dir (status.json, score.json, posting close date) with DateApplied from the
     tracker (else the first `applied` in status history) and the rejection date from status history
@@ -265,7 +281,8 @@ def load_records(settings: Settings, store: Any = None, tracker: Any = None) -> 
                             None) or _iso_date(row.get("LastEmailDate"))
         out.append(JobRecord(job_id=jid, company=p.company, title=p.title, status=status, fit=_int(sc.get("fit")),
                              category=sc.get("category"), decision=sc.get("decision"),
-                             skip_reason=sc.get("skip_reason"), date_applied=applied, rejected_at=rejected,
+                             skip_reason=(_deferral_note(hist) if status == "skipped" else None)
+                             or sc.get("skip_reason"), date_applied=applied, rejected_at=rejected,
                              closes_at=posting_closes_at(p)))
     for jid, row in rows.items():
         status = str(row.get("Status") or "found")
@@ -290,6 +307,16 @@ def _iso(d: date | None) -> str | None:
     return d.isoformat() if d else None
 
 
+def _competes(r: JobRecord) -> bool:
+    """A candidate for a slot: scored `prepare` and not yet queued, or deferred by the gate (skipped as
+    company_cap / cooldown, or requeued to `scored`). A job skipped for any other reason (dead posting,
+    safety, manual) never holds a slot, whatever its score.json says."""
+    deferred = r.skip_reason in DEFERRED_REASONS
+    if r.status in ("found", "scored"):
+        return r.decision == "prepare" or deferred
+    return r.status == "skipped" and deferred
+
+
 def _evaluate(company: str, records: Iterable[JobRecord], policy: Policy, today: date,
               include: str | None = None) -> dict[str, Any]:
     key = policy.company_key(company)
@@ -298,8 +325,9 @@ def _evaluate(company: str, records: Iterable[JobRecord], policy: Policy, today:
     since = today - timedelta(days=window)
     submitted = [r for r in recs if _counts(r, since)]
     reserved = [r for r in recs if r.status in RESERVED]
+    live_reserved = [r for r in reserved if not (r.closes_at and r.closes_at < today)]  # a closed one frees its slot
     pool = [r for r in recs if r.status not in SUBMITTED and r.status not in RESERVED
-            and (r.job_id == include or r.decision == "prepare" or r.skip_reason in DEFERRED_REASONS)]
+            and (r.job_id == include or _competes(r))]
 
     rejections = [r.rejected_at for r in recs if r.status == "rejected" and r.rejected_at]
     cd_end = max(rejections) + timedelta(days=policy.cooldown_days) if rejections and policy.cooldown_days else None
@@ -353,12 +381,12 @@ def _evaluate(company: str, records: Iterable[JobRecord], policy: Policy, today:
     rest = sorted((e for e in entries.values() if e["reason"] in ("unscored", "not_similar", "closed")),
                   key=lambda e: (-(e["fit"] or 0), e["job_id"]))
     ranked = [entries[r.job_id] for r in ordered] + rest
-    used = len(submitted) + len(reserved)
+    used = len(submitted) + len(live_reserved)
     return {
         "records": {r.job_id: r for r in recs},
         "ranked": ranked,
         "slots": {"company": company, "used": used, "allowed": mx, "remaining": max(0, mx - used),
-                  "window_days": window, "submitted": len(submitted), "reserved": len(reserved),
+                  "window_days": window, "submitted": len(submitted), "reserved": len(live_reserved),
                   "cooldown_until": _iso(cd_end)},
     }
 

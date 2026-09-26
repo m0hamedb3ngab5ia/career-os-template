@@ -373,3 +373,29 @@ def test_inbox_sync_adds_transparency_note():
     text = _skill("inbox-sync")
     assert "careeros company active" in text and "--exclude <job_id>" in text
     assert "mention these to the recruiter" in text
+
+
+def test_prepare_job_batch_scores_everything_before_preparing():
+    text = _skill("prepare-job")
+    batch = text.split("Batches", 1)[1].split("## Step 2", 1)[0]
+    assert "Phase 1" in batch and "Phase 2" in batch
+    assert batch.index("score-job") < batch.index("Phase 2"), "score every found job before preparing any"
+    assert "careeros jobs list --status found --status scored --order urgent" in batch
+    assert "careeros company gate" in batch.split("Phase 2", 1)[1], "gate again right before each prepare"
+
+
+def test_prepare_job_gate_skip_note_starts_with_reason_and_deferrals_reach_the_gate():
+    text = _skill("prepare-job")
+    step1 = text.split("## Step 1: score", 1)[1].split("## Step 1b", 1)[0]
+    assert "company_cap" in step1 and "Step 1b" in step1, "a deferred score-job skip is re-decided by the gate"
+    step1b = text.split("## Step 1b", 1)[1].split("## Step 2", 1)[0]
+    assert '--note "<gate.reason>: <gate.detail>"' in step1b
+
+
+def test_apply_job_gate_exit_3_skips_permanent_reasons():
+    pre = _skill("apply-job").split("## 1.", 1)[1].split("### 1b", 1)[0]
+    row = next(line for line in pre.splitlines() if "careeros company gate <job_id>" in line)
+    assert "status unchanged" in row and "`company_cap` / `cooldown`" in row
+    assert 'careeros job status <job_id> skipped --note "company <reason>: <detail>"' in row
+    for reason in ("closed", "not_similar", "already_applied"):
+        assert reason in row, reason
