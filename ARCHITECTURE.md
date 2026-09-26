@@ -25,7 +25,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 | 3 | Scorer / categorizer | `.claude/skills/score-job/` | per job | Claude skill |
 | 4 | Tailor (résumé) | `.claude/skills/tailor-resume/` + `templates/resume/` | per job ≥ threshold | LaTeX |
 | 5 | Writer (cover letter + app questions) | `.claude/skills/write-cover-letter/`, `.claude/skills/answer-question/` | per job | voice from `profile/voice/` |
-| 6 | QA gate | `.claude/skills/qa-review/` + `src/careeros/qa.py` | before every submit | truth/keyword/ATS/banned/confidential/specificity |
+| 6 | QA gate | `.claude/skills/qa-review/` + `src/careeros/qa.py` + `qa_ext/` | before every submit | truth/keyword/ATS/banned/confidential/specificity |
 | 7 | Applier | `src/careeros/apply/` + Chrome (Claude in Chrome) | apply session | one adapter per ATS |
 | 8 | Tracker | `src/careeros/tracker.py` → `data/JobTracker.xlsx` (configurable) | always | tabs: Jobs, Action Items, Contacts, Log, Config |
 | 9 | Inbox sync | `.claude/skills/inbox-sync/` (Gmail MCP) | daily | status updates + push on interview |
@@ -120,7 +120,8 @@ career-os/
   config/    targets.yaml  categories.yaml  companies.yaml  qa.yaml  pipeline.yaml        (gitignored)
   profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  voice/        (gitignored)
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
-  src/careeros/  bootstrap.py  scout/  apply/  tracker.py  qa.py  store.py  retention.py  cli.py
+  src/careeros/  bootstrap.py  scout/  apply/ (incl. snapshot.py)  safety/  tracker.py  qa.py  qa_ext/  store.py
+                 company_policy.py  outreach.py  retention.py  doctor.py  cli.py
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)
 ```
