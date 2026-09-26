@@ -726,3 +726,36 @@ def test_cancel_reaches_a_later_catch_up_after_an_earlier_one_was_cancelled(rc):
     locks.acquire(tick, owner="catch-up", ttl_seconds=600, pid=889, pid_alive=lambda p: True)
     out = rc2.cancel()
     assert out["status"] == "cancelling" and sent == [(888, signal.SIGTERM), (889, signal.SIGTERM)]
+
+
+# --- review round 2 ------------------------------------------------------------------------------------------
+
+def test_starting_a_step_keeps_the_live_catch_up_cancel_marker(rc):
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="catch-up", ttl_seconds=3600, pid=888, pid_alive=lambda p: True)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/venv/bin/python -m careeros.cli --root /r run catch-up --json")
+    assert rc2.cancel()["status"] == "cancelling"
+    rc2.start_step("scout")
+    out = rc2.cancel()
+    assert out["status"] == "already_stopping" and out["run_id"] == "catch-up" and sent == [(888, signal.SIGTERM)]
+
+
+def test_cancel_marker_removed_between_exists_and_read_is_no_marker(rc, monkeypatch):
+    _held_run(rc)
+    marker_dir = RunStore(rc.settings).dir / "ui"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    real = Path.read_text
+
+    def racing(self, *a, **kw):
+        if self.name.startswith("cancel-"):
+            self.unlink()
+            raise FileNotFoundError(self)
+        return real(self, *a, **kw)
+
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append(pid))
+    (marker_dir / f"cancel-{rc2._holder_of(None)[0]}").write_text("1 old\n")
+    monkeypatch.setattr(Path, "read_text", racing)
+    assert rc2.cancel()["status"] == "cancelling" and sent == [777]

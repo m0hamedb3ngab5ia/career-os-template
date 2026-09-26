@@ -162,6 +162,17 @@ class RunControl:
         st = locks.status(path, now=self.now(), alive=self.pid_alive)
         return st if st.get("state") == "held" else None
 
+    @staticmethod
+    def _holder_line(held: dict[str, Any] | None) -> str | None:
+        return f"{held.get('pid')} {held.get('acquired_at', '')}" if held else None
+
+    @staticmethod
+    def _marker_line(marker: Path) -> str | None:
+        try:
+            return marker.read_text().split("\n", 1)[0]
+        except FileNotFoundError:  # removed by a concurrent start: no marker
+            return None
+
     def _check_can_start(self) -> None:
         held = self._held(self.rs.runner_lock_path)
         if held:
@@ -176,9 +187,15 @@ class RunControl:
         for f in old[:max(0, len(old) - (KEEP_OUTPUTS - 1))]:
             f.unlink(missing_ok=True)
         for m in out_dir.glob("cancel-*"):  # cancel markers of runs that have stopped
-            run = self.rs.load_run(m.name.removeprefix("cancel-"))
-            if not run or self._state(run) != "running":
-                m.unlink(missing_ok=True)
+            rid = m.name.removeprefix("cancel-")
+            if rid == "catch-up":  # no run record: keep the marker while the holder it names still holds tick.lock
+                if self._marker_line(m) == self._holder_line(self._held(self.rs.dir / "tick.lock")):
+                    continue
+            else:
+                run = self.rs.load_run(rid)
+                if run and self._state(run) == "running":
+                    continue
+            m.unlink(missing_ok=True)
         out = out_dir / f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{name}.out"
         root = str(self.settings.root)
         # the root travels in CAREEROS_ROOT, not argv: macOS `ps` joins argv with spaces, and a root such as
@@ -270,8 +287,8 @@ class RunControl:
         marker = self.rs.dir / "ui" / f"cancel-{rid}"
         # the marker names the holder it cancelled (pid + lock time): a later holder of the same run id, such as
         # the next catch-up, finds a stale marker and can still be cancelled
-        holder = f"{pid} {held.get('acquired_at', '')}"
-        if marker.exists() and marker.read_text().split("\n", 1)[0] == holder:
+        holder = self._holder_line(held)
+        if self._marker_line(marker) == holder:
             return {"status": "already_stopping", "run_id": rid, "pid": pid}
         what = classify_cmdline(self.cmdline(pid), root=self.settings.root)
         if what == "tick":
