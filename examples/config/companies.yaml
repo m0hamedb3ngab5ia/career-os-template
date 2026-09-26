@@ -33,6 +33,11 @@ blocklist:             # never apply
   industries: [gambling]                      # INSERT: industries to never apply to, or []
   name_patterns: [draftkings, fanduel]        # INSERT: lowercase substrings of company names to skip, or []
 
+# Company-owned domains for the scam gate (careeros safety check). Needed only when the careers site's
+# domain is not just the company name (acme.com for "Acme" is recognized on its own). Board entries may
+# also carry `domain:`. A posting whose apply URL is on neither a known ATS nor one of these is a hard stop.
+company_domains: {}    # e.g. {"Two Sigma": twosigma.com, "Example Corp": [example.com, examplecareers.com]}
+
 boards:                # reusable default: fine to keep. Scout sources. ats: greenhouse | lever | ashby | custom (no adapter yet; skipped)
   # --- AI ---
   - {company: Anthropic,        ats: greenhouse, slug: anthropic}

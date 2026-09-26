@@ -28,11 +28,11 @@ belong in each candidate's own private repo, not here.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
 
 ## Safety — scam / data-harvesting protection
-- [ ] Scam gate in score-job + apply-job, before any form fill. Hard stops (→ Action Item, never auto):
+- [x] Scam gate in score-job + apply-job, before any form fill (`careeros safety check|fields`, `src/careeros/safety/scam.py`). Made-up companies: anything off the curated lists is `company_unverified` (no auto-submit) until /score-job verifies it (`careeros safety verify`); brand look-alikes on foreign domains are a hard stop. Hard stops (→ Action Item, never auto):
       any field asking SSN / DOB / bank / passport / driver's license / ID upload / mother's maiden name; pay-to-apply or "training fee";
       apply URL domain ≠ company domain and ≠ known ATS (greenhouse/lever/ashby/workday/icims/smartrecruiters/…); contact email on free domain (gmail/outlook/yahoo);
       company has no resolvable website / LinkedIn page / < N employees; posting text hits scam patterns (WhatsApp/Telegram interview, "hiring immediately, no interview", crypto wallet, check-cashing, "equipment reimbursement");
       salary wildly above market for level. Soft flags lower fit score and require review.
-- [ ] Allowlist: auto-submit only on the ATS families in `targets.yaml: safety.auto_submit_ats` reached from a company-owned domain or the company's ATS board (scout-sourced). Postings from aggregators (Jobright/Handshake/LinkedIn) must resolve to that before auto.
-- [ ] Data minimization: applier never enters anything not in `standard_answers.yaml`; address = city/state/zip only unless required by a verified ATS; phone/email are the only PII given by default.
-- [ ] `detection.yaml`-style registry for flagged companies/domains (`data/scam_registry.yaml`), consulted by scout to drop future postings.
+- [x] Allowlist (`auto_submit_allowed`, `safety.json`): auto-submit only on the ATS families in `targets.yaml: safety.auto_submit_ats` reached from a company-owned domain or the company's ATS board (scout-sourced). Postings from aggregators (Jobright/Handshake/LinkedIn) must resolve to that before auto.
+- [x] Data minimization (`answer_for`: optional street blank; `sensitive` labels never answered): applier never enters anything not in `standard_answers.yaml`; address = city/state/zip only unless required by a verified ATS; phone/email are the only PII given by default.
+- [x] `detection.yaml`-style registry for flagged companies/domains (`data/flagged_registry.yaml`, `careeros safety flag`), consulted by scout to drop future postings.

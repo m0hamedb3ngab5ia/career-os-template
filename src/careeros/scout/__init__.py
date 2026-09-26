@@ -6,6 +6,8 @@ from typing import Any
 
 from careeros.config import ConfigError, Settings, get_settings
 from careeros.models import Posting
+from careeros.safety import registry
+from careeros.safety.registry import is_flagged
 from careeros.scout.ashby import AshbyAdapter
 from careeros.scout.base import Adapter, BoardNotFound, FetchError
 from careeros.scout.greenhouse import GreenhouseAdapter
@@ -44,6 +46,7 @@ class BoardResult:
     filtered_location: int = 0
     filtered_blocklist: int = 0
     filtered_seniority: int = 0
+    filtered_flagged: int = 0
     error: str = ""
     stored_ids: list[str] = field(default_factory=list)
 
@@ -62,7 +65,8 @@ class ScoutSummary:
 
     @property
     def totals(self) -> dict[str, int]:
-        keys = ("fetched", "new", "stored", "filtered_title", "filtered_location", "filtered_blocklist", "filtered_seniority")
+        keys = ("fetched", "new", "stored", "filtered_title", "filtered_location", "filtered_blocklist", "filtered_seniority",
+                "filtered_flagged")
         return {k: sum(getattr(b, k) for b in self.boards) for k in keys}
 
 
@@ -74,8 +78,9 @@ def _kw_regex(keywords: list[str]) -> re.Pattern[str] | None:
 
 
 class Prefilter:
-    def __init__(self, settings: Settings):
+    def __init__(self, settings: Settings, flagged: list[dict[str, Any]] | None = None):
         self.s = settings
+        self.flagged = flagged or []
         self.active: dict[str, re.Pattern[str] | None] = {
             cat: _kw_regex(kws) for cat, kws in settings.title_keywords().items()
         }
@@ -122,6 +127,8 @@ class Prefilter:
         """Return (passes, reason, category)."""
         if self.s.is_blocklisted(p.company):
             return False, "blocklist", None
+        if self.flagged and is_flagged(self.flagged, p.company, p.apply_url or p.url):
+            return False, "flagged", None
         cat = self.title_category(p.title)
         if cat is None or self.title_excluded(p.title):
             return False, "title", cat
@@ -140,7 +147,7 @@ def run_scout(
 ) -> ScoutSummary:
     s = settings or get_settings()
     st = store or Store(s)
-    pf = Prefilter(s)
+    pf = Prefilter(s, flagged=registry.load(registry.default_path(s)))
     if not any(pf.active.values()):
         # Every title would fail the prefilter and be marked seen for good; refuse instead.
         raise ConfigError("no active category has title_keywords in config/categories.yaml; refusing to scout")
@@ -206,7 +213,7 @@ def run_scout(
         st.save_seen(seen)
         log(
             f"[scout] {company:<22} {ats:<10} fetched={res.fetched:<4} new={res.new:<4} stored={res.stored:<3} "
-            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority})"
+            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority} flagged-{res.filtered_flagged})"
         )
 
     return summary

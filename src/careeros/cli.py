@@ -209,22 +209,115 @@ def cmd_job_show(args: argparse.Namespace) -> int:
     return 0
 
 
-def cmd_action_add(args: argparse.Namespace) -> int:
-    s = _settings(args)
+def _add_action(s: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
+                link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False) -> str:
     tr = Tracker(settings=s)
-    company, role = args.company or "", args.role or ""
-    if args.job and not (company and role):
-        p = Store(s).load_posting(args.job)
+    if job_id and not (company and role):
+        p = Store(s).load_posting(job_id)
         if p:
             company, role = company or p.company, role or p.title
-    if getattr(args, "dedupe", False):
+    if dedupe:
         for it in tr.list_action_items(open_only=True):
-            if str(it.get("JobID") or "") == (args.job or "") and str(it.get("Type") or "") == args.type:
-                print(f"action item {it.get('ID')} already open ({args.type}, job {args.job or '-'}); not added")
-                return 0
-    aid = tr.add_action_item(what=args.what, type=args.type, job_id=args.job or "", company=company,
-                             role=role, link=args.link or "", priority=args.priority, needs=args.needs)
-    print(f"action item {aid} added ({args.type}/{args.priority}/{args.needs})")
+            if str(it.get("JobID") or "") == job_id and str(it.get("Type") or "") == type:
+                return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
+    aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
+                             role=role, link=link, priority=priority, needs=needs)
+    return f"action item {aid} added ({type}/{priority}/{needs})"
+
+
+def cmd_action_add(args: argparse.Namespace) -> int:
+    print(_add_action(_settings(args), args.what, args.type, job_id=args.job or "", company=args.company or "",
+                      role=args.role or "", link=args.link or "", priority=args.priority, needs=args.needs,
+                      dedupe=getattr(args, "dedupe", False)))
+    return 0
+
+
+SAFETY_HARD_EXIT = 3
+
+
+def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
+    Store(s).set_status(job_id, status, note)
+    Tracker(settings=s).set_status(job_id, status, note)
+
+
+def cmd_safety_check(args: argparse.Namespace) -> int:
+    """Posting-level scam gate. Writes data/jobs/<id>/safety.json. Exit 3 on any hard flag (after opening a
+    `scam_suspected` Action Item, setting needs_review and recording the company in the registry)."""
+    from careeros.safety import registry
+    from careeros.safety.scam import auto_submit_allowed, check_posting, hard, registrable_domain
+
+    s = _settings(args)
+    store = Store(s)
+    p = store.load_posting(args.job_id)
+    if not p:
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    reg_path = registry.default_path(s)
+    flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
+    ok, why = auto_submit_allowed(p, s)
+    hard_flags = hard(flags)
+    result = {"job_id": p.job_id, "checked_at": datetime.now().isoformat(timespec="seconds"),
+              "pass": not hard_flags, "flags": [f.to_dict() for f in flags],
+              "auto_submit_allowed": ok and not flags, "auto_submit_reason": why or ("soft flags" if flags else "")}
+    store._write(p.job_id, "safety.json", result)
+    for f in flags:
+        print(f"  {f.severity.upper():<4}  {f.code:<20} {f.detail}")
+    if not hard_flags:
+        print(f"{p.job_id}: safety pass" + (f" ({len(flags)} soft flag(s))" if flags else ""))
+        return 0
+    codes = "; ".join(dict.fromkeys(f.code for f in hard_flags))
+    registry.add_or_bump(reg_path, p.company, domain=registrable_domain(p.apply_url or p.url), reason=codes,
+                         job_id=p.job_id)
+    print(_add_action(s, f"scam gate: {codes} at {p.company} ({p.apply_url or p.url}); review by hand",
+                      "scam_suspected", job_id=p.job_id, link=p.apply_url or p.url, priority="H", needs="phone",
+                      dedupe=True))
+    _set_status_both(s, p.job_id, "needs_review", f"scam gate: {codes}")
+    store.append_log(p.job_id, f"scam gate hard flags: {codes}", component="safety")
+    print(f"{p.job_id}: SAFETY STOP ({codes})")
+    return SAFETY_HARD_EXIT
+
+
+def cmd_safety_fields(args: argparse.Namespace) -> int:
+    """Form-level gate: JSON list of visible labels (stdin with `-`). Exit 3 on a sensitive field."""
+    from careeros.safety.scam import check_form_fields
+
+    s = _settings(args)
+    store = Store(s)
+    if not store.exists(args.job_id):
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    raw = sys.stdin.read() if args.labels_json == "-" else Path(args.labels_json).read_text(encoding="utf-8")
+    labels = [str(x) for x in json.loads(raw or "[]")]
+    flags = check_form_fields(labels, status=store.get_status(args.job_id))
+    if not flags:
+        print(f"{args.job_id}: {len(labels)} field(s) ok")
+        return 0
+    for f in flags:
+        print(f"  HARD  {f.code:<20} {f.detail}")
+    what = "; ".join(f.detail for f in flags)[:300]
+    print(_add_action(s, f"scam gate (form): {what}", "scam_suspected", job_id=args.job_id, priority="H",
+                      needs="phone", dedupe=True))
+    _set_status_both(s, args.job_id, "needs_review", f"scam gate (form): {what}"[:200])
+    return SAFETY_HARD_EXIT
+
+
+def cmd_safety_verify(args: argparse.Namespace) -> int:
+    from careeros.safety import registry
+
+    s = _settings(args)
+    e = registry.add_verified(registry.verified_path(s), args.company, domain=args.domain or "",
+                              evidence=args.evidence)
+    print(f"verified: {e['company']} {e.get('domain') or ''} -> {registry.verified_path(s)}")
+    return 0
+
+
+def cmd_safety_flag(args: argparse.Namespace) -> int:
+    from careeros.safety import registry
+
+    s = _settings(args)
+    e = registry.add_or_bump(registry.default_path(s), args.company, domain=args.domain or "",
+                             reason=args.reason or "manual", notes=args.notes or "")
+    print(f"flagged: {e['company']} {e.get('domain') or ''} (count {e['count']}) -> {registry.default_path(s)}")
     return 0
 
 
@@ -364,6 +457,27 @@ def build_parser() -> argparse.ArgumentParser:
     ad = acs.add_parser("done")
     ad.add_argument("id")
     ad.set_defaults(fn=cmd_action_done)
+
+    sf = sub.add_parser("safety", help="scam / data-harvesting gate (exit 3 = hard stop)")
+    sfs = sf.add_subparsers(dest="safety_cmd", required=True)
+    sck = sfs.add_parser("check", help="posting checks -> safety.json; hard flag = Action Item + needs_review")
+    sck.add_argument("job_id")
+    sck.set_defaults(fn=cmd_safety_check)
+    sfd = sfs.add_parser("fields", help="check visible form labels (JSON list) for identity/bank/fee fields")
+    sfd.add_argument("job_id")
+    sfd.add_argument("--labels-json", required=True, help="path to a JSON list of labels, or - for stdin")
+    sfd.set_defaults(fn=cmd_safety_fields)
+    svf = sfs.add_parser("verify", help="mark a non-curated company as checked real (clears company_unverified)")
+    svf.add_argument("company")
+    svf.add_argument("--domain")
+    svf.add_argument("--evidence", required=True, help="what was checked, e.g. careers page URL, LinkedIn size")
+    svf.set_defaults(fn=cmd_safety_verify)
+    sfl = sfs.add_parser("flag", help="add a company (and domain) to data/flagged_registry.yaml by hand")
+    sfl.add_argument("company")
+    sfl.add_argument("--domain")
+    sfl.add_argument("--reason")
+    sfl.add_argument("--notes")
+    sfl.set_defaults(fn=cmd_safety_flag)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p

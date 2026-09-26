@@ -306,3 +306,18 @@ def test_tailor_resume_prefers_resume_default_and_qa_review_scores_bullet_streng
     for part in ("action verb", "technical", "scale", "tech"):
         assert part in row, part
     assert "bullet_shape" in qa
+
+
+def test_apply_job_scam_gate_runs_the_safety_cli():
+    """§1b calls the code gate (not a prose-only procedure) before filling and again on visible fields,
+    and auto-submit also needs the allowlist verdict."""
+    gate = _skill("apply-job").split("### 1b", 1)[1].split("\n## ", 1)[0]
+    assert "careeros safety check <job_id>" in gate
+    assert "careeros safety fields <job_id>" in gate
+    assert "auto_submit_allowed" in _skill("apply-job")
+    assert "no code yet" not in gate
+
+
+def test_score_job_skips_on_scam_flags():
+    text = _skill("score-job")
+    assert "careeros safety check" in text and "scam_" in text

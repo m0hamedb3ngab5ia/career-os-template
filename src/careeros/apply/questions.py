@@ -12,6 +12,10 @@ Rules (config/targets.yaml safety.pause_on):
 - EEO questions are never matched to the standard list; the skill fills them only from the `eeo:` block
   via `select_eeo_option(field, offered_option_labels, load_eeo_answers(path))`.
 - Standard entries are tried in file order; first hit wins, so specific patterns go above general ones.
+- `sensitive` (SSN, date of birth, bank, passport, driver's license, fees; careeros.safety.scam) is never
+  answered: the scam gate stops the run (`careeros safety fields`).
+- Address minimization: use `answer_for(label, yaml, required=...)`. An optional street field stays blank;
+  a required one gets the street entry (or the `full` form of `address`).
 - Anything classified `unknown` or `essay` goes to the answer-question skill; `legal`/`salary` with no
   standard match become Action Items.
 """
@@ -24,7 +28,7 @@ from typing import Any, Literal
 
 import yaml
 
-QuestionKind = Literal["standard", "eeo", "essay", "salary", "legal", "unknown"]
+QuestionKind = Literal["sensitive", "standard", "eeo", "essay", "salary", "legal", "unknown"]
 
 # Order matters: eeo and salary are checked before the generic standard list so that a form label like
 # "Gender" is never matched by a loose standard pattern, and "Expected salary" is always paused.
@@ -111,6 +115,8 @@ def classify_question(text: str, standard_answers_yaml: str | Path | None = None
     t = _norm(text)
     if not t:
         return "unknown"
+    if _is_sensitive(t):
+        return "sensitive"
     if _EEO_RE.search(t):
         return "eeo"
     if _SALARY_RE.search(t):
@@ -134,7 +140,7 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path)
     the answer is null in the YAML; the caller must open an Action Item.
     """
     t = _norm(question_text)
-    if not t or _EEO_RE.search(t):
+    if not t or _EEO_RE.search(t) or _is_sensitive(t):
         return None
     # A legal or salary question may only be answered by an entry whose pattern hit the legal/salary
     # wording itself: "convicted of a crime in any city" must not borrow the `address` answer.
@@ -151,6 +157,33 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path)
                 continue
             return entry["key"], entry.get("answer")
     return None
+
+
+_STREET_RE = re.compile(r"\b(street|address line ?1|address 1|mailing address|home address)\b", re.I)
+
+
+def _is_sensitive(text: str) -> bool:
+    from careeros.safety.scam import check_form_fields
+
+    return bool(check_form_fields([text]))
+
+
+def answer_for(label: str, standard_answers_yaml: str | Path, required: bool = False) -> tuple[str, Any] | None:
+    """`match_standard_answer` plus data minimization. A street-address field is left blank (None) unless
+    the form marks it required; then the first standard hit is used, with an `address` entry's `full`
+    value preferred over its city form. Sensitive fields are never answered."""
+    t = _norm(label)
+    if _is_sensitive(t):
+        return None
+    if _STREET_RE.search(t):
+        if not required:
+            return None
+        for entry in load_standard_answers(standard_answers_yaml):
+            if entry.get("key") == "address" and entry.get("full"):
+                hit = match_standard_answer(t, standard_answers_yaml)
+                if hit and hit[0] == "address":
+                    return "address", entry["full"]
+    return match_standard_answer(t, standard_answers_yaml)
 
 
 # --- EEO ---------------------------------------------------------------------------------------------
