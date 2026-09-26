@@ -71,7 +71,11 @@ function Mutuals({ n }: { n: number | null }) {
 interface Selected {
   drafts: ContactRow[];
   index: number;
+  /** One per opening: paging keeps the same sheet (and focus); reopening starts fresh. */
+  session: number;
 }
+
+let sessions = 0;
 
 export function ContactsPage() {
   const { data, isPending, isError, error } = useContacts();
@@ -92,7 +96,7 @@ export function ContactsPage() {
         <Button
           variant="primary"
           icon={<Users size={14} aria-hidden="true" />}
-          onClick={() => setOpen({ drafts: linkedin, index: 0 })}
+          onClick={() => setOpen({ drafts: linkedin, index: 0, session: ++sessions })}
         >
           Open LinkedIn drafts ({formatCount(linkedin.length)})
         </Button>
@@ -180,7 +184,7 @@ export function ContactsPage() {
                       key={`${c.job_id}/${c.name}`}
                       c={c}
                       onMark={() => setMarking(c)}
-                      onOpen={() => setOpen({ drafts: [c], index: 0 })}
+                      onOpen={() => setOpen({ drafts: [c], index: 0, session: ++sessions })}
                     />
                   ))}
                 </tbody>
@@ -193,7 +197,7 @@ export function ContactsPage() {
       <MarkConnectionSheet contact={marking} onClose={() => setMarking(null)} />
       {current ? (
         <DraftSheet
-          key={`${current.job_id}/${current.name}`}
+          key={open?.session}
           open
           onClose={() => setOpen(null)}
           draft={current.draft}

@@ -179,4 +179,16 @@ describe("InboxPage", () => {
     expect(screen.getByText(/\/draft-outreach/)).toBeInTheDocument();
     expect(screen.getByText("No emails synced for this job yet.")).toBeInTheDocument();
   });
+
+  it("a draft to someone you know (manual) has no auto-send wording and no Send or Pause", async () => {
+    const manual = draft({ mode: "manual", manual_tailor: true, manual_reason: "LINKEDIN_CONNECTED" });
+    mockApi({ "GET /api/inbox": LIST, "GET /api/inbox/hooli0000001": { ...HOOLI, drafts: [manual] } });
+    renderRoutes(routes, "/inbox/hooli0000001");
+    const note = await screen.findByRole("region", { name: "Hooli · after-apply note" });
+    expect(within(note).getByText("You know this person: tailor the note and send it yourself")).toBeInTheDocument();
+    expect(within(note).getByText("Manual: you tailor it")).toBeInTheDocument();
+    expect(within(note).queryByText(/Auto-send/)).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Send now" })).toBeNull();
+    expect(within(note).queryByRole("button", { name: "Pause auto-send" })).toBeNull();
+  });
 });

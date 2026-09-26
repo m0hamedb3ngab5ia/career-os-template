@@ -157,4 +157,31 @@ describe("ContactsPage", () => {
       "No LinkedIn drafts yet",
     );
   });
+
+  it("paging LinkedIn drafts keeps the sheet open and focus on the pager", async () => {
+    const user = userEvent.setup();
+    const three: ContactsResponse = {
+      ...DATA,
+      items: ["Riley Park", "Casey Moss", "Jamie Fox"].map((name) =>
+        row({ name, linkedin_degree: 3, mode: "linkedin_draft", draft: linkedinDraft({ contact: name }) }),
+      ),
+      linkedin_drafts: 3,
+    };
+    mockApi({ "GET /api/contacts": three });
+    renderRoutes(routes, "/contacts");
+    await screen.findByRole("table");
+    await user.click(screen.getByRole("button", { name: "Open LinkedIn drafts (3)" }));
+    const next = within(screen.getByRole("dialog")).getByRole("button", { name: "Next" });
+    next.focus();
+    await user.keyboard("{Enter}");
+    const dialog = screen.getByRole("dialog", { name: "LinkedIn draft" });
+    expect(within(dialog).getByText("To Casey Moss")).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: "Next" })).toHaveFocus();
+    expect(within(dialog).getAllByText("2 of 3")).toHaveLength(1);
+    await user.keyboard("{Enter}");
+    expect(screen.getByRole("dialog", { name: "LinkedIn draft" })).toBeInTheDocument();
+    expect(within(screen.getByRole("dialog")).getByText("To Jamie Fox")).toBeInTheDocument();
+    // Next is now disabled at the end; focus moves to Previous, still inside the dialog.
+    expect(within(screen.getByRole("dialog")).getByRole("button", { name: "Previous" })).toHaveFocus();
+  });
 });

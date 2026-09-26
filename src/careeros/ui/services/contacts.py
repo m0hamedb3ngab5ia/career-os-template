@@ -10,6 +10,7 @@ from __future__ import annotations
 from typing import Any
 
 from careeros.outreach import OutreachPolicy, _detail, mark_contact, needs_manual_outreach
+from careeros.ui.services.inbox import _contacts as _job_contacts
 from careeros.ui.services.inbox import job_drafts
 from careeros.ui.services.jobs import job_dir_for
 
@@ -43,7 +44,8 @@ def list_contacts(settings: Any, ix: Any) -> dict[str, Any]:
         jid = r["job_id"]
         if jid not in drafts:
             by: dict[str, dict[str, Any]] = {}
-            for d in job_drafts(Path(settings.paths["jobs_dir"]) / jid):
+            jd = Path(settings.paths["jobs_dir"]) / jid
+            for d in job_drafts(jd, _job_contacts(jd), policy):
                 key = d["contact"].strip().lower()
                 if key and key not in by and d["kind"] != "post_interview_thanks":
                     by[key] = d

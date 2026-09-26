@@ -178,6 +178,7 @@ function NotePane({ d, sendingReason }: { d: InboxDetailResponse; sendingReason:
   if (!draft) badge = { text: modeLabel(d.next.mode).label, tone: d.next.mode === "always_manual" ? "purple" : "gray" };
   else if (draft.sent) badge = { text: "Sent", tone: "green" };
   else if (draft.mode === "always_manual") badge = { text: "Always manual", tone: "purple" };
+  else if (draft.mode === "manual") badge = { text: "Manual: you tailor it", tone: "orange" };
   else if (count > 0) badge = { text: "Fill placeholders first", tone: "orange" };
   else badge = { text: "Draft · not sent", tone: "gray" };
 
@@ -243,7 +244,9 @@ function NotePane({ d, sendingReason }: { d: InboxDetailResponse; sendingReason:
             <span className={styles.policy}>
               {draft.mode === "always_manual"
                 ? "Thank-you notes are always manual: you send them yourself"
-                : "Auto-send will only ever go to a verified email; otherwise it becomes a LinkedIn draft"}
+                : draft.mode === "manual"
+                  ? "You know this person: tailor the note and send it yourself"
+                  : "Auto-send will only ever go to a verified email; otherwise it becomes a LinkedIn draft"}
             </span>
           </div>
         </>

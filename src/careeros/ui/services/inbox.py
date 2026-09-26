@@ -76,9 +76,21 @@ def _words(text: str | None) -> int:
     return len((text or "").split())
 
 
-def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None) -> dict[str, Any]:
+def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy: Any = None) -> dict[str, Any]:
     """One outreach.json draft (drafts[] or followups[]) as the UI shows it. `mode`: sent | always_manual (thank-you
-    notes) | manual (connected / mutuals) | verified_email | linkedin (LinkedIn is always draft-only)."""
+    notes) | manual (connected / mutuals) | verified_email | linkedin (LinkedIn is always draft-only).
+
+    Manual comes from the saved `manual_tailor` flag OR, with a `policy`, from the contact's current degree / mutuals
+    (careeros.outreach.needs_manual_outreach): a person marked Connected after the draft was written is never
+    treated as automatable."""
+    manual_reason = d.get("manual_reason")
+    manual = bool(d.get("manual_tailor"))
+    if contact is not None and policy is not None:
+        from careeros.outreach import needs_manual_outreach
+
+        now_manual, reason = needs_manual_outreach(contact, policy)
+        if now_manual:
+            manual, manual_reason = True, manual_reason or reason
     email = d.get("email") if isinstance(d.get("email"), dict) else None
     to = d.get("to") or None
     verified = bool(to) and (d.get("to_confidence") == "verified" or bool(
@@ -88,7 +100,7 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None) -> dict
         mode = "sent"
     elif d.get("kind") == THANKS:
         mode = "always_manual"
-    elif d.get("manual_tailor"):
+    elif manual:
         mode = "manual"
     elif verified and email:
         mode = "verified_email"
@@ -104,14 +116,16 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None) -> dict
         "contact": d.get("contact") or "", "role": d.get("role") or "", "kind": d.get("kind") or "",
         "channel": d.get("channel") or ("email" if email else "linkedin"), "to": to, "verified": verified,
         "subject": (email or {}).get("subject"), "body": body, "linkedin_note": d.get("linkedin_note"),
-        "linkedin_message": d.get("linkedin_message"), "manual_tailor": bool(d.get("manual_tailor")),
-        "manual_reason": d.get("manual_reason"), "sent": bool(d.get("sent")), "sent_by": d.get("sent_by"),
+        "linkedin_message": d.get("linkedin_message"), "manual_tailor": manual,
+        "manual_reason": manual_reason, "sent": bool(d.get("sent")), "sent_by": d.get("sent_by"),
         "sent_date": d.get("sent_date"), "mode": mode, "placeholders": ph, "words": _words(body),
     }
 
 
-def job_drafts(job_dir: Path, contacts: list[dict[str, Any]] | None = None) -> list[dict[str, Any]]:
-    """Every draft in the job's outreach.json (drafts[] then followups[]); none when the file is missing or broken."""
+def job_drafts(job_dir: Path, contacts: list[dict[str, Any]] | None = None, policy: Any = None
+               ) -> list[dict[str, Any]]:
+    """Every draft in the job's outreach.json (drafts[] then followups[]); none when the file is missing or broken.
+    Pass the job's contacts and the OutreachPolicy so the relationship gate applies to each draft."""
     data = _json(job_dir / "outreach.json")
     if not isinstance(data, dict):
         return []
@@ -121,7 +135,7 @@ def job_drafts(job_dir: Path, contacts: list[dict[str, Any]] | None = None) -> l
         items = data.get(key)
         for d in items if isinstance(items, list) else []:
             if isinstance(d, dict):
-                out.append(draft_view(d, by_name.get(str(d.get("contact", "")).strip().lower())))
+                out.append(draft_view(d, by_name.get(str(d.get("contact", "")).strip().lower()), policy))
     return out
 
 
@@ -182,8 +196,10 @@ def _next(job: dict[str, Any], ix: Any, cfg: Any, drafts: list[dict[str, Any]], 
 
 def _row(settings: Any, ix: Any, job: dict[str, Any], now: datetime, cfg: Any) -> tuple[dict[str, Any], dict]:
     d = Path(settings.paths["jobs_dir"]) / job["job_id"]
+    from careeros.outreach import OutreachPolicy
+
     contacts = _contacts(d)
-    drafts = job_drafts(d, contacts)
+    drafts = job_drafts(d, contacts, OutreachPolicy.from_settings(settings))
     emails = parse_inbox_log(_log(d))
     last_email = emails[-1] if emails else None
     primary = _primary(job["status"], drafts)

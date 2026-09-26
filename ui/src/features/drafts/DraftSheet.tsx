@@ -1,5 +1,5 @@
 import { Copy } from "lucide-react";
-import { useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Button } from "../../kit/Button";
 import { Chip, TierBadge } from "../../kit/chips";
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
@@ -73,6 +73,26 @@ export function DraftSheet({ open, onClose, draft, company, jobTitle, tier, appr
   const toast = useToast();
   const [confirming, setConfirming] = useState(false);
   const [discarded, setDiscarded] = useState(false);
+  const pagerRef = useRef<HTMLDivElement>(null);
+  const draftKey = draft ? `${draft.contact}|${draft.kind}|${pager?.index ?? 0}` : "";
+
+  // A new draft in the same sheet (paging) starts without a pending confirm or discard.
+  useEffect(() => {
+    setConfirming(false);
+    setDiscarded(false);
+  }, [draftKey]);
+
+  // Paging to either end disables the button that had focus; keep focus on the pager, inside the dialog.
+  const pagerIndex = pager?.index;
+  const paged = useRef(false);
+  useEffect(() => {
+    const el = pagerRef.current;
+    if (!paged.current || !el) return;
+    paged.current = false;
+    const active = document.activeElement;
+    if (active instanceof HTMLButtonElement && el.contains(active) && !active.disabled) return;
+    el.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
+  }, [pagerIndex]);
 
   if (!draft) return null;
   const count = draft.placeholders.length;
@@ -228,14 +248,28 @@ export function DraftSheet({ open, onClose, draft, company, jobTitle, tier, appr
         </div>
       ))}
       {pager && pager.count > 1 ? (
-        <div className={styles.pager}>
-          <Button size="small" onClick={pager.onPrev} disabled={pager.index === 0}>
+        <div ref={pagerRef} className={styles.pager}>
+          <Button
+            size="small"
+            onClick={() => {
+              paged.current = true;
+              pager.onPrev();
+            }}
+            disabled={pager.index === 0}
+          >
             Previous
           </Button>
-          <span className="tabular" aria-live="polite">
+          <span className="tabular" aria-live="polite" aria-atomic="true">
             {pager.index + 1} of {pager.count}
           </span>
-          <Button size="small" onClick={pager.onNext} disabled={pager.index >= pager.count - 1}>
+          <Button
+            size="small"
+            onClick={() => {
+              paged.current = true;
+              pager.onNext();
+            }}
+            disabled={pager.index >= pager.count - 1}
+          >
             Next
           </Button>
         </div>

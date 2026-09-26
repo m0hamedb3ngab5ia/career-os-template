@@ -210,3 +210,69 @@ def test_broken_outreach_json_is_ignored(data, idx):
     (Path(data["settings"].paths["jobs_dir"]) / data["jobs"]["applied"] / "outreach.json").write_text("{nope")
     hooli = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["company"] == "Hooli")
     assert hooli["drafts"] == 0 and hooli["next"]["mode"] == "no_draft"
+
+
+# --- review round 1 --------------------------------------------------------------------------------------------
+
+def _set_status(data, key, status, at):
+    from pathlib import Path
+
+    from careeros.runs.store import iso
+
+    jid = data["jobs"][key]
+    f = Path(data["settings"].paths["jobs_dir"]) / jid / "status.json"
+    st = json.loads(f.read_text())
+    st["history"].append({"status": status, "at": iso(at), "note": None})
+    st["status"], st["updated_at"] = status, iso(at)
+    f.write_text(json.dumps(st))
+    return jid
+
+
+def test_screening_status_followup_due_from_config(data, idx):
+    since = NOW - timedelta(days=1)
+    jid = _set_status(data, "applied", "screening", since)
+    idx.update_jobs([jid])
+    s = data["settings"]
+    s.pipeline.setdefault("ui", {})["followup_no_response_days"] = 10
+    row = next(r for r in inbox_svc.list_inbox(s, idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"]["kind"] == "status_followup"
+    assert datetime.fromisoformat(row["next"]["due"]) == since + timedelta(days=10)
+
+
+def test_offer_next_is_offer_reply(data, idx):
+    jid = _set_status(data, "interview", "offer", NOW - timedelta(hours=2))
+    idx.update_jobs([jid])
+    row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"] == {"kind": "offer_reply", "due": None, "mode": "you_reply"}
+
+
+def test_interview_invite_without_thanks_draft_is_reply_with_slot(data, idx):
+    from pathlib import Path
+
+    jid = data["jobs"]["interview"]
+    f = Path(data["settings"].paths["jobs_dir"]) / jid / "outreach.json"
+    o = json.loads(f.read_text())
+    o["followups"] = []
+    f.write_text(json.dumps(o))
+    row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"] == {"kind": "reply_with_slot", "due": None, "mode": "you_reply"}
+
+
+def test_sync_reason_when_schedule_has_inbox_sync_on(data, idx):
+    s = data["settings"]
+    s.pipeline["schedule"]["jobs"]["inbox_sync"]["enabled"] = True
+    assert inbox_svc.list_inbox(s, idx, NOW)["sync"] == {"available": False, "reason": inbox_svc.SYNC_NO_BUTTON}
+
+
+def test_marking_a_contact_connected_makes_its_inbox_draft_manual(data, idx):
+    jid = data["jobs"]["applied"]
+    assert inbox_svc.inbox_detail(data["settings"], idx, jid, NOW)["drafts"][0]["mode"] == "verified_email"
+    contacts_svc.mark(data["settings"], jid, "Dana Cruz", degree=1)
+    d = inbox_svc.inbox_detail(data["settings"], idx, jid, NOW)
+    assert d["drafts"][d["primary"]]["mode"] == "manual"
+    assert d["drafts"][d["primary"]]["manual_reason"] == "LINKEDIN_CONNECTED"
+    row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"]["mode"] == "manual"
+    contacts_svc.mark(data["settings"], jid, "Dana Cruz", degree=2, mutuals=3)
+    d = inbox_svc.inbox_detail(data["settings"], idx, jid, NOW)
+    assert d["drafts"][d["primary"]]["mode"] == "manual"
