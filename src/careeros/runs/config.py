@@ -32,7 +32,8 @@ DEFAULT_RANKING: dict[str, float] = {
     "fit_weight": 0.5,        # prepare runs only: points per fit point (fit 80 -> +40)
     "retry_bonus": 30,        # a job that failed once goes near the front of the next run
 }
-DEFAULT_TIMEOUTS: dict[str, float] = {"score": 10, "prepare": 45}
+DEFAULT_TIMEOUTS: dict[str, float] = {"score": 10, "prepare": 45, "inbox_sync": 20}
+TIMEOUT_KINDS = ("score", "prepare", "inbox_sync")
 # Verified against `claude --help` (Claude Code 2.1): -p prints and exits; stream-json needs --verbose and ends
 # with one `result` event; dontAsk denies any tool not in --allowedTools instead of prompting (nobody is there).
 DEFAULT_HEADLESS_CMD: list[str] = ["claude", "-p", "--output-format", "stream-json", "--verbose",
@@ -156,10 +157,10 @@ def load_runs_config(settings: Any) -> RunsConfig:
     cfg.preset = preset
     timeouts = raw.get("job_timeout_minutes") or {}
     if not isinstance(timeouts, dict):
-        raise _err("runs.job_timeout_minutes must be a mapping {score: N, prepare: N}")
+        raise _err("runs.job_timeout_minutes must be a mapping {score: N, prepare: N, inbox_sync: N}")
     for k, v in timeouts.items():
-        if k not in KINDS:
-            raise _err(f"runs.job_timeout_minutes: unknown kind {k!r}; valid: {', '.join(KINDS)}")
+        if k not in TIMEOUT_KINDS:
+            raise _err(f"runs.job_timeout_minutes: unknown kind {k!r}; valid: {', '.join(TIMEOUT_KINDS)}")
         cfg.job_timeout_minutes[k] = _num(v, f"runs.job_timeout_minutes.{k}", gt=0)
     if "max_consecutive_failures" in raw:
         cfg.max_consecutive_failures = _num(raw["max_consecutive_failures"], "runs.max_consecutive_failures",

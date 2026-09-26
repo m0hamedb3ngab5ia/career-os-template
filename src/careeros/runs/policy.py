@@ -21,7 +21,7 @@ from careeros.config import ConfigError
 DEFAULT_MAX_PER_DAY = 15
 DEFAULT_RETRY = {"max_attempts": 2, "action_item": True}
 AUTO_SUBMIT_KEYS = ("enabled", "allow", "manual")
-DEFAULT_AUTO_SUBMIT = {"enabled": False, "allow": ["tier_c", "tier_b"], "manual": ["tier_a", "fit_gte_90"]}
+DEFAULT_AUTO_SUBMIT = {"enabled": False, "allow": ["tier_c", "tier_b"], "manual": ["tier_a", "fit_gte_85"]}
 _TOKEN_RE = re.compile(r"^(tier_[abc]|fit_(gte|lt)_\d{1,3}|dream|category_[a-z0-9_]+)$")
 
 
