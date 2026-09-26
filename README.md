@@ -80,6 +80,7 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros action list                # also: action add "<what>" --type <t> --needs laptop|phone|anytime
 .venv/bin/careeros tracker sync               # also: tracker init | flush | applied-count | upsert
 .venv/bin/careeros stats
+.venv/bin/careeros prune [--yes] [--json]     # retention: dry run lists old files; --yes removes them
 .venv/bin/python -m careeros.qa data/jobs/<id>   # deterministic QA
 ```
 
@@ -160,6 +161,19 @@ automatically when a job has none yet, so hand-submitted and Tier A jobs get one
 replace a real (non-symlink) `profile/` or `config/`; move those into the private repo first.
 `CLAUDE.local.md` is where personal context for Claude goes; Claude Code loads it automatically.
 
+### Keeping data/ small
+
+`careeros prune` applies `config/pipeline.yaml: retention` (weekly via `schedule.prune`). It is a dry run
+unless you pass `--yes`.
+- Closed jobs (rejected, withdrawn, ghosted) lose their apply step screenshots 30 days after closing; the
+  confirmation screenshot stays (`keep_confirmation_screenshot` must be true or false).
+- Postings never prepared (found, scored, skipped) are trimmed to a stub after 90 days: ids, company, title,
+  URLs and dates stay (dedupe and repost checks need them), the description is cut to a short preview.
+  A stubbed found or scored job is marked `skipped` so it leaves the prepare queue, and
+  `careeros safety check` refuses a pruned posting.
+- Never touched: active jobs, `submitted/` copies, `seen.json`, `posting_history.json`, the scam registries.
+  Set a value to 0 to turn that rule off.
+
 ### Folder map
 
 ```
@@ -168,7 +182,7 @@ config/        targets.yaml, categories.yaml, companies.yaml, qa.yaml, pipeline.
 profile/       master.yaml (only source of truth), standard_answers.yaml, confidential_terms.yaml, voice/   [gitignored]
 templates/     resume/ (LaTeX + render.py), cover_letter/ (skeleton + render.py), outreach/, followup_email/
 src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, questions, session), doctor.py,
-               tracker.py, qa.py, store.py, cli.py, bootstrap.py
+               tracker.py, qa.py, store.py, retention.py, cli.py, bootstrap.py
 .claude/skills Claude Code skills (table above)
 data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx   [gitignored]
 docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md

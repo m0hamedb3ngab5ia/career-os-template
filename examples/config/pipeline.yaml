@@ -27,11 +27,19 @@ schedule:                                  # reusable default: fine to keep. For
   score_and_prepare: "30 7 * * *"
   inbox_sync: "0 8,18 * * *"
   followups: "0 9 * * 1-5"
+  prune: "0 3 * * 0"                       # weekly, Sunday 3am: `careeros prune --yes` (see retention below)
 
 llm:
   runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
   headless_cmd: ["claude", "-p", "--output-format", "json", "--permission-mode", "acceptEdits"]
   model_hint: null                         # leave null = Claude Code default
+
+retention:                                 # reusable default: fine to keep. `careeros prune` (dry run unless --yes)
+  screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this
+  keep_confirmation_screenshot: true       # ...but keep NN_confirmation.png as proof you applied
+  unprepared_posting_days: 90              # found/scored/skipped postings: description trimmed to a short stub
+                                           # 0 turns a rule off. Never touched: active jobs, submitted/ copies,
+                                           # seen.json, posting_history.json, the scam registries.
 
 notify:
   on_interview: push                       # push | none  (PushNotification tool from inbox-sync)

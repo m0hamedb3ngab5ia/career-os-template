@@ -244,8 +244,9 @@ GHOST_SKIP_EXIT = 4
 
 
 def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
-    Store(s).set_status(job_id, status, note)
-    Tracker(settings=s).set_status(job_id, status, note)
+    from careeros.tracker import set_status_both
+
+    set_status_both(s, job_id, status, note)
 
 
 def cmd_safety_check(args: argparse.Namespace) -> int:
@@ -262,6 +263,10 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
     p = store.load_posting(args.job_id)
     if not p:
         print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    if (store._read(p.job_id, "posting.json") or {}).get("pruned"):
+        print(f"job {p.job_id}: posting.json was pruned by retention (description is only a preview); "
+              "refusing to run the safety check. Re-fetch the posting first.", file=sys.stderr)
         return 1
     reg_path = registry.default_path(s)
     flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
@@ -444,6 +449,34 @@ def cmd_action_done(args: argparse.Namespace) -> int:
         return 0
     print("done" if ok else f"action item {args.id} not found")
     return 0 if ok else 1
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    from careeros import retention
+
+    s = _settings(args)
+    items = retention.plan(s)
+    dry = args.dry_run or not args.yes
+    summary = retention.summarize(items)
+    if args.json:
+        freed = 0 if dry else retention.execute(s, items)
+        print(json.dumps({"dry_run": dry, "items": [i.to_dict() for i in items], "summary": summary,
+                          "freed_bytes": freed}, indent=2))
+        return 0
+    if not items:
+        print("prune: nothing to remove")
+        return 0
+    for i in items:
+        what = (f"{len(i.paths)} screenshot(s): " + ", ".join(Path(p).name for p in i.paths[:4])
+                + (" ..." if len(i.paths) > 4 else "")) if i.action == "delete_screenshots" else "trim posting.json to a stub"
+        print(f"{i.job_id}  {what}  ({retention.human_bytes(i.bytes)})")
+    total = f"{summary['jobs']} job(s), {summary['files']} file(s), {retention.human_bytes(summary['bytes'])}"
+    if dry:
+        print(f"\ndry run: would free {total}. Re-run with --yes to apply.")
+        return 0
+    freed = retention.execute(s, items)
+    print(f"\npruned {total}; freed {retention.human_bytes(freed)}")
+    return 0
 
 
 def _contacts_path(args: argparse.Namespace) -> tuple[Settings, Path | None]:
@@ -629,6 +662,12 @@ def build_parser() -> argparse.ArgumentParser:
     scl.add_argument("company")
     scl.add_argument("--note")
     scl.set_defaults(fn=cmd_safety_clear)
+
+    pr = sub.add_parser("prune", help="remove old screenshots and trim old unprepared postings (dry run unless --yes)")
+    pr.add_argument("--dry-run", action="store_true", help="only list what would go (the default; wins over --yes)")
+    pr.add_argument("--yes", action="store_true", help="actually delete / trim")
+    pr.add_argument("--json", action="store_true", help="machine-readable plan (and result with --yes)")
+    pr.set_defaults(fn=cmd_prune)
 
     out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
     outs = out.add_subparsers(dest="outreach_cmd", required=True)
