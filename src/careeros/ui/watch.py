@@ -52,6 +52,14 @@ def _under(p: Path, root: Path) -> tuple[str, ...] | None:
         return None
 
 
+_RUN_STATE = {"pause.json", "catch_up.json", "runner.lock", "locks"}
+
+
+def _is_run_state(name: str) -> bool:
+    """Files the runner keeps beside the run folders (not runs themselves)."""
+    return name in _RUN_STATE or (name.startswith("queue-") and name.endswith(".json"))
+
+
 def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
     plan = Plan()
     index_names = {roots.index.name + s for s in ("", "-wal", "-shm", "-journal")}
@@ -72,7 +80,9 @@ def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
                 plan.jobs.add(parts[0])
             continue
         if (parts := _under(p, roots.runs)) is not None:
-            if len(parts) == 1 or parts[0] == "locks":
+            if len(parts) == 1 and not _is_run_state(parts[0]) and not _is_finder_copy(parts[0]):
+                plan.runs.add(parts[0])              # a run folder created, moved in or moved away
+            elif len(parts) == 1 or parts[0] == "locks":
                 plan.status = True                   # queue-*.json, pause.json, catch_up.json, runner.lock, ...
             elif not _is_finder_copy(parts[0]):
                 plan.runs.add(parts[0])

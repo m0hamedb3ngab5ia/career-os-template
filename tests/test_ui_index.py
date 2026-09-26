@@ -246,7 +246,7 @@ def _with_index_path(data, value):
     return s
 
 
-@pytest.mark.parametrize("target", ["tracker", "folder", "config", "profile", "jobs_dir"])
+@pytest.mark.parametrize("target", ["tracker", "folder", "config", "profile", "jobs_dir", "in_job", "in_runs"])
 def test_index_path_may_not_point_at_user_files(data, target):
     from careeros.config import ConfigError
     from careeros.ui.index import default_path
@@ -255,7 +255,8 @@ def test_index_path_may_not_point_at_user_files(data, target):
     tracker = s.paths["tracker_xlsx"]
     before = tracker.read_bytes()
     value = {"tracker": str(tracker), "folder": str(s.root / "data"), "config": "config/ui.db",
-             "profile": "profile/ui.db", "jobs_dir": str(s.paths["jobs_dir"])}[target]
+             "profile": "profile/ui.db", "jobs_dir": str(s.paths["jobs_dir"]),
+             "in_job": "data/jobs/abc123/score.json", "in_runs": "data/runs/x.db"}[target]
     _with_index_path(data, value)
     with pytest.raises(ConfigError):
         default_path(s)
@@ -386,3 +387,54 @@ def test_index_path_compared_case_insensitively(data):
     with pytest.raises(ConfigError):
         default_path(s)
     assert not tracker.exists()
+
+
+@pytest.mark.parametrize("probe", ["quick_check", "first_sync"])
+def test_damage_inside_a_data_page_is_caught_and_rebuilt(data, monkeypatch, probe):
+    ix = Index(data["settings"])
+    ix.rebuild()
+    root = ix.query("SELECT rootpage FROM sqlite_master WHERE name = 'jobs'")[0]["rootpage"]
+    page_size = ix.query("PRAGMA page_size")[0]["page_size"]
+    ix.con.execute("PRAGMA wal_checkpoint(TRUNCATE)")
+    ix.close()
+    path = ix.path
+    with path.open("r+b") as f:             # schema and meta pages stay readable; the jobs page does not
+        f.seek((root - 1) * page_size)
+        f.write(b"\xff" * 100)
+    if probe == "first_sync":               # the probe misses it: the first sync must still recover
+        monkeypatch.setattr(index_mod, "_classify", lambda p: "ours")
+    ix = Index(data["settings"])
+    ix.sync()
+    assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
+    ix.close()
+    assert len(list(path.parent.glob(path.name + ".corrupt-*"))) == 1
+
+
+def test_a_damaged_index_keeps_its_wal_next_to_the_aside_copy(data):
+    path = Index(data["settings"]).path
+    Index.remove_files(path)
+    path.write_bytes(b"SQLite format 3\x00" + b"damaged page" * 50)
+    wal = path.with_name(path.name + "-wal")
+    wal.write_bytes(b"wal frames " * 20)
+    ix = Index(data["settings"])
+    ix.close()
+    aside = [p for p in path.parent.glob(path.name + ".corrupt-*") if not p.name.endswith("-wal")]
+    assert len(aside) == 1
+    assert aside[0].with_name(aside[0].name + "-wal").read_bytes() == b"wal frames " * 20
+
+
+def test_set_aside_twice_in_the_same_second_gets_a_counter(data, monkeypatch):
+    class Frozen(datetime):
+        @classmethod
+        def now(cls, tz=None):
+            return datetime(2026, 9, 24, 15, 0, 0, tzinfo=tz)
+
+    monkeypatch.setattr(index_mod, "datetime", Frozen)
+    path = data["settings"].paths["jobs_dir"].parent / "careeros.db"
+    path.write_bytes(b"one")
+    first = index_mod._set_aside(path)
+    path.write_bytes(b"two")
+    second = index_mod._set_aside(path)
+    assert first.name == "careeros.db.corrupt-20260924-150000"
+    assert second.name == "careeros.db.corrupt-20260924-150000-1"
+    assert (first.read_bytes(), second.read_bytes()) == (b"one", b"two")

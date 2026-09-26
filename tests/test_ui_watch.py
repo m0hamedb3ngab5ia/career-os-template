@@ -153,3 +153,12 @@ def test_loop_passes_the_quiet_window_as_step(data, monkeypatch):
     w._loop([w.roots.jobs], False)
     assert seen["step"] == 1000 and seen["debounce"] == 5000 and seen["recursive"] is False
     ix.close()
+
+
+def test_plan_a_run_folder_moved_away_reindexes_that_run(roots):
+    r = roots.runs
+    plan = plan_changes([r / "20260924-010000-score-ab12"], roots)
+    assert plan.runs == {"20260924-010000-score-ab12"}
+    for state in ("queue-score.json", "pause.json", "catch_up.json", "runner.lock", "locks"):
+        plan = plan_changes([r / state], roots)
+        assert plan.status and not plan.runs, state

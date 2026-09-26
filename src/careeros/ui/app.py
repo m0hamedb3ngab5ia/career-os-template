@@ -8,7 +8,7 @@ edit keeps the last good settings and shows the error on /api/health), the Index
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
@@ -43,6 +43,7 @@ class Context:
         settings and show why. The index and the watcher were built on the old paths, so a change to `paths` or
         `ui.index_path` also keeps the old settings until `careeros ui` is restarted."""
         from careeros.runs.advisor import load_advisor_config
+        from careeros.runs.policy import daily_cap
         from careeros.runs.config import load_runs_config
         from careeros.runs.schedule import load_schedule
         from careeros.ui.config import load_ui_config
@@ -54,6 +55,7 @@ class Context:
             load_runs_config(fresh)
             load_schedule(fresh)
             load_advisor_config(fresh.pipeline)
+            daily_cap(fresh.targets or {}, date.today())       # volume block: the Today tile reads it
         except ConfigError as e:
             self.config_error = str(e)
             return

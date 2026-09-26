@@ -331,6 +331,33 @@ def test_reload_keeps_settings_when_server_keys_change(data, client, change):
     assert ctx.settings is old and "restart careeros ui" in ctx.config_error
 
 
+def test_reload_refuses_an_index_path_on_the_tracker(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["ui"] = {"index_path": str(data["settings"].paths["tracker_xlsx"])}
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "index_path" in ctx.config_error
+
+
+def test_reload_refuses_a_broken_volume_block(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "targets.yaml"
+    tg = yaml.safe_load(cfg.read_text()) or {}
+    tg["volume"] = {"max_applications_per_day": 0}
+    cfg.write_text(yaml.safe_dump(tg, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "volume" in ctx.config_error
+    assert client.get("/api/status").status_code == 200
+
+
 def test_cli_refuses_to_replace_a_foreign_file_at_the_index_path(data, tmp_path):
     db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
     db.write_bytes(b"not a database")

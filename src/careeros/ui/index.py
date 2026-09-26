@@ -92,7 +92,9 @@ SQLITE_HEADER = b"SQLite format 3\x00"
 
 def default_path(settings: Any) -> Path:
     """data/careeros.db, or `ui.index_path`. The index is deleted and rebuilt at will, so a path that is (or is
-    inside) something the candidate keeps is refused: a configured file, a folder, config/ or profile/."""
+    inside) something the candidate keeps is refused: a configured file, a folder, config/, profile/, or a path
+    inside the jobs or runs folder."""
+    from careeros.runs.store import runs_dir_for
     from careeros.ui.config import load_ui_config
 
     cfg = load_ui_config(settings)
@@ -104,17 +106,19 @@ def default_path(settings: Any) -> Path:
     fold = lambda x: Path(os.path.realpath(x).casefold())  # noqa: E731 - macOS volumes are case-insensitive
     real = fold(p)
     kept = {fold(v) for v in settings.paths.values()}
-    guarded = [fold(root / d) for d in ("config", "profile")]
+    guarded = [fold(root / d) for d in ("config", "profile")] + [fold(settings.paths["jobs_dir"]),
+                                                                 fold(runs_dir_for(settings))]
     if real in kept or Path(os.path.realpath(p)).is_dir() or any(real.is_relative_to(g) for g in guarded):
         raise ConfigError(f"config/pipeline.yaml: ui.index_path {cfg.index_path!r} points at your own files "
-                          "(a path under paths:, a folder, config/ or profile/); use a new file such as "
+                          "(a path under paths:, a folder, config/, profile/, the jobs or runs folder); use a new file such as "
                           "data/careeros.db, or null")
     return p
 
 
 def _classify(path: Path) -> str:
     """What sits at the index path: "absent" (missing or empty), "ours" (SQLite with our meta.schema_version row),
-    "damaged" (SQLite header but unreadable, or our meta table without its row), or "foreign" (anything else)."""
+    "damaged" (SQLite header but unreadable, failing quick_check, or our meta table without its row), or
+    "foreign" (anything else)."""
     if path.is_dir():
         return "foreign"
     if not path.exists() or not path.stat().st_size:
@@ -131,7 +135,10 @@ def _classify(path: Path) -> str:
         if "meta" not in tables:
             return "foreign"
         row = con.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone()
-        return "ours" if row else "damaged"
+        if not row:
+            return "damaged"
+        check = con.execute("PRAGMA quick_check(1)").fetchone()     # damage inside a data page
+        return "ours" if check and check[0] == "ok" else "damaged"
     except sqlite3.Error:
         return "damaged"
     finally:
@@ -182,13 +189,17 @@ class Index:
         self._lock = threading.RLock()
         self.con: sqlite3.Connection | None = None
         _prepare(self.path)
+        self._synced = False
         try:
             self._open()
         except sqlite3.DatabaseError:        # damaged in a way the read-only probe missed: set aside, rebuild
-            if self.con is not None:
-                self.con.close()
-            _set_aside(self.path)
-            self._open()
+            self._recover()
+
+    def _recover(self) -> None:
+        if self.con is not None:
+            self.con.close()
+        _set_aside(self.path)
+        self._open()
 
     def _open(self) -> None:
         self.con = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
@@ -248,6 +259,20 @@ class Index:
             return self.sync()
 
     def sync(self) -> dict[str, Any]:
+        with self._lock:
+            if self._synced:
+                return self._sync()
+            try:
+                res = self._sync()
+            except sqlite3.OperationalError:
+                raise
+            except sqlite3.DatabaseError:    # first sync hit damage the probe missed: set aside, rebuild once
+                self._recover()
+                res = self._sync()
+            self._synced = True
+            return res
+
+    def _sync(self) -> dict[str, Any]:
         with self._lock:
             self._ensure_schema()
             on_disk = set(self._job_ids())
