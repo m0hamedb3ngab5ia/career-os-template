@@ -40,7 +40,8 @@ class GreenhouseAdapter(Adapter):
                     description_text=html_to_text(content_html),
                     departments=depts,
                     source_slug=board["slug"],
-                    raw={"offices": offices, "metadata": meta, "internal_job_id": j.get("internal_job_id")},
+                    raw={"offices": offices, "metadata": meta, "internal_job_id": j.get("internal_job_id"),
+                         "application_deadline": j.get("application_deadline")},
                 )
             )
-        return out
+        return self.with_close_date(out)

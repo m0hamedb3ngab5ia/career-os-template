@@ -331,3 +331,45 @@ def test_score_job_uses_three_verdicts_and_reason_codes():
 def test_apply_job_follows_safety_verdict():
     text = _skill("apply-job")
     assert "verdict" in text and "block" in text and "review" in text
+
+
+# --- company policy (caps, cooldown with deadline exception, transparency) --------------------------
+
+@pytest.mark.parametrize("skill", ["score-job", "prepare-job"])
+def test_prepare_path_runs_company_gate_before_preparing(skill: str):
+    text = _skill(skill)
+    assert "careeros company gate" in text
+    for reason in ("company_cap", "cooldown"):
+        assert reason in text, reason
+
+
+def test_score_job_gate_comes_before_the_final_decision_is_recorded():
+    text = _skill("score-job")
+    assert text.index("careeros company gate") > text.index("## 7. Decision")
+    assert "careeros company requeue" in text
+
+
+def test_prepare_job_gates_before_tailoring():
+    text = _skill("prepare-job")
+    assert text.index("careeros company gate") < text.index("## Step 2: resume")
+
+
+def test_apply_job_uses_company_gate_not_manual_lookups():
+    pre = _skill("apply-job").split("## 1.", 1)[1].split("### 1b", 1)[0]
+    assert "careeros company gate <job_id>" in pre
+    assert 'applied-count "<company>"' not in pre, "company cap now comes from `careeros company gate`"
+    assert "--status rejected" not in pre, "cooldown now comes from `careeros company gate`"
+    assert "applied-count --days 1" in pre, "the daily cap stays"
+
+
+@pytest.mark.parametrize("skill", ["prepare-job", "apply-job"])
+def test_urgent_jobs_go_first(skill: str):
+    text = _skill(skill)
+    assert "careeros jobs list --status queued --order urgent" in text
+    assert "action_note" in text
+
+
+def test_inbox_sync_adds_transparency_note():
+    text = _skill("inbox-sync")
+    assert "careeros company active" in text and "--exclude <job_id>" in text
+    assert "mention these to the recruiter" in text

@@ -1,0 +1,39 @@
+{
+  "_note": "Recorded shapes (fictional companies) of the three public job-board APIs where a posting carries a close date. Greenhouse: `application_deadline` (ISO datetime, often null) or the description text. Lever and Ashby expose no deadline field; only the description text can have one.",
+  "greenhouse": {"jobs": [
+    {"id": 5001, "title": "Software Engineer, New Grad", "updated_at": "2026-09-20T10:00:00-04:00",
+     "first_published": "2026-09-15T10:00:00-04:00", "application_deadline": "2026-10-16T23:59:00-04:00",
+     "absolute_url": "https://boards.greenhouse.io/acme/jobs/5001", "location": {"name": "New York, NY"},
+     "content": "&lt;p&gt;Build payments APIs.&lt;/p&gt;", "departments": [], "offices": [], "metadata": []},
+    {"id": 5002, "title": "Backend Engineer", "updated_at": "2026-09-20T10:00:00-04:00",
+     "first_published": "2026-09-18T10:00:00-04:00", "application_deadline": null,
+     "absolute_url": "https://boards.greenhouse.io/acme/jobs/5002", "location": {"name": "Washington, DC"},
+     "content": "&lt;p&gt;Own the ingest service.&lt;/p&gt;&lt;p&gt;&lt;strong&gt;Application Deadline:&lt;/strong&gt; December 16, 2026&lt;/p&gt;",
+     "departments": [], "offices": [], "metadata": []},
+    {"id": 5003, "title": "Platform Engineer", "updated_at": "2026-09-20T10:00:00-04:00",
+     "first_published": "2026-09-18T10:00:00-04:00",
+     "absolute_url": "https://boards.greenhouse.io/acme/jobs/5003", "location": {"name": "Remote - US"},
+     "content": "&lt;p&gt;Deadline to apply: None. Applications will be reviewed on a rolling basis.&lt;/p&gt;",
+     "departments": [], "offices": [], "metadata": [{"id": 1, "name": "Employment Type", "value": "Full-time"}]}
+  ]},
+  "lever": [
+    {"id": "d0000000-0000-4000-8000-000000000001", "text": "Data Engineer", "categories": {"location": "New York"},
+     "workplaceType": "hybrid", "country": "US", "createdAt": 1758000000000,
+     "descriptionPlain": "Own our pipelines.", "lists": [{"text": "Key dates", "content": "<li>Applications close: 30 October 2026</li>"}],
+     "additionalPlain": "", "hostedUrl": "https://jobs.lever.co/leverco/d0000000-0000-4000-8000-000000000001"},
+    {"id": "d0000000-0000-4000-8000-000000000002", "text": "Software Engineer", "categories": {"location": "New York"},
+     "workplaceType": "onsite", "country": "US", "createdAt": 1758000000000,
+     "descriptionPlain": "Work under tight deadlines. Offer Deadline: we share our offer timelines.", "lists": [],
+     "hostedUrl": "https://jobs.lever.co/leverco/d0000000-0000-4000-8000-000000000002"}
+  ],
+  "ashby": {"jobs": [
+    {"id": "e0000000-0000-4000-8000-000000000001", "title": "Full Stack Engineer", "location": "New York",
+     "publishedAt": "2026-09-18T15:00:00.000Z", "isRemote": false,
+     "descriptionPlain": "Ship product features. Please apply by November 2, 2026.",
+     "jobUrl": "https://jobs.ashbyhq.com/ashbyco/e0000000-0000-4000-8000-000000000001"},
+    {"id": "e0000000-0000-4000-8000-000000000002", "title": "Mobile Engineer", "location": "New York",
+     "publishedAt": "2026-09-18T15:00:00.000Z", "isRemote": false,
+     "descriptionPlain": "Ship the iOS app.",
+     "jobUrl": "https://jobs.ashbyhq.com/ashbyco/e0000000-0000-4000-8000-000000000002"}
+  ]}
+}

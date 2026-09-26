@@ -33,6 +33,21 @@ Follow `.claude/skills/score-job/SKILL.md` with `JOB`. Store its RESULT as `step
 
 `tier` = score.tier. `tier_cfg` = `targets.tiers[tier]` (tier null -> treat as C).
 
+## Step 1b: company gate (before any tailoring)
+
+Run `.venv/bin/careeros company gate <job_id> --json` again (score-job ran it; a rejection or a new
+reservation may have landed since, and a re-run with `--force` skips nothing). Keep its JSON as `gate`.
+- Exit 3: final status `skipped`, reason = `gate.reason` (`company_cap`, `cooldown`, `not_similar`,
+  `closed`), note `gate.detail`. Go to Finish. `company_cap` / `cooldown` are deferred, not dropped:
+  `careeros company requeue` sets them back to `scored` once a slot opens or the cooldown ends.
+- Exit 0: continue. If `gate.urgent`, this job goes first (a close date before the cooldown ends, or a
+  cluster of similar roles at the company closing together): every Action Item for it below gets
+  `gate.action_note` appended and priority H, and run
+  `.venv/bin/careeros tracker upsert <job_id> --field NextActionDate=<gate.closes_at>` when `closes_at` is set.
+
+Batches: prepare jobs in `careeros jobs list --status found --order urgent` order (urgent first, then the
+earliest close date, then fit), and hand off in `careeros jobs list --status queued --order urgent` order.
+
 ## Step 2: resume
 
 Follow `.claude/skills/tailor-resume/SKILL.md` with `JOB`. Store RESULT as `steps.resume`.
@@ -117,8 +132,10 @@ each remaining action item run
 (`--dedupe` makes the CLI enforce the same rule: if an open item with the same job + type exists it
 prints the existing id and adds nothing; `profile_gap` for profile-gap items; `laptop` for anything
 that needs the repo or a browser, e.g. tier_a_review; `phone` for quick answers; default `anytime`).
+When `gate.urgent` is true and `gate.action_note` is non-empty, append it to the text (`... — <action_note>`)
+so the item shows the posting's close date.
 If the CLI is unavailable the caller applies them from RESULT.
 
 ## Finish: RESULT (last line)
 
-`RESULT: {"skill":"prepare-job","job_id":"...","status":"queued","tier":"B","category":"swe_backend","fit":78,"decision":"prepare","skip_reason":null,"qa_pass":true,"qa_mean":8.2,"regenerations":0,"cover_letter":true,"files":["..."],"ACTION_ITEMS":["..."],"outreach":null}`
+`RESULT: {"skill":"prepare-job","job_id":"...","status":"queued","tier":"B","category":"swe_backend","fit":78,"decision":"prepare","skip_reason":null,"qa_pass":true,"qa_mean":8.2,"regenerations":0,"cover_letter":true,"files":["..."],"ACTION_ITEMS":["..."],"outreach":null,"urgent":false,"closes_at":null}`

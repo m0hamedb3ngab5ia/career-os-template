@@ -59,6 +59,17 @@ scout ──► data/jobs/<job_id>/posting.json
         outreach  ──► Contacts tab: name, LinkedIn URL, email (if found), draft msg
 ```
 
+## Applications per company (`src/careeros/company_policy.py`)
+
+Pure functions over job records (status.json, score.json, tracker DateApplied, posting close date):
+`slots` (submitted in the cap window + reservations), `rank_candidates` (similar roles by fit; during a
+rejection cooldown, roles that close before it ends first), `gate` (allowed, reason, urgent, closes_at),
+`transparency_note`. Close dates: Greenhouse `application_deadline` or a custom metadata field, else the
+description text ("apply by", "applications close", "deadline", "closing date", "no later than" + a
+date); Lever and Ashby have no deadline field, text only. Unknown = None, and the cooldown applies.
+Scout stores it as `closes_at` in posting.json. CLI: `careeros company slots|gate|active|requeue`;
+score-job and prepare-job gate before tailoring, apply-job before submitting.
+
 ## Job lifecycle (tracker `Status` column)
 
 `found → scored → skipped | queued → prepared → needs_review → applied → screening → interview → offer | rejected | withdrawn | ghosted`

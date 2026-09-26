@@ -63,4 +63,4 @@ class LeverAdapter(Adapter):
                     raw={"commitment": cats.get("commitment"), "workplaceType": workplace, "country": j.get("country")},
                 )
             )
-        return out
+        return self.with_close_date(out)

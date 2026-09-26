@@ -40,10 +40,15 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: true only when the verdict is pass and the ATS is allowlisted on its own or the company's domain, reached from the company's board) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
 | daily cap: `.venv/bin/careeros tracker applied-count --days 1` (all companies, today) < `volume.max_applications_per_day` x `season_multiplier[month]` | tracker | outcome failed, reason "daily cap" |
-| company cap: `.venv/bin/careeros tracker applied-count "<company>" --days 90` < `volume.max_per_company_per_90_days` | tracker | outcome failed, reason "company cap" |
-| company not rejected within `same_company_cooldown_days` | `.venv/bin/careeros jobs list --json --status rejected` (same company), then that job's `status.json` history timestamp | outcome failed, reason "cooldown" |
+| company gate: `.venv/bin/careeros company gate <job_id> --json` exits 0. One check for the per-company cap (`volume.max_per_company_per_90_days`, or the company's `company_caps` entry), the rejection cooldown (`volume.same_company_cooldown_days`, lifted for a posting that closes before it ends) and a closed posting | tracker, job dirs, config | exit 3: outcome failed, reason "company <reason>: <detail>"; status unchanged (still queued, retried next session); no browser. Keep the JSON as `gate` |
 
-`applied-count` prints one integer (0 when the tracker does not exist yet). Never open the workbook
+`applied-count` prints one integer (0 when the tracker does not exist yet).
+
+Session order: take jobs in `careeros jobs list --status queued --order urgent` order. Urgent jobs (the
+posting closes before a rejection cooldown ends, or two or more similar roles at one company close within
+`volume.deadline_cluster_days`) go first so related applications land together, then the earliest close
+date, then fit. When `gate.urgent` is true, every Action Item this skill adds for the job ends with
+`gate.action_note` (it names the close date). Never open the workbook
 directly from this skill; every tracker read/write goes through the `careeros` CLI.
 
 ### 1b. Safety gate (before any form fill)
