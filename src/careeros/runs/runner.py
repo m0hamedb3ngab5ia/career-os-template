@@ -190,9 +190,12 @@ class _Loop:
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
         sid = str(uuid.uuid4())
         cmd = build_command(self.cfg, prompt, session_id=sid)
-        timeout_s = float(self.cfg.job_timeout_minutes[self.kind]) * 60
+        job_s = float(self.cfg.job_timeout_minutes[self.kind]) * 60
+        left_s = float(self.budget.max_minutes) * 60 - (self.clock() - self.t_start)
+        timeout_s = max(1e-3, min(job_s, left_s))  # the run's time budget also caps the job in flight
+        budget_bound = left_s < job_s
         lock = locks.acquire(self.rs.job_lock_path(jid), owner=f"run:{self.run['id']}", pid=os.getpid(),
-                             ttl_seconds=timeout_s + 300, note=f"{self.kind} {jid}")
+                             ttl_seconds=job_s + 300, note=f"{self.kind} {jid}")
         env = {**os.environ, "CAREEROS_RUN_ID": self.run["id"], "CAREEROS_LOCK_TOKEN": lock.token,
                "CAREEROS_ROOT": str(self.s.root)}
         started, t0 = self.now(), self.clock()
@@ -204,6 +207,8 @@ class _Loop:
         took = self.clock() - t0
         self.durations.append(took)
         outcome, detail = classify(res, self.cfg, self.kind, jid)
+        if outcome == "timeout" and budget_bound:
+            outcome, detail = "time_budget", f"stopped at the run's {self.budget.max_minutes:g}-minute budget"
         result = parse_result_line(res.result_text) if res.saw_result else None
         if outcome == "ok" and self.kind == "score" and result:
             _record_score_verdict(self.s, self.store, jid, result, self.run["id"])
@@ -258,7 +263,7 @@ class _Loop:
             else:
                 self.c["failed"] += 1
                 streak += 1
-            if outcome in HARD_STOPS:
+            if outcome in HARD_STOPS or outcome == "time_budget":
                 return outcome, att["detail"]
             if outcome == "timeout" and self.cfg.stop_on_timeout:
                 return "timeout", att["detail"]
