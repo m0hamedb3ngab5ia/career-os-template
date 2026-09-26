@@ -83,8 +83,16 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    evidence links; Verify / Flag / Clear), **Score**, **Documents** (résumé PDF, cover letter, answers, QA critic
    scores), **Apply session** (step timeline with screenshots, outcome), **Contacts & outreach** (drafts, relationship
    badge), **Log** (log.md + status history). Toolbar: Prepare, Apply, Re-run QA, Set status, Override.
-5. **Action Items**: all items, grouped by Type + Needs, sorted Priority then NextActionDate; Open / Today / Done
-   tabs; bulk done; Link always clickable.
+5. **Action Items**: all items grouped by due date (Overdue, Today, Tomorrow, Next 7 days, No date), soonest
+   first, then priority; Open / Today / Done tabs; bulk done; Link always clickable. Any item that has a natural
+   deadline shows it as secondary text under the task: relative wording when it's close ("Today, 6:00 PM",
+   "Tomorrow", "In 3 days"), an absolute date further out, and the reason ("posting closes", "reply within 48
+   hours", "saved form expires"). Red is only for overdue items and orange only for items due within 48 hours;
+   everything else stays secondary grey. Undated items get an "Add date" control, never an invented deadline.
+   Needs a new optional `due` (ISO datetime) and `due_reason` on `ActionItem` and a `Due` column on the Action
+   Items sheet. The producers set them: inbox-sync (interview reply window, assessment deadline), apply-job
+   (saved-form expiry), prepare-job (posting close date when the ATS gives one), and follow-ups (after-apply
+   window).
 6. **Inbox & follow-ups**: applied jobs with days since applying, last email, inbox-sync classification
    (rejection / assessment / interview / offer) and follow-up due dates; draft preview with Send / Edit / Skip.
    Auto-send only to a verified email; thank-you notes always manual.
