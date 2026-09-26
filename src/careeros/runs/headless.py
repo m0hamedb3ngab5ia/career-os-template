@@ -29,7 +29,7 @@ from typing import Any, Callable, Iterable
 from careeros.runs.config import RunsConfig
 
 OUTCOMES = ("ok", "usage_limit", "auth_required", "permission_denied", "timeout", "cancelled", "skill_error",
-            "invalid_result", "error")
+            "invalid_result", "error", "time_budget")  # time_budget: the runner cut the job at the run's budget
 # An outcome that ends the whole run at once (the next job would hit the same wall).
 HARD_STOPS = ("usage_limit", "auth_required", "permission_denied", "cancelled")
 RESULT_RE = re.compile(r"^\s*RESULT:\s*(\{.*\})\s*$")
