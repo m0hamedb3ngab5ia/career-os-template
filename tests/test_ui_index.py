@@ -183,16 +183,38 @@ def test_contacts_json_parse_errors_are_skipped(idx, data):
     assert idx.query("SELECT COUNT(*) AS n FROM contacts")[0]["n"] == 0
 
 
-def test_damaged_index_is_left_alone(data):
-    from careeros.config import ConfigError
+@pytest.mark.parametrize("damage", ["garbage_pages", "truncated_index"])
+def test_damaged_index_is_renamed_aside_and_rebuilt(data, damage):
+    path = Index(data["settings"]).path
+    if damage == "garbage_pages":
+        Index.remove_files(path)
+        path.write_bytes(b"SQLite format 3\x00" + b"damaged page" * 50)
+    else:                                   # our own index, cut short mid-write
+        ix = Index(data["settings"])
+        ix.rebuild()
+        ix.close()
+        for side in ("-wal", "-shm"):
+            path.with_name(path.name + side).unlink(missing_ok=True)
+        path.write_bytes(path.read_bytes()[:1500])
+    before = path.read_bytes()
+    ix = Index(data["settings"])
+    ix.sync()
+    assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
+    ix.close()
+    aside = list(path.parent.glob(path.name + ".corrupt-*"))
+    assert len(aside) == 1 and aside[0].read_bytes() == before
+    assert len(aside[0].name.rsplit(".corrupt-", 1)[1]) == len("20260924-150000")
 
+
+def test_reindex_renames_a_damaged_index_aside(data):
     path = Index(data["settings"]).path
     Index.remove_files(path)
-    path.write_bytes(b"SQLite format 3\x00" + b"damaged page" * 50)
+    path.write_bytes(b"SQLite format 3\x00" + b"x" * 400)
     before = path.read_bytes()
-    with pytest.raises(ConfigError, match="not a careeros index"):
-        Index(data["settings"])
-    assert path.read_bytes() == before
+    Index.remove_files(path)
+    assert not path.exists()
+    aside = list(path.parent.glob(path.name + ".corrupt-*"))
+    assert len(aside) == 1 and aside[0].read_bytes() == before
 
 
 def test_empty_file_at_the_index_path_is_adopted(data):

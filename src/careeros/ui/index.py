@@ -112,33 +112,61 @@ def default_path(settings: Any) -> Path:
     return p
 
 
-def _is_our_index(path: Path) -> bool:
-    """True when `path` is an SQLite file with this index's meta.schema_version row (any version)."""
+def _classify(path: Path) -> str:
+    """What sits at the index path: "absent" (missing or empty), "ours" (SQLite with our meta.schema_version row),
+    "damaged" (SQLite header but unreadable, or our meta table without its row), or "foreign" (anything else)."""
+    if path.is_dir():
+        return "foreign"
+    if not path.exists() or not path.stat().st_size:
+        return "absent"
+    with path.open("rb") as f:
+        if f.read(len(SQLITE_HEADER)) != SQLITE_HEADER:
+            return "foreign"
     try:
         con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
     except sqlite3.Error:
-        return False
+        return "damaged"
     try:
-        return con.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone() is not None
+        tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if "meta" not in tables:
+            return "foreign"
+        row = con.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone()
+        return "ours" if row else "damaged"
     except sqlite3.Error:
-        return False
+        return "damaged"
     finally:
         con.close()
 
 
-def _check_replaceable(path: Path) -> None:
-    """Raise ConfigError unless `path` is absent, empty or a careeros index: the only things the index may rebuild
-    or delete. Another program's database, or one too damaged to show it is ours, is left alone."""
+def _set_aside(path: Path) -> Path:
+    """Rename a damaged index (and its WAL side files) to <name>.corrupt-<stamp>; never delete it."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    aside = path.with_name(f"{path.name}.corrupt-{stamp}")
+    n = 1
+    while aside.exists():
+        aside, n = path.with_name(f"{path.name}.corrupt-{stamp}-{n}"), n + 1
+    path.rename(aside)
+    path.with_name(path.name + "-shm").unlink(missing_ok=True)   # shared-memory map: rebuilt by SQLite
+    for suffix in ("-wal", "-journal"):
+        side = path.with_name(path.name + suffix)
+        if side.exists() and side.stat().st_size:
+            side.rename(aside.with_name(aside.name + suffix))
+        else:
+            side.unlink(missing_ok=True)     # empty side file (e.g. made by the read-only probe)
+    return aside
+
+
+def _prepare(path: Path) -> None:
+    """Make `path` safe to open as the index: refuse a folder or another program's file (ConfigError, left
+    untouched); rename a damaged index aside so a fresh one is built."""
+    kind = _classify(path)
     if path.is_dir():
         raise ConfigError(f"UI index path {path} is a folder; set ui.index_path to a file (or null)")
-    if not path.exists() or not path.stat().st_size:
-        return
-    with path.open("rb") as f:
-        sqlite = f.read(len(SQLITE_HEADER)) == SQLITE_HEADER
-    if not sqlite or not _is_our_index(path):
-        raise ConfigError(f"UI index path {path} is not a careeros index (another file or database, or a damaged "
-                          "index); refusing to replace it. Move or delete it, or set ui.index_path "
-                          "(null = data/careeros.db)")
+    if kind == "foreign":
+        raise ConfigError(f"UI index path {path} is not a careeros index (another file or database); refusing to "
+                          "replace it. Move it away or set ui.index_path (null = data/careeros.db)")
+    if kind == "damaged":
+        _set_aside(path)
 
 
 class Index:
@@ -153,13 +181,13 @@ class Index:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
         self.con: sqlite3.Connection | None = None
-        _check_replaceable(self.path)
+        _prepare(self.path)
         try:
             self._open()
-        except sqlite3.DatabaseError:        # a damaged index: it is derived, so start over
+        except sqlite3.DatabaseError:        # damaged in a way the read-only probe missed: set aside, rebuild
             if self.con is not None:
                 self.con.close()
-            self.remove_files(self.path)
+            _set_aside(self.path)
             self._open()
 
     def _open(self) -> None:
@@ -170,8 +198,9 @@ class Index:
 
     @staticmethod
     def remove_files(path: Path) -> None:
-        """Delete the index and its WAL side files (`careeros ui --reindex`); refuses anything but an index."""
-        _check_replaceable(path)
+        """Delete the index and its WAL side files (`careeros ui --reindex`). Refuses anything but an index; a
+        damaged one is renamed aside, never deleted."""
+        _prepare(path)
         for suffix in ("", "-wal", "-shm", "-journal"):
             path.with_name(path.name + suffix).unlink(missing_ok=True)
 
