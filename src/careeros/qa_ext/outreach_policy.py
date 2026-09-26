@@ -29,6 +29,7 @@ from typing import Any
 
 from careeros.outreach import OutreachPolicy, needs_manual_outreach
 from careeros.qa import count_words
+from careeros.qa_ext import outreach_data, outreach_items
 
 DEFAULTS: dict[str, Any] = {
     "after_apply_max_words": 120,       # post_apply_outreach.md: ~100 words
@@ -112,10 +113,7 @@ def check_outreach_policy(ck: Any) -> None:
         ck.add("outreach_json_valid", "hard", False, f"outreach.json: {ck.outreach_error}")
         _skip_all(ck, "outreach.json unparseable")
         return
-    data = ck.outreach
-    if isinstance(data, list):
-        data = {"drafts": data}
-    if not isinstance(data, dict):
+    if outreach_data(ck) is None:
         ck.add("outreach_json_valid", "hard", False, "outreach.json is not an object")
         _skip_all(ck, "outreach.json unparseable")
         return
@@ -134,8 +132,7 @@ def check_outreach_policy(ck: Any) -> None:
             if isinstance(c, dict):
                 contacts[_key(c.get("name"))] = c
 
-    items = [d for d in (data.get("drafts") or []) if isinstance(d, dict)]
-    items += [d for d in (data.get("followups") or []) if isinstance(d, dict)]
+    items = [d for _, _, d in outreach_items(ck)]
     extras["drafts"] = len(items)
 
     issues: dict[str, list[str]] = {c: [] for c in CHECKS}

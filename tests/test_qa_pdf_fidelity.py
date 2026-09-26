@@ -342,3 +342,29 @@ def test_metadata_author_whitespace_and_case_tolerant(tmp_path: Path) -> None:
 def test_does_not_duplicate_core_pdf_checks(tmp_path: Path) -> None:
     names = {c["check"] for c in run(make_job(tmp_path)).checks}
     assert "pdf_page_count" not in names and "contact_intact:resume.pdf" not in names
+
+
+# --- review fixes (#22) -----------------------------------------------------------------------------
+
+@pytest.mark.parametrize("cfg", [{"text_recall_hard": "97%"}, {"text_recall_soft": "high"},
+                                 {"missing_sample": "lots"}, {"extra_tokens_max": [1]}])
+def test_malformed_pdf_config_fails_hard(tmp_path: Path, cfg: dict) -> None:
+    ck = run(make_job(tmp_path), cfg)
+    c = by_name(ck, "pdf_text_matches_resume")
+    assert c["level"] == "hard" and c["ok"] is False and not c.get("skipped")
+    assert next(iter(cfg)) in c["detail"]
+    assert any(x["level"] == "hard" and not x["ok"] for x in ck.checks)  # the gate does not pass
+
+
+def test_exception_in_hard_step_stays_hard(tmp_path: Path, monkeypatch) -> None:
+    import careeros.qa_ext.pdf_fidelity as pf
+
+    def boom(*a, **k):
+        raise RuntimeError("bad annots")
+
+    monkeypatch.setattr(pf, "_check_links", boom)
+    monkeypatch.setattr(pf, "_check_fonts", boom)
+    ck = run(make_job(tmp_path))
+    assert by_name(ck, "pdf_links_clickable")["level"] == "hard"
+    assert by_name(ck, "pdf_links_clickable")["ok"] is False
+    assert by_name(ck, "pdf_fonts_embedded")["level"] == "soft"

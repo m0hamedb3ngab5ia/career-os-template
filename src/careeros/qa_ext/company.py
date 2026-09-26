@@ -40,6 +40,8 @@ from pathlib import Path
 from typing import Any, Iterable
 
 from careeros.config import normalize_company
+from careeros.qa_ext import outreach_items, outreach_texts
+from careeros.safety.scam import registrable_domain
 
 DEFAULT_IGNORE = ("LinkedIn", "GitHub")
 # Company names that are also everyday words and can open a sentence or sit in a title-cased heading.
@@ -51,10 +53,10 @@ COMMON_WORD_NAMES = frozenset({
     "fidelity", "compass", "mercury", "brace", "wave", "signal", "zoom", "slack", "unity", "atlas", "sierra",
     "harvey", "glean", "hex", "modal", "replit", "together", "character", "scale ai",
 })
+# Host labels that name a hiring site, never the company ("careers.acme.com" is not the spelling "careers").
+GENERIC_DOMAIN_STEMS = frozenset({"careers", "career", "jobs", "job", "apply", "boards", "board", "www", "hire",
+                                  "hiring", "work", "team", "join", "recruiting"})
 SMALL_WORDS = frozenset({"a", "an", "the", "and", "or", "of", "for", "to", "in", "on", "at", "by", "with", "vs"})
-# outreach.json draft fields that hold text the candidate sends
-OUTREACH_TEXT_KEYS = ("linkedin_note", "linkedin_message", "followup_7d", "followup_14d", "message", "note",
-                      "text", "body", "subject")
 
 
 # --------------------------------------------------------------------------- #
@@ -107,9 +109,14 @@ def _related(a: str, b: str) -> bool:
 
 
 def _domain_stem(d: Any) -> str | None:
+    """The company label of a configured domain, as the scam gate reads it: `careers.acme.co.uk` -> `acme`.
+    None for a bare label or a generic hiring-site word."""
     s = re.sub(r"^[a-z]+://", "", str(d or "").strip().lower()).split("/")[0]
-    labels = [x for x in s.split(".") if x and x != "www"]
-    return labels[0] if len(labels) >= 2 else None
+    reg = registrable_domain(s) if s else ""
+    if "." not in reg:
+        return None
+    stem = reg.split(".")[0]
+    return stem if stem and stem not in GENERIC_DOMAIN_STEMS else None
 
 
 def _jobs_dirs(ck: Any) -> list[Path]:
@@ -290,26 +297,11 @@ def _answer_docs(answers: Any) -> list[tuple[str, str]]:
 
 
 def _outreach_docs(ck: Any) -> list[tuple[str, str]]:
-    data = ck.outreach
-    if data is None:
+    if ck.outreach is None:
         raw = ck.outreach_raw
         return [("outreach.json", raw)] if raw is not None else []  # unparseable: scan it whole rather than not at all
-    drafts = data.get("drafts") if isinstance(data, dict) else data
-    out = []
-    for i, d in enumerate(drafts if isinstance(drafts, list) else []):
-        if not isinstance(d, dict):
-            continue
-        for k in OUTREACH_TEXT_KEYS:
-            if isinstance(d.get(k), str) and d[k].strip():
-                out.append((f"outreach.json:drafts[{i}].{k}", d[k]))
-        email = d.get("email")
-        if isinstance(email, dict):
-            for k in ("subject", "body"):
-                if isinstance(email.get(k), str) and email[k].strip():
-                    out.append((f"outreach.json:drafts[{i}].email.{k}", email[k]))
-        elif isinstance(email, str) and email.strip():
-            out.append((f"outreach.json:drafts[{i}].email", email))
-    return out
+    return [(f"outreach.json:{section}[{i}].{field}", text)
+            for section, i, d in outreach_items(ck) for field, text in outreach_texts(d)]
 
 
 # --------------------------------------------------------------------------- #

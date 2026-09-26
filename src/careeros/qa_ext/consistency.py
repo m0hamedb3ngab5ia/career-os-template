@@ -16,7 +16,9 @@
 - `numbers_consistent` (hard): a sentence attributed to a bullet (>= `min_overlap` shared content words) states the
   bullet's numbers with the same value (2M == 2 million == two million). The reference is the résumé.json bullet,
   or the profile master text when the bullet is not on the résumé. Numbers are paired by kind (%, $, x) or by
-  the noun that follows them.
+  the noun that follows them. Only the clause(s) of the sentence that overlap the bullet most are compared
+  (clauses split on ";", ", and", ", while", " but ", dashes), and a number whose value the posting text or any
+  artifact's `facts_used` states is a company fact, never a mismatch.
 - `numbers_paraphrased` (soft, only on findings): a vague or hedged restatement ("nearly half", "dozens of",
   "nearly 40") of an exact bullet number. Hedging an `estimate: true` ("~") number is not reported.
 
@@ -30,6 +32,7 @@ import re
 from typing import Any
 
 from careeros.qa import cited_ids_cover_letter
+from careeros.qa_ext import outreach_data, outreach_items, outreach_texts
 
 DEFAULT_ROLE_NOUNS = (
     "engineer", "developer", "intern", "analyst", "scientist", "manager", "designer", "architect", "consultant",
@@ -77,6 +80,8 @@ DEGREE_RX = {
 }
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
 TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|[A-Za-z][A-Za-z'-]*|[(–-]")
+# clause boundaries inside one sentence: a company fact and a bullet claim often share a sentence
+CLAUSE_SPLIT = re.compile(r";|,\s+(?:and|while|whereas)\s+|\s+but\s+|\s*—\s*|\s+–\s+|\s+--?\s+")
 YEAR_RE = re.compile(r"(?<![\w$.,])((?:19|20)\d{2})(?![\d%+]|[.,]\d|\w)")
 
 
@@ -199,7 +204,8 @@ def _ids(obj: dict[str, Any]) -> set[str]:
 
 
 def prose_docs(ck: Any) -> list[tuple[str, str, set[str]]]:
-    """(name, text, cited ids) for the cover letter body, each non-standard answer and each outreach draft."""
+    """(name, text, cited ids) for the cover letter body, each non-standard answer and each outreach draft /
+    top-level follow-up."""
     docs: list[tuple[str, str, set[str]]] = []
     if ck.cover_md is not None:
         docs.append(("cover_letter.md", ck.cover_body, cited_ids_cover_letter(ck.cover_fm)))
@@ -207,17 +213,11 @@ def prose_docs(ck: Any) -> list[tuple[str, str, set[str]]]:
         for i, a in enumerate(ck.answers):
             if isinstance(a, dict) and a.get("answer") and a.get("type") != "standard":
                 docs.append((f"answers.json#{i}", str(a["answer"]), _ids(a)))
-    out = ck.outreach  # parsed by the Checker (None when missing/unparseable)
-    drafts = out.get("drafts") if isinstance(out, dict) else None
-    for i, d in enumerate(drafts if isinstance(drafts, list) else []):
-        if not isinstance(d, dict):
-            continue
-        email = d.get("email") if isinstance(d.get("email"), dict) else {}
-        parts = [d.get("linkedin_note"), d.get("linkedin_message"), email.get("subject"), email.get("body"),
-                 d.get("followup_7d"), d.get("followup_14d")]
-        text = "\n".join(str(p) for p in parts if p)
+    for section, i, d in outreach_items(ck):  # drafts[] (a bare list counts) + top-level followups[]
+        text = "\n".join(t for _, t in outreach_texts(d))
         if text.strip():
-            docs.append((f"outreach.json#{i}", text, _ids(d)))
+            label = f"outreach.json#{i}" if section == "drafts" else f"outreach.json#{section}[{i}]"
+            docs.append((label, text, _ids(d)))
     return docs
 
 
@@ -417,6 +417,37 @@ def _check_titles(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[st
 # 3. numbers_consistent
 # --------------------------------------------------------------------------- #
 
+def _clauses(sentence: str) -> list[str]:
+    return [c for c in CLAUSE_SPLIT.split(sentence) if c.strip()] or [sentence]
+
+
+def _facts_text(v: Any) -> list[str]:
+    out = []
+    for f in v if isinstance(v, list) else []:
+        if isinstance(f, dict):
+            out.append(str(f.get("fact") or ""))
+        elif isinstance(f, str):
+            out.append(f)
+    return out
+
+
+def _context_values(ck: Any) -> set[float]:
+    """Values of numbers in the posting text and every artifact's `facts_used`: company facts, not bullet claims."""
+    parts: list[str] = []
+    if isinstance(ck.posting, dict):
+        parts += [str(ck.posting.get(k) or "") for k in ("title", "description_text")]
+    fm = ck.cover_fm if isinstance(ck.cover_fm, dict) else {}
+    parts += _facts_text(fm.get("facts_used") or fm.get("company_facts"))
+    for a in ck.answers if isinstance(ck.answers, list) else []:
+        if isinstance(a, dict):
+            parts += _facts_text(a.get("facts_used"))
+    for _, _, d in outreach_items(ck):
+        parts += _facts_text(d.get("facts_used"))
+    data = outreach_data(ck) or {}
+    parts += _facts_text(data.get("facts_used"))
+    return {p["value"] for p in parse_numbers("\n".join(parts)) if p["value"] is not None and not p["vague"]}
+
+
 def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[str]]], cfg: dict[str, Any]) -> None:
     name = "numbers_consistent"
     rj = _resume(ck)
@@ -432,6 +463,7 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
         ck.skip(name, "hard", "no documents with bullet claims to compare")
         return
     min_overlap = cfg["min_overlap"]
+    context = _context_values(ck)
     mism, para, n = [], [], 0
     for doc, text, ids in all_docs:
         cands = {}
@@ -457,7 +489,12 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
             if not rnums:
                 continue
             n += 1
-            for p in parse_numbers(sent):
+            # only the clause(s) that restate the bullet: "Your platform ingests 40 million events, and at Acme
+            # I built ... 2 million events" compares 2 million, not the company's 40 million
+            clause_score = [(len(_content(c) & words[best]), c) for c in _clauses(sent)]
+            top = max(sc for sc, _ in clause_score)
+            nums = [p for sc, c in clause_score if sc == top for p in parse_numbers(c)]
+            for p in nums:
                 paired = [r for r in rnums if _paired(p, r)]
                 if not paired:
                     continue
@@ -472,6 +509,8 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
                         para.append(item)
                 elif p["hedged"] and any(r["estimate"] for r in paired):
                     continue
+                elif p["value"] is not None and any(abs(p["value"] - v) < 1e-9 for v in context):
+                    continue  # a number the posting / facts_used states: a company fact, not the bullet's
                 else:
                     mism.append(item)
     ex["number_mismatches"], ex["number_paraphrases"] = mism, para

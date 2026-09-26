@@ -400,3 +400,37 @@ def test_own_names_are_masked_inside_longer_spans(root: Path) -> None:
     # a candidate that is part of the candidate's own school name is never a leftover
     ck = run(make(root, cover=letter("State University called.")))
     assert check(ck, "wrong_company")["ok"], ck.extras["wrong_company_hits"]
+
+
+# --- review fixes (#22) -----------------------------------------------------------------------------
+
+def test_domain_stem_uses_registrable_domain(root: Path) -> None:
+    from careeros.qa_ext.company import company_spellings
+
+    edit_companies(root, lambda d: d.update(company_domains={"Ledgerline": "careers.ledgerline.com"}))
+    sp = company_spellings(make(root, cover=letter()), "Ledgerline")
+    assert "ledgerline" in [s.lower() for s in sp]
+    assert "careers" not in sp
+
+
+def test_generic_domain_stem_never_names_company(root: Path) -> None:
+    edit_companies(root, lambda d: d.update(company_domains={"Ledgerline": ["careers.ledgerline.com",
+                                                                            "jobs.example.io", "apply.co"]}))
+    body = letter(company_line=False) + "\nI found this on your careers page and the jobs board.\n"
+    c = names_company(make(root, cover=body))
+    assert not c["ok"], c
+
+
+def test_top_level_followups_scanned(root: Path) -> None:
+    out = {"drafts": [], "followups": [{"kind": "post_interview_thanks",
+                                        "email": {"body": "Thanks for the time with the Stripe team."}}]}
+    ck = run(make(root, outreach=out))
+    assert not check(ck, "wrong_company")["ok"]
+    assert [(h["file"], h["name"]) for h in ck.extras["wrong_company_hits"]] == [
+        ("outreach.json:followups[0].email.body", "Stripe")]
+
+
+def test_list_form_outreach_scanned(root: Path) -> None:
+    ck = run(make(root, outreach=[{"linkedin_note": "Big fan of the Stripe API."}]))
+    assert [(h["file"], h["name"]) for h in ck.extras["wrong_company_hits"]] == [
+        ("outreach.json:drafts[0].linkedin_note", "Stripe")]

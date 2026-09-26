@@ -325,3 +325,76 @@ def test_min_overlap_config(tmp_path: Path) -> None:
         "At Acme I shipped a React dashboard used by 45 analysts.")))
     assert by_name(ck, "numbers_consistent")["ok"]  # too little overlap to attribute at 12 words
     assert ck.extras["consistency"]["config"]["min_overlap"] == 12
+
+
+# --- review fixes (#22) -----------------------------------------------------------------------------
+
+ACME1 = ("At Acme I built a FastAPI service in Python that ingests Kafka order events into PostgreSQL, "
+         "processing 2 million events per day.")
+
+
+def _cover_with(sentence: str, facts: list[str] | None = None) -> str:
+    cover = COVER_LETTER.replace(ACME1, sentence)
+    for f in facts or []:
+        cover = cover.replace("facts_used:\n", f'facts_used:\n  - {{fact: "{f}", source: posting}}\n', 1)
+    return cover
+
+
+def test_company_number_in_other_clause_is_not_compared(tmp_path: Path) -> None:
+    sentence = ("Your platform ingests 40 million order events per day, and at Acme I built a FastAPI service in "
+                "Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day.")
+    chk = by_name(run(make_job(tmp_path, cover=_cover_with(sentence))), "numbers_consistent")
+    assert chk["ok"], chk["detail"]
+
+
+def test_mismatch_in_bullet_clause_still_fails(tmp_path: Path) -> None:
+    sentence = ("Your platform ingests 40 million order events per day, and at Acme I built a FastAPI service in "
+                "Python that ingests Kafka order events into PostgreSQL, processing 3 million events per day.")
+    chk = by_name(run(make_job(tmp_path, cover=_cover_with(sentence))), "numbers_consistent")
+    assert chk["ok"] is False and "3 million" in chk["detail"] and "40 million" not in chk["detail"]
+
+
+def test_number_from_facts_used_is_ignored(tmp_path: Path) -> None:
+    sentence = ("Like your platform, which handles 40 million order events per day, at Acme I built a FastAPI "
+                "service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day.")
+    chk = by_name(run(make_job(tmp_path, cover=_cover_with(sentence))), "numbers_consistent")
+    assert chk["ok"] is False  # without the fact, 40 million is read as a restatement of the bullet
+    cover = _cover_with(sentence, facts=["The platform handles 40 million order events per day"])
+    chk = by_name(run(make_job(tmp_path / "b", cover=cover)), "numbers_consistent")
+    assert chk["ok"], chk["detail"]
+
+
+def test_number_from_posting_text_is_ignored(tmp_path: Path) -> None:
+    sentence = ("Like your platform, which handles 40 million order events per day, at Acme I built a FastAPI "
+                "service in Python that ingests Kafka order events into PostgreSQL, processing 2 million events per day.")
+    ck = make_job(tmp_path, cover=_cover_with(sentence))
+    ck.posting = {"company": "Ledgerline", "title": "Software Engineer, Backend",
+                  "description_text": "Our ledger ingests 40 million order events per day."}
+    chk = by_name(run(ck), "numbers_consistent")
+    assert chk["ok"], chk["detail"]
+
+
+def test_list_form_outreach_is_checked(tmp_path: Path) -> None:
+    drafts = json.loads(json.dumps(OUTREACH["drafts"]))
+    drafts[0]["linkedin_note"] = ("I built a FastAPI service that ingests Kafka order events into PostgreSQL, "
+                                  "processing 5 million events per day.")
+    ck = run(make_job(tmp_path, outreach=drafts))
+    chk = by_name(ck, "numbers_consistent")
+    assert chk["ok"] is False and "outreach.json#0" in chk["detail"]
+
+
+def test_list_form_outreach_title_is_checked(tmp_path: Path) -> None:
+    drafts = json.loads(json.dumps(OUTREACH["drafts"]))
+    drafts[0]["linkedin_note"] = "Hi Jane, I'm a Senior Software Engineer at Acme."
+    chk = by_name(run(make_job(tmp_path, outreach=drafts)), "employer_title_consistent")
+    assert chk["ok"] is False and "outreach.json#0" in chk["detail"]
+
+
+def test_top_level_followups_are_checked(tmp_path: Path) -> None:
+    out = json.loads(json.dumps(OUTREACH))
+    out["followups"] = [{"contact": "Jane Doe", "kind": "post_interview_thanks", "bullet_ids": ["acme.1"],
+                         "email": {"subject": "Thanks", "body": "Thanks again. I built a FastAPI service that "
+                                   "ingests Kafka order events into PostgreSQL, processing 9 million events per day."}}]
+    ck = run(make_job(tmp_path, outreach=out))
+    chk = by_name(ck, "numbers_consistent")
+    assert chk["ok"] is False and "followups" in chk["detail"]

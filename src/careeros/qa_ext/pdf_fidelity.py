@@ -19,6 +19,7 @@ Config (config/qa.yaml, all optional):
     text_recall_soft: 0.9
     extra_tokens_max: 0          # PDF-only words tolerated before pdf_hidden_text warns
     missing_sample: 15           # cap on missing/extra/split token samples in details and extras
+    (a malformed numeric value hard-fails pdf_text_matches_resume with "invalid config: ...")
     metadata_placeholders: [...] # case-insensitive /Title or /Author values treated as placeholders
 
 Result: ck.extras["pdf_fidelity"] = {text_recall, missing_tokens, split_tokens, extra_tokens, links_found,
@@ -32,6 +33,15 @@ from collections import Counter
 from typing import Any
 
 CHECKS = ("pdf_links_clickable", "pdf_text_matches_resume", "pdf_fonts_embedded", "pdf_metadata")
+LEVELS = {"pdf_links_clickable": "hard", "pdf_text_matches_resume": "hard", "pdf_fonts_embedded": "soft",
+          "pdf_metadata": "soft"}
+# numeric qa.yaml `pdf:` keys: key -> (type, default, min, max)
+NUMERIC_CFG: dict[str, tuple[type, float, float, float | None]] = {
+    "text_recall_hard": (float, 0.97, 0.0, 1.0),
+    "text_recall_soft": (float, 0.9, 0.0, 1.0),
+    "missing_sample": (int, 15, 0, None),
+    "extra_tokens_max": (int, 0, 0, None),
+}
 LINK_FIELDS = ("email", "linkedin", "github", "website")
 DEFAULT_PLACEHOLDERS = ("latex", "untitled", "anonymous", "author", "title", "document", "name", "your name",
                         "microsoft word", "resume.tex", "main.tex")
@@ -161,6 +171,29 @@ def _cfg(ck: Any) -> dict[str, Any]:
     return pdf if isinstance(pdf, dict) else {}
 
 
+def _numeric_cfg(cfg: dict[str, Any]) -> tuple[dict[str, Any], list[str]]:
+    """The numeric `pdf:` settings with defaults filled in, and a message per malformed value."""
+    vals: dict[str, Any] = {}
+    errors: list[str] = []
+    for key, (typ, default, lo, hi) in NUMERIC_CFG.items():
+        raw = cfg.get(key, default)
+        try:
+            if isinstance(raw, bool) or not isinstance(raw, (int, float, str)):
+                raise ValueError
+            f = float(raw)
+            if f != f or (typ is int and not f.is_integer()):  # NaN / fractional count
+                raise ValueError
+            v = int(f) if typ is int else f
+        except (TypeError, ValueError):
+            errors.append(f"qa.yaml pdf.{key}: {raw!r} is not a{'n integer' if typ is int else ' number'}")
+            continue
+        if v < lo or (hi is not None and v > hi):
+            errors.append(f"qa.yaml pdf.{key}: {raw!r} is outside {lo}-{hi if hi is not None else 'inf'}")
+            continue
+        vals[key] = v
+    return vals, errors
+
+
 def _identity(ck: Any) -> dict[str, Any]:
     prof = getattr(ck.profile, "profile", {}) or {}
     ident = prof.get("identity") if isinstance(prof, dict) else None
@@ -199,10 +232,12 @@ def _check_text(ck: Any, pdf_text: str, cfg: dict[str, Any], ex: dict[str, Any])
     if ck.resume_txt is None:
         ck.skip("pdf_text_matches_resume", "hard", "resume.txt missing")
         return
-    hard_min = float(cfg.get("text_recall_hard", 0.97))
-    soft_min = float(cfg.get("text_recall_soft", 0.9))
-    sample = int(cfg.get("missing_sample", 15))
-    max_extra = int(cfg.get("extra_tokens_max", 0))
+    nums, errors = _numeric_cfg(cfg)
+    if errors:  # a typo in a threshold must not silently loosen (or crash) the gate
+        ck.add("pdf_text_matches_resume", "hard", False, "invalid config: " + "; ".join(errors))
+        return
+    hard_min, soft_min = nums["text_recall_hard"], nums["text_recall_soft"]
+    sample, max_extra = nums["missing_sample"], nums["extra_tokens_max"]
 
     txt_toks, pdf_toks = text_tokens(ck.resume_txt), text_tokens(pdf_text)
     cr, cp = Counter(txt_toks), Counter(pdf_toks)
@@ -295,7 +330,7 @@ def check_pdf_fidelity(ck: Any) -> None:
     """Run the resume.pdf fidelity checks against a careeros.qa.Checker (records into ck.checks/ck.extras)."""
     def skip_all(why: str, level_soft: bool = False) -> None:
         for name in CHECKS:
-            ck.skip(name, "soft" if level_soft or name in ("pdf_fonts_embedded", "pdf_metadata") else "hard", why)
+            ck.skip(name, "soft" if level_soft else LEVELS[name], why)
         ck.extras["pdf_fidelity"] = {"skipped": why}
 
     if not ck.pdf_path.exists():
@@ -324,4 +359,4 @@ def check_pdf_fidelity(ck: Any) -> None:
         try:
             step()
         except Exception as e:  # noqa: BLE001 - a malformed object must not crash the whole gate
-            ck.add(name, "soft", False, f"could not inspect resume.pdf: {type(e).__name__}: {e}")
+            ck.add(name, LEVELS[name], False, f"could not inspect resume.pdf: {type(e).__name__}: {e}")
