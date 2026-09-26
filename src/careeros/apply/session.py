@@ -5,6 +5,7 @@
     s = ApplySession.start(job_id="a1b2c3d4e5f6", ats="greenhouse", apply_url=url)
     s.step("open_tab", ok=True, note=url)
     s.shot(s.screenshot_dir(job_dir) / "01_form.png")
+    s.record_field("First name", "Alex", "standard")
     s.finish("submitted")
     s.save(job_dir)          # -> data/jobs/<id>/apply_session.json, appends to log.md
 
@@ -13,6 +14,7 @@ Outcomes: submitted | needs_review | blocked | failed.
 from __future__ import annotations
 
 import json
+import re
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -24,6 +26,36 @@ OUTCOMES: tuple[str, ...] = ("submitted", "needs_review", "blocked", "failed")
 SESSION_FILE = "apply_session.json"
 LOG_FILE = "log.md"
 SCREENSHOT_DIR = "screenshots"
+
+
+REDACTED = "<redacted>"
+
+# Labels whose values are secrets: never written to apply_session.json or a snapshot manifest.
+_SECRET_LABEL = re.compile(
+    r"pass(word|wd|code|phrase)|\botp\b|one[- ]?time|verification|verify|security (code|question|answer)"
+    r"|\b(2fa|mfa|pin)\b|token|secret|api[ _-]?key|auth(entication|orization)? code|access code",
+    re.IGNORECASE)
+# Any other "...code" label is treated as a secret unless it is one of these ordinary codes.
+_CODE = re.compile(r"\bcodes?\b", re.IGNORECASE)
+_ORDINARY_CODE = re.compile(
+    r"\b(zip|postal|post|country|area|dial(ing)?|phone|promo(tion(al)?)?|referral|discount|coupon|source"
+    r"|currency|language|state|province|region)\b", re.IGNORECASE)
+
+
+def is_secret_label(label: str) -> bool:
+    """True when a form label asks for a password, one-time/verification code, security answer or key."""
+    text = str(label or "")
+    if _SECRET_LABEL.search(text):
+        return True
+    return bool(_CODE.search(text)) and not _ORDINARY_CODE.search(text)
+
+
+def redact_entry(entry: dict[str, Any]) -> dict[str, Any]:
+    """Copy of an entered-value record with the value replaced by `<redacted>` when its label is a secret."""
+    out = dict(entry)
+    if is_secret_label(out.get("label", "")):
+        out["value"] = REDACTED
+    return out
 
 
 def _now() -> str:
@@ -47,6 +79,7 @@ class ApplySession:
     action_item: dict[str, Any] | None = None
     resume_version: str | None = None
     confirmation_text: str | None = None
+    entered: list[dict[str, Any]] = field(default_factory=list)
 
     # --- construction ---------------------------------------------------------------
 
@@ -70,6 +103,15 @@ class ApplySession:
     def step(self, action: str, ok: bool = True, note: str = "") -> dict[str, Any]:
         entry = {"time": _now(), "action": action, "ok": bool(ok), "note": note}
         self.steps.append(entry)
+        return entry
+
+    def record_field(self, label: str, value: Any, source: str | None = None) -> dict[str, Any]:
+        """Remember a value typed or picked into the form (kept in the as-submitted snapshot).
+
+        Secrets are never kept: a label matching `is_secret_label` stores `<redacted>` instead of the value.
+        """
+        entry = redact_entry({"label": label, "value": value, "source": source})
+        self.entered.append(entry)
         return entry
 
     def shot(self, path: str | Path) -> str:
@@ -137,6 +179,7 @@ class ApplySession:
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)
+        d["entered"] = [redact_entry(e) if isinstance(e, dict) else e for e in d["entered"]]
         d["status"] = self.status
         d["n_steps"] = len(self.steps)
         d["failed_steps"] = [s for s in self.steps if not s["ok"]]

@@ -29,7 +29,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 | 7 | Applier | `src/careeros/apply/` + Chrome (Claude in Chrome) | apply session | one adapter per ATS |
 | 8 | Tracker | `src/careeros/tracker.py` → `data/JobTracker.xlsx` (configurable) | always | tabs: Jobs, Action Items, Contacts, Log, Config |
 | 9 | Inbox sync | `.claude/skills/inbox-sync/` (Gmail MCP) | daily | status updates + push on interview |
-| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed |
+| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed; connected / mutuals → tailored by hand (`careeros outreach`) |
 
 ## Data flow
 
@@ -49,6 +49,7 @@ scout ──► data/jobs/<job_id>/posting.json
             │
             ▼
          applier  ──► submits (if tier allows auto) OR Action Item with screenshot
+            │         └► submitted/<stamp>/  frozen copy of what went out + form values (manifest.json)
             │
             ▼
          tracker  ──► JobTracker.xlsx row updated (careeros tracker upsert), Log appended
@@ -71,6 +72,26 @@ description text ("apply by", "applications close", "deadline", "closing date", 
 date); Lever and Ashby have no deadline field, text only. Unknown = None, and the cooldown applies.
 Scout stores it as `closes_at` in posting.json. CLI: `careeros company slots|gate|active|requeue`;
 score-job and prepare-job gate before tailoring, apply-job before submitting.
+
+## QA gate checks
+
+`python -m careeros.qa <job_dir>` (`src/careeros/qa.py`) runs every deterministic check and prints one JSON report;
+`pass` is false when any hard check fails. The core checks (truth trace, bullet fidelity, number/tool audits,
+banned phrases, confidential terms, contact, page count, keyword coverage) live in `qa.py`. The extended checks live
+in `src/careeros/qa_ext/` and read the Checker's shared inputs (`pipeline_cfg`, `companies_cfg`, `jobs_dir`,
+`outreach`, `contacts`); each writes its findings to an extra report key:
+
+| module | hard checks | soft checks | report key |
+|---|---|---|---|
+| `company.py` | `wrong_company`: a known company (companies.yaml, other job dirs) that is not this job's, in the letter, a generated answer or an outreach draft | — | `wrong_company_hits` |
+| `consistency.py` | `employer_title_consistent` (title/degree/year vs the résumé header), `numbers_consistent` (a restated bullet number) | `letter_experiences_on_resume`, `employer_title_uncertain`, `numbers_paraphrased` | `consistency` |
+| `outreach_policy.py` | `outreach_manual_contacts`, `linkedin_draft_only`, `linkedin_note_length` (> 300 chars), `email_autosend_verified`, `thank_you_manual`, `outreach_cold_limit`, `outreach_json_valid` | `outreach_word_counts` | `outreach_policy` |
+| `pdf_fidelity.py` | `pdf_links_clickable`, `pdf_text_matches_resume` | `pdf_text_split_words`, `pdf_hidden_text`, `pdf_fonts_embedded`, `pdf_metadata` | `pdf_fidelity` |
+
+`cover_letter_names_company` (hard, in `qa.py`) accepts the company's configured aliases and domain stems. Every
+threshold is optional config in `config/qa.yaml` (`consistency:`, `outreach:`, `pdf:`; defaults commented in
+`examples/config/qa.yaml`). A job without `outreach.json` or `resume.pdf` skips those checks. `/qa-review` caps
+`ats_safety` on the PDF checks and routes each failure to the writer skill that fixes it.
 
 ## Job lifecycle (tracker `Status` column)
 
@@ -99,7 +120,17 @@ career-os/
   config/    targets.yaml  categories.yaml  companies.yaml  qa.yaml  pipeline.yaml        (gitignored)
   profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  voice/        (gitignored)
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
-  src/careeros/  bootstrap.py  scout/  apply/  tracker.py  qa.py  store.py  cli.py
+  src/careeros/  bootstrap.py  scout/  apply/  tracker.py  qa.py  store.py  retention.py  cli.py
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)
 ```
+
+## Retention (`careeros prune`)
+
+`src/careeros/retention.py` plans, then (with `--yes`) applies two rules from `pipeline.yaml: retention`, both
+measured from the job's last status change: closed jobs drop apply step screenshots after
+`screenshots_after_closed_days` (confirmation shot kept), and never-prepared postings are rewritten as a stub
+(`pruned: true`, description cut to a preview) after `unprepared_posting_days`. A stubbed found/scored job is set to
+`skipped` (status.json and tracker, queued if the tracker is locked) so it leaves the prepare queue;
+`careeros safety check`, score-job and prepare-job refuse a pruned posting. Files it changes:
+`screenshots/`, `posting.json` and (for that status move) `status.json` inside `data/jobs/<id>/`; each change is logged in that job's `log.md`.

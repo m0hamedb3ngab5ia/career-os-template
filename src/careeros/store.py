@@ -106,6 +106,28 @@ class Store:
         cur.setdefault("history", []).append({"status": status, "at": cur["updated_at"], "note": note})
         self._write(job_id, STATUS, cur)
         self.append_log(job_id, f"status -> {status}" + (f": {note}" if note else ""), component="store")
+        if status == "applied":
+            self._freeze_if_missing(job_id)
+
+    def _freeze_if_missing(self, job_id: str) -> None:
+        """Every applied job keeps an as-submitted snapshot; make one if nothing froze it yet."""
+        from careeros.apply import snapshot
+
+        jd = self.job_dir(job_id)
+        try:
+            if snapshot.latest(jd):
+                return
+            out = snapshot.freeze(jd)
+        except (OSError, ValueError) as e:  # never block a status change (ValueError covers bad JSON)
+            self.append_log(job_id, f"snapshot failed: {e}", component="snapshot")
+            return
+        self.append_log(job_id, f"frozen as-submitted copy -> {out.relative_to(jd)}", component="snapshot")
+
+    def submitted_at(self, job_id: str) -> str | None:
+        from careeros.apply import snapshot
+
+        m = snapshot.latest(self.job_dir(job_id))
+        return m["frozen_at"] if m else None
 
     def get_status(self, job_id: str) -> str | None:
         d = self._read(job_id, STATUS)
@@ -251,6 +273,7 @@ class Store:
                     "category": sc.category if sc else None,
                     "fit": sc.fit if sc else None,
                     "tier": sc.tier if sc else None,
+                    "submitted_at": self.submitted_at(jid),
                 }
             )
         return out

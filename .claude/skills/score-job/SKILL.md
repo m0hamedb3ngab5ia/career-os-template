@@ -23,6 +23,8 @@ same posting give the same score (+/- 3).
 
 If `posting.json` is missing or has no `description_text`, write nothing and print
 `RESULT: {"job_id": "<dir name>", "error": "posting.json missing or empty"}` and stop.
+If `posting.json` has `pruned: true` (retention cut the description to a preview), write nothing and print
+`RESULT: {"job_id": "<dir name>", "error": "posting pruned by retention"}` and stop.
 
 ## 2. Hard filters (any hit => decision `skip`)
 

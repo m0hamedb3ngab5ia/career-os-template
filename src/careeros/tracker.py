@@ -662,3 +662,11 @@ def _parse_date(s: str) -> datetime | None:
         return datetime(int(m[1]), int(m[2]), int(m[3]))
     except ValueError:
         return None
+
+
+def set_status_both(settings: Settings, job_id: str, status: str, note: str) -> None:
+    """Set a job's status in data/jobs/<id>/status.json and in the tracker (queued if the tracker is locked)."""
+    from careeros.store import Store
+
+    Store(settings).set_status(job_id, status, note)
+    Tracker(settings=settings).set_status(job_id, status, note)

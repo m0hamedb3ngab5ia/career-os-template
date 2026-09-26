@@ -21,6 +21,10 @@ anything. Print its FAIL lines, then the final RESULT with `status: skipped`, `s
 and `ACTION_ITEMS: ["setup: fix the careeros doctor FAIL lines (profile still has example data or a tool is missing)"]`.
 This keeps the fictional example candidate (Alex Example) out of every real application.
 
+Pruned guard: if `JOB/posting.json` has `pruned: true` (retention cut the description to a preview), STOP:
+print the final RESULT with `status: skipped`, `skip_reason: "posting pruned by retention"`. Never score,
+tailor or safety-check a stub.
+
 Re-run guard: if `JOB/prepare.json` exists with `qa_pass: true` and `--force` was not given, print its
 RESULT again (status unchanged) and stop. `--force` re-prepares from Step 1.
 

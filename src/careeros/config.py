@@ -12,7 +12,7 @@ CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
 ATS_WITH_SLUG = ("greenhouse", "lever", "ashby")  # adapters that fetch by board slug (custom uses url)
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
-    "pipeline": ("paths",),
+    "pipeline": ("paths", "outreach"),
     "targets": ("candidate", "location", "seniority", "categories", "volume"),
     "companies": ("blocklist", "prestige_scoring", "prestige_tiers", "company_caps"),
 }

@@ -10,6 +10,7 @@ from pathlib import Path
 from careeros.bootstrap import EDIT_HINTS, InitError, copy_examples, link_private
 from careeros.config import ConfigError, Settings, SetupError, find_repo_root, get_settings
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, TrackerRow
+from careeros.outreach import OutreachPolicy, check_contacts, manual_action_text, mark_contact
 from careeros.scout import run_scout
 from careeros.store import Store
 from careeros.tracker import Tracker, parse_field_args
@@ -215,6 +216,11 @@ def cmd_job_show(args: argparse.Namespace) -> int:
         print("\n" + p.description_text)
     else:
         print("\n" + p.description_text[:800] + ("..." if len(p.description_text) > 800 else ""))
+    from careeros.apply.snapshot import latest
+
+    snap = latest(store.job_dir(p.job_id))
+    if snap:
+        print(f"submitted: {snap['frozen_at']} ({snap['reason']}) -> {snap['dir']}")
     log = store.read_log(p.job_id)
     if log:
         print("\nlog:\n" + log.rstrip())
@@ -346,8 +352,9 @@ def cmd_company_requeue(args: argparse.Namespace) -> int:
 
 
 def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
-    Store(s).set_status(job_id, status, note)
-    Tracker(settings=s).set_status(job_id, status, note)
+    from careeros.tracker import set_status_both
+
+    set_status_both(s, job_id, status, note)
 
 
 def cmd_safety_check(args: argparse.Namespace) -> int:
@@ -364,6 +371,10 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
     p = store.load_posting(args.job_id)
     if not p:
         print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    if (store._read(p.job_id, "posting.json") or {}).get("pruned"):
+        print(f"job {p.job_id}: posting.json was pruned by retention (description is only a preview); "
+              "refusing to run the safety check. Re-fetch the posting first.", file=sys.stderr)
         return 1
     reg_path = registry.default_path(s)
     flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))
@@ -496,6 +507,37 @@ def cmd_job_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_job_freeze(args: argparse.Namespace) -> int:
+    """Freeze an as-submitted copy of the job's documents (and the form values, if given)."""
+    from careeros.apply.snapshot import freeze
+
+    store = Store(_settings(args))
+    if not store.exists(args.job_id):
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    answers = None
+    if args.answers_json:
+        raw = sys.stdin.read() if args.answers_json == "-" else Path(args.answers_json).read_text(encoding="utf-8")
+        try:
+            answers = json.loads(raw)
+        except json.JSONDecodeError as e:
+            print(f"job freeze: --answers-json is not valid JSON: {e}", file=sys.stderr)
+            return 2
+        if not isinstance(answers, (list, dict)):
+            print("job freeze: --answers-json must be a JSON list of {label, value, source} or an object",
+                  file=sys.stderr)
+            return 2
+    try:
+        out = freeze(store.job_dir(args.job_id), reason=args.reason, answers_entered=answers)
+    except ValueError as e:
+        print(f"job freeze: {e}", file=sys.stderr)
+        return 2
+    store.append_log(args.job_id, f"frozen as-submitted copy -> {out.relative_to(store.job_dir(args.job_id))}",
+                     component="snapshot")
+    print(f"{args.job_id}: frozen -> {out}")
+    return 0
+
+
 def cmd_action_list(args: argparse.Namespace) -> int:
     tr = Tracker(settings=_settings(args))
     items = tr.list_action_items(open_only=not args.all)
@@ -515,6 +557,72 @@ def cmd_action_done(args: argparse.Namespace) -> int:
         return 0
     print("done" if ok else f"action item {args.id} not found")
     return 0 if ok else 1
+
+
+def cmd_prune(args: argparse.Namespace) -> int:
+    from careeros import retention
+
+    s = _settings(args)
+    items = retention.plan(s)
+    dry = args.dry_run or not args.yes
+    summary = retention.summarize(items)
+    if args.json:
+        freed = 0 if dry else retention.execute(s, items)
+        print(json.dumps({"dry_run": dry, "items": [i.to_dict() for i in items], "summary": summary,
+                          "freed_bytes": freed}, indent=2))
+        return 0
+    if not items:
+        print("prune: nothing to remove")
+        return 0
+    for i in items:
+        what = (f"{len(i.paths)} screenshot(s): " + ", ".join(Path(p).name for p in i.paths[:4])
+                + (" ..." if len(i.paths) > 4 else "")) if i.action == "delete_screenshots" else "trim posting.json to a stub"
+        print(f"{i.job_id}  {what}  ({retention.human_bytes(i.bytes)})")
+    total = f"{summary['jobs']} job(s), {summary['files']} file(s), {retention.human_bytes(summary['bytes'])}"
+    if dry:
+        print(f"\ndry run: would free {total}. Re-run with --yes to apply.")
+        return 0
+    freed = retention.execute(s, items)
+    print(f"\npruned {total}; freed {retention.human_bytes(freed)}")
+    return 0
+
+
+def _contacts_path(args: argparse.Namespace) -> tuple[Settings, Path | None]:
+    s = _settings(args)
+    f = Store(s).job_dir(args.job_id) / "contacts.json"
+    if not f.exists():
+        print(f"no contacts.json for job {args.job_id}; run /find-contacts first", file=sys.stderr)
+        return s, None
+    return s, f
+
+
+def cmd_outreach_check(args: argparse.Namespace) -> int:
+    s, f = _contacts_path(args)
+    if f is None:
+        return 1
+    rows = check_contacts(json.loads(f.read_text(encoding="utf-8")), OutreachPolicy.from_settings(s))
+    print(json.dumps({"job_id": args.job_id, "manual": sum(r["manual"] for r in rows),
+                      "action_text": manual_action_text(rows), "contacts": rows}, indent=2))
+    return 0
+
+
+def cmd_outreach_mark(args: argparse.Namespace) -> int:
+    if args.degree is None and args.mutuals is None:
+        print("outreach mark: give --degree and/or --mutuals", file=sys.stderr)
+        return 2
+    _, f = _contacts_path(args)
+    if f is None:
+        return 1
+    try:
+        c = mark_contact(f, args.name, degree=args.degree, mutuals=args.mutuals)
+    except KeyError:
+        print(f"no contact named {args.name!r} in {f}", file=sys.stderr)
+        return 1
+    except ValueError as e:
+        print(f"outreach mark: {e}", file=sys.stderr)
+        return 2
+    print(f"{c.get('name')}: degree={c.get('linkedin_degree')} mutuals={c.get('mutuals')}")
+    return 0
 
 
 def cmd_stats(args: argparse.Namespace) -> int:
@@ -620,6 +728,12 @@ def build_parser() -> argparse.ArgumentParser:
     jst.add_argument("status", choices=STATUSES)
     jst.add_argument("--note")
     jst.set_defaults(fn=cmd_job_status)
+    jfz = jbs.add_parser("freeze", help="keep an as-submitted copy of the documents under submitted/<stamp>/")
+    jfz.add_argument("job_id")
+    jfz.add_argument("--reason", choices=("submitted", "assisted_stop", "manual"),
+                     help="default: from apply_session.json, else manual")
+    jfz.add_argument("--answers-json", help="file or - (stdin): [{label, value, source}] or {label: value}")
+    jfz.set_defaults(fn=cmd_job_freeze)
 
     act = sub.add_parser("action")
     acs = act.add_subparsers(dest="action_cmd", required=True)
@@ -680,6 +794,24 @@ def build_parser() -> argparse.ArgumentParser:
     scl.add_argument("company")
     scl.add_argument("--note")
     scl.set_defaults(fn=cmd_safety_clear)
+
+    pr = sub.add_parser("prune", help="remove old screenshots and trim old unprepared postings (dry run unless --yes)")
+    pr.add_argument("--dry-run", action="store_true", help="only list what would go (the default; wins over --yes)")
+    pr.add_argument("--yes", action="store_true", help="actually delete / trim")
+    pr.add_argument("--json", action="store_true", help="machine-readable plan (and result with --yes)")
+    pr.set_defaults(fn=cmd_prune)
+
+    out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
+    outs = out.add_subparsers(dest="outreach_cmd", required=True)
+    och = outs.add_parser("check", help="JSON per contact: manual (never automated) + reason code; action_text for the one Action Item")
+    och.add_argument("job_id")
+    och.set_defaults(fn=cmd_outreach_check)
+    omk = outs.add_parser("mark", help="record what LinkedIn shows for a contact (degree 1 = connected, mutual count)")
+    omk.add_argument("job_id")
+    omk.add_argument("name")
+    omk.add_argument("--degree", type=int)
+    omk.add_argument("--mutuals", type=int)
+    omk.set_defaults(fn=cmd_outreach_mark)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p

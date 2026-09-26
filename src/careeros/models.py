@@ -154,6 +154,9 @@ class Contact(BaseModel):
     sent: bool = False
     sent_date: str | None = None
     replied: str = ""
+    # What the candidate saw on LinkedIn (recorded by hand; never scraped). 1 = already connected.
+    linkedin_degree: int | None = Field(default=None, ge=1, le=3)
+    mutuals: int | None = Field(default=None, ge=0)
 
 
 class TrackerRow(BaseModel):
