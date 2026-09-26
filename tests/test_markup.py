@@ -53,7 +53,7 @@ def test_validate_bold_non_string():
 
 
 @pytest.mark.parametrize("text,expected", [("Built **FastAPI** services", True), ("**Python**, SQL", True),
-                                           ("accepts f(*args, **kwargs)", False), ("2**32 and 2**64", False),
+                                           ("accepts f(*args, **kwargs)", True), ("2**32 and 2**64", False),
                                            ("plain text", False)])
 def test_has_markdown_bold(text: str, expected: bool) -> None:
     assert has_markdown_bold(text) is expected
@@ -66,10 +66,17 @@ def test_has_markdown_bold_catches_glued_and_lone_markers(text: str) -> None:
     assert has_markdown_bold(text) is True
 
 
-@pytest.mark.parametrize("text", ["f(**kwargs, **opts)", "2**n + 3**m", "f(*args, **kwargs)", "{**a, **b}",
-                                  "2**32 and 2**64", "x = y**2"])
-def test_has_markdown_bold_ignores_code(text: str) -> None:
+@pytest.mark.parametrize("text", ["2**32 and 2**64", "a 10**6 speedup", "x = 2 ** 10"])
+def test_has_markdown_bold_ignores_numeric_powers(text: str) -> None:
     assert has_markdown_bold(text) is False
+
+
+@pytest.mark.parametrize("text", ["f(**kwargs, **opts)", "{**a, **b}", "x = y**2", "Tools: Go, **Python and Kafka.",
+                                  "I used SQL, **Kafka, and Python.", "We shipped it (**FastAPI) in May.",
+                                  "Built **REST API**s", "The ** sign"])
+def test_any_other_double_star_counts(text: str) -> None:
+    # strict on purpose: code with ** in an answer is a visible false alarm; a pasted bullet marker is not visible
+    assert has_markdown_bold(text) is True
 
 
 @pytest.mark.parametrize("text", ["I built **python services", "shipped **about 2 months in",

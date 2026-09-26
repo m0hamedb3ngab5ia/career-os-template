@@ -58,17 +58,12 @@ def bold_spans(text: Any) -> list[str]:
     return text.split(MARKER)[1::2]
 
 
-# A markdown bold pair, including one glued to a word ("**REST API**s", "**10**k"); not after a digit or `*`
-# (so exponents like `2**32 and 2**64` never pair up), non-space just inside each marker.
-_MD_BOLD = re.compile(r"(?<![\d*])\*\*(?=\S)[^*\n]+?(?<=\S)\*\*(?!\*)")
-# `**` that is code, not markup: an exponent (`2**32`, `y**2`, `2**n`) or unpacking right after `(`, `,` or `{`
-# (`f(**kwargs)`, `{**a, **b}`). A lone `**` anywhere else counts as markup: a false alarm beats a pasted marker.
-_CODE_STARS = re.compile(r"(?<=[\w)\]])\*\*(?=[\w(])|(?:(?<=[(,{])|(?<=[(,{]\s))\*\*(?=[A-Za-z_]\w*\b)")
+# The one `**` that is never markup: a numeric power (`2**32`, `10**6`, `2 ** 10`). Every other `**` in prose counts,
+# on purpose: a code snippet with `**` in an answer is a visible false alarm, a pasted bullet marker is not.
+_NUMERIC_POWER = re.compile(r"(?<=\d)\s?\*\*\s?(?=\d)")
 
 
 def has_markdown_bold(text: Any) -> bool:
-    """True when `text` holds markdown bold (a pair, even glued to a word) or a stray `**` that is not code.
-    Bullet markers copied into prose look like this; `**kwargs` and `2**32` do not."""
-    if not isinstance(text, str) or MARKER not in text:
-        return False
-    return bool(_MD_BOLD.search(text)) or MARKER in _CODE_STARS.sub("", text)
+    """True when `text` holds any `**` other than a numeric power: bold pairs, glued pairs (`**REST API**s`) and
+    stray markers copied from bullet text all count."""
+    return isinstance(text, str) and MARKER in _NUMERIC_POWER.sub(" ", text)
