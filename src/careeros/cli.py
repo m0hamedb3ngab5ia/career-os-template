@@ -1280,7 +1280,7 @@ def cmd_sync_check_template_push(args: argparse.Namespace) -> int:
     from careeros.sync import SyncError, check_push
 
     try:
-        errors = check_push(_sync_root(args), args.url, sys.stdin.read())
+        errors = check_push(_sync_root(args), args.url, sys.stdin.read(), remote=args.remote_name)
     except SyncError as e:
         print(f"BLOCKED: careeros push guard failed: {e}", file=sys.stderr)
         return 1

@@ -27,6 +27,11 @@ def test_default_personal_paths():
     ("src/careeros/config.py", False),
     ("examples/config/pipeline.yaml", False),
     ("personalities.md", False),
+    ("profile", True),       # a committed symlink to the private dir
+    ("data", True),
+    ("personal", True),
+    ("config", True),
+    ("profiles/x", False),
 ])
 def test_is_personal(path, expected):
     assert sync.is_personal(path, PERSONAL) is expected

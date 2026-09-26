@@ -53,9 +53,10 @@ def parse_personal_paths(value: str | None) -> tuple[str, ...]:
 
 
 def _path_matches(path: str, entry: str) -> bool:
-    """`dir/` matches everything under it; anything else matches exactly, as a directory prefix, or as a glob."""
+    """`dir/` matches everything under it and the bare `dir` (e.g. a committed symlink); anything else matches
+    exactly, as a directory prefix, or as a glob."""
     if entry.endswith("/"):
-        return path.startswith(entry)
+        return path == entry.rstrip("/") or path.startswith(entry)
     return path == entry or path.startswith(entry + "/") or fnmatch.fnmatchcase(path, entry)
 
 
@@ -326,7 +327,14 @@ def pull(root: Path, *, remote: str = DEFAULT_REMOTE, template_branch: str = DEF
     if m.returncode != 0:
         conflicts = g.lines("diff", "--name-only", "--diff-filter=U")
         if not conflicts:
-            raise SyncError(f"git merge failed: {(m.stderr or m.stdout).strip()}")
+            # e.g. an untracked file the merge would overwrite: undo everything, leave the user on base
+            if g.run("rev-parse", "--verify", "--quiet", "MERGE_HEAD", check=False).returncode == 0:
+                g.run("merge", "--abort", check=False)
+            g.run("switch", "--quiet", base, check=False)
+            g.run("branch", "-D", branch, check=False)
+            return PullResult(1, [], [f"git merge failed, nothing changed (back on {base}, {branch} removed):",
+                                      (m.stderr or m.stdout).strip(),
+                                      "move or delete the files named above, then run careeros sync pull again"])
         err = [f"merge conflict in {len(conflicts)} file(s):", *[f"  {c}" for c in conflicts], "",
                "resolve them (keep the template's code; keep your personal values), then:",
                f"  git add {' '.join(shlex.quote(c) for c in conflicts)}",
@@ -357,9 +365,20 @@ def hook_path(root: Path) -> Path:
     return p if p.is_absolute() else root / p
 
 
-def check_push(root: Path, url: str, updates: str) -> list[str]:
+def pushed_paths(g: Git, remote: str, lsha: str, rsha: str) -> set[str]:
+    """Every path touched by the commits this update sends (not on `remote`'s tracking refs, not under rsha),
+    plus the tip tree. A raw URL has no tracking refs, so the whole history is scanned (fail closed)."""
+    exclude = ["--not", f"--remotes={remote}"]
+    if rsha != ZERO_SHA and g.ref_exists(rsha):
+        exclude.append(rsha)
+    paths = set(g.lines("log", "--format=", "--name-only", "--no-renames", "-m", lsha, *exclude))
+    paths.update(g.lines("ls-tree", "-r", "--name-only", lsha))
+    return paths
+
+
+def check_push(root: Path, url: str, updates: str, remote: str = "") -> list[str]:
     """Error lines if this push (pre-push stdin: `<lref> <lsha> <rref> <rsha>` per line) would send personal
-    paths to a template URL; [] when allowed."""
+    paths, in the tip or anywhere in the history being pushed, to a template URL; [] when allowed."""
     g = Git(root)
     pattern = g.config(CFG_URL_PATTERN) or DEFAULT_URL_PATTERN
     if not url_matches(url, pattern):
@@ -369,10 +388,10 @@ def check_push(root: Path, url: str, updates: str) -> list[str]:
         parts = line.split()
         if len(parts) != 4 or parts[1] == ZERO_SHA:
             continue
-        lref, lsha = parts[0], parts[1]
-        bad = blocked_paths(g.lines("ls-tree", "-r", "--name-only", lsha), personal)
+        lref, lsha, rsha = parts[0], parts[1], parts[3]
+        bad = sorted(blocked_paths(pushed_paths(g, remote or url, lsha, rsha), personal))
         if bad:
             shown = [f"  {p}" for p in bad[:10]] + ([f"  ... and {len(bad) - 10} more"] if len(bad) > 10 else [])
-            return [f"BLOCKED: {lref} contains personal paths; never push them to the template ({url}):", *shown,
+            return [f"BLOCKED: {lref} contains personal paths (tip or history); never push them to the template ({url}):", *shown,
                     "Branch template work from the template instead: git switch -c fix/<topic> template/main"]
     return []

@@ -154,6 +154,18 @@ def test_pull_refuses_dirty_tree(repos, env):
     assert "sync/" not in git(priv, env, "branch", "--list").stdout
 
 
+def test_pull_untracked_collision_leaves_user_on_base(repos, env):
+    template_commit(repos, env, {"new.txt": "from template\n"}, "feat: add new.txt")
+    priv = repos["private"]
+    (priv / "new.txt").write_text("mine, untracked\n")
+    r = cli(priv, env, "pull", "--no-checks")
+    assert r.returncode == 1, r.stdout + r.stderr
+    assert "new.txt" in r.stderr and "Traceback" not in r.stderr
+    assert git(priv, env, "branch", "--show-current").stdout.strip() == "main"
+    assert "sync/" not in git(priv, env, "branch", "--list").stdout
+    assert (priv / "new.txt").read_text() == "mine, untracked\n"
+
+
 def test_pull_stops_cleanly_on_conflict(repos, env):
     template_commit(repos, env, {"src/app.py": "VALUE = 2\n"}, "feat: bump value")
     priv = repos["private"]
@@ -215,6 +227,33 @@ def test_hook_blocks_personal_push_to_template_and_allows_others(repos, env):
     commit(priv, env, {"src/app.py": "VALUE = 7\n"}, "fix: value")
     r = git(priv, env, "push", "template", "fix/x", check=False)
     assert r.returncode == 0, r.stderr
+
+
+def test_hook_blocks_personal_path_in_history_even_if_deleted(repos, env):
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "switch", "-q", "-c", "fix/y", "template/main")
+    commit(priv, env, {"personal/x.md": "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", "personal/x.md")
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    r = git(priv, env, "push", "template", "fix/y", check=False)
+    assert r.returncode != 0
+    assert "BLOCKED" in r.stderr and "personal/x.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "fix/y").stdout.strip() == ""
+    # the same history pushed by raw URL (no remote-tracking refs) is scanned in full: still blocked
+    r = git(priv, env, "push", str(repos["bare"]), "fix/y", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr
+
+
+def test_hook_blocks_committed_symlink_to_private_dir(repos, env):
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "switch", "-q", "-c", "fix/z", "template/main")
+    (priv / "profile").symlink_to(priv / "personal")
+    git(priv, env, "add", "profile")
+    git(priv, env, "commit", "-q", "-m", "link profile")
+    r = git(priv, env, "push", "template", "fix/z", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "profile" in r.stderr
 
 
 def test_hook_pattern_and_personal_paths_from_git_config(repos, env):
