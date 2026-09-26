@@ -171,6 +171,71 @@ Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
 It checks `careeros doctor`, the QA result, daily and per-company caps, and a scam gate before touching
 the form. See the FAQ for what submits on its own.
 
+## 11. Unattended runs (optional, macOS)
+
+Once single jobs look right, the system can score and prepare in batches on a schedule. Python ranks the jobs and
+enforces the budgets; each job is one headless Claude Code call (`claude -p`, your subscription). Runs never apply:
+jobs end `queued` or `needs_review` and you still run `/apply-job` yourself.
+
+**One-time setup, interactively (an unattended run can't answer a login prompt):**
+
+1. Log in to Claude Code in a terminal: run `claude`, then `/login`. Scheduled runs use this same login.
+2. If a scheduled run will need an MCP server (for example Gmail for inbox work), authenticate it once in
+   `claude` with `/mcp` before any unattended run, and list it in `config/pipeline.yaml: runs.required_mcp_servers`
+   (e.g. `[gmail]`). A run then stops with `auth_required` instead of hanging when that login lapses. Score and
+   prepare need no MCP server, so the default is `[]` (Recommended).
+3. Review `config/pipeline.yaml: llm.allowed_tools`, the only tools a headless call may use (the shipped list
+   (Recommended) is what score-job and prepare-job need). A tool a skill needs but that is missing ends the run with
+   `permission_denied`, never a hang.
+
+**Try it by hand first:**
+
+```sh
+.venv/bin/careeros run score --dry-run          # which jobs would go first, and why; calls nothing
+.venv/bin/careeros run score --preset small     # 10 jobs or 30 minutes, whichever comes first
+.venv/bin/careeros run status                   # what is running, last runs, what goes next and why
+.venv/bin/careeros run list                     # past runs and their stop reasons
+.venv/bin/careeros run show <run_id> --log      # one run's log; --json for every attempt
+.venv/bin/careeros run prepare --preset small   # then prepare the best-scored jobs (never applies)
+```
+
+Budget presets (`config/pipeline.yaml: runs.preset`): small, medium (Recommended: 25 score / 5 prepare jobs, 90
+minutes), large, max, or custom (`runs.custom`). `--max-jobs N` and `--max-minutes M` override one run. A run ends
+with a stop reason: `completed`, `budget_reached`, `time_budget`, `daily_cap` and `paused` are normal;
+`usage_limit`, `auth_required`, `permission_denied`, `timeout`, `consecutive_failures` and `doctor_failed` need you
+(the detail says what to do). A job that fails twice (Recommended: retry once) becomes an Action Item.
+
+**Schedule it:**
+
+```sh
+.venv/bin/careeros schedule install     # LaunchAgent: `careeros tick` every 15 minutes
+.venv/bin/careeros schedule status      # installed / loaded, last tick, next run per job, missed runs
+.venv/bin/careeros tick --dry-run       # what a tick would do right now
+.venv/bin/careeros schedule uninstall   # remove it
+```
+
+The tick runs what is due in `config/pipeline.yaml: schedule.jobs`: scout every 3 hours, score every 6, prepare
+every 12, prune weekly (all Recommended). Score and prepare never start inside quiet hours (09:00 to 18:00,
+Recommended); scout and prune ignore them. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
+Code login, only while you are logged in to your Mac. Nothing runs while the Mac sleeps, is off or you are logged out.
+
+**Pause, resume, catch up:**
+
+```sh
+.venv/bin/careeros run pause --until +2h --reason "interview prep"   # or an ISO time; no --until = until resume
+.venv/bin/careeros run resume
+.venv/bin/careeros run catch-up --dry-run   # slots missed while the Mac slept or was off
+.venv/bin/careeros run catch-up             # run them now (once each)
+.venv/bin/careeros run catch-up --dismiss   # or drop them
+```
+
+Pausing stops the current run before its next job, and ticks skip what falls due (it is not stored up). Missed
+slots never run on their own: they collapse into one pending catch-up that you start or dismiss.
+
+**Where the logs are:** `data/runs/<run_id>/` (`run.json`, `run.log`, `attempts/` with each call's raw output),
+`data/runs/launchd.out.log` and `data/runs/launchd.err.log` (the scheduler's own output). `careeros prune` removes
+run logs after 30 days and whole runs after 365 (Recommended).
+
 ## Updating from upstream
 
 ```sh
@@ -201,7 +266,8 @@ an Action Item. Salary, legal or unknown questions are never guessed; they becom
 **How do I stop it?** Press Esc (or Ctrl-C) in Claude Code to interrupt a running skill. To make
 everything stop before submit, set `auto_submit: false` under both `tiers.B` and `tiers.C` in
 `config/targets.yaml`. For one job, set its `Override` column in the tracker to `A`. Nothing runs in the
-background unless you schedule it yourself.
+background unless you install the scheduler (`careeros schedule install`); `careeros run pause` stops scheduled
+and running batches, `careeros schedule uninstall` removes it. Batches never submit anything.
 
 **Can I try it without my own data?** Yes: `.venv/bin/python -m pytest -q` runs the whole pipeline on the
 fake candidate. The skills refuse to apply with that data (`careeros doctor` fails on it).

@@ -30,6 +30,9 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 | 8 | Tracker | `src/careeros/tracker.py` → `data/JobTracker.xlsx` (configurable) | always | tabs: Jobs, Action Items, Contacts, Log, Config |
 | 9 | Inbox sync | `.claude/skills/inbox-sync/` (Gmail MCP) | daily | status updates + push on interview |
 | 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed; connected / mutuals → tailored by hand (`careeros outreach`) |
+| 11 | Runner | `src/careeros/runs/` (`careeros run score\|prepare`) → `data/runs/` | on demand or scheduled | Python ranks and budgets; one headless skill call per job; never applies |
+| 12 | Scheduler | `careeros tick` (`runs/tick.py`, `runs/schedule.py`) + macOS LaunchAgent (`careeros schedule install`) | every 15 min | scout, score, prepare, prune when due; quiet hours; catch-up |
+| 13 | Storage + advisor | `careeros storage`, `careeros advise [apply <id>]` | after each prune / on demand | suggest-only; a config change only on `advise apply` |
 
 ## Data flow
 
@@ -59,6 +62,10 @@ scout ──► data/jobs/<job_id>/posting.json
             │
         outreach  ──► Contacts tab: name, LinkedIn URL, email (if found), draft msg
 ```
+
+Unattended, the first half runs in batches (see "Runs and scheduling"): `careeros tick` → scout →
+`careeros run score` (score-job per job) → `careeros run prepare` (prepare-job per job) → jobs end `queued` or
+`needs_review`. Applying stays a separate, attended step.
 
 ## Applications per company (`src/careeros/company_policy.py`)
 
@@ -116,9 +123,104 @@ Per-job override possible via tracker `Override` column.
 
 ## Where the LLM runs
 
-Skills in `.claude/skills/` are invoked two ways:
+Skills in `.claude/skills/` are invoked two ways, both on the Claude Code subscription (no API key):
 - Interactively: `/score-job data/jobs/<id>` inside Claude Code.
-- Headless from pipeline: `claude -p "/score-job data/jobs/<id>" --output-format json` (subscription-billed, no API key).
+- Headless from `careeros run` (one call per job, built from `pipeline.yaml: llm`):
+
+  ```
+  claude -p --output-format stream-json --verbose --permission-mode dontAsk \
+    --allowedTools <llm.allowed_tools, comma-joined> --session-id <uuid> "/score-job data/jobs/<id>"
+  ```
+
+  Why each flag: `-p` runs one prompt and exits. `stream-json` (which requires `--verbose`) prints one JSON event
+  per line as it happens, so the runner sees MCP server status (`system/init`), API errors (`authentication_failed`,
+  `rate_limit`), rejected rate-limit events and tool `permission_denials` as structured data instead of guessing
+  from text, tees the raw stream to `attempts/NNN.stream.jsonl`, and reads the skill's `RESULT:` line from the final
+  `result` event. `--output-format json` only prints at the end, so a hung call shows nothing. `dontAsk` denies any
+  tool not in `--allowedTools` instead of waiting for a prompt nobody will answer. `--session-id` is recorded per
+  attempt so a failed call can be reopened in Claude Code.
+
+## Runs and scheduling (`src/careeros/runs/`)
+
+Python decides what to work on and when to stop; the LLM only does one skill on one job per call.
+
+| Module | Does |
+|---|---|
+| `config.py` | `pipeline.yaml: runs` + `llm`, validated (a malformed budget is a ConfigError: runs never guess) |
+| `ranking.py` | pure ranking with a `why` per job: freshness (full weight under `fresh_hours`, linear to 0 at `stale_days`) + dream bonus + deadline bonus + fit × `fit_weight` (prepare only) + retry bonus. Prepare runs keep the company gate's fit-first order inside each company |
+| `runner.py` | the loop: rank → write `queue-<kind>.json` (dry run stops here) → global runner lock → preflight (pause, `careeros doctor`) → per job: job lock, headless call, classify, record, release |
+| `headless.py` | builds the command, streams events, validates the `RESULT:` line (job id, `decision` for score, `status` for prepare), classifies the outcome |
+| `service.py` | `run_batch`, what the CLI and the scheduler call: retry-once + Action Item, company gate before each prepare, daily-cap stop |
+| `policy.py` | daily apply cap in code, `runs.auto_submit` rules, retry and prepare config |
+| `locks.py`, `failures.py`, `store.py` | lock files, per-job failure counts, run history files |
+| `schedule.py`, `tick.py`, `launchd.py` | the tick planner, `careeros tick` / `careeros run catch-up`, the LaunchAgent plist |
+
+**Flow.** `careeros run score|prepare [--preset small|medium|large|max|custom] [--max-jobs N] [--max-minutes M]
+[--dry-run]`. Presets set jobs per run and wall-clock minutes (medium (Recommended): 25 score / 5 prepare jobs,
+90 minutes); the run stops at whichever comes first, and before a job the average job time says would overrun.
+Score runs take `found` jobs without a score; prepare runs take jobs whose score says `prepare` (or requeued gate
+deferrals) and that have no passing `prepare.json`. Jobs a run does not reach keep their status: nothing is
+bulk-skipped. After a valid score-job RESULT the runner records `scored` or `skipped` (note starting with the skip
+reason) unless the skill already moved the job.
+
+**Stop reasons** (`run.json: stop_reason`): `completed`, `budget_reached`, `time_budget`, `daily_cap`, `paused`,
+`cancelled` (the run did its job; CLI exit 0) and `usage_limit`, `auth_required`, `permission_denied`, `timeout`,
+`consecutive_failures`, `doctor_failed` (needs you; exit 1). A run that finds another holding the runner lock
+never starts (exit 5). `usage_limit`, `auth_required`, `permission_denied` and `cancelled` end the run at once
+(the next job would hit the same wall); `timeout` does with `runs.stop_on_timeout` (true, Recommended); three job
+failures in a row (Recommended) end it as `consecutive_failures`. A usage-limit reset time in the error text is
+never parsed or trusted; the next scheduled slot simply tries again.
+
+**Locks.** `data/runs/runner.lock`: one batch at a time. `data/runs/locks/<job_id>.lock`: one worker per job. Lock
+files carry owner, pid, host and expiry, are created atomically, and a stale one (expired, dead pid on this host,
+unreadable) is taken over under a short `flock`. prepare-job and apply-job take the job lock themselves
+(`careeros job lock <id> --owner <skill>`, exit 6 when held); inside a run they re-enter the runner's lock through
+`CAREEROS_LOCK_TOKEN`. `careeros job status` refuses a locked job without the token. `careeros job check <id>` reports it.
+
+**Retry.** Only the job's own failures count (`skill_error`, `invalid_result`, `error`, `timeout`) in
+`data/runs/failures.json`. With `runs.retry.max_attempts: 2` (Recommended) a failed job is retried once in a later
+run (retry bonus in the ranking); then it becomes an Action Item (deduped) and runs leave it out. Its status never
+changes. A usage limit, login problem, denied tool or cancel says nothing about the job and does not count.
+
+**Daily cap.** `policy.py` computes today's cap as `targets.yaml: volume.max_applications_per_day` × this month's
+`season_multiplier`, counted from DateApplied. apply-job checks it with `careeros run cap --check` (exit 3 when
+reached). Prepare runs stop with `daily_cap` once the jobs ready to submit fill what is left of today's cap
+(`runs.prepare.stop_at_daily_cap`, true, Recommended): preparing more than can be sent today is wasted work.
+
+**Auto-submit is config only.** `runs.auto_submit` (`enabled: false` (Recommended), `allow`, `manual`) is parsed and
+validated, and `auto_submit_decision` is the pure rule a future apply path will call (Tier A and a non-pass safety
+verdict are always manual, whatever the config says). Runs never apply in this version.
+
+**Scheduler.** `careeros schedule install` writes a LaunchAgent (`~/Library/LaunchAgents/<schedule.launchd_label>.plist`,
+absolute paths, a PATH with the `claude` it found, logs to `data/runs/launchd.out.log` / `launchd.err.log`) that
+runs `careeros tick` every `schedule.tick_minutes` (15, Recommended). It is a per-user agent, not a daemon: it runs
+as the candidate, with their Claude Code login, and only while they are logged in. A tick is idempotent
+(`data/runs/tick.lock`, never waits) and runs what `schedule.jobs` says is due, in order: scout (every 3 h), score
+(6 h), prepare (12 h), prune (weekly), all Recommended. Quiet hours (09:00 to 18:00, Recommended) hold back only
+the claude-using runs (score, prepare). Slots missed while the Mac slept or was off (more than
+`missed_after_minutes` late) never auto-run: they collapse into one pending record (`data/runs/catch_up.json`) that
+the candidate starts with `careeros run catch-up` or drops with `--dismiss`. `careeros run pause [--until +2h|ISO]`
+stops the current batch before its next job and makes ticks skip due slots (not stored up); `careeros run resume`
+lifts it. State: `data/runs/schedule.json` (last tick, last run per job).
+
+**History.** `data/runs/<run_id>/run.json` (kind, trigger, budget, counters, stop reason, timings),
+`attempts/NNN.json` (job, stage, rank, why, session id, outcome, RESULT) + `NNN.stream.jsonl` (raw events),
+`run.log`; `queue-<kind>.json` is the latest ranking. Files are canonical and written atomically; a SQLite index
+for the UI is future work (`docs/UI.md`). `careeros run list|show|status` read them.
+
+**Storage and advisor.** `careeros storage [--json] [--snapshot]` reports bytes by category (postings,
+résumés/PDFs, screenshots, run logs, tracker, other) and disk free; a snapshot line is appended to
+`data/runs/storage.jsonl` after every prune (`careeros prune --yes` and the scheduled weekly prune) and on
+`--snapshot`. `careeros advise [--json]` is suggest-only. Storage advice starts once `advisor.advise_after_days`
+(14, Recommended) of snapshots exist: projected 30 / 90-day growth against `storage.budget_mb` (1024, Recommended)
+and `storage.warn_at_pct` (80, Recommended), disk free under `storage.disk_free_warn_pct` (10, Recommended), a prune
+that removed nothing for `advisor.prune_idle_weeks` (4, Recommended) weeks (loosen retention), and the dominant
+category (tighten that retention key). Run-efficiency advice starts once `advisor.min_runs` (5, Recommended) runs of
+a kind exist in run.json history: time per job against the timeout, failure rate, scored → prepared %, budget
+used and `usage_limit` stops, turned into preset or timeout suggestions. Each recommendation has an id and either
+a concrete YAML change or advice only. `careeros advise apply <id>` applies that one change to
+`config/pipeline.yaml` only when called: ruamel.yaml round trip (comments and order kept), validate, roll back
+on failure. Nothing is ever applied automatically.
 
 ## Directories
 
@@ -131,8 +233,12 @@ career-os/
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
   src/careeros/  bootstrap.py  scout/  apply/ (incl. snapshot.py)  safety/  tracker.py  qa.py  qa_ext/  store.py
                  company_policy.py  outreach.py  retention.py  doctor.py  cli.py
+                 runs/ (config  ranking  runner  headless  service  policy  locks  failures  store  schedule  tick  launchd)
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)
+             runs/  <run_id>/{run.json, run.log, attempts/NNN.json, NNN.stream.jsonl}  queue-<kind>.json
+                    schedule.json  catch_up.json  pause.json  failures.json  storage.jsonl
+                    runner.lock  tick.lock  locks/<job_id>.lock  launchd.out.log  launchd.err.log
 ```
 
 ## Retention (`careeros prune`)
@@ -144,3 +250,9 @@ measured from the job's last status change: closed jobs drop apply step screensh
 `skipped` (status.json and tracker, queued if the tracker is locked) so it leaves the prepare queue;
 `careeros safety check`, score-job and prepare-job refuse a pruned posting. Files it changes:
 `screenshots/`, `posting.json` and (for that status move) `status.json` inside `data/jobs/<id>/`; each change is logged in that job's `log.md`.
+
+Run history has two more rules, measured from the run's end: after `run_logs_days` (30, Recommended) a run loses
+`run.log` and its raw `attempts/*.stream.jsonl` (run.json and attempts/NNN.json stay for history and the advisor);
+after `run_summaries_days` (365, Recommended) the whole `data/runs/<run_id>/` goes. A run still holding the runner
+lock is never touched. The scheduler prunes weekly (`schedule.jobs.prune`), and every prune appends a storage
+snapshot for `careeros advise`.

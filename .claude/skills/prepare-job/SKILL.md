@@ -62,15 +62,21 @@ reservation may have landed since, and a re-run with `--force` skips nothing). K
   `gate.action_note` appended and priority H, and run
   `.venv/bin/careeros tracker upsert <job_id> --field NextActionDate=<gate.closes_at>` when `closes_at` is set.
 
-Batches run in two phases, so the gate ranks every candidate by fit before any slot is reserved (scoring
-and preparing one job at a time would let a lower-fit job reserved first beat a higher-fit one found later):
-- Phase 1: follow `.claude/skills/score-job/SKILL.md` (gate included) for every job in
-  `careeros jobs list --status found`. Prepare nothing yet.
-- Phase 2: for each job in `careeros jobs list --status found --status scored --order urgent` order (urgent
-  first, then the earliest close date, then fit; `scored` = requeued deferrals), re-run
-  `careeros company gate <job_id> --json` right before preparing it: exit 0 -> run this skill on it
-  (Step 1 reuses the phase 1 `score.json`: do not re-score); exit 3 -> record it as in Step 1b and move on.
-  A job prepared earlier in the phase holds its slot, so the ranking stays correct as slots fill.
+Batches: run `.venv/bin/careeros run score`, then `.venv/bin/careeros run prepare` (add `--dry-run` first to see
+the order and why; `--preset small|medium|large|max|custom` sets the budget, medium is Recommended). Python does the
+ranking, gating and budgets, and makes one headless call of this skill per job, so do not loop over jobs inside a
+session. The runs keep the two-phase order, so the gate ranks every candidate by fit before any slot is reserved
+(scoring and preparing one job at a time would let a lower-fit job reserved first beat a higher-fit one found later):
+- Phase 1 is `careeros run score`: score-job (gate included) on the found jobs, one call each. Prepare nothing yet.
+- Phase 2 is `careeros run prepare`: scored jobs (and requeued deferrals), fit-first within each company, with
+  `careeros company gate` checked again right before each call (a blocked job is passed over, and the run stops at
+  today's apply cap). Step 1 then reuses the phase 1 `score.json`: do not re-score.
+By hand, only if a run can't be used (e.g. it keeps stopping for a reason you are fixing interactively): Phase 1, follow
+`.claude/skills/score-job/SKILL.md` for every job in `careeros jobs list --status found`; Phase 2, for each job in
+`careeros jobs list --status found --status scored --order urgent` order (urgent first, then the earliest close
+date, then fit), re-run `careeros company gate <job_id> --json` right before preparing it: exit 0 -> run this skill
+on it; exit 3 -> record it as in Step 1b and move on. A job prepared earlier in the phase holds its slot, so the
+ranking stays correct as slots fill.
 Hand off in `careeros jobs list --status queued --order urgent` order.
 
 ## Step 2: resume

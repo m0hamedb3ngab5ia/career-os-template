@@ -43,8 +43,19 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 - **Track** (`data/JobTracker.xlsx`, `/inbox-sync`): statuses, Action Items for anything uncertain, and
   Gmail replies moved into the tracker.
 
+- **Run in batches** (`careeros run score`, `careeros run prepare`): Python ranks the jobs (fresh postings,
+  dream companies, closing dates, fit) and enforces a budget preset (small, medium (Recommended), large, max,
+  custom); each job is one headless `/score-job` or `/prepare-job` call. Runs never apply.
+- **Schedule** (`careeros schedule install`): a macOS LaunchAgent runs `careeros tick` every 15 minutes, which runs
+  scout, score, prepare and a weekly prune when they are due, outside quiet hours for anything that uses Claude.
+  Missed slots wait for `careeros run catch-up`; `careeros run pause` stops everything.
+- **Storage and advice** (`careeros storage`, `careeros advise`): what `data/` holds and how it grows, plus
+  suggestions for retention, budgets and timeouts. A suggestion changes `config/pipeline.yaml` only when you run
+  `careeros advise apply <id>`.
+
 `/prepare-job` runs score, tailor, cover letter and QA for one job. `prepare-job` and `apply-job` both run
-`careeros doctor --quiet` first and stop while the example data is still in place.
+`careeros doctor --quiet` first and stop while the example data is still in place. Unattended setup (Claude
+login, allowed tools, scheduler): [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#11-unattended-runs-optional-macos).
 
 ## What you configure vs what's reusable
 
@@ -65,8 +76,9 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 - `config/companies.yaml`: the starter `boards` list, prestige tiers and scoring
 - `config/targets.yaml`: seniority filter, thresholds, tiers, tier rules, volume caps, safety lists
 - `config/qa.yaml`: every QA rule and the banned-phrases list
-- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`, `outreach` (people you are connected to
-  on LinkedIn, or share mutuals with, are never messaged automatically; record with `careeros outreach mark`)
+- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`, `llm.allowed_tools`, `runs` (budgets,
+  ranking, retry), `retention`, `outreach` (people you are connected to on LinkedIn, or share mutuals with, are
+  never messaged automatically; record with `careeros outreach mark`)
 - `templates/`, `.claude/skills/`, `src/careeros/`: the code, the same for everyone
 
 ## Reference
@@ -84,6 +96,13 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros tracker sync               # also: tracker init | flush | applied-count | upsert
 .venv/bin/careeros stats
 .venv/bin/careeros prune [--yes] [--json]     # retention: dry run lists old files; --yes removes them
+.venv/bin/careeros run score [--preset medium] [--dry-run]   # also: run prepare; --max-jobs N --max-minutes M
+.venv/bin/careeros run status                 # also: run list | show <id> [--log] | cap [--check]
+.venv/bin/careeros run pause [--until +2h]    # also: run resume | catch-up [--dry-run | --dismiss]
+.venv/bin/careeros job lock <id>              # also: job unlock <id> --token T | job check <id>
+.venv/bin/careeros schedule install           # also: schedule status | uninstall; launchd calls `careeros tick`
+.venv/bin/careeros storage [--snapshot]       # bytes by category + disk free
+.venv/bin/careeros advise                     # suggestions; advise apply <id> writes one to config/pipeline.yaml
 .venv/bin/python -m careeros.qa data/jobs/<id>   # deterministic QA
 ```
 
@@ -108,7 +127,8 @@ Until `init` has run, every command except `init` and `doctor` stops with "run `
 ### Daily loop
 
 1. `careeros scout --sync` pulls new postings into `data/jobs/`.
-2. `/prepare-job data/jobs/<id>` for each job worth it. Output lands in the job dir; failures become Action Items.
+2. `careeros run score`, then `careeros run prepare` (or `/prepare-job data/jobs/<id>` for one job). Output lands
+   in the job dir; failures become Action Items. With the scheduler installed, steps 1 and 2 happen on their own.
 3. Apply session (Chrome open, Claude in Chrome extension on): `/apply-job data/jobs/<id>` per job.
 4. `/inbox-sync` reads Gmail and moves statuses (screening, interview, rejected), pushes on interviews.
 5. Work the Action Items tab in the tracker (`careeros action list`).
@@ -188,13 +208,14 @@ replace a real (non-symlink) `profile/` or `config/`; move those into the privat
 ### Keeping data/ small
 
 `careeros prune` applies `config/pipeline.yaml: retention` (weekly via `schedule.jobs.prune` when `careeros schedule install` is set up). It is a dry run
-unless you pass `--yes`.
+unless you pass `--yes`. `careeros storage` shows what takes the space; `careeros advise` suggests retention changes.
 - Closed jobs (rejected, withdrawn, ghosted) lose their apply step screenshots 30 days after closing; the
   confirmation screenshot stays (`keep_confirmation_screenshot` must be true or false).
 - Postings never prepared (found, scored, skipped) are trimmed to a stub after 90 days: ids, company, title,
   URLs and dates stay (dedupe and repost checks need them), the description is cut to a short preview.
   A stubbed found or scored job is marked `skipped` so it leaves the prepare queue, and
   `careeros safety check` refuses a pruned posting.
+- Run history in `data/runs/`: logs and raw output go after 30 days, whole runs after 365 (both Recommended).
 - Never touched: active jobs, `submitted/` copies, `seen.json`, `posting_history.json`, the scam registries.
   Set a value to 0 to turn that rule off.
 
@@ -207,10 +228,11 @@ profile/       master.yaml (only source of truth), standard_answers.yaml, confid
 templates/     resume/ (LaTeX + render.py), cover_letter/ (skeleton + render.py), outreach/, followup_email/
 src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, questions, session, snapshot),
                safety/ (scam + ghost checks), qa.py + qa_ext/ (QA gate checks), company_policy.py (per-company
-               cap + cooldown), outreach.py (connected/mutuals gate), retention.py (prune), tracker.py, store.py,
-               doctor.py, cli.py, bootstrap.py
+               cap + cooldown), outreach.py (connected/mutuals gate), retention.py (prune), runs/ (batch runner,
+               ranking, locks, scheduler tick, LaunchAgent), tracker.py, store.py, doctor.py, cli.py, bootstrap.py
 .claude/skills Claude Code skills (table above)
-data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx   [gitignored]
+data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx,
+               runs/ (<run_id>/run.json + run.log + attempts/, queue, schedule and scheduler logs)   [gitignored]
 docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md, UI.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```
@@ -221,8 +243,11 @@ Point `config/pipeline.yaml: paths.tracker_xlsx` elsewhere to keep it in another
 ### LLM cost
 
 Everything runs through the Claude Code subscription: skills invoked interactively (`/score-job ...`)
-or headless (`claude -p "/score-job data/jobs/<id>" --output-format json`). No Anthropic API key exists
-in this repo and `config/pipeline.yaml: llm.runner` is `claude_code`.
+or headless by `careeros run score` and `careeros run prepare`, one call per job
+(`claude -p --output-format stream-json --verbose --permission-mode dontAsk --allowedTools ... "/score-job data/jobs/<id>"`;
+see ARCHITECTURE.md, "Where the LLM runs"). No Anthropic API key exists in this repo and
+`config/pipeline.yaml: llm.runner` is `claude_code`. A run that hits the subscription's usage limit stops
+(`usage_limit`) and the next scheduled slot tries again.
 
 ### Contributing / review
 

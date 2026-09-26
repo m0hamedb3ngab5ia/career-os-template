@@ -15,7 +15,18 @@ belong in each candidate's own private repo, not here.
 - [ ] P6 custom scrapers for `ats: custom` boards (company career pages without a public ATS API)
 - [ ] P7 LinkedIn Jobs discovery (never Easy Apply)
 - [ ] Workday adapter (assisted mode)
-- [ ] `/schedule` cloud routines for scout + inbox-sync
+- [x] Unattended runs: `careeros run score|prepare` (ranking with "why", budget presets, one headless skill call per
+      job, stop reasons, run history in `data/runs/`), global + per-job locks (`careeros job lock`), retry once then
+      an Action Item, daily apply cap in code (`careeros run cap`), `runs.auto_submit` as config only
+- [x] Scheduler: `careeros tick` + macOS LaunchAgent (`careeros schedule install`), quiet hours, pause/resume,
+      one pending catch-up for missed slots, weekly prune, run-log retention
+- [x] `careeros storage` (bytes by category, snapshots) + `careeros advise` / `advise apply <id>` (suggest-only)
+- [ ] SQLite run index (`data/careeros.db` `runs` table) for the UI, rebuilt from `data/runs/` (`docs/UI.md`)
+- [ ] Scheduled apply path: honour `runs.auto_submit.enabled`, gated by the daily cap (`careeros run cap --check`)
+      and `auto_submit_decision` (Tier A and non-pass safety always manual); off by default
+- [ ] Inbox-sync and follow-ups in the scheduler (`schedule.jobs`), with `runs.required_mcp_servers: [gmail]`
+- [ ] `/schedule` cloud routines as an alternative to the LaunchAgent (runs while the Mac is off; needs the repo and
+      data reachable from the cloud session) for scout + inbox-sync
 - [ ] Weekly self-review report: acceptance rate by category/tier, QA fail reasons, time saved
 - [ ] P1.5 scout source: Simplify New-Grad GitHub list parser (public, ATS links)
 - [ ] P7 chrome discovery: Jobright + Handshake feeds (saved-search URLs → `config/companies.yaml: searches`)
