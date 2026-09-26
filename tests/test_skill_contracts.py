@@ -359,7 +359,7 @@ def test_apply_job_uses_company_gate_not_manual_lookups():
     assert "careeros company gate <job_id>" in pre
     assert 'applied-count "<company>"' not in pre, "company cap now comes from `careeros company gate`"
     assert "--status rejected" not in pre, "cooldown now comes from `careeros company gate`"
-    assert "applied-count --days 1" in pre, "the daily cap stays"
+    assert "careeros run cap --check" in pre, "the daily cap stays (now in code: careeros.runs.policy)"
 
 
 @pytest.mark.parametrize("skill", ["prepare-job", "apply-job"])
@@ -407,3 +407,23 @@ def test_draft_outreach_opens_one_action_item_per_job_for_manual_contacts():
     assert "one Action Item per contact" not in t
     assert "name every manual contact in that item" not in t
     assert "action_text" in t and "--dedupe" in t
+
+
+@pytest.mark.parametrize("skill,owner", [("prepare-job", "prepare-job"), ("apply-job", "apply-job")])
+def test_job_mutating_skills_take_the_per_job_lock_first(skill: str, owner: str):
+    """prepare-job / apply-job lock the job (the same lock `careeros run` holds) right after the doctor guard,
+    stop on exit 6, pass the token to status changes, and unlock only a lock they took (not a reentrant one)."""
+    text = _skill(skill)
+    lock = text.find(f"careeros job lock <job_id> --owner {owner} --json")
+    assert 0 <= lock < text.index("careeros doctor --quiet") + 1500
+    around = text[lock: lock + 1200]
+    assert "6" in around and "reentrant" in around
+    assert "careeros job unlock <job_id> --token" in text
+    for m in re.finditer(r"careeros job status <job_id>[^`]*`", text):
+        assert "--lock-token" in m.group(0), m.group(0)
+
+
+def test_apply_job_daily_cap_is_the_cli_check():
+    text = _skill("apply-job")
+    assert "careeros run cap --check" in text
+    assert "tracker applied-count --days 1" not in text

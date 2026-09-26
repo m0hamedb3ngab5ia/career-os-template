@@ -17,6 +17,13 @@ Run `.venv/bin/careeros doctor --quiet` first. If it exits nonzero, STOP before 
 print its FAIL lines and a `RESULT` with `outcome: failed`, reason `setup: careeros doctor failed`.
 Never submit with the example candidate's data (Alex Example) or a half-configured profile.
 
+Job lock (next): `.venv/bin/careeros job lock <job_id> --owner apply-job --json`. Exit 6 means a run or another
+session is working on this job: STOP before opening a browser, change nothing, print a `RESULT` with
+`outcome: failed`, reason `locked: <owner from stderr>`. On exit 0 keep `token` and `reentrant` from its JSON;
+every `careeros job status` below takes `--lock-token <token>` (and `tracker upsert ... --field Status=` too).
+After the final `RESULT`, and on every stop after this point, release it with
+`.venv/bin/careeros job unlock <job_id> --token <token>` unless `reentrant` is true (the caller releases it).
+
 ## 0. Load tools
 
 `ToolSearch` once: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__find,mcp__claude-in-chrome__form_input,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__file_upload,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_network_requests,mcp__claude-in-chrome__tabs_close_mcp`
@@ -39,10 +46,10 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | tier from `score.json: tier`; the tracker `Override` column wins if set: read it with `.venv/bin/careeros tracker show <job_id> --json` (`Override` key; `A`/`B`/`C` replace the tier, `manual` or `skip` = no auto-submit) | score.json, tracker | if the command fails: `auto_submit` = false |
 | `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: true only when the verdict is pass and the ATS is allowlisted on its own or the company's domain, reached from the company's board) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
-| daily cap: `.venv/bin/careeros tracker applied-count --days 1` (all companies, today) < `volume.max_applications_per_day` x `season_multiplier[month]` | tracker | outcome failed, reason "daily cap" |
-| company gate: `.venv/bin/careeros company gate <job_id> --json` exits 0. One check for the per-company cap (`volume.max_per_company_per_90_days`, or the company's `company_caps` entry), the rejection cooldown (`volume.same_company_cooldown_days`, lifted for a posting that closes before it ends) and a closed posting | tracker, job dirs, config | exit 3: outcome failed, reason "company <reason>: <detail>"; no browser. `company_cap` / `cooldown`: status unchanged (still queued, retried next session). `closed`, `not_similar`, `already_applied`: permanent, so run `.venv/bin/careeros job status <job_id> skipped --note "company <reason>: <detail>"` (a dead job must not keep its slot or retry forever). Keep the JSON as `gate` |
+| daily cap: `.venv/bin/careeros run cap --check` exits 0 (applications today, by DateApplied, < `volume.max_applications_per_day` x `season_multiplier[month]`; code: `careeros.runs.policy`) | tracker, status history | exit 3: outcome failed, reason "daily cap" |
+| company gate: `.venv/bin/careeros company gate <job_id> --json` exits 0. One check for the per-company cap (`volume.max_per_company_per_90_days`, or the company's `company_caps` entry), the rejection cooldown (`volume.same_company_cooldown_days`, lifted for a posting that closes before it ends) and a closed posting | tracker, job dirs, config | exit 3: outcome failed, reason "company <reason>: <detail>"; no browser. `company_cap` / `cooldown`: status unchanged (still queued, retried next session). `closed`, `not_similar`, `already_applied`: permanent, so run `.venv/bin/careeros job status <job_id> skipped --note "company <reason>: <detail>" --lock-token <token>` (a dead job must not keep its slot or retry forever). Keep the JSON as `gate` |
 
-`applied-count` prints one integer (0 when the tracker does not exist yet).
+`run cap --check` prints today's count and cap (`--json` for fields); 0 applications when the tracker does not exist yet.
 
 Session order: take jobs in `careeros jobs list --status queued --order urgent` order. Urgent jobs (the
 posting closes before a rejection cooldown ends, or two or more similar roles at one company close within
@@ -91,7 +98,7 @@ s = ApplySession.start(job_id, ats, apply_url=url, tier=tier, auto_submit=auto_s
 
 Log every browser step with `s.step(action, ok, note)`. Save with `s.save(job_dir)` at the end of every
 path below, including errors. Set status with
-`.venv/bin/careeros job status <job_id> <applied|needs_review> --note "<reason>"` (updates
+`.venv/bin/careeros job status <job_id> <applied|needs_review> --note "<reason>" --lock-token <token>` (updates
 `status.json` and the tracker row together; every "status needs_review" / "status applied" below means
 this command).
 
@@ -177,7 +184,7 @@ value the helper did not return.
    Action Item type `review`, priority H for tier A, `what`: "Review & submit <company> <role>. Form is
    filled in the open tab. Screenshot: <prefill_review path>", `link`: apply_url. Leave the tab open.
    `s.finish("needs_review", reason="assisted: review & submit")`. Go to 7. When the user submits and
-   runs `careeros job status <job_id> applied`, the snapshot is frozen then (reason `assisted_stop`, with
+   runs `careeros job status <job_id> applied --lock-token <token>`, the snapshot is frozen then (reason `assisted_stop`, with
    the values recorded here), so do not freeze on this path.
 4. Auto-submit: `s.mark_submit_clicked(job_dir)` (writes `submit_clicked: true` to `apply_session.json`
    before anything else; it raises if any earlier session already clicked), then one click on the submit control from adapters.md.
@@ -185,8 +192,8 @@ value the helper did not return.
    - Success: screenshot → `s.shot(..., "confirmation")`; `s.finish("submitted", confirmation_text=...)`;
      freeze what went out: `from careeros.apply.snapshot import freeze; freeze(job_dir, session=s)`
      (copies résumé, cover letter, answers, posting and the recorded field values into
-     `<job_dir>/submitted/<stamp>/`, read-only; never overwrites an earlier one); then status `applied` (`careeros job status <job_id> applied`), then
-     `.venv/bin/careeros tracker upsert <job_id> --field DateApplied=today --field ATS=<ats> --field ResumeVersion=<meta.resume_version> --field Status=applied`.
+     `<job_dir>/submitted/<stamp>/`, read-only; never overwrites an earlier one); then status `applied` (`careeros job status <job_id> applied --lock-token <token>`), then
+     `.venv/bin/careeros tracker upsert <job_id> --field DateApplied=today --field ATS=<ats> --field ResumeVersion=<meta.resume_version> --field Status=applied --lock-token <token>`.
    - Validation error shown: read it. Do NOT click submit again. `s.finish("needs_review", reason="validation: <text>")`,
      Action Item type `review` with the error text. Status needs_review.
    - No signal and no error after 20 s: run the bot scan; positive → section 6; else

@@ -71,6 +71,18 @@ runs:                                      # reusable default: fine to keep. `ca
     retry_bonus: 30                        # a job whose last attempt failed goes near the front of the next run
   required_mcp_servers: []                 # MCP servers a run needs logged in (e.g. [gmail] for inbox work);
                                            # one reported needs-auth stops the run with auth_required
+  job_lock_minutes: 120                     # 120 (Recommended): a `careeros job lock` taken by a skill expires after this
+  retry:
+    max_attempts: 2                        # 2 (Recommended): a failed job is retried once in a later run...
+    action_item: true                      # ...then becomes an Action Item (true, Recommended); it is never skipped
+  prepare:
+    stop_at_daily_cap: true                # true (Recommended): stop preparing once the queued (ready to submit)
+                                           # jobs fill today's apply cap (targets.yaml volume)
+  auto_submit:                             # config only for now: runs NEVER apply in this version
+    enabled: false                         # false (Recommended)
+    allow: [tier_c, tier_b]                # rules: tier_a|tier_b|tier_c, fit_gte_<n>, fit_lt_<n>, dream, category_<name>
+    manual: [tier_a, fit_gte_85]           # (Recommended) always manual; wins over allow. Tier A is manual regardless.
+                                           # fit_gte_<n> threshold is yours: 85 (Recommended) = your best matches stay manual
 
 retention:                                 # reusable default: fine to keep. `careeros prune` (dry run unless --yes)
   screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this
