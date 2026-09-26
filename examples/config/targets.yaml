@@ -109,3 +109,5 @@ safety:
     - bot_detection_suspected
     - file_upload_failed
     - qa_failed_twice
+  scam:                                # careeros safety check (src/careeros/safety/scam.py)
+    salary_max_multiple: 3             # soft flag when posted salary > this x candidate.min_base_usd

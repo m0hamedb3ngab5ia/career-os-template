@@ -39,6 +39,19 @@ Add one string per hit to `hard_filter_fails`, wording exactly:
 | `title_excluded` | category resolves to one with `excluded: true` |
 | `salary_below_min` | `salary_max` is a number and `< candidate.min_base_usd`. Unknown salary = allowed. |
 | `already_applied_recent` | (company, role family) in `companies.already_applied` with date < 90 days ago |
+| `scam_<code>` | run `.venv/bin/careeros safety check <job_id>` first (it writes `JOB/safety.json`); one `scam_<code>` per **hard** flag, e.g. `scam_apply_domain`, `scam_free_email_contact`, `scam_phrase`, `scam_registry`. Exit 3 means the command already opened the `scam_suspected` Action Item and set `needs_review`; do not add another. Soft flags (`salary_implausible`, `company_unverified`) go in `reasons` and cost 10 fit points. `scam_lookalike_company` = a name borrowing a known brand on a foreign domain. |
+
+**Made-up company check** (only when `safety.json` has `company_unverified`: the company is on none of
+your boards, dream list, prestige tiers or `company_domains`). Verify with WebSearch/WebFetch, recording
+only what a source shows:
+1. An official website exists on a normal domain and its own careers page (or its ATS board) lists this role.
+2. A LinkedIn company page with real employees (dozens or more), or news / funding / SEC coverage.
+3. The site is not brand new or a template shell, and the recruiter's email domain matches the website.
+
+All hold → `.venv/bin/careeros safety verify "<company>" --domain <domain> --evidence "<urls, sizes>"`,
+then rerun `careeros safety check <job_id>`. Any fails, or nothing found → `careeros safety flag
+"<company>" --domain <domain> --reason "could not verify company"` and `scam_company_unverified` in
+`hard_filter_fails`. Tier A never applies here (dream companies are curated).
 | `prestige_avoid` | company in `prestige_tiers.avoid`: skip, unless the fit **before** `prestige_bonus` (sum of the other components, section 5) is >= 90, then flag `needs_review_avoid` instead |
 
 ## 3. Category

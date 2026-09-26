@@ -37,7 +37,7 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | `cover_letter.txt` exists when tier `cover_letter: always`, or posting requires one | job dir, targets.yaml | outcome failed, reason "cover letter missing" |
 | detected ATS (adapters.md table, from `posting.apply_url` or `url`) | posting.json | record in session |
 | tier from `score.json: tier`; the tracker `Override` column wins if set: read it with `.venv/bin/careeros tracker show <job_id> --json` (`Override` key; `A`/`B`/`C` replace the tier, `manual` or `skip` = no auto-submit) | score.json, tracker | if the command fails: `auto_submit` = false |
-| `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` | targets.yaml | if false: proceed in assisted mode (stop before submit) |
+| `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: `auto_submit_allowed` = allowlisted ATS on its own or the company's domain, reached from the company's board, no flags) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
 | daily cap: `.venv/bin/careeros tracker applied-count --days 1` (all companies, today) < `volume.max_applications_per_day` x `season_multiplier[month]` | tracker | outcome failed, reason "daily cap" |
 | company cap: `.venv/bin/careeros tracker applied-count "<company>" --days 90` < `volume.max_per_company_per_90_days` | tracker | outcome failed, reason "company cap" |
@@ -48,22 +48,29 @@ directly from this skill; every tracker read/write goes through the `careeros` C
 
 ### 1b. Scam / data-harvesting gate (hard stop, before any form fill)
 
-Spec: `TODO.md` "Safety — scam / data-harvesting protection". Procedure only for now (no code yet);
-run it after the preconditions above and again in section 3 as soon as the form's fields are visible,
-before typing anything. Any hit is a hard stop: never fill, never submit, never "just this once".
+Code: `src/careeros/safety/scam.py` (spec in `TODO.md` "Safety"). Run it after the preconditions above
+and again in section 3 as soon as the form's fields are visible, before typing anything. Exit 3 is a
+hard stop: never fill, never submit, never "just this once".
 
-| Trigger | How to check |
-|---|---|
-| Form asks for SSN / national ID number, date of birth, bank account or routing numbers, passport or government-ID upload, driver's license, mother's maiden name, or any fee ("application fee", "training fee", "equipment deposit") | scan every visible field label, placeholder, and upload prompt after `read_page`; check again on each new page/step of a multi-step form |
-| Apply URL domain is neither the company's own domain (posting `url` host, company site from `posting.json`/score) nor a known ATS domain (greenhouse, lever, ashby, workday/myworkdayjobs, icims, smartrecruiters, bamboohr, jobvite, taleo, successfactors, workable, rippling, gem, dover; see `adapters.md`) | compare the registrable domain of `posting.apply_url` (or the page you land on after redirects) against those two sets |
-| Posting contact email is on a free provider (gmail, outlook, hotmail, yahoo, icloud, proton, aol) | `posting.json` contact/recruiter fields and any email shown on the apply page |
+1. Posting gate, before opening the browser: `.venv/bin/careeros safety check <job_id>`.
+   It checks the apply-URL domain (company's own or a known ATS), free-provider recruiter emails, scam
+   phrases (messaging-app interviews, check deposits, buy-equipment-get-reimbursed, fees, pay in crypto),
+   and the flagged registry (`data/flagged_registry.yaml`), and writes `safety.json`, including
+   `auto_submit_allowed` (see the preconditions table).
+2. Field gate, on every page/step of the form: collect every visible field label, placeholder and upload
+   prompt after `read_page`, then
+   `echo '<JSON list of labels>' | .venv/bin/careeros safety fields <job_id> --labels-json -`.
+   It stops on SSN / national ID, date of birth, bank or card numbers, passport or ID uploads, driver's
+   license, mother's maiden name (all allowed only once status is `offer`) and any fee (never).
+3. Also stop, by hand, when a page you land on after redirects is on a domain other than the posting's
+   apply URL, the company's, or a known ATS: run `careeros safety flag "<company>" --domain <host>
+   --reason "redirect to <host>"`, then the steps below.
 
-On a hit:
-1. Do not enter anything further; leave the tab open (no submit, no browser close yet).
-2. `.venv/bin/careeros action add "scam gate: <trigger> at <company> (<url>)" --type scam_suspected --job <job_id> --priority H --needs phone --dedupe`
-3. `.venv/bin/careeros job status <job_id> needs_review --note "scam gate: <trigger>"`
-4. `s.step("scam_gate", False, "<trigger>")`, save the session, print `RESULT` with `outcome: failed`,
-   reason `scam_suspected: <trigger>`, then close the tab.
+On exit 3 the CLI has already opened the `scam_suspected` Action Item (H, phone) and set the status
+`needs_review`. Then:
+1. Do not enter anything further.
+2. `s.step("scam_gate", False, "<first flag line>")`, save the session, print `RESULT` with
+   `outcome: failed`, reason `scam_suspected: <codes>`, then close the tab.
 
 The user reviews the item by hand; the gate is never overridden from inside this skill.
 
@@ -100,9 +107,13 @@ Follow the ATS flow in `adapters.md` exactly. Sources for values:
 - Every other field, by label text:
 
 ```python
-from careeros.apply.questions import match_standard_answer, classify_question
-hit = match_standard_answer(label, "profile/standard_answers.yaml")
+from careeros.apply.questions import answer_for, classify_question
+hit = answer_for(label, "profile/standard_answers.yaml", required=<field is marked required>)
 ```
+
+  `answer_for` minimizes personal data: an optional street-address field stays blank; only a required
+  one gets the street. Phone and email are the only other contact data given. A `sensitive` label never
+  gets an answer (the field gate above already stopped the run).
 
   - hit with an answer → fill it. Apply the `note` rules from the YAML (referral name from
     Contacts tab; `previously_applied` = Yes if tracker shows this company applied).

@@ -458,3 +458,63 @@ def test_submit_click_is_persisted_before_the_click_and_blocks_a_rerun(tmp_path:
     fresh = ApplySession.start("j", "greenhouse", tier="B", auto_submit=True)
     with pytest.raises(RuntimeError, match="already clicked"):
         fresh.mark_submit_clicked(tmp_path)
+
+
+# --- sensitive fields + address minimization ----------------------------------------------------------
+
+ADDRESS = """\
+- key: address_street
+  match: ["street address", "address line 1", "street"]
+  answer: "1 Main St"
+- key: address_city
+  match: ["city"]
+  answer: "Springfield"
+- key: birthday_trap
+  match: ["date"]
+  answer: "never typed"
+- key: address
+  match: ["address", "location"]
+  answer: "Springfield, NY 10001"
+  full: "1 Main St, Springfield, NY 10001"
+"""
+
+
+@pytest.fixture
+def address_yaml(tmp_path: Path) -> Path:
+    clear_cache()
+    p = tmp_path / "answers.yaml"
+    p.write_text(ADDRESS, encoding="utf-8")
+    return p
+
+
+@pytest.mark.parametrize("label", ["Social Security Number", "Date of birth", "Bank routing number",
+                                   "Passport upload", "Driver's License #", "Mother's maiden name"])
+def test_sensitive_labels_classify_and_never_match(label: str, address_yaml: Path) -> None:
+    assert classify_question(label, address_yaml) == "sensitive"
+    assert match_standard_answer(label, address_yaml) is None
+
+
+@pytest.mark.parametrize("label,required,want", [
+    ("Street address", False, None),          # optional street: leave blank
+    ("Address line 1", True, "1 Main St"),    # required street: the street entry
+    ("City", False, "Springfield"),
+    ("Address", False, "Springfield, NY 10001"),
+    ("Current location", True, "Springfield, NY 10001"),
+    ("Date of birth", True, None),            # sensitive: never answered
+])
+def test_answer_for(label: str, required: bool, want, address_yaml: Path) -> None:
+    from careeros.apply.questions import answer_for
+
+    hit = answer_for(label, address_yaml, required=required)
+    assert (hit[1] if hit else None) == want
+
+
+def test_answer_for_required_street_falls_back_to_full(tmp_path: Path) -> None:
+    from careeros.apply.questions import answer_for
+
+    clear_cache()
+    p = tmp_path / "a.yaml"
+    p.write_text('- key: address\n  match: ["street address", "address"]\n  answer: "Springfield, NY 10001"\n'
+                 '  full: "1 Main St, Springfield, NY 10001"\n', encoding="utf-8")
+    assert answer_for("Street address", p, required=True) == ("address", "1 Main St, Springfield, NY 10001")
+    assert answer_for("Street address", p, required=False) is None
