@@ -33,7 +33,7 @@ from typing import Any, Callable, Iterator
 
 import yaml
 
-from careeros.markup import MARKER, strip_bold, validate_bold
+from careeros.markup import MARKER, bold_allowed, iter_strings, strip_bold, validate_bold
 
 PASS, WARN, FAIL = "pass", "warn", "fail"
 
@@ -337,25 +337,25 @@ def check_estimates(master: dict) -> list[Check]:
 
 
 def check_bold(master: dict) -> list[Check]:
-    """FAIL for invalid `**bold**` markup in bullet text / variants / summary_variants (render.py rejects it);
-    WARN for `**` in narratives (cover letters and answers draw on them and must stay plain prose)."""
-    fails: list[str] = []
+    """FAIL for invalid `**bold**` markup in bullet text / variants / summary_variants, and for `**` in any other
+    field (render.py rejects both: markup.bold_allowed); WARN for `**` in narratives (cover letters and answers
+    draw on them and must stay plain prose)."""
+    ids: dict[str, str] = {}  # "experience[0].bullets[1]" -> bullet id, for readable messages
     for sec in ("experience", "projects", "leadership"):
-        for e in master.get(sec) or []:
-            for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
-                if not isinstance(b, dict):
-                    continue
-                fields = [("text", b.get("text"))]
-                variants = b.get("variants") or {}
-                if isinstance(variants, dict):
-                    fields += [(f"variants.{k}", v) for k, v in variants.items()]
-                elif isinstance(variants, list):
-                    fields += [(f"variants[{i}]", v) for i, v in enumerate(variants)]
-                fails += [f"{b.get('id')}.{f}: {err}" for f, v in fields if (err := validate_bold(v))]
-    sv = master.get("summary_variants")
-    for k, v in (sv.items() if isinstance(sv, dict) else []):
-        if (err := validate_bold(v)):
-            fails.append(f"summary_variants.{k}: {err}")
+        for i, e in enumerate(master.get(sec) or []):
+            for j, b in enumerate((e.get("bullets") or []) if isinstance(e, dict) else []):
+                if isinstance(b, dict) and b.get("id") is not None:
+                    ids[f"{sec}[{i}].bullets[{j}]"] = str(b.get("id"))
+    fails: list[str] = []
+    for path, s in iter_strings(master):
+        if MARKER not in s or path.startswith("narratives["):
+            continue
+        if not bold_allowed(path, "master"):
+            fails.append(f"{path}: '**' is allowed only in bullet text, variants and summary_variants "
+                         "(render.py rejects it anywhere else): drop it")
+        elif (err := validate_bold(s)):
+            m = re.match(r"^(.*?\.bullets\[\d+\])\.(.+)$", path)
+            fails.append(f"{ids[m[1]]}.{m[2]}: {err}" if m and m[1] in ids else f"{path}: {err}")
     out = [Check(FAIL, "bold_markup", f"profile/master.yaml: {f}") for f in fails]
     narr = [str(n.get("id")) for n in master.get("narratives") or []
             if isinstance(n, dict) and MARKER in str(n.get("text") or "")]

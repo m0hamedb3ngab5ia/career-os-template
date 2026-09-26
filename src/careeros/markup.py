@@ -17,9 +17,40 @@ Pure functions, standard library only: the standalone render script imports this
 from __future__ import annotations
 
 import re
-from typing import Any
+from collections.abc import Iterator
+from typing import Any, Literal
 
 MARKER = "**"
+
+# Where `**` may appear, as field paths (`experience[0].bullets[2].text`, `skills.programming[0]`). One source of
+# truth for doctor (profile/master.yaml) and templates/resume/render.py (resume.json): `**` anywhere else is an error.
+BULLET_SECTIONS = ("experience", "projects", "leadership")
+_BULLET = r"(?:%s)\[\d+\]\.bullets\[\d+\]" % "|".join(BULLET_SECTIONS)
+_KEY = r"(?:\.[^.\[\]]+|\[\d+\])"  # one dict key or list index
+_BOLD_PATHS = {
+    # master.yaml: bullet text, every bullet variant, every summary variant
+    "master": re.compile(rf"^(?:summary_variants{_KEY}|{_BULLET}\.(?:text|variants{_KEY}))$"),
+    # resume.json: the tailored bullet text and the chosen summary
+    "resume": re.compile(rf"^(?:summary|{_BULLET}\.text)$"),
+}
+
+
+def bold_allowed(path: str, source: Literal["master", "resume"]) -> bool:
+    """True when `**bold**` markup may appear at field `path` of profile/master.yaml ("master") or resume.json
+    ("resume")."""
+    return bool(_BOLD_PATHS[source].match(path))
+
+
+def iter_strings(node: Any, path: str = "") -> Iterator[tuple[str, str]]:
+    """(field path, value) for every string in a YAML/JSON tree: `a.b[0].c`."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            yield from iter_strings(v, f"{path}.{k}" if path else str(k))
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            yield from iter_strings(v, f"{path}[{i}]")
+    elif isinstance(node, str):
+        yield path, node
 
 
 def strip_bold(text: Any) -> str:

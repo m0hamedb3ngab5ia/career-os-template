@@ -30,7 +30,7 @@ HERE = Path(__file__).resolve().parent
 REPO = HERE.parent.parent
 
 try:
-    from careeros.markup import MARKER, strip_bold, validate_bold
+    from careeros.markup import BULLET_SECTIONS, MARKER, bold_allowed, iter_strings, strip_bold, validate_bold
 except ImportError:  # standalone checkout without the package installed: load the module file directly
     import importlib.util
 
@@ -38,6 +38,8 @@ except ImportError:  # standalone checkout without the package installed: load t
     _markup = importlib.util.module_from_spec(_spec)
     _spec.loader.exec_module(_markup)  # type: ignore[union-attr]
     MARKER, strip_bold, validate_bold = _markup.MARKER, _markup.strip_bold, _markup.validate_bold
+    bold_allowed, iter_strings = _markup.bold_allowed, _markup.iter_strings
+    BULLET_SECTIONS = _markup.BULLET_SECTIONS
 CATEGORIES_YAML = REPO / "config" / "categories.yaml"
 
 SECTION_ORDER_DEFAULT = ["experience", "projects", "education", "skills"]
@@ -159,29 +161,17 @@ def check_placeholders(data: dict[str, Any]) -> list[str]:
     return hits
 
 
-BULLET_SECTIONS = ("experience", "projects", "leadership")
-_BOLD_TEXT_RE = re.compile(r"^(summary|(%s)\[\d+\]\.bullets\[\d+\]\.text)$" % "|".join(BULLET_SECTIONS))
-
-
 def check_bold(data: dict[str, Any]) -> list[str]:
     """"<path>: <reason>" for invalid `**` markup in bullet text / summary, and for `**` in any other field
-    (bold is allowed only in bullet text and the summary)."""
+    (bold is allowed only in bullet text and the summary: markup.bold_allowed)."""
     errs: list[str] = []
-
-    def walk(node: Any, path: str) -> None:
-        if isinstance(node, dict):
-            for k, v in node.items():
-                walk(v, f"{path}.{k}" if path else k)
-        elif isinstance(node, list):
-            for i, v in enumerate(node):
-                walk(v, f"{path}[{i}]")
-        elif isinstance(node, str) and MARKER in node:
-            if not _BOLD_TEXT_RE.match(path):
-                errs.append(f"{path}: '**' is allowed only in bullet text and the summary")
-            elif (err := validate_bold(node)):
-                errs.append(f"{path}: {err}")
-
-    walk(data, "")
+    for path, s in iter_strings(data):
+        if MARKER not in s:
+            continue
+        if not bold_allowed(path, "resume"):
+            errs.append(f"{path}: '**' is allowed only in bullet text and the summary")
+        elif (err := validate_bold(s)):
+            errs.append(f"{path}: {err}")
     return errs
 
 

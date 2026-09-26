@@ -1,9 +1,12 @@
 """Unit tests for careeros.markup: the `**bold**` markup allowed inside profile bullet text."""
 from __future__ import annotations
 
-import pytest
+import re
 
-from careeros.markup import bold_spans, strip_bold, validate_bold, has_markdown_bold
+import pytest
+from conftest import load_script
+
+from careeros.markup import bold_allowed, bold_spans, has_markdown_bold, iter_strings, strip_bold, validate_bold
 
 pytestmark = pytest.mark.unit
 
@@ -83,3 +86,56 @@ def test_any_other_double_star_counts(text: str) -> None:
                                   "I cut **manual prep by 5 hours", "led **ci/cd migration"])
 def test_lone_lowercase_marker_is_bold_not_code(text: str) -> None:
     assert has_markdown_bold(text) is True
+
+
+# --- where `**` may appear: one table for doctor (master.yaml paths) and render.py (resume.json paths) ---------
+
+# (master.yaml path, allowed in master.yaml, resume.json path it becomes, allowed in resume.json)
+BOLD_PATHS = [
+    ("experience[0].bullets[2].text", True, "experience[0].bullets[2].text", True),
+    ("projects[1].bullets[0].text", True, "projects[1].bullets[0].text", True),
+    ("leadership[0].bullets[0].text", True, "leadership[0].bullets[0].text", True),
+    ("experience[0].bullets[2].variants.short", True, "experience[0].bullets[2].text", True),
+    ("experience[0].bullets[2].variants[1]", True, "experience[0].bullets[2].text", True),
+    ("summary_variants.general", True, "summary", True),
+    ("skills.programming[0]", False, "skills.programming[0]", False),
+    ("experience[0].title", False, "experience[0].title", False),
+    ("experience[0].stack[1]", False, "experience[0].stack[1]", False),
+    ("experience[0].bullets[2].id", False, "experience[0].bullets[2].id", False),
+    ("projects[0].name", False, "projects[0].name", False),
+    ("education[0].degree", False, "education[0].degree", False),
+    ("identity.name", False, "identity.name", False),
+    ("narratives[0].text", False, "meta.note", False),
+    ("skills.text", False, "skills.text", False),
+]
+
+
+@pytest.mark.parametrize("master_path, in_master, resume_path, in_resume", BOLD_PATHS)
+def test_bold_allowed_table(master_path, in_master, resume_path, in_resume):
+    assert bold_allowed(master_path, "master") is in_master
+    assert bold_allowed(resume_path, "resume") is in_resume
+
+
+@pytest.mark.parametrize("master_path, in_master, resume_path, in_resume", BOLD_PATHS)
+def test_render_check_bold_agrees_with_table(master_path, in_master, resume_path, in_resume):
+    render = load_script("templates/resume/render.py")
+    data: dict = {}
+    node: object = data
+    parts = re.findall(r"[^.\[\]]+|\[\d+\]", resume_path)
+    for i, part in enumerate(parts):
+        last = i == len(parts) - 1
+        nxt = parts[i + 1] if not last else None
+        child = "**x**" if last else ([] if nxt.startswith("[") else {})
+        if part.startswith("["):
+            idx = int(part[1:-1])
+            node.extend([None] * (idx + 1 - len(node)))  # type: ignore[union-attr]
+            node[idx] = child  # type: ignore[index]
+        else:
+            node[part] = child  # type: ignore[index]
+        node = child
+    assert (render.check_bold(data) == []) is in_resume
+
+
+def test_iter_strings_yields_every_string_with_its_path():
+    got = list(iter_strings({"a": ["x", {"b": "y", 3: "z"}], "n": 1, "c": None}))
+    assert got == [("a[0]", "x"), ("a[1].b", "y"), ("a[1].3", "z")]
