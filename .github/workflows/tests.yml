@@ -28,3 +28,32 @@ jobs:
       - name: Everything + coverage
         if: steps.has_pkg.outputs.present == 'yes'
         run: pytest -q --cov=careeros --cov-report=term-missing
+
+  ui:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ui/package-lock.json
+      - name: Install
+        run: npm ci
+      - name: Typecheck
+        run: npm run typecheck
+      - name: Unit + component tests
+        run: npm test -- --run
+      - name: Build
+        run: npm run build
+      - name: Committed bundle is up to date
+        working-directory: .
+        run: |
+          git add -N src/careeros/ui/static
+          git diff --exit-code --stat src/careeros/ui/static || {
+            echo "::error::src/careeros/ui/static differs from a fresh build. Run 'npm run build' in ui/ (Node from .nvmrc) and commit the result."
+            exit 1
+          }

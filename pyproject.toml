@@ -22,6 +22,10 @@ package-dir = {"" = "src"}
 [tool.setuptools.packages.find]
 where = ["src"]
 
+[tool.setuptools.package-data]
+# The built web UI (ui/ -> npm run build); committed so `careeros ui` needs no Node.
+careeros = ["ui/static/**/*"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = ["src"]
