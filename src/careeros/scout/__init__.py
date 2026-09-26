@@ -262,3 +262,24 @@ def run_scout(
 
 
 __all__ = ["run_scout", "Prefilter", "ScoutSummary", "BoardResult", "ADAPTERS", "scout_config", "SCOUT_FILTERS"]
+
+
+def sync_to_tracker(settings: Settings, store: Store, summary: ScoutSummary) -> dict[str, int]:
+    """Upsert every posting this scout stored into the tracker (`careeros scout --sync`, scheduled scouts)."""
+    from datetime import datetime
+
+    from careeros.models import TrackerRow
+    from careeros.tracker import Tracker
+
+    rows = []
+    for b in summary.boards:
+        for jid in b.stored_ids:
+            p = store.load_posting(jid)
+            if p:
+                rows.append(TrackerRow.from_posting(p, folder=str(store.job_dir(jid))))
+    if not rows:
+        return {}
+    tr = Tracker(settings=settings)
+    counts = tr.upsert_jobs(rows)
+    tr.set_config("last_scout", datetime.now().strftime("%Y-%m-%d %H:%M"))
+    return counts

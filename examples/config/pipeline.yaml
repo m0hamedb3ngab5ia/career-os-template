@@ -22,12 +22,27 @@ paths:
   resume_template_dir: templates/resume
   output_dir_per_job: true                 # data/jobs/<id>/{posting.json,score.json,resume.pdf,cover_letter.md,answers.json,qa.json,log.md}
 
-schedule:                                  # reusable default: fine to keep. For /schedule cloud routines or local cron
-  scout: "0 7 * * *"                       # daily 7am
-  score_and_prepare: "30 7 * * *"
-  inbox_sync: "0 8,18 * * *"
-  followups: "0 9 * * 1-5"
-  prune: "0 3 * * 0"                       # weekly, Sunday 3am: `careeros prune --yes` (see retention below)
+schedule:                                  # reusable default: fine to keep. `careeros schedule install` adds a macOS
+                                           # LaunchAgent that runs `careeros tick` every tick_minutes; the tick runs
+                                           # whatever is due below. Follow-ups are not scheduled here.
+  tick_minutes: 15                         # 15 (Recommended): how often launchd wakes `careeros tick`
+  timezone: local                          # local (Recommended) or an IANA name, e.g. America/New_York
+  quiet_hours: {start: "09:00", end: "18:00"}  # (Recommended) claude-using runs (score, prepare) never start
+                                           # inside this window; scout and prune ignore it. null = no quiet hours
+  missed_after_minutes: 60                 # 60 (Recommended): slots missed while the Mac slept or was off (by more
+                                           # than this) never auto-run; they collapse into ONE pending catch-up you
+                                           # start with `careeros run catch-up` (or dismiss with --dismiss)
+  jobs:                                    # each job: every_hours: N | every_days: N | at: ["HH:MM", ...] (local time)
+    scout:   {every_hours: 3}              # 3 (Recommended: 2-3): `careeros scout --sync`; no quiet hours
+    inbox_sync:                            # /inbox-sync (Gmail) twice a day. OFF until the inbox-sync skill is finished
+      at: ["08:00", "18:00"]               # (Recommended) once enabled
+      enabled: false                       # false (Recommended for now)
+      mcp_servers: [gmail]                 # must be logged in (run `claude`, /mcp, once): else the run stops auth_required
+      allowed_tools_extra: [ToolSearch, mcp__claude_ai_Gmail__search_threads, mcp__claude_ai_Gmail__get_thread]
+    score:   {at: ["01:00"]}               # nightly 01:00 (Recommended): `careeros run score` with runs.preset
+    prepare: {at: ["02:00"]}               # nightly 02:00 (Recommended): `careeros run prepare`; never applies
+    prune:   {every_days: 7}               # 7 = weekly (Recommended): `careeros prune --yes` (retention below)
+  launchd_label: com.careeros.tick
 
 llm:                                       # reusable default: fine to keep
   runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
@@ -56,7 +71,7 @@ runs:                                      # reusable default: fine to keep. `ca
     large:  {max_score_jobs: 50, max_prepare_jobs: 10, max_minutes: 180}
     max:    {max_score_jobs: 150, max_prepare_jobs: 25, max_minutes: 480}
   custom: {max_score_jobs: 25, max_prepare_jobs: 5, max_minutes: 90}       # used when preset: custom
-  job_timeout_minutes: {score: 10, prepare: 45}   # (Recommended) one skill call is killed after this
+  job_timeout_minutes: {score: 10, prepare: 45, inbox_sync: 20}   # (Recommended) one skill call is killed after this
   stop_on_timeout: true                    # true (Recommended): a hung call usually means a prompt or auth wait
   max_consecutive_failures: 3              # 3 (Recommended): stop after this many failed jobs in a row
   preflight_doctor: true                   # true (Recommended): never run on example data or a broken setup
@@ -88,6 +103,8 @@ retention:                                 # reusable default: fine to keep. `ca
   screenshots_after_closed_days: 30        # rejected/withdrawn/ghosted jobs lose apply step screenshots after this
   keep_confirmation_screenshot: true       # ...but keep NN_confirmation.png as proof you applied
   unprepared_posting_days: 90              # found/scored/skipped postings: description trimmed to a short stub
+  run_logs_days: 30                        # 30 (Recommended): data/runs/<id>/run.log + raw stream output go after this
+  run_summaries_days: 365                  # 365 (Recommended): the whole run (run.json, attempts) goes after this
                                            # 0 turns a rule off. Never touched: active jobs, submitted/ copies,
                                            # seen.json, posting_history.json, the scam registries.
 

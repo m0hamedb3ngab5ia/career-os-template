@@ -503,14 +503,21 @@ def test_check_runs_passes_on_the_example_pipeline():
     from careeros.doctor import check_runs
 
     cfg = yaml.safe_load((EXAMPLE_REPO / "config" / "pipeline.yaml").read_text())
-    (c,) = check_runs(cfg)
-    assert c.level == PASS and c.name == "runs"
+    checks = check_runs(cfg)
+    assert [(c.level, c.name) for c in checks] == [(PASS, "runs"), (PASS, "schedule")]
+
+
+def test_check_runs_fails_on_old_cron_schedule():
+    from careeros.doctor import check_runs
+
+    checks = check_runs({"schedule": {"scout": "0 7 * * *"}})
+    assert checks[-1].level == FAIL and checks[-1].name == "schedule" and "schedule.jobs" in checks[-1].detail
 
 
 def test_check_runs_fails_on_a_bad_budget():
     from careeros.doctor import check_runs
 
-    (c,) = check_runs({"runs": {"preset": "huge"}})
+    c = next(c for c in check_runs({"runs": {"preset": "huge"}}) if c.name == "runs")
     assert c.level == FAIL and "runs.preset" in c.detail
 
 
@@ -518,8 +525,8 @@ def test_check_runs_warns_when_headless_cmd_does_not_stream():
     from careeros.doctor import check_runs
 
     checks = check_runs({"llm": {"headless_cmd": ["claude", "-p", "--output-format", "json"]}})
-    assert [c.level for c in checks] == [WARN]
-    assert "stream-json" in checks[0].detail
+    runs = [c for c in checks if c.name == "runs"]
+    assert [c.level for c in runs] == [WARN] and "stream-json" in runs[0].detail
 
 
 def test_run_doctor_reports_runs_config(tmp_path):
@@ -533,3 +540,11 @@ def test_run_doctor_reports_runs_config(tmp_path):
     p.write_text(yaml.safe_dump(data))
     fails = [c for c in run_doctor(root, which=lambda t: "/bin/" + t, examples=EXAMPLE_REPO) if c.name == "runs"]
     assert fails and fails[0].level == FAIL
+
+
+def test_check_runs_still_validates_the_schedule_when_headless_warns():
+    from careeros.doctor import check_runs
+
+    checks = check_runs({"llm": {"headless_cmd": ["claude", "-p", "--output-format", "json"]},
+                         "schedule": {"scout": "0 7 * * *"}})
+    assert {(c.name, c.level) for c in checks} >= {("runs", WARN), ("schedule", FAIL)}

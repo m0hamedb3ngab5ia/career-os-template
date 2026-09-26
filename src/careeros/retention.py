@@ -11,6 +11,10 @@ Two rules, each measured from the job's last status change (status.json history,
   job is also moved to `skipped` (status.json and tracker) so it leaves the prepare queue: scoring or a safety
   check on a 500-char preview would be meaningless. `careeros safety check` refuses a pruned posting.
 
+Run history (`data/runs/<id>/`): after `run_logs_days` a run loses its logs (run.log and the raw stream-json
+of each attempt; run.json and attempts/NNN.json stay for the history and the advisor); after
+`run_summaries_days` the whole run directory goes. A run that is still going is never touched.
+
 Never touched: jobs in any other status, `submitted/` snapshots, anything outside `screenshots/`, `status.json` and
 `posting.json`, the shared state in data/ (seen.json, posting_history.json, flagged_registry.yaml,
 verified_companies.yaml), and Finder duplicates. 0 or null days turns a rule off.
@@ -31,6 +35,8 @@ DEFAULTS: dict[str, Any] = {
     "screenshots_after_closed_days": 30,
     "keep_confirmation_screenshot": True,
     "unprepared_posting_days": 90,
+    "run_logs_days": 30,
+    "run_summaries_days": 365,
 }
 CLOSED = ("rejected", "withdrawn", "ghosted")
 UNPREPARED = ("found", "scored", "skipped")
@@ -43,9 +49,10 @@ _CONFIRMATION_RE = re.compile(r"^\d+_confirmation\b", re.I)
 @dataclass
 class PruneItem:
     job_id: str
-    action: str  # delete_screenshots | stub_posting
+    action: str  # delete_screenshots | stub_posting | delete_run_logs | delete_run
     paths: list[str] = field(default_factory=list)
     bytes: int = 0
+    run_id: str = ""
 
     def to_dict(self) -> dict[str, Any]:
         return asdict(self)
@@ -58,7 +65,7 @@ def retention_config(settings: Settings) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ConfigError("pipeline.yaml: retention must be a mapping (see examples/config/pipeline.yaml)")
     cfg = dict(DEFAULTS)
-    for key in ("screenshots_after_closed_days", "unprepared_posting_days"):
+    for key in ("screenshots_after_closed_days", "unprepared_posting_days", "run_logs_days", "run_summaries_days"):
         if key not in raw:
             continue
         val = raw[key]
@@ -74,6 +81,9 @@ def retention_config(settings: Settings) -> dict[str, Any]:
             raise ConfigError("pipeline.yaml: retention.keep_confirmation_screenshot must be true/false, "
                               f"got {keep!r}")
         cfg["keep_confirmation_screenshot"] = keep
+    if cfg["run_logs_days"] and cfg["run_summaries_days"] and cfg["run_summaries_days"] < cfg["run_logs_days"]:
+        raise ConfigError("pipeline.yaml: retention.run_summaries_days must be >= run_logs_days (a run summary "
+                          "outlives its logs)")
     return cfg
 
 
@@ -164,7 +174,63 @@ def plan(settings: Settings, now: datetime | None = None) -> list[PruneItem]:
             saved = path.stat().st_size - len(_dump(stub_posting(posting, now)).encode("utf-8"))
             if saved > 0:
                 items.append(PruneItem(jid, "stub_posting", [str(path)], saved))
-    return items
+    return items + plan_runs(settings, cfg, now)
+
+
+def _dir_bytes(d) -> int:
+    return sum(f.stat().st_size for f in d.rglob("*") if f.is_file())
+
+
+def plan_runs(settings: Settings, cfg: dict[str, Any], now: datetime) -> list[PruneItem]:
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    logs_days, keep_days = cfg["run_logs_days"], cfg["run_summaries_days"]
+    if not logs_days and not keep_days:
+        return []
+    rs = RunStore(settings)
+    held = locks.status(rs.runner_lock_path)
+    live = held.get("owner") if held.get("state") == "held" else None
+    out: list[PruneItem] = []
+    for rid in rs.run_ids():
+        if live == f"run:{rid}":
+            continue
+        run = rs.load_run(rid) or {}
+        at = _parse(run.get("ended_at") or run.get("started_at"))
+        if at is None:
+            continue
+        age = (now - at).total_seconds() / 86400
+        d = rs.run_dir(rid)
+        if keep_days and age > keep_days:
+            out.append(PruneItem("", "delete_run", [str(d)], _dir_bytes(d), run_id=rid))
+        elif logs_days and age > logs_days:
+            files = [f for f in [d / "run.log", *sorted((d / "attempts").glob("*.stream.jsonl"))] if f.is_file()]
+            if files:
+                out.append(PruneItem("", "delete_run_logs", [str(f) for f in files],
+                                     sum(f.stat().st_size for f in files), run_id=rid))
+    return out
+
+
+def _execute_run_item(settings: Settings, item: PruneItem) -> int:
+    import shutil
+
+    from careeros.runs.store import RunStore
+
+    d = RunStore(settings).run_dir(item.run_id)
+    if not item.run_id or not d.is_dir():
+        return 0
+    if item.action == "delete_run":
+        size = _dir_bytes(d)
+        shutil.rmtree(d)
+        return size
+    freed = 0
+    for p in item.paths:
+        f = os.path.realpath(p)
+        if not f.startswith(os.path.realpath(d) + os.sep) or not os.path.isfile(f):
+            continue  # only ever files inside this run's directory
+        freed += os.path.getsize(f)
+        os.unlink(f)
+    return freed
 
 
 def execute(settings: Settings, items: list[PruneItem], now: datetime | None = None) -> int:
@@ -176,6 +242,9 @@ def execute(settings: Settings, items: list[PruneItem], now: datetime | None = N
     days = retention_config(settings)["unprepared_posting_days"]
     freed = 0
     for item in items:
+        if item.run_id:
+            freed += _execute_run_item(settings, item)
+            continue
         jdir = store.job_dir(item.job_id)
         if item.action == "delete_screenshots":
             gone = 0
@@ -206,7 +275,8 @@ def execute(settings: Settings, items: list[PruneItem], now: datetime | None = N
 
 
 def summarize(items: list[PruneItem]) -> dict[str, int]:
-    return {"jobs": len({i.job_id for i in items}), "files": sum(len(i.paths) for i in items),
+    return {"jobs": len({i.job_id for i in items if not i.run_id}), "runs": len({i.run_id for i in items if i.run_id}),
+            "files": sum(len(i.paths) for i in items),
             "bytes": sum(i.bytes for i in items)}
 
 

@@ -139,6 +139,8 @@ def validate_result(stage: str, job_id: str, res: dict[str, Any]) -> list[str]:
     """Problems with a skill RESULT for this stage (empty = valid). A RESULT with `error` is valid here:
     `classify` reports it as `skill_error`."""
     probs = []
+    if stage == "inbox_sync":  # not about one job; any RESULT object is its summary
+        return probs
     if str(res.get("job_id") or "") != job_id:
         probs.append(f"RESULT job_id {res.get('job_id')!r} is not {job_id!r}")
     if "error" in res:
@@ -164,7 +166,9 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
         return "auth_required", "Claude Code is not logged in (authentication_failed): run `claude` and /login"
     if r.rate_limit_rejected or any(e in _LIMIT_ERRORS for e in r.api_errors):
         return "usage_limit", "subscription usage limit reached; the run stops and retries at the next slot"
-    need_auth = [n for n in cfg.required_mcp_servers if r.mcp_status.get(n) in ("needs-auth", "needs_auth")]
+    need_auth = [n for n in cfg.required_mcp_servers
+                 if any(n.lower() in name.lower() and st in ("needs-auth", "needs_auth", "failed")
+                        for name, st in r.mcp_status.items())]
     if need_auth:
         return "auth_required", f"MCP server(s) {', '.join(need_auth)} need auth: run `claude` and /mcp once"
     res = parse_result_line(r.result_text) if r.saw_result else None
@@ -187,6 +191,8 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
     if probs:
         return "invalid_result", "; ".join(probs)
     if "error" in res:
+        if "mcp_unavailable" in str(res["error"]).lower():
+            return "auth_required", f"the skill could not use its MCP server ({res['error']}): run `claude`, /mcp"
         return "skill_error", str(res["error"])[:200]
     return "ok", ""
 

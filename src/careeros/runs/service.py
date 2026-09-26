@@ -142,3 +142,81 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         for w in warnings:
             rs.log(run["id"], w)
     return run
+
+
+def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[str] | None = None,
+              allowed_tools_extra: list[str] | None = None, trigger: str = "manual", invoke=None, doctor=None,
+              now: Callable[[], datetime] = _utcnow, cancel=None,
+              echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+    """One headless call of a skill that is not about a single job (the scheduled inbox_sync). Same runner lock,
+    pause, doctor preflight and run records as a batch; `mcp_servers` must be logged in (auth_required if not).
+    Stop reason: completed, a hard stop (usage_limit, auth_required, permission_denied, timeout, cancelled),
+    paused, doctor_failed, or error (the call failed any other way)."""
+    import os
+    import uuid
+    from dataclasses import replace
+
+    from careeros.runs import locks
+    from careeros.runs.headless import build_command, classify, parse_result_line
+    from careeros.runs.headless import invoke as default_invoke
+    from careeros.runs.runner import RunBusy, default_doctor
+    from careeros.runs.store import iso
+
+    base = load_runs_config(settings)
+    cfg = replace(base, required_mcp_servers=list(dict.fromkeys([*base.required_mcp_servers, *(mcp_servers or [])])),
+                  allowed_tools=list(dict.fromkeys([*base.allowed_tools, *(allowed_tools_extra or [])])))
+    if invoke is None:
+        def invoke(cmd, cwd, env, timeout_s, stream_path):  # noqa: E306
+            return default_invoke(cmd, cwd, env, timeout_s, stream_path, cancel=cancel)
+    if doctor is None and cfg.preflight_doctor:
+        doctor = default_doctor
+    rs = RunStore(settings)
+    start = now()
+    timeout_s = float(cfg.job_timeout_minutes.get(kind, 20)) * 60
+    rid = f"{start.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
+    try:
+        lk = locks.acquire(rs.runner_lock_path, owner=f"run:{rid}", ttl_seconds=timeout_s + 600, pid=os.getpid(),
+                           now=start, note=f"{kind} ({trigger})")
+    except locks.LockBusy as e:
+        raise RunBusy(e.holder) from None
+    run = rs.new_run(kind, trigger, {"preset": None, "max_jobs": 1, "max_minutes": timeout_s / 60}, start,
+                     run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}"),
+                     counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
+    stop, detail = "completed", ""
+    try:
+        pause = rs.pause_state(start)
+        fails = [] if pause else (doctor(settings.root) if doctor else [])
+        if pause:
+            stop, detail = "paused", f"paused ({pause.get('reason') or 'careeros run pause'})"
+        elif fails:
+            stop, detail = "doctor_failed", "; ".join(fails)[:500]
+        else:
+            n, stream_path = rs.next_attempt(rid)
+            sid = str(uuid.uuid4())
+            env = {**os.environ, "CAREEROS_RUN_ID": rid, "CAREEROS_ROOT": str(settings.root)}
+            t0 = now()
+            echo(f"[{n}] {kind}: /{skill}")
+            res = invoke(build_command(cfg, f"/{skill}", session_id=sid), str(settings.root), env, timeout_s,
+                         stream_path)
+            outcome, detail = classify(res, cfg, kind, "")
+            run["counters"]["attempted"] = 1
+            run["counters"]["ok" if outcome == "ok" else "failed"] = 1
+            att = {"n": n, "run_id": rid, "job_id": None, "stage": kind, "session_id": res.session_id or sid,
+                   "outcome": outcome, "detail": detail,
+                   "result": parse_result_line(res.result_text) if res.saw_result else None,
+                   "started_at": iso(t0), "ended_at": iso(now()), "duration_s": round(res.duration_s, 1),
+                   "stream": f"attempts/{n:03d}.stream.jsonl", "headless": res.summary()}
+            rs.save_attempt(rid, att)
+            run["attempts"].append(n)
+            rs.log(rid, f"attempt {n} {kind} -> {outcome}" + (f": {detail}" if detail else ""))
+            if outcome != "ok":
+                stop = outcome if outcome in ("usage_limit", "auth_required", "permission_denied", "timeout",
+                                              "cancelled") else "error"
+    finally:
+        end = now()
+        run.update(status="done", stop_reason=stop, detail=detail, ended_at=iso(end),
+                   duration_s=round((end - start).total_seconds(), 1))
+        rs.save_run(run)
+        rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
+        locks.release(rs.runner_lock_path, lk.token)
+    return run
