@@ -521,6 +521,13 @@ def test_check_runs_fails_on_a_bad_budget():
     assert c.level == FAIL and "runs.preset" in c.detail
 
 
+def test_check_runs_fails_on_a_bad_ui_block():
+    from careeros.doctor import check_runs
+
+    c = next(c for c in check_runs({"ui": {"theme": "blue"}}) if c.name == "ui")
+    assert c.level == FAIL and "ui.theme" in c.detail
+
+
 def test_check_runs_warns_when_headless_cmd_does_not_stream():
     from careeros.doctor import check_runs
 

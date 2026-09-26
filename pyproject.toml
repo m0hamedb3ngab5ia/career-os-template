@@ -11,7 +11,8 @@ dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl", "ruamel.yaml>=0
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]
-test = ["pytest", "pytest-cov", "jinja2", "pypdf"]
+test = ["pytest", "pytest-cov", "jinja2", "pypdf", "httpx"]
+ui = ["fastapi", "uvicorn", "watchfiles"]
 
 [project.scripts]
 careeros = "careeros.cli:main"
