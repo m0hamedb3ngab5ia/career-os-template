@@ -74,7 +74,13 @@ the UI has to stand on its own as an application, without a Claude Code session 
   notes after interviews are always written by hand; Tier A is never auto-submitted; runs never apply.
 - Every option shows its default with "(Recommended)" next to it, the same wording as the comments in
   `examples/config/pipeline.yaml`, and a "Reset to recommended" control per group.
-- **Built (schema + writes, no routes yet):** `src/careeros/ui/settings_schema/` declares every page as data (one
+- **Built (screens):** `/settings/<section>` for every section, one generic renderer over `Section.to_dict()`
+  plus custom pieces where the mockup needs them (tier cards, budget presets, ranking weights with a live preview of
+  the next 5 jobs, the Storage & efficiency overview). API: `GET /api/settings`, `GET /api/settings/{section}`,
+  `POST /api/settings/{section}/diff`, `PUT /api/settings/{section}` (422 with per-field errors, 409 on a stale
+  version), `POST /api/settings/{section}/reset/{group}`, `POST /api/settings/runs/ranking-preview`, `GET /api/storage`,
+  `GET /api/advise`, `POST /api/advise/{id}/apply`, `POST /api/prune {dry_run}`.
+- **Built (schema + writes):** `src/careeros/ui/settings_schema/` declares every page as data (one
   `Field` per YAML key: control, range, default, "(Recommended)", locked/read-only, help), and one generic form
   renderer draws them all. `src/careeros/ui/services/settings_io.py` reads a page's effective values, previews a
   change as a diff, and saves several keys across files at once (`runs/yamledit.apply_changes_many`): per-field
