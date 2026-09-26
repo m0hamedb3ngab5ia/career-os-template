@@ -268,7 +268,10 @@ class RunControl:
         if not isinstance(pid, int) or not self.pid_alive(pid):
             return {"status": "idle", "detail": "the run's process has already stopped"}
         marker = self.rs.dir / "ui" / f"cancel-{rid}"
-        if marker.exists():
+        # the marker names the holder it cancelled (pid + lock time): a later holder of the same run id, such as
+        # the next catch-up, finds a stale marker and can still be cancelled
+        holder = f"{pid} {held.get('acquired_at', '')}"
+        if marker.exists() and marker.read_text().split("\n", 1)[0] == holder:
             return {"status": "already_stopping", "run_id": rid, "pid": pid}
         what = classify_cmdline(self.cmdline(pid), root=self.settings.root)
         if what == "tick":
@@ -287,7 +290,7 @@ class RunControl:
         except PermissionError:
             return {"status": "refused", "run_id": rid, "detail": f"not allowed to signal pid {pid}"}
         marker.parent.mkdir(parents=True, exist_ok=True)
-        marker.write_text(self.now().isoformat())
+        marker.write_text(f"{holder}\n{self.now().isoformat()}\n")
         return {"status": "cancelling", "run_id": rid, "pid": pid}
 
     def pause(self, until: datetime | None = None, reason: str = "") -> dict[str, Any]:

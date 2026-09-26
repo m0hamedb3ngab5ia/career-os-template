@@ -710,3 +710,19 @@ def test_cancel_ignores_a_scheduled_tick_lock(rc):
     rs = RunStore(rc.settings)
     locks.acquire(rs.dir / "tick.lock", owner="tick", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
     assert make_rc(rc.settings, kill=lambda *a: pytest.fail("no kill")).cancel()["status"] == "idle"
+
+
+def test_cancel_reaches_a_later_catch_up_after_an_earlier_one_was_cancelled(rc):
+    """The cancel marker belongs to one holder: a later catch-up (new pid) must not look 'already stopping'."""
+    rs = RunStore(rc.settings)
+    tick = rs.dir / "tick.lock"
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/v/bin/python -m careeros.cli run catch-up --json")
+    locks.acquire(tick, owner="catch-up", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    assert rc2.cancel()["status"] == "cancelling"
+    assert rc2.cancel()["status"] == "already_stopping"
+    locks.release(tick, None, force=True)
+    locks.acquire(tick, owner="catch-up", ttl_seconds=600, pid=889, pid_alive=lambda p: True)
+    out = rc2.cancel()
+    assert out["status"] == "cancelling" and sent == [(888, signal.SIGTERM), (889, signal.SIGTERM)]
