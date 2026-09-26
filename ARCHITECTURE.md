@@ -86,7 +86,15 @@ career-os/
   config/    targets.yaml  categories.yaml  companies.yaml  qa.yaml  pipeline.yaml        (gitignored)
   profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  voice/        (gitignored)
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
-  src/careeros/  bootstrap.py  scout/  apply/  tracker.py  qa.py  store.py  cli.py
+  src/careeros/  bootstrap.py  scout/  apply/  tracker.py  qa.py  store.py  retention.py  cli.py
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)
 ```
+
+## Retention (`careeros prune`)
+
+`src/careeros/retention.py` plans, then (with `--yes`) applies two rules from `pipeline.yaml: retention`, both
+measured from the job's last status change: closed jobs drop apply step screenshots after
+`screenshots_after_closed_days` (confirmation shot kept), and never-prepared postings are rewritten as a stub
+(`pruned: true`, description cut to a preview) after `unprepared_posting_days`. It only ever touches
+`screenshots/` and `posting.json` inside `data/jobs/<id>/`; each change is logged in that job's `log.md`.

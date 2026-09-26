@@ -409,6 +409,34 @@ def cmd_action_done(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_prune(args: argparse.Namespace) -> int:
+    from careeros import retention
+
+    s = _settings(args)
+    items = retention.plan(s)
+    dry = args.dry_run or not args.yes
+    summary = retention.summarize(items)
+    if args.json:
+        freed = 0 if dry else retention.execute(s, items)
+        print(json.dumps({"dry_run": dry, "items": [i.to_dict() for i in items], "summary": summary,
+                          "freed_bytes": freed}, indent=2))
+        return 0
+    if not items:
+        print("prune: nothing to remove")
+        return 0
+    for i in items:
+        what = (f"{len(i.paths)} screenshot(s): " + ", ".join(Path(p).name for p in i.paths[:4])
+                + (" ..." if len(i.paths) > 4 else "")) if i.action == "delete_screenshots" else "trim posting.json to a stub"
+        print(f"{i.job_id}  {what}  ({retention.human_bytes(i.bytes)})")
+    total = f"{summary['jobs']} job(s), {summary['files']} file(s), {retention.human_bytes(summary['bytes'])}"
+    if dry:
+        print(f"\ndry run: would free {total}. Re-run with --yes to apply.")
+        return 0
+    freed = retention.execute(s, items)
+    print(f"\npruned {total}; freed {retention.human_bytes(freed)}")
+    return 0
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     s = _settings(args)
     store = Store(s)
@@ -548,6 +576,12 @@ def build_parser() -> argparse.ArgumentParser:
     scl.add_argument("company")
     scl.add_argument("--note")
     scl.set_defaults(fn=cmd_safety_clear)
+
+    pr = sub.add_parser("prune", help="remove old screenshots and trim old unprepared postings (dry run unless --yes)")
+    pr.add_argument("--dry-run", action="store_true", help="only list what would go (the default; wins over --yes)")
+    pr.add_argument("--yes", action="store_true", help="actually delete / trim")
+    pr.add_argument("--json", action="store_true", help="machine-readable plan (and result with --yes)")
+    pr.set_defaults(fn=cmd_prune)
 
     sub.add_parser("stats").set_defaults(fn=cmd_stats)
     return p
