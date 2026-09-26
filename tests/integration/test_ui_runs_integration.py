@@ -118,7 +118,7 @@ def test_tracker_step_records_a_run(root, env):
 def claude_pids(fake_bin: str) -> list[int]:
     import subprocess
 
-    out = subprocess.run(["ps", "-eo", "pid=,args="], capture_output=True, text=True).stdout  # macOS and Linux
+    out = subprocess.run(["ps", "-ww", "-eo", "pid=,args="], capture_output=True, text=True).stdout  # -ww: procps cuts at 80 columns
     return [int(line.split(None, 1)[0]) for line in out.splitlines() if fake_bin in line]
 
 

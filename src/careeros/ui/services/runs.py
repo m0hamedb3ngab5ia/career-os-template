@@ -51,8 +51,13 @@ def _utcnow() -> datetime:
 
 
 def ps_cmdline(pid: int) -> str:
+    """The process's argv joined by spaces: /proc/<pid>/cmdline on Linux, else `ps -ww` (without -ww, procps cuts
+    the line at 80 columns when stdout is not a terminal)."""
+    proc = Path(f"/proc/{pid}/cmdline")
     try:
-        return subprocess.run(["ps", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
+        if proc.exists():
+            return " ".join(a.decode("utf-8", "replace") for a in proc.read_bytes().split(b"\0") if a)
+        return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
                               timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
         return ""

@@ -653,3 +653,9 @@ def test_tail_holds_back_a_half_written_line(rc):
 
     events = list(make_rc(rc.settings, sleep=sleep).tail(run["id"], follow=True, poll_s=0))
     assert [e for e in events if e["type"] == "assistant"] == [{"type": "assistant", "text": "whole", "attempt": 1}]
+
+
+def test_ps_cmdline_of_this_process_is_not_truncated():
+    from careeros.ui.services.runs import ps_cmdline
+
+    assert "pytest" in ps_cmdline(os.getpid())
