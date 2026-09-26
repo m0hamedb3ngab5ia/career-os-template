@@ -59,7 +59,8 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 - `config/companies.yaml`: the starter `boards` list, prestige tiers and scoring
 - `config/targets.yaml`: seniority filter, thresholds, tiers, tier rules, volume caps, safety lists
 - `config/qa.yaml`: every QA rule and the banned-phrases list
-- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`
+- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`, `outreach` (people you are connected to
+  on LinkedIn, or share mutuals with, are never messaged automatically; record with `careeros outreach mark`)
 - `templates/`, `.claude/skills/`, `src/careeros/`: the code, the same for everyone
 
 ## Reference

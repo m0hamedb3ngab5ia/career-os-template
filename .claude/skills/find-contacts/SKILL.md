@@ -38,6 +38,11 @@ category). Read `config/targets.yaml` tiers: if tier C (`outreach: never`) stop 
    `medium` if the domain's pattern was observed for another employee on a public page; else `low`.
    Never mark verified without a URL.
 
+LinkedIn relationship: this skill never opens LinkedIn, so it cannot see whether the candidate is already
+connected to someone. Leave `linkedin_degree` and `mutuals` null. The candidate records what their own logged-in
+LinkedIn shows when they open the search URLs: `careeros outreach mark <job_id> "<name>" --degree 1` (connected)
+or `--mutuals <n>`. `draft-outreach` reads these (see its step 1).
+
 Referral: if any found person lists one of the candidate's schools (`profile/master.yaml: education[].school`)
 or past employers (`experience[].company`) in a public bio, set `possible_referral: true` and explain in `note`.
 
@@ -51,7 +56,8 @@ or past employers (`experience[].company`) in a public bio, set `possible_referr
     {"name": "Jane Doe", "title": "Technical Recruiter", "role": "recruiter|hiring_manager|team_lead|other",
      "linkedin": "https://www.linkedin.com/in/... or null", "source": "posting|<url>", "confidence": "high|medium|low",
      "email_candidates": ["jane.doe@ledgerline.com", "jane@ledgerline.com"], "email": null,
-     "email_confidence": "verified|medium|low", "possible_referral": false, "note": ""}
+     "email_confidence": "verified|medium|low", "possible_referral": false,
+     "linkedin_degree": null, "mutuals": null, "note": ""}
   ],
   "search_urls": {"recruiter": "...", "hiring_manager": "...", "team_lead": "...", "alumni": "..."},
   "team": "Payments Platform",

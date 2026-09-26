@@ -19,6 +19,9 @@ first). This skill writes drafts only. It never sends, never creates Gmail draft
 - `templates/outreach/*.md` if present: `linkedin_note.md`, `linkedin_message.md`, `cold_email.md`,
   `followup_7d.md`, `followup_14d.md`. Treat each as structure + length guidance, not text to copy. If a
   template is missing, use the structure below and set `templates_used` accordingly.
+- Relationship gate: run `careeros outreach check <job_id>` (JSON per contact: `manual`, `reason`
+  `LINKEDIN_CONNECTED|LINKEDIN_MUTUALS`, `detail`; switches in `config/pipeline.yaml: outreach`). A `manual` contact is
+  someone the candidate already knows on LinkedIn: never automate it (step 3a).
 - `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
   wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.
 
@@ -55,6 +58,16 @@ For each entry in `contacts.json.contacts` produce:
    A recruiter with no verified email still gets `linkedin_note` + `linkedin_message` (the LinkedIn variant, about half
    the length of the email).
 
+### 3a. Manual contacts (connected or mutuals)
+
+For each contact `outreach check` marks `manual: true`:
+- Still write the drafts above as a starting point, but set `manual_tailor: true`, `manual_reason` (the reason code),
+  `send_after: null` forever and `followup_7d`/`followup_14d` null. No sender, scheduler or follow-up ever sends it.
+- Do not open with a cold-intro line ("I came across your profile"); the candidate adds the shared context.
+- Open one Action Item per contact:
+  `careeros action add "tailor manually: <name> (<detail>)" --type send_linkedin --job <job_id> --link "<contact.linkedin or search url>" --priority M --needs phone --dedupe`
+  (`--dedupe` keeps one open item per job; if one is open, name every manual contact in that item's text instead).
+
 ## 4. Write `JOB/outreach.json`
 
 ```json
@@ -66,7 +79,7 @@ For each entry in `contacts.json.contacts` produce:
      "linkedin_message": "...", "email": {"subject": "...", "body": "..."},
      "followup_7d": "...", "followup_14d": "...",
      "bullet_ids": ["acme.1"], "narrative_ids": ["n.data"], "facts_used": [{"fact": "...", "source": "posting"}],
-     "send_after": null, "sent": false}
+     "manual_tailor": false, "manual_reason": null, "send_after": null, "sent": false}
   ],
   "review_required": true
 }
@@ -79,4 +92,4 @@ Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [draft-outreach] <n> contacts dra
 
 ## 5. RESULT
 
-`RESULT: {"skill":"draft-outreach","job_id":"...","drafts":2,"review_required":true,"templates_used":["..."],"ACTION_ITEM":"Review outreach drafts in data/jobs/<id>/outreach.json before sending"}`
+`RESULT: {"skill":"draft-outreach","job_id":"...","drafts":2,"manual_tailor":1,"review_required":true,"templates_used":["..."],"ACTION_ITEM":"Review outreach drafts in data/jobs/<id>/outreach.json before sending"}`
