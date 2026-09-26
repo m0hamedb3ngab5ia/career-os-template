@@ -7,9 +7,11 @@ Two rules, each measured from the job's last status change (status.json history,
   `keep_confirmation_screenshot` is on.
 - Postings never prepared (found / scored / skipped) older than `unprepared_posting_days` become a stub:
   every field stays except the description, which is cut to a short preview (the HTML copy is dropped).
-  Dedupe, repost and tracker code only need the ids, company, title, url and dates.
+  Dedupe, repost and tracker code only need the ids, company, title, url and dates. A stubbed found / scored
+  job is also moved to `skipped` (status.json and tracker) so it leaves the prepare queue: scoring or a safety
+  check on a 500-char preview would be meaningless. `careeros safety check` refuses a pruned posting.
 
-Never touched: jobs in any other status, `submitted/` snapshots, anything outside `screenshots/` and
+Never touched: jobs in any other status, `submitted/` snapshots, anything outside `screenshots/`, `status.json` and
 `posting.json`, the shared state in data/ (seen.json, posting_history.json, flagged_registry.yaml,
 verified_companies.yaml), and Finder duplicates. 0 or null days turns a rule off.
 """
@@ -32,6 +34,7 @@ DEFAULTS: dict[str, Any] = {
 }
 CLOSED = ("rejected", "withdrawn", "ghosted")
 UNPREPARED = ("found", "scored", "skipped")
+QUEUE = ("found", "scored")  # still waiting for score/prepare: a stub must leave this queue
 SCREENSHOT_DIR = "screenshots"
 STUB_TEXT_CHARS = 500
 _CONFIRMATION_RE = re.compile(r"^\d+_confirmation\b", re.I)
@@ -65,8 +68,12 @@ def retention_config(settings: Settings) -> dict[str, Any]:
         if isinstance(val, bool) or not isinstance(val, int) or val < 0:
             raise ConfigError(f"pipeline.yaml: retention.{key} must be a whole number of days >= 0 (0 = off), got {val!r}")
         cfg[key] = val
-    if "keep_confirmation_screenshot" in raw:
-        cfg["keep_confirmation_screenshot"] = bool(raw["keep_confirmation_screenshot"])
+    keep = raw.get("keep_confirmation_screenshot")
+    if keep is not None:
+        if not isinstance(keep, bool):
+            raise ConfigError("pipeline.yaml: retention.keep_confirmation_screenshot must be true/false, "
+                              f"got {keep!r}")
+        cfg["keep_confirmation_screenshot"] = keep
     return cfg
 
 
@@ -162,8 +169,11 @@ def plan(settings: Settings, now: datetime | None = None) -> list[PruneItem]:
 
 def execute(settings: Settings, items: list[PruneItem], now: datetime | None = None) -> int:
     """Apply a plan. Returns bytes freed. Each touched job gets a `[prune]` line in its log.md."""
+    from careeros.tracker import set_status_both
+
     now = now or datetime.now(timezone.utc)
     store = Store(settings)
+    days = retention_config(settings)["unprepared_posting_days"]
     freed = 0
     for item in items:
         jdir = store.job_dir(item.job_id)
@@ -189,6 +199,9 @@ def execute(settings: Settings, items: list[PruneItem], now: datetime | None = N
             tmp.replace(path)
             freed += max(0, before - path.stat().st_size)
             store.append_log(item.job_id, "posting.json trimmed to a stub (retention)", component="prune")
+            if store.get_status(item.job_id) in QUEUE:
+                set_status_both(settings, item.job_id, "skipped",
+                                f"retention stub (posting older than {days} days)")
     return freed
 
 

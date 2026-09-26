@@ -150,9 +150,11 @@ replace a real (non-symlink) `profile/` or `config/`; move those into the privat
 `careeros prune` applies `config/pipeline.yaml: retention` (weekly via `schedule.prune`). It is a dry run
 unless you pass `--yes`.
 - Closed jobs (rejected, withdrawn, ghosted) lose their apply step screenshots 30 days after closing; the
-  confirmation screenshot stays.
+  confirmation screenshot stays (`keep_confirmation_screenshot` must be true or false).
 - Postings never prepared (found, scored, skipped) are trimmed to a stub after 90 days: ids, company, title,
   URLs and dates stay (dedupe and repost checks need them), the description is cut to a short preview.
+  A stubbed found or scored job is marked `skipped` so it leaves the prepare queue, and
+  `careeros safety check` refuses a pruned posting.
 - Never touched: active jobs, `submitted/` copies, `seen.json`, `posting_history.json`, the scam registries.
   Set a value to 0 to turn that rule off.
 

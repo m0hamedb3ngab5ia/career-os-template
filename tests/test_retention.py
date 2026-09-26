@@ -214,3 +214,57 @@ def test_summary_totals(settings):
     assert s["jobs"] == 2
     assert s["files"] == 3
     assert s["bytes"] == sum(i.bytes for i in items)
+
+
+# --- review fixes: stubbed postings leave the prepare queue; config strictness ----------------
+
+
+@pytest.mark.parametrize("status", ["found", "scored"])
+def test_stubbed_queue_posting_is_marked_skipped(settings, status):
+    from careeros.tracker import Tracker
+
+    d = _job(settings, status, 91)
+    retention.execute(settings, retention.plan(settings, now=NOW), now=NOW)
+    st = json.loads((d / "status.json").read_text())
+    assert st["status"] == "skipped"
+    assert st["history"][-1]["note"] == "retention stub (posting older than 90 days)"
+    assert d.name not in [j["job_id"] for j in Store(settings).list_jobs(status)]
+    assert Tracker(settings=settings).get_job(d.name)["Status"] == "skipped"
+
+
+def test_stubbed_skipped_posting_status_unchanged(settings):
+    d = _job(settings, "skipped", 120)
+    hist_before = json.loads((d / "status.json").read_text())["history"]
+    retention.execute(settings, retention.plan(settings, now=NOW), now=NOW)
+    assert json.loads((d / "status.json").read_text())["history"] == hist_before
+
+
+def test_stub_status_change_queues_when_tracker_locked(settings, monkeypatch):
+    from careeros.tracker import Tracker
+
+    d = _job(settings, "found", 100)
+
+    def locked(self):
+        raise PermissionError("locked")
+
+    monkeypatch.setattr(Tracker, "_load", locked)
+    with pytest.warns(UserWarning):
+        retention.execute(settings, retention.plan(settings, now=NOW), now=NOW)
+    assert json.loads((d / "status.json").read_text())["status"] == "skipped"
+    assert Tracker(settings=settings).pending_count() == 1
+
+
+def test_config_null_keep_confirmation_defaults_true(settings):
+    settings.pipeline["retention"] = {"keep_confirmation_screenshot": None}
+    assert retention.retention_config(settings)["keep_confirmation_screenshot"] is True
+    d = _job(settings, "rejected", 40, shots=["01_form.png", "03_confirmation.png"])
+    retention.execute(settings, retention.plan(settings, now=NOW), now=NOW)
+    assert (d / "screenshots" / "03_confirmation.png").exists()
+    assert not (d / "screenshots" / "01_form.png").exists()
+
+
+@pytest.mark.parametrize("bad", ["no", "", [], 0, 1])
+def test_config_rejects_non_bool_keep_confirmation(settings, bad):
+    settings.pipeline["retention"] = {"keep_confirmation_screenshot": bad}
+    with pytest.raises(ConfigError, match="keep_confirmation_screenshot must be true/false"):
+        retention.retention_config(settings)

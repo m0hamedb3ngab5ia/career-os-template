@@ -96,5 +96,7 @@ career-os/
 `src/careeros/retention.py` plans, then (with `--yes`) applies two rules from `pipeline.yaml: retention`, both
 measured from the job's last status change: closed jobs drop apply step screenshots after
 `screenshots_after_closed_days` (confirmation shot kept), and never-prepared postings are rewritten as a stub
-(`pruned: true`, description cut to a preview) after `unprepared_posting_days`. It only ever touches
-`screenshots/` and `posting.json` inside `data/jobs/<id>/`; each change is logged in that job's `log.md`.
+(`pruned: true`, description cut to a preview) after `unprepared_posting_days`. A stubbed found/scored job is set to
+`skipped` (status.json and tracker, queued if the tracker is locked) so it leaves the prepare queue;
+`careeros safety check`, score-job and prepare-job refuse a pruned posting. Files it changes:
+`screenshots/`, `posting.json` and (for that status move) `status.json` inside `data/jobs/<id>/`; each change is logged in that job's `log.md`.

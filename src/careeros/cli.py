@@ -238,8 +238,9 @@ GHOST_SKIP_EXIT = 4
 
 
 def _set_status_both(s: Settings, job_id: str, status: str, note: str) -> None:
-    Store(s).set_status(job_id, status, note)
-    Tracker(settings=s).set_status(job_id, status, note)
+    from careeros.tracker import set_status_both
+
+    set_status_both(s, job_id, status, note)
 
 
 def cmd_safety_check(args: argparse.Namespace) -> int:
@@ -256,6 +257,10 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
     p = store.load_posting(args.job_id)
     if not p:
         print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    if (store._read(p.job_id, "posting.json") or {}).get("pruned"):
+        print(f"job {p.job_id}: posting.json was pruned by retention (description is only a preview); "
+              "refusing to run the safety check. Re-fetch the posting first.", file=sys.stderr)
         return 1
     reg_path = registry.default_path(s)
     flags = check_posting(p, s, registry=registry.load(reg_path), verified=registry.load(registry.verified_path(s)))

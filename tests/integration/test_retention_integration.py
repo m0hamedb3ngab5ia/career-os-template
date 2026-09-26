@@ -90,3 +90,30 @@ def test_prune_bad_config_exits_1(temp_root, home):
     r = _cli(temp_root, home, "prune")
     assert r.returncode == 1
     assert "retention" in r.stderr
+
+
+def test_prune_bad_keep_confirmation_exits_1(temp_root, home):
+    import yaml
+    cfg = temp_root / "config" / "pipeline.yaml"
+    data = yaml.safe_load(cfg.read_text())
+    data["retention"] = {"keep_confirmation_screenshot": "no"}
+    cfg.write_text(yaml.safe_dump(data))
+    r = _cli(temp_root, home, "prune")
+    assert r.returncode == 1
+    assert "keep_confirmation_screenshot must be true/false" in r.stderr
+
+
+def test_pruned_found_posting_leaves_queue_and_safety_check_refuses(temp_root, home):
+    stale = _job(temp_root, "found", 120)
+    jid = stale.name
+    r = _cli(temp_root, home, "prune", "--yes")
+    assert r.returncode == 0, r.stderr
+    assert json.loads((stale / "status.json").read_text())["status"] == "skipped"
+    listed = _cli(temp_root, home, "jobs", "list", "--status", "found")
+    assert listed.returncode == 0, listed.stderr
+    assert jid not in listed.stdout
+
+    chk = _cli(temp_root, home, "safety", "check", jid)
+    assert chk.returncode != 0
+    assert "pruned" in chk.stderr
+    assert not (stale / "safety.json").exists()
