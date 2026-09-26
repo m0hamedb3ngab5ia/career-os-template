@@ -165,7 +165,9 @@ reason) unless the skill already moved the job.
 
 **Stop reasons** (`run.json: stop_reason`): `completed`, `budget_reached`, `time_budget`, `daily_cap`, `paused`,
 `cancelled` (the run did its job; CLI exit 0) and `usage_limit`, `auth_required`, `permission_denied`, `timeout`,
-`consecutive_failures`, `doctor_failed` (needs you; exit 1). A run that finds another holding the runner lock
+`consecutive_failures`, `doctor_failed`, `error` (needs you; exit 1; `error` = the single inbox_sync call failed another
+way, or a run crashed). The run's time budget also caps the job in flight: a job cut at the budget stops the run
+as `time_budget`, not `timeout`, and does not count against the job. A run that finds another holding the runner lock
 never starts (exit 5). `usage_limit`, `auth_required`, `permission_denied` and `cancelled` end the run at once
 (the next job would hit the same wall); `timeout` does with `runs.stop_on_timeout` (true, Recommended); three job
 failures in a row (Recommended) end it as `consecutive_failures`. A usage-limit reset time in the error text is
@@ -180,7 +182,14 @@ unreadable) is taken over under a short `flock`. prepare-job and apply-job take 
 **Retry.** Only the job's own failures count (`skill_error`, `invalid_result`, `error`, `timeout`) in
 `data/runs/failures.json`. With `runs.retry.max_attempts: 2` (Recommended) a failed job is retried once in a later
 run (retry bonus in the ranking); then it becomes an Action Item (deduped) and runs leave it out. Its status never
-changes. A usage limit, login problem, denied tool or cancel says nothing about the job and does not count.
+changes. A usage limit, login problem, denied tool or cancel says nothing about the job and does not count. A
+failure that leaves the job where no run can pick it up again (e.g. a passing `prepare.json` with the status never
+recorded) becomes the Action Item at once.
+
+**Company gate in prepare runs.** Checked before each call: `company_cap` / `cooldown` only pass the job over (it
+competes again later); any other block (`closed`, `not_similar`, `already_applied`) records it `skipped` with a note
+`company <reason>: <detail>`. When a company being prepared still has unscored `found` jobs, the run warns (output,
+`run.log`, `run.json: warnings`) but does not block: fit-first slot ranking only sees scored jobs.
 
 **Daily cap.** `policy.py` computes today's cap as `targets.yaml: volume.max_applications_per_day` × this month's
 `season_multiplier`, counted from DateApplied. apply-job checks it with `careeros run cap --check` (exit 3 when
@@ -204,7 +213,9 @@ Recommended) hold back only the claude-using runs (inbox_sync, score, prepare). 
 `/inbox-sync` call (`service.run_skill`) whose `mcp_servers` (Gmail) must be logged in: a Gmail MCP reported
 needs-auth, or the skill's `gmail_mcp_unavailable`, stops it with `auth_required` (it stops with `error` on any other
 failure). Slots missed while the Mac slept or was off (more than
-`missed_after_minutes` late) never auto-run: they collapse into one pending record (`data/runs/catch_up.json`) that
+`missed_after_minutes` late; "asleep" = the gap since the previous tick ENDED, so a long run inside a tick never
+counts) never auto-run: they collapse into one pending record (`data/runs/catch_up.json`, written under
+`tick.lock`; `careeros run catch-up` holds the same lock and removes only the kinds it ran) that
 the candidate starts with `careeros run catch-up` or drops with `--dismiss`. `careeros run pause [--until +2h|ISO]`
 stops the current batch before its next job and makes ticks skip due slots (not stored up); `careeros run resume`
 lifts it. State: `data/runs/schedule.json` (last tick, last run per job).

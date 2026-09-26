@@ -71,6 +71,9 @@ session. The runs keep the two-phase order, so the gate ranks every candidate by
 - Phase 2 is `careeros run prepare`: scored jobs (and requeued deferrals), fit-first within each company, with
   `careeros company gate` checked again right before each call (a blocked job is passed over, and the run stops at
   today's apply cap). Step 1 then reuses the phase 1 `score.json`: do not re-score.
+- Fit-first slot ranking holds only when the last `careeros run score` stopped `completed` (every found job
+  scored). For companies with several open roles, run score to completion (or with a larger `--max-jobs`) before
+  prepare; `careeros run prepare` warns, without blocking, when a company it prepares still has unscored jobs.
 By hand, only if a run can't be used (e.g. it keeps stopping for a reason you are fixing interactively): Phase 1, follow
 `.claude/skills/score-job/SKILL.md` for every job in `careeros jobs list --status found`; Phase 2, for each job in
 `careeros jobs list --status found --status scored --order urgent` order (urgent first, then the earliest close

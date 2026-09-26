@@ -180,10 +180,11 @@ jobs end `queued` or `needs_review` and you still run `/apply-job` yourself.
 **One-time setup, interactively (an unattended run can't answer a login prompt):**
 
 1. Log in to Claude Code in a terminal: run `claude`, then `/login`. Scheduled runs use this same login.
-2. If a scheduled run will need an MCP server (for example Gmail for inbox work), authenticate it once in
-   `claude` with `/mcp` before any unattended run, and list it in `config/pipeline.yaml: runs.required_mcp_servers`
-   (e.g. `[gmail]`). A run then stops with `auth_required` instead of hanging when that login lapses. Score and
-   prepare need no MCP server, so the default is `[]` (Recommended).
+2. If you will turn on the scheduled inbox sync, authenticate the Gmail MCP once in `claude` with `/mcp` before any
+   unattended run. The job already lists it in `config/pipeline.yaml: schedule.jobs.inbox_sync.mcp_servers`
+   (`[gmail]`, Recommended); if that login lapses the run stops with `auth_required` instead of hanging. Score and
+   prepare need no MCP server, so the global `runs.required_mcp_servers` (MCP servers every run needs) stays `[]`
+   (Recommended).
 3. Review `config/pipeline.yaml: llm.allowed_tools`, the only tools a headless call may use (the shipped list
    (Recommended) is what score-job and prepare-job need). A tool a skill needs but that is missing ends the run with
    `permission_denied`, never a hang.
@@ -218,8 +219,9 @@ The tick runs what is due in `config/pipeline.yaml: schedule.jobs`: scout every 
 prepare nightly at 02:00, prune weekly (all Recommended). Each job takes `every_hours`, `every_days` or times of day
 (`at: ["01:00"]`). A nightly job waits for its time after you install the schedule; it does not run at once.
 `inbox_sync` (08:00 and 18:00) is in the file but `enabled: false` until the inbox-sync skill is finished; once you
-turn it on it needs the Gmail MCP logged in (step 2 above), or it stops with `auth_required`. Score and prepare never start inside quiet hours (09:00 to 18:00,
-Recommended); scout and prune ignore them. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
+turn it on it needs the Gmail MCP logged in (step 2 above), or it stops with `auth_required`. Score, prepare and
+inbox sync never start inside quiet hours (09:00 to 18:00, Recommended); scout and prune ignore them. A slot held
+back by quiet hours (or a busy runner) runs as soon as it may; it is not lost. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
 Code login, only while you are logged in to your Mac. Nothing runs while the Mac sleeps, is off or you are logged out.
 
 **Pause, resume, catch up:**

@@ -88,7 +88,7 @@ Writes `pipeline.yaml: runs`, `schedule` and `llm.allowed_tools`.
 | Auto-submit | shown **off and read-only**: "Runs never apply in this version". The `allow` / `manual` rule lists are visible (manual: Tier A, fit ≥ 85 (Recommended), with the fit threshold editable) so the policy can be reviewed before an apply path exists |
 | Safety | "Run `careeros doctor` before every run" on (Recommended); required MCP servers for every run (empty (Recommended); the inbox sync job carries its own `gmail`); job lock expiry 120 min (Recommended) |
 | Allowed tools | the `llm.allowed_tools` list as removable chips (the shipped list (Recommended)); a note that a tool missing here ends a run with "Tool not allowed", never a hang |
-| Quiet hours | on, 09:00 to 18:00 (Recommended); applies to score and prepare runs only (they use Claude); scout and prune ignore it. Time zone: local (Recommended) |
+| Quiet hours | on, 09:00 to 18:00 (Recommended); applies to score, prepare and inbox sync (they use Claude); scout and prune ignore it. Time zone: local (Recommended) |
 | Schedule jobs | one row per job with an enable switch and either an interval or times of day: scout every 3 h (Recommended: 2 to 3), inbox sync at 08:00 and 18:00 (off (Recommended) until the inbox-sync skill is finished; shows "needs Gmail login" when its MCP is not authenticated), score nightly at 01:00 (Recommended), prepare nightly at 02:00 (Recommended), prune weekly (Recommended); score and prepare rows take an optional preset override. Tick every 15 min (Recommended); missed after 60 min (Recommended) |
 | Scheduler | Install / Uninstall buttons (`careeros schedule install`, `careeros schedule uninstall`) and the agent state from `careeros schedule status` (installed, loaded, last tick) |
 
@@ -159,7 +159,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
      catch-up), budget used ("7 of 25 jobs, 41 of 90 min"), the current job and its live stream-json events. Cancel
      sends SIGTERM; the batch stops before its next job with stop reason `cancelled`.
    - **Queue ("why next")**: the ranked jobs for the next score and prepare run, from `data/runs/queue-<kind>.json`
-     (refreshed by `careeros run status`): rank, company, role, points, and the `why` text ("posted 20h ago (+60);
+     (rewritten by every `careeros run score|prepare`, including `--dry-run`; `careeros run status` computes the live top 5 without writing it): rank, company, role, points, and the `why` text ("posted 20h ago (+60);
      dream company (+25)"). Excluded jobs (pruned, filtered, out of retries) sit in a collapsed "Not in queue" group
      with their reason.
    - **Run sheet** (Run score… / Run prepare…): a budget picker with presets small · **medium (Recommended)** ·
@@ -181,7 +181,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    |---|---|---|
    | `completed` | Done | nothing left in the queue |
    | `budget_reached` | Job budget used | the preset's job count is done; the rest wait for the next run |
-   | `time_budget` | Time budget used | the preset's minutes are spent |
+   | `time_budget` | Time budget used | the preset's minutes are spent (the job in flight is cut at the budget too) |
    | `daily_cap` | Daily cap reached | prepared jobs fill today's apply cap |
    | `paused` | Paused | stopped by Pause all |
    | `cancelled` | Cancelled | stopped by you (Cancel or Ctrl-C) |
@@ -191,6 +191,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    | `timeout` | Job timed out | one skill call ran past its timeout; often a login or prompt wait |
    | `consecutive_failures` | Too many failures | 3 jobs failed in a row; open the attempts |
    | `doctor_failed` | Setup check failed | `careeros doctor` has FAIL lines |
+   | `error` | Failed (orange) | a single-call run (inbox sync) failed for another reason, or a run crashed; open the attempt and `run.log` |
 
    A run whose process died without writing a stop reason shows **Interrupted** (grey).
 9. **Settings**: grouped lists: General, Targets, Autonomy, Safety, Scout, Companies, Outreach, Notifications,
@@ -198,7 +199,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
 10. **Phone: Today**: stat strip, phone/anytime Action Items, swipe to mark done, interview push banner.
 11. **Phone: Approve draft**: cover letter or outreach draft with Approve / Edit / Reject.
 
-Plus a **components sheet**: the 13 status chips, safety badges, tier chips, the 12 stop-reason chips, action-type glyphs, light/dark tokens.
+Plus a **components sheet**: the 13 status chips, safety badges, tier chips, the 13 stop-reason chips, action-type glyphs, light/dark tokens.
 
 ## Running pipeline steps from the UI
 
