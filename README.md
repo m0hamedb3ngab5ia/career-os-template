@@ -31,7 +31,11 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 - **Tailor** (`/tailor-resume`, `/write-cover-letter`): builds a résumé and letter only from bullets in
   `profile/master.yaml`, cited by id, with numbers frozen.
 - **QA** (`python -m careeros.qa`, `/qa-review`): fabrication audit, banned phrases, confidential terms,
-  the example-identity guard and a critic score; one regeneration, then an Action Item.
+  the example-identity guard and a critic score; one regeneration, then an Action Item. It also catches another
+  company's name left in a letter, answer or outreach draft, titles/years/numbers that disagree across documents,
+  outreach that breaks the send policy (LinkedIn draft-only, notes over 300 chars, auto-send only to a verified
+  email, thank-yous always manual) and a `resume.pdf` whose links, text or metadata differ from the reviewed résumé
+  (see ARCHITECTURE.md, "QA gate checks").
 - **Apply** (`/apply-job`): fills the form in Chrome with your standard answers only. Tier B/C on
   Greenhouse/Lever/Ashby submit after QA; Tier A and every other ATS stop before submit for you.
 - **Track** (`data/JobTracker.xlsx`, `/inbox-sync`): statuses, Action Items for anything uncertain, and
@@ -59,7 +63,8 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 - `config/companies.yaml`: the starter `boards` list, prestige tiers and scoring
 - `config/targets.yaml`: seniority filter, thresholds, tiers, tier rules, volume caps, safety lists
 - `config/qa.yaml`: every QA rule and the banned-phrases list
-- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`
+- `config/pipeline.yaml`: paths, schedule, `llm.runner: claude_code`, `outreach` (people you are connected to
+  on LinkedIn, or share mutuals with, are never messaged automatically; record with `careeros outreach mark`)
 - `templates/`, `.claude/skills/`, `src/careeros/`: the code, the same for everyone
 
 ## Reference
@@ -123,6 +128,17 @@ Types: `captcha`, `bot_detection`, `review`, `question`, `salary`, `qa_fail`, `s
 `send_email`, `profile_gap`, `laptop_required`, `scam_suspected`, `other`. Screenshots referenced by an
 item live in `data/jobs/<id>/screenshots/`.
 
+### As-submitted snapshots
+
+Regenerating a résumé or cover letter overwrites the files in `data/jobs/<id>/`, so the versions that were
+actually sent are frozen into `data/jobs/<id>/submitted/<UTC stamp>/`: résumé, cover letter, answers,
+posting, apply session, and a `manifest.json` with SHA-256 hashes, the résumé version and every value typed
+into the form. Files are read-only and a snapshot is never overwritten. The applier freezes right after it
+clicks submit; `careeros job status <id> applied` (or `tracker upsert --field Status=applied`) freezes
+automatically when a job has none yet, so hand-submitted and Tier A jobs get one too.
+`careeros job freeze <id> [--answers-json -]` makes one by hand; `job show` and `jobs list --json`
+(`submitted_at`) show the latest.
+
 ### Safety rules
 
 - Never fabricate. Every bullet, claim and number traces to `profile/master.yaml` by id.
@@ -168,7 +184,7 @@ templates/     resume/ (LaTeX + render.py), cover_letter/ (skeleton + render.py)
 src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, questions, session), doctor.py,
                tracker.py, qa.py, store.py, retention.py, cli.py, bootstrap.py
 .claude/skills Claude Code skills (table above)
-data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md ...), JobTracker.xlsx   [gitignored]
+data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx   [gitignored]
 docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```

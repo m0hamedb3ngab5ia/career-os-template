@@ -208,6 +208,7 @@ def test_active_categories_and_keyword_helpers():
 
 @pytest.mark.parametrize("fname,body,where", [
     ("pipeline.yaml", "paths: [jobs_dir]\n", "pipeline.yaml: paths"),
+    ("pipeline.yaml", "outreach: true\n", "pipeline.yaml: outreach"),
     ("companies.yaml", "- Acme\n- Initech\n", "companies.yaml"),
     ("targets.yaml", "location: [US]\n", "targets.yaml: location"),
 ])

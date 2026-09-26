@@ -131,6 +131,13 @@ hit = answer_for(label, "profile/standard_answers.yaml", required=<field is mark
       `.claude/skills/answer-question/SKILL.md`. If it returns `needs_review` → STOP, screenshot,
       Action Item type `question`, status needs_review.
   - Respect `maxlength`; an over-limit answer is a STOP (type `question`).
+- After filling any field, record what went in: `s.record_field(label, value, source)` with `source` one of
+  `profile`, `standard`, `eeo`, `essay`, `salary`, `upload` (for uploads the value is the file name). These
+  values are kept in the as-submitted snapshot (section 5). Secrets are never recorded: do not pass a
+  password (e.g. the Workday account password), a verification or one-time code, a security question
+  answer, a token or an API key to `record_field` or `--answers-json`, and never write them in `s.step`
+  notes, `log.md` or the RESULT line. As a backstop, `record_field` and `freeze` store `<redacted>` for any
+  label matching `careeros.apply.session.is_secret_label`.
 - After each page/step in multi-page flows: screenshot, `s.step`.
 
 ## 4. EEO
@@ -164,12 +171,16 @@ value the helper did not return.
 3. If `not s.can_click_submit()` (tier A, assisted ATS, or already clicked): status `needs_review`,
    Action Item type `review`, priority H for tier A, `what`: "Review & submit <company> <role>. Form is
    filled in the open tab. Screenshot: <prefill_review path>", `link`: apply_url. Leave the tab open.
-   `s.finish("needs_review", reason="assisted: review & submit")`. Go to 7.
+   `s.finish("needs_review", reason="assisted: review & submit")`. Go to 7. When the user submits and
+   runs `careeros job status <job_id> applied`, the snapshot is frozen then (reason `assisted_stop`, with
+   the values recorded here), so do not freeze on this path.
 4. Auto-submit: `s.mark_submit_clicked(job_dir)` (writes `submit_clicked: true` to `apply_session.json`
    before anything else; it raises if any earlier session already clicked), then one click on the submit control from adapters.md.
 5. Wait and poll for a success signal (adapters.md "Success detection", up to 20 s).
    - Success: screenshot → `s.shot(..., "confirmation")`; `s.finish("submitted", confirmation_text=...)`;
-     status `applied` (`careeros job status <job_id> applied`), then
+     freeze what went out: `from careeros.apply.snapshot import freeze; freeze(job_dir, session=s)`
+     (copies résumé, cover letter, answers, posting and the recorded field values into
+     `<job_dir>/submitted/<stamp>/`, read-only; never overwrites an earlier one); then status `applied` (`careeros job status <job_id> applied`), then
      `.venv/bin/careeros tracker upsert <job_id> --field DateApplied=today --field ATS=<ats> --field ResumeVersion=<meta.resume_version> --field Status=applied`.
    - Validation error shown: read it. Do NOT click submit again. `s.finish("needs_review", reason="validation: <text>")`,
      Action Item type `review` with the error text. Status needs_review.

@@ -47,6 +47,10 @@ notify:
   on_qa_fail: action_item_only
   daily_digest: true
 
+outreach:                                  # reusable default: fine to keep
+  manual_if_connected: true                # already connected on LinkedIn (1st degree): never automate; you tailor it
+  manual_if_mutuals: true                  # any mutual connections: same. Record with `careeros outreach mark`
+
 resume_build:
   engine: tectonic                         # tectonic | pdflatex
   fallback: markdown_to_pdf
