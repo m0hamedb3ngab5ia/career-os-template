@@ -183,10 +183,22 @@ def test_contacts_json_parse_errors_are_skipped(idx, data):
     assert idx.query("SELECT COUNT(*) AS n FROM contacts")[0]["n"] == 0
 
 
-def test_damaged_sqlite_index_is_replaced(data):
+def test_damaged_index_is_left_alone(data):
+    from careeros.config import ConfigError
+
     path = Index(data["settings"]).path
     Index.remove_files(path)
     path.write_bytes(b"SQLite format 3\x00" + b"damaged page" * 50)
+    before = path.read_bytes()
+    with pytest.raises(ConfigError, match="not a careeros index"):
+        Index(data["settings"])
+    assert path.read_bytes() == before
+
+
+def test_empty_file_at_the_index_path_is_adopted(data):
+    path = Index(data["settings"]).path
+    Index.remove_files(path)
+    path.write_bytes(b"")
     ix = Index(data["settings"])
     ix.sync()
     assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
@@ -304,3 +316,51 @@ def test_legacy_qa_results_list_still_indexed(idx, data):
     idx.update_jobs([jid])
     row = _jobs(idx)[jid]
     assert row["qa_passed"] == 1 and row["qa_score"] == pytest.approx(7.0)
+
+
+def _foreign_sqlite(path):
+    path.parent.mkdir(parents=True, exist_ok=True)
+    con = sqlite3.connect(path)
+    con.execute("CREATE TABLE jobs (id INTEGER, title TEXT)")
+    con.execute("INSERT INTO jobs VALUES (1, 'kept')")
+    con.commit()
+    con.close()
+    return path.read_bytes()
+
+
+def test_another_apps_sqlite_file_is_never_adopted(data):
+    from careeros.config import ConfigError
+
+    path = Index(data["settings"]).path
+    Index.remove_files(path)
+    before = _foreign_sqlite(path)
+    with pytest.raises(ConfigError, match="not a careeros index"):
+        Index(data["settings"])
+    with pytest.raises(ConfigError, match="not a careeros index"):
+        Index.remove_files(path)
+    assert path.read_bytes() == before
+
+
+def test_our_old_schema_is_still_adopted_and_rebuilt(data):
+    ix = Index(data["settings"])
+    ix.rebuild()
+    ix.set_meta("schema_version", "0")
+    ix.close()
+    ix = Index(data["settings"])
+    ix.sync()
+    assert ix.get_meta("schema_version") == str(index_mod.SCHEMA_VERSION)
+    assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
+    ix.close()
+
+
+def test_index_path_compared_case_insensitively(data):
+    from careeros.config import ConfigError
+    from careeros.ui.index import default_path
+
+    s = data["settings"]
+    tracker = s.paths["tracker_xlsx"]
+    tracker.unlink()                                             # not created yet: still refused
+    s.pipeline.setdefault("ui", {})["index_path"] = str(tracker.with_name(tracker.name.upper()))
+    with pytest.raises(ConfigError):
+        default_path(s)
+    assert not tracker.exists()

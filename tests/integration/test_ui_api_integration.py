@@ -200,8 +200,10 @@ def test_cli_refuses_a_non_loopback_host(data, tmp_path):
 
 
 def test_cli_reindex_flag_rebuilds(data, tmp_path):
-    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
-    db.write_bytes(b"SQLite format 3\x00" + b"damaged" * 100)
+    ix = Index(data["settings"])
+    ix.rebuild()
+    ix.query("UPDATE jobs SET company = 'Stale Co'")      # drifted rows a plain sync would skip (same files)
+    ix.close()
     home = tmp_path / "h3"
     home.mkdir()
     port = _free_port()
@@ -211,10 +213,10 @@ def test_cli_reindex_flag_rebuilds(data, tmp_path):
     try:
         _wait_health(f"http://127.0.0.1:{port}", proc)
         assert httpx.get(f"http://127.0.0.1:{port}/api/status").json()["counts"]["jobs"] == 8
+        assert httpx.get(f"http://127.0.0.1:{port}/api/jobs", params={"q": "stale"}).json()["total"] == 0
     finally:
         proc.terminate()
         proc.wait(timeout=10)
-
 
 
 # --- watcher threads + settings reload -------------------------------------------------------------------------
@@ -336,5 +338,22 @@ def test_cli_refuses_to_replace_a_foreign_file_at_the_index_path(data, tmp_path)
     home.mkdir()
     r = subprocess.run([sys.executable, "-m", "careeros.cli", "ui", "--no-open", "--reindex"],
                        env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
-    assert r.returncode == 1 and "not an SQLite index" in r.stderr
+    assert r.returncode == 1 and "not a careeros index" in r.stderr
     assert db.read_bytes() == b"not a database"
+
+
+def test_cli_reindex_refuses_another_apps_sqlite_file(data, tmp_path):
+    import sqlite3
+
+    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE jobs (id INTEGER)")
+    con.commit()
+    con.close()
+    before = db.read_bytes()
+    home = tmp_path / "h5"
+    home.mkdir()
+    r = subprocess.run([sys.executable, "-m", "careeros.cli", "ui", "--no-open", "--reindex"],
+                       env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
+    assert r.returncode == 1 and "not a careeros index" in r.stderr
+    assert db.read_bytes() == before

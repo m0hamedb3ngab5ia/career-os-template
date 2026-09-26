@@ -100,26 +100,45 @@ def default_path(settings: Any) -> Path:
         return Path(settings.paths["jobs_dir"]).parent / "careeros.db"
     p = Path(cfg.index_path).expanduser()
     p = p if p.is_absolute() else (Path(settings.root) / p).resolve()
-    real = Path(os.path.realpath(p))
     root = Path(settings.root)
-    kept = {Path(os.path.realpath(v)) for v in settings.paths.values()}
-    guarded = [Path(os.path.realpath(root / d)) for d in ("config", "profile")]
-    if real in kept or real.is_dir() or any(real.is_relative_to(g) for g in guarded):
+    fold = lambda x: Path(os.path.realpath(x).casefold())  # noqa: E731 - macOS volumes are case-insensitive
+    real = fold(p)
+    kept = {fold(v) for v in settings.paths.values()}
+    guarded = [fold(root / d) for d in ("config", "profile")]
+    if real in kept or Path(os.path.realpath(p)).is_dir() or any(real.is_relative_to(g) for g in guarded):
         raise ConfigError(f"config/pipeline.yaml: ui.index_path {cfg.index_path!r} points at your own files "
                           "(a path under paths:, a folder, config/ or profile/); use a new file such as "
                           "data/careeros.db, or null")
     return p
 
 
+def _is_our_index(path: Path) -> bool:
+    """True when `path` is an SQLite file with this index's meta.schema_version row (any version)."""
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return False
+    try:
+        return con.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone() is not None
+    except sqlite3.Error:
+        return False
+    finally:
+        con.close()
+
+
 def _check_replaceable(path: Path) -> None:
-    """Raise ConfigError unless `path` is absent, empty or an SQLite file: the only things the index may delete."""
+    """Raise ConfigError unless `path` is absent, empty or a careeros index: the only things the index may rebuild
+    or delete. Another program's database, or one too damaged to show it is ours, is left alone."""
     if path.is_dir():
         raise ConfigError(f"UI index path {path} is a folder; set ui.index_path to a file (or null)")
-    if path.exists() and path.stat().st_size:
-        with path.open("rb") as f:
-            if f.read(len(SQLITE_HEADER)) != SQLITE_HEADER:
-                raise ConfigError(f"UI index path {path} holds a file that is not an SQLite index; refusing to "
-                                  "replace it. Move it away or set ui.index_path (null = data/careeros.db)")
+    if not path.exists() or not path.stat().st_size:
+        return
+    with path.open("rb") as f:
+        sqlite = f.read(len(SQLITE_HEADER)) == SQLITE_HEADER
+    if not sqlite or not _is_our_index(path):
+        raise ConfigError(f"UI index path {path} is not a careeros index (another file or database, or a damaged "
+                          "index); refusing to replace it. Move or delete it, or set ui.index_path "
+                          "(null = data/careeros.db)")
 
 
 class Index:
