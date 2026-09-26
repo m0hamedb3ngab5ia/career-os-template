@@ -203,11 +203,13 @@ examples/      the fictional candidate: config/ + profile/ (copied by `careeros 
 config/        targets.yaml, categories.yaml, companies.yaml, qa.yaml, pipeline.yaml   [gitignored]
 profile/       master.yaml (only source of truth), standard_answers.yaml, confidential_terms.yaml, voice/   [gitignored]
 templates/     resume/ (LaTeX + render.py), cover_letter/ (skeleton + render.py), outreach/, followup_email/
-src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, questions, session), doctor.py,
-               tracker.py, qa.py, store.py, retention.py, cli.py, bootstrap.py
+src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, questions, session, snapshot),
+               safety/ (scam + ghost checks), qa.py + qa_ext/ (QA gate checks), company_policy.py (per-company
+               cap + cooldown), outreach.py (connected/mutuals gate), retention.py (prune), tracker.py, store.py,
+               doctor.py, cli.py, bootstrap.py
 .claude/skills Claude Code skills (table above)
 data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx   [gitignored]
-docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md
+docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md, UI.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```
 
