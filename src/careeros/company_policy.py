@@ -9,7 +9,7 @@ Rules (config: targets.yaml `volume`, companies.yaml `company_caps`):
   has not closed.
 - Candidates. Jobs scored `prepare` and not yet reserved, plus jobs the gate deferred (`company_cap` /
   `cooldown`, from score.json or the `skipped` status note). A job skipped for anything else (dead
-  posting, safety, by hand) never holds a slot.
+  posting, safety, by hand) or whose posting `careeros prune` trimmed to a stub never holds a slot.
 - Similar roles only. Only roles in `targets.yaml categories.primary` or `secondary` compete for a slot;
   an excluded, unknown or other category never does (no spraying unrelated roles at one company).
 - Ranking. Reservations keep their slots; the remaining slots go to candidates by fit (desc), then the
@@ -224,6 +224,7 @@ class JobRecord:
     date_applied: date | None = None
     rejected_at: date | None = None
     closes_at: date | None = None
+    pruned: bool = False                 # posting.json stubbed by `careeros prune` (retention)
 
 
 def _local_date(at: Any) -> date | None:
@@ -283,7 +284,8 @@ def load_records(settings: Settings, store: Any = None, tracker: Any = None) -> 
                              category=sc.get("category"), decision=sc.get("decision"),
                              skip_reason=(_deferral_note(hist) if status == "skipped" else None)
                              or sc.get("skip_reason"), date_applied=applied, rejected_at=rejected,
-                             closes_at=posting_closes_at(p)))
+                             closes_at=posting_closes_at(p),
+                             pruned=bool((store._read(jid, "posting.json") or {}).get("pruned"))))
     for jid, row in rows.items():
         status = str(row.get("Status") or "found")
         out.append(JobRecord(job_id=jid, company=str(row.get("Company") or ""), title=str(row.get("Role") or ""),
@@ -310,7 +312,10 @@ def _iso(d: date | None) -> str | None:
 def _competes(r: JobRecord) -> bool:
     """A candidate for a slot: scored `prepare` and not yet queued, or deferred by the gate (skipped as
     company_cap / cooldown, or requeued to `scored`). A job skipped for any other reason (dead posting,
-    safety, manual) never holds a slot, whatever its score.json says."""
+    safety, manual) never holds a slot, whatever its score.json says; nor does a job whose posting retention
+    trimmed to a stub (prepare-job refuses a pruned posting)."""
+    if r.pruned:
+        return False
     deferred = r.skip_reason in DEFERRED_REASONS
     if r.status in ("found", "scored"):
         return r.decision == "prepare" or deferred

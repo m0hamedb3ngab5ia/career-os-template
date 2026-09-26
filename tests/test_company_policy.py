@@ -281,6 +281,17 @@ def test_scored_skip_for_other_reasons_does_not_compete(policy):
     assert gate("y", records=records, policy=policy, today=TODAY)["allowed"] is True
 
 
+@pytest.mark.parametrize("status", ["skipped", "scored"])
+def test_retention_pruned_deferred_job_does_not_compete(policy, status):
+    # `careeros prune` stubs an old unprepared posting (description cut to a preview) and prepare-job refuses
+    # it, so a deferred job whose posting was pruned must not win a slot or be requeued.
+    records = [rec("a1", "applied", date_applied=d(-10)),
+               rec("old", status, fit=95, decision="skip", skip_reason="company_cap", pruned=True),
+               rec("y", "scored", fit=85)]
+    assert gate("y", records=records, policy=policy, today=TODAY)["allowed"] is True
+    assert "old" not in {r["job_id"] for r in rank_candidates("Acme", records=records, policy=policy, today=TODAY)}
+
+
 def test_reserved_job_past_its_close_date_frees_its_slot(policy):
     records = [rec("q1", "queued", closes_at=d(-1)), rec("q2", "queued"), rec("y", "scored", fit=70)]
     got = slots("Acme", records=records, policy=policy, today=TODAY)

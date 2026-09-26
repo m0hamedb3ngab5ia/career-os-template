@@ -65,7 +65,7 @@ scout ──► data/jobs/<job_id>/posting.json
 Pure functions over job records (status.json, score.json, tracker DateApplied, posting close date):
 `slots` (submitted in the cap window + reservations whose posting has not closed), `rank_candidates`
 (candidates = scored `prepare` or gate-deferred `company_cap` / `cooldown`, read from score.json or the
-`skipped` status note; other skips never compete; similar roles by fit; during a
+`skipped` status note; other skips, and postings `careeros prune` stubbed, never compete; similar roles by fit; during a
 rejection cooldown, roles that close before it ends first), `gate` (allowed, reason, urgent, closes_at),
 `transparency_note`. Close dates: Greenhouse `application_deadline` or a custom metadata field, else the
 description text ("apply by", "applications close", "deadline", "closing date", "no later than" + a

@@ -262,3 +262,33 @@ def test_batch_scores_all_then_gates_so_higher_fit_wins(temp_root: Path, home: P
         if r.returncode == 0:
             store.set_status(jid, "queued", "prepared")  # prepare-job reserves the slot
     assert outcome == {hi: "ok", lo: "company_cap", requeued: "company_cap"}
+
+
+def test_retention_stubbed_deferred_job_is_not_requeued(temp_root: Path, home: Path):
+    """`careeros prune --yes` stubs a gate-deferred posting untouched for > 90 days; it then neither holds a
+    slot nor comes back through `company requeue` (prepare-job would refuse the pruned posting)."""
+    s = Settings.load(temp_root)
+    store = Store(s)
+    _applied(temp_root, store, _job(store, "1", "Backend Engineer"), days_ago=10)
+    old = _job(store, "2", "Platform Engineer", fit=95, status="skipped", text="Build things. " * 100,
+               decision="skip", skip_reason="company_cap")
+    st = store._read(old, "status.json")
+    for h in st["history"]:
+        h["at"] = _days(-120) + "T12:00:00+00:00"
+    st["updated_at"] = st["history"][-1]["at"]
+    store._write(old, "status.json", st)
+    fresh = _job(store, "3", "Data Engineer", fit=85, status="scored")
+
+    r = _cli(temp_root, home, "prune", "--yes", "--json")
+    assert r.returncode == 0, r.stderr
+    assert [i["job_id"] for i in json.loads(r.stdout)["items"]] == [old]
+    assert store._read(old, "posting.json")["pruned"] is True
+    assert {r.job_id: r for r in load_records(s)}[old].pruned is True
+
+    r = _cli(temp_root, home, "company", "requeue", "--json")
+    assert r.returncode == 0, r.stderr
+    out = json.loads(r.stdout)
+    assert out["requeued"] == [] and out["still_deferred"] == []
+    assert store.get_status(old) == "skipped"
+    r = _cli(temp_root, home, "company", "gate", fresh, "--json")
+    assert r.returncode == 0, r.stdout + r.stderr

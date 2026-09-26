@@ -317,7 +317,7 @@ def cmd_company_active(args: argparse.Namespace) -> int:
 
 def cmd_company_requeue(args: argparse.Namespace) -> int:
     """Jobs skipped as `company_cap` / `cooldown` whose gate is open now -> status `scored` (re-run
-    /prepare-job on them). Other skips are never touched."""
+    /prepare-job on them). Other skips, and deferred jobs whose posting retention pruned, are never touched."""
     from careeros.company_policy import DEFERRED_REASONS, gate
 
     s = _settings(args)
@@ -325,8 +325,8 @@ def cmd_company_requeue(args: argparse.Namespace) -> int:
     want = policy.company_key(args.company) if args.company else None
     requeued, waiting = [], []
     for r in records:
-        if r.status != "skipped" or r.skip_reason not in DEFERRED_REASONS:
-            continue
+        if r.status != "skipped" or r.skip_reason not in DEFERRED_REASONS or r.pruned:
+            continue  # a pruned posting is only a preview: prepare-job would refuse it
         if want is not None and policy.company_key(r.company) != want:
             continue
         g = gate(r.job_id, records=records, policy=policy)
