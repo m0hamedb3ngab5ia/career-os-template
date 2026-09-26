@@ -128,6 +128,20 @@ def test_install_hook_new_idempotent_foreign_and_force(tmp_path: Path):
     assert sync.HOOK_MARKER in hook.read_text()
 
 
+def test_install_hook_force_never_overwrites_an_existing_backup(tmp_path: Path):
+    hook = tmp_path / "hooks" / "pre-push"
+    hook.parent.mkdir()
+    hook.write_text("#!/bin/sh\necho original\n")
+    assert sync.install_hook(hook, "/usr/bin/python3", force=True) == "replaced"
+    hook.write_text("#!/bin/sh\necho second\n")
+    assert sync.install_hook(hook, "/usr/bin/python3", force=True) == "replaced"
+    hook.write_text("#!/bin/sh\necho third\n")
+    assert sync.install_hook(hook, "/usr/bin/python3", force=True) == "replaced"
+    assert (tmp_path / "hooks" / "pre-push.bak").read_text() == "#!/bin/sh\necho original\n"
+    assert (tmp_path / "hooks" / "pre-push.bak.1").read_text() == "#!/bin/sh\necho second\n"
+    assert (tmp_path / "hooks" / "pre-push.bak.2").read_text() == "#!/bin/sh\necho third\n"
+
+
 def test_pr_command_quotes_body_and_names_branch():
     cmd = sync.pr_command(branch="sync/2026-03-04", base="main", remote="template", template_branch="main",
                           commits=["abc123 feat: thing"], results=[("pytest", "passed"), ("ui", "skipped")])

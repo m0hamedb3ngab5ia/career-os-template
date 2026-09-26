@@ -159,7 +159,11 @@ def install_hook(hook: Path, python: str, force: bool = False) -> str:
             raise HookExists(f"{hook} exists and was not written by careeros; rerun with --force "
                              f"(the current hook is kept as {hook.name}.bak)")
         else:
-            hook.with_name(hook.name + ".bak").write_text(old)
+            bak, n = hook.with_name(hook.name + ".bak"), 0
+            while bak.exists():  # never overwrite an earlier backup: the first one is the user's original hook
+                n += 1
+                bak = hook.with_name(f"{hook.name}.bak.{n}")
+            bak.write_text(old)
             result = "replaced"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(new)
@@ -401,13 +405,33 @@ def remote_is_template_only(g: Git, remote: str, pattern: str) -> bool:
     return bool(urls) and all(url_matches(u, pattern) for u in urls)
 
 
+def tracking_refs_owned(g: Git, remote: str) -> bool:
+    """True when nothing but `remote` itself can write under refs/remotes/<remote>/ (the `--remotes=<remote>`
+    glob): no other remote is named `<remote>/...` and no other remote's fetch refspec lands there."""
+    target = f"refs/remotes/{remote}/"
+    if any(r != remote and r.startswith(target[len("refs/remotes/"):]) for r in g.lines("remote")):
+        return False
+    cfg = g.run("config", "--get-regexp", r"^remote\..*\.fetch$", check=False).stdout
+    for line in cfg.splitlines():
+        key, _, spec = line.partition(" ")
+        name = key[len("remote."):-len(".fetch")]
+        spec = spec.strip()
+        if name == remote or not spec or spec.startswith("^"):
+            continue
+        dst = spec.lstrip("+").partition(":")[2]
+        prefix = dst.split("*", 1)[0]
+        if prefix.startswith(target) or ("*" in dst and target.startswith(prefix)):
+            return False
+    return True
+
+
 def pushed_paths(g: Git, remote: str, lsha: str, rsha: str, pattern: str = DEFAULT_URL_PATTERN) -> set[str]:
     """Every path touched by the commits this update sends (not under rsha, and not on `remote`'s tracking refs
     when that remote only ever points at the template), plus the tip tree. A raw URL, or a remote that also
-    fetches/pushes elsewhere (its tracking refs may hold history the template never got), is scanned in full
-    (fail closed)."""
+    fetches/pushes elsewhere, or whose tracking-ref namespace another remote can write into (its tracking refs may
+    hold history the template never got), is scanned in full (fail closed)."""
     exclude = ["--not"]
-    if remote_is_template_only(g, remote, pattern):
+    if remote_is_template_only(g, remote, pattern) and tracking_refs_owned(g, remote):
         exclude.append(f"--remotes={remote}")
     if rsha != ZERO_SHA and g.ref_exists(rsha):
         exclude.append(rsha)

@@ -351,6 +351,31 @@ def test_hook_scans_full_history_when_remote_also_pushes_elsewhere(repos, env):
     assert git(repos["bare"], env, "branch", "--list", "fix/h").stdout.strip() == ""
 
 
+@pytest.mark.parametrize("nested", ["name", "refspec"])
+def test_hook_scans_full_history_when_another_remote_writes_under_template_refs(repos, env, tmp_path, nested):
+    # --remotes=template globs refs/remotes/template/*: a remote named template/bak, or one whose fetch refspec
+    # writes there, must not hide personal history from the scan
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    side = tmp_path / "side.git"
+    git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(side))
+    if nested == "name":
+        git(priv, env, "remote", "add", "template/bak", str(side))
+    else:
+        git(priv, env, "remote", "add", "side", str(side))
+        git(priv, env, "config", "--replace-all", "remote.side.fetch", "+refs/heads/*:refs/remotes/template/bak/*")
+    git(priv, env, "switch", "-q", "-c", "leak", "template/main")
+    commit(priv, env, {"personal/b.md": "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", "personal/b.md")
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    git(priv, env, "push", "-q", str(side), "leak")
+    git(priv, env, "fetch", "-q", "template/bak" if nested == "name" else "side")
+    assert git(priv, env, "rev-parse", "refs/remotes/template/bak/leak").returncode == 0
+    r = git(priv, env, "push", "template", "leak", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/b.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
+
+
 def test_hook_empty_pattern_config_falls_back_to_default(repos, env):
     priv = repos["private"]
     assert cli(priv, env, "install-hook").returncode == 0
