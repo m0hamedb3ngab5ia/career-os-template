@@ -10,7 +10,7 @@ from pathlib import Path
 from careeros.bootstrap import EDIT_HINTS, InitError, copy_examples, link_private
 from careeros.config import ConfigError, Settings, SetupError, find_repo_root, get_settings
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, TrackerRow
-from careeros.outreach import OutreachPolicy, check_contacts, mark_contact
+from careeros.outreach import OutreachPolicy, check_contacts, manual_action_text, mark_contact
 from careeros.scout import run_scout
 from careeros.store import Store
 from careeros.tracker import Tracker, parse_field_args
@@ -424,7 +424,8 @@ def cmd_outreach_check(args: argparse.Namespace) -> int:
     if f is None:
         return 1
     rows = check_contacts(json.loads(f.read_text(encoding="utf-8")), OutreachPolicy.from_settings(s))
-    print(json.dumps({"job_id": args.job_id, "manual": sum(r["manual"] for r in rows), "contacts": rows}, indent=2))
+    print(json.dumps({"job_id": args.job_id, "manual": sum(r["manual"] for r in rows),
+                      "action_text": manual_action_text(rows), "contacts": rows}, indent=2))
     return 0
 
 
@@ -589,7 +590,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
     outs = out.add_subparsers(dest="outreach_cmd", required=True)
-    och = outs.add_parser("check", help="JSON per contact: manual (never automated) + reason code")
+    och = outs.add_parser("check", help="JSON per contact: manual (never automated) + reason code; action_text for the one Action Item")
     och.add_argument("job_id")
     och.set_defaults(fn=cmd_outreach_check)
     omk = outs.add_parser("mark", help="record what LinkedIn shows for a contact (degree 1 = connected, mutual count)")

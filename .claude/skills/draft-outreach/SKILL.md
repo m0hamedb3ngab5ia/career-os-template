@@ -20,7 +20,7 @@ first). This skill writes drafts only. It never sends, never creates Gmail draft
   `followup_7d.md`, `followup_14d.md`. Treat each as structure + length guidance, not text to copy. If a
   template is missing, use the structure below and set `templates_used` accordingly.
 - Relationship gate: run `careeros outreach check <job_id>` (JSON per contact: `manual`, `reason`
-  `LINKEDIN_CONNECTED|LINKEDIN_MUTUALS`, `detail`; switches in `config/pipeline.yaml: outreach`). A `manual` contact is
+  `LINKEDIN_CONNECTED|LINKEDIN_MUTUALS`, `detail`, plus top-level `action_text`; switches in `config/pipeline.yaml: outreach`). A `manual` contact is
   someone the candidate already knows on LinkedIn: never automate it (step 3a).
 - `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
   wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.
@@ -64,9 +64,11 @@ For each contact `outreach check` marks `manual: true`:
 - Still write the drafts above as a starting point, but set `manual_tailor: true`, `manual_reason` (the reason code),
   `send_after: null` forever and `followup_7d`/`followup_14d` null. No sender, scheduler or follow-up ever sends it.
 - Do not open with a cold-intro line ("I came across your profile"); the candidate adds the shared context.
-- Open one Action Item per contact:
-  `careeros action add "tailor manually: <name> (<detail>)" --type send_linkedin --job <job_id> --link "<contact.linkedin or search url>" --priority M --needs phone --dedupe`
-  (`--dedupe` keeps one open item per job; if one is open, name every manual contact in that item's text instead).
+- After drafting all contacts, open ONE Action Item for the job that names every manual contact. `outreach check`
+  prints it ready-made as `action_text` (`tailor manually: <name1> (<detail1>); <name2> (<detail2>)`; null when no
+  contact is manual). Pass it verbatim:
+  `careeros action add "<action_text>" --type send_linkedin --job <job_id> --link "<first manual contact.linkedin or search url>" --priority M --needs phone --dedupe`
+  (`--dedupe` keys on job + type, so a second call for the same job is a no-op; never call it once per contact).
 
 ## 4. Write `JOB/outreach.json`
 
@@ -78,7 +80,7 @@ For each contact `outreach check` marks `manual: true`:
      "kind": "cold_email", "channel": "email",
      "linkedin_note": "...", "linkedin_note_chars": 287,
      "linkedin_message": "...", "email": {"subject": "...", "body": "..."},
-     "followup_7d": "...", "followup_14d": "...",
+     "followup_7d": "...", "followup_14d": null,
      "bullet_ids": ["acme.1"], "narrative_ids": ["n.data"], "facts_used": [{"fact": "...", "source": "posting"}],
      "manual_tailor": false, "manual_reason": null, "send_after": null, "linkedin_send_after": null,
      "auto_send": false, "sent": false, "sent_by": null}

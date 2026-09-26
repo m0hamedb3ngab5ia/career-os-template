@@ -48,6 +48,7 @@ def test_check_before_and_after_mark(temp_root: Path, home: Path, job: str):
     assert r.returncode == 0, r.stderr
     out = json.loads(r.stdout)
     assert out["manual"] == 0 and [c["manual"] for c in out["contacts"]] == [False, False]
+    assert out["action_text"] is None
 
     assert _cli(temp_root, home, "outreach", "mark", job, "Jane Doe", "--degree", "1").returncode == 0
     r = _cli(temp_root, home, "outreach", "mark", job, "Sam Lee", "--degree", "2", "--mutuals", "3")
@@ -56,6 +57,7 @@ def test_check_before_and_after_mark(temp_root: Path, home: Path, job: str):
     out = json.loads(_cli(temp_root, home, "outreach", "check", job).stdout)
     assert out["manual"] == 2
     assert [c["reason"] for c in out["contacts"]] == ["LINKEDIN_CONNECTED", "LINKEDIN_MUTUALS"]
+    assert out["action_text"] == "tailor manually: Jane Doe (connected on LinkedIn); Sam Lee (3 mutual connections)"
     saved = json.loads((temp_root / "data" / "jobs" / job / "contacts.json").read_text())
     assert saved["contacts"][1]["mutuals"] == 3
 
@@ -77,3 +79,29 @@ def test_errors(temp_root: Path, home: Path, job: str):
     assert r.returncode == 1 and "contacts.json" in r.stderr
     r = _cli(temp_root, home, "outreach", "mark", job, "Jane Doe")
     assert r.returncode == 2
+
+
+def test_two_manual_contacts_one_deduped_action_item(temp_root: Path, home: Path, job: str):
+    """The draft-outreach recipe: one `action add <action_text> --dedupe` per job keeps every manual contact."""
+    assert _cli(temp_root, home, "tracker", "init").returncode == 0
+    _cli(temp_root, home, "outreach", "mark", job, "Jane Doe", "--degree", "1")
+    _cli(temp_root, home, "outreach", "mark", job, "Sam Lee", "--mutuals", "2")
+    text = json.loads(_cli(temp_root, home, "outreach", "check", job).stdout)["action_text"]
+    for _ in range(2):  # a rerun of the skill must not add a second item
+        r = _cli(temp_root, home, "action", "add", text, "--type", "send_linkedin", "--job", job,
+                 "--priority", "M", "--needs", "phone", "--dedupe")
+        assert r.returncode == 0, r.stderr
+    r = _cli(temp_root, home, "action", "list")
+    assert r.returncode == 0, r.stderr
+    assert r.stdout.count("tailor manually") == 1
+    assert "Jane Doe" in r.stdout and "Sam Lee" in r.stdout
+
+
+def test_non_mapping_outreach_config_is_a_clean_error(temp_root: Path, home: Path, job: str):
+    cfg = temp_root / "config" / "pipeline.yaml"
+    data = yaml.safe_load(cfg.read_text())
+    data["outreach"] = True
+    cfg.write_text(yaml.safe_dump(data, sort_keys=False))
+    r = _cli(temp_root, home, "outreach", "check", job)
+    assert r.returncode == 1 and "outreach must be a mapping" in r.stderr
+    assert "Traceback" not in r.stderr

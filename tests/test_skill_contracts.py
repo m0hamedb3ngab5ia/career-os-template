@@ -331,3 +331,11 @@ def test_score_job_uses_three_verdicts_and_reason_codes():
 def test_apply_job_follows_safety_verdict():
     text = _skill("apply-job")
     assert "verdict" in text and "block" in text and "review" in text
+
+
+def test_draft_outreach_opens_one_action_item_per_job_for_manual_contacts():
+    """`action add --dedupe` keys on job + type, so per-contact items would drop all but the first."""
+    t = (ROOT / ".claude" / "skills" / "draft-outreach" / "SKILL.md").read_text(encoding="utf-8")
+    assert "one Action Item per contact" not in t
+    assert "name every manual contact in that item" not in t
+    assert "action_text" in t and "--dedupe" in t

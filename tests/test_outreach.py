@@ -11,6 +11,7 @@ from careeros.models import Contact
 from careeros.outreach import (
     OutreachPolicy,
     check_contacts,
+    manual_action_text,
     mark_contact,
     needs_manual_outreach,
 )
@@ -110,3 +111,38 @@ def test_mark_contact_partial_and_errors(tmp_path: Path):
         mark_contact(f, "Jane", degree=0)
     with pytest.raises(ValueError):
         mark_contact(f, "Jane", mutuals=-2)
+
+
+def test_manual_action_text_names_every_manual_contact():
+    rows = check_contacts({"contacts": [
+        {"name": "Jane", "linkedin_degree": 1},
+        {"name": "Kim"},
+        {"name": "Sam", "mutuals": 2},
+    ]}, ON)
+    assert manual_action_text(rows) == "tailor manually: Jane (connected on LinkedIn); Sam (2 mutual connections)"
+
+
+def test_manual_action_text_none_when_no_manual_contacts():
+    assert manual_action_text(check_contacts({"contacts": [{"name": "Kim"}]}, ON)) is None
+    assert manual_action_text([]) is None
+
+
+def test_mark_contact_is_atomic(tmp_path: Path, monkeypatch):
+    f = tmp_path / "contacts.json"
+    original = json.dumps({"contacts": [{"name": "Jane"}]})
+    f.write_text(original)
+
+    def boom(self, target):
+        raise OSError("disk full")
+
+    monkeypatch.setattr(Path, "replace", boom)
+    with pytest.raises(OSError):
+        mark_contact(f, "Jane", degree=1)
+    assert f.read_text() == original
+
+
+def test_mark_contact_leaves_no_tmp_file(tmp_path: Path):
+    f = tmp_path / "contacts.json"
+    f.write_text(json.dumps({"contacts": [{"name": "Jane"}]}))
+    mark_contact(f, "Jane", degree=1)
+    assert sorted(p.name for p in tmp_path.iterdir()) == ["contacts.json"]

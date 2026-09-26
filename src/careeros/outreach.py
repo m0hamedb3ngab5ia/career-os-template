@@ -2,12 +2,14 @@
 
 `contacts.json` entries may carry `linkedin_degree` (1 = connected) and `mutuals` (count of mutual connections),
 recorded by the candidate with `careeros outreach mark`. `draft-outreach` calls `careeros outreach check` and, for a
-manual contact, marks the draft `manual_tailor: true` and opens a `send_linkedin` Action Item instead of queueing it.
+manual contact, marks the draft `manual_tailor: true` and opens ONE `send_linkedin` Action Item per job (text =
+`action_text`, naming every manual contact) instead of queueing it.
 Unknown degree/mutuals = no known relationship = the normal (draft-only / verified-email) rules apply.
 """
 from __future__ import annotations
 
 import json
+import os
 from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
@@ -65,6 +67,12 @@ def check_contacts(data: Mapping[str, Any], policy: OutreachPolicy) -> list[dict
     return out
 
 
+def manual_action_text(rows: list[Mapping[str, Any]]) -> str | None:
+    """One Action Item text naming every manual contact (`action add --dedupe` keeps one item per job + type)."""
+    parts = [f"{r['name']} ({r['detail']})" for r in rows if r.get("manual")]
+    return f"tailor manually: {'; '.join(parts)}" if parts else None
+
+
 def mark_contact(path: Path, name: str, degree: int | None = None, mutuals: int | None = None) -> dict[str, Any]:
     """Record degree/mutuals for the contact named `name` (case-insensitive) in contacts.json; returns the entry."""
     if degree is not None and not 1 <= degree <= 3:
@@ -79,6 +87,11 @@ def mark_contact(path: Path, name: str, degree: int | None = None, mutuals: int 
                 c["linkedin_degree"] = degree
             if mutuals is not None:
                 c["mutuals"] = mutuals
-            path.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")  # atomic, like Store._write
+            try:
+                tmp.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+                tmp.replace(path)
+            finally:
+                tmp.unlink(missing_ok=True)
             return c
     raise KeyError(name)

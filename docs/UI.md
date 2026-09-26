@@ -122,14 +122,18 @@ Every run is a subprocess the server owns, one row in the `runs` table, and a st
 
 ## Phase 2 implementation outline
 
-- `careeros ui [--port 8765] [--reindex] [--no-open]` subcommand; server binds to `127.0.0.1` only.
+- `careeros ui [--port 8765] [--host 127.0.0.1] [--reindex] [--no-open]` subcommand; server binds to `127.0.0.1` by
+  default (any other `--host` requires auth; see Phone below).
 - Optional extra in `pyproject.toml`: `ui = ["fastapi", "uvicorn", "ruamel.yaml", "watchfiles"]`, so the core CLI
   keeps its four dependencies.
 - `src/careeros/ui/`: `app.py` (FastAPI routes + SSE), `index.py` (SQLite schema + indexer from `Store`),
   `runs.py` (subprocess runner, `RESULT:` parsing), `settings_io.py` (ruamel round-trip + validate + rollback),
   `static/` (built frontend).
 - Frontend: React + TypeScript, built to static files and served by FastAPI; no Node needed at runtime.
-- Phone: the same app, responsive; reach it over the local network or a tunnel of the candidate's choice.
+- Phone: the same app, responsive. The default bind stays `127.0.0.1`, so the phone path is a tunnel of the
+  candidate's choice to that loopback port (e.g. an SSH tunnel or a private-network VPN such as Tailscale). An opt-in
+  `careeros ui --host 0.0.0.0` LAN mode exists for home Wi-Fi, but it refuses to start without auth (a token set in
+  config or generated and printed on first run, required on every request); no unauthenticated non-loopback bind.
 - Tests (repo rule, tests first): unit tests for the indexer, settings round-trip (comments preserved, invalid
   values rolled back), `RESULT:` parsing; integration tests that start the app with a temp root and drive the API.
 - Also needed before the Inbox & follow-ups screen is fully live: the follow-up scheduler (backlog P4).
