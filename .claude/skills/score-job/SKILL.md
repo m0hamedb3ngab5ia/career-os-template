@@ -41,6 +41,18 @@ Add one string per hit to `hard_filter_fails`, wording exactly:
 | `already_applied_recent` | (company, role family) in `companies.already_applied` with date < 90 days ago |
 | `scam_<code>` | run `.venv/bin/careeros safety check <job_id>` first (it writes `JOB/safety.json`); one `scam_<code>` per **hard** flag, e.g. `scam_apply_domain`, `scam_free_email_contact`, `scam_phrase`, `scam_registry`. Exit 3 means the command already opened the `scam_suspected` Action Item and set `needs_review`; do not add another. Soft flags (`salary_implausible`, `company_unverified`) go in `reasons` and cost 10 fit points. `scam_lookalike_company` = a name borrowing a known brand on a foreign domain. |
 
+**Ghost-job check** (same `safety.check` run; thresholds in `targets.yaml: safety.ghost`). Before it, when
+`data/company_signals.json` has no entry for the company or the entry's `checked_at` is over 30 days old,
+WebSearch `"<company>" layoffs OR "hiring freeze" <this year>` and record only what a dated, reputable
+source states: `.venv/bin/careeros safety signal "<company>" --kind freeze|layoffs|none --date <YYYY-MM-DD>
+--source <url>` (`none` with today's date and the search you ran when nothing is found). Then:
+- hard `ghost_stale` (posted 45+ days ago) or `ghost_freeze` (freeze in the last 180 days): the command
+  exits 4 and sets status `skipped`; put `ghost_stale` / `ghost_freeze` in `hard_filter_fails`.
+- soft `ghost_stale` (30+ days), `ghost_reposted` (same role 3+ times in 90 days), `ghost_unlinked`
+  (aggregator posting not found on the company's own site), `ghost_layoffs`: add to `reasons`, 5 fit
+  points each; any of them turns auto-submit off for this job.
+- dream companies are never skipped: their hard flags come back soft, with a `ghost_job` Action Item.
+
 **Made-up company check** (only when `safety.json` has `company_unverified`: the company is on none of
 your boards, dream list, prestige tiers or `company_domains`). Verify with WebSearch/WebFetch, recording
 only what a source shows:

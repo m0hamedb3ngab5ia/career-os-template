@@ -38,6 +38,10 @@ blocklist:             # never apply
 # also carry `domain:`. A posting whose apply URL is on neither a known ATS nor one of these is a hard stop.
 company_domains: {}    # e.g. {"Two Sigma": twosigma.com, "Example Corp": [example.com, examplecareers.com]}
 
+# Hiring freezes / layoffs you know about (ghost-job check). score-job also records web findings in
+# data/company_signals.json; entries here win. kind: freeze (skip) | layoffs (flag) | none (clears).
+hiring_signals: []     # e.g. [{company: Example Corp, kind: layoffs, date: 2026-08-01, source: "https://..."}]
+
 boards:                # reusable default: fine to keep. Scout sources. ats: greenhouse | lever | ashby | custom (no adapter yet; skipped)
   # --- AI ---
   - {company: Anthropic,        ats: greenhouse, slug: anthropic}

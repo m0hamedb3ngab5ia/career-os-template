@@ -105,3 +105,23 @@ def test_save_seen_uses_a_private_temp_file(settings, monkeypatch):
     assert shared.read_text() == "in use by another writer"
     assert store.load_seen() == {"a", "b"}
     assert not list(store.seen_file.parent.glob(f"*.{os.getpid()}.tmp"))
+
+
+# --- posting history (ghost-job detection) -------------------------------------------------------------
+
+def test_history_tracks_reposts_under_new_ids(settings):
+    from careeros.models import Posting
+    from careeros.store import Store
+
+    st = Store(settings)
+    a = Posting(company="Acme", title="Software Engineer", location="NY", ats="greenhouse", ats_job_id="1",
+                posted_at="2026-08-01")
+    b = Posting(company="Acme", title="Software Engineer", location="NY", ats="greenhouse", ats_job_id="2",
+                posted_at="2026-09-20")
+    hist = st.update_history([a], today="2026-08-02")
+    hist = st.update_history([a, b], today="2026-09-21")
+    e = st.load_history()[next(iter(hist))]
+    assert e["ats_job_ids"] == ["1", "2"] and e["posted_at_min"] == "2026-08-01"
+    assert e["first_seen"].startswith("2026-08-02") and e["last_seen"].startswith("2026-09-21")
+    assert e["sightings"] == ["2026-08-01", "2026-09-20"]
+    assert len(st.load_history()) == 1

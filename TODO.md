@@ -24,8 +24,14 @@ belong in each candidate's own private repo, not here.
 ## Future (not now)
 - [ ] Action Items redesign: group by `Type` + `Needs` column = `laptop` (Chrome/Handshake/Workday session, candidate present) | `phone` (approve/send from anywhere) | `anytime`; sort by Priority then NextActionDate; separate "Today" view. Tier A submits, Handshake, Workday review pages = `laptop`. LinkedIn sends, email approvals, cover-letter reviews = `phone`.
 - [ ] Handshake apply sessions: candidate logged in + present; system drives Chrome, candidate debugs live. Assisted mode only.
-- [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
+- [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats). Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
+
+## Ghost jobs
+- [x] Stale (30 flag / 45 skip days), reposted (3+ in 90 days), aggregator-only (not on the company's site),
+      hiring freeze (skip) / layoffs (flag) — `src/careeros/safety/ghost.py`, `data/posting_history.json`,
+      `careeros safety signal`. Dream companies only flagged. Greenhouse age now from `first_published`.
+- [ ] Tracker `PostedDate` column (needs a Jobs-sheet column migration like Action Items `Needs`).
 
 ## Safety — scam / data-harvesting protection
 - [x] Scam gate in score-job + apply-job, before any form fill (`careeros safety check|fields`, `src/careeros/safety/scam.py`). Made-up companies: anything off the curated lists is `company_unverified` (no auto-submit) until /score-job verifies it (`careeros safety verify`); brand look-alikes on foreign domains are a hard stop. Hard stops (→ Action Item, never auto):

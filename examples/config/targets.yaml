@@ -111,3 +111,9 @@ safety:
     - qa_failed_twice
   scam:                                # careeros safety check (src/careeros/safety/scam.py)
     salary_max_multiple: 3             # soft flag when posted salary > this x candidate.min_base_usd
+  ghost:                               # ghost-job detection (src/careeros/safety/ghost.py)
+    stale_flag_days: 30                # posted this many days ago -> flag (no auto-submit)
+    stale_skip_days: 45                # -> skip (dream companies only flagged)
+    repost_window_days: 90
+    repost_flag_count: 3               # same role reposted this many times in the window -> flag
+    layoff_window_days: 180            # freeze in window -> skip; layoffs in window -> flag
