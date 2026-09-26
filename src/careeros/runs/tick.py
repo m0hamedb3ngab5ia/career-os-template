@@ -86,8 +86,11 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
     def prune(trigger: str) -> tuple[str, str]:
         from careeros import retention
 
+        from careeros.runs.storage import snapshot_after_prune
+
         items = retention.plan(settings)
         freed = retention.execute(settings, items)
+        snapshot_after_prune(settings, freed)
         return "ok", f"{len(items)} item(s), {retention.human_bytes(freed)} freed"
 
     return {"scout": scout, "score": batch("score"), "prepare": batch("prepare"), "prune": prune}

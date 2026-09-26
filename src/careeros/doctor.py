@@ -405,6 +405,12 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
         sched = load_schedule(type("_P", (), {"pipeline": pipeline})())
     except ConfigError as e:
         return [Check(FAIL, "schedule", str(e))]
+    from careeros.runs.advisor import load_advisor_config
+
+    try:
+        load_advisor_config(pipeline)
+    except ConfigError as e:
+        return [Check(FAIL, "advisor", str(e))]
     on = [k for k, j in sched.jobs.items() if j.enabled]
     return [Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ..."),
             Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} (install: careeros schedule install)")]
