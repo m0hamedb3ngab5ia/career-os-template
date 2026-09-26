@@ -76,12 +76,14 @@ def set_path(path: Path, dotted: str, value: Any) -> Any:
 
 
 def apply_change(path: Path, dotted: str, value: Any, *, validate: Callable[[Path], None],
-                 expect_from: Any = _MISSING) -> Any:
+                 expect_from: Any = _MISSING, current: Callable[[Any], Any] | None = None) -> Any:
     """set_path + validate, restoring the original text when validation raises. `expect_from`: refuse when the
-    current value differs (the recommendation was computed against an older file)."""
+    current value differs (the recommendation was computed against an older file). `current(data)` gives the
+    effective value (defaults applied) to compare with; default: the raw YAML value."""
     real = Path(os.path.realpath(path))
     original = real.read_text(encoding="utf-8")
-    current = get_path(_yaml().load(original), dotted)
+    data = _yaml().load(original)
+    current = current(data) if current else get_path(data, dotted)
     if expect_from is not _MISSING and current != expect_from:
         raise ValueError(f"{dotted} is now {current!r}, not {expect_from!r}; run `careeros advise` again")
     old = set_path(real, dotted, value)
