@@ -92,10 +92,13 @@ def run_inbox_sync(settings: Settings) -> dict[str, Any]:
     from careeros.runs.service import run_skill
 
     cancel = threading.Event()
-    signal.signal(signal.SIGTERM, lambda *_: cancel.set())
-    job = load_schedule(settings).jobs["inbox_sync"]
-    return run_skill(settings, "inbox_sync", "inbox-sync", mcp_servers=job.mcp_servers,
-                     allowed_tools_extra=job.allowed_tools_extra, trigger="manual", cancel=cancel)
+    old = signal.signal(signal.SIGTERM, lambda *_: cancel.set())  # SIGTERM = the UI's Cancel: stop cleanly
+    try:
+        job = load_schedule(settings).jobs["inbox_sync"]
+        return run_skill(settings, "inbox_sync", "inbox-sync", mcp_servers=job.mcp_servers,
+                         allowed_tools_extra=job.allowed_tools_extra, trigger="manual", cancel=cancel)
+    finally:
+        signal.signal(signal.SIGTERM, old)
 
 
 def _raise_interrupt(*_: Any) -> None:

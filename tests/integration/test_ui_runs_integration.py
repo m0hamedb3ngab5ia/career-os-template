@@ -112,3 +112,31 @@ def test_tracker_step_records_a_run(root, env):
     run = wait_for(lambda: finished(rc, "tracker"))
     assert run["stop_reason"] == "completed" and "synced 2 jobs" in run["detail"]
     assert (root / "JobTracker.xlsx").exists()
+
+
+def claude_pids(fake_bin: str) -> list[int]:
+    import subprocess
+
+    out = subprocess.run(["ps", "-axo", "pid=,command="], capture_output=True, text=True).stdout
+    return [int(line.split(None, 1)[0]) for line in out.splitlines() if fake_bin in line]
+
+
+def test_cancel_a_ui_catch_up_stops_the_batch_and_leaves_no_claude(root, env):
+    ids = add_jobs(root, 2)
+    for jid in ids:
+        (root / "data" / "jobs" / jid / ".fake_mode").write_text("hang")
+    rs = RunStore(Settings.load(root))
+    rs.dir.mkdir(parents=True, exist_ok=True)
+    (rs.dir / "catch_up.json").write_text(json.dumps({"kinds": {"score": {"slots": 2}}}))
+    rc = RunControl(Settings.load(root), env=env)
+    out = rc.catch_up()
+    assert out["kinds"] == ["score"]
+    cur = wait_for(lambda: (c := rc.current()) and c.get("current_job") and c)
+    assert cur["trigger"] == "catch_up"
+    wait_for(lambda: any(e["type"] == "system" for e in rc.tail(cur["id"], follow=False)))  # claude is up
+    fake_bin = env["PATH"].split(os.pathsep)[0]
+    assert claude_pids(fake_bin)
+    assert rc.cancel()["status"] == "cancelling"
+    run = wait_for(lambda: finished(rc, "score"), timeout=30)
+    assert run["stop_reason"] == "cancelled"
+    wait_for(lambda: not claude_pids(fake_bin), timeout=15)

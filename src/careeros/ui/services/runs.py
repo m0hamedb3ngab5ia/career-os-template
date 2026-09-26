@@ -17,7 +17,7 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
@@ -58,12 +58,47 @@ def ps_cmdline(pid: int) -> str:
         return ""
 
 
-def _is_careeros(cmd: str) -> bool:
-    return "careeros" in cmd
+def ps_started(pid: int) -> datetime | None:
+    """When the process started (`ps -o lstart=`, local time, whole seconds); None when unknown."""
+    try:
+        out = subprocess.run(["ps", "-o", "lstart=", "-p", str(pid)], capture_output=True, text=True,
+                             timeout=5, env={**os.environ, "LC_ALL": "C"}).stdout
+        return datetime.strptime(" ".join(out.split()), "%a %b %d %H:%M:%S %Y").astimezone()
+    except (OSError, subprocess.SubprocessError, ValueError):
+        return None
 
 
-def _is_tick(cmd: str) -> bool:
-    return " tick" in f" {cmd} " and " run " not in f" {cmd} "
+CANCELLABLE_RUNS = ("score", "prepare", "catch-up")
+
+
+def _cli_kind(rest: list[str]) -> str | None:
+    while rest[:1] == ["--root"]:
+        rest = rest[2:]
+    if rest[:1] == ["tick"]:
+        return "tick"
+    if len(rest) >= 2 and rest[0] == "run" and rest[1] in CANCELLABLE_RUNS:
+        return "run"
+    return None
+
+
+def classify_cmdline(cmd: str) -> str | None:
+    """What a process is, from its argv tokens: "run" (`careeros run score|prepare|catch-up`, as `-m careeros.cli`
+    or the `careeros` entry point), "step" (`-m careeros.ui.services.step <kind>`), "tick", or None (anything else,
+    including other careeros commands). Exact tokens, never a substring, so a reused pid is never mistaken."""
+    toks = cmd.split()
+    for i, t in enumerate(toks):
+        if t == "-m" and i + 1 < len(toks):
+            mod, rest = toks[i + 1], toks[i + 2:]
+            if mod == "careeros.cli":
+                return _cli_kind(rest)
+            if mod == "careeros.ui.services.step":
+                while rest[:1] == ["--root"]:
+                    rest = rest[2:]
+                return "step" if len(rest) == 1 and rest[0] in STEP_KINDS else None
+            return None
+        if os.path.basename(t) == "careeros" and i <= 1:  # the entry point (possibly after its interpreter)
+            return _cli_kind(toks[i + 1:])
+    return None
 
 
 def _parse_dt(v: Any) -> datetime | None:
@@ -78,12 +113,19 @@ class RunControl:
                  python: str = sys.executable, env: dict[str, str] | None = None,
                  pid_alive: Callable[[int], bool] = locks.pid_alive, cmdline: Callable[[int], str] = ps_cmdline,
                  kill: Callable[[int, int], None] = os.kill, now: Callable[[], datetime] = _utcnow,
-                 sleep: Callable[[float], None] = time.sleep, launchctl: Callable[..., Any] | None = None):
+                 sleep: Callable[[float], None] = time.sleep, launchctl: Callable[..., Any] | None = None,
+                 started: Callable[[int], datetime | None] = ps_started, agents_dir: Path | None = None,
+                 which: Callable[[str], str | None] | None = None):
         self.settings = settings
         self.rs = RunStore(settings)
         self.popen, self.python, self.env = popen, python, env
         self.pid_alive, self.cmdline, self.kill, self.now, self.sleep = pid_alive, cmdline, kill, now, sleep
-        self.launchctl = launchctl
+        self.launchctl, self.started, self.agents_dir = launchctl, started, agents_dir
+        if which is None:
+            import shutil
+
+            which = shutil.which
+        self.which = which
 
     # --- starting ------------------------------------------------------------------------------------------
 
@@ -192,13 +234,22 @@ class RunControl:
         marker = self.rs.dir / "ui" / f"cancel-{rid}"
         if marker.exists():
             return {"status": "already_stopping", "run_id": rid, "pid": pid}
-        cmd = self.cmdline(pid)
-        if not _is_careeros(cmd):
-            return {"status": "refused", "run_id": rid, "detail": f"pid {pid} is not a careeros process"}
-        if _is_tick(cmd):
+        what = classify_cmdline(self.cmdline(pid))
+        if what == "tick":
             return {"status": "refused", "run_id": rid,
                     "detail": "started by the scheduler; use Pause all to stop it before its next job"}
-        self.kill(pid, signal.SIGTERM)
+        if what not in ("run", "step"):
+            return {"status": "refused", "run_id": rid, "detail": f"pid {pid} is not a careeros run or step"}
+        began, acquired = self.started(pid), _parse_dt(held.get("acquired_at"))
+        if began and acquired and began > acquired + timedelta(seconds=1):
+            return {"status": "refused", "run_id": rid,
+                    "detail": f"pid {pid} started after the lock was taken (a reused pid)"}
+        try:
+            self.kill(pid, signal.SIGTERM)
+        except ProcessLookupError:
+            return {"status": "idle", "detail": "the run's process has already stopped"}
+        except PermissionError:
+            return {"status": "refused", "run_id": rid, "detail": f"not allowed to signal pid {pid}"}
         marker.parent.mkdir(parents=True, exist_ok=True)
         marker.write_text(self.now().isoformat())
         return {"status": "cancelling", "run_id": rid, "pid": pid}
@@ -230,6 +281,8 @@ class RunControl:
 
     def _with_state(self, run: dict[str, Any]) -> dict[str, Any]:
         st = self._state(run)
+        if run.get("status") == "running" and st not in ("running", "interrupted"):
+            run = self.rs.load_run(run["id"]) or run  # it finished between our read and the lock check
         out = {**run, "state": st}
         if st == "interrupted" and not run.get("stop_reason"):
             out["stop_reason"] = "interrupted"
@@ -326,6 +379,7 @@ class RunControl:
             run = self.rs.load_run(run_id) or {}
             state = self._state(run) if run else "missing"
             if state != "running":
+                run = self.rs.load_run(run_id) or run  # the final stop reason
                 yield from read_new()
                 yield {"type": "end", "state": state, "stop_reason": run.get("stop_reason")}
                 return
@@ -340,22 +394,24 @@ class RunControl:
         from careeros.runs.tick import schedule_overview
 
         label = load_schedule(self.settings).launchd_label
-        kw = {"launchctl": self.launchctl} if self.launchctl else {}
-        return {**launchd.status(label, **kw), **schedule_overview(self.settings, self.now())}
+        return {**launchd.status(label, **self._launchd_kw()), **schedule_overview(self.settings, self.now())}
+
+    def _launchd_kw(self) -> dict[str, Any]:
+        kw: dict[str, Any] = {"agents_dir": self.agents_dir}
+        if self.launchctl:
+            kw["launchctl"] = self.launchctl
+        return kw
 
     def schedule_install(self) -> dict[str, Any]:
-        import shutil
-
         from careeros.runs import launchd
         from careeros.runs.schedule import load_schedule
 
         sc = load_schedule(self.settings)
-        claude = shutil.which("claude")
+        claude = self.which("claude")
         dirs = [os.path.dirname(p) for p in (claude, self.python) if p]
         plist = launchd.build_plist(label=sc.launchd_label, python=self.python, root=self.settings.root,
                                     runs_dir=self.rs.dir, tick_minutes=sc.tick_minutes, path_dirs=dirs)
-        kw = {"launchctl": self.launchctl} if self.launchctl else {}
-        out = launchd.install(plist, **kw)
+        out = launchd.install(plist, **self._launchd_kw())
         return {**out, "warning": None if claude else
                 "`claude` is not on PATH; scheduled score and prepare runs will stop with doctor_failed"}
 
@@ -363,8 +419,7 @@ class RunControl:
         from careeros.runs import launchd
         from careeros.runs.schedule import load_schedule
 
-        kw = {"launchctl": self.launchctl} if self.launchctl else {}
-        return launchd.uninstall(load_schedule(self.settings).launchd_label, **kw)
+        return launchd.uninstall(load_schedule(self.settings).launchd_label, **self._launchd_kw())
 
     def storage(self) -> dict[str, Any]:
         from careeros.runs.storage import load_snapshots, measure
