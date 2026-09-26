@@ -173,7 +173,7 @@ def test_job_detail_reads_the_files(data, idx):
     assert d["job"]["company"] == "Stark Industries" and d["job"]["status"] == "interview"
     assert d["posting"]["title"] == "Software Engineer" and "description_html" not in d["posting"]
     assert d["score"]["fit"] == 86 and d["safety"]["verdict"] == "pass"
-    assert d["qa"][0]["passed"] is True
+    assert d["qa"]["pass"] is True and d["qa"]["mean"] == pytest.approx(8.2) and "rubric" in d["qa"]
     assert {f["name"] for f in d["documents"]} >= {"resume.pdf", "cover_letter.md"}
     assert [c["name"] for c in d["contacts"]] == ["Pat Rivers", "Sam Lee"]
     assert [h["status"] for h in d["history"]][-1] == "interview"

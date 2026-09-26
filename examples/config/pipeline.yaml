@@ -129,7 +129,7 @@ ui:                                        # reusable default: fine to keep. `ca
   theme: system                            # system (Recommended) | light | dark
   undo_seconds: 8                          # 8 (Recommended): how long "Undo" stays on after Mark done, Send, Apply
   page_size: 100                           # 100 (Recommended): rows per page in Jobs and Runs history (20 to 1000)
-  watch_debounce_ms: 300                   # 300 (Recommended): file changes within this window refresh the app once
+  watch_debounce_ms: 300                   # 300 (Recommended): the app refreshes once files are quiet this long
   index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
   pipeline:
     columns:                               # (Recommended) the six below. Each status sits in at most one column;

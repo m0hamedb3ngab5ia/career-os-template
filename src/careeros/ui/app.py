@@ -39,15 +39,26 @@ class Context:
         self.config_error: str | None = None
 
     def reload_settings(self) -> None:
+        """Take the edited config when every block the app reads still validates; otherwise keep the last good
+        settings and show why. The index and the watcher were built on the old paths, so a change to `paths` or
+        `ui.index_path` also keeps the old settings until `careeros ui` is restarted."""
+        from careeros.runs.advisor import load_advisor_config
         from careeros.runs.config import load_runs_config
+        from careeros.runs.schedule import load_schedule
         from careeros.ui.config import load_ui_config
+        from careeros.ui.index import default_path
 
         try:
             fresh = Settings.load(self.settings.root)
             load_ui_config(fresh)
             load_runs_config(fresh)
+            load_schedule(fresh)
+            load_advisor_config(fresh.pipeline)
         except ConfigError as e:
             self.config_error = str(e)
+            return
+        if fresh.paths != self.settings.paths or default_path(fresh) != default_path(self.settings):
+            self.config_error = "paths changed in config/pipeline.yaml: restart careeros ui to use them"
             return
         self.settings, self.config_error = fresh, None
 

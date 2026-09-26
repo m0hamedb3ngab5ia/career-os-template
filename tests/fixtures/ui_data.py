@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any
 
 from careeros.config import Settings
-from careeros.models import Posting, QACheck, QAResult, Score
+from careeros.models import Posting, Score
 from careeros.runs.store import RunStore, iso
 from careeros.store import Store
 from careeros.tracker import Tracker
@@ -73,9 +73,14 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
             store._write(jid, "safety.json", {"job_id": jid, "checked_at": iso(found), "verdict": safety,
                                               "flags": [], "runs": []})
         if key in ("queued", "review", "applied", "interview"):
-            store.save_qa(jid, [QAResult(job_id=jid, artifact="resume", passed=True,
-                                         checks=[QACheck(name="truth", passed=True)],
-                                         critic_scores={"specificity": 8.0, "voice": 9.0})])
+            # the qa-review skill's qa.json (.claude/skills/qa-review/SKILL.md section 6)
+            store._write(jid, "qa.json", {
+                "job_id": jid, "reviewed_at": iso(found), "deterministic": {"pass": True, "checks": []},
+                "rubric": {k: {"score": v, "why": "fixture"} for k, v in (
+                    ("relevance", 8), ("specificity", 8), ("voice_match", 8), ("zero_fabrication", 9),
+                    ("ats_safety", 8))},
+                "fabrication_audit": [], "unsupported_count": 0, "mean": 8.2, "pass": True, "fail_reasons": [],
+                "regenerate_suggestions": [], "regenerations": 0})
             (store.job_dir(jid) / "resume.pdf").write_bytes(b"%PDF-1.4 fixture\n")
             (store.job_dir(jid) / "cover_letter.md").write_text("Hi,\n\nFixture letter.\n", encoding="utf-8")
     contacts = {"contacts": [

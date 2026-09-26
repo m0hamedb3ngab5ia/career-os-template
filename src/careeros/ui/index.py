@@ -229,15 +229,9 @@ class Index:
         status = _obj(d / "status.json")
         score = _obj(d / "score.json")
         safety = _obj(d / "safety.json")
-        qa = _obj(d / "qa.json").get("results")
+        qa_passed, qa_score = qa_summary(_obj(d / "qa.json"))
         hist = status.get("history") if isinstance(status.get("history"), list) else []
         hist = [h for h in hist if isinstance(h, dict)]
-        qa_passed = qa_score = None
-        if isinstance(qa, list) and qa:
-            results = [r for r in qa if isinstance(r, dict)]
-            qa_passed = int(all(r.get("passed") for r in results)) if results else None
-            crit = [v for r in results for v in (r.get("critic_scores") or {}).values() if isinstance(v, (int, float))]
-            qa_score = round(sum(crit) / len(crit), 2) if crit else None
         applied_at = next((h.get("at") for h in hist if h.get("status") == "applied"), None)
         found_at = posting.get("fetched_at") or next((h.get("at") for h in hist if h.get("status") == "found"), None)
         fit = score.get("fit")
@@ -316,20 +310,18 @@ class Index:
     # --- tracker (action items) ----------------------------------------------------------------------------
 
     def update_tracker(self) -> bool:
-        """Re-read the Action Items tab when the workbook changed. A missing tracker indexes as no items and is
-        never created here (Tracker() would create one on read)."""
+        """Re-read the Action Items tab when the workbook changed. Read-only: never through Tracker, whose load
+        creates a missing workbook and renames a damaged one. A missing tracker indexes as no items."""
         with self._lock:
             sig = _sig([self.tracker_path]) if self.tracker_path.exists() else "missing"
             if self.get_meta("tracker_sig") == sig:
                 return False
             items: list[dict[str, Any]] = []
             if self.tracker_path.exists():
-                from careeros.tracker import Tracker
-
                 try:
-                    items = Tracker(path=self.tracker_path, settings=self.settings).list_action_items(open_only=False)
-                except Exception:  # noqa: BLE001 - a half-written or foreign workbook: keep the old rows
-                    return False
+                    items = read_action_items(self.tracker_path)
+                except Exception:  # noqa: BLE001 - half-written, locked or foreign workbook: keep the old rows
+                    return False                 # and no signature, so the next change retries
             self.con.execute("DELETE FROM action_items")
             self.con.executemany(
                 "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
@@ -339,6 +331,34 @@ class Index:
                   _s(it.get("DoneDate"))) for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
             return True
+
+
+def qa_summary(qa: dict[str, Any]) -> tuple[int | None, float | None]:
+    """(passed, score) from qa.json: the qa-review skill's top-level `pass` / `mean`; a legacy
+    {"results": [QAResult]} file (Store.save_qa) falls back to all-passed and the mean critic score."""
+    if "pass" in qa or "mean" in qa:
+        mean = qa.get("mean")
+        return (int(bool(qa["pass"])) if isinstance(qa.get("pass"), bool) else None,
+                float(mean) if isinstance(mean, (int, float)) and not isinstance(mean, bool) else None)
+    results = [r for r in qa.get("results") or [] if isinstance(r, dict)] if isinstance(qa.get("results"), list) else []
+    if not results:
+        return None, None
+    crit = [v for r in results for v in (r.get("critic_scores") or {}).values() if isinstance(v, (int, float))]
+    return int(all(r.get("passed") for r in results)), (round(sum(crit) / len(crit), 2) if crit else None)
+
+
+def read_action_items(path: Path) -> list[dict[str, Any]]:
+    """The Action Items tab as {header: value} rows, opened read-only (raises on an unreadable workbook)."""
+    from openpyxl import load_workbook
+
+    wb = load_workbook(path, read_only=True, data_only=True)
+    try:
+        ws = wb["Action Items"]
+        rows = ws.iter_rows(values_only=True)
+        header = [str(h) if h is not None else "" for h in next(rows, ())]
+        return [dict(zip(header, r)) for r in rows if r and r[0] not in (None, "")]
+    finally:
+        wb.close()
 
 
 def _s(v: Any) -> str | None:

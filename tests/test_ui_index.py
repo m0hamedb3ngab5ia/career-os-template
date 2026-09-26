@@ -48,7 +48,7 @@ def test_rebuild_indexes_every_job_with_its_fields(idx, data):
     r = jobs[data["jobs"]["review"]]
     assert (r["company"], r["title"], r["status"], r["fit"], r["tier"], r["safety"], r["category"]) == (
         "Umbrella Labs", "Infrastructure Engineer", "needs_review", 91, "A", "review", "swe_backend")
-    assert r["qa_passed"] == 1 and r["qa_score"] == pytest.approx(8.5)
+    assert r["qa_passed"] == 1 and r["qa_score"] == pytest.approx(8.2)
     assert jobs[data["jobs"]["found"]]["fit"] is None and jobs[data["jobs"]["found"]]["qa_passed"] is None
     assert jobs[data["jobs"]["applied"]]["applied_at"].startswith("2026-09-22")
     assert jobs[data["jobs"]["found"]]["applied_at"] is None
@@ -194,3 +194,62 @@ def test_corrupt_index_file_is_replaced(data):
     ix.sync()
     assert ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"] == len(data["jobs"])
     ix.close()
+
+
+def test_deleted_run_folder_leaves_the_index(idx, data):
+    import shutil
+
+    from careeros.runs.store import RunStore
+
+    rid = data["runs"]["prepare"]
+    shutil.rmtree(RunStore(data["settings"]).run_dir(rid))
+    res = idx.sync()
+    assert res["runs_removed"] == [rid]
+    assert idx.query("SELECT COUNT(*) AS n FROM runs WHERE id = ?", (rid,))[0]["n"] == 0
+    assert idx.query("SELECT COUNT(*) AS n FROM attempts WHERE run_id = ?", (rid,))[0]["n"] == 0
+
+
+@pytest.mark.parametrize("junk", [b"partial write", b"PK\x03\x04 truncated zip"])
+def test_unreadable_tracker_keeps_old_rows_and_is_never_touched(idx, data, junk):
+    tr = data["settings"].paths["tracker_xlsx"]
+    before = idx.query("SELECT id FROM action_items ORDER BY id")
+    tr.write_bytes(junk)
+    assert idx.update_tracker() is False
+    assert idx.query("SELECT id FROM action_items ORDER BY id") == before
+    assert tr.read_bytes() == junk
+    assert not list(tr.parent.glob("*corrupt*"))
+    assert idx.update_tracker() is False           # signature not stored: retried, still failing
+
+
+def test_tracker_is_read_without_the_tracker_class(idx, data, monkeypatch):
+    import careeros.tracker as tracker_mod
+
+    def boom(*a, **k):
+        raise AssertionError("the index must not go through Tracker (it can rename or re-init the workbook)")
+
+    monkeypatch.setattr(tracker_mod.Tracker, "_load", boom)
+    st = data["settings"].paths["tracker_xlsx"]
+    os.utime(st, (st.stat().st_atime, st.stat().st_mtime + 7))
+    assert idx.update_tracker() is True
+    assert len(idx.query("SELECT id FROM action_items")) == 4
+
+
+def test_qa_review_schema_is_indexed(idx, data):
+    jid = data["jobs"]["queued"]
+    jd = Store(data["settings"]).job_dir(jid)
+    (jd / "qa.json").write_text(json.dumps({"job_id": jid, "mean": 6.4, "pass": False, "rubric": {},
+                                            "deterministic": {"pass": True}}), encoding="utf-8")
+    idx.update_jobs([jid])
+    row = _jobs(idx)[jid]
+    assert row["qa_passed"] == 0 and row["qa_score"] == pytest.approx(6.4)
+
+
+def test_legacy_qa_results_list_still_indexed(idx, data):
+    from careeros.models import QAResult
+
+    jid = data["jobs"]["scored"]
+    Store(data["settings"]).save_qa(jid, [QAResult(job_id=jid, artifact="resume", passed=True,
+                                                   critic_scores={"voice": 7.0})])
+    idx.update_jobs([jid])
+    row = _jobs(idx)[jid]
+    assert row["qa_passed"] == 1 and row["qa_score"] == pytest.approx(7.0)

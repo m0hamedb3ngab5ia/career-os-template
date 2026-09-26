@@ -133,3 +133,23 @@ def test_watcher_roots_come_from_settings(data):
     assert w.roots.index == ix.path.resolve()
     assert set(w.watch_dirs()) >= {w.roots.jobs, w.roots.config}
     ix.close()
+
+
+def test_loop_passes_the_quiet_window_as_step(data, monkeypatch):
+    import watchfiles
+
+    seen = {}
+
+    def fake_watch(*dirs, **kw):
+        seen.update(kw, dirs=dirs)
+        return iter(())
+
+    monkeypatch.setattr(watchfiles, "watch", fake_watch)
+    ix = Index(data["settings"])
+    w = Watcher(data["settings"], ix, FakeBroker(), debounce_ms=300)
+    w._loop([w.roots.jobs], True)
+    assert seen["step"] == 300 and seen["debounce"] == 1600 and seen["recursive"] is True
+    w = Watcher(data["settings"], ix, FakeBroker(), debounce_ms=1000)
+    w._loop([w.roots.jobs], False)
+    assert seen["step"] == 1000 and seen["debounce"] == 5000 and seen["recursive"] is False
+    ix.close()

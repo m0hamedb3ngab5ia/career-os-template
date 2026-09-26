@@ -215,3 +215,102 @@ def test_cli_reindex_flag_rebuilds(data, tmp_path):
         proc.terminate()
         proc.wait(timeout=10)
 
+
+
+# --- watcher threads + settings reload -------------------------------------------------------------------------
+
+class _Broker:
+    def __init__(self):
+        import threading
+
+        self.sent, self.cond = [], threading.Condition()
+
+    def publish(self, event, payload):
+        with self.cond:
+            self.sent.append((event, payload))
+            self.cond.notify_all()
+        return len(self.sent)
+
+    def wait_for(self, pred, timeout=15):
+        with self.cond:
+            return self.cond.wait_for(lambda: any(pred(e, p) for e, p in self.sent), timeout)
+
+
+def test_watcher_watches_a_tracker_outside_the_data_dirs(tmp_path):
+    import yaml
+
+    from careeros.config import Settings
+    from careeros.tracker import Tracker
+    from careeros.ui.watch import Watcher
+
+    root = make_temp_root(tmp_path / "repo")
+    outside = tmp_path / "Desktop"
+    outside.mkdir()
+    pl = yaml.safe_load((root / "config" / "pipeline.yaml").read_text())
+    pl["paths"]["tracker_xlsx"] = str(outside / "JobTracker.xlsx")
+    (root / "config" / "pipeline.yaml").write_text(yaml.safe_dump(pl, sort_keys=False))
+    data = build_ui_data(root, NOW)
+    s = data["settings"]
+    assert s.paths["tracker_xlsx"].parent == outside
+    ix = Index(s)
+    ix.rebuild()
+    b = _Broker()
+    w = Watcher(s, ix, b, debounce_ms=100)
+    w.start()
+    try:
+        assert len(w._threads) == 2
+        time.sleep(0.5)                                     # let both watchers arm
+        Tracker(settings=s).mark_action_done(data["actions"]["high"])
+        assert b.wait_for(lambda e, p: e == "changed" and p["actions"] is True), b.sent
+    finally:
+        w.stop()
+        ix.close()
+    assert ix.path.exists()
+
+
+def test_reload_keeps_settings_when_paths_change(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["paths"]["jobs_dir"] = "elsewhere/jobs"
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "restart careeros ui" in ctx.config_error
+    pl["paths"]["jobs_dir"] = "data/jobs"
+    pl["ui"] = {"index_path": "other.db"}
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "restart careeros ui" in ctx.config_error
+
+
+def test_reload_accepts_a_harmless_change(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["ui"] = {"theme": "dark"}
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.config_error is None and client.get("/api/meta").json()["ui"]["theme"] == "dark"
+
+
+@pytest.mark.parametrize("block", [
+    {"schedule": {"scout": "0 7 * * *"}},
+    {"advisor": {"advise_after_days": -1}},
+])
+def test_reload_rejects_a_broken_schedule_or_advisor(data, client, block):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl.update(block)
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and ctx.config_error and ("schedule" in ctx.config_error or
+                                                          "advis" in ctx.config_error)

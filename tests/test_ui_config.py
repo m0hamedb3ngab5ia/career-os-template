@@ -86,3 +86,26 @@ def test_default_columns_are_not_shared_state():
     cfg.columns[0]["statuses"].append("x")
     assert "x" not in DEFAULT_COLUMNS[0]["statuses"]
     assert load_ui_config(S(copy.deepcopy({}))).columns[0]["statuses"] == DEFAULT_COLUMNS[0]["statuses"]
+
+
+def test_index_path_blank_fails_closed():
+    for bad in ("", "   ", 5):
+        with pytest.raises(ConfigError):
+            load_ui_config(S({"ui": {"index_path": bad}}))
+    assert load_ui_config(S({"ui": {"index_path": None}})).index_path is None
+
+
+def test_index_path_resolution(tmp_path, monkeypatch):
+    from careeros.ui.index import default_path
+
+    class St:
+        def __init__(self, ip):
+            self.root = tmp_path / "repo"
+            self.pipeline = {"ui": {"index_path": ip}}
+            self.paths = {"jobs_dir": tmp_path / "repo" / "data" / "jobs"}
+
+    monkeypatch.setenv("HOME", str(tmp_path / "home"))
+    assert default_path(St(None)) == tmp_path / "repo" / "data" / "careeros.db"
+    assert default_path(St("idx/ui.db")) == (tmp_path / "repo" / "idx" / "ui.db").resolve()
+    assert default_path(St(str(tmp_path / "abs.db"))) == tmp_path / "abs.db"
+    assert default_path(St("~/x/ui.db")) == tmp_path / "home" / "x" / "ui.db"

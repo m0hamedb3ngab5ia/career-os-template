@@ -97,7 +97,7 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:
     posting.pop("description_html", None)
     posting.pop("raw", None)
     status = _json(d / "status.json") or {}
-    qa = (_json(d / "qa.json") or {}).get("results")
+    qa = _json(d / "qa.json")
     contacts = (_json(d / "contacts.json") or {}).get("contacts")
     submitted = d / "submitted"
     try:
@@ -111,7 +111,7 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:
         "history": status.get("history") if isinstance(status.get("history"), list) else [],
         "score": _json(d / "score.json"),
         "safety": _json(d / "safety.json"),
-        "qa": qa if isinstance(qa, list) else [],
+        "qa": qa if isinstance(qa, dict) else None,      # the qa-review skill's qa.json as written
         "documents": _files(d, SECTION_FILES),
         "submitted": sorted(p.name for p in submitted.iterdir() if p.is_dir()) if submitted.is_dir() else [],
         "apply_session": _json(d / "apply_session.json"),

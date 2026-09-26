@@ -1,6 +1,6 @@
 """Live updates: watch the data and config folders, re-index what changed, tell the browser once per batch.
 
-watchfiles groups changes that arrive within `ui.watch_debounce_ms` into one batch; plan_changes() turns the
+watchfiles groups changes into one batch until the files have been quiet for `ui.watch_debounce_ms`; plan_changes() turns the
 batch into job ids, run ids and flags; handle() re-indexes those (skipping files whose signature is unchanged)
 and publishes one `changed` SSE event, or nothing when the batch changed nothing the UI shows. A scout run that
 writes hundreds of files therefore costs a few events, not hundreds.
@@ -128,8 +128,10 @@ class Watcher:
         from watchfiles import watch
 
         try:
-            for changes in watch(*dirs, debounce=self.debounce_ms, stop_event=self._stop, recursive=recursive,
-                                 raise_interrupt=False):
+            # step = the quiet window (a batch ends once nothing changed for this long); debounce = the longest a
+            # batch may grow while files keep changing
+            for changes in watch(*dirs, step=self.debounce_ms, debounce=max(1600, 5 * self.debounce_ms),
+                                 stop_event=self._stop, recursive=recursive, raise_interrupt=False):
                 try:
                     self.handle(p for _, p in changes)
                 except Exception:  # noqa: BLE001 - one bad batch must not stop live updates
