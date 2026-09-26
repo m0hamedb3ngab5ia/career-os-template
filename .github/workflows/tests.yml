@@ -7,6 +7,9 @@ on:
 
 jobs:
   pytest:
+    # CI runs only in the public template: private copies have a small Actions quota, so their syncs are
+    # verified locally (`careeros sync pull`). Skipped jobs count as passed there.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -30,6 +33,9 @@ jobs:
         run: pytest -q --cov=careeros --cov-report=term-missing
 
   ui:
+    # CI runs only in the public template: private copies have a small Actions quota, so their syncs are
+    # verified locally (`careeros sync pull`). Skipped jobs count as passed there.
+    if: ${{ !github.event.repository.private }}
     runs-on: ubuntu-latest
     defaults:
       run:
