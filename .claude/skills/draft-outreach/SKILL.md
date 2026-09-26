@@ -19,6 +19,8 @@ first). This skill writes drafts only. It never sends, never creates Gmail draft
 - `templates/outreach/*.md` if present: `linkedin_note.md`, `linkedin_message.md`, `cold_email.md`,
   `followup_7d.md`, `followup_14d.md`. Treat each as structure + length guidance, not text to copy. If a
   template is missing, use the structure below and set `templates_used` accordingly.
+- `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
+  wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.
 
 ## 2. Rules
 
@@ -42,12 +44,16 @@ For each entry in `contacts.json.contacts` produce:
    team + "would like to connect". No links.
 2. `linkedin_message` (60-120 words): after connecting. Fact about their team, one proof with a
    number, the ask (15-min chat or "would you be the right person to ask about <role>?").
-3. `email`: `subject` (<= 60 chars, e.g. "New grad backend applicant: <role> at <company>"), `body`
-   (90-150 words): greeting per rule above, hook fact, proof (bullet ids), ask, sign-off
+3. `email`: when the job is already applied, this is the after-applying outreach (`post_apply_outreach.md`, ~100 words,
+   one hook, one or two proofs, not a mini cover letter). Otherwise: `subject` (<= 60 chars, e.g. "New grad backend
+   applicant: <role> at <company>"), `body` (90-150 words): greeting per rule above, hook fact, proof (bullet ids), ask, sign-off
    `identity.name` + phone + LinkedIn URL from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
 4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.
-5. `followup_14d` (30-50 words): final, polite close-the-loop, leaves the door open. No guilt.
+5. `followup_14d` (30-50 words): final, polite close-the-loop, leaves the door open. No guilt. Only when the contact
+   has replied before; for a cold application with zero contact set it to null (one outreach + at most one follow-up).
+   A recruiter with no verified email still gets `linkedin_note` + `linkedin_message` (the LinkedIn variant, about half
+   the length of the email).
 
 ## 4. Write `JOB/outreach.json`
 

@@ -1,48 +1,54 @@
-# Thank-you email, same day as an interview
+# After interview: thank-you
 
-Sent within 6 hours of the interview, to each interviewer whose email is known (else via recruiter).
-60 to 110 words. Subject: "Thanks, <First>" or "<Role> interview today".
+Send same day or next morning, to each interviewer whose email is known (else via the recruiter). 60 to 120 words.
+**Always manual.** The draft must use at least one real detail from the interview, taken from the candidate's notes in
+the job's `log.md`. If there are no notes yet, create an Action Item asking for them instead of drafting a generic
+thank-you: a thank-you without a real detail reads as automated.
 
 ## Guidance
 
-- Reference one specific thing from the conversation (a problem they described, a question that
-  was hard, something they said about the team). Pulled from the interview notes in the job's `log.md`.
-- If a question went badly, one sentence with the better answer. No excuses.
-- Restate interest in one plain sentence. Don't oversell.
-- No "It was a pleasure", no "I'm confident I", nothing from `config/qa.yaml: banned_phrases`.
-- Sign with the candidate's first name. No phone signature needed; they have it.
+- Pull one real, specific thing from the conversation (a problem they described, a topic you discussed).
+- If a technical question went badly, do not write an essay correcting it. At most one sentence ("I kept thinking about
+  X afterward and realized Y."), and only when it adds value.
+- Restate interest plainly. Don't oversell. Nothing from `config/qa.yaml: banned_phrases`.
 
 ## Skeleton
 
 ```
-Subject: <Role> interview today
+Subject: Thank you, [ROLE] interview
 
-Hi <First>,
+Hi [NAME],
 
-Thanks for the time today. <The specific thing from the conversation, one or two sentences.>
+Thanks again for taking the time to speak with me today about the [ROLE] position.
 
-<Optional: better answer to the hard question, one sentence.>
+I especially enjoyed our conversation about [INTERVIEW DETAIL]. Hearing more about [WHAT YOU LEARNED about the team or
+problem] made me even more interested in the work the team is doing.
 
-<Plain interest sentence.> <What happens next, if known.>
+[Optional: TECHNICAL CONNECTION to the candidate's experience, one or two sentences.]
 
+Thanks again for the conversation. I look forward to hearing what comes next.
+
+Best,
 <Candidate first name>
 ```
 
 ## Example
 
-EXAMPLE (fictional candidate Alex Example) — regenerate in the candidate's voice once samples exist.
+EXAMPLE (fictional candidate Alex Example).
 
 ```
-Subject: Backend SWE interview today
+Subject: Thank you, Backend SWE interview
 
 Hi Priya,
 
-Thanks for the time today. The discussion around retried settlement writes stuck with me; it is close to the FastAPI service I built at Acme that ingests Kafka order events into PostgreSQL, 2 million a day.
+Thanks again for taking the time to speak with me today about the Backend SWE position.
 
-On the partitioning question, I should have said: partition by merchant, not by date, since the hot path is per-merchant reads.
+I especially enjoyed our conversation about retried settlement writes. Hearing how the team moved to idempotency keys made me even more interested in the work.
 
-I'd like to work on this. Happy to do a follow-up round whenever it suits the team.
+I kept thinking about the partitioning question afterward and realized partitioning by merchant fits your per-merchant reads better than by date.
 
+Thanks again for the conversation. I look forward to hearing what comes next.
+
+Best,
 Alex
 ```
-(proof: acme.1; interview detail from log.md)
