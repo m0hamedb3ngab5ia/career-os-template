@@ -20,7 +20,8 @@
   (clauses split on ";", ", and", ", while", " but ", dashes), and a number whose value the posting text or any
   artifact's `facts_used` states is a company fact, never a mismatch.
 - `numbers_paraphrased` (soft, only on findings): a vague or hedged restatement ("nearly half", "dozens of",
-  "nearly 40") of an exact bullet number. Hedging a number the bullet itself hedges ("~2", "about 2") is not reported.
+  "nearly 40") of an exact bullet number. Repeating the bullet's own hedge class ("about 2" for "~2", "more than 40%" for "over 40%") is
+  not reported; flipping a bound ("up to 40%" -> "over 40%") is.
 
 Config (`config/qa.yaml: consistency`, all optional): enabled (true), min_overlap (3), year_window (40),
 role_nouns, seniority_words (lists; defaults below). Findings go to `ck.extras["consistency"]`:
@@ -68,6 +69,14 @@ VAGUE_QTY = {"dozens", "hundreds", "thousands", "millions", "billions", "several
 HEDGE_1 = {"nearly", "almost", "about", "roughly", "around", "approximately", "over", "under", "~", "upwards",
            "approx", "some"}
 HEDGE_2 = {("more", "than"), ("less", "than"), ("fewer", "than"), ("close", "to"), ("up", "to"), ("north", "of")}
+# hedge direction: a restatement may repeat the bullet's own hedge class, never flip a bound ("up to 40%" -> "over 40%")
+HEDGE_LOWER = {"over", "upwards", "more than", "north of"}
+HEDGE_UPPER = {"under", "less than", "fewer than", "up to"}
+
+
+def hedge_class(hedge: str) -> str:
+    """'lower' (a floor: over, more than), 'upper' (a ceiling: under, up to) or 'approx' (about, ~, nearly...)."""
+    return "lower" if hedge in HEDGE_LOWER else "upper" if hedge in HEDGE_UPPER else "approx"
 DATE_WORDS = {"in", "since", "from", "until", "till", "through", "to", "during", "of", "summer", "fall", "autumn",
               "spring", "winter", "class", "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "sept",
               "oct", "nov", "dec", "january", "february", "march", "april", "june", "july", "august", "september",
@@ -79,8 +88,9 @@ DEGREE_RX = {
     "doctorate": re.compile(r"\bph\.?\s?d\b|\bdoctora(?:te|l)\b", re.I),
 }
 SENT_SPLIT = re.compile(r"(?<=[.!?])\s+(?=[A-Z\"'(])|\n+")
-# a word may carry digits after its first letter, so product names (S3, EC2, K8s, OAuth2) never parse as numbers
-TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|[A-Za-z][A-Za-z0-9'-]*|[(–-]")
+# Letters glued to digits with no hyphen (S3, EC2, K8s, OAuth2, v2, Q3, H100) are product / version names, not
+# quantities. Percentiles (p99) and hyphen compounds (sub-100ms, top-10) still yield their number.
+TOKEN_RE = re.compile(r"~|\$|\d[\d,]*(?:\.\d+)?(?:%|[kKmMbB](?![A-Za-z])|x(?![A-Za-z])|\+)?|(?<![A-Za-z0-9])(?![pP]\d+(?![A-Za-z\d]))[A-Za-z]+\d[A-Za-z\d]*|[A-Za-z][A-Za-z'-]*|[(–-]")
 # clause boundaries inside one sentence: a company fact and a bullet claim often share a sentence
 CLAUSE_SPLIT = re.compile(r";|,\s+(?:and|while|whereas)\s+|\s+but\s+|\s*—\s*|\s+–\s+|\s+--?\s+")
 YEAR_RE = re.compile(r"(?<![\w$.,])((?:19|20)\d{2})(?![\d%+]|[.,]\d|\w)")
@@ -186,10 +196,17 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
                 break
             k += 1
         out.append({"value": value, "kind": kind, "unit": set(unit), "hedged": hedged, "vague": vague,
-                    "estimate": prev1 == "~",
+                    "estimate": prev1 == "~", "hedge": hedge,
                     "raw": (hedge + (" " if hedge != "~" else "") if hedge else "") + " ".join(toks[start:j])})
         i = j
     return out
+
+
+def _same_hedge(p: dict[str, Any], r: dict[str, Any]) -> bool:
+    """The restatement repeats the bullet's own hedge: the same class, or approximate for a `~` / approximate bullet."""
+    if not (r["estimate"] or r["hedged"]):
+        return False
+    return hedge_class(p["hedge"]) == hedge_class(r["hedge"] or "~")
 
 
 def _paired(p: dict[str, Any], r: dict[str, Any]) -> bool:
@@ -512,7 +529,7 @@ def _check_numbers(ck: Any, ex: dict[str, Any], docs: list[tuple[str, str, set[s
                 if equal:
                     # hedging is a paraphrase only when the bullet states the number exactly; a bullet that
                     # itself says "about 2 months" (or "~2") may be restated with a hedge
-                    if p["hedged"] and not any(r["estimate"] or r["hedged"] for r in equal):
+                    if p["hedged"] and not any(_same_hedge(p, r) for r in equal):
                         para.append(item)
                 elif p["hedged"] and any(r["estimate"] for r in paired):
                     continue

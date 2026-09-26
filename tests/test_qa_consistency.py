@@ -447,3 +447,60 @@ def test_product_names_are_not_numbers(text: str) -> None:
                                         ("2M events", 2_000_000.0)])
 def test_plain_numbers_still_parse(text: str, value: float) -> None:
     assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+# --- review fixes (#25) -----------------------------------------------------------------------------
+@pytest.mark.parametrize("text,value", [("sub-100ms latency", 100.0), ("cut p99 latency", 99.0),
+                                        ("top-10 customers", 10.0), ("Top-5 accounts", 5.0)])
+def test_metric_compounds_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+@pytest.mark.parametrize("text", ["v2 API", "Q3 roadmap", "H100 GPUs", "IPv6 stack"])
+def test_versions_and_models_are_words(text: str) -> None:
+    assert parse_numbers(text) == []
+
+
+def _metric_job(tmp_path: Path, bullet: str, restated: str) -> Checker:
+    root = make_temp_root(tmp_path / "repo")
+    prof = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    prof["experience"][0]["bullets"].append({"id": "acme.7", "text": bullet})
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(prof, sort_keys=False))
+    out = json.loads(json.dumps(OUTREACH))
+    out["drafts"][0]["email"]["body"] = restated
+    out["drafts"][0]["bullet_ids"] = ["acme.7"]
+    return run(make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.7"], outreach=out))
+
+
+@pytest.mark.parametrize("bullet,restated", [
+    ("Cut checkout p99 latency by 40ms for the payments API at Acme",
+     "At Acme I cut checkout p95 latency by 40ms for the payments API."),
+    ("Cut checkout API latency to sub-100ms for payments at Acme",
+     "At Acme I cut checkout API latency to sub-500ms for payments."),
+])
+def test_changed_metric_compound_in_outreach_is_hard(tmp_path: Path, bullet: str, restated: str) -> None:
+    chk = by_name(_metric_job(tmp_path, bullet, restated), "numbers_consistent")
+    assert chk["ok"] is False and "outreach.json" in chk["detail"]
+
+
+@pytest.mark.parametrize("bullet_phrase,restated", [
+    ("up to 40%", "over 40%"),        # upper bound restated as a lower bound: inflated
+    ("over 40%", "under 40%"),
+    ("about 40%", "over 40%"),        # approximate restated as a floor
+])
+def test_flipped_hedge_still_warns(tmp_path: Path, bullet_phrase: str, restated: str) -> None:
+    b = f"Cut nightly reconciliation runtime by {bullet_phrase} by batching PostgreSQL writes in the settlement job"
+    r = f"At Acme I cut nightly reconciliation runtime by {restated} by batching PostgreSQL writes in the settlement job."
+    ck = _metric_job(tmp_path, b, r)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert by_name(ck, "numbers_paraphrased")["ok"] is False
+
+
+@pytest.mark.parametrize("bullet_phrase,restated", [("about 40%", "roughly 40%"), ("up to 40%", "up to 40%"),
+                                                     ("over 40%", "more than 40%"), ("~40%", "about 40%")])
+def test_same_class_hedge_is_silent(tmp_path: Path, bullet_phrase: str, restated: str) -> None:
+    b = f"Cut nightly reconciliation runtime by {bullet_phrase} by batching PostgreSQL writes in the settlement job"
+    r = f"At Acme I cut nightly reconciliation runtime by {restated} by batching PostgreSQL writes in the settlement job."
+    ck = _metric_job(tmp_path, b, r)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert "numbers_paraphrased" not in names(ck), by_name(ck, "numbers_paraphrased")["detail"]
