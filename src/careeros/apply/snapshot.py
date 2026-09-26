@@ -11,7 +11,8 @@ prepared from what the company actually read.
 
 Layout: `data/jobs/<id>/submitted/<UTC stamp>/` holding copies of the documents that exist plus
 `manifest.json` {job_id, frozen_at, reason, resume_version, confirmation_text, files[{name, sha256, bytes}],
-answers_entered[{label, value, source}]}. Snapshots are never overwritten (a same-second freeze gets `-2`)
+answers_entered[{label, value, source}]}. Values of secret fields (passwords, verification/one-time codes,
+security answers, tokens, keys; see `session.is_secret_label`) are stored as `<redacted>`. Snapshots are never overwritten (a same-second freeze gets `-2`)
 and their files are made read-only.
 
 `Store.set_status(..., "applied")` freezes automatically when a job has no snapshot yet, so every applied
@@ -28,7 +29,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Mapping
 
-from careeros.apply.session import SESSION_FILE, ApplySession
+from careeros.apply.session import SESSION_FILE, ApplySession, redact_entry
 
 SNAPSHOT_DIR = "submitted"
 MANIFEST = "manifest.json"
@@ -64,12 +65,12 @@ def _normalize_answers(answers: list[Mapping[str, Any]] | Mapping[str, Any] | No
     if not answers:
         return []
     if isinstance(answers, Mapping):
-        return [{"label": str(k), "value": v, "source": None} for k, v in answers.items()]
+        return [redact_entry({"label": str(k), "value": v, "source": None}) for k, v in answers.items()]
     out = []
     for a in answers:
         if not isinstance(a, Mapping) or "label" not in a:
             raise ValueError("each entered answer needs a 'label'")
-        out.append({"label": str(a["label"]), "value": a.get("value"), "source": a.get("source")})
+        out.append(redact_entry({"label": str(a["label"]), "value": a.get("value"), "source": a.get("source")}))
     return out
 
 
@@ -143,7 +144,9 @@ def freeze(job_dir: str | Path, *, reason: str | None = None,
         "files": files,
         "answers_entered": entered,
     }
-    (out / MANIFEST).write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp = out / (MANIFEST + ".tmp")  # atomic: a crash never leaves a truncated manifest behind
+    tmp.write_text(json.dumps(manifest, indent=2, ensure_ascii=False), encoding="utf-8")
+    tmp.replace(out / MANIFEST)
 
     ro = stat.S_IRUSR | stat.S_IRGRP | stat.S_IROTH
     for p in out.iterdir():

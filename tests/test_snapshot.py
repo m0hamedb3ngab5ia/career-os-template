@@ -166,3 +166,91 @@ def test_list_jobs_reports_submitted_at(settings):
     assert st.list_jobs()[0]["submitted_at"] is None
     st.set_status("j1", "applied")
     assert st.list_jobs()[0]["submitted_at"] == snapshot.latest(st.job_dir("j1"))["frozen_at"]
+
+
+# --- secrets never recorded (review #20) -------------------------------------------------------------
+
+@pytest.mark.parametrize("label", [
+    "Password", "Confirm password", "Create Password*", "Passcode", "Verification code", "Enter the 6-digit code",
+    "One-time code", "OTP", "Security code", "Security question", "Answer to security question", "API key",
+    "Access token", "Client secret", "Code",
+])
+def test_record_field_redacts_secrets(label):
+    s = ApplySession.start("abc123def456", "workday")
+    e = s.record_field(label, "hunter2", "profile")
+    assert e["value"] == "<redacted>"
+    assert s.entered[-1]["value"] == "<redacted>"
+
+
+@pytest.mark.parametrize("label", [
+    "Zip code", "Postal Code", "Country code", "Phone country code", "Area code", "Promo code", "Referral code",
+    "First name", "Email", "Why us?",
+])
+def test_record_field_keeps_ordinary_fields(label):
+    s = ApplySession.start("abc123def456", "workday")
+    assert s.record_field(label, "07030", "profile")["value"] == "07030"
+
+
+def test_session_file_never_holds_a_secret_appended_directly(tmp_path):
+    jd = _job(tmp_path)
+    s = ApplySession.start("abc123def456", "workday")
+    s.entered.append({"label": "Password", "value": "hunter2", "source": "profile"})
+    s.save(jd)
+    assert "hunter2" not in (jd / "apply_session.json").read_text()
+
+
+def test_freeze_redacts_answers_passed_in(tmp_path):
+    jd = _job(tmp_path)
+    out = snapshot.freeze(jd, answers_entered=[{"label": "Password", "value": "hunter2"},
+                                               {"label": "Zip code", "value": "07030"}])
+    text = (out / "manifest.json").read_text()
+    assert "hunter2" not in text
+    m = json.loads(text)
+    assert [a["value"] for a in m["answers_entered"]] == ["<redacted>", "07030"]
+    out2 = snapshot.freeze(jd, answers_entered={"Verification code": "123456"})
+    assert json.loads((out2 / "manifest.json").read_text())["answers_entered"][0]["value"] == "<redacted>"
+
+
+def test_freeze_redacts_secrets_in_saved_session(tmp_path):
+    jd = _job(tmp_path)
+    (jd / "apply_session.json").write_text(json.dumps({
+        "job_id": "abc123def456", "ats": "workday",
+        "entered": [{"label": "Password", "value": "hunter2", "source": "profile"}]}))
+    out = snapshot.freeze(jd)
+    assert json.loads((out / "manifest.json").read_text())["answers_entered"][0]["value"] == "<redacted>"
+
+
+# --- auto-freeze never blocks a status change (review #20) -------------------------------------------
+
+@pytest.mark.parametrize("target,exc", [
+    ("freeze", PermissionError("denied")),
+    ("latest", PermissionError("denied")),
+    ("latest", json.JSONDecodeError("bad", "{", 0)),
+    ("freeze", ValueError("each entered answer needs a 'label'")),
+])
+def test_status_applied_survives_snapshot_failure(settings, monkeypatch, target, exc):
+    st = _store_job(settings)
+
+    def boom(*a, **k):
+        raise exc
+
+    monkeypatch.setattr(snapshot, target, boom)
+    st.set_status("j1", "applied")
+    assert st.get_status("j1") == "applied"
+    assert "snapshot failed" in st.read_log("j1")
+
+
+def test_manifest_written_atomically(tmp_path, monkeypatch):
+    jd = _job(tmp_path)
+    real = Path.write_text
+    calls = []
+
+    def spy(self, *a, **k):
+        calls.append(self.name)
+        return real(self, *a, **k)
+
+    monkeypatch.setattr(Path, "write_text", spy)
+    out = snapshot.freeze(jd)
+    assert "manifest.json" not in calls and any(c.startswith("manifest.json") for c in calls)
+    assert sorted(p.name for p in out.iterdir() if p.name.startswith("manifest")) == ["manifest.json"]
+    assert json.loads((out / "manifest.json").read_text())["job_id"] == "abc123def456"

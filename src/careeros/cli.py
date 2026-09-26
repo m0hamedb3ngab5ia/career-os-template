@@ -409,6 +409,10 @@ def cmd_job_freeze(args: argparse.Namespace) -> int:
         except json.JSONDecodeError as e:
             print(f"job freeze: --answers-json is not valid JSON: {e}", file=sys.stderr)
             return 2
+        if not isinstance(answers, (list, dict)):
+            print("job freeze: --answers-json must be a JSON list of {label, value, source} or an object",
+                  file=sys.stderr)
+            return 2
     try:
         out = freeze(store.job_dir(args.job_id), reason=args.reason, answers_entered=answers)
     except ValueError as e:

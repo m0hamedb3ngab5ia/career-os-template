@@ -114,11 +114,11 @@ class Store:
         from careeros.apply import snapshot
 
         jd = self.job_dir(job_id)
-        if snapshot.latest(jd):
-            return
         try:
+            if snapshot.latest(jd):
+                return
             out = snapshot.freeze(jd)
-        except OSError as e:  # never block a status change on a copy failure
+        except (OSError, ValueError) as e:  # never block a status change (ValueError covers bad JSON)
             self.append_log(job_id, f"snapshot failed: {e}", component="snapshot")
             return
         self.append_log(job_id, f"frozen as-submitted copy -> {out.relative_to(jd)}", component="snapshot")

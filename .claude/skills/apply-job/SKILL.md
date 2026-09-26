@@ -133,7 +133,11 @@ hit = answer_for(label, "profile/standard_answers.yaml", required=<field is mark
   - Respect `maxlength`; an over-limit answer is a STOP (type `question`).
 - After filling any field, record what went in: `s.record_field(label, value, source)` with `source` one of
   `profile`, `standard`, `eeo`, `essay`, `salary`, `upload` (for uploads the value is the file name). These
-  values are kept in the as-submitted snapshot (section 5).
+  values are kept in the as-submitted snapshot (section 5). Secrets are never recorded: do not pass a
+  password (e.g. the Workday account password), a verification or one-time code, a security question
+  answer, a token or an API key to `record_field` or `--answers-json`, and never write them in `s.step`
+  notes, `log.md` or the RESULT line. As a backstop, `record_field` and `freeze` store `<redacted>` for any
+  label matching `careeros.apply.session.is_secret_label`.
 - After each page/step in multi-page flows: screenshot, `s.step`.
 
 ## 4. EEO

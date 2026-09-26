@@ -97,3 +97,21 @@ def test_apply_skill_flow_freezes_once_with_entered_values(temp_root: Path, home
     m = latest(jd)
     assert m["reason"] == "submitted" and m["resume_version"] == "swe_backend-v1"
     assert [a["value"] for a in m["answers_entered"]] == ["Alex", "Staplers."]
+
+
+@pytest.mark.parametrize("payload", ["1", "true", '"text"', "null"])
+def test_job_freeze_rejects_non_list_answers(temp_root: Path, home: Path, payload: str):
+    jd = _seed(temp_root)
+    r = _cli(temp_root, home, "job", "freeze", jd.name, "--answers-json", "-", stdin=payload)
+    assert r.returncode == 2, r.stderr
+    assert "Traceback" not in r.stderr and "answers-json" in r.stderr
+    assert not (jd / "submitted").exists()
+
+
+def test_job_freeze_redacts_password_from_stdin(temp_root: Path, home: Path):
+    jd = _seed(temp_root)
+    answers = json.dumps([{"label": "Password", "value": "hunter2"}, {"label": "Email", "value": "a@example.com"}])
+    r = _cli(temp_root, home, "job", "freeze", jd.name, "--answers-json", "-", stdin=answers)
+    assert r.returncode == 0, r.stderr
+    out = Path(r.stdout.strip().split()[-1])
+    assert "hunter2" not in (out / "manifest.json").read_text()
