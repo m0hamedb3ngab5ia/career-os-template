@@ -141,10 +141,10 @@ def parse_numbers(text: str) -> list[dict[str, Any]]:
     # Amounts stay facts: a suffix (USD5M, Top5%, 10x) or an amount prefix (USD5000, approx60) marks a quantity.
     glued_at = set()
     for i, (tok, pos) in enumerate(spans):
-        if not pos or not text[pos - 1].isalpha() or not re.fullmatch(r"\d[\d,]*(?:\.\d+)?", tok):
+        if not pos or not re.fullmatch(r"\d[\d,]*(?:\.\d+)?", tok):
             continue
-        prefix = re.search(r"[A-Za-z]+$", text[:pos]).group().lower()
-        if prefix not in AMOUNT_PREFIXES:
+        m = re.search(r"[A-Za-z]+$", text[:pos])  # ASCII letters only: "café3", "経験3年" are not product names
+        if m and m.group().lower() not in AMOUNT_PREFIXES:
             glued_at.add(i)
     low = [t.lower() for t in toks]
     out: list[dict[str, Any]] = []

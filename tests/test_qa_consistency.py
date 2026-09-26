@@ -583,3 +583,16 @@ def test_currency_glued_posting_amount_is_a_company_fact(tmp_path: Path, posting
                                                          "description_text": posting}))
     chk = by_name(run(Checker(ck.job_dir, ck.root)), "numbers_consistent")
     assert chk["ok"], chk["detail"]
+
+
+# --- review fixes (#25, round 5): non-ASCII letters before a digit never crash -------------------------------
+@pytest.mark.parametrize("text", ["β2 service", "経験3年以上", "Zürich office, café3 perks"])
+def test_non_ascii_letter_before_digit_does_not_crash(text: str) -> None:
+    parse_numbers(text)
+
+
+def test_non_ascii_posting_runs_cross_doc(tmp_path: Path) -> None:
+    ck = make_job(tmp_path)
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": "Tokyo team: 経験3年以上, café3 perks"}))
+    run(Checker(ck.job_dir, EXAMPLE_REPO))
