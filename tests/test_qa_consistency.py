@@ -11,7 +11,7 @@ from conftest import EXAMPLE_REPO, build_resume_json, make_temp_root
 from test_qa import COVER_LETTER, RESUME_TXT
 
 from careeros.qa import Checker
-from careeros.qa_ext.consistency import check_cross_doc
+from careeros.qa_ext.consistency import check_cross_doc, parse_numbers
 
 pytestmark = pytest.mark.unit
 
@@ -398,3 +398,201 @@ def test_top_level_followups_are_checked(tmp_path: Path) -> None:
     ck = run(make_job(tmp_path, outreach=out))
     chk = by_name(ck, "numbers_consistent")
     assert chk["ok"] is False and "followups" in chk["detail"]
+
+
+# --- hedged bullet numbers --------------------------------------------------------------------------
+def _hedged_root(tmp_path: Path, bullet_phrase: str) -> tuple[Path, dict]:
+    root = make_temp_root(tmp_path / "repo")
+    prof = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    prof["experience"][0]["bullets"].append({
+        "id": "acme.6",
+        "text": f"Deployed the reconciliation dashboard to production {bullet_phrase} of joining, running on Kubernetes"})
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(prof, sort_keys=False))
+    return root, prof
+
+
+def _hedged_job(tmp_path: Path, bullet_phrase: str, restated: str) -> Checker:
+    root, prof = _hedged_root(tmp_path, bullet_phrase)
+    text = f"At Acme I deployed the reconciliation dashboard to production {restated}, running on Kubernetes."
+    return run(make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                        answers=answer(text, ids=("acme.6",))))
+
+
+@pytest.mark.parametrize("restated", ["in about 2 months", "within roughly 2 months"])
+def test_hedge_copied_from_bullet_is_not_a_paraphrase(tmp_path: Path, restated: str) -> None:
+    # the bullet itself says "about 2 months": repeating that hedge is the bullet's own wording
+    ck = _hedged_job(tmp_path, "within about 2 months", restated)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert "numbers_paraphrased" not in names(ck), by_name(ck, "numbers_paraphrased")["detail"]
+
+
+def test_hedging_an_exact_bullet_number_still_warns_and_names_the_hedge(tmp_path: Path) -> None:
+    ck = _hedged_job(tmp_path, "within 2 months", "in about 2 months")
+    chk = by_name(ck, "numbers_paraphrased")
+    assert chk["ok"] is False and "'about 2'" in chk["detail"]
+    assert ck.extras["consistency"]["number_paraphrases"][0]["found"] == "about 2"
+
+
+def test_hedged_bullet_with_changed_number_is_still_hard(tmp_path: Path) -> None:
+    ck = _hedged_job(tmp_path, "within about 2 months", "in about 3 months")
+    assert by_name(ck, "numbers_consistent")["ok"] is False
+
+
+@pytest.mark.parametrize("text", ["AWS (Glue, Athena, S3)", "EC2 and K8s", "Web3 and OAuth2", "TLS1.3", "v2.3 API",
+                                  "Python3.12", "OAuth2.0", "H100 GPUs"])
+def test_product_names_are_flagged_glued(text: str) -> None:
+    nums = parse_numbers(text)
+    assert nums and all(p["glued"] for p in nums)
+
+
+@pytest.mark.parametrize("text,value", [("ran on 3 nodes", 3.0), ("Python 3.12", 3.12), ("cut latency 10x", 10.0),
+                                        ("2M events", 2_000_000.0)])
+def test_plain_numbers_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+# --- review fixes (#25) -----------------------------------------------------------------------------
+@pytest.mark.parametrize("text,value", [("sub-100ms latency", 100.0), ("cut p99 latency", 99.0),
+                                        ("top-10 customers", 10.0), ("Top-5 accounts", 5.0)])
+def test_metric_compounds_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+
+
+def _metric_job(tmp_path: Path, bullet: str, restated: str) -> Checker:
+    root = make_temp_root(tmp_path / "repo")
+    prof = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    prof["experience"][0]["bullets"].append({"id": "acme.7", "text": bullet})
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(prof, sort_keys=False))
+    out = json.loads(json.dumps(OUTREACH))
+    out["drafts"][0]["email"]["body"] = restated
+    out["drafts"][0]["bullet_ids"] = ["acme.7"]
+    return run(make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.7"], outreach=out))
+
+
+@pytest.mark.parametrize("bullet,restated", [
+    ("Cut checkout p99 latency by 40ms for the payments API at Acme",
+     "At Acme I cut checkout p95 latency by 40ms for the payments API."),
+    ("Cut checkout API latency to sub-100ms for payments at Acme",
+     "At Acme I cut checkout API latency to sub-500ms for payments."),
+])
+def test_changed_metric_compound_in_outreach_is_hard(tmp_path: Path, bullet: str, restated: str) -> None:
+    chk = by_name(_metric_job(tmp_path, bullet, restated), "numbers_consistent")
+    assert chk["ok"] is False and "outreach.json" in chk["detail"]
+
+
+@pytest.mark.parametrize("bullet_phrase,restated", [
+    ("up to 40%", "over 40%"),        # upper bound restated as a lower bound: inflated
+    ("over 40%", "under 40%"),
+    ("about 40%", "over 40%"),        # approximate restated as a floor
+])
+def test_flipped_hedge_still_warns(tmp_path: Path, bullet_phrase: str, restated: str) -> None:
+    b = f"Cut nightly reconciliation runtime by {bullet_phrase} by batching PostgreSQL writes in the settlement job"
+    r = f"At Acme I cut nightly reconciliation runtime by {restated} by batching PostgreSQL writes in the settlement job."
+    ck = _metric_job(tmp_path, b, r)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert by_name(ck, "numbers_paraphrased")["ok"] is False
+
+
+@pytest.mark.parametrize("bullet_phrase,restated", [("about 40%", "roughly 40%"), ("up to 40%", "up to 40%"),
+                                                     ("over 40%", "more than 40%"), ("~40%", "about 40%")])
+def test_same_class_hedge_is_silent(tmp_path: Path, bullet_phrase: str, restated: str) -> None:
+    b = f"Cut nightly reconciliation runtime by {bullet_phrase} by batching PostgreSQL writes in the settlement job"
+    r = f"At Acme I cut nightly reconciliation runtime by {restated} by batching PostgreSQL writes in the settlement job."
+    ck = _metric_job(tmp_path, b, r)
+    assert by_name(ck, "numbers_consistent")["ok"]
+    assert "numbers_paraphrased" not in names(ck), by_name(ck, "numbers_paraphrased")["detail"]
+
+
+# --- review fixes (#25, round 2) --------------------------------------------------------------------
+
+
+@pytest.mark.parametrize("text,value", [("p99.9 latency", 99.9), ("Python 3.12", 3.12)])
+def test_dotted_numbers_still_parse(text: str, value: float) -> None:
+    assert [p["value"] for p in parse_numbers(text)] == [value]
+
+
+def test_glued_version_in_posting_does_not_excuse_changed_number(tmp_path: Path) -> None:
+    root, prof = _hedged_root(tmp_path, "within 2 months")
+    text = "At Acme I deployed the reconciliation dashboard to production in 3 months, running on Kubernetes."
+    ck = make_job(tmp_path, root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                  answers=answer(text, ids=("acme.6",)))
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": "Our services speak TLS1.3 only."}))
+    ck = run(Checker(ck.job_dir, root))
+    assert by_name(ck, "numbers_consistent")["ok"] is False
+
+
+# --- review fixes (#25, round 3): the tokenizer is main's; glued numbers are only dropped from company facts ----
+@pytest.mark.parametrize("text,value,kind", [("USD5M savings", 5_000_000.0, ""), ("Top5% of teams", 5.0, "%"),
+                                             ("approx60% faster", 60.0, "%"), ("CAD300k budget", 300_000.0, "")])
+def test_glued_quantities_still_parse(text: str, value: float, kind: str) -> None:
+    [p] = parse_numbers(text)
+    assert (p["value"], p["kind"]) == (value, kind)
+
+
+@pytest.mark.parametrize("bullet,restated", [
+    ("Saved USD 2M in annual cloud spend at Acme by rightsizing the payments cluster",
+     "At Acme I saved USD5M in annual cloud spend by rightsizing the payments cluster."),
+    ("Ranked in the top 1% of Acme engineers for payments incident response",
+     "At Acme I ranked in the Top5% of engineers for payments incident response."),
+])
+def test_changed_glued_quantity_is_hard(tmp_path: Path, bullet: str, restated: str) -> None:
+    chk = by_name(_metric_job(tmp_path, bullet, restated), "numbers_consistent")
+    assert chk["ok"] is False
+
+
+@pytest.mark.parametrize("posting", ["We store reports in AWS S3.", "EC2 fleet", "Our services speak TLS1.3 only."])
+def test_glued_product_numbers_are_not_company_facts(tmp_path: Path, posting: str) -> None:
+    root, prof = _hedged_root(tmp_path, "within 2 months")
+    restated = "3" if "S3" in posting or "TLS" in posting else "2"
+    if restated == "2":  # EC2: restate a changed 2 -> must still fail when the bullet says a different number
+        root, prof = _hedged_root(tmp_path / "b", "within 4 months")
+    text = f"At Acme I deployed the reconciliation dashboard to production in {restated} months, running on Kubernetes."
+    ck = make_job(tmp_path / "j", root=root, profile=prof, resume_ids=RESUME_IDS + ["acme.6"],
+                  answers=answer(text, ids=("acme.6",)))
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": posting}))
+    assert by_name(run(Checker(ck.job_dir, root)), "numbers_consistent")["ok"] is False
+
+
+# --- review fixes (#25, round 4): currency / hedge-glued amounts in the posting are still company facts ------
+@pytest.mark.parametrize("text,glued", [("USD5M", False), ("EUR2M", False), ("CAD300k", False), ("Top5%", False),
+                                        ("approx60%", False), ("USD5000", False), ("S3", True), ("EC2", True),
+                                        ("TLS1.3", True), ("H100", True)])
+def test_glued_flag_is_only_for_product_names(text: str, glued: bool) -> None:
+    [p] = parse_numbers(text)
+    assert p["glued"] is glued
+
+
+@pytest.mark.parametrize("posting,bullet,restated", [
+    ("We manage USD5M in annual cloud spend.",
+     "Saved USD 2M in annual cloud spend at Acme by rightsizing the payments cluster",
+     "At Acme I saved USD 2M in annual cloud spend by rightsizing the payments cluster, useful for a team "
+     "managing USD 5M in cloud spend."),
+    ("Nightly settlement runtime grew approx60% last year.",
+     "Cut nightly settlement runtime by 40% by batching PostgreSQL writes at Acme",
+     "At Acme I cut nightly settlement runtime by 40% by batching PostgreSQL writes; your settlement runtime "
+     "grew 60%."),
+])
+def test_currency_glued_posting_amount_is_a_company_fact(tmp_path: Path, posting: str, bullet: str,
+                                                          restated: str) -> None:
+    ck = _metric_job(tmp_path, bullet, restated)
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": posting}))
+    chk = by_name(run(Checker(ck.job_dir, ck.root)), "numbers_consistent")
+    assert chk["ok"], chk["detail"]
+
+
+# --- review fixes (#25, round 5): non-ASCII letters before a digit never crash -------------------------------
+@pytest.mark.parametrize("text", ["β2 service", "経験3年以上", "Zürich office, café3 perks"])
+def test_non_ascii_letter_before_digit_does_not_crash(text: str) -> None:
+    parse_numbers(text)
+
+
+def test_non_ascii_posting_runs_cross_doc(tmp_path: Path) -> None:
+    ck = make_job(tmp_path)
+    (ck.job_dir / "posting.json").write_text(json.dumps({"company": "Ledgerline", "title": "Backend Engineer",
+                                                         "description_text": "Tokyo team: 経験3年以上, café3 perks"}))
+    run(Checker(ck.job_dir, EXAMPLE_REPO))
