@@ -49,12 +49,20 @@ describe("Job detail screen", () => {
     expect(document.title).toBe("Northwind Labs · career-os");
   });
 
+  it("Set status never offers applied: that goes only through the confirmed Mark submitted path", async () => {
+    setup();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Set status" }));
+    const menu = screen.getByRole("menu", { name: "Set status" });
+    expect(within(menu).queryByRole("menuitemradio", { name: "Applied" })).not.toBeInTheDocument();
+  });
+
   it("Set status: a menu of meta.statuses; picking one posts it and offers Undo", async () => {
     const { api } = setup();
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Set status" }));
     const menu = screen.getByRole("menu", { name: "Set status" });
-    expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(META.statuses.length);
+    expect(within(menu).getAllByRole("menuitemradio")).toHaveLength(META.statuses.filter((x) => x !== "applied").length);
     expect(within(menu).getByRole("menuitemradio", { name: "Needs review" })).toHaveAttribute("aria-checked", "true");
     expect(within(menu).getByRole("menuitemradio", { name: "Needs review" })).toHaveFocus();
     await user.click(within(menu).getByRole("menuitemradio", { name: "Interview" }));

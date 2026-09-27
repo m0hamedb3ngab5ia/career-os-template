@@ -1,3 +1,4 @@
+import { useEffect, useRef, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { Button } from "../../kit/Button";
 import { ActionTypeLabel, NeedsLabel, PriorityChip } from "../../kit/chips";
@@ -37,6 +38,10 @@ export function NeedsYou() {
   const markDone = useMarkDone();
   const reopen = useReopen();
   const undoSeconds = meta.data?.ui?.undo_seconds;
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  const listRef = useRef<HTMLUListElement>(null);
+  /** After Mark done: the row that left and the row whose control takes focus (null = the heading). */
+  const [refocus, setRefocus] = useState<{ done: string; next: string | null } | null>(null);
 
   function setParam(key: "sort" | "filter", value: string, fallback: string) {
     setParams(
@@ -51,6 +56,9 @@ export function NeedsYou() {
   }
 
   function onDone(item: ActionItem) {
+    const i = shown.findIndex((a) => a.id === item.id);
+    const next = shown[i + 1] ?? shown[i - 1];
+    setRefocus({ done: String(item.id), next: next ? String(next.id) : null });
     markDone.mutate(item, {
       onSuccess: (res) =>
         toast.show({
@@ -67,12 +75,21 @@ export function NeedsYou() {
 
   const all = today.data?.actions ?? [];
   const shown = sortActions(filterActions(all, filter, now), sort);
+  useEffect(() => {
+    if (!refocus || shown.some((a) => String(a.id) === refocus.done)) return;
+    setRefocus(null);
+    const target =
+      refocus.next === null
+        ? null
+        : listRef.current?.querySelector<HTMLElement>(`[data-action-id="${CSS.escape(refocus.next)}"] [role="checkbox"]`);
+    (target ?? headingRef.current)?.focus();
+  });
   const countLabel = shown.length === all.length ? formatCount(all.length) : `${formatCount(shown.length)} of ${formatCount(all.length)}`;
 
   return (
     <section className={styles.list} aria-labelledby="needs-you-title" aria-busy={today.isPending || undefined}>
       <div className={styles.listHead}>
-        <h2 id="needs-you-title" className={styles.h2}>
+        <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className={styles.h2}>
           Needs you {today.data ? <span className={`${styles.count} tabular`}>{countLabel}</span> : null}
         </h2>
         <Link to="/actions" className={styles.headLink}>
@@ -123,7 +140,7 @@ export function NeedsYou() {
               </button>
             </p>
           ) : (
-            <ul className={styles.rows}>
+            <ul ref={listRef} className={styles.rows}>
               {shown.map((item) => (
                 <ActionRow key={item.id} item={item} now={now} onDone={onDone} />
               ))}
@@ -139,7 +156,7 @@ function ActionRow({ item, now, onDone }: { item: ActionItem; now: Date; onDone:
   const due = dueInfo(item.due, now);
   const link = linkInfo(item.link);
   return (
-    <li className={styles.row}>
+    <li className={styles.row} data-action-id={String(item.id)}>
       <span className={styles.rowDone}>
         <MarkDoneCircle done={false} onDoneChange={() => onDone(item)} itemName={`${item.company}: ${item.what}`} />
       </span>

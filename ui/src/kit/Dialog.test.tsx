@@ -4,11 +4,11 @@ import { useState } from "react";
 import { describe, expect, it } from "vitest";
 import { axeViolations } from "../test/axe";
 import { Button } from "./Button";
-import { Dialog, Sheet } from "./Dialog";
+import { Dialog } from "./Dialog";
 
-function Demo({ kind }: { kind: "dialog" | "sheet" }) {
+function Demo() {
   const [open, setOpen] = useState(false);
-  const Frame = kind === "dialog" ? Dialog : Sheet;
+  const Frame = Dialog;
   return (
     <>
       <Button onClick={() => setOpen(true)}>Evidence</Button>
@@ -20,10 +20,10 @@ function Demo({ kind }: { kind: "dialog" | "sheet" }) {
   );
 }
 
-describe.each(["dialog", "sheet"] as const)("%s", (kind) => {
+describe("Dialog", () => {
   it("opens as a labelled modal dialog, traps Tab, and Escape returns focus to the opener", async () => {
     const user = userEvent.setup();
-    render(<Demo kind={kind} />);
+    render(<Demo />);
     const opener = screen.getByRole("button", { name: "Evidence" });
     await user.click(opener);
     const dlg = screen.getByRole("dialog", { name: "Evidence for old posting" });
@@ -44,7 +44,7 @@ describe.each(["dialog", "sheet"] as const)("%s", (kind) => {
 
   it("the Close button closes it", async () => {
     const user = userEvent.setup();
-    render(<Demo kind={kind} />);
+    render(<Demo />);
     await user.click(screen.getByRole("button", { name: "Evidence" }));
     await user.click(screen.getByRole("button", { name: "Close" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
@@ -52,7 +52,7 @@ describe.each(["dialog", "sheet"] as const)("%s", (kind) => {
 
   it("has no axe violations", { timeout: 20_000 }, async () => {
     const user = userEvent.setup();
-    render(<Demo kind={kind} />);
+    render(<Demo />);
     await user.click(screen.getByRole("button", { name: "Evidence" }));
     expect(await axeViolations(document.body)).toEqual([]);
   });

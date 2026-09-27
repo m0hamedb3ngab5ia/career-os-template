@@ -37,7 +37,7 @@ function ModalFrame({
   footer,
   children,
   className,
-}: ModalProps & { variant: "dialog" | "sheet" }) {
+}: ModalProps & { variant: "dialog" }) {
   const titleId = useId();
   const descId = useId();
   const ref = useRef<HTMLDivElement>(null);
@@ -119,7 +119,3 @@ export function Dialog(props: ModalProps) {
   return <ModalFrame variant="dialog" {...props} />;
 }
 
-/** Side sheet for edits and confirmations (docs/UI.md: "sheets for edits, not modal dialogs"). */
-export function Sheet(props: ModalProps) {
-  return <ModalFrame variant="sheet" {...props} />;
-}
