@@ -1,0 +1,110 @@
+{
+  "counts": {
+    "done": 1,
+    "open": 4,
+    "today": 1
+  },
+  "group": "due",
+  "groups": [
+    {
+      "count": 1,
+      "items": [
+        {
+          "bucket": "tomorrow",
+          "company": "Umbrella Labs",
+          "created": "<created>",
+          "done": false,
+          "done_date": null,
+          "due": "2026-09-25T15:00:00+00:00",
+          "due_date_only": false,
+          "due_reason": "posting closes",
+          "id": "<id>",
+          "job_id": "<job_review>",
+          "level": "soon",
+          "link": "https://boards.example.com/review",
+          "needs": "laptop",
+          "priority": "H",
+          "role": "Infrastructure Engineer",
+          "scam_actions": false,
+          "type": "review",
+          "what": "Review and submit"
+        }
+      ],
+      "key": "tomorrow"
+    },
+    {
+      "count": 3,
+      "items": [
+        {
+          "bucket": "nodate",
+          "company": "Obsidian Quant Partners",
+          "created": "<created>",
+          "done": false,
+          "done_date": null,
+          "due": null,
+          "due_date_only": false,
+          "due_reason": null,
+          "id": "<id>",
+          "job_id": "<job_scam>",
+          "level": "none",
+          "link": "https://obsidian-careers.example/jobs/1",
+          "needs": "phone",
+          "priority": "H",
+          "role": "Quant Developer",
+          "scam_actions": true,
+          "type": "scam_suspected",
+          "what": "Posting asks for a paid equipment kit. Block the company or mark the posting safe"
+        },
+        {
+          "bucket": "nodate",
+          "company": "Initech",
+          "created": "<created>",
+          "done": false,
+          "done_date": null,
+          "due": null,
+          "due_date_only": false,
+          "due_reason": null,
+          "id": "<id>",
+          "job_id": "<job_queued>",
+          "level": "none",
+          "link": "",
+          "needs": "anytime",
+          "priority": "M",
+          "role": "Platform Engineer",
+          "scam_actions": false,
+          "type": "salary",
+          "what": "Answer the salary question"
+        },
+        {
+          "bucket": "nodate",
+          "company": "Stark Industries",
+          "created": "<created>",
+          "done": false,
+          "done_date": null,
+          "due": null,
+          "due_date_only": false,
+          "due_reason": null,
+          "id": "<id>",
+          "job_id": "<job_interview>",
+          "level": "none",
+          "link": "",
+          "needs": "phone",
+          "priority": "L",
+          "role": "Software Engineer",
+          "scam_actions": false,
+          "type": "send_linkedin",
+          "what": "Send the LinkedIn note"
+        }
+      ],
+      "key": "nodate"
+    }
+  ],
+  "head": {
+    "overdue": 0,
+    "soon": 1
+  },
+  "more_done": 0,
+  "now": "2026-09-24T15:00:00+00:00",
+  "sort": "soonest",
+  "tab": "open"
+}
