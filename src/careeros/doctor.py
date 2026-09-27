@@ -386,7 +386,7 @@ def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None =
 
 
 def check_runs(pipeline: dict[str, Any]) -> list[Check]:
-    """`pipeline.yaml: runs`, `llm`, `schedule`, `storage` / `advisor` parse; the headless command streams. Every
+    """`pipeline.yaml: runs`, `llm`, `schedule`, `storage` / `advisor`, `ui` parse; the headless command streams. Every
     block is checked on its own, so one warning never hides another block's FAIL."""
     from careeros.config import ConfigError
     from careeros.runs.config import load_runs_config
@@ -420,7 +420,30 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
         load_advisor_config(pipeline)
     except ConfigError as e:
         out.append(Check(FAIL, "advisor", str(e)))
+    from careeros.ui.config import load_ui_config
+
+    try:
+        load_ui_config(p)
+    except ConfigError as e:
+        out.append(Check(FAIL, "ui", str(e)))
     return out
+
+
+def check_ui_index(root: Path) -> list[Check]:
+    """`ui.index_path` must not point at the candidate's own files (`careeros ui` refuses to start on it)."""
+    from careeros.config import ConfigError, Settings
+    from careeros.ui.index import default_path
+
+    try:
+        s = Settings.load(root)
+    except ConfigError:
+        return []                         # reported by the yaml / schema / runs checks
+    try:
+        default_path(s)
+    except ConfigError as e:
+        if "index_path" in str(e):
+            return [Check(FAIL, "ui", str(e))]
+    return []
 
 
 def check_voice(root: Path) -> Check:
@@ -488,6 +511,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
     checks += check_runs(cfg["pipeline"])
+    checks += check_ui_index(root)
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)

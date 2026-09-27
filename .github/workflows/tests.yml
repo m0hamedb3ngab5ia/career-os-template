@@ -18,7 +18,7 @@ jobs:
         run: echo "present=$([ -f pyproject.toml ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
       - name: Install
         if: steps.has_pkg.outputs.present == 'yes'
-        run: pip install -e ".[test]"
+        run: pip install -e ".[test,ui]"
       - name: Unit tests
         if: steps.has_pkg.outputs.present == 'yes'
         run: pytest -q -m unit
