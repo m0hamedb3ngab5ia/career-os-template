@@ -299,3 +299,102 @@ def test_job_timeout_still_applies_when_the_budget_is_larger(settings, store):
 
     rec = run(settings, slow, max_minutes=90)
     assert seen["timeout_s"] == 10 * 60 and rec["stop_reason"] == "timeout"
+
+
+# --- lock safety: the runner lock is released whatever the teardown does ----------------------------------------
+
+def _exec(settings, invoke, **kw):
+    cfg = cfg_of(settings, preflight_doctor=False)
+    return execute_run(settings, "score", budget_for(cfg, "score"), cfg=cfg, invoke=invoke, now=lambda: NOW,
+                       clock=Clock(), **kw)
+
+
+def _boom_invoke(*a, **kw):
+    raise RuntimeError("invoke exploded")
+
+
+def test_raising_finalize_after_a_good_run_surfaces_and_releases_the_lock(settings, store):
+    add_job(store, 1)
+
+    def finalize(r):
+        raise OSError("pause hook failed")
+    with pytest.raises(OSError, match="pause hook failed"):
+        _exec(settings, FakeInvoke(settings), finalize=finalize)
+    rs = RunStore(settings)
+    assert not rs.runner_lock_path.exists()
+    (rid,) = [p.name for p in rs.dir.iterdir() if (p / "run.json").exists()]
+    assert rs.load_run(rid)["status"] == "done"  # run.json saved before the hook
+
+
+def test_raising_finalize_does_not_mask_the_original_run_error(settings, store):
+    add_job(store, 1)
+    seen = []
+
+    def finalize(r):
+        seen.append(r["status"])
+        raise OSError("pause hook failed")
+    with pytest.raises(RuntimeError, match="invoke exploded"):
+        _exec(settings, _boom_invoke, finalize=finalize)
+    assert seen == ["failed"]
+    rs = RunStore(settings)
+    assert not rs.runner_lock_path.exists()
+    (rid,) = [p.name for p in rs.dir.iterdir() if (p / "run.json").exists()]
+    assert "pause hook failed" in (rs.run_dir(rid) / "run.log").read_text()
+
+
+def _fail_save_from(monkeypatch, n: int):
+    """save_run raises from its n-th call on (1 = new_run's first save, 2 = the final run.json save)."""
+    real, calls = RunStore.save_run, []
+
+    def save(self, run):
+        calls.append(1)
+        if len(calls) >= n:
+            raise OSError("disk full")
+        return real(self, run)
+    monkeypatch.setattr(RunStore, "save_run", save)
+
+
+def test_final_save_run_raising_still_runs_finalize_and_releases_the_lock(settings, store, monkeypatch):
+    add_job(store, 1)
+    _fail_save_from(monkeypatch, 2)
+    seen = []
+    with pytest.raises(OSError, match="disk full"):
+        _exec(settings, FakeInvoke(settings), finalize=lambda r: seen.append(r["status"]))
+    assert seen == ["done"]
+    assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_raising_save_run_still_releases_the_lock(settings, store, monkeypatch):
+    add_job(store, 1)
+
+    def bad_save(self, run):
+        raise OSError("disk full")
+    monkeypatch.setattr(RunStore, "save_run", bad_save)
+    with pytest.raises(OSError, match="disk full"):
+        _exec(settings, FakeInvoke(settings))
+    assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_raising_save_run_does_not_mask_the_original_run_error(settings, store, monkeypatch):
+    add_job(store, 1)
+    _fail_save_from(monkeypatch, 2)
+    with pytest.raises(RuntimeError, match="invoke exploded"):
+        _exec(settings, _boom_invoke)
+    assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_teardown_error_is_warned_when_run_log_is_unwritable(settings, store, monkeypatch):
+    add_job(store, 1)
+    real_log = RunStore.log
+
+    def log(self, rid, msg):
+        if msg.startswith("teardown"):
+            raise OSError("log gone")
+        return real_log(self, rid, msg)
+    monkeypatch.setattr(RunStore, "log", log)
+
+    def finalize(r):
+        raise OSError("pause hook failed")
+    with pytest.warns(UserWarning, match="pause hook failed"), pytest.raises(RuntimeError, match="invoke exploded"):
+        _exec(settings, _boom_invoke, finalize=finalize)
+    assert not RunStore(settings).runner_lock_path.exists()

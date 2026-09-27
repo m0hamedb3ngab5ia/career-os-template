@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { act } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -154,5 +154,87 @@ describe("AppShell", () => {
       await screen.findAllByText("0");
       expect(screen.queryByText(/synced/)).not.toBeInTheDocument();
     });
+  });
+});
+
+describe("AppShell route changes", () => {
+  it("moves focus to the main region and announces the new page's title", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    await user.click(within(nav).getByRole("link", { name: /^Runs/ }));
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Runs" });
+    const main = screen.getByRole("main");
+    await waitFor(() => expect(main).toHaveFocus());
+    expect(main.contains(h1)).toBe(true);
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Runs");
+  });
+
+  it("does not announce or move focus on the first load", async () => {
+    renderAt("/runs");
+    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    expect(screen.getByRole("main")).not.toHaveFocus();
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
+  });
+
+  it("leaves focus alone when only the query string changes (e.g. ?sel=)", async () => {
+    const { router } = renderAt("/runs");
+    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    const search = screen.getByRole("searchbox", { name: "Search jobs and companies" });
+    search.focus();
+    await act(() => router.navigate("/runs?sel=abc"));
+    expect(search).toHaveFocus();
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
+  });
+
+  it("waits for a loading page's real title before announcing it (not the placeholder)", async () => {
+    const { router } = renderAt("/runs");
+    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    await act(() => router.navigate("/runs/abc"));
+    const h1 = await screen.findByRole("heading", { level: 1, name: (n) => n !== "Run" && n !== "Runs" });
+    await waitFor(() => expect(screen.getByTestId("route-announcer")).toHaveTextContent(h1.textContent!));
+    expect(screen.getByTestId("route-announcer").textContent).not.toBe("Run");
+  });
+
+  it("Ctrl+K focuses the sidebar search off a Mac (Cmd+K does not)", async () => {
+    const user = userEvent.setup();
+    renderAt("/runs");
+    const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
+    await user.keyboard("{Meta>}k{/Meta}");
+    expect(search).not.toHaveFocus();
+    await user.keyboard("{Control>}k{/Control}");
+    expect(search).toHaveFocus();
+    expect(search).toHaveAttribute("aria-keyshortcuts", "Control+K");
+  });
+
+  it("on a Mac Cmd+K focuses the search and Ctrl+K in a text field is left to the field", async () => {
+    vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
+    try {
+      const user = userEvent.setup();
+      renderAt("/runs");
+      const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
+      expect(search).toHaveAttribute("aria-keyshortcuts", "Meta+K");
+      const area = document.body.appendChild(document.createElement("textarea"));
+      area.focus();
+      expect(fireEvent.keyDown(area, { key: "k", ctrlKey: true })).toBe(true);
+      expect(area).toHaveFocus();
+      await user.keyboard("{Meta>}k{/Meta}");
+      expect(search).toHaveFocus();
+      area.remove();
+    } finally {
+      vi.restoreAllMocks();
+    }
+  });
+
+  it("does not pull focus out of an open modal", async () => {
+    renderAt("/runs");
+    await screen.findByRole("searchbox", { name: "Search jobs and companies" });
+    const modal = document.body.appendChild(document.createElement("div"));
+    modal.setAttribute("aria-modal", "true");
+    const inside = modal.appendChild(document.createElement("button"));
+    inside.focus();
+    expect(fireEvent.keyDown(inside, { key: "k", ctrlKey: true })).toBe(true);
+    expect(inside).toHaveFocus();
+    modal.remove();
   });
 });
