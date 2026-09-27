@@ -1,0 +1,221 @@
+{
+  "activity": [
+    {
+      "at": "<wall>",
+      "component": "fixture",
+      "message": "status -> applied"
+    }
+  ],
+  "apply_session": null,
+  "contacts": [
+    {
+      "confidence": "high",
+      "email": "dana.cruz@example.com",
+      "email_candidates": [
+        "dana.cruz@example.com"
+      ],
+      "email_confidence": "verified",
+      "linkedin": "https://www.linkedin.com/in/example-dana",
+      "linkedin_degree": null,
+      "mutuals": null,
+      "name": "Dana Cruz",
+      "role": "recruiter",
+      "title": "Technical Recruiter"
+    }
+  ],
+  "contacts_policy": [
+    {
+      "detail": "",
+      "manual": false,
+      "name": "Dana Cruz",
+      "reason": null,
+      "role": "recruiter"
+    }
+  ],
+  "documents": [
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
+    },
+    {
+      "modified": "<mtime>",
+      "name": "outreach.json",
+      "size": 1101
+    },
+    {
+      "modified": "<mtime>",
+      "name": "resume.pdf",
+      "size": 17
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-09-16T15:00:00+00:00",
+      "note": null,
+      "status": "found"
+    },
+    {
+      "at": "2026-09-16T16:00:00+00:00",
+      "note": null,
+      "status": "scored"
+    },
+    {
+      "at": "2026-09-16T17:00:00+00:00",
+      "note": null,
+      "status": "queued"
+    },
+    {
+      "at": "2026-09-22T15:00:00+00:00",
+      "note": null,
+      "status": "applied"
+    }
+  ],
+  "job": {
+    "applied_at": "2026-09-22T15:00:00+00:00",
+    "ats": "greenhouse",
+    "category": "swe_backend",
+    "closes_at": null,
+    "company": "Hooli",
+    "fit": 84,
+    "found_at": "2026-09-16T15:00:00+00:00",
+    "job_id": "<job:applied>",
+    "location": "New York, NY",
+    "qa_passed": 1,
+    "qa_score": 8.2,
+    "safety": "pass",
+    "status": "applied",
+    "tier": "B",
+    "title": "New Grad Engineer",
+    "updated_at": "2026-09-22T15:00:00+00:00",
+    "url": "https://boards.example.com/applied"
+  },
+  "log": "- <wall> [fixture] status -> applied\n",
+  "outreach": {
+    "company": "Hooli",
+    "drafted_at": "2026-09-23T15:00:00+00:00",
+    "drafts": [
+      {
+        "auto_send": false,
+        "bullet_ids": [],
+        "channel": "email",
+        "contact": "Dana Cruz",
+        "email": {
+          "body": "Hi Dana,\n\nI applied for the New Grad Engineer role this week. [SPECIFIC CONNECTION]\n\nHappy to share more about [MOST RELEVANT EXPERIENCE]. Thanks for reading.\n\nAlex",
+          "subject": "New Grad Engineer application"
+        },
+        "facts_used": [],
+        "followup_14d": null,
+        "followup_7d": null,
+        "kind": "post_apply_outreach",
+        "linkedin_message": null,
+        "linkedin_note": "Hi Dana, I applied to the New Grad Engineer role at Hooli.",
+        "linkedin_note_chars": 0,
+        "linkedin_send_after": null,
+        "manual_reason": null,
+        "manual_tailor": false,
+        "narrative_ids": [],
+        "role": "recruiter",
+        "send_after": null,
+        "sent": false,
+        "sent_by": null,
+        "to": "dana.cruz@example.com",
+        "to_confidence": "verified"
+      }
+    ],
+    "followups": [],
+    "job_id": "<job:applied>",
+    "review_required": true
+  },
+  "override": null,
+  "posting": {
+    "apply_url": "",
+    "ats": "greenhouse",
+    "ats_job_id": "applied-1",
+    "closes_at": null,
+    "company": "Hooli",
+    "departments": [],
+    "description_text": "New Grad Engineer at Hooli.",
+    "fetched_at": "2026-09-16T15:00:00+00:00",
+    "first_published": null,
+    "job_id": "<job:applied>",
+    "last_updated": null,
+    "location": "New York, NY",
+    "posted_at": null,
+    "remote": null,
+    "salary_currency": null,
+    "salary_max": null,
+    "salary_min": null,
+    "source_slug": "",
+    "title": "New Grad Engineer",
+    "url": "https://boards.example.com/applied"
+  },
+  "qa": {
+    "deterministic": {
+      "checks": [],
+      "pass": true
+    },
+    "fabrication_audit": [],
+    "fail_reasons": [],
+    "job_id": "<job:applied>",
+    "mean": 8.2,
+    "pass": true,
+    "regenerate_suggestions": [],
+    "regenerations": 0,
+    "reviewed_at": "2026-09-16T15:00:00+00:00",
+    "rubric": {
+      "ats_safety": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "relevance": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "specificity": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "voice_match": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "zero_fabrication": {
+        "score": 9,
+        "why": "fixture"
+      }
+    },
+    "unsupported_count": 0
+  },
+  "registry": {
+    "flagged": null,
+    "verified": null
+  },
+  "safety": {
+    "checked_at": "2026-09-16T15:00:00+00:00",
+    "flags": [],
+    "job_id": "<job:applied>",
+    "runs": [],
+    "verdict": "pass"
+  },
+  "score": {
+    "category": "swe_backend",
+    "fit": 84,
+    "hard_filter_fails": [],
+    "job_id": "<job:applied>",
+    "location_ok": null,
+    "matched_skills": [],
+    "missing_skills": [],
+    "prestige": null,
+    "reasons": [
+      "fixture"
+    ],
+    "required_skills": [],
+    "salary_ok": null,
+    "scored_at": "<wall>",
+    "tier": "B"
+  },
+  "screenshots": [],
+  "status": "applied",
+  "submitted": []
+}

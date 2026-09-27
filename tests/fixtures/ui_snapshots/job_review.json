@@ -1,0 +1,208 @@
+{
+  "activity": [
+    {
+      "at": "<wall>",
+      "component": "fixture",
+      "message": "status -> needs_review"
+    }
+  ],
+  "apply_session": {
+    "ats": "greenhouse",
+    "auto_submit": false,
+    "finished": "2026-09-23T15:06:00+00:00",
+    "job_id": "<job:review>",
+    "n_steps": 2,
+    "outcome": "needs_review",
+    "reason": "Tier A: you submit",
+    "screenshots": [
+      "<tmp>/repo/data/jobs/<job:review>/screenshots/01_form.png"
+    ],
+    "started": "2026-09-23T15:00:00+00:00",
+    "status": "needs_review",
+    "steps": [
+      {
+        "action": "open_form",
+        "note": "",
+        "ok": true,
+        "time": "2026-09-23T15:00:00+00:00"
+      },
+      {
+        "action": "finish",
+        "note": "needs_review: Tier A: you submit",
+        "ok": false,
+        "time": "2026-09-23T15:05:00+00:00"
+      }
+    ],
+    "submit_clicked": false,
+    "tier": "A"
+  },
+  "contacts": [],
+  "contacts_policy": [],
+  "documents": [
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
+    },
+    {
+      "modified": "<mtime>",
+      "name": "resume.pdf",
+      "size": 17
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-09-19T15:00:00+00:00",
+      "note": null,
+      "status": "found"
+    },
+    {
+      "at": "2026-09-19T16:00:00+00:00",
+      "note": null,
+      "status": "scored"
+    },
+    {
+      "at": "2026-09-19T17:00:00+00:00",
+      "note": null,
+      "status": "queued"
+    },
+    {
+      "at": "2026-09-19T18:00:00+00:00",
+      "note": null,
+      "status": "prepared"
+    },
+    {
+      "at": "2026-09-19T19:00:00+00:00",
+      "note": null,
+      "status": "needs_review"
+    }
+  ],
+  "job": {
+    "applied_at": null,
+    "ats": "greenhouse",
+    "category": "swe_backend",
+    "closes_at": null,
+    "company": "Umbrella Labs",
+    "fit": 91,
+    "found_at": "2026-09-19T15:00:00+00:00",
+    "job_id": "<job:review>",
+    "location": "New York, NY",
+    "qa_passed": 1,
+    "qa_score": 8.2,
+    "safety": "review",
+    "status": "needs_review",
+    "tier": "A",
+    "title": "Infrastructure Engineer",
+    "updated_at": "2026-09-19T19:00:00+00:00",
+    "url": "https://boards.example.com/review"
+  },
+  "log": "- <wall> [fixture] status -> needs_review\n",
+  "outreach": null,
+  "override": null,
+  "posting": {
+    "apply_url": "",
+    "ats": "greenhouse",
+    "ats_job_id": "review-1",
+    "closes_at": null,
+    "company": "Umbrella Labs",
+    "departments": [],
+    "description_text": "Infrastructure Engineer at Umbrella Labs.",
+    "fetched_at": "2026-09-19T15:00:00+00:00",
+    "first_published": null,
+    "job_id": "<job:review>",
+    "last_updated": null,
+    "location": "New York, NY",
+    "posted_at": null,
+    "remote": null,
+    "salary_currency": null,
+    "salary_max": null,
+    "salary_min": null,
+    "source_slug": "",
+    "title": "Infrastructure Engineer",
+    "url": "https://boards.example.com/review"
+  },
+  "qa": {
+    "deterministic": {
+      "checks": [],
+      "pass": true
+    },
+    "fabrication_audit": [],
+    "fail_reasons": [],
+    "job_id": "<job:review>",
+    "mean": 8.2,
+    "pass": true,
+    "regenerate_suggestions": [],
+    "regenerations": 0,
+    "reviewed_at": "2026-09-19T15:00:00+00:00",
+    "rubric": {
+      "ats_safety": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "relevance": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "specificity": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "voice_match": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "zero_fabrication": {
+        "score": 9,
+        "why": "fixture"
+      }
+    },
+    "unsupported_count": 0
+  },
+  "registry": {
+    "flagged": null,
+    "verified": null
+  },
+  "safety": {
+    "checked_at": "2026-09-19T15:00:00+00:00",
+    "flags": [
+      {
+        "at": "2026-09-19T15:00:00+00:00",
+        "code": "GHOST_OLD_POST",
+        "detail": "Posted 45 days ago",
+        "evidence": [
+          "https://boards.example.com/review"
+        ],
+        "level": "review"
+      }
+    ],
+    "job_id": "<job:review>",
+    "runs": [],
+    "verdict": "review"
+  },
+  "score": {
+    "category": "swe_backend",
+    "fit": 91,
+    "hard_filter_fails": [],
+    "job_id": "<job:review>",
+    "location_ok": null,
+    "matched_skills": [],
+    "missing_skills": [],
+    "prestige": null,
+    "reasons": [
+      "fixture"
+    ],
+    "required_skills": [],
+    "salary_ok": null,
+    "scored_at": "<wall>",
+    "tier": "A"
+  },
+  "screenshots": [
+    {
+      "modified": "<mtime>",
+      "name": "01_form.png",
+      "size": 66
+    }
+  ],
+  "status": "needs_review",
+  "submitted": []
+}
