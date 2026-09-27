@@ -20,11 +20,12 @@ import os
 import socket
 import time
 import uuid
+from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import datetime, timedelta, timezone
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 try:
     import fcntl
@@ -50,7 +51,7 @@ class Lock:
 
 
 def _now() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def pid_alive(pid: int) -> bool:
@@ -68,7 +69,7 @@ def _parse(ts: Any) -> datetime | None:
         dt = datetime.fromisoformat(str(ts))
     except ValueError:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
+    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
 
 
 def read(path: Path) -> dict[str, Any] | None:
@@ -203,7 +204,8 @@ def config_lock_path(root: Path) -> Path:
 @contextmanager
 def config_lock(root: Path, timeout: float | None = None, poll: float = 0.05) -> Iterator[None]:
     """Hold the config-write lock for the block; wait up to `timeout` (default CONFIG_LOCK_TIMEOUT_S) or raise
-    LockBusy. Not reentrant: take it once around the whole check + write."""
+    LockBusy. Not reentrant: take it once around the whole check + write. A no-op where fcntl is unavailable
+    (non-POSIX): writes are then not serialised."""
     path = config_lock_path(root)
     path.parent.mkdir(parents=True, exist_ok=True)
     if fcntl is None:  # pragma: no cover

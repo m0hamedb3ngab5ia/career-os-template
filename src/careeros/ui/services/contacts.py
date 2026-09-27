@@ -9,7 +9,12 @@ from __future__ import annotations
 
 from typing import Any
 
-from careeros.outreach import OutreachPolicy, _detail, mark_contact, needs_manual_outreach
+from careeros.outreach import (
+    OutreachPolicy,
+    _detail,
+    mark_contact,
+    needs_manual_outreach,
+)
 from careeros.ui.services.inbox import _contacts as _job_contacts
 from careeros.ui.services.inbox import job_drafts
 from careeros.ui.services.jobs import job_dir_for

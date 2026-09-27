@@ -9,11 +9,13 @@ browser sends its IANA name; the server's own zone otherwise). A due date withou
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta, tzinfo
-from typing import Any, Iterable
+from typing import Any
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, parse_due
+from careeros.runs import locks
 
 TABS = ("open", "today", "done")
 GROUPS = ("due", "priority", "needs")
@@ -22,7 +24,7 @@ BUCKETS = ("overdue", "today", "tomorrow", "week", "later", "nodate")
 TODAY_TAB = ("overdue", "today", "tomorrow")
 PRIORITIES = ("H", "M", "L")
 _PRIO_RANK = {p: i for i, p in enumerate(PRIORITIES)}
-_HTTP = re.compile(r"^https?://[^\s]+$", re.I)
+_HTTP = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
 MAX_WHAT = 500
 
 
@@ -99,7 +101,7 @@ def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> dict
     }
 
 
-def _sort_key(sort: str):  # noqa: ANN202
+def _sort_key(sort: str):
     def due_k(i: dict[str, Any]) -> tuple[int, float]:
         return (0, datetime.fromisoformat(i["due"]).timestamp()) if i["due"] else (1, 0.0)
 
@@ -194,7 +196,7 @@ def validate_new_item(body: dict[str, Any]) -> dict[str, Any]:
             "role": str(body.get("role") or "").strip(), "due": due, "due_reason": reason or None}
 
 
-def _tracker(settings: Any):  # noqa: ANN202
+def _tracker(settings: Any):
     from careeros.tracker import Tracker
 
     return Tracker(settings=settings)
@@ -264,13 +266,14 @@ def _company(settings: Any, it: dict[str, Any]) -> str:
     return company.strip()
 
 
-def _blocklist_path(settings: Any):  # noqa: ANN202
+def _blocklist_path(settings: Any):
     from careeros.ui.services.settings_io import config_path
 
     return config_path(settings, "companies")
 
 
 def _set_blocklist(settings: Any, companies: list[str]) -> None:
+    """Caller holds locks.config_lock (the read that produced `companies` + this write are one step)."""
     from careeros.runs import yamledit
     from careeros.ui.services.settings_io import validate_root
 
@@ -293,11 +296,13 @@ def block_company(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
 
     it = _scam_item(ix, aid)
     company = _company(settings, it)
-    current = _current_blocklist(settings)
     key = normalize_company(company)
-    added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
-    if added:
-        _set_blocklist(settings, [*current, company])
+    # read + write under the config lock: a Settings save or a second click can't land in between (LockBusy -> 409)
+    with locks.config_lock(settings.root):
+        current = _current_blocklist(settings)
+        added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
+        if added:
+            _set_blocklist(settings, [*current, company])
     done = _tracker(settings).mark_action_done(aid)
     return {"company": company, "added": added, "queued": done is None, "job_id": it["job_id"]}
 
@@ -308,10 +313,11 @@ def unblock_company(settings: Any, ix: Any, aid: str, company: str, remove: bool
     it = _scam_item(ix, aid)
     if company.strip().lower() != _company(settings, it).lower():
         raise ValueError("that company isn't this item's company")
-    current = _current_blocklist(settings)
-    kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
-    if kept != current:
-        _set_blocklist(settings, kept)
+    with locks.config_lock(settings.root):  # read + write as one step, like block_company
+        current = _current_blocklist(settings)
+        kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
+        if kept != current:
+            _set_blocklist(settings, kept)
     done = _tracker(settings).reopen_action(aid)
     return {"company": company, "removed": kept != current, "queued": done is None}
 
@@ -326,7 +332,6 @@ def mark_safe(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
     from careeros.safety import registry
     from careeros.store import Store
     from careeros.tracker import set_status_both
-
     from careeros.ui.services.job_actions import ensure_unlocked
 
     it = _scam_item(ix, aid)

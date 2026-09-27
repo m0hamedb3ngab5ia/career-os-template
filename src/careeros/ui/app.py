@@ -8,9 +8,10 @@ edit keeps the last good settings and shows the error on /api/health), the Index
 """
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from collections.abc import Callable
+from datetime import UTC, date, datetime
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
@@ -45,8 +46,8 @@ class Context:
         settings and show why. The index and the watcher were built on the old paths, so a change to `paths` or
         `ui.index_path` also keeps the old settings until `careeros ui` is restarted."""
         from careeros.runs.advisor import load_advisor_config
-        from careeros.runs.policy import daily_cap
         from careeros.runs.config import load_runs_config
+        from careeros.runs.policy import daily_cap
         from careeros.runs.schedule import load_schedule
         from careeros.ui.config import load_ui_config
         from careeros.ui.index import default_path
@@ -99,7 +100,7 @@ def plain_validation(errors: Any) -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def _static_response(static_dir: Path, path: str) -> Response:
@@ -117,7 +118,18 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import actions, contacts, events, health, inbox, jobs, meta, pipeline, runs, status
+    from careeros.ui.routers import (
+        actions,
+        contacts,
+        events,
+        health,
+        inbox,
+        jobs,
+        meta,
+        pipeline,
+        runs,
+        status,
+    )
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -148,7 +160,8 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
 
     for r in (health, meta, status, jobs, events, runs, actions, pipeline):
         app.include_router(r.router, prefix="/api")
-    from careeros.ui.routers import settings as settings_r, storage as storage_r  # Settings + Storage slice
+    from careeros.ui.routers import settings as settings_r  # Settings + Storage slice
+    from careeros.ui.routers import storage as storage_r
     for r in (settings_r, storage_r):
         app.include_router(r.router, prefix="/api")
     from careeros.ui.routers import today, tracker  # Today / Jobs / Job detail slice

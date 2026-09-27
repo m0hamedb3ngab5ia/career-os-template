@@ -19,7 +19,13 @@ import yaml
 
 from careeros.config import ConfigError, Settings
 from careeros.runs import locks, yamledit
-from careeros.ui.settings_schema import Field, Section, get_section, reset_group, validate_value
+from careeros.ui.settings_schema import (
+    Field,
+    Section,
+    get_section,
+    reset_group,
+    validate_value,
+)
 
 _MISSING = object()
 
@@ -186,8 +192,12 @@ def read_section(settings: Settings, section_id: str) -> dict[str, Any]:
 
 
 def known_ids(settings: Settings, source: str) -> list[str]:
-    """The top-level ids of config/<source>.yaml (e.g. the category ids), read fresh from disk; [] when absent."""
-    data = _load(config_path(settings, source))
+    """The top-level ids of config/<source>.yaml (e.g. the category ids), read fresh from disk; [] when the file
+    is absent or not valid YAML (id validation is then skipped, as for an empty file)."""
+    try:
+        data = _load(config_path(settings, source))
+    except (OSError, yaml.YAMLError):
+        return []
     return [str(k) for k, v in data.items() if isinstance(v, dict)] if isinstance(data, dict) else []
 
 

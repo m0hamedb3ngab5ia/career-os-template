@@ -3,7 +3,7 @@ data. Every write lands in the real files (tracker, status.json, companies.yaml,
 answers the next GET, and one `changed` event goes to open tabs."""
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import pytest
 import yaml
@@ -11,19 +11,19 @@ from conftest import make_temp_root
 from fixtures.ui_data import add_scam_case, build_ui_data
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient  # noqa: E402
+from fastapi.testclient import TestClient
 
-from careeros.safety import registry  # noqa: E402
-from careeros.store import Store  # noqa: E402
-from careeros.tracker import Tracker  # noqa: E402
-from careeros.ui.app import create_app  # noqa: E402
-from careeros.ui.events import Broker  # noqa: E402
-from careeros.ui.index import Index  # noqa: E402
-from careeros.ui.security import LOOPBACK  # noqa: E402
+from careeros.safety import registry
+from careeros.store import Store
+from careeros.tracker import Tracker
+from careeros.ui.app import create_app
+from careeros.ui.events import Broker
+from careeros.ui.index import Index
+from careeros.ui.security import LOOPBACK
 
 pytestmark = pytest.mark.integration
 
-NOW = datetime(2026, 9, 24, 15, 0, tzinfo=timezone.utc)
+NOW = datetime(2026, 9, 24, 15, 0, tzinfo=UTC)
 W = {"X-CareerOS": "1"}
 
 
@@ -32,7 +32,7 @@ class Spy(Broker):
         super().__init__()
         self.sent: list[tuple[str, dict]] = []
 
-    def publish(self, event, data):  # noqa: ANN001, ANN201
+    def publish(self, event, data):
         self.sent.append((event, data))
         return super().publish(event, data)
 
@@ -206,7 +206,7 @@ def test_undo_block_leaves_an_existing_blocklist_entry(env, data):
     assert scam["action_id"] in _items(c.get("/api/actions").json())
 
 
-def _hold_lock(s, job_id):  # noqa: ANN001, ANN202
+def _hold_lock(s, job_id):
     import os
 
     from careeros.runs import locks
@@ -272,3 +272,17 @@ def test_config_write_sends_one_changed_event_with_the_watcher(env, data):
     companies.write_text(companies.read_text() + "\n# edited by hand\n")
     assert w.handle([companies])["config"] is True
     assert len(spy.sent) == n + 2
+
+
+def test_block_company_while_another_config_write_holds_the_lock_is_409(env, data, monkeypatch):
+    from careeros.runs import locks
+
+    c, _ = env
+    s, scam = data["settings"], data["scam"]
+    companies = s.root / "config" / "companies.yaml"
+    before = companies.read_text()
+    monkeypatch.setattr(locks, "CONFIG_LOCK_TIMEOUT_S", 0.2)
+    with locks.config_lock(s.root):
+        r = c.post(f"/api/actions/{scam['action_id']}/block-company", headers=W)
+    assert r.status_code == 409 and companies.read_text() == before
+    assert scam["action_id"] in _items(c.get("/api/actions").json())  # not marked done

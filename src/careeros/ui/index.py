@@ -17,9 +17,10 @@ import json
 import os
 import sqlite3
 import threading
-from datetime import datetime, timezone
+from collections.abc import Iterable
+from datetime import UTC, datetime
 from pathlib import Path
-from typing import Any, Iterable
+from typing import Any
 
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
@@ -55,7 +56,7 @@ _TABLES = ("meta", "jobs", "status_history", "action_items", "contacts", "runs",
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
+    return datetime.now(UTC).replace(microsecond=0).isoformat()
 
 
 def _read_json(path: Path) -> Any:
@@ -107,7 +108,7 @@ def default_path(settings: Any) -> Path:
     p = Path(cfg.index_path).expanduser()
     p = p if p.is_absolute() else (Path(settings.root) / p).resolve()
     root = Path(settings.root)
-    fold = lambda x: Path(os.path.realpath(x).casefold())  # noqa: E731 - macOS volumes are case-insensitive
+    fold = lambda x: Path(os.path.realpath(x).casefold())
     real = fold(p)
     kept = {fold(v) for v in settings.paths.values()}
     guarded = [fold(root / d) for d in ("config", "profile")] + [fold(settings.paths["jobs_dir"]),

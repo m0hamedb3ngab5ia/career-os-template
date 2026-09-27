@@ -18,9 +18,10 @@ import signal
 import subprocess
 import sys
 import time
-from datetime import datetime, timedelta, timezone
+from collections.abc import Callable, Iterator
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any, Callable, Iterator
+from typing import Any
 
 from careeros.config import Settings
 from careeros.runs import locks
@@ -48,7 +49,7 @@ class NotSetUp(RuntimeError):
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 def ps_cmdline(pid: int) -> list[str] | str:

@@ -4,5 +4,5 @@ from __future__ import annotations
 from fastapi import Request
 
 
-def ctx(request: Request):  # noqa: ANN201 - careeros.ui.app.Context (import cycle)
+def ctx(request: Request):
     return request.app.state.ctx

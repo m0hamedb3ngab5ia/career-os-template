@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from careeros.runs.locks import LockBusy
 from careeros.ui.routers import ctx
 from careeros.ui.services import actions as svc
 from careeros.ui.services.reindex import after_write
@@ -46,11 +47,13 @@ class UndoSafe(BaseModel):
     registry_before: dict[str, Any] | None = None
 
 
-def _run(fn, *args: Any) -> Any:  # noqa: ANN001
+def _run(fn, *args: Any) -> Any:
     try:
         return fn(*args)
     except LookupError as e:
         raise HTTPException(404, str(e).strip("'\"")) from None
+    except LockBusy:
+        raise HTTPException(409, "Another settings save is in progress; try again in a moment.") from None
 
 
 @router.get("/actions")

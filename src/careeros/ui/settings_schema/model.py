@@ -7,8 +7,9 @@ generic form renderer, so a new setting is one Field here (and its key in exampl
 from __future__ import annotations
 
 import re
+from collections.abc import Callable
 from dataclasses import dataclass
-from typing import Any, Callable
+from typing import Any
 
 # Controls the generic renderer knows. Values:
 #   switch bool · number / slider int|float · select / preset_cards one of options · text str · time "HH:MM"

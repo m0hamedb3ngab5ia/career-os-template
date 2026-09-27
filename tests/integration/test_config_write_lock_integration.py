@@ -7,6 +7,7 @@ import json
 import subprocess
 import threading
 import time
+from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -74,11 +75,11 @@ def test_lock_file_lives_under_gitignored_data(root):
 
 
 def _seed_snapshots(root: Path) -> None:
-    from datetime import datetime, timedelta, timezone
+    from datetime import datetime, timedelta
     mb = 1024 * 1024
     runs = root / "data" / "runs"
     runs.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(timezone.utc)
+    now = datetime.now(UTC)
     lines = []
     for i, day in enumerate((21, 10, 0)):
         total = int((100 + 800 * i / 2) * mb)
@@ -121,3 +122,80 @@ def test_category_fields_offer_the_ids_from_categories_yaml(root):
     fields = {f["id"]: f for g in sec["groups"] for f in g["items"] if "id" in f}
     for fid in ("targets:categories.primary", "targets:categories.secondary", "targets:categories.excluded"):
         assert set(fields[fid]["options"]) == known and fields[fid]["strict_options"] is False
+
+
+def _stub_block_item(monkeypatch, company: str) -> None:
+    from careeros.ui.services import actions as svc
+
+    class _Tracker:
+        def mark_action_done(self, aid):
+            return {"id": aid}
+
+    monkeypatch.setattr(svc, "_scam_item", lambda ix, aid: {"job_id": "job000000001"})
+    monkeypatch.setattr(svc, "_company", lambda settings, it: company)
+    monkeypatch.setattr(svc, "_tracker", lambda settings: _Tracker())
+
+
+def test_block_company_during_a_companies_save_loses_neither_write(root, monkeypatch):
+    from careeros.ui.services import actions as svc
+
+    _stub_block_item(monkeypatch, "Blocked By Action")
+    s = Settings.load(root)
+    read = settings_io.read_section(s, "companies")
+    current = read["values"]["companies:blocklist.companies"] or []
+    real_check = settings_io._check_changes
+
+    def slow_check(*a, **kw):  # widen the version check -> write window
+        time.sleep(0.4)
+        return real_check(*a, **kw)
+
+    monkeypatch.setattr(settings_io, "_check_changes", slow_check)
+    errors: list[BaseException] = []
+
+    def save() -> None:
+        try:
+            settings_io.save_section(Settings.load(root), "companies",
+                                     {"companies:blocklist.companies": [*current, "Added In Settings"]},
+                                     version=read["version"])
+        except BaseException as e:  # noqa: BLE001
+            errors.append(e)
+
+    t = threading.Thread(target=save)
+    t.start()
+    time.sleep(0.1)  # the save now holds the lock, between its version check and its write
+    svc.block_company(Settings.load(root), None, "a1")
+    t.join(10)
+    assert not errors, errors
+    bl = yaml.safe_load((root / "config" / "companies.yaml").read_text())["blocklist"]["companies"]
+    assert "Added In Settings" in bl and "Blocked By Action" in bl
+
+
+def test_block_company_refuses_while_the_config_lock_is_held(root, monkeypatch):
+    from careeros.ui.services import actions as svc
+
+    _stub_block_item(monkeypatch, "Blocked By Action")
+    monkeypatch.setattr(locks, "CONFIG_LOCK_TIMEOUT_S", 0.2)
+    path = root / "config" / "companies.yaml"
+    before = path.read_text()
+    with locks.config_lock(root), pytest.raises(locks.LockBusy):
+        svc.block_company(Settings.load(root), None, "a1")
+    assert path.read_text() == before
+
+
+def test_targets_reads_and_saves_without_a_categories_file(root):
+    s = Settings.load(root)
+    (root / "config" / "categories.yaml").unlink(missing_ok=True)
+    assert settings_io.known_ids(s, "categories") == []  # id validation skipped, like an empty file
+    read = settings_io.read_section(s, "targets")
+    settings_io.save_section(s, "targets", {"targets:categories.primary": ["anything_goes"]}, version=read["version"])
+    assert yaml.safe_load((root / "config" / "targets.yaml").read_text())["categories"]["primary"] == ["anything_goes"]
+
+
+def test_targets_reads_with_invalid_categories_yaml_and_a_save_is_refused_not_crashed(root):
+    s = Settings.load(root)  # the app loaded fine; the file broke afterwards
+    (root / "config" / "categories.yaml").write_text("a: [unclosed\n  b: {")
+    assert settings_io.known_ids(s, "categories") == []
+    read = settings_io.read_section(s, "targets")
+    assert read["section"]["id"] == "targets"
+    with pytest.raises(SettingsInvalid, match="categories"):  # the whole-config check names the broken file
+        settings_io.save_section(s, "targets", {"targets:categories.primary": ["x"]}, version=read["version"])

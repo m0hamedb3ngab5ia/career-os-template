@@ -5,9 +5,9 @@ two in step. Malformed values raise ConfigError, like the rest of the config.
 """
 from __future__ import annotations
 
+import re
 from copy import deepcopy
 from dataclasses import dataclass, field
-import re
 from typing import Any
 
 from careeros.config import ConfigError
