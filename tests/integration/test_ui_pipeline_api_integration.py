@@ -83,7 +83,18 @@ def test_get_pipeline_per_job_state(client, data):
     got = client.get(f"/api/jobs/{review}/pipeline").json()
     assert got["stage"] == "review" and got["next_action"] is None
     assert got["blocked_reason"] == "Tier A: never auto-applied; apply manually"
-    assert got["review_reasons"] == ["cover_letter_facts: add 2 facts", "Open action item: Review and submit"]
+    assert got["review_reasons"] == ["cover_letter_facts: add 2 facts", "Apply session needs_review: Tier A: you submit",
+                                     "Open action item: Review and submit"]
+    # Tier B with the form staged in the browser (auto_submit off): nothing runnable, the human submits.
+    Store(data["settings"])._write(review, "score.json", {**json.loads((Store(data["settings"]).job_dir(review) / "score.json").read_text()), "tier": "B"})
+    Store(data["settings"])._write(review, "apply_session.json", {"outcome": "staged", "status": "needs_review",
+                                                                  "reason": "assisted: review & submit"})
+    staged = client.get(f"/api/jobs/{review}/pipeline").json()
+    assert staged["stage"] == "review" and staged["next_action"] is None
+    assert staged["blocked_reason"].startswith("Application staged in the browser")
+    assert "Apply session staged: assisted: review & submit" in staged["review_reasons"]
+    r = client.post(f"/api/jobs/{review}/pipeline", json={"action": "approve_continue"}, headers=W)
+    assert r.status_code == 409 and "staged in the browser" in r.json()["detail"]
     applied = client.get(f"/api/jobs/{data['jobs']['applied']}/pipeline").json()
     assert applied["next_action"] is None and applied["blocked_reason"] is None and applied["active_run_id"] is None
     assert client.get("/api/jobs/nope/pipeline").status_code == 404
@@ -132,8 +143,14 @@ def test_409_while_a_run_is_active_and_the_active_run_is_reported(client, data, 
                      counters={"attempted": 0}, queue=[{"job_id": jid, "rank": 1, "score": 1, "why": ""}])
     locks.acquire(rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="apply",
                   pid_alive=lambda p: True)
+    got = client.get(f"/api/jobs/{jid}/pipeline").json()  # picked by the batch, not in flight: queued, no Cancel
+    assert got["active_run_id"] is None and got["queued_in_run"] == run["id"] and got["next_action"] is None
+    assert got["blocked_reason"] == f"Queued in batch run {run['id']}"
+    locks.acquire(rs.job_lock_path(jid), owner=f"run:{run['id']}", ttl_seconds=600, pid=999, note=f"apply {jid}",
+                  pid_alive=lambda p: True)
     got = client.get(f"/api/jobs/{jid}/pipeline").json()
-    assert got["active_run_id"] == run["id"] and got["next_action"] is None
-    assert client.get(f"/api/jobs/{data['jobs']['found']}/pipeline").json()["active_run_id"] is None
+    assert got["active_run_id"] == run["id"] and got["queued_in_run"] is None and got["next_action"] is None
+    other = client.get(f"/api/jobs/{data['jobs']['found']}/pipeline").json()
+    assert other["active_run_id"] is None and other["queued_in_run"] is None
     r = client.post(f"/api/jobs/{jid}/pipeline", json={"action": "continue"}, headers=W)
     assert r.status_code == 409 and "already running" in r.json()["detail"] and fakes.spawned == []

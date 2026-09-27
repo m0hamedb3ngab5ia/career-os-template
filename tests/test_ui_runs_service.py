@@ -848,4 +848,21 @@ def test_active_run_for_names_the_running_job_run(rc, settings):
                         queue=[{"job_id": jid, "rank": 1, "score": 1, "why": ""}])
     locks.acquire(rc.rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="apply",
                   pid_alive=lambda p: True)
+    assert rc.active_run_for(jid) is None and rc.queued_in_run(jid) == run["id"]  # picked, not yet in flight
+    locks.acquire(rc.rs.job_lock_path(jid), owner=f"run:{run['id']}", ttl_seconds=600, pid=999,
+                  note=f"apply {jid}", pid_alive=lambda p: True)
     assert rc.active_run_for(jid) == run["id"] and rc.active_run_for("other") is None
+
+
+def test_active_run_for_is_only_the_job_in_flight_and_queued_jobs_are_reported_apart(rc, settings):
+    jid, other = add_jobs(settings, 2)
+    run = rc.rs.new_run("prepare", "manual", {"max_jobs": 2, "max_minutes": 30}, NOW, counters={"attempted": 0},
+                        queue=[{"job_id": jid, "rank": 1, "score": 1, "why": ""},
+                               {"job_id": other, "rank": 2, "score": 1, "why": ""}])
+    locks.acquire(rc.rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="prepare",
+                  pid_alive=lambda p: True)
+    locks.acquire(rc.rs.job_lock_path(jid), owner=f"run:{run['id']}", ttl_seconds=600, pid=999,
+                  note=f"prepare {jid}", pid_alive=lambda p: True)
+    assert rc.active_run_for(jid) == run["id"] and rc.queued_in_run(jid) is None
+    assert rc.active_run_for(other) is None and rc.queued_in_run(other) == run["id"]
+    assert rc.active_run_for("nope") is None and rc.queued_in_run("nope") is None

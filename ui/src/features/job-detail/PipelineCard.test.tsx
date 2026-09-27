@@ -17,6 +17,7 @@ const base: PipelineState = {
   blocked_reason: null,
   review_reasons: [],
   active_run_id: null,
+  queued_in_run: null,
 };
 
 let restore: () => void;
@@ -158,6 +159,50 @@ describe("PipelineCard", () => {
     const api = await scoreThen({ stage: "prepare", next_action: "continue", next_kind: "prepare", force: false }, true);
     expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
     expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("recovers when the run ends before the first poll and shows its stop reason", async () => {
+    let current: PipelineState = { ...base, stage: "apply", next_action: "continue", next_kind: "apply" };
+    const api = mockApi({
+      "GET /api/jobs/j1/pipeline": () => current,
+      "POST /api/jobs/j1/pipeline": () => {
+        // The run failed at once (doctor): status.json unchanged, active_run_id never set.
+        current = { ...current, review_reasons: ["Flag: doctor failed"] };
+        return { run_id: "run-fast", kind: "apply" };
+      },
+      "GET /api/runs/run-fast": () => ({
+        id: "run-fast", kind: "apply", trigger: "manual", status: "finished", state: "finished",
+        stop_reason: "doctor", detail: "careeros doctor failed", started_at: "2026-09-27T10:00:00Z",
+        ended_at: "2026-09-27T10:00:01Z", attempts: [], budget: {}, counters: {},
+      }),
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    expect(await screen.findByText(/Run run-fast ended: doctor — careeros doctor failed/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(screen.getByText("Flag: doctor failed")).toBeInTheDocument();
+    expect(api.callsTo("GET /api/runs/run-fast").length).toBeGreaterThan(0);
+  });
+
+  it("streams the returned run even before the pipeline reports it as active", async () => {
+    const api = setup({ stage: "apply", next_action: "continue", next_kind: "apply" }, {
+      "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-late", kind: "apply" }),
+      "GET /api/runs/run-late": () => ({ status: 404, body: { detail: "no run 'run-late'" } }),
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
+    expect(FakeEventSource.last.url).toBe("/api/runs/run-late/stream");
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeInTheDocument();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("shows a queued-in-batch job as blocked without Cancel", async () => {
+    setup({ stage: "prepare", next_action: null, next_label: null, next_kind: null,
+            blocked_reason: "Queued in batch run 20260927-090000-prepare-11aa",
+            queued_in_run: "20260927-090000-prepare-11aa" });
+    expect(await screen.findByText("Queued in batch run 20260927-090000-prepare-11aa")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeDisabled();
   });
 
   it("shows the server's refusal as a toast", async () => {

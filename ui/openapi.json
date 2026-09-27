@@ -3975,6 +3975,17 @@
             ],
             "title": "Next Label"
           },
+          "queued_in_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Queued In Run"
+          },
           "review_reasons": {
             "items": {
               "type": "string"
@@ -3995,7 +4006,8 @@
           "force",
           "blocked_reason",
           "review_reasons",
-          "active_run_id"
+          "active_run_id",
+          "queued_in_run"
         ],
         "title": "PipelineState",
         "type": "object"

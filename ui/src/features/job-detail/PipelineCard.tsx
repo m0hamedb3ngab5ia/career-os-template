@@ -1,9 +1,12 @@
+import { useQuery } from "@tanstack/react-query";
 import { Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
-import { useCancelRun, useRunStream } from "../runs/api";
+import { runKeys, useCancelRun, useRunStream } from "../runs/api";
 import { LogPane, type LogLine } from "../runs/LogPane";
+import type { RunDetail } from "../runs/types";
 import { errorText, usePipeline, useStartPipeline } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -30,6 +33,10 @@ function chainsToPrepare(s: PipelineState): boolean {
     s.active_run_id == null;
 }
 
+// Polls of GET /runs/{id} (1s apart) that may 404 before a run the card started is given up on: `careeros run`
+// writes run.json within a second or two of spawning; ~15s without one means it never started.
+const MAX_MISSING_POLLS = 15;
+
 /** Stage stepper, the one next action (Start / Continue / Approve & continue), the review reasons and, while a
  * run works on this job, its live output with Cancel. The server decides what can run (job_pipeline.py).
  * A score run started here chains into prepare (score → prepare → QA in one click) and stops at the review gate
@@ -43,18 +50,37 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const [chaining, setChaining] = useState(false);
   // The kind of the run this card started, so only our own score run chains (never a run from elsewhere).
   const startedKind = useRef<string | null>(null);
+  // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
+  const [lastEnd, setLastEnd] = useState<string | null>(null);
   const pipeline = usePipeline(jobId, started !== null);
   const state = pipeline.data;
-  const runId = state?.active_run_id ?? null;
+  // Stream the run we started even before the pipeline reports it (it may end before the first 1s poll).
+  const runId = state?.active_run_id ?? started;
   const start = useStartPipeline(jobId);
   const cancel = useCancelRun();
   const stream = useRunStream(runId, runId !== null);
+  // The started run's record: 404 until run.json exists, then its status. A finished record means the run ended
+  // (maybe before we ever saw it active); MAX_MISSING_POLLS 404s in a row mean it never started.
+  const startedRun = useQuery({
+    queryKey: runKeys.detail(started ?? ""),
+    queryFn: () => apiFetch<RunDetail>(`/api/runs/${encodeURIComponent(started ?? "")}`),
+    enabled: started !== null,
+    retry: false,
+    refetchInterval: 1000,
+  });
+  const startedEnded = started !== null && startedRun.data != null && startedRun.data.state !== "running";
+  const startedMissing = started !== null && startedRun.data == null && startedRun.errorUpdateCount >= MAX_MISSING_POLLS;
 
   useEffect(() => {
-    if (runId && started && runId !== started) setStarted(null); // another run took the job: follow that one
-  }, [runId, started]);
+    if (state?.active_run_id && started && state.active_run_id !== started) setStarted(null); // another run took the job
+  }, [state?.active_run_id, started]);
   useEffect(() => {
-    if (!stream.ended) return;
+    if (!stream.ended && !startedEnded && !startedMissing) return;
+    if (started && !stream.ended) {
+      const d = startedRun.data;
+      setLastEnd(d ? `Run ${d.id} ended: ${d.stop_reason ?? d.status}${d.detail ? ` — ${d.detail}` : ""}`
+                   : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
+    }
     setStarted(null);
     setChaining(false);
     const wasScore = startedKind.current === "score";
@@ -74,8 +100,8 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         },
       );
     });
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch (and maybe chain) once per stream end
-  }, [stream.ended]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- refetch (and maybe chain) once per run end
+  }, [stream.ended, startedEnded, startedMissing]);
 
   if (pipeline.error) {
     return (
@@ -105,6 +131,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   function run() {
     if (!state?.next_action) return;
     const kind = state.next_kind;
+    setLastEnd(null);
     start.mutate(
       { action: state.next_action },
       {
@@ -140,6 +167,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           </ul>
         </div>
       ) : null}
+      {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
       {runId ? (
         <>
           <div className={styles.buttons}>

@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from careeros.ui.services.job_pipeline import TIER_A_BLOCKED, compute_state, review_reasons
+from careeros.ui.services.job_pipeline import APPLY_STAGED, TIER_A_BLOCKED, compute_state, review_reasons
 
 pytestmark = pytest.mark.unit
 
@@ -74,3 +74,33 @@ def test_review_reasons_collect_qa_prepare_and_open_items_deduplicated():
                    "tier_a_review: review resume", "long letter", "Open action item: tier_a_review: review resume",
                    "Open action item: Answer the salary question"]
     assert review_reasons(None, None, []) == [] and review_reasons({"checks": "junk"}, {"flags": 3}, []) == []
+
+
+STAGED = {"outcome": "staged", "status": "needs_review", "reason": "assisted: review & submit",
+          "action_item": {"type": "review", "what": "Review the staged form and click submit"}}
+
+
+def test_a_staged_apply_session_is_reviewed_by_hand_and_never_re_approved():
+    # The default config path: auto_submit off -> apply-job stages the form, status needs_review, qa_pass true.
+    st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session=STAGED)
+    assert st["stage"] == "review" and st["next_action"] is None and st["next_kind"] is None
+    assert st["blocked_reason"] == APPLY_STAGED
+    assert "Apply session staged: assisted: review & submit" in st["review_reasons"]
+    assert "Action item: Review the staged form and click submit" in st["review_reasons"]
+    for outcome in ("submitted", "blocked"):
+        st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session={**STAGED, "outcome": outcome})
+        assert st["next_action"] is None and st["blocked_reason"], outcome
+
+
+def test_a_failed_apply_session_allows_a_retry_with_the_reason_shown():
+    failed = {"outcome": "failed", "status": "needs_review", "reason": "daily cap", "action_item": None}
+    st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session=failed)
+    assert act(st) == ("review", "approve_continue", "apply", False, None)
+    assert "Apply session failed: daily cap" in st["review_reasons"]
+
+
+def test_a_job_queued_in_a_batch_is_blocked_without_an_active_run():
+    st = compute_state("scored", SCORE_B, None, None, queued_in_run="20260927-100000-prepare-ab12")
+    assert st["next_action"] is None and st["active_run_id"] is None
+    assert st["queued_in_run"] == "20260927-100000-prepare-ab12"
+    assert st["blocked_reason"] == "Queued in batch run 20260927-100000-prepare-ab12"

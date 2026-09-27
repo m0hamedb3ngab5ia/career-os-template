@@ -253,12 +253,19 @@ class RunControl:
         return {**out, "run_id": run_id} if job_id else out
 
     def active_run_for(self, job_id: str) -> str | None:
-        """The id of the running batch whose queue names this job (a `--job` run or a batch that picked it),
-        else None. Steps and lock holders without a run record never name a job."""
+        """The id of the running batch whose job in flight (its job lock) is this job, else None. A job that is
+        only queued in the batch is `queued_in_run`: cancelling for it would kill the whole batch."""
         run = self.current()
-        if not run or run.get("state") != "running":
+        if run and run.get("state") == "running" and run.get("current_job") == job_id:
+            return run["id"]
+        return None
+
+    def queued_in_run(self, job_id: str) -> str | None:
+        """The id of the running batch whose queue names this job while another job is in flight, else None."""
+        run = self.current()
+        if not run or run.get("state") != "running" or run.get("current_job") == job_id:
             return None
-        if run.get("current_job") == job_id or any(q.get("job_id") == job_id for q in run.get("queue") or []):
+        if any(q.get("job_id") == job_id for q in run.get("queue") or []):
             return run["id"]
         return None
 
