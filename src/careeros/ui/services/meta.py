@@ -32,5 +32,5 @@ def meta(settings: Any) -> dict[str, Any]:
                     "recommended": RECOMMENDED_PRESET, "current": runs.preset},
         "pipeline": {"columns": ui.columns, "closed": ui.closed, "card_limit": ui.card_limit},
         "ui": {"theme": ui.theme, "undo_seconds": ui.undo_seconds, "page_size": ui.page_size,
-               "due_soon_hours": ui.due_soon_hours},
+               "due_soon_hours": ui.due_soon_hours, "pause_until_tomorrow_at": ui.pause_until_tomorrow_at},
     }

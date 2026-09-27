@@ -7,15 +7,17 @@ from __future__ import annotations
 
 from copy import deepcopy
 from dataclasses import dataclass, field
+import re
 from typing import Any
 
 from careeros.config import ConfigError
 from careeros.models import STATUSES
 
 UI_KEYS = ("port", "host", "open_browser", "theme", "undo_seconds", "page_size", "watch_debounce_ms", "index_path",
-           "due_soon_hours", "pipeline")
+           "due_soon_hours", "pause_until_tomorrow_at", "pipeline")
 PIPELINE_KEYS = ("columns", "card_limit")
 THEMES = ("system", "light", "dark")
+_HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # The mockup's board: one column per stage; statuses left out (skipped, rejected, withdrawn, ghosted) are
 # counted in the "Closed" summary line under the board.
 DEFAULT_COLUMNS: list[dict[str, Any]] = [
@@ -40,6 +42,7 @@ class UiConfig:
     index_path: str | None = None          # None: data/careeros.db next to data/jobs
     due_soon_hours: int = 48               # Action Items: orange "due soon" within this many hours
     card_limit: int = 10                   # Pipeline: cards per column before "Show all"
+    pause_until_tomorrow_at: str = "08:00"   # Runs › Pause all › "Until tomorrow": this local time tomorrow
     columns: list[dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_COLUMNS))
 
     @property
@@ -122,6 +125,11 @@ def load_ui_config(settings: Any) -> UiConfig:
         cfg.index_path = raw["index_path"]
     if "due_soon_hours" in raw:
         cfg.due_soon_hours = _int(raw["due_soon_hours"], "due_soon_hours", 1, 24 * 14)
+    if "pause_until_tomorrow_at" in raw:
+        v = raw["pause_until_tomorrow_at"]
+        if not isinstance(v, str) or not _HHMM.match(v):
+            raise _err(f'pause_until_tomorrow_at must be a quoted 24-hour time like "08:00", got {v!r}')
+        cfg.pause_until_tomorrow_at = v
     pl = raw.get("pipeline")
     if pl is not None:
         if not isinstance(pl, dict) or set(pl) - set(PIPELINE_KEYS):

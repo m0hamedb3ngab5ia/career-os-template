@@ -8,11 +8,12 @@ edit keeps the last good settings and shows the error on /api/health), the Index
 """
 from __future__ import annotations
 
-from datetime import datetime, timezone
+from datetime import date, datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
 
 from fastapi import FastAPI, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
 
 from careeros.config import ConfigError, Settings
@@ -44,6 +45,7 @@ class Context:
         settings and show why. The index and the watcher were built on the old paths, so a change to `paths` or
         `ui.index_path` also keeps the old settings until `careeros ui` is restarted."""
         from careeros.runs.advisor import load_advisor_config
+        from careeros.runs.policy import daily_cap
         from careeros.runs.config import load_runs_config
         from careeros.runs.schedule import load_schedule
         from careeros.ui.config import load_ui_config
@@ -55,13 +57,45 @@ class Context:
             load_runs_config(fresh)
             load_schedule(fresh)
             load_advisor_config(fresh.pipeline)
+            daily_cap(fresh.targets or {}, date.today())       # volume block: the Today tile reads it
         except ConfigError as e:
             self.config_error = str(e)
             return
-        if fresh.paths != self.settings.paths or default_path(fresh) != default_path(self.settings):
-            self.config_error = "paths changed in config/pipeline.yaml: restart careeros ui to use them"
+        try:
+            moved = fresh.paths != self.settings.paths or default_path(fresh) != default_path(self.settings)
+        except ConfigError as e:
+            self.config_error = str(e)
+            return
+        server = ("host", "port", "watch_debounce_ms")
+        new_ui, old_ui = load_ui_config(fresh), load_ui_config(self.settings)
+        if moved or any(getattr(new_ui, k) != getattr(old_ui, k) for k in server):
+            self.config_error = ("paths, ui.index_path, ui.host, ui.port or ui.watch_debounce_ms changed in "
+                                 "config/pipeline.yaml: restart careeros ui to use them")
             return
         self.settings, self.config_error = fresh, None
+
+
+_WHAT = {"int_parsing": "must be a whole number", "int_from_float": "must be a whole number",
+         "float_parsing": "must be a number", "bool_parsing": "must be true or false",
+         "missing": "is required", "greater_than_equal": "is too small", "less_than_equal": "is too large",
+         "string_type": "must be text", "json_invalid": "is not valid JSON"}
+
+
+_INPUT_SHOWN = 80  # longest input a validation message echoes
+
+
+def plain_validation(errors: Any) -> str:
+    """FastAPI's validation errors as one sentence ("max_jobs must be a whole number, got 2.5.")."""
+    parts = []
+    for err in list(errors)[:3]:
+        loc = [str(x) for x in err.get("loc", ()) if x not in ("body", "query", "path", "header")]
+        field = ".".join(loc) or "the request"
+        what = _WHAT.get(err.get("type", ""), str(err.get("msg", "is not valid")).lower())
+        shown = repr(err.get("input"))  # a body-level error carries the whole body: cut it short
+        shown = shown if len(shown) <= _INPUT_SHOWN else shown[: _INPUT_SHOWN - 1] + "…"
+        got = f", got {shown}" if "input" in err and err.get("type") != "missing" else ""
+        parts.append(f"{field} {what}{got}")
+    return ("; ".join(parts) or "The request is not valid") + "."
 
 
 def _utcnow() -> datetime:
@@ -83,7 +117,7 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import actions, events, health, job_actions, jobs, meta, pipeline, status
+    from careeros.ui.routers import actions, events, health, job_actions, jobs, meta, pipeline, runs, status
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -104,11 +138,18 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     async def job_locked(_: Request, e: JobLocked) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=409)
 
+    @app.exception_handler(RequestValidationError)
+    async def bad_request(_: Request, e: RequestValidationError) -> JSONResponse:
+        return JSONResponse({"detail": plain_validation(e.errors())}, status_code=422)
+
     @app.exception_handler(ConfigError)
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=503)
 
-    for r in (health, meta, status, jobs, events, actions, pipeline, job_actions):
+    for r in (health, meta, status, jobs, events, runs, actions, pipeline, job_actions):
+        app.include_router(r.router, prefix="/api")
+    from careeros.ui.routers import settings as settings_r, storage as storage_r  # Settings + Storage slice
+    for r in (settings_r, storage_r):
         app.include_router(r.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)

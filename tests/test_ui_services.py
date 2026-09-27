@@ -1,6 +1,8 @@
 """careeros.ui.services: meta, the Today status (stat tiles, counts) and the jobs list/detail, over the index."""
 from __future__ import annotations
 
+import json
+
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -56,7 +58,8 @@ def test_meta_lists_codes_from_config_and_models(data):
     assert m["presets"]["values"]["small"] == {"max_score_jobs": 10, "max_prepare_jobs": 2, "max_minutes": 30}
     assert [c["name"] for c in m["pipeline"]["columns"]][0] == "Found"
     assert "rejected" in m["pipeline"]["closed"]
-    assert m["ui"] == {"theme": "system", "undo_seconds": 8, "page_size": 100, "due_soon_hours": 48}
+    assert m["ui"] == {"theme": "system", "undo_seconds": 8, "page_size": 100, "due_soon_hours": 48,
+                       "pause_until_tomorrow_at": "08:00"}
     assert m["pipeline"]["card_limit"] == 10
 
 
@@ -76,6 +79,21 @@ def test_status_tiles(data, idx):
     assert (rr["applied"], rr["responded"], rr["days"]) == (3, 2, 30)
     assert rr["rate"] == pytest.approx(2 / 3)
     assert "screening" in rr["definition"]
+
+
+def test_response_rate_counts_a_response_even_after_withdrawing(data, idx):
+    from careeros.store import Store
+
+    jid = data["jobs"]["applied"]
+    f = Store(data["settings"]).job_dir(jid) / "status.json"
+    st = json.loads(f.read_text(encoding="utf-8"))
+    at = st["history"][-1]["at"]
+    st["history"] += [{"status": "screening", "at": at, "note": None}, {"status": "withdrawn", "at": at, "note": None}]
+    st["status"] = "withdrawn"
+    f.write_text(json.dumps(st), encoding="utf-8")
+    idx.update_jobs([jid])
+    rr = status_svc.status(data["settings"], idx, NOW)["tiles"]["response_rate"]
+    assert (rr["applied"], rr["responded"]) == (3, 3)
 
 
 def test_status_counts_pipeline_and_runs(data, idx):

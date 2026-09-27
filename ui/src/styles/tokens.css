@@ -54,6 +54,7 @@
   --cat-2: #c2610c;
   --cat-3: #7a3ba0;
   --cat-4: #00907f;
+  --cat-other: #8e8e93;      /* folded "Other" series: neutral, not a fifth hue */
 
   /* elevation */
   --shadow-card: 0 1px 2px rgba(0, 0, 0, 0.06), 0 1px 1px rgba(0, 0, 0, 0.04);

@@ -11,7 +11,12 @@ import { routes } from "./routes";
 function renderAt(path: string, status: unknown = {}) {
   vi.stubGlobal(
     "fetch",
-    vi.fn(async () => new Response(JSON.stringify(status), { headers: { "content-type": "application/json" } })),
+    // Only /api/status answers; screens that load their own data see a 404 and must still render their frame.
+    vi.fn(async (url: string) =>
+      String(url).startsWith("/api/status")
+        ? new Response(JSON.stringify(status), { headers: { "content-type": "application/json" } })
+        : new Response(JSON.stringify({ detail: "not in this test" }), { status: 404 }),
+    ),
   );
   const router = createMemoryRouter(routes, { initialEntries: [path] });
   const qc = new QueryClient({ defaultOptions: { queries: { retry: false } } });
@@ -51,10 +56,11 @@ describe("AppShell", () => {
     for (const g of ["Overview", "Work", "System"]) expect(within(nav).getByText(g)).toBeInTheDocument();
   });
 
-  it("marks the current section and shows its page heading", () => {
+  it("marks the current section and shows its page heading", async () => {
     renderAt("/runs");
-    expect(screen.getByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
-    expect(screen.getByRole("heading", { level: 1, name: "Runs" })).toBeInTheDocument();
+    expect(await screen.findByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+    // the screen is a lazy route: allow for its chunk to load
+    expect(await screen.findByRole("heading", { level: 1, name: "Runs" }, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it("shows live counts from /api/status; zero when there is no data yet", async () => {

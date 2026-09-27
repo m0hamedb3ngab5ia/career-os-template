@@ -200,8 +200,10 @@ def test_cli_refuses_a_non_loopback_host(data, tmp_path):
 
 
 def test_cli_reindex_flag_rebuilds(data, tmp_path):
-    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
-    db.write_bytes(b"not a database")
+    ix = Index(data["settings"])
+    ix.rebuild()
+    ix.query("UPDATE jobs SET company = 'Stale Co'")      # drifted rows a plain sync would skip (same files)
+    ix.close()
     home = tmp_path / "h3"
     home.mkdir()
     port = _free_port()
@@ -211,10 +213,10 @@ def test_cli_reindex_flag_rebuilds(data, tmp_path):
     try:
         _wait_health(f"http://127.0.0.1:{port}", proc)
         assert httpx.get(f"http://127.0.0.1:{port}/api/status").json()["counts"]["jobs"] == 8
+        assert httpx.get(f"http://127.0.0.1:{port}/api/jobs", params={"q": "stale"}).json()["total"] == 0
     finally:
         proc.terminate()
         proc.wait(timeout=10)
-
 
 
 # --- watcher threads + settings reload -------------------------------------------------------------------------
@@ -239,7 +241,6 @@ class _Broker:
 def test_watcher_watches_a_tracker_outside_the_data_dirs(tmp_path):
     import yaml
 
-    from careeros.config import Settings
     from careeros.tracker import Tracker
     from careeros.ui.watch import Watcher
 
@@ -314,3 +315,72 @@ def test_reload_rejects_a_broken_schedule_or_advisor(data, client, block):
     ctx.reload_settings()
     assert ctx.settings is old and ctx.config_error and ("schedule" in ctx.config_error or
                                                           "advis" in ctx.config_error)
+
+
+@pytest.mark.parametrize("change", [{"watch_debounce_ms": 900}, {"port": 9100}, {"host": "localhost"}])
+def test_reload_keeps_settings_when_server_keys_change(data, client, change):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["ui"] = change
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "restart careeros ui" in ctx.config_error
+
+
+def test_reload_refuses_an_index_path_on_the_tracker(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "pipeline.yaml"
+    pl = yaml.safe_load(cfg.read_text())
+    pl["ui"] = {"index_path": str(data["settings"].paths["tracker_xlsx"])}
+    cfg.write_text(yaml.safe_dump(pl, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "index_path" in ctx.config_error
+
+
+def test_reload_refuses_a_broken_volume_block(data, client):
+    import yaml
+
+    ctx = client.app.state.ctx
+    old = ctx.settings
+    cfg = data["settings"].root / "config" / "targets.yaml"
+    tg = yaml.safe_load(cfg.read_text()) or {}
+    tg["volume"] = {"max_applications_per_day": 0}
+    cfg.write_text(yaml.safe_dump(tg, sort_keys=False))
+    ctx.reload_settings()
+    assert ctx.settings is old and "volume" in ctx.config_error
+    assert client.get("/api/status").status_code == 200
+
+
+def test_cli_refuses_to_replace_a_foreign_file_at_the_index_path(data, tmp_path):
+    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
+    db.write_bytes(b"not a database")
+    home = tmp_path / "h4"
+    home.mkdir()
+    r = subprocess.run([sys.executable, "-m", "careeros.cli", "ui", "--no-open", "--reindex"],
+                       env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
+    assert r.returncode == 1 and "not a careeros index" in r.stderr
+    assert db.read_bytes() == b"not a database"
+
+
+def test_cli_reindex_refuses_another_apps_sqlite_file(data, tmp_path):
+    import sqlite3
+
+    db = data["settings"].paths["jobs_dir"].parent / "careeros.db"
+    con = sqlite3.connect(db)
+    con.execute("CREATE TABLE jobs (id INTEGER)")
+    con.commit()
+    con.close()
+    before = db.read_bytes()
+    home = tmp_path / "h5"
+    home.mkdir()
+    r = subprocess.run([sys.executable, "-m", "careeros.cli", "ui", "--no-open", "--reindex"],
+                       env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
+    assert r.returncode == 1 and "not a careeros index" in r.stderr
+    assert db.read_bytes() == before

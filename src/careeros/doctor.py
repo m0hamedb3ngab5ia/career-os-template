@@ -429,6 +429,23 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
     return out
 
 
+def check_ui_index(root: Path) -> list[Check]:
+    """`ui.index_path` must not point at the candidate's own files (`careeros ui` refuses to start on it)."""
+    from careeros.config import ConfigError, Settings
+    from careeros.ui.index import default_path
+
+    try:
+        s = Settings.load(root)
+    except ConfigError:
+        return []                         # reported by the yaml / schema / runs checks
+    try:
+        default_path(s)
+    except ConfigError as e:
+        if "index_path" in str(e):
+            return [Check(FAIL, "ui", str(e))]
+    return []
+
+
 def check_voice(root: Path) -> Check:
     d = root / "profile" / "voice" / "samples"
     n = sum(1 for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.is_dir() else 0
@@ -494,6 +511,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
     checks += check_runs(cfg["pipeline"])
+    checks += check_ui_index(root)
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)

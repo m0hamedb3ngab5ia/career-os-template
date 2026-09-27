@@ -177,6 +177,7 @@ def test_high_failure_rate_is_advice_only_and_metrics_are_reported():
     assert rec["change"] is None
     m = out["metrics"]["score"]
     assert m["runs"] == 5 and m["failure_rate"] == 0.6 and m["avg_job_s"] == 60
+    assert m["failed"] == 15, "the exact count, so the UI need not rebuild it from a rounded rate"
 
 
 # --- YAML edit (ruamel round trip) -------------------------------------------------------------------------

@@ -79,6 +79,9 @@ def test_overrides_and_custom_columns():
     {"ui": {"pipeline": {"card_limit": "10"}}},
     {"ui": {"due_soon_hours": 0}},
     {"ui": {"due_soon_hours": 24 * 15}},
+    {"ui": {"pause_until_tomorrow_at": "8:00"}},
+    {"ui": {"pause_until_tomorrow_at": "24:00"}},
+    {"ui": {"pause_until_tomorrow_at": 800}},
 ])
 def test_invalid_config_fails_closed(bad):
     with pytest.raises(ConfigError):
@@ -91,6 +94,9 @@ def test_board_card_limit_and_due_soon_window():
     cfg = load_ui_config(S({"ui": {"due_soon_hours": 24, "pipeline": {"card_limit": 25}}}))
     assert cfg.card_limit == 25 and cfg.due_soon_hours == 24
     assert [c["name"] for c in cfg.columns][0] == "Found"      # card_limit alone keeps the default columns
+def test_pause_until_tomorrow_at_defaults_to_eight_and_takes_hh_mm():
+    assert load_ui_config(S({})).pause_until_tomorrow_at == "08:00"
+    assert load_ui_config(S({"ui": {"pause_until_tomorrow_at": "06:30"}})).pause_until_tomorrow_at == "06:30"
 
 
 def test_default_columns_are_not_shared_state():

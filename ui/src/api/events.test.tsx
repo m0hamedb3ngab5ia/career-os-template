@@ -37,17 +37,22 @@ describe("keysForChange", () => {
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
+      ["storage"],
+      ["advise"],
       ["status"],
       ["actions"],
       ["pipeline"],
     ]);
     expect(keysForChange({ jobs: [], runs: [], actions: false, config: true, status: false })).toEqual([
       ["meta"],
+      ["runs"],
       ["settings"],
+      ["advise"],
+      ["storage"],
       ["status"],
       ["pipeline"],
     ]);
-    expect(keysForChange({ status: true })).toEqual([["status"]]);
+    expect(keysForChange({ status: true })).toEqual([["status"], ["runs"]]);
     expect(keysForChange({})).toEqual([]);
   });
 });

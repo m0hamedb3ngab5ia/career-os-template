@@ -21,6 +21,9 @@ def run_state(rs: RunStore, run: dict[str, Any], alive=locks.pid_alive) -> str:
         held = locks.status(path, alive=alive)
         if held.get("state") == "held" and held.get("owner") == owner:
             return "running"
+    fresh = rs.load_run(run["id"])  # it may have finished between the caller's read and the lock check
+    if fresh and fresh.get("status") != "running":
+        return str(fresh.get("status"))
     return "interrupted"
 
 

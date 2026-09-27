@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatCount, formatDay, formatDue, formatMonthDay, formatRelative } from "./format";
+import { formatClock, formatCount, formatDay, formatDue, formatDuration, formatMonthDay, formatNumber, formatRelative, formatWhen, getAppLocale, setAppLocale } from "./format";
 
 describe("format", () => {
   const now = new Date("2026-09-26T12:00:00Z");
@@ -25,6 +25,43 @@ describe("format", () => {
 
   it("formats counts with grouping", () => {
     expect(formatCount(1736, en)).toBe("1,736");
+  });
+
+  it("formats wall-clock schedule times in the locale's style", () => {
+    expect(formatClock("01:00", en)).toBe("1:00 AM");
+    expect(formatClock("18:30", "fr-FR")).toBe("18:30");
+    expect(formatClock("nope", en)).toBe("nope");
+  });
+
+  it("formats a moment relative to today: time, weekday, or date", () => {
+    const local = new Date(2026, 8, 26, 12, 0);
+    const today = new Date(2026, 8, 26, 1, 5).toISOString();
+    const thursday = new Date(2026, 8, 24, 20, 0).toISOString();
+    const earlier = new Date(2026, 7, 2, 9, 0).toISOString();
+    expect(formatWhen(today, local, en)).toBe("1:05 AM");
+    expect(formatWhen(thursday, local, en)).toBe("Thu 8:00 PM");
+    expect(formatWhen(earlier, local, en)).toBe("Aug 2, 9:00 AM");
+    expect(formatWhen(null, local, en)).toBeNull();
+  });
+
+  it("formats durations and numbers with Intl units", () => {
+    expect(formatDuration(42, en)).toBe("42 sec");
+    expect(formatDuration(432, en)).toBe("7 min 12 sec");
+    expect(formatDuration(7500, en)).toBe("2 hr 5 min");
+    expect(formatDuration(null, en)).toBeNull();
+    expect(formatNumber(12.5, "fr-FR")).toBe("12,5");
+  });
+
+  it("uses the app locale when no locale is passed (tests pin en-US in setup)", () => {
+    expect(getAppLocale()).toBe("en-US");
+    expect(formatRelative("2026-09-26T11:58:00Z", now)).toBe("2 minutes ago");
+    setAppLocale("fr-FR");
+    try {
+      expect(formatRelative("2026-09-26T11:58:00Z", now)).toBe("il y a 2 minutes");
+      expect(formatCount(1736)).toBe("1\u202f736");
+    } finally {
+      setAppLocale("en-US");
+    }
   });
 });
 
