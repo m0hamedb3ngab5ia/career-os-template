@@ -1,6 +1,6 @@
 // One outreach.json draft as the server sends it (src/careeros/ui/services/inbox.py: draft_view).
 
-export type DraftMode = "sent" | "always_manual" | "manual" | "verified_email" | "linkedin";
+export type DraftMode = "sent" | "always_manual" | "manual" | "verified_email" | "email_draft" | "linkedin";
 
 export interface Draft {
   contact: string;
@@ -22,4 +22,8 @@ export interface Draft {
   mode: DraftMode | string;
   placeholders: string[];
   words: number;
+  /** True for follow-ups (followup_7d/14d, followups[]): never auto-sent. */
+  followup?: boolean;
+  /** A follow-up's send_after, once the note it follows is sent. */
+  due?: string | null;
 }

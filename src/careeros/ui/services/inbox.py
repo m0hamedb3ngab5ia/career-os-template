@@ -23,6 +23,8 @@ _LOG_RE = re.compile(r"^- (\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}) \[inbox-sync\] (
                      r"\((\S+)\)\s*$")
 _DATE_TAIL = re.compile(r"\s+\d{4}-\d{2}-\d{2}(?:[T ][\d:]+)?$")
 THANKS = "post_interview_thanks"
+FOLLOWUP_KINDS = ("followup_7d", "followup_14d")
+_FOLLOWUP, _PARENT_SENT = "_ui_followup", "_ui_parent_sent"  # internal markers set by _outreach_items
 SYNC_OFF = "Inbox sync isn't set up yet"
 SYNC_NO_BUTTON = "Inbox sync runs on its schedule; starting it from here isn't built yet"
 SENDING_OFF = "Follow-up sending isn't built yet"
@@ -78,7 +80,8 @@ def _words(text: str | None) -> int:
 
 def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy: Any = None) -> dict[str, Any]:
     """One outreach.json draft (drafts[] or followups[]) as the UI shows it. `mode`: sent | always_manual (thank-you
-    notes) | manual (connected / mutuals) | verified_email | linkedin (LinkedIn is always draft-only).
+    notes) | manual (connected / mutuals) | verified_email | email_draft (an email follow-up: never auto-sent) |
+    linkedin (LinkedIn is always draft-only). `due`: a follow-up's `send_after`, once the note it follows is sent.
 
     Manual comes from the saved `manual_tailor` flag OR, with a `policy`, from the contact's current degree / mutuals
     (careeros.outreach.needs_manual_outreach): a person marked Connected after the draft was written is never
@@ -94,6 +97,7 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         now_manual, reason = needs_manual_outreach(contact, policy)
         if now_manual:
             manual, manual_reason = True, manual_reason or reason
+    followup = bool(d.get(_FOLLOWUP)) or d.get("kind") in FOLLOWUP_KINDS
     email = d.get("email") if isinstance(d.get("email"), dict) else None
     linkedin_note = _str(d.get("linkedin_note"))
     linkedin_message = _str(d.get("linkedin_message"))
@@ -101,7 +105,7 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
     if channel == "linkedin" and (linkedin_message or linkedin_note):
         email = None  # a LinkedIn first touch shows (and is blocked by) its LinkedIn variant, not the email block
     to = _str(d.get("to"))
-    verified = bool(to) and (d.get("to_confidence") == "verified" or bool(
+    verified = channel != "linkedin" and bool(to) and (d.get("to_confidence") == "verified" or bool(
         contact and contact.get("email_confidence") == "verified" and contact.get("email") == to))
     body = _str((email or {}).get("body")) or linkedin_message or linkedin_note or _str(d.get("body")) or ""
     if d.get("sent"):
@@ -110,10 +114,14 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         mode = "always_manual"
     elif manual:
         mode = "manual"
+    elif followup:  # follow-ups are never auto-sent: the candidate sends them on their own channel
+        mode = "linkedin" if channel == "linkedin" else "email_draft"
     elif verified and email:
         mode = "verified_email"
     else:
         mode = "linkedin"
+    # a scheduled follow-up (send_after) is due once the note it follows up on has gone out
+    due = _str(d.get("send_after")) if not d.get("sent") and d.get(_PARENT_SENT, True) else None
     subject = _str((email or {}).get("subject"))
     texts = [subject, body, linkedin_note, linkedin_message]
     ph: list[str] = []
@@ -127,7 +135,7 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         "subject": subject, "body": body, "linkedin_note": linkedin_note,
         "linkedin_message": linkedin_message, "manual_tailor": manual,
         "manual_reason": manual_reason, "sent": bool(d.get("sent")), "sent_by": d.get("sent_by"),
-        "sent_date": d.get("sent_date"), "mode": mode, "placeholders": ph, "words": _words(body),
+        "sent_date": d.get("sent_date"), "mode": mode, "followup": followup, "due": due, "placeholders": ph, "words": _words(body),
     }
 
 
@@ -146,9 +154,10 @@ def _outreach_items(data: Any) -> list[dict[str, Any]]:
         for d in items if isinstance(items, list) else []:
             if not isinstance(d, dict):
                 continue
-            out.append(d)
+            out.append({**d, _FOLLOWUP: True} if key == "followups" else d)
             inherit = {k: d.get(k) for k in ("contact", "role", "channel", "to", "to_confidence", "manual_tailor",
                                              "manual_reason")}
+            inherit.update({_FOLLOWUP: True, _PARENT_SENT: bool(d.get("sent"))})
             for k in ("followup_7d", "followup_14d"):
                 text = d.get(k)
                 if isinstance(text, str) and text.strip():
@@ -158,7 +167,7 @@ def _outreach_items(data: Any) -> list[dict[str, Any]]:
                 if isinstance(f, str) and f.strip():
                     f = {"body": f}
                 if isinstance(f, dict):
-                    out.append({"contact": d.get("contact"), "role": d.get("role"), **f})
+                    out.append({**inherit, "kind": None, **f, _FOLLOWUP: True, _PARENT_SENT: bool(d.get("sent"))})
     return out
 
 
@@ -235,8 +244,9 @@ def _next(job: dict[str, Any], ix: Any, cfg: Any, drafts: list[dict[str, Any]], 
     if status == "screening":
         return _status_followup(ix, job, cfg, mode, last_email, "screening")
     applied = _parse(job["applied_at"])
-    firsts = [d for d in drafts if d["kind"] in ("post_apply_outreach", "cold_email")]
-    sent = any(d["sent"] for d in firsts) or (bool(drafts) and all(d["sent"] for d in drafts))
+    # one first touch per contact: the step is done only once every contact's first note has gone out
+    firsts = [d for d in drafts if not d["followup"] and d["kind"] not in ("status_followup", THANKS)]
+    sent = bool(firsts) and all(d["sent"] for d in firsts)
     due = applied + timedelta(days=cfg.followup_after_apply_days) if applied and not sent else None
     return {"kind": "post_apply_outreach", "due": _iso(due), "mode": "sent" if sent else mode}
 
@@ -273,12 +283,14 @@ def _sync_state(settings: Any) -> dict[str, Any]:
 
 
 def _last_sync(ix: Any) -> str | None:
-    """When the last inbox sync that finished cleanly ended (failed / aborted runs don't count)."""
+    """When the last inbox sync that ran to the end of its work ended (failed, paused or cancelled runs don't
+    count)."""
     from careeros.runs.runner import CLEAN_STOPS
 
+    done = tuple(s for s in CLEAN_STOPS if s not in ("paused", "cancelled"))
+
     rows = ix.query("SELECT ended_at FROM runs WHERE kind = 'inbox_sync' AND ended_at IS NOT NULL "
-                    f"AND stop_reason IN ({','.join('?' * len(CLEAN_STOPS))}) ORDER BY ended_at DESC LIMIT 1",
-                    CLEAN_STOPS)
+                    f"AND stop_reason IN ({','.join('?' * len(done))}) ORDER BY ended_at DESC LIMIT 1", done)
     return rows[0]["ended_at"] if rows else None
 
 

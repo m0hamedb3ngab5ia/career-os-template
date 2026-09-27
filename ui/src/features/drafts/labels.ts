@@ -24,6 +24,7 @@ const MODES: Record<string, { label: string; tone: Tone }> = {
   always_manual: { label: "Always manual", tone: "purple" },
   manual: { label: "Manual: you tailor it", tone: "orange" },
   verified_email: { label: "Verified email", tone: "teal" },
+  email_draft: { label: "Email · you send", tone: "gray" },
   linkedin: { label: "LinkedIn · you send", tone: "gray" },
   you_reply: { label: "You reply", tone: "purple" },
   sent: { label: "Sent", tone: "green" },
