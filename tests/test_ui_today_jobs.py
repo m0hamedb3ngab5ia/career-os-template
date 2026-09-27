@@ -450,8 +450,8 @@ def test_job_detail_splits_key_documents_from_other_files(data, idx):
     for name in ("cover_letter.txt", "resume.txt", "cover_letter.pdf", "resume.json", "resume.tex"):
         (jd / name).write_text("x", encoding="utf-8")
     d = jobs_svc.job_detail(s, idx, jid)
-    assert [f["name"] for f in d["documents"]] == ["resume.pdf", "cover_letter.pdf", "resume.txt", "cover_letter.txt"]
+    assert [f["name"] for f in d["documents"]] == ["resume.pdf", "cover_letter.pdf", "cover_letter.md", "resume.txt", "cover_letter.txt"]
     others = [f["name"] for f in d["other_files"]]
-    assert "resume.json" in others and "resume.tex" in others and "cover_letter.md" in others
+    assert "resume.json" in others and "resume.tex" in others and "cover_letter.md" not in others
     assert not {"posting.json", "score.json", "log.md"} & set(others)
     assert not set(others) & {f["name"] for f in d["documents"]}

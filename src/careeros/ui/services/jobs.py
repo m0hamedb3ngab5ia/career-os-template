@@ -19,7 +19,7 @@ JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 SECTION_FILES = {"posting.json", "status.json", "score.json", "safety.json", "qa.json", "contacts.json",
                  "apply_session.json", "log.md"}
 # The documents Job detail shows prominently, in this order; every other file in the folder is under "All files".
-KEY_DOCUMENTS = ("resume.pdf", "cover_letter.pdf", "resume.txt", "cover_letter.txt")
+KEY_DOCUMENTS = ("resume.pdf", "cover_letter.pdf", "cover_letter.md", "resume.txt", "cover_letter.txt")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
                "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at")
 
