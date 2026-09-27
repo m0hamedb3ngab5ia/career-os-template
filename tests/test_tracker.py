@@ -139,6 +139,16 @@ def test_a_direct_write_replays_the_queue_first(tmp_path: Path, monkeypatch):
     assert tr.read_overrides()["o1"] == "B"
 
 
+def test_a_broken_queued_op_does_not_block_new_writes(tmp_path: Path):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    tr._write_pending([{"op": "upsert_job", "payload": {"bogus": 1}, "queued_at": "x"}])  # replay raises TypeError
+    with pytest.warns(UserWarning, match="could not replay"):
+        tr.upsert_job({"job_id": "w1", "company": "Acme", "role": "SWE"})
+    assert tr.get_job("w1") is not None
+    assert tr.pending_count() == 1  # the broken op stays queued for `careeros tracker flush` to report
+
+
 def test_locked_file_queues_and_flushes(tmp_path: Path, monkeypatch):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()

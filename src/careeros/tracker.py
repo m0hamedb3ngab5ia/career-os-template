@@ -323,7 +323,11 @@ class Tracker:
         re-queues and this op queues after it, keeping the order."""
         with self._lock():
             if self._lock_depth == 1 and self._read_pending():  # depth > 1: we are the flush's own replay
-                self._flush_locked()
+                try:
+                    self._flush_locked()
+                except Exception as e:  # a broken queued op must not block every later write; it stays queued
+                    warnings.warn(f"could not replay queued tracker ops ({e}); run `careeros tracker flush`",
+                                  stacklevel=3)
             return self._mutate_locked(op, payload, fn)
 
     def _mutate_locked(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
