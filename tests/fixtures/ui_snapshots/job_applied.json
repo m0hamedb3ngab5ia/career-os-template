@@ -38,6 +38,11 @@
       "modified": "<mtime>",
       "name": "resume.pdf",
       "size": 17
+    },
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
     }
   ],
   "history": [
@@ -83,11 +88,6 @@
   },
   "log": "- <wall> [fixture] status -> applied\n",
   "other_files": [
-    {
-      "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    },
     {
       "modified": "<mtime>",
       "name": "outreach.json",

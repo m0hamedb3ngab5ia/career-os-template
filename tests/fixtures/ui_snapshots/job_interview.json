@@ -50,6 +50,11 @@
       "modified": "<mtime>",
       "name": "resume.pdf",
       "size": 17
+    },
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
     }
   ],
   "history": [
@@ -105,11 +110,6 @@
   },
   "log": "- <wall> [fixture] status -> interview\n- 2026-09-22 15:00:00 [inbox-sync] interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://mail.google.com/mail/u/0/#all/thread-stark-1)\n",
   "other_files": [
-    {
-      "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    },
     {
       "modified": "<mtime>",
       "name": "outreach.json",

@@ -44,6 +44,11 @@
       "modified": "<mtime>",
       "name": "resume.pdf",
       "size": 17
+    },
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
     }
   ],
   "history": [
@@ -93,13 +98,7 @@
     "url": "https://boards.example.com/review"
   },
   "log": "- <wall> [fixture] status -> needs_review\n",
-  "other_files": [
-    {
-      "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    }
-  ],
+  "other_files": [],
   "outreach": null,
   "override": null,
   "posting": {
