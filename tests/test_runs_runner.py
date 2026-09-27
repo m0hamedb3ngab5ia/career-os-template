@@ -381,3 +381,20 @@ def test_raising_save_run_does_not_mask_the_original_run_error(settings, store, 
     with pytest.raises(RuntimeError, match="invoke exploded"):
         _exec(settings, _boom_invoke)
     assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_teardown_error_is_warned_when_run_log_is_unwritable(settings, store, monkeypatch):
+    add_job(store, 1)
+    real_log = RunStore.log
+
+    def log(self, rid, msg):
+        if msg.startswith("teardown"):
+            raise OSError("log gone")
+        return real_log(self, rid, msg)
+    monkeypatch.setattr(RunStore, "log", log)
+
+    def finalize(r):
+        raise OSError("pause hook failed")
+    with pytest.warns(UserWarning, match="pause hook failed"), pytest.raises(RuntimeError, match="invoke exploded"):
+        _exec(settings, _boom_invoke, finalize=finalize)
+    assert not RunStore(settings).runner_lock_path.exists()

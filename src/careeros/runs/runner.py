@@ -21,6 +21,7 @@ import os
 import threading
 import time
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -377,8 +378,8 @@ def close_run(rs: RunStore, run: dict[str, Any], finalize: Callable[[dict[str, A
                 first = first or e
                 try:
                     rs.log(rid, f"teardown {name} failed: {type(e).__name__}: {e}"[:500])
-                except Exception:  # noqa: BLE001 - logging is best effort here
-                    pass
+                except Exception:  # noqa: BLE001 - run.log unwritable: say it on stderr instead of losing it
+                    warnings.warn(f"run {rid}: teardown {name} failed: {type(e).__name__}: {e}", stacklevel=2)
     finally:
         release()
     if first is not None and run.get("status") != "failed":
