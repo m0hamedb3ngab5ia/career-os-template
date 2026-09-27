@@ -50,9 +50,9 @@ STANDARD_KEYS = (
 IDENTITY_KEYS = ("name", "email", "phone", "linkedin", "github")
 ENTRY_SECTIONS = ("experience", "projects", "education", "leadership")
 MARKER_RE = re.compile(r"#\s*(INSERT\b|EDIT\b)")
-BULLET_FLAGS = ("resume_default", "weak", "estimate", "resume_pin")
+BULLET_FLAGS = ("resume_default", "weak", "estimate", "resume_pin")   # optional per-bullet booleans (resume_writing_rules.md)
 MAX_PINS_PER_ENTRY = 2      # resume_pin bullets per entry (one-page budget; tailor-resume grows the budget to the pin count)
-MAX_PINNED_PROJECTS = 2     # projects with a pin (each is always picked, even past the 3-project cap)   # optional per-bullet booleans (resume_writing_rules.md)
+MAX_PINNED_PROJECTS = 2     # projects with a pin (each is always picked, even past the 3-project cap)
 EXAMPLE_EMAIL_RE = re.compile(r"[\w.+-]+@example\.com\b", re.I)
 
 
