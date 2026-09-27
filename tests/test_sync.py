@@ -156,6 +156,25 @@ def test_install_hook_force_replaces_a_symlinked_hook_not_its_target(tmp_path: P
     assert not hook.is_symlink() and sync.HOOK_MARKER in hook.read_text()
 
 
+@pytest.mark.parametrize("target_text", ["same", "older"])
+def test_install_hook_never_writes_through_a_symlink_even_to_a_careeros_hook(tmp_path: Path, target_text):
+    # the link target already carries the marker (a shared careeros hook): still move the link aside, never
+    # write or chmod through it, since other repos may share that target
+    shared = tmp_path / "shared-hooks" / "pre-push"
+    shared.parent.mkdir()
+    body = sync.hook_script("/usr/bin/python3") if target_text == "same" else f"#!/bin/sh\n# {sync.HOOK_MARKER}\nold\n"
+    shared.write_text(body)
+    shared.chmod(0o644)
+    hook = tmp_path / "hooks" / "pre-push"
+    hook.parent.mkdir()
+    hook.symlink_to(shared)
+    assert sync.install_hook(hook, "/usr/bin/python3") == "updated"
+    assert shared.read_text() == body and shared.stat().st_mode & 0o777 == 0o644  # target untouched
+    bak = tmp_path / "hooks" / "pre-push.bak"
+    assert bak.is_symlink() and bak.resolve() == shared.resolve()
+    assert not hook.is_symlink() and hook.read_text() == sync.hook_script("/usr/bin/python3")
+
+
 def test_pr_command_quotes_body_and_names_branch():
     cmd = sync.pr_command(branch="sync/2026-03-04", base="main", remote="template", template_branch="main",
                           commits=["abc123 feat: thing"], results=[("pytest", "passed"), ("ui", "skipped")])
@@ -262,3 +281,14 @@ def test_matches_keep_normalises_both_sides(path, globs):
 def test_hook_script_falls_back_to_default_on_empty_pattern():
     s = sync.hook_script("/usr/bin/python3")
     assert f"[ -n \"$pattern\" ] || pattern='{sync.DEFAULT_URL_PATTERN}'" in s
+
+
+def test_fold_nfc_normalises_before_casefold():
+    assert sync._fold("Témplate") == sync._fold("témplate") == "témplate"
+
+
+@pytest.mark.parametrize("dst, expected", [
+    ("refs/remotes/template/x", "refs/remotes/template/x"), ("remotes/template/x", "refs/remotes/template/x"),
+    ("heads/x", "refs/heads/x"), ("tags/v1", "refs/tags/v1"), ("", ""), ("template/x", None), ("x", None)])
+def test_qualify_dst_expands_like_git_and_flags_ambiguous(dst, expected):
+    assert sync._qualify_dst(dst) == expected

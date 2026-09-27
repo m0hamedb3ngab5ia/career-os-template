@@ -404,6 +404,34 @@ def test_hook_scans_full_history_when_another_remote_writes_under_template_refs(
     assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
 
 
+@pytest.mark.parametrize("how", ["unqualified_dst", "legacy_remotes_file"])
+def test_hook_scans_full_history_when_template_refs_are_written_by_unusual_fetch_rules(repos, env, tmp_path, how):
+    # git expands an unqualified refspec dst (remotes/template/x -> refs/remotes/template/x), and legacy
+    # .git/remotes/<name> files carry `Pull:` rules that git config never shows: neither may hide history
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    side = tmp_path / "side.git"
+    git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(side))
+    git(priv, env, "switch", "-q", "-c", "leak", "template/main")
+    commit(priv, env, {"personal/b.md": "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", "personal/b.md")
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    git(priv, env, "push", "-q", str(side), "leak:main")
+    if how == "unqualified_dst":
+        git(priv, env, "remote", "add", "side", str(side))
+        git(priv, env, "config", "--replace-all", "remote.side.fetch", "refs/heads/main:remotes/template/leak")
+    else:
+        common = Path(git(priv, env, "rev-parse", "--git-common-dir").stdout.strip())
+        common = common if common.is_absolute() else priv / common
+        (common / "remotes").mkdir(exist_ok=True)
+        (common / "remotes" / "side").write_text(f"URL: {side}\nPull: refs/heads/main:refs/remotes/template/leak\n")
+    git(priv, env, "fetch", "-q", "side")
+    assert git(priv, env, "rev-parse", "refs/remotes/template/leak").returncode == 0
+    r = git(priv, env, "push", "template", "leak", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/b.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
+
+
 def test_hook_empty_pattern_config_falls_back_to_default(repos, env):
     priv = repos["private"]
     assert cli(priv, env, "install-hook").returncode == 0

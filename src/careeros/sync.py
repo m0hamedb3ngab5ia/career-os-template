@@ -165,11 +165,16 @@ def install_hook(hook: Path, python: str, force: bool = False) -> str:
     old one kept as <hook>.bak). Raises HookExists for a foreign hook without force."""
     new = hook_script(python)
     result = "installed"
-    if hook.is_symlink() and force and HOOK_MARKER not in _read_or_empty(hook):
-        # move the link itself aside, never write through it: its target may be shared by other repos
+    if hook.is_symlink():
+        # never write or chmod through a link, whatever its target holds: the target may be shared by other
+        # repos. Move the link itself aside and write a regular file (a dangling link counts as foreign)
+        ours = HOOK_MARKER in _read_or_empty(hook)
+        if not ours and not force:
+            raise HookExists(f"{hook} exists and was not written by careeros; rerun with --force "
+                             f"(the current hook is kept as {hook.name}.bak)")
         hook.rename(_free_backup(hook))
-        result = "replaced"
-    elif hook.exists() or hook.is_symlink():  # a dangling link counts as a foreign hook, never write through it
+        result = "updated" if ours else "replaced"
+    elif hook.exists():
         old = _read_or_empty(hook)
         if HOOK_MARKER in old:
             if old == new:
@@ -421,15 +426,43 @@ def remote_is_template_only(g: Git, remote: str, pattern: str) -> bool:
     return bool(urls) and all(url_matches(u, pattern) for u in urls)
 
 
+def _fold(name: str) -> str:
+    """NFC then casefold: APFS treats differently cased and differently composed ref names as one file."""
+    return unicodedata.normalize("NFC", name).casefold()
+
+
+def _qualify_dst(dst: str) -> str | None:
+    """A fetch refspec destination as git stores it: `refs/...` as is, `heads/`, `tags/`, `remotes/` get a
+    `refs/` prefix; "" (fetch without storing) stays "". Any other unqualified name is ambiguous: None."""
+    if not dst or dst.startswith("refs/"):
+        return dst
+    if dst.startswith(("heads/", "tags/", "remotes/")):
+        return "refs/" + dst
+    return None
+
+
+def _legacy_remote_files(g: Git) -> bool:
+    """True when <git-common-dir>/remotes/ holds any file: legacy remotes carry `Pull:` fetch rules that
+    `git config` never shows, so their destinations can't be checked (callers fall back to a full scan)."""
+    common = Path(g.out("rev-parse", "--git-common-dir"))
+    d = common if common.is_absolute() else g.root / common
+    try:
+        return any(True for _ in (d / "remotes").iterdir())
+    except OSError:  # missing (the usual case) or unreadable
+        return (d / "remotes").exists()
+
+
 def tracking_refs_owned(g: Git, remote: str) -> bool:
     """True when nothing but `remote` itself can write under refs/remotes/<remote>/ (the `--remotes=<remote>`
     glob): no other remote is named `<remote>/...` and no other remote's fetch refspec lands there. Compared
     casefolded: on a case-insensitive filesystem (APFS) refs/remotes/Template/x resolves as refs/remotes/template/x,
     so a differently cased name or refspec destination is treated as a collision (full scan, fail safe)."""
-    target = f"refs/remotes/{remote}/".casefold()
-    folded = remote.casefold()
+    if _legacy_remote_files(g):
+        return False
+    target = _fold(f"refs/remotes/{remote}/")
+    folded = _fold(remote)
     for r in g.lines("remote"):
-        rf = r.casefold()
+        rf = _fold(r)
         if r != remote and (rf == folded or rf.startswith(target[len("refs/remotes/"):])):
             return False
     cfg = g.run("config", "--get-regexp", r"^remote\..*\.fetch$", check=False).stdout
@@ -439,7 +472,9 @@ def tracking_refs_owned(g: Git, remote: str) -> bool:
         spec = spec.strip()
         if name == remote or not spec or spec.startswith("^"):
             continue
-        dst = spec.lstrip("+").partition(":")[2].casefold()
+        dst = _qualify_dst(_fold(spec.lstrip("+").partition(":")[2].strip()))
+        if dst is None:
+            return False
         prefix = dst.split("*", 1)[0]
         if prefix.startswith(target) or ("*" in dst and target.startswith(prefix)):
             return False
