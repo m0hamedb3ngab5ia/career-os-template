@@ -79,14 +79,19 @@ def _steps(store: Store, kind: str, job_id: str, state: str) -> list[dict[str, s
     if state != "active":
         return [{"name": n, "state": "pending"} for n, _ in steps]
     d = store.job_dir(job_id)
-    out, active_given = [], False
-    for name, files in steps:
-        done = kind == "prepare" and any((d / f).exists() for f in files)
-        if not done and not active_given:
-            out.append({"name": name, "state": "active"})
-            active_given = True
+    have = [kind == "prepare" and any((d / f).exists() for f in files) for _, files in steps]
+    # A later step's output means every earlier step finished; one with no output of its own was skipped
+    # (prepare-job skips the cover letter when the tier rule is `if_required` and the posting doesn't ask).
+    last = max((i for i, h in enumerate(have) if h), default=-1)
+    out = []
+    for i, (name, _) in enumerate(steps):
+        if have[i]:
+            state = "done"
+        elif i < last:
+            state = "skipped"
         else:
-            out.append({"name": name, "state": "done" if done and not active_given else "pending"})
+            state = "active" if i == last + 1 else "pending"
+        out.append({"name": name, "state": state})
     return out
 
 

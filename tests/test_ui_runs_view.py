@@ -98,6 +98,18 @@ def test_current_lists_done_active_and_queued_jobs_with_steps(rc):
     assert "cap" in cur  # prepare runs show today's apply cap
 
 
+def test_steps_mark_a_skipped_cover_letter_once_a_later_step_has_output(rc):
+    """A tier rule of `if_required` can skip the cover letter; qa.json without cover_letter.md means Cover
+    was skipped, not still running."""
+    s = rc.settings
+    j = add_job(s, "a", "Acme Robotics")
+    d = Store(s).job_dir(j)
+    for f in ("score.json", "resume.json", "qa.json"):
+        (d / f).write_text("{}")
+    assert [(st["name"], st["state"]) for st in view._steps(Store(s), "prepare", j, "active")] == [
+        ("Score", "done"), ("Tailor", "done"), ("Cover", "skipped"), ("QA", "done")]
+
+
 def test_current_marks_a_scheduled_batch(rc):
     rs = RunStore(rc.settings)
     run = rs.new_run("score", "schedule", {"preset": "small", "max_jobs": 2, "max_minutes": 30},

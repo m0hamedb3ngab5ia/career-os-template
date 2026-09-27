@@ -15,7 +15,7 @@ import styles from "./Runs.module.css";
 import type { CurrentRun, JobRow, Step } from "./types";
 
 function StepPill({ step }: { step: Step }) {
-  const words = { done: " done", active: " in progress", pending: " not started" }[step.state];
+  const words = { done: " done", active: " in progress", pending: " not started", skipped: " skipped" }[step.state];
   return (
     <span className={styles.step} data-state={step.state}>
       {step.state === "done" ? <Check size={12} strokeWidth={2.4} aria-hidden="true" /> : null}

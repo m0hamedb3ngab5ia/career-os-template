@@ -70,6 +70,9 @@ _WHAT = {"int_parsing": "must be a whole number", "int_from_float": "must be a w
          "string_type": "must be text", "json_invalid": "is not valid JSON"}
 
 
+_INPUT_SHOWN = 80  # longest input a validation message echoes
+
+
 def plain_validation(errors: Any) -> str:
     """FastAPI's validation errors as one sentence ("max_jobs must be a whole number, got 2.5.")."""
     parts = []
@@ -77,7 +80,9 @@ def plain_validation(errors: Any) -> str:
         loc = [str(x) for x in err.get("loc", ()) if x not in ("body", "query", "path", "header")]
         field = ".".join(loc) or "the request"
         what = _WHAT.get(err.get("type", ""), str(err.get("msg", "is not valid")).lower())
-        got = f", got {err['input']!r}" if "input" in err and err.get("type") != "missing" else ""
+        shown = repr(err.get("input"))  # a body-level error carries the whole body: cut it short
+        shown = shown if len(shown) <= _INPUT_SHOWN else shown[: _INPUT_SHOWN - 1] + "…"
+        got = f", got {shown}" if "input" in err and err.get("type") != "missing" else ""
         parts.append(f"{field} {what}{got}")
     return ("; ".join(parts) or "The request is not valid") + "."
 

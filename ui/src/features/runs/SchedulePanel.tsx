@@ -23,12 +23,18 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
   const action = useScheduleAction();
   const toast = useToast();
   const [asking, setAsking] = useState<"install" | "uninstall" | null>(null);
+  const [warning, setWarning] = useState<string | null>(null); // install succeeded but the server flagged a problem
   const trigger = useRef<HTMLButtonElement>(null); // Install or Uninstall, whichever is shown
 
   function run(which: "install" | "uninstall") {
+    setWarning(null);
     action.mutate(which, {
-      onSuccess: () =>
-        toast.show({ message: which === "install" ? "Scheduler installed." : "Scheduler uninstalled." }),
+      onSuccess: (out) => {
+        const warn = typeof out?.warning === "string" && out.warning ? out.warning : null;
+        setWarning(warn);
+        const done = which === "install" ? "Scheduler installed" : "Scheduler uninstalled";
+        toast.show({ message: warn ? `${done} with a warning.` : `${done}.` });
+      },
       onSettled: () => setAsking(null),
     });
   }
@@ -122,6 +128,11 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
           onCancel={() => setAsking(null)}
           onConfirm={() => run("uninstall")}
         />
+      ) : null}
+      {warning ? (
+        <p role="status" aria-label="Scheduler warning" className={styles.fix}>
+          {warning}
+        </p>
       ) : null}
       {action.error ? (
         <p role="alert" className={styles.fix}>

@@ -52,7 +52,8 @@ export interface HistoryPage {
 
 export interface Step {
   name: string;
-  state: "done" | "active" | "pending";
+  /** skipped: a later step has output but this one has none (e.g. a cover letter the tier rule left out). */
+  state: "done" | "active" | "pending" | "skipped";
 }
 
 export interface JobRow {

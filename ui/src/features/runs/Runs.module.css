@@ -216,6 +216,9 @@
   color: var(--blue);
   font-weight: 600;
 }
+.step[data-state="skipped"] {
+  text-decoration: line-through;
+}
 .stepDot {
   width: 8px;
   height: 8px;

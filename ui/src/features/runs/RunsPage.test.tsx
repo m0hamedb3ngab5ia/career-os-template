@@ -138,6 +138,20 @@ describe("Runs page", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it("names a skipped step (a cover letter the tier rule left out)", async () => {
+    const base = current();
+    const jobs = base.jobs.map((j) =>
+      j.state === "active"
+        ? { ...j, steps: [{ name: "Score", state: "done" as const }, { name: "Tailor", state: "done" as const },
+            { name: "Cover", state: "skipped" as const }, { name: "QA", state: "active" as const }] }
+        : j,
+    );
+    open({ current: { ...base, jobs } });
+    const rows = within(await screen.findByRole("list", { name: "Jobs in this run" })).getAllByRole("listitem");
+    expect(rows[1]!).toHaveTextContent("Cover skipped");
+    expect(rows[1]!).toHaveTextContent("QA in progress");
+  });
+
   it("cancels after a confirm, then says it stops at the next safe point", async () => {
     const user = userEvent.setup();
     const { api } = open({ current: current(), post: { "/api/runs/cancel": { status: "cancelling", run_id: "x", pid: 1 } } });
@@ -402,6 +416,17 @@ describe("Runs page", () => {
     await user.click(within(screen.getByRole("alertdialog", { name: /Install the scheduler/ })).getByRole("button", { name: "Install" }));
     await waitFor(() => expect(api.posts()[0]?.url).toBe("/api/schedule/install"));
     expect(await screen.findByText("Scheduler installed.")).toBeInTheDocument();
+  });
+
+  it("says when the scheduler installed but claude is not on PATH", async () => {
+    const user = userEvent.setup();
+    const warning = "`claude` is not on PATH; scheduled score and prepare runs will stop with doctor_failed";
+    open({ post: { "/api/schedule/install": { loaded: true, warning } } });
+    await user.click(await screen.findByRole("button", { name: "Install" }));
+    await user.click(within(screen.getByRole("alertdialog", { name: /Install the scheduler/ })).getByRole("button", { name: "Install" }));
+    expect(await screen.findByText("Scheduler installed with a warning.")).toBeInTheDocument();
+    expect(screen.getByRole("status", { name: "Scheduler warning" })).toHaveTextContent(warning);
+    expect(screen.queryByText("Scheduler installed.")).not.toBeInTheDocument();
   });
 });
 

@@ -317,3 +317,9 @@ def test_stream_disconnect_during_a_quiet_run_stops_the_tail_promptly(data, fake
     assert done.wait(3), "the tail thread kept polling after the client went away"
     t.join(3)
     assert "cancelled_after" in result and result["cancelled_after"] - t0 < 1.5
+
+
+def test_validation_errors_do_not_echo_a_whole_body(client):
+    r = client.post("/api/runs/cancel", json=["x" * 500], headers=W)
+    assert r.status_code == 422
+    assert "x" * 100 not in r.text and "…" in r.text
