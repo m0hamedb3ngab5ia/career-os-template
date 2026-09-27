@@ -5,13 +5,15 @@ import type { JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./typ
 export interface ListParams {
   tab: TabKey;
   q: string;
+  location: string;
   sort: string;
   limit: number;
 }
 
-function listUrl({ tab, q, sort, limit }: ListParams, cursor?: string): string {
+function listUrl({ tab, q, location, sort, limit }: ListParams, cursor?: string): string {
   const p = new URLSearchParams({ tab, sort, limit: String(limit) });
   if (q) p.set("q", q);
+  if (location) p.set("location", location);
   if (cursor) p.set("cursor", cursor);
   return `/api/jobs?${p}`;
 }
@@ -28,10 +30,14 @@ export function useJobsList(params: ListParams, enabled = true) {
   });
 }
 
-export function useJobsTabs(q: string) {
+export function useJobsTabs(q: string, location = "") {
+  const p = new URLSearchParams();
+  if (q) p.set("q", q);
+  if (location) p.set("location", location);
+  const qs = p.toString();
   return useQuery({
-    queryKey: ["jobs-tabs", q],
-    queryFn: () => apiFetch<JobsTabs>(`/api/jobs/tabs${q ? `?q=${encodeURIComponent(q)}` : ""}`),
+    queryKey: ["jobs-tabs", q, location],
+    queryFn: () => apiFetch<JobsTabs>(`/api/jobs/tabs${qs ? `?${qs}` : ""}`),
     placeholderData: keepPreviousData,
   });
 }
@@ -46,7 +52,7 @@ export function useOpenTracker() {
 
 export type ExportRequest =
   | { job_ids: string[]; columns: string[] }
-  | { tab: TabKey; q?: string; sort: string; columns: string[] };
+  | { tab: TabKey; q?: string; location?: string; sort: string; columns: string[] };
 
 function filenameFrom(disposition: string | null): string {
   const m = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);

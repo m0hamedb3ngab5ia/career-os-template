@@ -63,6 +63,9 @@ def test_jobs_list_filters_and_paging(client):
     applied = client.get("/api/jobs", params=[("status", "applied"), ("status", "interview")]).json()
     assert {j["company"] for j in applied["items"]} == {"Hooli", "Stark Industries"}
     assert client.get("/api/jobs", params={"q": "initech"}).json()["total"] == 1
+    remote = client.get("/api/jobs", params={"location": "REMOTE", "sort": "location"}).json()
+    assert [j["location"] for j in remote["items"]] == ["Remote"]
+    assert client.get("/api/jobs", params={"location": "new york"}).json()["total"] == 7
     assert client.get("/api/jobs", params={"sort": "bogus"}).status_code == 400
     assert client.get("/api/jobs", params={"limit": 0}).status_code == 422
 

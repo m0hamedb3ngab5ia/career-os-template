@@ -170,6 +170,10 @@ def test_jobs_list_default_sort_and_paging(data, idx):
     ({"category": ["swe_backend"], "q": "glob"}, {"Globex"}),
     ({"q": "platform"}, {"Initech"}),
     ({"q": "100%_"}, set()),
+    ({"location": "remote"}, {"Globex"}),
+    ({"location": "REMOTE", "category": ["swe_backend"]}, {"Globex"}),
+    ({"location": "remote", "q": "initech"}, set()),
+    ({"location": "100%_"}, set()),
 ])
 def test_jobs_list_filters(idx, kw, expect):
     assert {j["company"] for j in jobs_svc.list_jobs(idx, **kw)["items"]} == expect
@@ -180,6 +184,8 @@ def test_jobs_list_sorts(idx):
     assert [j["company"] for j in by_company][:2] == ["Acme Robotics", "Globex"]
     newest = jobs_svc.list_jobs(idx, sort="-found_at")["items"]
     assert newest[0]["company"] == "Acme Robotics"
+    by_location = jobs_svc.list_jobs(idx, sort="-location")["items"]
+    assert by_location[0]["location"] == "Remote" and by_location[-1]["location"] == "New York, NY"
     with pytest.raises(ValueError):
         jobs_svc.list_jobs(idx, sort="nope; DROP TABLE jobs")
     with pytest.raises(ValueError):
