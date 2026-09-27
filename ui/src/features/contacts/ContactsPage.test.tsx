@@ -147,6 +147,18 @@ describe("ContactsPage", () => {
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("no contact named");
   });
 
+  it("an email the candidate sends by hand is labelled email, not LinkedIn, and opens its draft", async () => {
+    const d = draft({ contact: "Sam Lee", mode: "email_manual", kind: "status_followup" });
+    mockApi({
+      "GET /api/contacts": { ...DATA, items: [row({ name: "Sam Lee", mode: "email_manual", draft: d })], linkedin_drafts: 0 },
+      "GET /api/meta": {},
+    });
+    renderRoutes(routes, "/contacts");
+    const table = await screen.findByRole("table", { name: "Contacts at companies you applied to" });
+    expect(within(table).getByText("Email draft · you send")).toBeInTheDocument();
+    expect(within(table).queryByText(/LinkedIn draft/)).not.toBeInTheDocument();
+  });
+
   it("empty state when no contacts exist yet", async () => {
     mockApi({
       "GET /api/contacts": { items: [], linkedin_drafts: 0, policy: { manual_if_connected: true, manual_if_mutuals: true } },

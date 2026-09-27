@@ -80,7 +80,7 @@ def _words(text: str | None) -> int:
 
 def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy: Any = None) -> dict[str, Any]:
     """One outreach.json draft (drafts[] or followups[]) as the UI shows it. `mode`: sent | always_manual (thank-you
-    notes) | manual (connected / mutuals) | verified_email | email_draft (an email follow-up: never auto-sent) |
+    notes) | manual (connected / mutuals) | verified_email | email_manual (an email follow-up: never auto-sent) |
     linkedin (LinkedIn is always draft-only). `due`: a follow-up's `send_after`, once the note it follows is sent.
 
     Manual comes from the saved `manual_tailor` flag OR, with a `policy`, from the contact's current degree / mutuals
@@ -115,7 +115,7 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
     elif manual:
         mode = "manual"
     elif followup:  # follow-ups are never auto-sent: the candidate sends them on their own channel
-        mode = "linkedin" if channel == "linkedin" else "email_draft"
+        mode = "linkedin" if channel == "linkedin" else "email_manual"
     elif verified and email:
         mode = "verified_email"
     else:
@@ -247,8 +247,13 @@ def _next(job: dict[str, Any], ix: Any, cfg: Any, drafts: list[dict[str, Any]], 
     # one first touch per contact: the step is done only once every contact's first note has gone out
     firsts = [d for d in drafts if not d["followup"] and d["kind"] not in ("status_followup", THANKS)]
     sent = bool(firsts) and all(d["sent"] for d in firsts)
-    due = applied + timedelta(days=cfg.followup_after_apply_days) if applied and not sent else None
-    return {"kind": "post_apply_outreach", "due": _iso(due), "mode": "sent" if sent else mode}
+    if sent:  # every first note is out: a pending follow-up (with its own send_after) is what comes next
+        pending = next((d for d in drafts if d["followup"] and not d["sent"] and d["kind"] != THANKS), None)
+        if pending is not None:
+            return {"kind": "post_apply_outreach", "due": pending["due"], "mode": pending["mode"]}
+        return {"kind": "post_apply_outreach", "due": None, "mode": "sent"}
+    due = applied + timedelta(days=cfg.followup_after_apply_days) if applied else None
+    return {"kind": "post_apply_outreach", "due": _iso(due), "mode": mode}
 
 
 def _row(settings: Any, ix: Any, job: dict[str, Any], now: datetime, cfg: Any) -> tuple[dict[str, Any], dict]:

@@ -2,8 +2,8 @@ import type { Draft } from "../drafts/types";
 
 // GET /api/contacts (src/careeros/ui/services/contacts.py).
 
-/** replied | sent | manual | email_draft | linkedin_draft | no_draft (unknown values fall back to plain text). */
-export type ContactMode = "replied" | "sent" | "manual" | "email_draft" | "linkedin_draft" | "no_draft";
+/** replied | sent | manual | email_draft | email_manual | linkedin_draft | no_draft (unknown values fall back to plain text). */
+export type ContactMode = "replied" | "sent" | "manual" | "email_draft" | "email_manual" | "linkedin_draft" | "no_draft";
 
 export interface ContactRow {
   job_id: string;

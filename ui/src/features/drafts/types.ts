@@ -1,6 +1,6 @@
 // One outreach.json draft as the server sends it (src/careeros/ui/services/inbox.py: draft_view).
 
-export type DraftMode = "sent" | "always_manual" | "manual" | "verified_email" | "email_draft" | "linkedin";
+export type DraftMode = "sent" | "always_manual" | "manual" | "verified_email" | "email_manual" | "linkedin";
 
 export interface Draft {
   contact: string;

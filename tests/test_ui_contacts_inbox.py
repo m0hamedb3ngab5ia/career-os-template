@@ -444,7 +444,7 @@ def test_last_sync_ignores_a_newer_cancelled_or_paused_inbox_sync(data, idx):
     assert inbox_svc.list_inbox(data["settings"], idx, NOW)["last_sync"] == iso(NOW - timedelta(hours=6))
 
 
-def test_email_followups_are_hand_sent_email_drafts_with_send_after_as_due(data):
+def test_email_followups_are_hand_sent_email_manual_with_send_after_as_due(data):
     from pathlib import Path
 
     f = _outreach(data, "applied")
@@ -455,7 +455,7 @@ def test_email_followups_are_hand_sent_email_drafts_with_send_after_as_due(data)
                     "followups": [{"kind": "status_followup", "body": "Any update?", "send_after": due}]}]
     f.write_text(json.dumps(o))
     got = inbox_svc.job_drafts(Path(f).parent)
-    assert [d["mode"] for d in got[1:]] == ["email_draft", "email_draft"]
+    assert [d["mode"] for d in got[1:]] == ["email_manual", "email_manual"]
     assert got[2]["due"] is None  # parent not sent yet
     o["drafts"][0].update({"sent": True, "sent_by": "candidate"})
     f.write_text(json.dumps(o))
@@ -471,3 +471,28 @@ def test_linkedin_draft_is_never_reported_verified():
          "linkedin_message": "Hi Sam."}
     assert inbox_svc.draft_view(d)["verified"] is False
     assert inbox_svc.draft_view({**d, "channel": "email", "email": {"body": "Hi"}})["verified"] is True
+
+
+# --- review round 4 --------------------------------------------------------------------------------------------
+
+def test_contact_whose_only_item_is_an_email_followup_counts_as_email_not_linkedin(data, idx):
+    f = _outreach(data, "interview")
+    f.write_text(json.dumps({"followups": [{"contact": "Sam Lee", "kind": "status_followup", "channel": "email",
+                                            "to": "sam@example.com", "body": "Any update?"}]}))
+    got = contacts_svc.list_contacts(data["settings"], idx)
+    sam = next(c for c in got["items"] if c["name"] == "Sam Lee")
+    assert sam["draft"]["mode"] == "email_manual" and sam["mode"] == "email_manual"
+    assert got["linkedin_drafts"] == 0
+
+
+def test_applied_job_with_first_notes_sent_and_a_pending_followup_shows_the_followup_mode(data, idx):
+    f = _outreach(data, "applied")
+    o = json.loads(f.read_text())
+    due = (NOW + timedelta(days=3)).isoformat()
+    for d in o["drafts"]:
+        d["sent"], d["sent_by"], d["sent_date"] = True, "candidate", (NOW - timedelta(days=1)).isoformat()
+    o["drafts"][0]["followups"] = [{"kind": "status_followup", "body": "Any update?", "send_after": due}]
+    f.write_text(json.dumps(o))
+    hooli = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["company"] == "Hooli")
+    assert hooli["next"]["kind"] == "post_apply_outreach"
+    assert hooli["next"]["mode"] == "email_manual" and hooli["next"]["due"] == due

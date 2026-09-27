@@ -20,6 +20,7 @@ const MODE_TEXT: Record<string, string> = {
   manual: "Manual: you tailor it",
   linkedin_draft: "LinkedIn draft ready · you send",
   email_draft: "Email draft · verified address",
+  email_manual: "Email draft · you send",
   no_draft: "No draft yet",
   sent: "Sent",
   replied: "Replied",
@@ -273,7 +274,7 @@ function ContactRowView({ c, onMark, onOpen }: { c: ContactRow; onMark: () => vo
             <Button size="small" variant="primary" onClick={onOpen} aria-label={`Tailor manually: ${c.name}`}>
               Tailor manually
             </Button>
-          ) : c.draft && (c.mode === "linkedin_draft" || c.mode === "email_draft") ? (
+          ) : c.draft && (c.mode === "linkedin_draft" || c.mode === "email_draft" || c.mode === "email_manual") ? (
             <Button size="small" onClick={onOpen} aria-label={`Open draft for ${c.name}`}>
               Open draft
             </Button>

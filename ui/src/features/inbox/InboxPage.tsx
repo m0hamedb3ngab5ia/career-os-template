@@ -175,7 +175,7 @@ function policyText(mode: string): string {
       return "You know this person: tailor the note and send it yourself";
     case "verified_email":
       return "Auto-send will only ever go to a verified email; otherwise it becomes a LinkedIn draft";
-    case "email_draft":
+    case "email_manual":
       return "Follow-ups are never sent automatically: copy it and send it yourself";
     default:
       return "LinkedIn is draft-only: copy it and send it yourself";

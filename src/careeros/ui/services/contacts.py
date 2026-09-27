@@ -20,7 +20,7 @@ _FIELDS = ("c.job_id, c.seq, c.name, c.title, c.company, c.linkedin, c.email, c.
 
 def _mode(contact: dict[str, Any], manual: bool, draft: dict[str, Any] | None) -> str:
     """replied | sent | manual (connected / mutuals: you tailor it) | email_draft (to a verified address) |
-    linkedin_draft (you send it on LinkedIn) | no_draft."""
+    email_manual (an email you send yourself) | linkedin_draft (you send it on LinkedIn) | no_draft."""
     if contact.get("replied"):
         return "replied"
     if contact.get("sent") or (draft and draft["sent"]):
@@ -29,7 +29,10 @@ def _mode(contact: dict[str, Any], manual: bool, draft: dict[str, Any] | None) -
         return "manual"
     if draft is None:
         return "no_draft"
-    return "email_draft" if draft["mode"] == "verified_email" else "linkedin_draft"
+    if draft["mode"] == "verified_email":
+        return "email_draft"
+    # by channel: an email the candidate sends by hand (e.g. an email follow-up) is not a LinkedIn draft
+    return "linkedin_draft" if draft["channel"] == "linkedin" else "email_manual"
 
 
 def list_contacts(settings: Any, ix: Any) -> dict[str, Any]:
