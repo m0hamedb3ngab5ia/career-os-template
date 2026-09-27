@@ -76,6 +76,26 @@ describe("Job detail screen", () => {
     });
   });
 
+  it("Set status Undo restores applied when the job was applied before", async () => {
+    const { api } = setup({
+      "POST /api/jobs/nw01/status": (c: Call) => ({ status: (c.body as { status: string }).status, previous: "applied" }),
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Set status" }));
+    await user.click(within(screen.getByRole("menu", { name: "Set status" })).getByRole("menuitemradio", { name: "Interview" }));
+    await user.click(await screen.findByRole("button", { name: "Undo" }));
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/nw01/status")).toHaveLength(2));
+    expect(api.callsTo("POST /api/jobs/nw01/status")[1]!.body).toEqual({ status: "applied", note: "undo status change" });
+  });
+
+  it("Status override: says when Excel holds the tracker and the change is queued", async () => {
+    setup({ "POST /api/jobs/nw01/override": (c: Call) => ({ override: (c.body as { value: string }).value, queued: true }) });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Status override: none" }));
+    await user.click(screen.getByRole("menuitemradio", { name: /skip/i }));
+    expect(await screen.findByText(/queued until you close it/)).toBeInTheDocument();
+  });
+
   it("Status override: reads the value and posts the choice", async () => {
     const { api } = setup({ "GET /api/jobs/nw01": detail({ override: "B" }) });
     const user = userEvent.setup();

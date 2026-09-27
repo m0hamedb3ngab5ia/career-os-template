@@ -69,7 +69,10 @@ export function NeedsYou() {
               onError: (e) => toast.show({ message: `Couldn’t reopen ${item.company}: ${errorText(e)}` }),
             }),
         }),
-      onError: (e) => toast.show({ message: `Couldn’t mark ${item.company} done: ${errorText(e)}` }),
+      onError: (e) => {
+        setRefocus(null); // the row comes back: nothing to move focus to
+        toast.show({ message: `Couldn’t mark ${item.company} done: ${errorText(e)}` });
+      },
     });
   }
 

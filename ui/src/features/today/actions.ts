@@ -42,10 +42,16 @@ const byDue = (a: ActionItem, b: ActionItem) => {
   return x === y ? 0 : x < y ? -1 : 1;
 };
 
+const byCompany = (a: ActionItem, b: ActionItem) => {
+  const x = a.company ?? "";
+  const y = b.company ?? "";
+  return x === y ? 0 : !x ? 1 : !y ? -1 : x.localeCompare(y); // an item with no company sorts last
+};
+
 const SORTERS: Record<SortKey, (a: ActionItem, b: ActionItem) => number> = {
   priority: (a, b) => prio(a) - prio(b) || byDue(a, b),
   due: (a, b) => byDue(a, b) || prio(a) - prio(b),
-  az: (a, b) => a.company.localeCompare(b.company) || prio(a) - prio(b),
+  az: (a, b) => byCompany(a, b) || prio(a) - prio(b),
   newest: (a, b) => created(b) - created(a) || prio(a) - prio(b),
 };
 

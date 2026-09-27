@@ -243,6 +243,46 @@ def test_withdraw_then_undo(data):
     assert Store(s).get_status(jid) == "applied"
 
 
+def test_set_status_undo_restores_applied_only_right_after_leaving_it(data):
+    s, jid = data["settings"], data["jobs"]["applied"]
+    assert acts.set_status(s, jid, "interview") == {"status": "interview", "previous": "applied"}
+    acts.set_status(s, jid, "applied", "undo status change")  # the Undo toast of the change just made
+    assert Store(s).get_status(jid) == "applied"
+    acts.set_status(s, jid, "interview")
+    acts.set_status(s, jid, "offer")
+    with pytest.raises(ValueError, match="Mark submitted"):
+        acts.set_status(s, jid, "applied")  # the latest change was interview -> offer: not an undo
+    q = data["jobs"]["queued"]
+    acts.set_status(s, q, "needs_review")
+    with pytest.raises(ValueError, match="Mark submitted"):
+        acts.set_status(s, q, "applied")  # never applied
+    assert Store(s).get_status(q) == "needs_review"
+
+
+def test_set_override_reports_queued_while_excel_holds_the_tracker(data, monkeypatch):
+    from openpyxl.workbook.workbook import Workbook
+
+    s, jid = data["settings"], data["jobs"]["queued"]
+    acts.set_override(s, jid, "B")  # the Jobs row exists
+
+    def locked(self, filename):
+        raise PermissionError(13, "locked")
+
+    monkeypatch.setattr(Workbook, "save", locked)
+    with pytest.warns(UserWarning):
+        assert acts.set_override(s, jid, "skip") == {"override": "skip", "queued": True}
+
+
+def test_job_dir_for_refuses_a_symlinked_folder_outside_jobs_dir(data, tmp_path):
+    s, jid = data["settings"], data["jobs"]["queued"]
+    outside = tmp_path / "outside" / "evil01"
+    outside.mkdir(parents=True)
+    (outside / "posting.json").write_text((Store(s).job_dir(jid) / "posting.json").read_text())
+    os.symlink(outside, Store(s).job_dir(jid).parent / "evil01")
+    assert jobs_svc.job_dir_for(s, "evil01") is None
+    assert jobs_svc.job_dir_for(s, jid) is not None
+
+
 def test_mark_submitted_sets_applied_with_note(data):
     s, jid = data["settings"], data["jobs"]["review"]
     assert acts.mark_submitted(s, jid)["status"] == "applied"
@@ -252,7 +292,7 @@ def test_mark_submitted_sets_applied_with_note(data):
 
 def test_set_override_writes_the_tracker_column(data):
     s, jid = data["settings"], data["jobs"]["queued"]
-    assert acts.set_override(s, jid, "skip") == {"override": "skip"}
+    assert acts.set_override(s, jid, "skip") == {"override": "skip", "queued": False}
     assert Tracker(settings=s).read_overrides()[jid] == "skip"
     acts.set_override(s, jid, "")
     assert jid not in Tracker(settings=s).read_overrides()

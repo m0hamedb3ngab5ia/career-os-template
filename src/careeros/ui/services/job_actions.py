@@ -1,7 +1,8 @@
 """Job detail and Jobs writes, each through the code the CLI already uses:
 
 - status (Set status, Withdraw + undo, Mark submitted): `tracker.set_status_both` (status.json + tracker)
-- Status override: the tracker's Override column (`Tracker.upsert_job`)
+- Status override: the tracker's Override column (`Tracker.upsert_job`); `queued` when Excel holds the file, since
+  apply-job reads the column (`careeros tracker show`) and sees the old value until `careeros tracker flush`
 - Safety Verify / Flag / Clear: `careeros.safety.registry` (same as `careeros safety verify|flag|clear`)
 - Re-run QA: `careeros.qa.run_deterministic` (same as `python -m careeros.qa data/jobs/<id>`)
 - Sync tracker: `tracker.sync_all` (same as `careeros tracker sync`)
@@ -84,19 +85,20 @@ def ensure_unlocked(settings: Any, job_id: str) -> None:
                         f"({st.get('note') or '-'}); not changed. Try again when it finishes.")
 
 
-def _is_withdraw_undo(store: Any, job_id: str) -> bool:
-    """True when the job is withdrawn and was applied right before: restoring "applied" is the Undo toast."""
+def _is_applied_undo(store: Any, job_id: str) -> bool:
+    """True when the latest change moved the job from "applied" to its current status (a withdraw or a Set status):
+    restoring "applied" is that change's Undo toast. Never true for a job that was not applied right before."""
     hist = (store._read(job_id, "status.json") or {}).get("history") or []
-    return (store.get_status(job_id) == "withdrawn" and len(hist) >= 2
-            and hist[-1].get("status") == "withdrawn" and hist[-2].get("status") == "applied")
+    return (len(hist) >= 2 and hist[-1].get("status") == store.get_status(job_id) != "applied"
+            and hist[-2].get("status") == "applied")
 
 
 def set_status(settings: Any, job_id: str, status: str, note: str | None = None) -> dict[str, Any]:
-    """Set status: "applied" only through the confirmed Mark submitted (or undoing a withdraw of an applied job)."""
+    """Set status: "applied" only through the confirmed Mark submitted (or undoing the change that left "applied")."""
     from careeros.store import Store
 
     _job(settings, job_id)
-    if status == "applied" and not _is_withdraw_undo(Store(settings), job_id):
+    if status == "applied" and not _is_applied_undo(Store(settings), job_id):
         raise ValueError("use Mark submitted to mark a job applied")
     return _write_status(settings, job_id, status, note)
 
@@ -133,7 +135,7 @@ def set_override(settings: Any, job_id: str, value: str) -> dict[str, Any]:
     tr = Tracker(settings=settings)
     tr.init()
     if tr.get_job(job_id) is not None:
-        tr.upsert_job({"job_id": job_id, "override": value})
+        got = tr.upsert_job({"job_id": job_id, "override": value})
     else:  # no Jobs row yet: write the whole row, as `careeros tracker sync` would
         store = Store(settings)
         p = store.load_posting(job_id)
@@ -144,8 +146,8 @@ def set_override(settings: Any, job_id: str, value: str) -> dict[str, Any]:
         if st:
             row.status = st  # type: ignore[assignment]
         row.override = value
-        tr.upsert_job(row)
-    return {"override": value}
+        got = tr.upsert_job(row)
+    return {"override": value, "queued": got == "queued"}
 
 
 # --- QA ----------------------------------------------------------------------------------------------------------

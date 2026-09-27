@@ -177,8 +177,13 @@ def job_dir_for(settings: Any, job_id: str) -> Path | None:
     """The job's folder, or None for an id that is malformed (path tricks) or has no posting."""
     if not isinstance(job_id, str) or not JOB_ID_RE.match(job_id) or _is_finder_copy(job_id):
         return None
-    d = Path(settings.paths["jobs_dir"]) / job_id
-    return d if (d / "posting.json").is_file() else None
+    root = Path(settings.paths["jobs_dir"])
+    d = root / job_id
+    try:  # a symlinked job folder must stay inside jobs_dir
+        inside = d.resolve().is_relative_to(root.resolve())
+    except OSError:
+        return None
+    return d if inside and (d / "posting.json").is_file() else None
 
 
 def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:

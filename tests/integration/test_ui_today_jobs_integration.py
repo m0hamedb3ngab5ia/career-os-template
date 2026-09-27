@@ -217,7 +217,8 @@ def test_set_status_withdraw_undo_and_submitted(client, data):
 
 def test_override(client, data):
     s, jid = data["settings"], data["jobs"]["found"]
-    assert client.post(f"/api/jobs/{jid}/override", json={"value": "manual"}, headers=H).json() == {"override": "manual"}
+    got = client.post(f"/api/jobs/{jid}/override", json={"value": "manual"}, headers=H).json()
+    assert got == {"override": "manual", "queued": False}
     assert Tracker(settings=s).read_overrides()[jid] == "manual"
     assert client.get(f"/api/jobs/{jid}").json()["override"] == "manual"
     assert client.post(f"/api/jobs/{jid}/override", json={"value": "X"}, headers=H).status_code == 400

@@ -46,7 +46,7 @@ function useJobWrite<TBody, TReply>(id: string, action: string) {
 }
 
 export const useSetStatus = (id: string) => useJobWrite<{ status: string; note?: string }, StatusReply>(id, "status");
-export const useSetOverride = (id: string) => useJobWrite<{ value: string }, { override: string }>(id, "override");
+export const useSetOverride = (id: string) => useJobWrite<{ value: string }, { override: string; queued?: boolean }>(id, "override");
 export const useWithdraw = (id: string) => useJobWrite<{ note?: string }, StatusReply>(id, "withdraw");
 export const useMarkSubmitted = (id: string) => useJobWrite<{ note?: string }, StatusReply>(id, "submitted");
 export const useRerunQa = (id: string) => useJobWrite<undefined, QaRun>(id, "qa");

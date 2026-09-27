@@ -26,6 +26,14 @@ describe("sortActions", () => {
   it("A–Z by company", () => {
     expect(ids(sortActions(items, "az"))).toEqual([2, 1, 4, 3]);
   });
+  it("A–Z puts an item with no company last instead of crashing", () => {
+    const noCompany = { ...items[0]!, id: 5, company: undefined as unknown as string };
+    const zz = { ...items[0]!, id: 6, company: "Zzyzx" };
+    expect(ids(sortActions([noCompany, ...items], "az"))).toEqual([2, 1, 4, 3, 5]);
+    expect(ids(sortActions([...items, noCompany, zz], "az"))).toEqual([2, 1, 4, 3, 6, 5]);
+    expect(ids(sortActions([zz, noCompany], "az"))).toEqual([6, 5]);
+    expect(ids(sortActions([noCompany, zz], "az"))).toEqual([6, 5]);
+  });
   it("newest by created", () => {
     expect(ids(sortActions(items, "newest"))).toEqual([2, 4, 3, 1]);
   });

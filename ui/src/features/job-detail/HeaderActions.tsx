@@ -75,7 +75,14 @@ export function OverrideMenu({ jobId, override }: { jobId: string; override: str
               set.mutate(
                 { value: v },
                 {
-                  onSuccess: () => toast.show({ message: `Override set to ${OVERRIDE_LABELS[v]!.toLowerCase()}` }),
+                  onSuccess: (r) =>
+                    toast.show({
+                      message:
+                        `Override set to ${OVERRIDE_LABELS[v]!.toLowerCase()}` +
+                        (r?.queued
+                          ? ". Excel has the tracker open, so the change is queued until you close it; apply-job reads the old value until then."
+                          : ""),
+                    }),
                   onError: (e) => toast.show({ message: errorText(e) }),
                 },
               )
