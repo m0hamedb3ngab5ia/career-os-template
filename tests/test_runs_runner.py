@@ -3,6 +3,7 @@ locks, run records."""
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -548,3 +549,110 @@ def test_apply_is_never_a_scheduled_or_batch_kind():
 
     assert "apply" not in schedule.JOB_KINDS and "apply" not in schedule.CLAUDE_KINDS
     assert "apply" not in BATCH_KINDS
+
+
+# --- submit safety, `--force` contract and explicit-run exit semantics -------------------------------------
+
+def _safety(store: Store, jid: str, verdict: str = "pass") -> None:
+    (store.job_dir(jid) / "safety.json").write_text(json.dumps({"job_id": jid, "verdict": verdict}))
+
+
+def _apply_invoke(store: Store, jid: str, calls: list, outcome: str = "submitted", status: str = "applied"):
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        calls.append(dict(env))
+        Path(stream_path).write_text("{}")
+        store.set_status(jid, status, "fake apply")
+        return parse_stream(events(jid, {"job_id": jid, "outcome": outcome, "status": status}))
+    return invoke
+
+
+def _apply_run(settings, invoke, jid, **runs):
+    cfg = cfg_of(settings, preflight_doctor=False, **runs)
+    return execute_run(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
+                       invoke=invoke, now=lambda: NOW, clock=Clock(), job_ids=[jid])
+
+
+def test_apply_run_passes_auto_submit_0_with_the_default_config(settings, store):
+    jid = add_job(store, 1)
+    _prepared(store, jid, tier="B")
+    _safety(store, jid)
+    calls: list = []
+    rec = _apply_run(settings, _apply_invoke(store, jid, calls), jid)
+    assert rec["counters"]["ok"] == 1
+    assert calls[0]["CAREEROS_AUTO_SUBMIT"] == "0"
+    assert calls[0]["CAREEROS_AUTO_SUBMIT_REASON"] == "auto_submit disabled"
+    att = RunStore(settings).load_attempts(rec["id"])[0]
+    assert att["auto_submit"] == {"allowed": False, "reason": "auto_submit disabled"}
+
+
+def test_apply_run_passes_auto_submit_1_for_an_allowed_tier_b_job_with_a_safety_pass(settings, store):
+    jid = add_job(store, 1)
+    _prepared(store, jid, tier="B")
+    _safety(store, jid)
+    calls: list = []
+    _apply_run(settings, _apply_invoke(store, jid, calls), jid, auto_submit={"enabled": True})
+    assert calls[0]["CAREEROS_AUTO_SUBMIT"] == "1" and calls[0]["CAREEROS_AUTO_SUBMIT_REASON"] == "allowed: tier_b"
+
+
+@pytest.mark.parametrize("verdict", [None, "review", "block"])
+def test_apply_run_never_passes_auto_submit_1_without_a_safety_pass(settings, store, verdict):
+    jid = add_job(store, 1)
+    _prepared(store, jid, tier="B")
+    if verdict:
+        _safety(store, jid, verdict)
+    calls: list = []
+    _apply_run(settings, _apply_invoke(store, jid, calls), jid, auto_submit={"enabled": True})
+    assert calls[0]["CAREEROS_AUTO_SUBMIT"] == "0" and "safety" in calls[0]["CAREEROS_AUTO_SUBMIT_REASON"]
+
+
+def test_apply_run_accepts_a_staged_result_in_assisted_mode(settings, store):
+    jid = add_job(store, 1)
+    _prepared(store, jid)
+    calls: list = []
+    rec = _apply_run(settings, _apply_invoke(store, jid, calls, outcome="staged", status="needs_review"), jid)
+    att = RunStore(settings).load_attempts(rec["id"])[0]
+    assert att["outcome"] == "ok" and att["result"]["outcome"] == "staged" and rec["counters"]["ok"] == 1
+
+
+def test_force_without_job_is_rejected_before_anything_runs(settings, store):
+    from careeros.runs.service import run_batch
+
+    add_job(store, 1)
+    inv = FakeInvoke(settings)
+    cfg = cfg_of(settings, preflight_doctor=False)
+    with pytest.raises(ValueError, match="--force"):
+        run_batch(settings, "score", budget_for(cfg, "score", max_jobs=1, max_minutes=30), cfg=cfg, invoke=inv,
+                  force=True)
+    assert inv.calls == [] and RunStore(settings).list_runs() == []
+
+
+def test_explicit_run_refused_by_the_company_gate_is_not_completed(settings, store):
+    from careeros.runs.runner import JobNotRunnable
+
+    jid = add_job(store, 1)
+    _scored(store, jid)
+    inv = FakeInvoke(settings)
+    cfg = cfg_of(settings, preflight_doctor=False)
+    with pytest.raises(JobNotRunnable) as ei:
+        execute_run(settings, "prepare", budget_for(cfg, "prepare", max_jobs=1, max_minutes=30), cfg=cfg,
+                    invoke=inv, now=lambda: NOW, clock=Clock(), job_ids=[jid],
+                    pre_attempt=lambda item: "company cap: 2 of 2 in 90 days")
+    assert ei.value.reasons == {jid: "company cap: 2 of 2 in 90 days"} and inv.calls == []
+    runs = RunStore(settings).list_runs()
+    assert all(r.get("stop_reason") != "completed" for r in runs)
+
+
+def test_explicit_run_on_a_locked_job_raises_job_busy_with_the_holder(settings, store):
+    from careeros.runs.runner import JobBusy, RunBusy
+
+    jid = add_job(store, 1)
+    inv = FakeInvoke(settings)
+    cfg = cfg_of(settings, preflight_doctor=False)
+    rs = RunStore(settings)
+    locks.acquire(rs.job_lock_path(jid), owner="skill:other", pid=os.getpid(), ttl_seconds=600)
+    with pytest.raises(JobBusy) as ei:
+        execute_run(settings, "score", budget_for(cfg, "score", max_jobs=1, max_minutes=30), cfg=cfg,
+                    invoke=inv, now=lambda: NOW, clock=Clock(), job_ids=[jid])
+    assert isinstance(ei.value, RunBusy) and ei.value.job_id == jid and ei.value.holder["owner"] == "skill:other"
+    assert inv.calls == [] and all(r.get("stop_reason") != "completed" for r in rs.list_runs())
+    assert locks.read(rs.runner_lock_path) is None  # the global runner lock is released again

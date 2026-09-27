@@ -844,7 +844,7 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
                     and any(r.startswith(done) for r in e.reasons.values()) else "")
             print(f"{e}; not started{hint}", file=sys.stderr)
         return 2
-    except ValueError as e:  # `run apply` without --job
+    except ValueError as e:  # `run apply` without --job, `--force` without --job
         if args.json:
             print(json.dumps({"error": str(e), "kind": kind}))
         print(f"run {kind}: {e}", file=sys.stderr)

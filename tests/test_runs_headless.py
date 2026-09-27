@@ -189,5 +189,8 @@ def test_apply_result_needs_outcome_and_a_known_status():
 
     assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "submitted", "status": "applied"}) == []
     assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "failed", "status": "queued"}) == []
+    assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "staged", "status": "needs_review"}) == []
+    assert any("outcome" in p for p in validate_result("apply", "j1", {"job_id": "j1", "outcome": "done",
+                                                                        "status": "applied"}))
     assert validate_result("apply", "j1", {"job_id": "j1", "status": "applied"}) == ["RESULT has no outcome"]
     assert any("status" in p for p in validate_result("apply", "j1", {"job_id": "j1", "outcome": "x", "status": "found"}))

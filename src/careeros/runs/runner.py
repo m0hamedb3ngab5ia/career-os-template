@@ -57,6 +57,30 @@ class RunBusy(RuntimeError):
                          f"started {holder.get('acquired_at')})")
 
 
+class JobBusy(RunBusy):
+    """An explicit `--job` run found its one job locked by someone else (a batch would pass it over)."""
+
+    def __init__(self, job_id: str, holder: dict[str, Any]):
+        self.job_id, self.holder = job_id, holder
+        RuntimeError.__init__(self, f"job {job_id} is locked by {holder.get('owner')} (pid {holder.get('pid')}, "
+                                    f"until {holder.get('expires_at')}); not started")
+
+
+def auto_submit_verdict(settings: Settings, store: Store, cfg: RunsConfig, item: dict[str, Any],
+                        ) -> tuple[bool, str]:
+    """The runner's submit decision for one apply attempt: `runs.auto_submit` applied to score.json (tier, fit,
+    category), safety.json (pass or not) and the dream flag. Handed to apply-job as CAREEROS_AUTO_SUBMIT."""
+    from careeros.runs.policy import AutoSubmitPolicy, auto_submit_decision
+
+    jid = item["job_id"]
+    score = store._read(jid, "score.json") or {}
+    safety = store._read(jid, "safety.json") or {}
+    job = {"tier": score.get("tier"), "fit": score.get("fit"), "category": score.get("category"),
+           "dream": bool(item.get("dream")) or settings.is_dream(str(item.get("company") or "")),
+           "safety_pass": safety.get("verdict") == "pass"}
+    return auto_submit_decision(job, AutoSubmitPolicy.from_config(cfg.raw))
+
+
 def _utcnow() -> datetime:
     return datetime.now(timezone.utc)
 
@@ -212,10 +236,10 @@ class _Loop:
                  run: dict[str, Any], invoke: Callable[..., HeadlessResult], now: Callable[[], datetime],
                  clock: Callable[[], float], cancel: threading.Event | None, echo: Callable[[str], None],
                  after_attempt: Callable[[dict[str, Any]], None] | None,
-                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None):
+                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None, explicit: bool = False):
         self.s, self.kind, self.budget, self.cfg, self.rs, self.run = settings, kind, budget, cfg, rs, run
         self.invoke, self.now, self.clock, self.cancel, self.echo = invoke, now, clock, cancel, echo
-        self.after_attempt, self.pre_attempt = after_attempt, pre_attempt
+        self.after_attempt, self.pre_attempt, self.explicit = after_attempt, pre_attempt, explicit
         self.store = Store(settings)
         self.c = run["counters"]
         self.durations: list[float] = []
@@ -234,8 +258,15 @@ class _Loop:
                              ttl_seconds=job_s + 300, note=f"{self.kind} {jid}")
         env = {**os.environ, "CAREEROS_RUN_ID": self.run["id"], "CAREEROS_LOCK_TOKEN": lock.token,
                "CAREEROS_ROOT": str(self.s.root)}
+        submit: dict[str, Any] | None = None
+        if self.kind == "apply":  # the submit decision is made here, in code, never left to the skill
+            allowed, reason = auto_submit_verdict(self.s, self.store, self.cfg, item)
+            submit = {"allowed": allowed, "reason": reason}
+            env.update(CAREEROS_AUTO_SUBMIT="1" if allowed else "0", CAREEROS_AUTO_SUBMIT_REASON=reason)
         started, t0 = self.now(), self.clock()
         self.echo(f"[{n}] {self.kind} {jid} {item.get('company', '')} — {item.get('title', '')}")
+        if submit:
+            self.echo(f"    auto-submit {'on' if submit['allowed'] else 'off (assisted)'}: {submit['reason']}")
         try:
             res = self.invoke(cmd, str(self.s.root), env, timeout_s, stream_path)
         finally:
@@ -257,6 +288,8 @@ class _Loop:
                "session_id": res.session_id or sid, "outcome": outcome, "detail": detail, "result": result,
                "started_at": iso(started), "ended_at": iso(self.now()), "duration_s": round(took, 1),
                "stream": f"attempts/{n:03d}.stream.jsonl", "headless": res.summary()}
+        if submit:
+            att["auto_submit"] = submit
         self.rs.save_attempt(self.run["id"], att)
         self.run["attempts"].append(n)
         self.rs.log(self.run["id"], f"attempt {n} {self.kind} {jid} -> {outcome}" + (f": {detail}" if detail else ""))
@@ -290,6 +323,8 @@ class _Loop:
             if stop:
                 return stop
             held_back = self.pre_attempt(item) if self.pre_attempt else None
+            if held_back and self.explicit:  # `--job`: a refused job is the answer, not something to skip
+                raise JobNotRunnable(self.kind, {item["job_id"]: held_back})
             if held_back:
                 self.c["gated"] += 1
                 self.rs.log(self.run["id"], f"skip {item['job_id']}: {held_back}")
@@ -298,6 +333,8 @@ class _Loop:
             try:
                 att = self.attempt(item)
             except locks.LockBusy as e:
+                if self.explicit:
+                    raise JobBusy(item["job_id"], e.holder) from None
                 self.c["locked"] += 1
                 self.rs.log(self.run["id"], f"skip {item['job_id']}: locked by {e.holder.get('owner')}")
                 self.echo(f"    {item['job_id']} locked by {e.holder.get('owner')}; passed over")
@@ -333,8 +370,9 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 job_ids: list[str] | None = None, force: bool = False) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
     another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock.
-    `job_ids` restricts the run to those jobs (JobNotRunnable when none is a candidate; the batch queue file
-    is left alone); `force` reruns an already scored/prepared job."""
+    `job_ids` restricts the run to those jobs (JobNotRunnable when none is a candidate, or when the company gate
+    refuses it; JobBusy when its lock is held: an explicit run never reports `completed` for a job it did not
+    run; the batch queue file is left alone); `force` reruns an already scored/prepared job."""
     cfg = cfg or load_runs_config(settings)
     rs = RunStore(settings)
     t_now = now()
@@ -371,7 +409,8 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
     except BaseException:
         locks.release(rs.runner_lock_path, glock.token)
         raise
-    loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt)
+    loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt,
+                 explicit=job_ids is not None)
     loop.lock_token, loop.lock_ttl = glock.token, ttl
     status = "done"
     try:
