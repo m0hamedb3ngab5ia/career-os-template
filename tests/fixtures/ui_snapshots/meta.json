@@ -154,7 +154,8 @@
     "paused",
     "cancelled",
     "doctor_failed",
-    "error"
+    "error",
+    "busy"
   ],
   "tiers": [
     "A",

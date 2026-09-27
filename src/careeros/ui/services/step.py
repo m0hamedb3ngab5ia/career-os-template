@@ -5,7 +5,7 @@ restart) and records it like a batch: data/runs/<id>/run.json (kind scout|tracke
 so Runs › History shows it. The work itself is the scheduler's (`tick.default_actions`) or the CLI's
 (`tracker.sync_all`); nothing is reimplemented. One step of a kind at a time: data/runs/step-<kind>.lock.
 Scout and prune also hold the pipeline lock (data/runs/runner.lock, owner step:<id>, `locks.pipeline_lock`), so
-they never overlap a batch; the tracker sync writes atomically per op and may run beside one.
+they never overlap a batch (losing that race records a failed run, stop reason `busy`); the tracker sync writes atomically per op and may run beside one.
 Inbox sync is a headless skill call; `service.run_skill` records its own run and holds the runner lock.
 The step's stdout/stderr lines go to its run.log, so the Runs log tail streams them.
 SIGTERM (the UI's Cancel) ends the step with stop reason `cancelled`.
@@ -17,7 +17,7 @@ import io
 import os
 import signal
 import sys
-from contextlib import redirect_stderr, redirect_stdout
+from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -81,48 +81,51 @@ def default_actions(settings: Settings) -> dict[str, Callable[[], tuple[str, str
 
 def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], tuple[str, str]]] | None = None,
              now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> dict[str, Any]:
-    """Run scout | tracker | prune once, recorded as a run. Raises StepBusy when one of that kind is running."""
+    """Run scout | tracker | prune once, recorded as a run. Raises StepBusy when one of that kind is running.
+    A scout/prune that finds the pipeline lock held (a batch started after the UI's check) is recorded as a
+    failed run with stop reason `busy` (main exits 5)."""
     if kind not in ("scout", "tracker", "prune"):
         raise ValueError(f"unknown step {kind!r}")
     rs = RunStore(settings)
     start = now()
     rid = f"{start.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
-    try:
-        lk = locks.acquire(step_lock_path(rs, kind), owner=f"step:{rid}", ttl_seconds=LOCK_TTL_S, pid=os.getpid(),
-                           now=start, note=kind)
-    except locks.LockBusy as e:
-        raise StepBusy(e.holder) from None
-    pipe = locks.pipeline_lock(settings, f"step:{rid}", note=kind, wait_s=0) if kind in PIPELINE_STEPS else None
-    try:
-        if pipe is not None:
-            pipe.__enter__()
-    except locks.LockBusy as e:
-        locks.release(step_lock_path(rs, kind), lk.token)
-        raise Busy(e.holder) from None
-    run = rs.new_run(kind, "manual", {}, start, run_id=rid, step=True)
-    rs.log(rid, f"start {kind}")
-    status, stop, detail = "done", "completed", ""
-    out = _RunLogWriter(rs, rid)
-    try:
-        actions = actions if actions is not None else default_actions(settings)
-        with redirect_stdout(out), redirect_stderr(out):
-            result, detail = actions[kind]()
-        if result != "ok":
-            status, stop = "failed", "error"
-    except KeyboardInterrupt:
-        stop, detail = "cancelled", "cancelled by signal"
-    except Exception as e:  # noqa: BLE001 - recorded on the run; the UI shows it
-        status, stop, detail = "failed", "error", f"{type(e).__name__}: {e}"[:500]
-    finally:
-        out.flush()
-        end = now()
-        run.update(status=status, stop_reason=stop, detail=detail, ended_at=iso(end),
-                   duration_s=round((end - start).total_seconds(), 1))
-        rs.save_run(run)
-        rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
-        if pipe is not None:
-            pipe.__exit__(None, None, None)
-        locks.release(step_lock_path(rs, kind), lk.token)
+    with ExitStack() as held:  # releases whatever was taken, even when recording the run raises
+        try:
+            lk = locks.acquire(step_lock_path(rs, kind), owner=f"step:{rid}", ttl_seconds=LOCK_TTL_S,
+                               pid=os.getpid(), now=start, note=kind)
+        except locks.LockBusy as e:
+            raise StepBusy(e.holder) from None
+        held.callback(locks.release, step_lock_path(rs, kind), lk.token)
+        busy: locks.LockBusy | None = None
+        if kind in PIPELINE_STEPS:
+            try:
+                held.enter_context(locks.pipeline_lock(settings, f"step:{rid}", note=kind, wait_s=0))
+            except locks.LockBusy as e:  # lost the race after the UI's pre-spawn check: record why nothing ran
+                busy = e
+        run = rs.new_run(kind, "manual", {}, start, run_id=rid, step=True)
+        rs.log(rid, f"start {kind}")
+        status, stop, detail = "done", "completed", ""
+        out = _RunLogWriter(rs, rid)
+        try:
+            if busy is not None:
+                status, stop, detail = "failed", "busy", str(busy)[:500]
+            else:
+                actions = actions if actions is not None else default_actions(settings)
+                with redirect_stdout(out), redirect_stderr(out):
+                    result, detail = actions[kind]()
+                if result != "ok":
+                    status, stop = "failed", "error"
+        except KeyboardInterrupt:
+            stop, detail = "cancelled", "cancelled by signal"
+        except Exception as e:  # noqa: BLE001 - recorded on the run; the UI shows it
+            status, stop, detail = "failed", "error", f"{type(e).__name__}: {e}"[:500]
+        finally:
+            out.flush()
+            end = now()
+            run.update(status=status, stop_reason=stop, detail=detail, ended_at=iso(end),
+                       duration_s=round((end - start).total_seconds(), 1))
+            rs.save_run(run)
+            rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
     return run
 
 
@@ -162,6 +165,9 @@ def main(argv: list[str] | None = None) -> int:
             print(str(e), file=sys.stderr)
             return 5
     print(rec["id"])
+    if rec.get("stop_reason") == "busy":
+        print(rec.get("detail", ""), file=sys.stderr)
+        return 5
     return 0 if rec.get("stop_reason") in ("completed", "cancelled") else 1
 
 

@@ -128,7 +128,83 @@ def test_nested_use_is_reentrant_and_the_outer_holder_keeps_it(settings):
     assert locks.read(rs.runner_lock_path) is None
 
 
+def test_another_thread_does_not_reenter_the_lock(settings):
+    import threading
+
+    got = []
+
+    def other():
+        try:
+            with locks.pipeline_lock(settings, "step:s2", note="prune", wait_s=0):
+                got.append("entered")
+        except locks.PipelineBusy:
+            got.append("busy")
+
+    with locks.pipeline_lock(settings, "step:s1", note="scout", wait_s=0) as outer:
+        t = threading.Thread(target=other)
+        t.start()
+        t.join()
+        assert got == ["busy"]
+        assert locks.read(RunStore(settings).runner_lock_path)["token"] == outer.token
+
+
+def test_waiting_announces_the_holder_once(settings):
+    hold_batch(settings)
+    c, said = Clock(), []
+    with pytest.raises(locks.PipelineBusy):
+        with locks.pipeline_lock(settings, "cli:scout", note="scout", wait_s=3, poll_s=1, sleep=c.sleep, clock=c,
+                                 on_wait=lambda holder, w: said.append((holder["owner"], w))):
+            pass
+    assert said == [("run:r1", 3)]
+
+
 # --- tick -----------------------------------------------------------------------------------------------------
+
+def _spy_wait(monkeypatch):
+    from contextlib import contextmanager
+
+    waits, real = [], locks.pipeline_lock
+
+    @contextmanager
+    def spy(settings, owner, **kw):
+        waits.append(kw.get("wait_s"))
+        with real(settings, owner, **kw) as lk:
+            yield lk
+    monkeypatch.setattr(locks, "pipeline_lock", spy)
+    return waits
+
+
+@pytest.mark.parametrize("kind", ["scout", "prune"])
+def test_scheduled_scout_and_prune_never_wait_but_catch_up_does(settings, monkeypatch, kind):
+    from types import SimpleNamespace
+
+    from careeros import retention
+    from careeros.runs import tick
+
+    monkeypatch.setattr("careeros.scout.run_scout",
+                        lambda *a, **k: SimpleNamespace(totals={"fetched": 0, "new": 0, "stored": 0}))
+    monkeypatch.setattr("careeros.scout.sync_to_tracker", lambda *a, **k: None)
+    monkeypatch.setattr(retention, "plan", lambda s: [])
+    waits = _spy_wait(monkeypatch)
+    acts = tick.default_actions(settings)
+    tick._run_one(acts[kind], "schedule")
+    tick._run_one(acts[kind], "catch_up")
+    assert waits == [0, None]
+
+
+def test_tick_scout_syncs_the_tracker_outside_the_pipeline_lock(settings, monkeypatch):
+    from types import SimpleNamespace
+
+    from careeros.runs import tick
+
+    seen = []
+    monkeypatch.setattr("careeros.scout.run_scout",
+                        lambda *a, **k: SimpleNamespace(totals={"fetched": 1, "new": 1, "stored": 1}))
+    monkeypatch.setattr("careeros.scout.sync_to_tracker",
+                        lambda *a, **k: seen.append(locks.read(RunStore(settings).runner_lock_path)))
+    status, _ = tick._run_one(tick.default_actions(settings)["scout"], "schedule")
+    assert status == "ok" and seen == [None]
+
 
 def test_tick_scout_during_a_batch_is_busy_and_stays_due(settings, monkeypatch):
     from careeros.runs import tick
@@ -166,15 +242,29 @@ def test_ui_start_step_scout_or_prune_during_a_batch_is_busy(settings):
     rc.start_step("tracker")  # the tracker writes atomically per op: it may run beside a batch
 
 
-def test_step_process_refuses_without_recording_a_run(settings):
-    from careeros.ui.services import step
-    from careeros.ui.services.runs import Busy
+def test_step_that_loses_the_race_records_a_busy_run_and_exits_5(settings, monkeypatch):
+    """The UI already answered started:true; the Runs screen must show why nothing ran."""
+    from careeros.ui.services import meta, step
 
     hold_batch(settings)
-    with pytest.raises(Busy):
-        step.run_step(settings, "prune", actions={"prune": lambda: ("ok", "")})
+    ran = []
+    run = step.run_step(settings, "prune", actions={"prune": lambda: ran.append(1) or ("ok", "")})
     rs = RunStore(settings)
-    assert rs.list_runs() == [] and locks.read(step.step_lock_path(rs, "prune")) is None
+    assert ran == [] and run["status"] == "failed" and run["stop_reason"] == "busy" and "run:r1" in run["detail"]
+    assert [r["id"] for r in rs.list_runs()] == [run["id"]] and locks.read(step.step_lock_path(rs, "prune")) is None
+    assert "busy" in meta.EXTRA_STOPS
+    monkeypatch.setattr(step.Settings, "load", staticmethod(lambda root=None: settings))
+    assert step.main(["prune"]) == 5
+
+
+def test_step_releases_both_locks_when_recording_the_run_fails(settings, monkeypatch):
+    from careeros.ui.services import step
+
+    rs = RunStore(settings)
+    monkeypatch.setattr(RunStore, "new_run", lambda *a, **k: (_ for _ in ()).throw(OSError("disk full")))
+    with pytest.raises(OSError):
+        step.run_step(settings, "scout", actions={"scout": lambda: ("ok", "")})
+    assert locks.read(rs.runner_lock_path) is None and locks.read(step.step_lock_path(rs, "scout")) is None
 
 
 def test_step_holds_the_pipeline_lock_under_its_own_owner(settings):

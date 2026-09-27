@@ -65,13 +65,17 @@ def _pipeline_busy(e: Exception) -> int:
     return 6
 
 
+def _announce_wait(holder: dict, wait_s: float) -> None:
+    print(f"waiting up to {wait_s:.0f}s for {holder.get('owner')} ({holder.get('note') or '-'})…", flush=True)
+
+
 def cmd_scout(args: argparse.Namespace) -> int:
     """Holds the pipeline lock (data/runs/runner.lock) so it never writes while a batch reads; exit 6 = busy."""
     from careeros.runs import locks
 
     s = _settings(args)
     try:
-        with locks.pipeline_lock(s, "cli:scout", note="scout"):
+        with locks.pipeline_lock(s, "cli:scout", note="scout", on_wait=_announce_wait):
             return _scout(s, args)
     except locks.PipelineBusy as e:
         return _pipeline_busy(e)
@@ -643,7 +647,7 @@ def cmd_prune(args: argparse.Namespace) -> int:
     s = _settings(args)
     dry = args.dry_run or not args.yes
     try:
-        with nullcontext() if dry else locks.pipeline_lock(s, "cli:prune", note="prune"):
+        with nullcontext() if dry else locks.pipeline_lock(s, "cli:prune", note="prune", on_wait=_announce_wait):
             return _prune(s, args, dry)
     except locks.PipelineBusy as e:
         return _pipeline_busy(e)

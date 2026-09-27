@@ -76,14 +76,19 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
 
     sched = load_schedule(settings)
 
+    def _wait(trigger: str) -> float | None:
+        """A scheduled job never waits (it would hold tick.lock; it stays due and the next tick retries).
+        catch_up and manual runs wait runs.lock_wait_s (None = from config)."""
+        return 0 if trigger == "schedule" else None
+
     def scout(trigger: str) -> tuple[str, str]:
         from careeros.scout import run_scout, sync_to_tracker
         from careeros.store import Store
 
-        with locks.pipeline_lock(settings, f"{trigger}:scout", note="scout"):
+        with locks.pipeline_lock(settings, f"{trigger}:scout", note="scout", wait_s=_wait(trigger)):
             store = Store(settings)
             summary = run_scout(settings, store)
-            sync_to_tracker(settings, store, summary)
+        sync_to_tracker(settings, store, summary)  # outside the lock: a locked tracker file never holds batches off
         t = summary.totals
         return "ok", f"fetched={t['fetched']} new={t['new']} stored={t['stored']}"
 
@@ -100,7 +105,7 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
 
         from careeros.runs.storage import snapshot_after_prune
 
-        with locks.pipeline_lock(settings, f"{trigger}:prune", note="prune"):
+        with locks.pipeline_lock(settings, f"{trigger}:prune", note="prune", wait_s=_wait(trigger)):
             items = retention.plan(settings)
             freed = retention.execute(settings, items)
         detail = f"{len(items)} item(s), {retention.human_bytes(freed)} freed"

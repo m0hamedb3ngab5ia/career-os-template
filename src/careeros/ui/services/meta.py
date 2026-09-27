@@ -15,7 +15,8 @@ TIERS = ["A", "B", "C"]
 PRIORITIES = ["H", "M", "L"]
 SAFETY_VERDICTS = ["pass", "review", "block", "skip"]
 # `error`: a single-call run (inbox sync) failed or a run crashed (runner.execute_run); not in STOP_REASONS.
-EXTRA_STOPS = ["error"]
+# `busy`: a UI step (scout/prune) lost the race for the pipeline lock after the UI said started (ui.services.step).
+EXTRA_STOPS = ["error", "busy"]
 
 
 # Response shapes: FastAPI turns these into the OpenAPI schema that ui/src/api/schema.gen.ts is generated from.

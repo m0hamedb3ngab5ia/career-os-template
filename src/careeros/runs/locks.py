@@ -21,6 +21,7 @@ from __future__ import annotations
 import json
 import os
 import socket
+import threading
 import time
 import uuid
 from contextlib import contextmanager
@@ -208,14 +209,24 @@ class PipelineBusy(LockBusy):
 
 
 PIPELINE_TTL_S = 6 * 3600  # scout/prune/steps are short; a dead pid frees the lock sooner
-_HELD: dict[str, str] = {}  # pipeline lock path -> token held by this process (nested use is reentrant)
+_HELD = threading.local()  # .tokens: pipeline lock path -> token held by THIS thread (nested use re-enters;
+# another thread of the same process is a separate holder and waits/refuses like another process)
+
+
+def _held() -> dict[str, str]:
+    tokens = getattr(_HELD, "tokens", None)
+    if tokens is None:
+        tokens = _HELD.tokens = {}
+    return tokens
 
 
 def acquire_waiting(path: Path, owner: str, ttl_seconds: float, *, wait_s: float = 0.0, poll_s: float = 1.0,
                     sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
-                    **kw: Any) -> Lock:
-    """`acquire`, retried every `poll_s` for up to `wait_s` seconds; PipelineBusy when still held."""
+                    on_wait: Callable[[dict[str, Any], float], None] | None = None, **kw: Any) -> Lock:
+    """`acquire`, retried every `poll_s` for up to `wait_s` seconds; PipelineBusy when still held.
+    `on_wait(holder, wait_s)` is called once, before the first wait (the CLI says what it is waiting for)."""
     start = clock()
+    announced = False
     while True:
         try:
             return acquire(path, owner, ttl_seconds, **kw)
@@ -223,6 +234,9 @@ def acquire_waiting(path: Path, owner: str, ttl_seconds: float, *, wait_s: float
             waited = clock() - start
             if waited >= wait_s:
                 raise PipelineBusy(e.path, e.holder, waited) from None
+            if on_wait is not None and not announced:
+                announced = True
+                on_wait(e.holder, wait_s)
             sleep(min(poll_s, wait_s - waited))
 
 
@@ -238,22 +252,25 @@ def pipeline_wait_s(settings: Any) -> float:
 def pipeline_lock(settings: Any, owner: str, *, note: str = "", wait_s: float | None = None, poll_s: float = 1.0,
                   ttl_seconds: float = PIPELINE_TTL_S, sleep: Callable[[float], None] = time.sleep,
                   clock: Callable[[], float] = time.monotonic,
-                  pid_alive: Callable[[int], bool] = pid_alive) -> Iterator[Lock]:
+                  pid_alive: Callable[[int], bool] = pid_alive,
+                  on_wait: Callable[[dict[str, Any], float], None] | None = None) -> Iterator[Lock]:
     """Hold data/runs/runner.lock for scout / prune / a UI step. `wait_s` None = from config (pipeline_wait_s).
-    Nested use in one process (a UI step calling the scheduler's scout) re-enters the outer lock."""
+    Nested use in one thread (a UI step calling the scheduler's scout) re-enters the outer lock; another thread
+    is another holder. `on_wait(holder, wait_s)` is called once before waiting."""
     from careeros.runs.store import RunStore
 
     path = RunStore(settings).runner_lock_path
     key = str(path)
     wait = pipeline_wait_s(settings) if wait_s is None else wait_s
+    held = _held()
     lk = acquire_waiting(path, owner, ttl_seconds, wait_s=wait, poll_s=poll_s, sleep=sleep, clock=clock,
-                         token=_HELD.get(key), pid=os.getpid(), note=note, pid_alive=pid_alive)
+                         on_wait=on_wait, token=held.get(key), pid=os.getpid(), note=note, pid_alive=pid_alive)
     if lk.reentrant:
         yield lk
         return
-    _HELD[key] = lk.token
+    held[key] = lk.token
     try:
         yield lk
     finally:
-        _HELD.pop(key, None)
+        held.pop(key, None)
         release(path, lk.token)
