@@ -85,8 +85,8 @@ def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
                     plan.runs.add(parts[0])          # a run folder created, moved in or moved away
                 if not p.is_dir():
                     plan.status = True               # schedule.json, storage.jsonl, launchd logs, or a deleted file
-            elif len(parts) == 1 or parts[0] == "locks":
-                plan.status = True                   # queue-*.json, pause.json, catch_up.json, runner.lock, ...
+            elif len(parts) <= 1 or parts[0] == "locks":
+                plan.status = True                   # runs/ itself, queue-*.json, pause.json, catch_up.json, runner.lock, ...
             elif not _is_finder_copy(parts[0]):
                 plan.runs.add(parts[0])
             continue
