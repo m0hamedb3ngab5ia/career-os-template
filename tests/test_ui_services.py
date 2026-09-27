@@ -58,7 +58,7 @@ def test_meta_lists_codes_from_config_and_models(data):
     assert m["presets"]["values"]["small"] == {"max_score_jobs": 10, "max_prepare_jobs": 2, "max_minutes": 30}
     assert [c["name"] for c in m["pipeline"]["columns"]][0] == "Found"
     assert "rejected" in m["pipeline"]["closed"]
-    assert m["ui"] == {"theme": "system", "undo_seconds": 8, "page_size": 100}
+    assert m["ui"] == {"theme": "system", "undo_seconds": 8, "page_size": 100, "pause_until_tomorrow_at": "08:00"}
 
 
 # --- status ----------------------------------------------------------------------------------------------------

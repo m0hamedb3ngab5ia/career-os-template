@@ -31,5 +31,6 @@ def meta(settings: Any) -> dict[str, Any]:
         "presets": {"names": list(PRESET_NAMES), "values": {k: dict(v) for k, v in runs.presets.items()},
                     "recommended": RECOMMENDED_PRESET, "current": runs.preset},
         "pipeline": {"columns": ui.columns, "closed": ui.closed},
-        "ui": {"theme": ui.theme, "undo_seconds": ui.undo_seconds, "page_size": ui.page_size},
+        "ui": {"theme": ui.theme, "undo_seconds": ui.undo_seconds, "page_size": ui.page_size,
+               "pause_until_tomorrow_at": ui.pause_until_tomorrow_at},
     }

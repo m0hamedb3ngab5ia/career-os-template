@@ -193,6 +193,8 @@ def _f(key: str) -> Field:
     ("company_domains", {"Acme": "acme.com", "Beta": ["beta.io", "betajobs.com"]}, True),
     ("company_domains", {"Acme": 3}, False),
     ("advisor.failure_rate_warn", 1.5, False),
+    ("ui.pause_until_tomorrow_at", "07:30", True),
+    ("ui.pause_until_tomorrow_at", "7:30", False),
 ])
 def test_validate_value(key, value, ok):
     err = validate_value(_f(key), value)

@@ -2,7 +2,8 @@
 
 Status: building. The mockup is signed off; Phase 2 is being built in slices. Built so far: the `careeros ui`
 server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/status`, `/api/jobs`, `/api/events`,
-`pipeline.yaml: ui`). Everything else in this file is not built yet unless it says so.
+`pipeline.yaml: ui`) and the Runs screen (`/runs`, `/runs/<id>`; `/api/runs*`, `/api/schedule*` over
+`RunControl`). Everything else in this file is not built yet unless it says so.
 
 ## Goals
 
