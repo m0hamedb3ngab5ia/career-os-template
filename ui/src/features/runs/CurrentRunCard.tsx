@@ -171,6 +171,7 @@ export function CurrentRunCard({ run }: { run: CurrentRun | null | undefined }) 
       <LogPane
         label="Live run output"
         empty="Waiting for output…"
+        live
         lines={lines.map((l) => ({
           key: l.key,
           text: l.text,

@@ -43,6 +43,19 @@ describe("KitPage", () => {
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it("has no axe violations in the dark theme, board and page", async () => {
+    document.documentElement.setAttribute("data-theme", "dark");
+    try {
+      renderKit();
+      const dark = screen.getByRole("region", { name: "Dark" });
+      expect(dark).toHaveAttribute("data-theme", "dark");
+      expect(await axeViolations(dark)).toEqual([]);
+      expect(await axeViolations(document.body)).toEqual([]);
+    } finally {
+      document.documentElement.removeAttribute("data-theme");
+    }
+  });
+
   it("shows an unavailable control with its reason and opens a sheet", async () => {
     const user = userEvent.setup();
     renderKit();
