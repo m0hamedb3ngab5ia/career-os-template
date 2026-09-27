@@ -1,0 +1,20 @@
+# profile/apply_lessons.yaml: hurdles apply-job hit on an ATS or at a company, written once, read before the
+# next application (`careeros learn list --ats <ats> --company <company>`). Add lessons with
+# `careeros learn lesson "<text>" [--ats workday|greenhouse|lever|ashby|custom] [--company X]`; apply-job
+# records its own at the end of a session. `ats` / `company` null = applies everywhere. Keep each lesson one
+# factual line with no personal data. These two belong to the fictional candidate: delete them when you like.
+lessons:
+  - id: example-workday-resume-first
+    text: "Workday only unlocks the review page after the resume upload finishes; wait for the file name before Next."
+    ats: workday
+    company: null
+    job_id: null
+    added: "2026-01-15"
+    tags: [upload]
+  - id: example-acme-portfolio
+    text: "Acme's Greenhouse form asks for a portfolio link on page 2; the github standard answer fits."
+    ats: greenhouse
+    company: Acme
+    job_id: null
+    added: "2026-02-03"
+    tags: [form]

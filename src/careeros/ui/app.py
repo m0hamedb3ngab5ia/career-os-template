@@ -156,6 +156,8 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
         app.include_router(r.router, prefix="/api")
     app.include_router(contacts.router, prefix="/api")
     app.include_router(inbox.router, prefix="/api")
+    from careeros.ui.routers import learning  # answers learned once, hurdles remembered
+    app.include_router(learning.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:

@@ -28,6 +28,12 @@ class NewItem(BaseModel):
     due_reason: str | None = None
 
 
+class Answer(BaseModel):
+    answer: str
+    scope: str = "general"        # general | company (company = the item's company)
+    company: str | None = None
+
+
 class Ids(BaseModel):
     ids: list[str] = Field(min_length=1, max_length=500)
 
@@ -91,6 +97,15 @@ def bulk_reopen(body: Ids, c=Depends(ctx)) -> dict[str, Any]:
 def done(aid: str, c=Depends(ctx)) -> dict[str, Any]:
     out = _run(svc.mark_done, c.settings, [aid])
     after_write(c, tracker=True)
+    return out
+
+
+@router.post("/actions/{aid}/answer")
+def answer(aid: str, body: Answer, c=Depends(ctx)) -> dict[str, Any]:
+    """Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
+    mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}."""
+    out = _run(svc.answer_item, c.settings, c.index, aid, body.answer, body.scope, body.company)
+    after_write(c, tracker=True, jobs=[out["learned"]["job_id"]] if out["learned"].get("job_id") else None)
     return out
 
 

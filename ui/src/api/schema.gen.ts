@@ -19,6 +19,14 @@ export interface paths {
     /** Bulk Reopen */
     post: operations["bulk_reopen_api_actions_bulk_reopen_post"];
   };
+  "/api/actions/{aid}/answer": {
+    /**
+     * Answer
+     * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
+     * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
+     */
+    post: operations["answer_api_actions__aid__answer_post"];
+  };
   "/api/actions/{aid}/block-company": {
     /** Block Company */
     post: operations["block_company_api_actions__aid__block_company_post"];
@@ -148,6 +156,12 @@ export interface paths {
   "/api/jobs/{job_id}/withdraw": {
     /** Withdraw */
     post: operations["withdraw_api_jobs__job_id__withdraw_post"];
+  };
+  "/api/learning/lessons": {
+    /** List Lessons */
+    get: operations["list_lessons_api_learning_lessons_get"];
+    /** Add Lesson */
+    post: operations["add_lesson_api_learning_lessons_post"];
   };
   "/api/meta": {
     /** Meta */
@@ -427,6 +441,18 @@ export interface components {
       usage_limit_stops: number;
       /** Window Days */
       window_days: number;
+    };
+    /** Answer */
+    Answer: {
+      /** Answer */
+      answer: string;
+      /** Company */
+      company?: string | null;
+      /**
+       * Scope
+       * @default general
+       */
+      scope?: string;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -1228,6 +1254,31 @@ export interface components {
       /** Tabs */
       tabs: components["schemas"]["JobsTab"][];
     };
+    /** Lesson */
+    Lesson: {
+      /** Added */
+      added?: string | null;
+      /** Ats */
+      ats?: string | null;
+      /** Company */
+      company?: string | null;
+      /** Id */
+      id: string;
+      /** Job Id */
+      job_id?: string | null;
+      /**
+       * Tags
+       * @default []
+       */
+      tags?: string[];
+      /** Text */
+      text: string;
+    };
+    /** Lessons */
+    Lessons: {
+      /** Lessons */
+      lessons: components["schemas"]["Lesson"][];
+    };
     /** LocationOption */
     LocationOption: {
       /** Count */
@@ -1316,6 +1367,22 @@ export interface components {
       type?: string;
       /** What */
       what: string;
+    };
+    /** NewLesson */
+    NewLesson: {
+      /** Ats */
+      ats?: string | null;
+      /** Company */
+      company?: string | null;
+      /** Job Id */
+      job_id?: string | null;
+      /**
+       * Tags
+       * @default []
+       */
+      tags?: string[];
+      /** Text */
+      text: string;
     };
     /** NotScoredHint */
     NotScoredHint: {
@@ -2211,6 +2278,39 @@ export interface operations {
       };
     };
   };
+  /**
+   * Answer
+   * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
+   * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
+   */
+  answer_api_actions__aid__answer_post: {
+    parameters: {
+      path: {
+        aid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Answer"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Block Company */
   block_company_api_actions__aid__block_company_post: {
     parameters: {
@@ -2946,6 +3046,51 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Lessons */
+  list_lessons_api_learning_lessons_get: {
+    parameters: {
+      query?: {
+        ats?: string | null;
+        company?: string | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Lessons"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Add Lesson */
+  add_lesson_api_learning_lessons_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NewLesson"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Lesson"];
         };
       };
       /** @description Validation Error */
