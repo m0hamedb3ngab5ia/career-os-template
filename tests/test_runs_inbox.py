@@ -84,3 +84,42 @@ def test_paused_does_not_call(settings):
     fake = Fake([])
     rec = go(settings, fake)
     assert rec["stop_reason"] == "paused" and fake.calls == []
+
+
+def test_invoke_raising_records_a_failed_error_run_and_releases_the_lock(settings):
+    def boom(*a, **kw):
+        raise RuntimeError("invoke exploded")
+    with pytest.raises(RuntimeError, match="invoke exploded"):
+        go(settings, boom)
+    rs = RunStore(settings)
+    assert not rs.runner_lock_path.exists()
+    (rid,) = [p.name for p in rs.dir.iterdir() if (p / "run.json").exists()]
+    rec = rs.load_run(rid)
+    assert rec["status"] == "failed" and rec["stop_reason"] == "error" and "invoke exploded" in rec["detail"]
+
+
+@pytest.mark.parametrize("fail_from", [1, 2])  # 1: the first save in new_run; 2: the final run.json save
+def test_run_skill_save_run_raising_still_releases_the_lock(settings, monkeypatch, fail_from):
+    real, calls = RunStore.save_run, []
+
+    def save(self, run):
+        calls.append(1)
+        if len(calls) >= fail_from:
+            raise OSError("disk full")
+        return real(self, run)
+    monkeypatch.setattr(RunStore, "save_run", save)
+    with pytest.raises(OSError, match="disk full"):
+        go(settings, Fake([init(), result({"skill": "inbox-sync"})]))
+    assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_run_skill_pause_hook_raising_does_not_mask_the_invoke_error(settings, monkeypatch):
+    from careeros.runs import service
+    monkeypatch.setattr(service, "pause_after_usage_limit",
+                        lambda *a, **kw: (_ for _ in ()).throw(OSError("pause hook failed")))
+
+    def boom(*a, **kw):
+        raise RuntimeError("invoke exploded")
+    with pytest.raises(RuntimeError, match="invoke exploded"):
+        go(settings, boom)
+    assert not RunStore(settings).runner_lock_path.exists()

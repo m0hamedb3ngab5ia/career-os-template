@@ -172,7 +172,7 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
     from careeros.runs import locks
     from careeros.runs.headless import build_command, classify, parse_result_line
     from careeros.runs.headless import invoke as default_invoke
-    from careeros.runs.runner import RunBusy, default_doctor
+    from careeros.runs.runner import RunBusy, close_run, default_doctor
     from careeros.runs.store import iso
 
     base = load_runs_config(settings)
@@ -192,10 +192,14 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
                            now=start, note=f"{kind} ({trigger})")
     except locks.LockBusy as e:
         raise RunBusy(e.holder) from None
-    run = rs.new_run(kind, trigger, {"preset": None, "max_jobs": 1, "max_minutes": timeout_s / 60}, start,
-                     run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}"),
-                     counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
-    stop, detail = "completed", ""
+    try:
+        run = rs.new_run(kind, trigger, {"preset": None, "max_jobs": 1, "max_minutes": timeout_s / 60}, start,
+                         run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}"),
+                         counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
+    except BaseException:
+        locks.release(rs.runner_lock_path, lk.token)
+        raise
+    status, stop, detail = "done", "completed", ""
     try:
         pause = rs.pause_state(start)
         fails = [] if pause else (doctor(settings.root) if doctor else [])
@@ -225,14 +229,14 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
             if outcome != "ok":
                 stop = outcome if outcome in ("usage_limit", "auth_required", "permission_denied", "timeout",
                                               "cancelled") else "error"
+    except BaseException as e:
+        status, stop, detail = "failed", "error", f"{type(e).__name__}: {e}"[:500]
+        raise
     finally:
         end = now()
-        run.update(status="done", stop_reason=stop, detail=detail, ended_at=iso(end),
+        run.update(status=status, stop_reason=stop, detail=detail, ended_at=iso(end),
                    duration_s=round((end - start).total_seconds(), 1))
-        rs.save_run(run)
-        rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
-        try:
-            pause_after_usage_limit(settings, cfg, run, now())  # under the lock: no run starts unpaused in between
-        finally:
-            locks.release(rs.runner_lock_path, lk.token)
+        # under the lock: no run starts unpaused in between
+        close_run(rs, run, lambda r: pause_after_usage_limit(settings, cfg, r, now()),
+                  lambda: locks.release(rs.runner_lock_path, lk.token))
     return run
