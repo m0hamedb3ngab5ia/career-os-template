@@ -111,8 +111,20 @@ def _tracker_watch_dir(folder: Path, root: Path) -> Path | None:
     return None
 
 
+def _dir_id(p: Path) -> tuple[int, int] | None:
+    """Identity of a folder, so one deleted and recreated (or renamed away and replaced) under the same path is
+    noticed: a watch on the old one would never report again."""
+    try:
+        st = p.stat()
+    except OSError:
+        return None
+    return (st.st_dev, st.st_ino)
+
+
 class Watcher:
-    tracker_poll_s = 2.0        # how often a missing tracker folder outside the repo root is checked for
+    tracker_poll_s = 2.0        # how often the tracker's watch target is re-checked (folder appeared/went away)
+    tracker_backoff_max_s = 60.0  # longest wait between retries after the tracker watch fails (e.g. PermissionError)
+    _tracker_watching: Path | None = None   # the folder the tracker watch is attached to (tests, diagnostics)
 
     def __init__(self, settings: Any, index: Any, broker: Any, *, debounce_ms: int = 300,
                  on_config: Callable[[], None] | None = None):
@@ -154,13 +166,14 @@ class Watcher:
 
     # --- thread --------------------------------------------------------------------------------------------
 
-    def _watch(self, dirs: list[Path], recursive: bool):
+    def _watch(self, dirs: list[Path], recursive: bool, timeout_ms: int | None = None):
         from watchfiles import watch
 
         # step = the quiet window (a batch ends once nothing changed for this long); debounce = the longest a
-        # batch may grow while files keep changing
+        # batch may grow while files keep changing; timeout_ms = also yield an empty batch after this long quiet
+        extra: dict[str, Any] = {"rust_timeout": timeout_ms, "yield_on_timeout": True} if timeout_ms else {}
         return watch(*dirs, step=self.debounce_ms, debounce=max(1600, 5 * self.debounce_ms),
-                     stop_event=self._stop, recursive=recursive, raise_interrupt=False)
+                     stop_event=self._stop, recursive=recursive, raise_interrupt=False, **extra)
 
     def _handle_batch(self, paths: Iterable[Path | str]) -> None:
         try:
@@ -177,33 +190,53 @@ class Watcher:
 
     def _tracker_loop(self) -> None:
         """Watch the tracker's folder (not recursively). While it is missing, watch its nearest existing ancestor
-        inside the repo root (or poll, when there is none) and switch to the folder once it appears."""
+        inside the repo root (or poll, when there is none) and switch to the folder once it appears. An OSError
+        other than a vanished folder (e.g. PermissionError) is retried with a capped backoff, not fatal."""
         folder = self.roots.tracker.parent
+        backoff = 0.0
         try:
             while not self._stop.is_set():
-                target = _tracker_watch_dir(folder, self.repo_root)
-                if target is None:
-                    self._stop.wait(self.tracker_poll_s)
-                    if folder.is_dir() and self.roots.tracker.exists():
-                        self._handle_batch([self.roots.tracker])
-                    continue
-                waiting = target != folder
                 try:
-                    for changes in self._watch([target], False):
-                        if waiting:
-                            if _tracker_watch_dir(folder, self.repo_root) != target:
-                                break                 # the folder (or a nearer ancestor) appeared: re-target
-                        elif not folder.is_dir():
-                            break                     # the folder went away: fall back to an ancestor
-                        else:
-                            self._handle_batch(p for _, p in changes)
+                    self._tracker_watch_once(folder)
+                    backoff = 0.0
                 except FileNotFoundError:             # the target vanished between the check and the watch
                     self._stop.wait(self.tracker_poll_s)
-                    continue
-                if waiting and folder.is_dir() and self.roots.tracker.exists():
-                    self._handle_batch([self.roots.tracker])   # written before the folder watch attached
+                except OSError as e:
+                    backoff = min(max(2 * backoff, self.tracker_poll_s), self.tracker_backoff_max_s)
+                    log.warning("careeros ui: tracker watcher failed (%s); retrying in %.1fs", e, backoff)
+                    self._stop.wait(backoff)
+                    if not self._stop.is_set() and folder.is_dir() and self.roots.tracker.exists():
+                        self._handle_batch([self.roots.tracker])   # may have changed while the watch was down
         except Exception:  # noqa: BLE001
             log.exception("careeros ui: tracker watcher stopped; restart `careeros ui` for live updates")
+        finally:
+            self._tracker_watching = None
+
+    def _tracker_watch_once(self, folder: Path) -> None:
+        """One watch of the current target, until the target changes (the folder appeared, went away or was
+        replaced) or the watcher stops. Empty timeout yields every poll re-check the target, so a folder that
+        appears before the watch attaches (no event ever arrives) is still picked up."""
+        target = _tracker_watch_dir(folder, self.repo_root)
+        if target is None:
+            self._stop.wait(self.tracker_poll_s)
+            if folder.is_dir() and self.roots.tracker.exists():
+                self._handle_batch([self.roots.tracker])
+            return
+        ident = _dir_id(target)
+        if ident is None:
+            raise FileNotFoundError(target)
+        waiting = target != folder
+        for changes in self._watch([target], False, timeout_ms=max(1, int(self.tracker_poll_s * 1000))):
+            self._tracker_watching = target
+            if _tracker_watch_dir(folder, self.repo_root) != target or _dir_id(target) != ident:
+                break                                 # re-target: the folder appeared, went away or was replaced
+            if changes and not waiting:
+                self._handle_batch(p for _, p in changes)
+        else:
+            return                                    # stopped
+        self._tracker_watching = None
+        if folder.is_dir() and self.roots.tracker.exists():
+            self._handle_batch([self.roots.tracker])  # written before the new watch attaches
 
     def start(self) -> None:
         dirs = self.watch_dirs()

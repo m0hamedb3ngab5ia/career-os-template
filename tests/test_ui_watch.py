@@ -250,19 +250,77 @@ def test_missing_tracker_folder_is_picked_up_once_created(data):
     w.handle = lambda paths: seen.extend(str(p) for p in paths)
     w.start()
     try:
-        assert _wait_for(lambda: len(w._threads) == 2)
-        import time
-        time.sleep(0.5)                                       # let the ancestor watch attach
+        assert _wait_for(lambda: w._tracker_watching == s.root.resolve(), 5)     # the ancestor watch is attached
         tracker.parent.mkdir(parents=True)
         tracker.write_bytes(b"x")
         assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen)), seen
         seen.clear()
-        time.sleep(0.5)
+        assert _wait_for(lambda: w._tracker_watching == tracker.parent.resolve(), 5)   # now the folder itself
         tracker.write_bytes(b"xy")                            # now the folder itself is watched
         assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen)), seen
     finally:
         w.stop()
         ix.close()
+
+
+def test_tracker_folder_created_as_the_ancestor_watch_attaches_is_picked_up(data):
+    """The folder appears between choosing the ancestor and attaching its watch: no event ever arrives, so the
+    watcher must re-check the target on its own every poll and index the tracker file already there."""
+    s = data["settings"]
+    tracker = s.root / "trk" / "deep" / "JobTracker.xlsx"
+    s.paths["tracker_xlsx"] = tracker
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    w.tracker_poll_s = 0.2
+    seen: list = []
+    w.handle = lambda paths: seen.extend(str(p) for p in paths)
+    real_watch = w._watch
+
+    def racing_watch(dirs, recursive, **kw):
+        if not recursive and not tracker.parent.exists():     # the tracker thread, about to watch the ancestor
+            tracker.parent.mkdir(parents=True)                # lands before the ancestor watch attaches
+            tracker.write_bytes(b"x")
+        return real_watch(dirs, recursive, **kw)
+
+    w._watch = racing_watch
+    w.start()
+    try:
+        assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen), 3), seen
+        assert _wait_for(lambda: w._tracker_watching == tracker.parent.resolve(), 3)
+    finally:
+        w.stop()
+        ix.close()
+
+
+def test_tracker_watch_permission_error_retries_with_backoff(data, caplog):
+    s = data["settings"]
+    tracker = s.root / "trk" / "JobTracker.xlsx"
+    tracker.parent.mkdir(parents=True)
+    s.paths["tracker_xlsx"] = tracker
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    w.tracker_poll_s = 0.05
+    w.tracker_backoff_max_s = 0.2
+    calls: list = []
+
+    def failing_watch(dirs, recursive, **kw):
+        calls.append(dirs)
+        if len(calls) <= 3:
+            raise PermissionError("denied")
+        w._stop.wait(5)
+        return iter(())
+
+    w._watch = failing_watch
+    with caplog.at_level("WARNING", logger="careeros.ui"):
+        w._spawn(w._tracker_loop)
+        try:
+            assert _wait_for(lambda: len(calls) >= 4, 5), calls     # still retrying after three failures
+        finally:
+            w.stop()
+    assert not w._threads[0].is_alive()                               # the stop event ends the backoff wait
+    msgs = [r.getMessage() for r in caplog.records if "tracker watcher" in r.getMessage()]
+    assert len(msgs) == 3 and all("denied" in m for m in msgs), msgs
+    ix.close()
 
 
 def test_missing_tracker_folder_outside_root_is_never_watched(data, monkeypatch, tmp_path):
