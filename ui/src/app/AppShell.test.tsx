@@ -121,9 +121,11 @@ describe("AppShell", () => {
       expect(router.state.location.search).toBe("?tab=review");
     });
 
-    it("elsewhere the box starts empty", () => {
+    it("elsewhere the box starts empty", async () => {
       renderAt("/runs?q=globex");
-      expect(screen.getByRole("searchbox", { name: "Search jobs and companies" })).toHaveValue("");
+      // the Runs route is lazy-loaded, so the shell appears once it resolves
+      const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
+      expect(box).toHaveValue("");
     });
   });
 

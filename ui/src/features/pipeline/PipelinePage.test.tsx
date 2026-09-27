@@ -147,7 +147,7 @@ describe("Pipeline", () => {
     await user.click(screen.getByRole("menuitem", { name: "Applied" }));
     await user.click(within(screen.getByRole("dialog")).getByRole("button", { name: "Mark applied" }));
     expect(await screen.findByText("Moved Umbrella Labs to Applied")).toBeInTheDocument();
-    expect(calls.find((c) => c.method === "POST")!.path).toBe("/api/jobs/r1/submitted"); // Mark submitted, not Set status
+    expect(calls.find((c) => c.method === "POST")!.url).toBe("/api/jobs/r1/submitted"); // Mark submitted, not Set status
     expect(screen.queryByRole("button", { name: "Undo" })).toBeNull();
   });
 
@@ -178,7 +178,8 @@ describe("Pipeline", () => {
     await waitFor(() => expect(applied).toHaveAttribute("data-drop"));
     fireEvent.drop(applied, { dataTransfer: dt });
     await userEvent.setup().click(within(screen.getByRole("dialog", { name: "Mark Initech applied?" })).getByRole("button", { name: "Mark applied" }));
-    await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ status: "applied" }));
+    // Applied goes through Mark submitted (it records the date applied), not Set status
+    await waitFor(() => expect(calls.find((c) => c.method === "POST")?.url).toBe("/api/jobs/q1/submitted"));
   });
 
   it("Add job is disabled with a plain-language reason; Table links to Jobs", async () => {
