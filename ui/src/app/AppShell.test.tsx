@@ -113,12 +113,20 @@ describe("AppShell", () => {
       const { router } = renderAt("/jobs?tab=review&q=globex");
       const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
       expect(box).toHaveValue("globex");
+      // Let the lazily loaded Jobs page mount and its (404ing) queries settle before typing: a re-render of the
+      // controlled box landing between user-event's clear and type once left the old text in front (CI flake).
+      await screen.findByRole("searchbox", { name: "Search jobs" }, { timeout: 5000 });
+      await waitFor(() => expect(fetch).toHaveBeenCalledWith(expect.stringMatching(/^\/api\/jobs/), expect.anything()));
       await user.clear(box);
-      await user.type(box, "initech{Enter}");
-      expect(router.state.location.search).toBe("?tab=review&q=initech");
-      await user.clear(box);
+      await waitFor(() => expect(box).toHaveValue(""));
+      await user.type(box, "initech");
+      await waitFor(() => expect(box).toHaveValue("initech"));
       await user.keyboard("{Enter}");
-      expect(router.state.location.search).toBe("?tab=review");
+      await waitFor(() => expect(router.state.location.search).toBe("?tab=review&q=initech"));
+      await user.clear(box);
+      await waitFor(() => expect(box).toHaveValue(""));
+      await user.keyboard("{Enter}");
+      await waitFor(() => expect(router.state.location.search).toBe("?tab=review"));
     });
 
     it("elsewhere the box starts empty", async () => {
