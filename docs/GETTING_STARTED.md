@@ -1,7 +1,7 @@
 # Getting started
 
 From a fresh clone to your first tailored application in about 20 minutes. Every command is meant to be
-copy-pasted from the repo root. Nothing is submitted anywhere until step 10, and only when you run it.
+copy-pasted from the repo root. Nothing is submitted anywhere until step 11, and only when you run it.
 
 ## Prerequisites
 
@@ -101,7 +101,32 @@ To change what scout keeps:
 | never skip old postings | `scout.filters.ghost: false`, or tune `safety.ghost` thresholds |
 | treat a safety check differently | `safety.levels: {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}` |
 
-## 7. Prepare one job
+## 7. Open the app
+
+```sh
+.venv/bin/pip install -e ".[ui]"
+.venv/bin/careeros ui  # --port 8765 (default) --reindex --no-open
+```
+
+Opens a browser at `http://127.0.0.1:8765` (loopback only; add `--host` and it refuses to start). `data/careeros.db`
+is a disposable index built from the files above; delete it or pass `--reindex` any time and it rebuilds. One
+screen per stage of the pipeline:
+
+| Screen | Shows |
+|---|---|
+| Today | stat row, open Action Items, upcoming runs, missed-run catch-up banner |
+| Jobs | the tracker's Jobs tab as a live, filterable table |
+| Job detail | status, safety verdict, score, documents, apply session, contacts, log |
+| Action Items | every open item, grouped by due date, with a Done control |
+| Pipeline | a board, one column per stage, drag to change status |
+| Runs | live and past scout / score / prepare / inbox-sync runs, with cancel and pause |
+| Contacts | outreach drafts, relationship badges, sent/replied |
+| Inbox | applied jobs with inbox-sync classification and follow-up drafts |
+| Settings | every config file as forms, including Storage & efficiency |
+
+See [docs/UI.md](UI.md) for the full design.
+
+## 8. Prepare one job
 
 Pick an id from the list, start Claude Code in the repo, and run the skill:
 
@@ -117,7 +142,7 @@ It checks `careeros doctor` first, then scores the posting, tailors a one-page r
 writes a cover letter when the tier calls for one, and runs QA (one regeneration if needed). The last
 line is a `RESULT` with `queued`, `needs_review` or `skipped`.
 
-## 8. Review the output
+## 9. Review the output
 
 ```sh
 ls data/jobs/<id>/
@@ -144,7 +169,7 @@ Open items (questions it couldn't answer, reviews) are in the tracker's Action I
 .venv/bin/careeros action list
 ```
 
-## 9. Keep your data private (recommended)
+## 10. Keep your data private (recommended)
 
 `profile/`, `config/`, `CLAUDE.local.md` and `data/` are gitignored, so they never go into this repo. To
 back them up and use them from several machines, keep them in your own **private** repo and link them in:
@@ -160,7 +185,7 @@ cd ~/career-private && git init && git add . && git commit -m "my career-os data
 `--link` makes `profile`, `config` (and `CLAUDE.local.md` if that folder has one) symlinks into
 `~/career-private`. `CLAUDE.local.md` is where personal notes for Claude go; it is never committed.
 
-## 10. Apply (when you're ready)
+## 11. Apply (when you're ready)
 
 Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
 
@@ -171,7 +196,7 @@ Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
 It checks `careeros doctor`, the QA result, daily and per-company caps, and a scam gate before touching
 the form. See the FAQ for what submits on its own.
 
-## 11. Unattended runs (optional, macOS)
+## 12. Unattended runs (optional, macOS)
 
 Once single jobs look right, the system can score and prepare in batches on a schedule. Python ranks the jobs and
 enforces the budgets; each job is one headless Claude Code call (`claude -p`, your subscription). Runs never apply:
