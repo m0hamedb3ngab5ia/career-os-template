@@ -33,24 +33,26 @@ def _closed(c: Any) -> list[str]:
 @router.get("/jobs")
 def list_jobs(status: list[str] = Query(default=[]), tier: list[str] = Query(default=[]),
               safety: list[str] = Query(default=[]), category: list[str] = Query(default=[]), q: str | None = None,
-              sort: str = svc.DEFAULT_SORT, cursor: str | None = None, tab: str | None = None,
+              location: str | None = None, sort: str = svc.DEFAULT_SORT, cursor: str | None = None,
+              tab: str | None = None,
               limit: int | None = Query(default=None, ge=1, le=svc.MAX_LIMIT), c=Depends(ctx)) -> svc.JobsPage:
     from careeros.ui.config import load_ui_config
 
-    return svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q, sort=sort,
-                         cursor=cursor, limit=limit or load_ui_config(c.settings).page_size, tab=tab,
+    return svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q,
+                         location=location, sort=sort, cursor=cursor, limit=limit or load_ui_config(c.settings).page_size, tab=tab,
                          closed=_closed(c))
 
 
 @router.get("/jobs/tabs")
-def job_tabs(q: str | None = None, c=Depends(ctx)) -> svc.JobsTabs:
-    return {"tabs": svc.tabs(c.index, _closed(c), q=q)}
+def job_tabs(q: str | None = None, location: str | None = None, c=Depends(ctx)) -> svc.JobsTabs:
+    return {"tabs": svc.tabs(c.index, _closed(c), q=q, location=location)}
 
 
 class Export(BaseModel):
     job_ids: list[str] | None = Field(default=None, max_length=svc.MAX_EXPORT)
     tab: str | None = None
     q: str | None = None
+    location: str | None = None
     status: list[str] = []
     tier: list[str] = []
     sort: str = svc.DEFAULT_SORT
@@ -61,7 +63,8 @@ class Export(BaseModel):
 def export(body: Export, c=Depends(ctx)) -> Response:
     raw = svc.export_xlsx(c.index, job_ids=body.job_ids, columns=body.columns, sort=body.sort, closed=_closed(c),
                           **({} if body.job_ids is not None else
-                             {"tab": body.tab, "q": body.q, "status": body.status, "tier": body.tier}))
+                             {"tab": body.tab, "q": body.q, "location": body.location, "status": body.status,
+                              "tier": body.tier}))
     name = f"careeros-jobs-{datetime.now().strftime('%Y%m%d')}.xlsx"
     return Response(raw, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

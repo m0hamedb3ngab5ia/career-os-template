@@ -17,7 +17,7 @@
           "found_at": "2026-09-21T15:00:00+00:00",
           "hint": null,
           "job_id": "<job:scored>",
-          "location": "New York, NY",
+          "location": "Remote",
           "override": null,
           "qa_passed": null,
           "qa_score": null,
@@ -190,8 +190,12 @@
     ],
     "locations": [
       {
-        "count": 8,
+        "count": 7,
         "value": "New York, NY"
+      },
+      {
+        "count": 1,
+        "value": "Remote"
       }
     ]
   }

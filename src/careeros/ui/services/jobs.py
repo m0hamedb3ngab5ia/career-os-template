@@ -11,7 +11,7 @@ from typing_extensions import TypedDict
 
 from careeros.store import _is_finder_copy
 
-SORTS = ("fit", "company", "status", "tier", "found_at", "applied_at", "updated_at")
+SORTS = ("fit", "company", "location", "status", "tier", "found_at", "applied_at", "updated_at")
 DEFAULT_SORT = "-fit"
 MAX_LIMIT = 1000
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -159,8 +159,9 @@ def _tab_clause(tab: str | None, closed: list[str] | None) -> tuple[str | None, 
 
 
 def _where(*, status: list[str] | None = None, tier: list[str] | None = None, safety: list[str] | None = None,
-           category: list[str] | None = None, q: str | None = None, tab: str | None = None,
-           closed: list[str] | None = None, job_ids: list[str] | None = None) -> tuple[str, list[Any]]:
+           category: list[str] | None = None, q: str | None = None, location: str | None = None,
+           tab: str | None = None, closed: list[str] | None = None,
+           job_ids: list[str] | None = None) -> tuple[str, list[Any]]:
     where, params = [], []
     for col, vals in (("status", status), ("tier", tier), ("safety", safety), ("category", category)):
         if vals:
@@ -170,6 +171,9 @@ def _where(*, status: list[str] | None = None, tier: list[str] | None = None, sa
         where.append("(LOWER(company) LIKE ? ESCAPE '\\' OR LOWER(title) LIKE ? ESCAPE '\\' "
                      "OR LOWER(location) LIKE ? ESCAPE '\\')")
         params.extend([_like(q.strip())] * 3)
+    if location and location.strip():
+        where.append("LOWER(location) LIKE ? ESCAPE '\\'")
+        params.append(_like(location.strip()))
     clause, extra = _tab_clause(tab, closed)
     if clause:
         where.append(clause)
@@ -185,9 +189,10 @@ def _where(*, status: list[str] | None = None, tier: list[str] | None = None, sa
 
 def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | None = None,
               safety: list[str] | None = None, category: list[str] | None = None, q: str | None = None,
-              sort: str = DEFAULT_SORT, cursor: str | None = None, limit: int = 100, tab: str | None = None,
-              closed: list[str] | None = None) -> JobsPage:
-    clause, params = _where(status=status, tier=tier, safety=safety, category=category, q=q, tab=tab, closed=closed)
+              location: str | None = None, sort: str = DEFAULT_SORT, cursor: str | None = None, limit: int = 100,
+              tab: str | None = None, closed: list[str] | None = None) -> JobsPage:
+    clause, params = _where(status=status, tier=tier, safety=safety, category=category, q=q, location=location,
+                            tab=tab, closed=closed)
     try:
         offset = int(cursor) if cursor else 0
     except ValueError:
@@ -202,10 +207,10 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
 
 
-def tabs(ix: Any, closed: list[str], q: str | None = None) -> list[JobsTab]:
+def tabs(ix: Any, closed: list[str], q: str | None = None, location: str | None = None) -> list[JobsTab]:
     out: list[JobsTab] = []
     for key, label in TABS:
-        clause, params = _where(q=q, tab=key, closed=closed)
+        clause, params = _where(q=q, location=location, tab=key, closed=closed)
         out.append({"key": key, "label": label, "count": ix.query(f"SELECT COUNT(*) AS n FROM jobs{clause}", params)[0]["n"]})
     return out
 
