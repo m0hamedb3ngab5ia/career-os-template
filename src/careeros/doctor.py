@@ -50,7 +50,9 @@ STANDARD_KEYS = (
 IDENTITY_KEYS = ("name", "email", "phone", "linkedin", "github")
 ENTRY_SECTIONS = ("experience", "projects", "education", "leadership")
 MARKER_RE = re.compile(r"#\s*(INSERT\b|EDIT\b)")
-BULLET_FLAGS = ("resume_default", "weak", "estimate")   # optional per-bullet booleans (resume_writing_rules.md)
+BULLET_FLAGS = ("resume_default", "weak", "estimate", "resume_pin")   # optional per-bullet booleans (resume_writing_rules.md)
+MAX_PINS_PER_ENTRY = 2      # resume_pin bullets per entry (one-page budget; tailor-resume grows the budget to the pin count)
+MAX_PINNED_PROJECTS = 2     # projects with a pin (each is always picked, even past the 3-project cap)
 EXAMPLE_EMAIL_RE = re.compile(r"[\w.+-]+@example\.com\b", re.I)
 
 
@@ -166,6 +168,30 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
         for e in m.get(sec) or []:
             for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
                 need(isinstance(b, dict) and isinstance(b.get("text"), str), f"profile/master.yaml: bullet {b.get('id') if isinstance(b, dict) else b} needs text")
+    for e in m.get("projects") or []:
+        links = e.get("links") if isinstance(e, dict) else None
+        if links is not None:
+            need(isinstance(links, list) and all(isinstance(l, dict) and isinstance(l.get("label"), str)
+                                                 and l["label"].strip() and isinstance(l.get("url"), str)
+                                                 and l["url"].strip().startswith(("http://", "https://"))
+                                                 for l in links),
+                 f"profile/master.yaml: {e.get('id')}.links must be a list of {{label, url}} with a non-empty "
+                 "label and an http(s):// url")
+    # resume_pin cardinality: pins always make the page (tailor-resume grows the bullet budget and the
+    # 3-project cap to fit them), so too many pins break the one-page budget before the fit loop can help
+    pinned_projects = 0
+    for sec in ("experience", "projects", "leadership"):
+        for e in m.get(sec) or []:
+            pins = [b for b in (e.get("bullets") or []) if isinstance(b, dict) and b.get("resume_pin") is True] \
+                if isinstance(e, dict) else []
+            need(len(pins) <= MAX_PINS_PER_ENTRY,
+                 f"profile/master.yaml: {e.get('id') if isinstance(e, dict) else e} has {len(pins)} resume_pin "
+                 f"bullets (max {MAX_PINS_PER_ENTRY}: pins always make the page, more breaks the one-page budget)")
+            if sec == "projects" and pins:
+                pinned_projects += 1
+    need(pinned_projects <= MAX_PINNED_PROJECTS,
+         f"profile/master.yaml: {pinned_projects} projects carry a resume_pin bullet (max {MAX_PINNED_PROJECTS}: "
+         "a pinned project is always picked, more breaks the one-page budget)")
     for sec in ("experience", "projects", "leadership"):
         for e in m.get(sec) or []:
             for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
