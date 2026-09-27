@@ -460,6 +460,8 @@ SECTIONS: tuple[Section, ...] = (
             _tags(P, "runs.required_mcp_servers", "Required MCP servers", [],
                   help="Servers every run needs logged in. Inbox sync carries its own gmail."),
             _num(P, "runs.job_lock_minutes", "Job lock expires after", 120, lo=1, unit="min"),
+            _switch(P, "runs.scout_waits_for_batch", "Scout and prune wait for a running batch", True),
+            _num(P, "runs.lock_wait_s", "Wait at most", 300, lo=0, unit="s"),
             MANUAL_LOCK,
         )),
         Group("tools", "Allowed tools", (

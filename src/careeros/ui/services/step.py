@@ -4,6 +4,8 @@
 restart) and records it like a batch: data/runs/<id>/run.json (kind scout|tracker|prune, trigger manual) + run.log,
 so Runs › History shows it. The work itself is the scheduler's (`tick.default_actions`) or the CLI's
 (`tracker.sync_all`); nothing is reimplemented. One step of a kind at a time: data/runs/step-<kind>.lock.
+Scout and prune also hold the pipeline lock (data/runs/runner.lock, owner step:<id>, `locks.pipeline_lock`), so
+they never overlap a batch; the tracker sync writes atomically per op and may run beside one.
 Inbox sync is a headless skill call; `service.run_skill` records its own run and holds the runner lock.
 The step's stdout/stderr lines go to its run.log, so the Runs log tail streams them.
 SIGTERM (the UI's Cancel) ends the step with stop reason `cancelled`.
@@ -27,6 +29,7 @@ from careeros.ui.services.runs import Busy
 
 STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync")
 LOCK_TTL_S = 3 * 3600  # a dead pid frees it sooner
+PIPELINE_STEPS = ("scout", "prune")  # steps that also take the pipeline lock (never beside a batch)
 
 
 class StepBusy(Busy):
@@ -89,6 +92,13 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
                            now=start, note=kind)
     except locks.LockBusy as e:
         raise StepBusy(e.holder) from None
+    pipe = locks.pipeline_lock(settings, f"step:{rid}", note=kind, wait_s=0) if kind in PIPELINE_STEPS else None
+    try:
+        if pipe is not None:
+            pipe.__enter__()
+    except locks.LockBusy as e:
+        locks.release(step_lock_path(rs, kind), lk.token)
+        raise Busy(e.holder) from None
     run = rs.new_run(kind, "manual", {}, start, run_id=rid, step=True)
     rs.log(rid, f"start {kind}")
     status, stop, detail = "done", "completed", ""
@@ -110,6 +120,8 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
                    duration_s=round((end - start).total_seconds(), 1))
         rs.save_run(run)
         rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
+        if pipe is not None:
+            pipe.__exit__(None, None, None)
         locks.release(step_lock_path(rs, kind), lk.token)
     return run
 
@@ -146,7 +158,7 @@ def main(argv: list[str] | None = None) -> int:
         signal.signal(signal.SIGTERM, _raise_interrupt)
         try:
             rec = run_step(settings, args.kind)
-        except StepBusy as e:
+        except Busy as e:  # StepBusy, or a batch holds the pipeline lock
             print(str(e), file=sys.stderr)
             return 5
     print(rec["id"])

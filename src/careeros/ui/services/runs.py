@@ -245,9 +245,13 @@ class RunControl:
                                "skill is finished and Gmail is logged in")
             self._check_can_start()  # a headless skill call: the runner lock and pause apply
         else:
+            from careeros.ui.services.step import PIPELINE_STEPS
+
             held = self._held(step_lock_path(self.rs, kind))
             if held:
                 raise Busy(held, f"a {kind} step is already running")
+            if kind in PIPELINE_STEPS and (held := self._held(self.rs.runner_lock_path)):
+                raise Busy(held)  # scout / prune never run beside a batch (the shared pipeline lock)
         return {"kind": kind, **self._spawn(kind, ["careeros.ui.services.step", kind])}
 
     def prune_plan(self) -> dict[str, Any]:
@@ -348,11 +352,18 @@ class RunControl:
         return out
 
     def current(self) -> dict[str, Any] | None:
-        """The running batch: budget used, the job in flight (from its job lock) and the finished attempts."""
+        """The running batch: budget used, the job in flight (from its job lock) and the finished attempts. Also a
+        running step (scout, tracker, prune: its run record) or an unrecorded pipeline-lock holder (`careeros
+        scout|prune`, the scheduler's scout/prune): kind, started_at and the holder's pid, nothing else."""
         rid, held = self._holder_of(None)
         run = self.rs.load_run(rid) if rid else None
+        if not run and held is None:
+            run, held = self._running_step()
+        if not run and held is not None and str(held.get("owner", "")).partition(":")[0] != "run":
+            return self._holder_only(held)
         if not run:
             return None
+        rid = run["id"]
         b = run.get("budget") or {}
         started = _parse_dt(run.get("started_at"))
         minutes = round((self.now() - started).total_seconds() / 60, 1) if started else None
@@ -368,6 +379,27 @@ class RunControl:
                 "used": {"jobs": (run.get("counters") or {}).get("attempted", 0), "max_jobs": b.get("max_jobs"),
                          "minutes": minutes, "max_minutes": b.get("max_minutes")},
                 "attempts": self.rs.load_attempts(rid)}
+
+    def _running_step(self) -> tuple[dict[str, Any] | None, dict[str, Any] | None]:
+        from careeros.ui.services.step import step_lock_path
+
+        for kind in ("scout", "tracker", "prune"):
+            held = self._held(step_lock_path(self.rs, kind))
+            owner, _, rid = str((held or {}).get("owner", "")).partition(":")
+            if held and owner == "step" and (run := self.rs.load_run(rid)):
+                return run, held
+        return None, None
+
+    def _holder_only(self, held: dict[str, Any]) -> dict[str, Any]:
+        owner = str(held.get("owner", ""))
+        kind = str(held.get("note") or owner.partition(":")[2] or owner).split(" ")[0]
+        started = _parse_dt(held.get("acquired_at"))
+        minutes = round((self.now() - started).total_seconds() / 60, 1) if started else None
+        return {"id": owner, "kind": kind, "trigger": owner.partition(":")[0], "status": "running",
+                "state": "running", "step": True, "stop_reason": None, "detail": "", "budget": {}, "counters": {},
+                "started_at": held.get("acquired_at"), "ended_at": None, "duration_s": None, "pid": held.get("pid"),
+                "holder": held, "current_job": None,
+                "used": {"jobs": 0, "max_jobs": None, "minutes": minutes, "max_minutes": None}, "attempts": []}
 
     def history(self, kind: str | None = None, limit: int = 50, cursor: str | None = None) -> dict[str, Any]:
         """Past and running runs, newest first. `cursor` = the last id of the previous page."""

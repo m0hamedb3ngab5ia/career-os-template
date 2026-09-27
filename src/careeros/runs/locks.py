@@ -8,12 +8,20 @@ check-and-takeover runs under a short `flock` on `<lock>.guard`, so two processe
 A lock taken from the CLI (`careeros job lock`) has no pid (the CLI exits at once), so only its expiry frees it.
 The runner's locks carry its pid. The same token re-acquires a lock without changing it (`reentrant`): a skill
 run by the runner sees the runner's job lock through `CAREEROS_LOCK_TOKEN`.
+
+`data/runs/runner.lock` is the one pipeline lock: batches and headless skill runs (owner `run:<id>`), scout and
+prune from the CLI (`cli:<kind>`), the scheduler (`schedule:<kind>`, `catch_up:<kind>`) and UI steps
+(`step:<id>`) all take it, so a prune never deletes a job folder a batch is preparing and a scout never writes
+while a batch reads. `pipeline_lock` is the helper for everything that is not a batch: it waits up to
+`runs.lock_wait_s` while a batch holds the lock (`runs.scout_waits_for_batch`, Recommended) or refuses at once,
+and raises `PipelineBusy`. A batch that finds the lock held raises `RunBusy` (the UI answers 409).
 """
 from __future__ import annotations
 
 import json
 import os
 import socket
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -185,3 +193,67 @@ def refresh(path: Path, token: str, ttl_seconds: float, now: datetime | None = N
 @contextmanager
 def _nullctx() -> Iterator[None]:
     yield
+
+
+class PipelineBusy(LockBusy):
+    """The pipeline lock stayed held (by a batch, a scout, a prune...) for the whole wait."""
+
+    def __init__(self, path: Path, holder: dict[str, Any], waited_s: float = 0.0):
+        super().__init__(path, holder)
+        self.waited_s = waited_s
+        waited = f"; waited {waited_s:.0f}s" if waited_s else ""
+        RuntimeError.__init__(self, f"the pipeline is busy: {holder.get('owner')} ({holder.get('note') or '-'}, "
+                                    f"pid {holder.get('pid')}, since {holder.get('acquired_at')}){waited}; "
+                                    "try again when it finishes")
+
+
+PIPELINE_TTL_S = 6 * 3600  # scout/prune/steps are short; a dead pid frees the lock sooner
+_HELD: dict[str, str] = {}  # pipeline lock path -> token held by this process (nested use is reentrant)
+
+
+def acquire_waiting(path: Path, owner: str, ttl_seconds: float, *, wait_s: float = 0.0, poll_s: float = 1.0,
+                    sleep: Callable[[float], None] = time.sleep, clock: Callable[[], float] = time.monotonic,
+                    **kw: Any) -> Lock:
+    """`acquire`, retried every `poll_s` for up to `wait_s` seconds; PipelineBusy when still held."""
+    start = clock()
+    while True:
+        try:
+            return acquire(path, owner, ttl_seconds, **kw)
+        except LockBusy as e:
+            waited = clock() - start
+            if waited >= wait_s:
+                raise PipelineBusy(e.path, e.holder, waited) from None
+            sleep(min(poll_s, wait_s - waited))
+
+
+def pipeline_wait_s(settings: Any) -> float:
+    """runs.lock_wait_s when runs.scout_waits_for_batch (Recommended), else 0 (refuse at once)."""
+    from careeros.runs.config import load_runs_config
+
+    cfg = load_runs_config(settings)
+    return float(cfg.lock_wait_s) if cfg.scout_waits_for_batch else 0.0
+
+
+@contextmanager
+def pipeline_lock(settings: Any, owner: str, *, note: str = "", wait_s: float | None = None, poll_s: float = 1.0,
+                  ttl_seconds: float = PIPELINE_TTL_S, sleep: Callable[[float], None] = time.sleep,
+                  clock: Callable[[], float] = time.monotonic,
+                  pid_alive: Callable[[int], bool] = pid_alive) -> Iterator[Lock]:
+    """Hold data/runs/runner.lock for scout / prune / a UI step. `wait_s` None = from config (pipeline_wait_s).
+    Nested use in one process (a UI step calling the scheduler's scout) re-enters the outer lock."""
+    from careeros.runs.store import RunStore
+
+    path = RunStore(settings).runner_lock_path
+    key = str(path)
+    wait = pipeline_wait_s(settings) if wait_s is None else wait_s
+    lk = acquire_waiting(path, owner, ttl_seconds, wait_s=wait, poll_s=poll_s, sleep=sleep, clock=clock,
+                         token=_HELD.get(key), pid=os.getpid(), note=note, pid_alive=pid_alive)
+    if lk.reentrant:
+        yield lk
+        return
+    _HELD[key] = lk.token
+    try:
+        yield lk
+    finally:
+        _HELD.pop(key, None)
+        release(path, lk.token)

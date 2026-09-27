@@ -91,6 +91,9 @@ runs:                                      # reusable default: fine to keep. `ca
   required_mcp_servers: []                 # MCP servers a run needs logged in (e.g. [gmail] for inbox work);
                                            # one reported needs-auth stops the run with auth_required
   job_lock_minutes: 120                     # 120 (Recommended): a `careeros job lock` taken by a skill expires after this
+  scout_waits_for_batch: true              # true (Recommended): scout / prune started while a batch runs wait for it
+                                           # (up to lock_wait_s), then refuse | false: refuse at once
+  lock_wait_s: 300                         # 300 (Recommended): how long scout / prune wait for a running batch
   on_usage_limit: stop                     # stop (Recommended): the run stops and the next scheduled run tries again |
                                            # pause: stop and pause all runs until `careeros run resume`
   retry:
