@@ -21,6 +21,7 @@ import os
 import threading
 import time
 import uuid
+import warnings
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -320,12 +321,17 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                               note=f"{kind} ({trigger})")
     except locks.LockBusy as e:
         raise RunBusy(e.holder) from None
-    run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False,
-                     cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>"),
-                     counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0,
-                               "gated": 0},
-                     queue=[{k: r[k] for k in ("job_id", "rank", "score", "why")} for r in ranked[:budget.max_jobs]])
-    rs.log(rid, f"start {kind} ({trigger}) budget={budget.to_dict()} candidates={len(ranked)}")
+    try:
+        run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False,
+                         cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>"),
+                         counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0,
+                                   "gated": 0},
+                         queue=[{k: r[k] for k in ("job_id", "rank", "score", "why")}
+                                for r in ranked[:budget.max_jobs]])
+        rs.log(rid, f"start {kind} ({trigger}) budget={budget.to_dict()} candidates={len(ranked)}")
+    except BaseException:
+        locks.release(rs.runner_lock_path, glock.token)
+        raise
     loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt)
     loop.lock_token, loop.lock_ttl = glock.token, ttl
     status = "done"
@@ -346,11 +352,35 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
         end = now()
         run.update(status=status, stop_reason=stop, detail=detail, ended_at=iso(end),
                    duration_s=round((end - t_now).total_seconds(), 1))
-        rs.save_run(run)
-        rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
-        try:
-            if finalize is not None:
-                finalize(run)
-        finally:
-            locks.release(rs.runner_lock_path, glock.token)
+        close_run(rs, run, finalize, lambda: locks.release(rs.runner_lock_path, glock.token))
     return run
+
+
+def close_run(rs: RunStore, run: dict[str, Any], finalize: Callable[[dict[str, Any]], None] | None,
+              release: Callable[[], None]) -> None:
+    """Run teardown: save run.json, log the stop, run `finalize(run)` (e.g. the usage-limit pause), then
+    `release()` the runner lock, which always happens. Each step runs even if an earlier one raised. After a
+    failed run (status "failed", its error in flight) teardown errors are logged, not raised, so they never
+    mask the run's own error; after a good run the first teardown error surfaces."""
+    rid, stop, detail = run["id"], run.get("stop_reason"), run.get("detail")
+    steps: list[tuple[str, Callable[[], Any]]] = [
+        ("save run.json", lambda: rs.save_run(run)),
+        ("log", lambda: rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))),
+    ]
+    if finalize is not None:
+        steps.append(("finalize", lambda: finalize(run)))
+    first: BaseException | None = None
+    try:
+        for name, step in steps:
+            try:
+                step()
+            except Exception as e:  # noqa: BLE001 - keep tearing down; decide below what surfaces
+                first = first or e
+                try:
+                    rs.log(rid, f"teardown {name} failed: {type(e).__name__}: {e}"[:500])
+                except Exception:  # noqa: BLE001 - run.log unwritable: say it on stderr instead of losing it
+                    warnings.warn(f"run {rid}: teardown {name} failed: {type(e).__name__}: {e}", stacklevel=2)
+    finally:
+        release()
+    if first is not None and run.get("status") != "failed":
+        raise first

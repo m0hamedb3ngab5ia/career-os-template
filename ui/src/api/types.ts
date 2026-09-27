@@ -1,29 +1,12 @@
-// Hand-written minimal API types for the shell, matching src/careeros/ui/services/status.py on feat/ui-server.
-// TODO(slice 1 merge): replace with types generated from the FastAPI OpenAPI schema (openapi-typescript),
-// committed and checked for drift in CI.
+// API types for the shell, generated from the FastAPI OpenAPI schema (ui/openapi.json → src/api/schema.gen.ts).
+// Regenerate after a backend change: `python -m careeros.ui.openapi > ui/openapi.json && npm run gen:api`
+// (docs/UI.md). Endpoints still returning an untyped dict keep hand-written types in src/features/*/types.ts.
+import type { components } from "./schema.gen";
 
-export interface StatusSummary {
-  now?: string;
-  counts?: {
-    jobs?: number;
-    action_items_open?: number;
-    inbox?: number;
-    contacts?: number;
-  };
-  index?: {
-    /** ISO time of the last completed (re)index. */
-    indexed_at?: string | null;
-  };
-}
+type Schemas = components["schemas"];
 
-/** GET /api/meta (src/careeros/ui/services/meta.py): every code the UI renders, plus the ui settings. */
-export interface Meta {
-  statuses: string[];
-  tiers: string[];
-  priorities: string[];
-  action_types: string[];
-  action_needs: string[];
-  safety_verdicts: string[];
-  pipeline: { columns: { name: string; statuses: string[] }[]; closed: string[]; card_limit: number };
-  ui: { theme: string; undo_seconds: number; page_size: number; due_soon_hours: number };
-}
+/** GET /api/status (src/careeros/ui/services/status.py: Status). */
+export type StatusSummary = Schemas["Status"];
+
+/** GET /api/meta (src/careeros/ui/services/meta.py: Meta): every code the UI renders, plus the ui settings. */
+export type Meta = Schemas["Meta"];

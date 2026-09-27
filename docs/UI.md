@@ -54,6 +54,26 @@ write through an Excel lock. Until then, UI writes go through `Tracker` and inhe
 UI writes always go through the existing APIs (`Store.set_status`, `Tracker.set_status`, `Tracker.mark_action_done`,
 `careeros outreach mark`, …), then the indexer picks up the changed files. The UI never edits JSON directly.
 
+### API types (generated)
+
+The frontend's API types come from FastAPI's OpenAPI schema, not from hand-written copies. A route gets a shape by
+annotating its service function with a `TypedDict` (`NotRequired[...]` for keys the backend may leave out); routes
+that still return `dict[str, Any]` keep hand-written types in `ui/src/features/*/types.ts`, as do SSE payloads.
+After changing a response shape, regenerate and commit both files:
+
+```bash
+.venv/bin/python -m careeros.ui.openapi > ui/openapi.json   # sorted keys, no machine-specific values
+cd ui && npm run gen:api                                     # openapi.json -> src/api/schema.gen.ts
+```
+
+A FastAPI or pydantic bump (`fastapi` is pinned to one minor in the `ui` extra) also requires regenerating both files.
+
+`tests/integration/test_ui_openapi_integration.py` fails when `ui/openapi.json` is stale, and CI fails when
+`schema.gen.ts` differs from a fresh `npm run gen:api`. Use the generated types through aliases
+(`components["schemas"]["Status"]`) in `ui/src/api/types.ts`. A `TypedDict` return filters the response to its
+listed keys, so snapshot the endpoint's JSON first (`tests/fixtures/ui_snapshots/`, refresh with
+`CAREEROS_UPDATE_SNAPSHOTS=1`) to prove no key is dropped.
+
 ## Live updates
 
 A file watcher (`watchfiles`) on `data/jobs/**`, `data/runs/**`, `data/*.json|yaml` and the tracker path re-indexes the changed job
@@ -290,6 +310,42 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
 - Tests (repo rule, tests first): unit tests for the indexer, settings round-trip (comments preserved, invalid
   values rolled back), `RESULT:` parsing; integration tests that start the app with a temp root and drive the API.
 - Also needed before the Inbox & follow-ups screen is fully live: the follow-up scheduler (backlog P4).
+
+## Performance baseline
+
+A one-off measurement (not a CI suite) with `scripts/ui_perf.py`. Synthetic root: 5,000 fictional jobs
+(realistic status mix, 1,350 `contacts.json`, 623 `outreach.json`, 40 runs, tracker via `careeros.tracker`);
+Apple M4, 24 GB, Python 3.14, 2026-09. Screens are the median of 5 GETs of the first page through FastAPI's
+TestClient (no network, no browser render).
+
+| Step | Time | Limit |
+|---|---|---|
+| Full reindex (fresh `careeros.db`) | 1.75 s | 30 s |
+| `GET /api/jobs` | 2 ms | 1 s |
+| `GET /api/pipeline` | 3 ms | 1 s |
+| `GET /api/today` | 454 ms | 1 s |
+| `GET /api/contacts` | 55 ms | 1 s |
+| `GET /api/inbox` | 51 ms | 1 s |
+| `GET /api/runs` | 2 ms | 1 s |
+| 200 job files changed: real watcher until the index shows all | 0.66 s | 5 s |
+| 200 job files changed: `Watcher.handle` alone | 0.10 s | 5 s |
+
+Nothing crosses a limit. `/api/today` grows fastest: its prepare queue uses the runner's own candidate selection
+(`runs.runner.select_candidates`), which reads every job's files from disk rather than the index, so it is linear
+in the number of job folders. Worth moving onto the index if job counts grow well past 5,000.
+
+Re-run (the index goes to `--index` or a temp file, never the root's `data/`):
+
+```bash
+PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --synth 5000 --out /tmp/cos-perf   # fictional root
+PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --root /tmp/cos-perf              # timings + watcher burst
+PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --root . --index /tmp/real.db     # own data, read-only
+```
+
+The watcher burst rewrites 200 `status.json` files, so it only runs when `--root` is a `--synth` output: `--synth`
+marks its root with a `.ui-perf-synthetic` file, and the burst is skipped (with a printed note) unless that marker
+is present at `--root`. Running against real data (like the last command above) is safe by default. `--no-burst`
+still force-skips the burst explicitly; it's otherwise a no-op alias now that the marker guards real data.
 
 ## HIG notes
 

@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any
 
+from typing_extensions import TypedDict
+
 from careeros.models import ACTION_NEEDS, ACTION_TYPES
 from careeros.runs.config import PRESET_NAMES, RECOMMENDED_PRESET, load_runs_config
 from careeros.runs.runner import CLEAN_STOPS, STOP_REASONS
@@ -16,7 +18,48 @@ SAFETY_VERDICTS = ["pass", "review", "block", "skip"]
 EXTRA_STOPS = ["error"]
 
 
-def meta(settings: Any) -> dict[str, Any]:
+# Response shapes: FastAPI turns these into the OpenAPI schema that ui/src/api/schema.gen.ts is generated from.
+class Presets(TypedDict):
+    names: list[str]
+    values: dict[str, dict[str, int]]
+    recommended: str
+    current: str
+
+
+class ColumnConfig(TypedDict):
+    name: str
+    statuses: list[str]
+
+
+class PipelineConfig(TypedDict):
+    columns: list[ColumnConfig]
+    closed: list[str]
+    card_limit: int
+
+
+class UiSettings(TypedDict):
+    theme: str
+    undo_seconds: int
+    page_size: int
+    due_soon_hours: int
+    pause_until_tomorrow_at: str
+
+
+class Meta(TypedDict):
+    statuses: list[str]
+    tiers: list[str]
+    priorities: list[str]
+    action_types: list[str]
+    action_needs: list[str]
+    safety_verdicts: list[str]
+    stop_reasons: list[str]
+    clean_stops: list[str]
+    presets: Presets
+    pipeline: PipelineConfig
+    ui: UiSettings
+
+
+def meta(settings: Any) -> Meta:
     ui = load_ui_config(settings)
     runs = load_runs_config(settings)
     return {
