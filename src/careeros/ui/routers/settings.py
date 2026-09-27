@@ -3,7 +3,7 @@ back on any error), "Reset to recommended" proposals and the Runs page's ranking
 careeros.ui.services.settings_io / settings_page."""
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
@@ -31,17 +31,17 @@ def _invalid(e: settings_io.SettingsInvalid) -> JSONResponse:
 
 
 @router.get("/settings")
-def sections() -> dict[str, Any]:
+def sections() -> page.SectionList:
     return {"sections": page.section_list()}
 
 
 @router.get("/settings/{section}")
-def read(section: str, c=Depends(ctx)) -> dict[str, Any]:
+def read(section: str, c=Depends(ctx)) -> page.SectionData:
     try:
         out = settings_io.read_section(c.settings, section)
     except KeyError:
         raise HTTPException(404, f"no settings section {section!r}") from None
-    return {**out, "files": page.relative_files(out["files"], c.settings.root)}
+    return cast(page.SectionData, {**out, "files": page.relative_files(out["files"], c.settings.root)})
 
 
 @router.post("/settings/runs/ranking-preview")

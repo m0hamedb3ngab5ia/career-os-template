@@ -14,6 +14,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any
 
+from typing_extensions import NotRequired, TypedDict
+
 from careeros.ui.config import load_ui_config
 from careeros.ui.services.jobs import job_dir_for
 from careeros.ui.services.status import POST_APPLY
@@ -28,6 +30,95 @@ _FOLLOWUP, _PARENT_SENT = "_ui_followup", "_ui_parent_sent"  # internal markers 
 SYNC_OFF = "Inbox sync isn't set up yet"
 SYNC_NO_BUTTON = "Inbox sync runs on its schedule; starting it from here isn't built yet"
 SENDING_OFF = "Follow-up sending isn't built yet"
+
+
+# Response shapes (GET /api/inbox, /api/inbox/{job_id}; InboxDraft also in /api/contacts): FastAPI turns these into
+# the OpenAPI schema behind ui/src/api/schema.gen.ts. "class" / "from" are Python keywords: functional syntax.
+InboxEmail = TypedDict("InboxEmail", {"at": str | None, "class": str, "from": str, "status": str,
+                                      "link": str | None})
+
+
+class InboxNext(TypedDict):
+    kind: str
+    due: str | None
+    mode: str
+
+
+class InboxAvailability(TypedDict):
+    available: bool
+    reason: str
+
+
+class InboxDraft(TypedDict):
+    contact: str
+    role: str
+    kind: str
+    channel: str
+    to: str | None
+    verified: bool
+    subject: str | None
+    body: str
+    linkedin_note: str | None
+    linkedin_message: str | None
+    manual_tailor: bool
+    manual_reason: str | None
+    sent: bool
+    sent_by: str | None
+    sent_date: str | None
+    mode: str
+    followup: bool
+    due: str | None
+    placeholders: list[str]
+    words: int
+
+
+class InboxRow(TypedDict):
+    job_id: str
+    company: str | None
+    title: str | None
+    status: str
+    tier: str | None
+    applied_at: str | None
+    updated_at: str | None
+    days_since_applied: int | None
+    last_email: InboxEmail | None
+    next: InboxNext
+    drafts: int
+    placeholders: int
+
+
+class InboxPage(TypedDict):
+    items: list[InboxRow]
+    last_sync: str | None
+    sync: InboxAvailability
+    sending: InboxAvailability
+
+
+# one thread entry; `type` says which keys it has: status (status, note), email (class, from, link, status),
+# pending_update (status, note), sent (contact, kind, sent_by)
+InboxThreadEvent = TypedDict("InboxThreadEvent", {
+    "at": str, "type": str, "status": NotRequired[str | None], "note": NotRequired[str | None],
+    "class": NotRequired[str], "from": NotRequired[str], "link": NotRequired[str | None],
+    "contact": NotRequired[str], "kind": NotRequired[str], "sent_by": NotRequired[str | None]})
+
+
+class InboxDetail(TypedDict):
+    job_id: str
+    company: str | None
+    title: str | None
+    status: str
+    tier: str | None
+    applied_at: str | None
+    updated_at: str | None
+    days_since_applied: int | None
+    last_email: InboxEmail | None
+    next: InboxNext
+    drafts: list[InboxDraft]  # the drafts themselves here, the count in InboxRow
+    placeholders: int
+    thread: list[InboxThreadEvent]
+    primary: int | None
+    sync: InboxAvailability
+    sending: InboxAvailability
 
 
 def placeholders(text: str | None) -> list[str]:
@@ -134,8 +225,8 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         "channel": channel, "to": to, "verified": verified,
         "subject": subject, "body": body, "linkedin_note": linkedin_note,
         "linkedin_message": linkedin_message, "manual_tailor": manual,
-        "manual_reason": manual_reason, "sent": bool(d.get("sent")), "sent_by": d.get("sent_by"),
-        "sent_date": d.get("sent_date"), "mode": mode, "followup": followup, "due": due, "placeholders": ph, "words": _words(body),
+        "manual_reason": manual_reason, "sent": bool(d.get("sent")), "sent_by": _str(d.get("sent_by")),
+        "sent_date": _str(d.get("sent_date")), "mode": mode, "followup": followup, "due": due, "placeholders": ph, "words": _words(body),
     }
 
 
@@ -305,7 +396,7 @@ def _sort_key(r: dict[str, Any]) -> tuple:
     return (due is None, due.timestamp() if due else 0, -(applied.timestamp() if applied else 0), r["company"] or "")
 
 
-def list_inbox(settings: Any, ix: Any, now: datetime) -> dict[str, Any]:
+def list_inbox(settings: Any, ix: Any, now: datetime) -> InboxPage:
     cfg = load_ui_config(settings)
     jobs = ix.query(f"SELECT job_id, company, title, status, tier, applied_at, updated_at FROM jobs "
                     f"WHERE status IN ({','.join('?' * len(POST_APPLY))})", POST_APPLY)
@@ -319,12 +410,13 @@ def _pending_updates(settings: Any, job_id: str) -> list[dict[str, Any]]:
     out = []
     for u in got if isinstance(got, list) else []:
         if isinstance(u, dict) and u.get("job_id") == job_id and not u.get("applied"):
-            out.append({"at": _iso(_parse(u.get("date"))), "type": "pending_update", "status": u.get("status"),
-                        "note": u.get("note")})
+            out.append({"at": _iso(_parse(u.get("date"))), "type": "pending_update",
+                        "status": u.get("status") if isinstance(u.get("status"), str) else None,
+                        "note": u.get("note") if isinstance(u.get("note"), str) else None})
     return out
 
 
-def inbox_detail(settings: Any, ix: Any, job_id: str, now: datetime) -> dict[str, Any] | None:
+def inbox_detail(settings: Any, ix: Any, job_id: str, now: datetime) -> InboxDetail | None:
     """One job's thread (status changes, classified emails, pending sync updates, sends) newest first, and its
     drafts. Any job with a posting answers (the Job detail screen reuses it); unknown ids are None."""
     if job_dir_for(settings, job_id) is None:

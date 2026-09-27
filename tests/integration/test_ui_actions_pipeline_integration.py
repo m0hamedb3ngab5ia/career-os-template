@@ -272,3 +272,17 @@ def test_config_write_sends_one_changed_event_with_the_watcher(env, data):
     companies.write_text(companies.read_text() + "\n# edited by hand\n")
     assert w.handle([companies])["config"] is True
     assert len(spy.sent) == n + 2
+
+
+def test_block_company_while_another_config_write_holds_the_lock_is_409(env, data, monkeypatch):
+    from careeros.runs import locks
+
+    c, _ = env
+    s, scam = data["settings"], data["scam"]
+    companies = s.root / "config" / "companies.yaml"
+    before = companies.read_text()
+    monkeypatch.setattr(locks, "CONFIG_LOCK_TIMEOUT_S", 0.2)
+    with locks.config_lock(s.root):
+        r = c.post(f"/api/actions/{scam['action_id']}/block-company", headers=W)
+    assert r.status_code == 409 and companies.read_text() == before
+    assert scam["action_id"] in _items(c.get("/api/actions").json())  # not marked done

@@ -2,7 +2,7 @@ import type { Draft } from "./types";
 
 // Fictional drafts in the server's shape (tests only).
 export function draft(over: Partial<Draft> = {}): Draft {
-  return {
+  const base: Draft = {
     contact: "Dana Cruz",
     role: "recruiter",
     kind: "post_apply_outreach",
@@ -17,11 +17,14 @@ export function draft(over: Partial<Draft> = {}): Draft {
     manual_reason: null,
     sent: false,
     sent_by: null,
+    sent_date: null,
     mode: "verified_email",
     placeholders: ["[SPECIFIC CONNECTION]", "[MOST RELEVANT EXPERIENCE]"],
     words: 14,
-    ...over,
+    followup: false,
+    due: null,
   };
+  return Object.assign(base, over);
 }
 
 export const linkedinDraft = (over: Partial<Draft> = {}) =>

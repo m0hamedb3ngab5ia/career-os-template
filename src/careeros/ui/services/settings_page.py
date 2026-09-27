@@ -9,7 +9,9 @@ from __future__ import annotations
 from dataclasses import replace
 from datetime import datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Union
+
+from typing_extensions import TypedDict
 
 from careeros.ui.services.settings_io import SettingsInvalid
 from careeros.ui.settings_schema import SECTIONS
@@ -17,7 +19,83 @@ from careeros.ui.settings_schema import SECTIONS
 PREVIEW_KINDS = ("score", "prepare")
 
 
-def section_list() -> list[dict[str, Any]]:
+
+# Response shapes of GET /api/settings and GET /api/settings/{section} (settings_schema/model.py to_dict and
+# settings_io.read_section), typed for ui/openapi.json -> ui/src/api/schema.gen.ts. Numbers that can be int or
+# float are `int | float` so ints stay ints on the wire.
+class SectionSummary(TypedDict):
+    id: str
+    title: str
+    help: str
+    files: list[str]
+
+
+class SectionList(TypedDict):
+    sections: list[SectionSummary]
+
+
+class FieldSchema(TypedDict):
+    id: str
+    file: str
+    key: str
+    control: str
+    label: str
+    help: str
+    default: Any
+    recommended: bool
+    personal: bool
+    options: list[Any]
+    strict_options: bool
+    min: Union[int, float, None]
+    max: Union[int, float, None]
+    step: Union[int, float, None]
+    integer: bool
+    nullable: bool
+    unit: str
+    locked: bool
+    readonly: bool
+    note: str
+
+
+class PolicyItem(TypedDict):
+    """A locked row: a rule the code enforces whatever the config says."""
+    control: Literal["policy"]
+    label: str
+    value: str
+    why: str
+    locked: Literal[True]
+
+
+class GroupSchema(TypedDict):
+    id: str
+    title: str
+    help: str
+    items: list[Union[PolicyItem, FieldSchema]]
+
+
+class SectionSchema(TypedDict):
+    id: str
+    title: str
+    help: str
+    files: list[str]
+    groups: list[GroupSchema]
+
+
+class UnquotedWarning(TypedDict):
+    message: str
+    intended: Any
+
+
+class SectionData(TypedDict):
+    section: SectionSchema
+    values: dict[str, Any]
+    defaults: dict[str, Any]
+    warnings: dict[str, UnquotedWarning]
+    files: dict[str, str]
+    version: str
+
+
+def section_list() -> list[SectionSummary]:
     return [{"id": s.id, "title": s.title, "help": s.help, "files": s.files()} for s in SECTIONS]
 
 

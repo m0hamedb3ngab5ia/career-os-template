@@ -7,6 +7,7 @@ from typing import Any
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel, Field
 
+from careeros.runs.locks import LockBusy
 from careeros.ui.routers import ctx
 from careeros.ui.services import actions as svc
 from careeros.ui.services.reindex import after_write
@@ -51,11 +52,13 @@ def _run(fn, *args: Any) -> Any:  # noqa: ANN001
         return fn(*args)
     except LookupError as e:
         raise HTTPException(404, str(e).strip("'\"")) from None
+    except LockBusy:
+        raise HTTPException(409, "Another settings save is in progress; try again in a moment.") from None
 
 
 @router.get("/actions")
 def list_actions(tab: str = "open", group: str = "due", sort: str = "soonest", tz: str | None = None,
-                 c=Depends(ctx)) -> dict[str, Any]:
+                 c=Depends(ctx)) -> svc.ActionsPage:
     from careeros.ui.config import load_ui_config
 
     ui = load_ui_config(c.settings)

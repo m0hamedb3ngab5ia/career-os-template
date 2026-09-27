@@ -4,14 +4,16 @@ a recorded step run). Everything goes through RunControl, the same code as the C
 from __future__ import annotations
 
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 
 from careeros.config import ConfigError
+from careeros.runs.locks import LockBusy
 from careeros.ui.routers import ctx
 from careeros.ui.services.runs import Busy, RunControl
+from careeros.ui.services.storage_view import Advice, StorageView
 
 router = APIRouter(tags=["storage"])
 
@@ -33,15 +35,15 @@ def _rc(c: Any) -> Any:
 
 
 @router.get("/storage")
-def storage(c=Depends(ctx)) -> dict[str, Any]:
+def storage(c=Depends(ctx)) -> StorageView:
     from careeros.runs.advisor import load_advisor_config
 
-    return {**_rc(c).storage(), "config": load_advisor_config(c.settings.pipeline)}
+    return cast(StorageView, {**_rc(c).storage(), "config": load_advisor_config(c.settings.pipeline)})
 
 
 @router.get("/advise")
-def advise(c=Depends(ctx)) -> dict[str, Any]:
-    return _rc(c).advise()
+def advise(c=Depends(ctx)) -> Advice:
+    return cast(Advice, _rc(c).advise())
 
 
 @router.post("/advise/{rec_id}/apply")
@@ -54,6 +56,8 @@ def advise_apply(rec_id: str, c=Depends(ctx)) -> dict[str, Any]:
         raise HTTPException(422, str(e)) from None
     except ValueError as e:
         raise HTTPException(409, str(e)) from None
+    except LockBusy:
+        raise HTTPException(409, "Another settings save is in progress; try again in a moment.") from None
     c.reload_settings()
     return out
 

@@ -15,6 +15,10 @@ prune from the CLI (`cli:<kind>`), the scheduler (`schedule:<kind>`, `catch_up:<
 while a batch reads. `pipeline_lock` is the helper for everything that is not a batch: it waits up to
 `runs.lock_wait_s` while a batch holds the lock (`runs.scout_waits_for_batch`, Recommended) or refuses at once,
 and raises `PipelineBusy`. A batch that finds the lock held raises `RunBusy` (the UI answers 409).
+
+`config_lock(root)` is different: a short blocking `flock` on `data/locks/config.lock` that serialises every config
+write (Settings saves, `careeros advise apply`) so a check-then-write never interleaves with another writer. It
+waits up to `CONFIG_LOCK_TIMEOUT_S`, then raises `LockBusy`; the kernel drops it if the holder dies.
 """
 from __future__ import annotations
 
@@ -274,3 +278,37 @@ def pipeline_lock(settings: Any, owner: str, *, note: str = "", wait_s: float | 
     finally:
         held.pop(key, None)
         release(path, lk.token)
+
+
+CONFIG_LOCK_TIMEOUT_S = 10.0
+
+
+def config_lock_path(root: Path) -> Path:
+    """Under data/ (gitignored): never committed."""
+    return Path(root) / "data" / "locks" / "config.lock"
+
+
+@contextmanager
+def config_lock(root: Path, timeout: float | None = None, poll: float = 0.05) -> Iterator[None]:
+    """Hold the config-write lock for the block; wait up to `timeout` (default CONFIG_LOCK_TIMEOUT_S) or raise
+    LockBusy. Not reentrant: take it once around the whole check + write. A no-op where fcntl is unavailable
+    (non-POSIX): writes are then not serialised."""
+    path = config_lock_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if fcntl is None:  # pragma: no cover
+        yield
+        return
+    deadline = time.monotonic() + (CONFIG_LOCK_TIMEOUT_S if timeout is None else timeout)
+    with path.open("a") as fh:
+        while True:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise LockBusy(path, {"owner": "another config write"}) from None
+                time.sleep(poll)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)

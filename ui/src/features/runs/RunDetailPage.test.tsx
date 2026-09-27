@@ -15,7 +15,7 @@ const routes = [
 ];
 
 function detail(over: Partial<RunDetail> = {}): RunDetail {
-  return {
+  const base: RunDetail = {
     id: "r1",
     kind: "score",
     trigger: "manual",
@@ -25,13 +25,15 @@ function detail(over: Partial<RunDetail> = {}): RunDetail {
     started_at: "2026-09-25T01:00:00Z",
     ended_at: null,
     duration_s: null,
+    detail: "",
+    budget: {},
     counters: { attempted: 1, ok: 1 },
     attempts: [
       { n: 1, job_id: "j1", company: "Initech", title: "Platform Engineer", outcome: "ok", duration_s: 60 },
     ].map((a) => ({ ...a, session_id: null, detail: "" })),
     log: "",
-    ...over,
   };
+  return Object.assign(base, over);
 }
 
 let restoreLayout: () => void;

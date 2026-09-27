@@ -1,0 +1,78 @@
+{
+  "attempts": [],
+  "budget": {
+    "max_jobs": 2,
+    "max_minutes": 30,
+    "preset": "small"
+  },
+  "cap": {
+    "applied": 0,
+    "base": 15,
+    "cap": 30,
+    "date": "<date>",
+    "multiplier": 2.0,
+    "reached": false,
+    "remaining": 30
+  },
+  "counters": {
+    "attempted": 0
+  },
+  "current_job": "<job_queued>",
+  "detail": "",
+  "duration_s": null,
+  "ended_at": null,
+  "holder": {
+    "acquired_at": "<acquired_at>",
+    "expires_at": "<expires_at>",
+    "host": "<host>",
+    "note": "prepare",
+    "owner": "run:<run_current>",
+    "pid": "<pid>",
+    "state": "held",
+    "token": "<token>"
+  },
+  "id": "<id>",
+  "jobs": [
+    {
+      "company": "Initech",
+      "detail": "",
+      "duration_s": null,
+      "job_id": "<job_queued>",
+      "outcome": null,
+      "state": "active",
+      "steps": [
+        {
+          "name": "Score",
+          "state": "done"
+        },
+        {
+          "name": "Tailor",
+          "state": "done"
+        },
+        {
+          "name": "Cover",
+          "state": "done"
+        },
+        {
+          "name": "QA",
+          "state": "done"
+        }
+      ],
+      "title": "Platform Engineer"
+    }
+  ],
+  "kind": "prepare",
+  "pid": "<pid>",
+  "scheduled": false,
+  "started_at": "2026-09-24T14:55:00+00:00",
+  "state": "running",
+  "status": "running",
+  "stop_reason": null,
+  "trigger": "manual",
+  "used": {
+    "jobs": 0,
+    "max_jobs": 2,
+    "max_minutes": 30,
+    "minutes": "<minutes>"
+  }
+}

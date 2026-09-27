@@ -1,0 +1,32 @@
+{
+  "bytes": {
+    "other": "<n>",
+    "postings": "<n>",
+    "resumes_pdfs": "<n>",
+    "run_logs": "<n>",
+    "screenshots": "<n>",
+    "tracker": "<n>"
+  },
+  "config": {
+    "advisor": {
+      "advise_after_days": "<n>",
+      "failure_rate_warn": "<n>",
+      "min_runs": "<n>",
+      "prune_idle_weeks": "<n>",
+      "usage_limit_stops": "<n>",
+      "window_days": "<n>"
+    },
+    "storage": {
+      "budget_mb": "<n>",
+      "disk_free_warn_pct": "<n>",
+      "warn_at_pct": "<n>"
+    }
+  },
+  "disk": {
+    "free": "<n>",
+    "free_pct": "<n>",
+    "total": "<n>"
+  },
+  "snapshots": [],
+  "total": "<n>"
+}

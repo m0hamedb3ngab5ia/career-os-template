@@ -1,0 +1,1333 @@
+{
+  "defaults": {
+    "pipeline:llm.allowed_tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(.venv/bin/careeros *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(date *)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "pipeline:runs.auto_submit.allow": [
+      "tier_c",
+      "tier_b"
+    ],
+    "pipeline:runs.auto_submit.enabled": false,
+    "pipeline:runs.auto_submit.manual": [
+      "tier_a",
+      "fit_gte_85"
+    ],
+    "pipeline:runs.custom.max_minutes": 90,
+    "pipeline:runs.custom.max_prepare_jobs": 5,
+    "pipeline:runs.custom.max_score_jobs": 25,
+    "pipeline:runs.job_lock_minutes": 120,
+    "pipeline:runs.job_timeout_minutes.inbox_sync": 20,
+    "pipeline:runs.job_timeout_minutes.prepare": 45,
+    "pipeline:runs.job_timeout_minutes.score": 10,
+    "pipeline:runs.lock_wait_s": 300,
+    "pipeline:runs.max_consecutive_failures": 3,
+    "pipeline:runs.on_usage_limit": "stop",
+    "pipeline:runs.preflight_doctor": true,
+    "pipeline:runs.prepare.stop_at_daily_cap": true,
+    "pipeline:runs.preset": "medium",
+    "pipeline:runs.presets": {
+      "large": {
+        "max_minutes": 180,
+        "max_prepare_jobs": 10,
+        "max_score_jobs": 50
+      },
+      "max": {
+        "max_minutes": 480,
+        "max_prepare_jobs": 25,
+        "max_score_jobs": 150
+      },
+      "medium": {
+        "max_minutes": 90,
+        "max_prepare_jobs": 5,
+        "max_score_jobs": 25
+      },
+      "small": {
+        "max_minutes": 30,
+        "max_prepare_jobs": 2,
+        "max_score_jobs": 10
+      }
+    },
+    "pipeline:runs.ranking.deadline_bonus": 15,
+    "pipeline:runs.ranking.deadline_days": 7,
+    "pipeline:runs.ranking.dream_bonus": 25,
+    "pipeline:runs.ranking.fit_weight": 0.5,
+    "pipeline:runs.ranking.fresh_hours": 48,
+    "pipeline:runs.ranking.freshness_weight": 60,
+    "pipeline:runs.ranking.retry_bonus": 30,
+    "pipeline:runs.ranking.stale_days": 30,
+    "pipeline:runs.required_mcp_servers": [],
+    "pipeline:runs.retry.action_item": true,
+    "pipeline:runs.retry.max_attempts": 2,
+    "pipeline:runs.scout_waits_for_batch": true,
+    "pipeline:runs.stop_on_timeout": true,
+    "pipeline:schedule.jobs.inbox_sync": {
+      "allowed_tools_extra": [
+        "ToolSearch",
+        "mcp__claude_ai_Gmail__search_threads",
+        "mcp__claude_ai_Gmail__get_thread"
+      ],
+      "at": [
+        "08:00",
+        "18:00"
+      ],
+      "enabled": false,
+      "mcp_servers": [
+        "gmail"
+      ]
+    },
+    "pipeline:schedule.jobs.prepare": {
+      "at": [
+        "02:00"
+      ]
+    },
+    "pipeline:schedule.jobs.prune": {
+      "every_days": 7
+    },
+    "pipeline:schedule.jobs.score": {
+      "at": [
+        "01:00"
+      ]
+    },
+    "pipeline:schedule.jobs.scout": {
+      "every_hours": 3
+    },
+    "pipeline:schedule.missed_after_minutes": 60,
+    "pipeline:schedule.missed_runs": "ask",
+    "pipeline:schedule.quiet_hours": {
+      "end": "18:00",
+      "start": "09:00"
+    },
+    "pipeline:schedule.scout_quiet_hours": false,
+    "pipeline:schedule.tick_minutes": 15,
+    "pipeline:schedule.timezone": "local"
+  },
+  "files": {
+    "pipeline": "config/pipeline.yaml"
+  },
+  "section": {
+    "files": [
+      "pipeline"
+    ],
+    "groups": [
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "preset_cards",
+            "default": "medium",
+            "file": "pipeline",
+            "help": "A run stops at whichever limit comes first.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.preset",
+            "label": "Budget",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [
+              "small",
+              "medium",
+              "large",
+              "max",
+              "custom"
+            ],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "key_value",
+            "default": {
+              "large": {
+                "max_minutes": 180,
+                "max_prepare_jobs": 10,
+                "max_score_jobs": 50
+              },
+              "max": {
+                "max_minutes": 480,
+                "max_prepare_jobs": 25,
+                "max_score_jobs": 150
+              },
+              "medium": {
+                "max_minutes": 90,
+                "max_prepare_jobs": 5,
+                "max_score_jobs": 25
+              },
+              "small": {
+                "max_minutes": 30,
+                "max_prepare_jobs": 2,
+                "max_score_jobs": 10
+              }
+            },
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.presets",
+            "label": "Preset sizes",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "Fixed sizes; choose custom for your own numbers.",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": true,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 25,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.custom.max_score_jobs",
+            "label": "Custom: jobs to score",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 5,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.custom.max_prepare_jobs",
+            "label": "Custom: jobs to prepare",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 90,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.custom.max_minutes",
+            "label": "Custom: time limit",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          }
+        ],
+        "title": "Budget"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "number",
+            "default": 10,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.job_timeout_minutes.score",
+            "label": "Score timeout per job",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          },
+          {
+            "control": "number",
+            "default": 45,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.job_timeout_minutes.prepare",
+            "label": "Prepare timeout per job",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          },
+          {
+            "control": "number",
+            "default": 20,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.job_timeout_minutes.inbox_sync",
+            "label": "Inbox sync timeout",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          },
+          {
+            "control": "switch",
+            "default": true,
+            "file": "pipeline",
+            "help": "A hung call usually means a login or prompt wait.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.stop_on_timeout",
+            "label": "Stop the run on a timeout",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 3,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.max_consecutive_failures",
+            "label": "Stop after failures in a row",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "select",
+            "default": "stop",
+            "file": "pipeline",
+            "help": "The run stops and says so. Stop: the next scheduled run tries again. Pause: all runs stay paused until you resume them.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.on_usage_limit",
+            "label": "When Claude hits your usage limit",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [
+              "stop",
+              "pause"
+            ],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Timeouts and failures"
+      },
+      {
+        "help": "Which jobs go first. No Claude involved.",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "slider",
+            "default": 60,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.freshness_weight",
+            "label": "Freshness",
+            "locked": false,
+            "max": 100,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "points"
+          },
+          {
+            "control": "number",
+            "default": 48,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.fresh_hours",
+            "label": "Fresh for",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "hours"
+          },
+          {
+            "control": "number",
+            "default": 30,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.stale_days",
+            "label": "Stale at",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "days"
+          },
+          {
+            "control": "slider",
+            "default": 25,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.dream_bonus",
+            "label": "Dream company bonus",
+            "locked": false,
+            "max": 100,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "points"
+          },
+          {
+            "control": "slider",
+            "default": 15,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.deadline_bonus",
+            "label": "Deadline bonus",
+            "locked": false,
+            "max": 100,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "points"
+          },
+          {
+            "control": "number",
+            "default": 7,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.deadline_days",
+            "label": "Deadline within",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "days"
+          },
+          {
+            "control": "slider",
+            "default": 0.5,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.ranking.fit_weight",
+            "label": "Fit weight (prepare)",
+            "locked": false,
+            "max": 5,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": 0.1,
+            "strict_options": true,
+            "unit": "points per fit point"
+          },
+          {
+            "control": "slider",
+            "default": 30,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.ranking.retry_bonus",
+            "label": "Retry bonus",
+            "locked": false,
+            "max": 100,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "points"
+          }
+        ],
+        "title": "Ranking"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "number",
+            "default": 2,
+            "file": "pipeline",
+            "help": "2 = retry once.",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.retry.max_attempts",
+            "label": "Attempts per job",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "switch",
+            "default": true,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.retry.action_item",
+            "label": "Then add an Action Item",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Retry"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "switch",
+            "default": true,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.prepare.stop_at_daily_cap",
+            "label": "Stop preparing at today's apply cap",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Prepare"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "policy",
+            "label": "Applying",
+            "locked": true,
+            "value": "Runs never apply in this version",
+            "why": "Scheduled and manual runs score and prepare only; you submit every application."
+          },
+          {
+            "control": "policy",
+            "label": "Tier A auto-submit",
+            "locked": true,
+            "value": "Never",
+            "why": "Dream companies are always submitted by you."
+          },
+          {
+            "control": "switch",
+            "default": false,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.auto_submit.enabled",
+            "label": "Scheduled runs may submit",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "Runs never apply in this version.",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": true,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "rule_list",
+            "default": [
+              "tier_c",
+              "tier_b"
+            ],
+            "file": "pipeline",
+            "help": "tier_a | tier_b | tier_c, fit_gte_<n>, fit_lt_<n>, dream, category_<name>.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.auto_submit.allow",
+            "label": "Allowed",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "rule_list",
+            "default": [
+              "tier_a",
+              "fit_gte_85"
+            ],
+            "file": "pipeline",
+            "help": "Wins over Allowed. fit_gte_85 keeps your best matches manual.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.auto_submit.manual",
+            "label": "Always manual",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Auto-submit"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "switch",
+            "default": true,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.preflight_doctor",
+            "label": "Run `careeros doctor` first",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "tags",
+            "default": [],
+            "file": "pipeline",
+            "help": "Servers every run needs logged in. Inbox sync carries its own gmail.",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.required_mcp_servers",
+            "label": "Required MCP servers",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": false,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 120,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.job_lock_minutes",
+            "label": "Job lock expires after",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          },
+          {
+            "control": "switch",
+            "default": true,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "runs.scout_waits_for_batch",
+            "label": "Scout and prune wait for a running batch",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 300,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "runs.lock_wait_s",
+            "label": "Wait at most",
+            "locked": false,
+            "max": null,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "s"
+          },
+          {
+            "control": "policy",
+            "label": "Manual commands during a run",
+            "locked": true,
+            "value": "Share the job lock",
+            "why": "/prepare-job, /apply-job and `careeros job status` take the same per-job lock as runs; on a job a run is working on they stop and say so. Run them again once the run moves on."
+          }
+        ],
+        "title": "Before each run"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "tags",
+            "default": [
+              "Read",
+              "Write",
+              "Edit",
+              "Glob",
+              "Grep",
+              "Bash(.venv/bin/careeros *)",
+              "Bash(.venv/bin/python *)",
+              "Bash(date *)",
+              "WebSearch",
+              "WebFetch"
+            ],
+            "file": "pipeline",
+            "help": "A tool missing here ends a run with \"Tool not allowed\", never a hang.",
+            "id": "<id>",
+            "integer": false,
+            "key": "llm.allowed_tools",
+            "label": "Tools a run may use",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": false,
+            "unit": ""
+          }
+        ],
+        "title": "Allowed tools"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "schedule",
+            "default": {
+              "every_hours": 3
+            },
+            "file": "pipeline",
+            "help": "Every 2\u20133 hours. Ignores quiet hours unless Scout follows quiet hours is on.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.jobs.scout",
+            "label": "Scout",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "schedule",
+            "default": {
+              "allowed_tools_extra": [
+                "ToolSearch",
+                "mcp__claude_ai_Gmail__search_threads",
+                "mcp__claude_ai_Gmail__get_thread"
+              ],
+              "at": [
+                "08:00",
+                "18:00"
+              ],
+              "enabled": false,
+              "mcp_servers": [
+                "gmail"
+              ]
+            },
+            "file": "pipeline",
+            "help": "Off until the inbox-sync skill is finished.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.jobs.inbox_sync",
+            "label": "Inbox sync",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "schedule",
+            "default": {
+              "at": [
+                "01:00"
+              ]
+            },
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.jobs.score",
+            "label": "Score",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "schedule",
+            "default": {
+              "at": [
+                "02:00"
+              ]
+            },
+            "file": "pipeline",
+            "help": "Never applies.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.jobs.prepare",
+            "label": "Prepare",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "schedule",
+            "default": {
+              "every_days": 7
+            },
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.jobs.prune",
+            "label": "Prune",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "number",
+            "default": 15,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "schedule.tick_minutes",
+            "label": "Check every",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          },
+          {
+            "control": "number",
+            "default": 60,
+            "file": "pipeline",
+            "help": "A slot more than this late (Mac asleep or off) counts as missed; handled per Missed runs below.",
+            "id": "<id>",
+            "integer": true,
+            "key": "schedule.missed_after_minutes",
+            "label": "Missed after",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "min"
+          }
+        ],
+        "title": "Schedule"
+      },
+      {
+        "help": "",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "time_range",
+            "default": {
+              "end": "18:00",
+              "start": "09:00"
+            },
+            "file": "pipeline",
+            "help": "Score, prepare and inbox sync never start inside it. Prune ignores it.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.quiet_hours",
+            "label": "Quiet hours",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": true,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "switch",
+            "default": false,
+            "file": "pipeline",
+            "help": "Scout uses no Claude quota, so it runs any time.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.scout_quiet_hours",
+            "label": "Scout follows quiet hours",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "select",
+            "default": "ask",
+            "file": "pipeline",
+            "help": "Mac off or asleep at run time. Missed runs never start on their own. Ask: one catch-up prompt on Today and Runs. Skip: they are dropped.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.missed_runs",
+            "label": "Missed runs",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [
+              "ask",
+              "skip"
+            ],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          },
+          {
+            "control": "text",
+            "default": "local",
+            "file": "pipeline",
+            "help": "local, or an IANA name like America/New_York.",
+            "id": "<id>",
+            "integer": false,
+            "key": "schedule.timezone",
+            "label": "Time zone",
+            "locked": false,
+            "max": null,
+            "min": null,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Quiet hours and missed runs"
+      }
+    ],
+    "help": "",
+    "id": "<id>",
+    "title": "Runs & schedule"
+  },
+  "values": {
+    "pipeline:llm.allowed_tools": [
+      "Read",
+      "Write",
+      "Edit",
+      "Glob",
+      "Grep",
+      "Bash(.venv/bin/careeros *)",
+      "Bash(.venv/bin/python *)",
+      "Bash(date *)",
+      "WebSearch",
+      "WebFetch"
+    ],
+    "pipeline:runs.auto_submit.allow": [
+      "tier_c",
+      "tier_b"
+    ],
+    "pipeline:runs.auto_submit.enabled": false,
+    "pipeline:runs.auto_submit.manual": [
+      "tier_a",
+      "fit_gte_85"
+    ],
+    "pipeline:runs.custom.max_minutes": 90,
+    "pipeline:runs.custom.max_prepare_jobs": 5,
+    "pipeline:runs.custom.max_score_jobs": 25,
+    "pipeline:runs.job_lock_minutes": 120,
+    "pipeline:runs.job_timeout_minutes.inbox_sync": 20,
+    "pipeline:runs.job_timeout_minutes.prepare": 45,
+    "pipeline:runs.job_timeout_minutes.score": 10,
+    "pipeline:runs.lock_wait_s": 300,
+    "pipeline:runs.max_consecutive_failures": 3,
+    "pipeline:runs.on_usage_limit": "stop",
+    "pipeline:runs.preflight_doctor": true,
+    "pipeline:runs.prepare.stop_at_daily_cap": true,
+    "pipeline:runs.preset": "medium",
+    "pipeline:runs.presets": {
+      "large": {
+        "max_minutes": 180,
+        "max_prepare_jobs": 10,
+        "max_score_jobs": 50
+      },
+      "max": {
+        "max_minutes": 480,
+        "max_prepare_jobs": 25,
+        "max_score_jobs": 150
+      },
+      "medium": {
+        "max_minutes": 90,
+        "max_prepare_jobs": 5,
+        "max_score_jobs": 25
+      },
+      "small": {
+        "max_minutes": 30,
+        "max_prepare_jobs": 2,
+        "max_score_jobs": 10
+      }
+    },
+    "pipeline:runs.ranking.deadline_bonus": 15,
+    "pipeline:runs.ranking.deadline_days": 7,
+    "pipeline:runs.ranking.dream_bonus": 25,
+    "pipeline:runs.ranking.fit_weight": 0.5,
+    "pipeline:runs.ranking.fresh_hours": 48,
+    "pipeline:runs.ranking.freshness_weight": 60,
+    "pipeline:runs.ranking.retry_bonus": 30,
+    "pipeline:runs.ranking.stale_days": 30,
+    "pipeline:runs.required_mcp_servers": [],
+    "pipeline:runs.retry.action_item": true,
+    "pipeline:runs.retry.max_attempts": 2,
+    "pipeline:runs.scout_waits_for_batch": true,
+    "pipeline:runs.stop_on_timeout": true,
+    "pipeline:schedule.jobs.inbox_sync": {
+      "allowed_tools_extra": [
+        "ToolSearch",
+        "mcp__claude_ai_Gmail__search_threads",
+        "mcp__claude_ai_Gmail__get_thread"
+      ],
+      "at": [
+        "08:00",
+        "18:00"
+      ],
+      "enabled": false,
+      "mcp_servers": [
+        "gmail"
+      ]
+    },
+    "pipeline:schedule.jobs.prepare": {
+      "at": [
+        "02:00"
+      ]
+    },
+    "pipeline:schedule.jobs.prune": {
+      "every_days": 7
+    },
+    "pipeline:schedule.jobs.score": {
+      "at": [
+        "01:00"
+      ]
+    },
+    "pipeline:schedule.jobs.scout": {
+      "every_hours": 3
+    },
+    "pipeline:schedule.missed_after_minutes": 60,
+    "pipeline:schedule.missed_runs": "ask",
+    "pipeline:schedule.quiet_hours": {
+      "end": "18:00",
+      "start": "09:00"
+    },
+    "pipeline:schedule.scout_quiet_hours": false,
+    "pipeline:schedule.tick_minutes": 15,
+    "pipeline:schedule.timezone": "local"
+  },
+  "version": "<version>",
+  "warnings": {}
+}

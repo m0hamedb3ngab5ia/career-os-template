@@ -30,6 +30,7 @@ function storageSection(): SectionData {
     defaults: {},
     files: { pipeline: "config/pipeline.yaml" },
     version: "v1",
+    warnings: {},
   };
 }
 
@@ -41,19 +42,20 @@ function storage(snapshots: Snapshot[]): StorageData {
     snapshots,
     config: {
       storage: { budget_mb: 1024, warn_at_pct: 80, disk_free_warn_pct: 10 },
-      advisor: { advise_after_days: 14, min_runs: 5, window_days: 30 },
+      advisor: { advise_after_days: 14, prune_idle_weeks: 4, min_runs: 5, window_days: 30, usage_limit_stops: 2, failure_rate_warn: 0.3 },
     },
   };
 }
 
 const READY: Advice = {
-  storage: { ready: true, days: 21, need_days: 14, current: 25 * MB, rate_per_day: MB, projection: { "30d": 55 * MB, "90d": 115 * MB }, budget: 1024 * MB },
+  storage: { ready: true, days: 21, need_days: 14, current: 25 * MB, rate_per_day: MB, projection: { "30d": 55 * MB, "90d": 115 * MB }, budget: 1024 * MB, recommendations: [] },
   runs: {
     ready: true,
     min_runs: 5,
     metrics: {
       score: { runs: 6, attempts: 60, avg_job_s: 52, p90_job_s: 80, failure_rate: 0.1, failed: 7, budget_used: 0.8, stops: { usage_limit: 2 }, prepare_share: 0.18 },
     },
+    recommendations: [],
   },
   recommendations: [
     {
@@ -69,8 +71,8 @@ const READY: Advice = {
 };
 
 const EMPTY: Advice = {
-  storage: { ready: false, days: 3, need_days: 14 },
-  runs: { ready: false, min_runs: 5, metrics: {} },
+  storage: { ready: false, days: 3, need_days: 14, recommendations: [] },
+  runs: { ready: false, min_runs: 5, metrics: {}, recommendations: [] },
   recommendations: [],
 };
 

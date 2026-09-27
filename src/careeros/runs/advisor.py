@@ -194,7 +194,7 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
                 for r in rs]
         m = {"runs": len(rs), "attempts": attempted, "failed": failed, "avg_job_s": round(sum(durs) / len(durs), 1) if durs else 0,
              "p90_job_s": _p90(durs), "failure_rate": round(failed / attempted, 2) if attempted else 0.0,
-             "budget_used": round(sum(used) / len(used), 2), "stops": dict(Counter(r.get("stop_reason") for r in rs))}
+             "budget_used": round(sum(used) / len(used), 2), "stops": dict(Counter(r.get("stop_reason") or "unknown" for r in rs))}
         if kind == "score":
             oks = [a for a in atts if a.get("outcome") == "ok"]
             m["prepare_share"] = round(sum(1 for a in oks if (a.get("result") or {}).get("decision") == "prepare")
@@ -318,21 +318,25 @@ def validate_root(root: Any) -> None:
 def apply_recommendation(settings: Any, rec_id: str, now: datetime) -> dict[str, Any]:
     """Apply ONE current recommendation's YAML change (comments kept, validated, rolled back on error): the code
     behind `careeros advise apply <id>` and the UI's Apply button. LookupError: no such recommendation now;
-    ValueError: advice only, or the value changed since it was computed; ConfigError: the result did not validate."""
+    ValueError: advice only, or the value changed since it was computed; ConfigError: the result did not validate;
+    locks.LockBusy: another config write held the config lock for longer than the wait."""
     import json
 
     from careeros.runs import yamledit
 
-    recs = {r["id"]: r for r in advise(settings, now)["recommendations"]}
-    rec = recs.get(rec_id)
-    if rec is None:
-        raise LookupError(f"no current recommendation {rec_id!r}" +
-                          (f"; current: {', '.join(recs)}" if recs else "; run `careeros advise`"))
-    c = rec["change"]
-    if not c:
-        raise ValueError(f"{rec_id} is advice only; nothing to change")
-    yamledit.apply_change(settings.root / c["file"], c["path"], c["to"], expect_from=c["from"],
-                          validate=lambda p: validate_root(settings.root),
-                          current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
-                                                               c["path"]))
+    from careeros.runs import locks
+
+    with locks.config_lock(settings.root):  # never interleave with a Settings save (LockBusy after the wait)
+        recs = {r["id"]: r for r in advise(settings, now)["recommendations"]}
+        rec = recs.get(rec_id)
+        if rec is None:
+            raise LookupError(f"no current recommendation {rec_id!r}" +
+                              (f"; current: {', '.join(recs)}" if recs else "; run `careeros advise`"))
+        c = rec["change"]
+        if not c:
+            raise ValueError(f"{rec_id} is advice only; nothing to change")
+        yamledit.apply_change(settings.root / c["file"], c["path"], c["to"], expect_from=c["from"],
+                              validate=lambda p: validate_root(settings.root),
+                              current=lambda data: effective_value(json.loads(json.dumps(data or {}, default=str)),
+                                                                   c["path"]))
     return {"id": rec_id, "file": c["file"], "path": c["path"], "from": c["from"], "to": c["to"]}

@@ -17,7 +17,7 @@ class MarkBody(BaseModel):
 
 
 @router.get("/contacts")
-def list_contacts(c=Depends(ctx)) -> dict[str, Any]:
+def list_contacts(c=Depends(ctx)) -> svc.ContactsPage:
     return svc.list_contacts(c.settings, c.index)
 
 

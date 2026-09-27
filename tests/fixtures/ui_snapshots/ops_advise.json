@@ -1,0 +1,41 @@
+{
+  "recommendations": [],
+  "runs": {
+    "metrics": {
+      "prepare": {
+        "attempts": 1,
+        "avg_job_s": 400.0,
+        "budget_used": 0.5,
+        "failed": 0,
+        "failure_rate": 0.0,
+        "p90_job_s": 400.0,
+        "runs": 1,
+        "stops": {
+          "usage_limit": 1
+        }
+      },
+      "score": {
+        "attempts": 1,
+        "avg_job_s": 400.0,
+        "budget_used": 0.5,
+        "failed": 0,
+        "failure_rate": 0.0,
+        "p90_job_s": 400.0,
+        "prepare_share": 0.0,
+        "runs": 1,
+        "stops": {
+          "completed": 1
+        }
+      }
+    },
+    "min_runs": 5,
+    "ready": false,
+    "recommendations": []
+  },
+  "storage": {
+    "days": 0,
+    "need_days": 14,
+    "ready": false,
+    "recommendations": []
+  }
+}

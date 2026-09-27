@@ -1,0 +1,44 @@
+{
+  "counts": {
+    "done": 1,
+    "open": 4,
+    "today": 1
+  },
+  "group": "due",
+  "groups": [
+    {
+      "count": 1,
+      "items": [
+        {
+          "bucket": "nodate",
+          "company": "Hooli",
+          "created": "<created>",
+          "done": true,
+          "done_date": "2026-09-27",
+          "due": null,
+          "due_date_only": false,
+          "due_reason": null,
+          "id": "<id>",
+          "job_id": "<job_applied>",
+          "level": "none",
+          "link": "",
+          "needs": "laptop",
+          "priority": "M",
+          "role": "New Grad Engineer",
+          "scam_actions": false,
+          "type": "captcha",
+          "what": "Solve the captcha"
+        }
+      ],
+      "key": "done"
+    }
+  ],
+  "head": {
+    "overdue": 0,
+    "soon": 1
+  },
+  "more_done": 0,
+  "now": "2026-09-24T15:00:00+00:00",
+  "sort": "soonest",
+  "tab": "done"
+}

@@ -9,13 +9,48 @@ from __future__ import annotations
 
 from typing import Any
 
+from typing_extensions import TypedDict
+
 from careeros.outreach import OutreachPolicy, _detail, mark_contact, needs_manual_outreach
 from careeros.ui.services.inbox import _contacts as _job_contacts
-from careeros.ui.services.inbox import job_drafts
+from careeros.ui.services.inbox import InboxDraft, job_drafts
 from careeros.ui.services.jobs import job_dir_for
 
 _FIELDS = ("c.job_id, c.seq, c.name, c.title, c.company, c.linkedin, c.email, c.email_confidence, c.linkedin_degree, "
            "c.mutuals, c.sent, c.replied, j.title AS job_title, j.status AS job_status, j.company AS job_company")
+
+
+# Response shapes (GET /api/contacts): FastAPI turns these into the OpenAPI schema behind ui/src/api/schema.gen.ts.
+class ContactRow(TypedDict):
+    job_id: str
+    company: str | None
+    job_title: str | None
+    job_status: str | None
+    name: str
+    title: str
+    linkedin: str | None
+    email: str | None
+    email_confidence: str | None
+    linkedin_degree: int | None
+    mutuals: int | None
+    sent: bool
+    replied: str | None
+    manual: bool
+    manual_reason: str | None
+    manual_detail: str | None
+    draft: InboxDraft | None
+    mode: str
+
+
+class ContactsPolicy(TypedDict):
+    manual_if_connected: bool
+    manual_if_mutuals: bool
+
+
+class ContactsPage(TypedDict):
+    items: list[ContactRow]
+    linkedin_drafts: int
+    policy: ContactsPolicy
 
 
 def _mode(contact: dict[str, Any], manual: bool, draft: dict[str, Any] | None) -> str:
@@ -35,7 +70,7 @@ def _mode(contact: dict[str, Any], manual: bool, draft: dict[str, Any] | None) -
     return "linkedin_draft" if draft["channel"] == "linkedin" else "email_manual"
 
 
-def list_contacts(settings: Any, ix: Any) -> dict[str, Any]:
+def list_contacts(settings: Any, ix: Any) -> ContactsPage:
     from pathlib import Path
 
     policy = OutreachPolicy.from_settings(settings)

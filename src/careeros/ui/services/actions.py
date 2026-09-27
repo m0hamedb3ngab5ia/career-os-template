@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing_extensions import TypedDict
 
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, parse_due
+from careeros.runs import locks
 
 TABS = ("open", "today", "done")
 GROUPS = ("due", "priority", "needs")
@@ -26,6 +27,57 @@ PRIORITIES = ("H", "M", "L")
 _PRIO_RANK = {p: i for i, p in enumerate(PRIORITIES)}
 _HTTP = re.compile(r"^https?://[^\s]+$", re.I)
 MAX_WHAT = 500
+
+
+# Response shapes (GET /api/actions): FastAPI turns these into the OpenAPI schema behind ui/src/api/schema.gen.ts.
+class ActionItem(TypedDict):
+    """One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape)."""
+    id: str
+    created: str | None
+    job_id: str | None
+    company: str
+    role: str
+    type: str
+    what: str
+    link: str
+    priority: str
+    needs: str
+    done: bool
+    done_date: str | None
+    due: str | None
+    due_date_only: bool
+    due_reason: str | None
+    bucket: str
+    level: str
+    scam_actions: bool
+
+
+class ActionGroup(TypedDict):
+    key: str
+    count: int
+    items: list[ActionItem]
+
+
+class ActionCounts(TypedDict):
+    open: int
+    today: int
+    done: int
+
+
+class ActionHead(TypedDict):
+    overdue: int
+    soon: int
+
+
+class ActionsPage(TypedDict):
+    tab: str
+    group: str
+    sort: str
+    counts: ActionCounts
+    head: ActionHead
+    groups: list[ActionGroup]
+    more_done: int
+    now: str
 
 
 # --- time -------------------------------------------------------------------------------------------------------
@@ -86,28 +138,6 @@ def due_level(due: str | None, now: datetime, tz: tzinfo, soon_hours: int) -> st
 
 # --- the list ---------------------------------------------------------------------------------------------------
 
-class ActionItem(TypedDict):
-    """One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape)."""
-    id: str
-    created: str | None
-    job_id: str | None
-    company: str
-    role: str
-    type: str
-    what: str
-    link: str
-    priority: str
-    needs: str
-    done: bool
-    done_date: str | None
-    due: str | None
-    due_date_only: bool
-    due_reason: str | None
-    bucket: str
-    level: str
-    scam_actions: bool
-
-
 def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> ActionItem:
     at = due_at(r.get("due"), tz)
     return {
@@ -151,7 +181,7 @@ def _group_order(group: str, present: Iterable[str]) -> list[str]:
 
 
 def build_view(rows: list[dict[str, Any]], *, tab: str, group: str, sort: str, now: datetime, tz: tzinfo,
-               soon_hours: int, done_limit: int | None = None) -> dict[str, Any]:
+               soon_hours: int, done_limit: int | None = None) -> ActionsPage:
     if tab not in TABS:
         raise ValueError(f"tab must be one of {', '.join(TABS)}, got {tab!r}")
     if group not in GROUPS:
@@ -185,7 +215,7 @@ def build_view(rows: list[dict[str, Any]], *, tab: str, group: str, sort: str, n
 
 
 def list_actions(ix: Any, *, tab: str, group: str, sort: str, now: datetime, tz: tzinfo, soon_hours: int,
-                 done_limit: int) -> dict[str, Any]:
+                 done_limit: int) -> ActionsPage:
     rows = ix.query("SELECT * FROM action_items")
     return build_view(rows, tab=tab, group=group, sort=sort, now=now, tz=tz, soon_hours=soon_hours,
                       done_limit=done_limit)
@@ -298,7 +328,7 @@ def _set_blocklist(settings: Any, companies: list[str]) -> None:
     from careeros.runs import yamledit
     from careeros.ui.services.settings_io import validate_root
 
-    root = settings.root
+    root = settings.root  # caller holds locks.config_lock: the read that produced `companies` + this write are one step
     yamledit.apply_changes(_blocklist_path(settings), [("blocklist.companies", companies)],
                            validate=lambda _p: validate_root(root))
 
@@ -317,11 +347,13 @@ def block_company(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
 
     it = _scam_item(ix, aid)
     company = _company(settings, it)
-    current = _current_blocklist(settings)
     key = normalize_company(company)
-    added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
-    if added:
-        _set_blocklist(settings, [*current, company])
+    # read + write under the config lock: a Settings save or a second click can't land in between (LockBusy -> 409)
+    with locks.config_lock(settings.root):
+        current = _current_blocklist(settings)
+        added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
+        if added:
+            _set_blocklist(settings, [*current, company])
     done = _tracker(settings).mark_action_done(aid)
     return {"company": company, "added": added, "queued": done is None, "job_id": it["job_id"]}
 
@@ -332,10 +364,11 @@ def unblock_company(settings: Any, ix: Any, aid: str, company: str, remove: bool
     it = _scam_item(ix, aid)
     if company.strip().lower() != _company(settings, it).lower():
         raise ValueError("that company isn't this item's company")
-    current = _current_blocklist(settings)
-    kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
-    if kept != current:
-        _set_blocklist(settings, kept)
+    with locks.config_lock(settings.root):  # read + write as one step, like block_company
+        current = _current_blocklist(settings)
+        kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
+        if kept != current:
+            _set_blocklist(settings, kept)
     done = _tracker(settings).reopen_action(aid)
     return {"company": company, "removed": kept != current, "queued": done is None}
 
