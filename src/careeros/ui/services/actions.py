@@ -358,9 +358,11 @@ def undo_mark_safe(settings: Any, ix: Any, aid: str, previous_status: str | None
         from careeros.config import _fuzzy_eq, normalize_company
 
         # mark_safe found the entry with registry._find()'s fuzzy match, so the saved name may differ from the
-        # posting's ("Acme Health" for "Acme Health Careers"): accept exactly what that match accepts
+        # posting's ("Acme Health" for "Acme Health Careers"): exact normalized match first, else accept exactly
+        # what that fuzzy match accepts
         name = str(registry_before.get("company") or "") if isinstance(registry_before, dict) else ""
-        if not (name and _fuzzy_eq(normalize_company(name), normalize_company(company))):
+        key, want = normalize_company(name), normalize_company(company)
+        if not (name and (key == want or _fuzzy_eq(key, want))):
             raise ValueError("registry_before must be this company's registry entry")
         registry.restore(registry.default_path(settings), {k: registry_before[k] for k in REGISTRY_KEYS
                                                            if k in registry_before})

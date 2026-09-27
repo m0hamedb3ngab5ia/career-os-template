@@ -12,6 +12,7 @@ data/action_items.json). Every table is derived; the index never writes back. A 
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import sqlite3
 import threading
@@ -68,19 +69,22 @@ def _obj(path: Path) -> dict[str, Any]:
 
 
 def _sig(paths: Iterable[Path]) -> str:
-    n = newest = size = 0
+    """Hash of sorted (name, mtime_ns, size) per file, so renames and same-size edits change it too.
+    Names are parent/name, enough to tell run.json from attempts/001.json."""
+    rows = []
     for p in paths:
         try:
             st = p.stat()
         except OSError:
             continue
-        n, newest, size = n + 1, max(newest, st.st_mtime_ns), size + st.st_size
-    return f"{n}:{newest}:{size}"
+        rows.append((f"{p.parent.name}/{p.name}", st.st_mtime_ns, st.st_size))
+    return hashlib.sha1(repr(sorted(rows)).encode("utf-8")).hexdigest()
 
 
 def _dir_sig(d: Path) -> str:
     try:
-        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name))
+        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name)
+                    and not f.name.endswith(".tmp"))
     except OSError:
         return ""
 

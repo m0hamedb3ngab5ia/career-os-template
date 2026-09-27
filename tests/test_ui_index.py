@@ -280,3 +280,30 @@ def test_excel_date_cell_due_is_indexed_as_a_date(idx, data):
     due = idx.query("SELECT due FROM action_items WHERE id = ?", (data["actions"]["medium"],))[0]["due"]
     assert due == "2026-09-24"
     assert svc.due_bucket(due, NOW, timezone.utc) == "today"
+
+
+def test_dir_sig_changes_on_rename_and_same_size_edit(tmp_path):
+    import os
+
+    from careeros.ui.index import _dir_sig
+
+    d = tmp_path / "job"
+    d.mkdir()
+    f = d / "a.json"
+    f.write_text("aaaa", encoding="utf-8")
+    os.utime(f, ns=(1_000_000_000, 1_000_000_000))
+    s0 = _dir_sig(d)
+    f.rename(d / "b.json")
+    s1 = _dir_sig(d)
+    assert s1 != s0
+    (d / "b.json").write_text("bbbb", encoding="utf-8")
+    os.utime(d / "b.json", ns=(1_000_000_000, 1_000_000_000))
+    (d / "c.json").write_text("cc", encoding="utf-8")
+    s2 = _dir_sig(d)
+    (d / "c.json").write_text("dd", encoding="utf-8")
+    os.utime(d / "c.json", ns=(2_000_000_000, 2_000_000_000))
+    os.utime(d / "b.json", ns=(3_000_000_000, 3_000_000_000))
+    s3 = _dir_sig(d)
+    assert s3 != s2
+    (d / "x.json.tmp").write_text("partial", encoding="utf-8")
+    assert _dir_sig(d) == s3

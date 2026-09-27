@@ -97,3 +97,23 @@ def test_restore_adds_a_missing_entry(tmp_path):
     p = tmp_path / "flagged_registry.yaml"
     registry.restore(p, {"company": "Nimbus Hiring", "state": "active", "confidence": "high"})
     assert [e["company"] for e in registry.load(p)] == ["Nimbus Hiring"]
+
+
+def test_restore_replaces_the_entry_clear_changed_not_another_fuzzy_match(tmp_path):
+    """Undo must put back the exact entry `clear` changed, even when another entry also fuzzy-matches its name."""
+    p = tmp_path / "flagged_registry.yaml"
+    registry._save(p, [
+        {"company": "Acme Health West", "domain": "", "reason": "SCAM_PAYMENT", "confidence": "high",
+         "state": "active", "review_note": "west", "count": 1},
+        {"company": "Acme Health", "domain": "", "reason": "SCAM_PAYMENT", "confidence": "high",
+         "state": "active", "review_note": "plain", "count": 2},
+    ])
+    west_before = next(dict(e) for e in registry.load(p) if e["company"] == "Acme Health West")
+    before = next(dict(e) for e in registry.load(p) if e["company"] == "Acme Health")
+    cleared = registry.clear(p, "Acme Health East", note="checked")
+    assert cleared is not None and cleared["company"] == "Acme Health"
+    registry.restore(p, before)
+    got = {e["company"]: e for e in registry.load(p)}
+    assert len(registry.load(p)) == 2
+    assert got["Acme Health"] == before
+    assert got["Acme Health West"] == west_before
