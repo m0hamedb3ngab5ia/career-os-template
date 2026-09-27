@@ -80,7 +80,7 @@ export function OverrideMenu({ jobId, override }: { jobId: string; override: str
                       message:
                         `Override set to ${OVERRIDE_LABELS[v]!.toLowerCase()}` +
                         (r?.queued
-                          ? ". Excel has the tracker open, so the change is queued until you close it; apply-job reads the old value until then."
+                          ? ". Excel has the tracker open, so it's saved to a queue; it's written on the next change, or run `careeros tracker flush` after closing Excel. apply-job reads the old value until then."
                           : ""),
                     }),
                   onError: (e) => toast.show({ message: errorText(e) }),

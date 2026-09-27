@@ -318,7 +318,12 @@ class Tracker:
                 tmp.unlink(missing_ok=True)
 
     def _mutate(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
+        """Every write replays the pending queue first, so an op queued while Excel held the file lands before
+        this one instead of being replayed over it by a later flush. If the file is still locked, the replay
+        re-queues and this op queues after it, keeping the order."""
         with self._lock():
+            if self._lock_depth == 1 and self._read_pending():  # depth > 1: we are the flush's own replay
+                self._flush_locked()
             return self._mutate_locked(op, payload, fn)
 
     def _mutate_locked(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
@@ -607,11 +612,8 @@ class Tracker:
             _put(ws, r, hdr["DoneDate"], "")
             return True
 
-        # A Mark done queued while Excel held the file must land before this Undo, or a later flush redoes it.
-        with self._lock():
-            if self._read_pending():
-                self._flush_locked()
-            return self._mutate_locked("reopen_action", {"id": id}, fn)
+        # _mutate replays a Mark done queued while Excel held the file first, so a later flush can't redo it.
+        return self._mutate("reopen_action", {"id": id}, fn)
 
     # --- contacts ----------------------------------------------------------
 

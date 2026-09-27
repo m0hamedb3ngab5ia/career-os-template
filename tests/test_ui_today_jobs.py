@@ -273,6 +273,23 @@ def test_set_override_reports_queued_while_excel_holds_the_tracker(data, monkeyp
         assert acts.set_override(s, jid, "skip") == {"override": "skip", "queued": True}
 
 
+def test_set_override_after_excel_closes_is_not_undone_by_a_later_flush(data, monkeypatch):
+    from openpyxl.workbook.workbook import Workbook
+
+    s, jid = data["settings"], data["jobs"]["queued"]
+    acts.set_override(s, jid, "")
+    real_save = Workbook.save
+    monkeypatch.setattr(Workbook, "save", lambda self, filename: (_ for _ in ()).throw(PermissionError(13, "locked")))
+    with pytest.warns(UserWarning):
+        assert acts.set_override(s, jid, "skip")["queued"] is True  # Excel holds the tracker
+    monkeypatch.setattr(Workbook, "save", real_save)  # Excel closed
+    assert acts.set_override(s, jid, "B") == {"override": "B", "queued": False}
+    tr = Tracker(settings=s)
+    tr.flush_pending()  # `careeros tracker flush`
+    assert tr.read_overrides()[jid] == "B"
+    assert tr.pending_count() == 0
+
+
 def test_job_dir_for_refuses_a_symlinked_folder_outside_jobs_dir(data, tmp_path):
     s, jid = data["settings"], data["jobs"]["queued"]
     outside = tmp_path / "outside" / "evil01"

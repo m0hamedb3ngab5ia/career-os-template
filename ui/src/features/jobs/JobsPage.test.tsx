@@ -221,7 +221,7 @@ describe("Jobs screen", () => {
     expect(api.callsTo("POST /api/tracker/sync")[0]!.headers["x-careeros"]).toBe("1");
     pending = 3;
     await user.click(screen.getByRole("button", { name: "Sync tracker" }));
-    expect(await screen.findByText(/changes are queued until you close it/)).toBeInTheDocument();
+    expect(await screen.findByText(/saved to a queue; they're written on the next change, or run `careeros tracker flush` after closing Excel/)).toBeInTheDocument();
   });
 
   it("Open JobTracker.xlsx shows the server's reason on 409", async () => {

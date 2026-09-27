@@ -122,6 +122,23 @@ def test_reopen_after_a_queued_mark_done_flushes_first(tmp_path: Path, monkeypat
     assert tr.pending_count() == 0
 
 
+def test_a_direct_write_replays_the_queue_first(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    tr.upsert_job({"job_id": "o1", "company": "Acme", "role": "SWE"})
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+    monkeypatch.setattr(Workbook, "save", lambda self, filename: (_ for _ in ()).throw(PermissionError(13, "locked")))
+    with pytest.warns(UserWarning):
+        assert tr.upsert_job({"job_id": "o1", "override": "skip"}) == "queued"
+    monkeypatch.setattr(Workbook, "save", real_save)
+    tr.upsert_job({"job_id": "o1", "override": "B"})  # Excel closed: the queued "skip" lands first
+    assert tr.pending_count() == 0
+    tr.flush_pending()
+    assert tr.read_overrides()["o1"] == "B"
+
+
 def test_locked_file_queues_and_flushes(tmp_path: Path, monkeypatch):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()
