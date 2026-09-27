@@ -607,7 +607,11 @@ class Tracker:
             _put(ws, r, hdr["DoneDate"], "")
             return True
 
-        return self._mutate("reopen_action", {"id": id}, fn)
+        # A Mark done queued while Excel held the file must land before this Undo, or a later flush redoes it.
+        with self._lock():
+            if self._read_pending():
+                self._flush_locked()
+            return self._mutate_locked("reopen_action", {"id": id}, fn)
 
     # --- contacts ----------------------------------------------------------
 

@@ -177,6 +177,20 @@ def test_resolve_file_inside_the_job_dir_only(data, tmp_path):
         acts.resolve_file(s, "../x", "resume.pdf")
 
 
+def test_resolve_file_refuses_a_symlink_into_a_hidden_path(data):
+    s, jid = data["settings"], data["jobs"]["review"]
+    jd = Store(s).job_dir(jid)
+    (jd / ".private").mkdir()
+    (jd / ".private" / "notes.txt").write_text("no")
+    (jd / ".env").write_text("no")
+    os.symlink(jd / ".private" / "notes.txt", jd / "notes.txt")
+    os.symlink(jd / ".env", jd / "env.txt")
+    os.symlink(jd / ".private", jd / "priv")
+    for bad in ("notes.txt", "env.txt", "priv/notes.txt"):
+        with pytest.raises(LookupError):
+            acts.resolve_file(s, jid, bad)
+
+
 # --- writes ------------------------------------------------------------------------------------------------------
 
 def _tracker_status(s, jid):
@@ -192,6 +206,33 @@ def test_set_status_writes_status_json_and_tracker(data):
         acts.set_status(s, jid, "bogus")
     with pytest.raises(LookupError):
         acts.set_status(s, "nope00000000", "queued")
+
+
+def _hold_lock(s, jid):
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    return locks.acquire(RunStore(s).job_lock_path(jid), "run", 600, pid=os.getpid(), note="prepare")
+
+
+def test_status_writes_refuse_while_the_job_is_locked(data):
+    s, jid = data["settings"], data["jobs"]["queued"]
+    _hold_lock(s, jid)
+    for write in (lambda: acts.set_status(s, jid, "needs_review"), lambda: acts.withdraw(s, jid),
+                  lambda: acts.mark_submitted(s, jid)):
+        with pytest.raises(acts.JobLocked):
+            write()
+    assert Store(s).get_status(jid) == "queued"
+
+
+def test_set_status_refuses_applied_except_to_undo_a_withdraw(data):
+    s, jid = data["settings"], data["jobs"]["queued"]
+    with pytest.raises(ValueError, match="Mark submitted"):
+        acts.set_status(s, jid, "applied")
+    acts.withdraw(s, jid)
+    with pytest.raises(ValueError):
+        acts.set_status(s, jid, "applied")  # was queued before the withdraw: not an undo
+    assert Store(s).get_status(jid) == "withdrawn"
 
 
 def test_withdraw_then_undo(data):

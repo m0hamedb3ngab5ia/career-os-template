@@ -104,6 +104,24 @@ def test_reopen_action_undoes_mark_done(tmp_path: Path):
     assert tr.reopen_action("nope") is False
 
 
+def test_reopen_after_a_queued_mark_done_flushes_first(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    aid = tr.add_action_item("Solve captcha", type="captcha", job_id="j1", company="Acme", priority="H")
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+    monkeypatch.setattr(Workbook, "save", lambda self, filename: (_ for _ in ()).throw(PermissionError(13, "locked")))
+    with pytest.warns(UserWarning):
+        assert tr.mark_action_done(aid) is None  # Excel holds the file: queued
+    monkeypatch.setattr(Workbook, "save", real_save)
+    assert tr.reopen_action(aid) is True  # Undo after Excel closed
+    tr.flush_pending()
+    [item] = tr.list_action_items()
+    assert item["ID"] == aid and item["Done"] == "N"
+    assert tr.pending_count() == 0
+
+
 def test_locked_file_queues_and_flushes(tmp_path: Path, monkeypatch):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()

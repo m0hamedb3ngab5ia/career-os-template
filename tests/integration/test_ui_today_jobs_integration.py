@@ -187,6 +187,19 @@ def test_job_detail_extras_and_files(client, data, tmp_path):
     assert client.get("/api/jobs/nope00000000/files/resume.pdf").status_code == 404
 
 
+def test_status_writes_409_while_the_job_is_locked_and_applied_needs_submitted(client, data):
+    from careeros.runs import locks
+
+    s, jid = data["settings"], data["jobs"]["queued"]
+    r = client.post(f"/api/jobs/{jid}/status", json={"status": "applied"}, headers=H)
+    assert r.status_code == 400 and "Mark submitted" in r.json()["detail"]
+    locks.acquire(RunStore(s).job_lock_path(jid), "run", 600, pid=os.getpid(), note="prepare")
+    for path, body in (("status", {"status": "prepared"}), ("withdraw", {}), ("submitted", {})):
+        r = client.post(f"/api/jobs/{jid}/{path}", json=body, headers=H)
+        assert r.status_code == 409 and "locked" in r.json()["detail"], path
+    assert Store(s).get_status(jid) == "queued"
+
+
 def test_set_status_withdraw_undo_and_submitted(client, data):
     s, jid = data["settings"], data["jobs"]["queued"]
     r = client.post(f"/api/jobs/{jid}/status", json={"status": "prepared", "note": "by hand"}, headers=H)

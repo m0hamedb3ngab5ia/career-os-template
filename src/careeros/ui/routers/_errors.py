@@ -11,11 +11,12 @@ from fastapi import HTTPException
 @contextmanager
 def refusals() -> Iterator[None]:
     from careeros.ui.services.desktop import Unsupported
+    from careeros.ui.services.job_actions import JobLocked
     from careeros.ui.services.runs import Busy, NotSetUp, Paused
 
     try:
         yield
     except LookupError as e:
         raise HTTPException(404, str(e).strip("'\"")) from None
-    except (Busy, Paused, NotSetUp, Unsupported) as e:
+    except (Busy, Paused, NotSetUp, Unsupported, JobLocked) as e:
         raise HTTPException(409, str(e)) from None
