@@ -361,3 +361,54 @@ def test_interview_thank_you_all_sent_is_not_reported_as_sent_mode(data, idx):
     row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
     assert row["next"]["kind"] == "status_followup"
     assert row["next"]["mode"] != "sent"
+
+
+# --- review round 2 --------------------------------------------------------------------------------------------
+
+def test_applied_job_with_all_outreach_sent_has_no_due_and_sent_mode(data, idx):
+    f = _outreach(data, "applied")
+    o = json.loads(f.read_text())
+    for d in o["drafts"]:
+        d["sent"], d["sent_by"], d["sent_date"] = True, "candidate", (NOW - timedelta(days=1)).isoformat()
+    f.write_text(json.dumps(o))
+    hooli = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["company"] == "Hooli")
+    assert hooli["next"]["kind"] == "post_apply_outreach"
+    assert hooli["next"]["due"] is None and hooli["next"]["mode"] == "sent"
+
+
+def test_linkedin_channel_draft_shows_the_linkedin_variant_not_the_email():
+    d = {"contact": "Sam", "kind": "cold_email", "channel": "linkedin", "to": "sam@x.com", "to_confidence": "verified",
+         "linkedin_note": "Hi Sam, quick note.", "linkedin_message": "Hi Sam, I applied to the role.",
+         "email": {"subject": "Role at [Company]", "body": "Hi [Name], email body."}}
+    v = inbox_svc.draft_view(d)
+    assert v["body"] == "Hi Sam, I applied to the role."
+    assert v["placeholders"] == [] and v["mode"] == "linkedin"
+    assert inbox_svc.draft_view({**d, "channel": "email"})["body"] == "Hi [Name], email body."
+
+
+def test_draft_followup_7d_and_14d_are_listed_after_their_draft(data):
+    from pathlib import Path
+
+    f = _outreach(data, "applied")
+    o = json.loads(f.read_text())
+    first = o["drafts"][0]
+    o["drafts"] = [{**first, "followup_7d": "Following up on my note.", "followup_14d": "Closing the loop."}]
+    f.write_text(json.dumps(o))
+    got = inbox_svc.job_drafts(Path(f).parent)
+    assert [d["kind"] for d in got] == [first["kind"], "followup_7d", "followup_14d"]
+    assert got[1]["body"] == "Following up on my note." and got[1]["contact"] == first["contact"]
+    assert got[2]["body"] == "Closing the loop." and not got[1]["sent"]
+
+
+def test_last_sync_ignores_failed_inbox_sync_runs(data, idx):
+    from careeros.runs.store import RunStore, iso
+
+    rs = RunStore(data["settings"])
+    ok = rs.new_run("inbox_sync", "schedule", {}, NOW - timedelta(hours=6))
+    ok.update({"status": "done", "stop_reason": "completed", "ended_at": iso(NOW - timedelta(hours=6))})
+    rs.save_run(ok)
+    bad = rs.new_run("inbox_sync", "schedule", {}, NOW - timedelta(hours=1))
+    bad.update({"status": "failed", "stop_reason": "error", "ended_at": iso(NOW - timedelta(hours=1))})
+    rs.save_run(bad)
+    idx.sync()
+    assert inbox_svc.list_inbox(data["settings"], idx, NOW)["last_sync"] == iso(NOW - timedelta(hours=6))

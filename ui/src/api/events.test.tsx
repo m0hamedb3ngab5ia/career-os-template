@@ -48,7 +48,8 @@ describe("keysForChange", () => {
       ["contacts"],
       ["status"],
     ]);
-    expect(keysForChange({ status: true })).toEqual([["status"]]);
+    // data/sync_updates.json (pending inbox-sync updates) arrives as a bare status change: the Inbox refetches too
+    expect(keysForChange({ status: true })).toEqual([["status"], ["inbox"]]);
     expect(keysForChange({})).toEqual([]);
   });
 });

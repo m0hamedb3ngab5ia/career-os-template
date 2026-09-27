@@ -46,7 +46,10 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["contacts"]); // outreach.manual_if_connected / manual_if_mutuals
     add(["status"]);
   }
-  if (p.status) add(["status"]);
+  if (p.status) {
+    add(["status"]);
+    add(["inbox"]); // data/sync_updates.json: pending inbox-sync updates in the Inbox thread
+  }
   return keys;
 }
 

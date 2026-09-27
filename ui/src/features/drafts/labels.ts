@@ -6,6 +6,8 @@ const KINDS: Record<string, string> = {
   cold_email: "Intro note",
   post_apply_outreach: "After-apply note",
   status_followup: "Status follow-up",
+  followup_7d: "7-day follow-up",
+  followup_14d: "14-day follow-up",
   post_interview_thanks: "Thank-you after interview",
   after_rejection: "Optional reply",
   reply_with_slot: "Reply with a slot",
