@@ -8,6 +8,8 @@ from __future__ import annotations
 from datetime import datetime, timedelta
 from typing import Any
 
+from typing_extensions import TypedDict
+
 from careeros.config import ConfigError
 from careeros.ui.config import load_ui_config
 
@@ -15,6 +17,134 @@ POST_APPLY = ("applied", "screening", "interview", "offer")      # the Inbox & f
 RESPONDED = ("screening", "interview", "offer", "rejected")
 RESPONSE_DAYS = 30
 ROWS = 10
+
+
+# Response shapes: FastAPI turns these into the OpenAPI schema that ui/src/api/schema.gen.ts is generated from.
+# Index columns are nullable TEXT, hence `| None`. `paused` and `catch_up` are the run store's JSON files as
+# written, so they stay open mappings (a typed shape would drop keys it does not list).
+class TileRow(TypedDict):
+    job_id: str
+    company: str | None
+    role: str | None
+    detail: str | None
+    when: str | None
+
+
+class ActionRow(TypedDict):
+    id: str
+    job_id: str | None
+    company: str | None
+    role: str | None
+    what: str | None
+    type: str | None
+    priority: str | None
+    needs: str | None
+    link: str | None
+    created: str | None
+
+
+class AppliedWeekTile(TypedDict):
+    value: int
+    since: str
+    daily_cap: int | None
+    rows: list[TileRow]
+
+
+class NeedsYouTile(TypedDict):
+    value: int
+    high: int
+    rows: list[ActionRow]
+
+
+class InterviewsTile(TypedDict):
+    value: int
+    rows: list[TileRow]
+
+
+class ResponseBreakdown(TypedDict):
+    status: str
+    count: int
+    companies: list[str | None]
+
+
+class ResponseRateTile(TypedDict):
+    rate: float | None
+    responded: int
+    applied: int
+    days: int
+    definition: str
+    rows: list[TileRow]
+    breakdown: list[ResponseBreakdown]
+
+
+class Tiles(TypedDict):
+    applied_week: AppliedWeekTile
+    needs_you: NeedsYouTile
+    interviews: InterviewsTile
+    response_rate: ResponseRateTile
+
+
+class PipelineColumnCount(TypedDict):
+    name: str
+    statuses: list[str]
+    count: int
+
+
+class ClosedCount(TypedDict):
+    count: int
+    by_status: dict[str, int]
+
+
+class PipelineCounts(TypedDict):
+    columns: list[PipelineColumnCount]
+    closed: ClosedCount
+
+
+class Counts(TypedDict):
+    jobs: int
+    action_items_open: int
+    inbox: int
+    contacts: int
+
+
+class RunRow(TypedDict):
+    id: str
+    kind: str | None
+    trigger: str | None
+    status: str | None
+    stop_reason: str | None
+    detail: str | None
+    started_at: str | None
+    ended_at: str | None
+    duration_s: float | None
+    attempted: int | None
+    ok: int | None
+    failed: int | None
+    interrupted: bool
+
+
+class ScheduleState(TypedDict):
+    last_tick: str | None
+    next: dict[str, str | None]
+    error: str | None
+
+
+class IndexState(TypedDict):
+    indexed_at: str | None
+
+
+class Status(TypedDict):
+    now: str
+    tiles: Tiles
+    pipeline: PipelineCounts
+    counts: Counts
+    recent_runs: list[RunRow]
+    paused: dict[str, Any] | None
+    catch_up: dict[str, Any] | None
+    schedule: ScheduleState
+    index: IndexState
+
+
 _PRIO = "CASE priority WHEN 'H' THEN 0 WHEN 'M' THEN 1 WHEN 'L' THEN 2 ELSE 3 END"
 
 
@@ -34,11 +164,11 @@ def week_start(now: datetime) -> datetime:
     return (local - timedelta(days=local.weekday())).replace(hour=0, minute=0, second=0, microsecond=0)
 
 
-def _job_row(j: dict[str, Any], detail: str, when: str | None) -> dict[str, Any]:
+def _job_row(j: dict[str, Any], detail: str, when: str | None) -> TileRow:
     return {"job_id": j["job_id"], "company": j["company"], "role": j["title"], "detail": detail, "when": when}
 
 
-def _breakdown(window: list[dict[str, Any]]) -> list[dict[str, Any]]:
+def _breakdown(window: list[dict[str, Any]]) -> list[ResponseBreakdown]:
     """The response-rate popover: applications in the window by how far they got (no_reply = still waiting)."""
     out = []
     for key in (*[s for s in ("interview", "screening", "offer") if s in RESPONDED], "rejected", "no_reply"):
@@ -47,7 +177,7 @@ def _breakdown(window: list[dict[str, Any]]) -> list[dict[str, Any]]:
     return out
 
 
-def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
+def tiles(ix: Any, settings: Any, now: datetime) -> Tiles:
     from careeros.runs.policy import daily_cap
 
     applied = [j for j in ix.query("SELECT * FROM jobs WHERE applied_at IS NOT NULL ORDER BY applied_at DESC")
@@ -81,7 +211,7 @@ def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
     }
 
 
-def pipeline(ix: Any, settings: Any) -> dict[str, Any]:
+def pipeline(ix: Any, settings: Any) -> PipelineCounts:
     ui = load_ui_config(settings)
     by = {r["status"]: r["n"] for r in ix.query("SELECT status, COUNT(*) AS n FROM jobs GROUP BY status")}
     closed = {s: by[s] for s in ui.closed if by.get(s)}
@@ -90,7 +220,7 @@ def pipeline(ix: Any, settings: Any) -> dict[str, Any]:
             "closed": {"count": sum(closed.values()), "by_status": closed}}
 
 
-def run_row(r: dict[str, Any]) -> dict[str, Any]:
+def run_row(r: dict[str, Any]) -> RunRow:
     from careeros.runs.locks import pid_alive
 
     out = {k: r[k] for k in ("id", "kind", "trigger", "status", "stop_reason", "detail", "started_at", "ended_at",
@@ -99,7 +229,7 @@ def run_row(r: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
-def schedule(settings: Any, now: datetime) -> dict[str, Any]:
+def schedule(settings: Any, now: datetime) -> ScheduleState:
     from careeros.runs.tick import schedule_overview
 
     try:
@@ -109,7 +239,7 @@ def schedule(settings: Any, now: datetime) -> dict[str, Any]:
     return {"last_tick": ov["last_tick"], "next": ov["next"], "error": None}
 
 
-def status(settings: Any, ix: Any, now: datetime) -> dict[str, Any]:
+def status(settings: Any, ix: Any, now: datetime) -> Status:
     from careeros.runs.store import RunStore
     from careeros.runs.tick import load_catch_up
 
