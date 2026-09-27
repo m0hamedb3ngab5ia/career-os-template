@@ -49,6 +49,13 @@ jobs:
           cache-dependency-path: ui/package-lock.json
       - name: Install
         run: npm ci
+      - name: Generated API types are up to date
+        run: |
+          npm run gen:api
+          if ! git diff --exit-code -- src/api/schema.gen.ts; then
+            echo "::error::ui/src/api/schema.gen.ts differs from 'npm run gen:api'. Regenerate it from ui/openapi.json and commit the result."
+            exit 1
+          fi
       - name: Typecheck
         run: npm run typecheck
       - name: Unit + component tests

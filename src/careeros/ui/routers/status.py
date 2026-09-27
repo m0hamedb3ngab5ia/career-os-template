@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from typing import Any
-
 from fastapi import APIRouter, Depends
 
 from careeros.ui.routers import ctx
@@ -11,5 +9,5 @@ router = APIRouter(tags=["status"])
 
 
 @router.get("/status")
-def status(c=Depends(ctx)) -> dict[str, Any]:
+def status(c=Depends(ctx)) -> svc.Status:
     return svc.status(c.settings, c.index, c.now())

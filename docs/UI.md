@@ -53,6 +53,24 @@ write through an Excel lock. Until then, UI writes go through `Tracker` and inhe
 UI writes always go through the existing APIs (`Store.set_status`, `Tracker.set_status`, `Tracker.mark_action_done`,
 `careeros outreach mark`, …), then the indexer picks up the changed files. The UI never edits JSON directly.
 
+### API types (generated)
+
+The frontend's API types come from FastAPI's OpenAPI schema, not from hand-written copies. A route gets a shape by
+annotating its service function with a `TypedDict` (`NotRequired[...]` for keys the backend may leave out); routes
+that still return `dict[str, Any]` keep hand-written types in `ui/src/features/*/types.ts`, as do SSE payloads.
+After changing a response shape, regenerate and commit both files:
+
+```bash
+.venv/bin/python -m careeros.ui.openapi > ui/openapi.json   # sorted keys, no machine-specific values
+cd ui && npm run gen:api                                     # openapi.json -> src/api/schema.gen.ts
+```
+
+`tests/integration/test_ui_openapi_integration.py` fails when `ui/openapi.json` is stale, and CI fails when
+`schema.gen.ts` differs from a fresh `npm run gen:api`. Use the generated types through aliases
+(`components["schemas"]["Status"]`) in `ui/src/api/types.ts`. A `TypedDict` return filters the response to its
+listed keys, so snapshot the endpoint's JSON first (`tests/fixtures/ui_snapshots/`, refresh with
+`CAREEROS_UPDATE_SNAPSHOTS=1`) to prove no key is dropped.
+
 ## Live updates
 
 A file watcher (`watchfiles`) on `data/jobs/**`, `data/runs/**`, `data/*.json|yaml` and the tracker path re-indexes the changed job
