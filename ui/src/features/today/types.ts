@@ -23,8 +23,11 @@ export interface ActionItem {
   needs?: string | null;
   link?: string | null;
   created?: string | null;
+  /** Same fields as /api/actions (services/actions.py): ISO deadline, date-only flag, overdue | soon | later | none. */
   due?: string | null;
+  due_date_only?: boolean;
   due_reason?: string | null;
+  level?: string;
 }
 
 export interface ResponseBreakdown {

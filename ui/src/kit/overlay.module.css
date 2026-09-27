@@ -1,4 +1,4 @@
-/* Dialog and Sheet */
+/* Dialog (the side sheet is kit/Sheet.tsx) */
 .backdrop {
   position: fixed;
   inset: 0;
@@ -9,11 +9,6 @@
   padding: var(--space-4);
   background: rgba(0, 0, 0, 0.32);
   overscroll-behavior: contain;
-}
-.backdrop[data-variant="sheet"] {
-  align-items: stretch;
-  justify-content: flex-end;
-  padding: 0;
 }
 .modal {
   display: flex;
@@ -26,14 +21,6 @@
   border: 1px solid var(--sep);
   box-shadow: var(--shadow-popover);
   animation: pop 0.16s ease-out;
-}
-.modal[data-variant="sheet"] {
-  width: min(420px, 100%);
-  max-height: none;
-  height: 100dvh;
-  border-radius: var(--r-card) 0 0 var(--r-card);
-  padding-bottom: env(safe-area-inset-bottom);
-  animation: slide 0.2s ease-out;
 }
 .head {
   display: flex;
@@ -85,12 +72,6 @@
   from {
     opacity: 0;
     transform: scale(0.98);
-  }
-}
-@keyframes slide {
-  from {
-    transform: translateX(24px);
-    opacity: 0;
   }
 }
 

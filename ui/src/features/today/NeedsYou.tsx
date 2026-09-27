@@ -8,7 +8,8 @@ import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
 import { PillGroup } from "../../kit/PillGroup";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { useToast } from "../../kit/Toast";
-import { dueInfo } from "../../lib/dates";
+import { dueInfo, type DueLevel } from "../../lib/dates";
+import { formatDue } from "../../lib/format";
 import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
 import {
@@ -62,7 +63,7 @@ export function NeedsYou() {
     markDone.mutate(item, {
       onSuccess: (res) =>
         toast.show({
-          message: `Marked ${item.company} done.${res?.queued ? " The tracker is open in Excel, so the change is queued." : ""}`,
+          message: `Marked ${item.company} done.${res?.queued.length ? " The tracker is open in Excel, so the change is queued." : ""}`,
           seconds: undoSeconds,
           onUndo: () =>
             reopen.mutate(item, {
@@ -156,7 +157,12 @@ export function NeedsYou() {
 }
 
 function ActionRow({ item, now, onDone }: { item: ActionItem; now: Date; onDone: (item: ActionItem) => void }) {
-  const due = dueInfo(item.due, now);
+  const info = dueInfo(item.due, now);
+  // Same fields as /api/actions: a date-only deadline has no time of day; the server's level wins when present.
+  const due = info && {
+    text: item.due_date_only ? (formatDue(item.due, true, now) ?? info.text) : info.text,
+    level: (item.level as DueLevel | undefined) ?? info.level,
+  };
   const link = linkInfo(item.link);
   return (
     <li className={styles.row} data-action-id={String(item.id)}>

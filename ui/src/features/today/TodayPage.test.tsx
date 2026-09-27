@@ -78,12 +78,12 @@ describe("TodayPage", () => {
 
     it("Prepare queued shows the queue size and posts the recommended preset", async () => {
       const user = userEvent.setup();
-      const { calls } = setup({ "POST /api/runs/batches/prepare": { kind: "prepare", started: true } });
+      const { calls } = setup({ "POST /api/runs": { kind: "prepare", started: true } });
       const btn = await screen.findByRole("button", { name: "Prepare queued (3)" });
       await waitFor(() => expect(btn).toBeEnabled());
       await user.click(btn);
       expect(await screen.findByText("Prepare started.")).toBeInTheDocument();
-      expect(calls.find((c) => c.path === "/api/runs/batches/prepare")?.body).toEqual({ preset: "medium" });
+      expect(calls.find((c) => c.path === "/api/runs")?.body).toEqual({ kind: "prepare", preset: "medium" });
     });
 
     it("Prepare is disabled with a reason when nothing is queued", async () => {

@@ -337,8 +337,11 @@ def check_form_fields(labels: list[str], status: str | None = None, page_url: st
 
 def auto_submit_allowed(p: Posting, settings: Settings) -> tuple[bool, str]:
     """(True, "") only for an allowlisted ATS reached on its own domain (or the company's), from the
-    company's board. Aggregator postings need `raw.resolved_from` (set once resolved to the real board)."""
+    company's board. Aggregator postings need `raw.resolved_from` (set once resolved to the real board).
+    `targets.yaml: safety.pause_auto_submit: true` turns it off for every job (Settings › Safety)."""
     safety = settings.targets.get("safety") or {}
+    if safety.get("pause_auto_submit") is True:
+        return False, "auto-submit is paused (safety.pause_auto_submit); you submit every application"
     allowed = [str(a).lower() for a in safety.get("auto_submit_ats") or []]
     ats = (p.ats or "").lower()
     if ats not in allowed:

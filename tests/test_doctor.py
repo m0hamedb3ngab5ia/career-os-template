@@ -549,6 +549,20 @@ def test_run_doctor_reports_runs_config(tmp_path):
     assert fails and fails[0].level == FAIL
 
 
+def test_run_doctor_fails_an_index_path_that_careeros_ui_refuses(tmp_path):
+    root = filled(tmp_path)
+    p = root / "config" / "pipeline.yaml"
+    data = yaml.safe_load(p.read_text())
+    data.setdefault("ui", {})["index_path"] = data["paths"]["tracker_xlsx"]
+    p.write_text(yaml.safe_dump(data))
+    ui = [c for c in doctor(root) if c.name == "ui"]
+    assert [c.level for c in ui] == [FAIL] and "index_path" in ui[0].detail
+
+
+def test_run_doctor_quiet_about_ui_on_the_default_index_path(tmp_path):
+    assert not [c for c in doctor(filled(tmp_path)) if c.name == "ui"]
+
+
 def test_check_runs_still_validates_the_schedule_when_headless_warns():
     from careeros.doctor import check_runs
 

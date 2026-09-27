@@ -9,9 +9,11 @@ interface SwitchProps {
   /** Hide the visible label when the row already shows it; it stays the accessible name. */
   labelHidden?: boolean;
   disabled?: boolean;
+  /** Id(s) of hint or error text for aria-describedby. */
+  describedBy?: string;
 }
 
-export function Switch({ checked, onCheckedChange, label, labelHidden = false, disabled }: SwitchProps) {
+export function Switch({ checked, onCheckedChange, label, labelHidden = false, disabled, describedBy }: SwitchProps) {
   const id = useId();
   return (
     <label className={styles.switchRow}>
@@ -20,6 +22,7 @@ export function Switch({ checked, onCheckedChange, label, labelHidden = false, d
         role="switch"
         aria-checked={checked}
         aria-labelledby={id}
+        aria-describedby={describedBy}
         className={styles.switch}
         disabled={disabled}
         onClick={() => onCheckedChange(!checked)}

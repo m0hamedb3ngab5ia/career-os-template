@@ -124,7 +124,7 @@ export function SafetyCard({ jobId, company, tier, safety, registry }: Props) {
       {confirmClear ? (
         <ConfirmPanel
           question={`Clear the flag on ${company}?`}
-          description="Its postings stop being blocked or sent for review."
+          detail="Its postings stop being blocked or sent for review."
           cancelLabel="Keep flag"
           confirmLabel="Clear flag"
           pending={clear.isPending}

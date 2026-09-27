@@ -56,23 +56,16 @@ def closed(data):
 
 # --- Today -------------------------------------------------------------------------------------------------------
 
-def test_open_actions_lists_every_open_item_with_empty_due(data, idx):
-    items = today_svc.open_actions(idx)
+def test_open_actions_are_the_action_items_services_items(data, idx):
+    """One source: Today's items carry the same fields as /api/actions (due, due_date_only, level, bucket)."""
+    from careeros.ui.services.actions import _item
+
+    items = today_svc.open_actions(idx, NOW, timezone.utc, 48)
     assert [i["company"] for i in items] == ["Umbrella Labs", "Initech", "Stark Industries"]
-    assert all(i["due"] is None and i["due_reason"] is None for i in items)
+    by_id = {r["id"]: r for r in idx.query("SELECT * FROM action_items")}
+    assert all(i == _item(by_id[i["id"]], NOW, timezone.utc, 48) for i in items)
+    assert all({"due", "due_date_only", "due_reason", "level"} <= i.keys() for i in items)
     assert items[0]["link"] == "https://boards.example.com/review" and items[0]["needs"] == "laptop"
-
-
-def test_mark_done_and_reopen_go_through_the_tracker(data):
-    s, aid = data["settings"], data["actions"]["high"]
-    assert today_svc.mark_done(s, aid) == {"ok": True, "queued": False}
-    assert aid not in {i["ID"] for i in Tracker(settings=s).list_action_items()}
-    assert today_svc.reopen(s, aid) == {"ok": True, "queued": False}
-    assert aid in {i["ID"] for i in Tracker(settings=s).list_action_items()}
-    with pytest.raises(LookupError):
-        today_svc.mark_done(s, "nope")
-    with pytest.raises(LookupError):
-        today_svc.reopen(s, "nope")
 
 
 def test_prepare_queue_counts_real_candidates(data):
@@ -200,7 +193,7 @@ def _tracker_status(s, jid):
 def test_set_status_writes_status_json_and_tracker(data):
     s, jid = data["settings"], data["jobs"]["queued"]
     out = acts.set_status(s, jid, "needs_review", "checked by hand")
-    assert out == {"status": "needs_review", "previous": "queued"}
+    assert out == {"job_id": jid, "status": "needs_review", "previous": "queued"}
     assert Store(s).get_status(jid) == "needs_review" and _tracker_status(s, jid) == "needs_review"
     with pytest.raises(ValueError):
         acts.set_status(s, jid, "bogus")
@@ -237,7 +230,7 @@ def test_set_status_refuses_applied_except_to_undo_a_withdraw(data):
 
 def test_withdraw_then_undo(data):
     s, jid = data["settings"], data["jobs"]["applied"]
-    assert acts.withdraw(s, jid) == {"status": "withdrawn", "previous": "applied"}
+    assert acts.withdraw(s, jid) == {"job_id": jid, "status": "withdrawn", "previous": "applied"}
     assert Store(s).get_status(jid) == "withdrawn"
     acts.set_status(s, jid, "applied", "undo withdraw")
     assert Store(s).get_status(jid) == "applied"
@@ -245,7 +238,7 @@ def test_withdraw_then_undo(data):
 
 def test_set_status_undo_restores_applied_only_right_after_leaving_it(data):
     s, jid = data["settings"], data["jobs"]["applied"]
-    assert acts.set_status(s, jid, "interview") == {"status": "interview", "previous": "applied"}
+    assert acts.set_status(s, jid, "interview") == {"job_id": jid, "status": "interview", "previous": "applied"}
     acts.set_status(s, jid, "applied", "undo status change")  # the Undo toast of the change just made
     assert Store(s).get_status(jid) == "applied"
     acts.set_status(s, jid, "interview")

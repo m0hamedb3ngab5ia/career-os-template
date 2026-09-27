@@ -113,13 +113,13 @@ describe("NeedsYou", () => {
     let open = today.actions!;
     const { calls } = setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
-      "POST /api/today/actions/12/done": () => {
+      "POST /api/actions/12/done": () => {
         open = open.filter((a) => a.id !== 12);
-        return json({ ok: true, queued: false });
+        return json({ ok: ["12"], queued: [], missing: [] });
       },
-      "POST /api/today/actions/12/reopen": () => {
+      "POST /api/actions/12/reopen": () => {
         open = today.actions!;
-        return json({ ok: true, queued: false });
+        return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
     await screen.findByText("Globex");
@@ -127,13 +127,13 @@ describe("NeedsYou", () => {
     await waitFor(() => expect(screen.queryByText("Globex")).not.toBeInTheDocument());
     const toast = await screen.findByText("Marked Globex done.");
     expect(toast.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
-    const done = calls.find((c) => c.method === "POST" && c.path === "/api/today/actions/12/done");
+    const done = calls.find((c) => c.method === "POST" && c.path === "/api/actions/12/done");
     expect(done?.headers.get("X-CareerOS")).toBe("1");
 
     await user.click(screen.getByRole("button", { name: "Undo" }));
     expect(await screen.findByText("Globex")).toBeInTheDocument();
     await waitFor(() =>
-      expect(calls.some((c) => c.method === "POST" && c.path === "/api/today/actions/12/reopen")).toBe(true),
+      expect(calls.some((c) => c.method === "POST" && c.path === "/api/actions/12/reopen")).toBe(true),
     );
   });
 
@@ -142,9 +142,9 @@ describe("NeedsYou", () => {
     let open = today.actions!;
     setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
-      "POST /api/today/actions/12/done": () => {
+      "POST /api/actions/12/done": () => {
         open = open.filter((a) => a.id !== 12);
-        return json({ ok: true, queued: false });
+        return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
     await screen.findByText("Globex");
@@ -161,9 +161,9 @@ describe("NeedsYou", () => {
     let open = today.actions!.filter((a) => a.id === 12);
     setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
-      "POST /api/today/actions/12/done": () => {
+      "POST /api/actions/12/done": () => {
         open = [];
-        return json({ ok: true, queued: false });
+        return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
     await user.click(await screen.findByRole("checkbox", { name: /^Mark Globex: / }));
@@ -172,7 +172,7 @@ describe("NeedsYou", () => {
 
   it("puts the row back and shows the server's reason when mark done fails", async () => {
     const user = userEvent.setup();
-    setup("/", { "POST /api/today/actions/12/done": { $status: 409, body: { detail: "Tracker is busy" } } });
+    setup("/", { "POST /api/actions/12/done": { $status: 409, body: { detail: "Tracker is busy" } } });
     await screen.findByText("Globex");
     await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: Interview invite/ }));
     expect(await screen.findByText(/Tracker is busy/)).toBeInTheDocument();
@@ -181,7 +181,7 @@ describe("NeedsYou", () => {
 
   it("says when the change is queued behind an open tracker", async () => {
     const user = userEvent.setup();
-    setup("/", { "POST /api/today/actions/12/done": () => json({ ok: true, queued: true }) });
+    setup("/", { "POST /api/actions/12/done": () => json({ ok: [], queued: ["12"], missing: [] }) });
     await screen.findByText("Globex");
     await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: Interview invite/ }));
     expect(await screen.findByText(/Marked Globex done\. .*queued/)).toBeInTheDocument();

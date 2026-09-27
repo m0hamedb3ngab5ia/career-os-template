@@ -113,7 +113,7 @@ def _write_status(settings: Any, job_id: str, status: str, note: str | None) -> 
     ensure_unlocked(settings, job_id)
     previous = Store(settings).get_status(job_id)
     set_status_both(settings, job_id, status, (note or "set in careeros ui").strip()[:200])
-    return {"status": status, "previous": previous}
+    return {"job_id": job_id, "status": status, "previous": previous}
 
 
 def withdraw(settings: Any, job_id: str, note: str | None = None) -> dict[str, Any]:

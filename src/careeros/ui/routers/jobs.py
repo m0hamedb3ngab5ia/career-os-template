@@ -11,6 +11,7 @@ from careeros.ui.routers import ctx
 from careeros.ui.routers._errors import refusals
 from careeros.ui.services import job_actions as acts
 from careeros.ui.services import jobs as svc
+from careeros.ui.services.reindex import after_write
 
 router = APIRouter(tags=["jobs"])
 
@@ -119,25 +120,33 @@ class ClearBody(BaseModel):
 @router.post("/jobs/{job_id}/status")
 def set_status(job_id: str, body: StatusBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
-        return acts.set_status(c.settings, job_id, body.status, body.note)
+        out = acts.set_status(c.settings, job_id, body.status, body.note)
+    after_write(c, jobs=[job_id], tracker=True)
+    return out
 
 
 @router.post("/jobs/{job_id}/withdraw")
 def withdraw(job_id: str, body: NoteBody | None = None, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
-        return acts.withdraw(c.settings, job_id, body.note if body else None)
+        out = acts.withdraw(c.settings, job_id, body.note if body else None)
+    after_write(c, jobs=[job_id], tracker=True)
+    return out
 
 
 @router.post("/jobs/{job_id}/submitted")
 def mark_submitted(job_id: str, body: NoteBody | None = None, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
-        return acts.mark_submitted(c.settings, job_id, body.note if body else None)
+        out = acts.mark_submitted(c.settings, job_id, body.note if body else None)
+    after_write(c, jobs=[job_id], tracker=True)
+    return out
 
 
 @router.post("/jobs/{job_id}/override")
 def set_override(job_id: str, body: OverrideBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
-        return acts.set_override(c.settings, job_id, body.value)
+        out = acts.set_override(c.settings, job_id, body.value)
+    after_write(c, jobs=[job_id], tracker=True)
+    return out
 
 
 @router.post("/jobs/{job_id}/qa")

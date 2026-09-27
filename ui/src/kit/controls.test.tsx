@@ -161,12 +161,12 @@ describe("ConfirmPanel", () => {
   });
 });
 
-describe("ConfirmPanel description", () => {
+describe("ConfirmPanel detail", () => {
   it("adds an optional second line as the accessible description", () => {
     render(
       <ConfirmPanel
         question="Withdraw from Acme?"
-        description="career-os stops all work on this job."
+        detail="career-os stops all work on this job."
         cancelLabel="Keep application"
         confirmLabel="Withdraw"
         onCancel={() => undefined}
@@ -176,6 +176,24 @@ describe("ConfirmPanel description", () => {
     expect(screen.getByRole("alertdialog", { name: "Withdraw from Acme?" })).toHaveAccessibleDescription(
       "career-os stops all work on this job.",
     );
+  });
+});
+
+describe("ConfirmPanel pending", () => {
+  it("keeps the outcome on the busy button: Withdraw…", () => {
+    render(
+      <ConfirmPanel
+        question="Withdraw from Acme?"
+        cancelLabel="Keep application"
+        confirmLabel="Withdraw"
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+        pending
+      />,
+    );
+    const b = screen.getByRole("button", { name: "Withdraw…" });
+    expect(b).toBeDisabled();
+    expect(b).toHaveAttribute("aria-busy", "true");
   });
 });
 

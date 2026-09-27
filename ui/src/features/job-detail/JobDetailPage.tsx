@@ -98,7 +98,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
         {confirmWithdraw ? (
           <ConfirmPanel
             question={`Withdraw from ${company}?`}
-            description="career-os stops all work on this job. Your documents stay in the job folder."
+            detail="career-os stops all work on this job. Your documents stay in the job folder."
             cancelLabel="Keep application"
             confirmLabel="Withdraw"
             pending={withdraw.isPending}

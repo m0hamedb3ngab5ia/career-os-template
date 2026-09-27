@@ -10,7 +10,8 @@ from __future__ import annotations
 
 from typing import Any
 
-from careeros import retention
+from careeros import outreach, retention
+from careeros.doctor import KNOWN_ATS
 from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
@@ -19,6 +20,8 @@ from careeros.ui import config as ui_cfg
 from careeros.ui.settings_schema.model import Field, Group, Policy, Section
 
 P, T, C, Q = "pipeline", "targets", "companies", "qa"
+# Shown, not editable: a key no step reads yet (tests/test_settings_schema.py fails when one gains a reader).
+UNUSED = {"readonly": True, "note": "Not used yet: no step reads this setting."}
 
 # Every safety check code (src/careeros/safety/scam.py, ghost.py); a test keeps this in step with the source.
 SAFETY_CODES = (
@@ -85,11 +88,17 @@ def _domains(v: dict[Any, Any]) -> str | None:
     return None
 
 
+def _file_path(v: Any) -> str | None:
+    return "Enter a file path, e.g. data/JobTracker.xlsx." if not str(v or "").strip() else None
+
+
 def _boards(v: list[dict[str, Any]]) -> str | None:
     for i, b in enumerate(v, 1):
         if not b.get("company") or not b.get("ats"):
             return f"Board {i} needs a company and an ATS."
         ats = str(b["ats"]).lower()
+        if ats not in KNOWN_ATS:
+            return f"Board {i} ({b['company']}): unknown ATS {b['ats']}. Use one of {', '.join(sorted(KNOWN_ATS))}."
         if ats in ATS_WITH_SLUG and not str(b.get("slug") or "").strip():
             return f"Board {i} ({b['company']}) needs a {ats} slug."
         if ats not in ATS_WITH_SLUG and not str(b.get("url") or "").strip():
@@ -158,7 +167,16 @@ OUTREACH_FIELDS = (
             "1st-degree LinkedIn connections never get an automated message; they become an Action Item."),
     _switch(P, "outreach.manual_if_mutuals", "Tailor by hand when you have mutual connections", True,
             "Anyone with mutuals is handled by hand. Record what LinkedIn shows with `careeros outreach mark`."),
+    _num(P, "outreach.mutuals_threshold", "Minimum mutual connections", outreach.OutreachPolicy.mutuals_threshold,
+         lo=outreach.MUTUALS_THRESHOLD_RANGE[0], hi=outreach.MUTUALS_THRESHOLD_RANGE[1], unit="or more",
+         help="Counts people with at least this many mutual connections."),
 )
+# Rules the code enforces with no key to change them (shown as locked rows).
+DREAM_FLAG_ONLY = Policy("Dream companies", "Flag only",
+                         "Ghost-job checks only flag a dream company for review; they never skip it.")
+MANUAL_LOCK = Policy("Manual commands during a run", "Share the job lock",
+                     "/prepare-job, /apply-job and `careeros job status` take the same per-job lock as runs; on a job "
+                     "a run is working on they stop and say so. Run them again once the run moves on.")
 
 
 def _tier(t: str, desc: str, auto: bool, cover: str, outreach: str, review: list[str]) -> Group:
@@ -181,6 +199,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("general", "General", (
         Group("files", "Files", (
             Field(P, "paths.tracker_xlsx", "text", "Tracker spreadsheet", default="data/JobTracker.xlsx",
+                  check=_file_path,
                   help="Where JobTracker.xlsx is exported. Relative to the repo, or ~/… for anywhere."),
         )),
         Group("app", "App", (
@@ -195,10 +214,19 @@ SECTIONS: tuple[Section, ...] = (
                   min=1, max=60, integer=True, unit="s"),
             Field(P, "ui.page_size", "number", "Rows per page", default=ui_cfg.UiConfig.page_size, min=20, max=1000,
                   integer=True, help="Jobs and Runs history."),
+            Field(P, "ui.pause_until_tomorrow_at", "time", "Pause until tomorrow ends at",
+                  default=ui_cfg.UiConfig.pause_until_tomorrow_at,
+                  help="Runs › Pause all › Until tomorrow lifts the pause at this local time tomorrow."),
             Field(P, "ui.watch_debounce_ms", "number", "Refresh after files are quiet for",
                   default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
             Field(P, "ui.pipeline.columns", "records", "Pipeline columns", default=ui_cfg.DEFAULT_COLUMNS,
                   check=_ui_columns, help="One column per stage; statuses in no column count as Closed."),
+            Field(P, "ui.pipeline.card_limit", "number", "Cards per Pipeline column",
+                  default=ui_cfg.UiConfig.card_limit, min=1, max=500, integer=True,
+                  help="The rest of a column opens with Show all."),
+            Field(P, "ui.due_soon_hours", "number", "Action Items are due soon within",
+                  default=ui_cfg.UiConfig.due_soon_hours, min=1, max=24 * 14, integer=True, unit="h",
+                  help="Due soon shows orange; overdue shows red."),
         )),
         Group("claude", "Claude", (
             Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),
@@ -207,7 +235,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("resume", "Résumé", (
             Field(P, "resume_build.engine", "select", "LaTeX engine", default="tectonic",
-                  options=("tectonic", "pdflatex")),
+                  options=("tectonic", "pdflatex"), **UNUSED),
             Policy("Résumé length", "One page", "A hard QA rule."),
         )),
     )),
@@ -216,8 +244,8 @@ SECTIONS: tuple[Section, ...] = (
             _personal(T, "candidate.level", "select", "Level", options=("new_grad", "early_career")),
             _personal(T, "candidate.graduation", "text", "Graduation", pattern=r"\d{4}-(0[1-9]|1[0-2])",
                       help="Year and month, e.g. 2026-05."),
-            _num(T, "candidate.current_base_usd", "Current base salary", None, unit="USD", nullable=True,
-                 personal=True),
+            _personal(T, "candidate.current_base_usd", "number", "Current base salary", unit="USD", nullable=True,
+                      min=0, integer=True, **UNUSED),
             _num(T, "candidate.min_base_usd", "Minimum base salary", None, unit="USD", personal=True,
                  help="Postings whose top of range is below this are skipped. Unknown salary is allowed."),
             _num(T, "candidate.salary_dropdown_floor_usd", "Salary dropdown floor", None, unit="USD", personal=True,
@@ -253,7 +281,8 @@ SECTIONS: tuple[Section, ...] = (
         Group("thresholds", "Fit thresholds", (
             _num(T, "thresholds.min_fit_to_prepare", "Minimum fit to prepare", 70, hi=100),
             _num(T, "thresholds.min_fit_nonpreferred_location", "Minimum fit outside preferred cities", 85, hi=100),
-            _num(T, "thresholds.boost_industry_bonus", "Boost for preferred industries", 5, hi=100, unit="points"),
+            Field(T, "thresholds.boost_industry_bonus", "number", "Boost for preferred industries", default=5,
+                  min=0, max=100, integer=True, unit="points", **UNUSED),
             _num(T, "thresholds.tier_a_min_fit", "Minimum fit for dream companies", 60, hi=100),
         )),
     )),
@@ -287,6 +316,8 @@ SECTIONS: tuple[Section, ...] = (
                   ["workday", "icims", "taleo", "smartrecruiters", "jobvite", "successfactors", "custom"],
                   options=ATS_FAMILIES, strict=True),
             _tags(T, "safety.pause_on", "Always stop and ask on", list(PAUSE_TRIGGERS), options=PAUSE_TRIGGERS),
+            _switch(T, "safety.pause_auto_submit", "Pause all auto-submit", False,
+                    "Everything stops at Prepared until you turn this off: Apply fills the form and you submit."),
         )),
         Group("scam", "Scam checks", (
             _num(T, "safety.scam.salary_max_multiple", "Review salaries above", 3, lo=1, integer=False,
@@ -306,6 +337,7 @@ SECTIONS: tuple[Section, ...] = (
                  unit="days"),
             _num(T, "safety.ghost.layoff_window_days", "Layoffs count for", G["layoff_window_days"], lo=1,
                  unit="days"),
+            DREAM_FLAG_ONLY,
         )),
         Group("levels", "Check levels", (
             Field(T, "safety.levels", "reason_levels", "Change a check's level", default={}, options=SAFETY_CODES,
@@ -317,7 +349,7 @@ SECTIONS: tuple[Section, ...] = (
         Group("sources", "Sources", (
             _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby"],
                   options=("greenhouse", "lever", "ashby"), strict=True),
-            _tags(C, "searches.keywords", "Search phrases", None, personal=True),
+            _tags(C, "searches.keywords", "Search phrases", None, personal=True, **UNUSED),
         )),
         Group("filters", "Filters", (
             _switch(T, "scout.filters.blocklist", "Skip blocked companies", True),
@@ -354,11 +386,12 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("notifications", "Notifications", (
         Group("notify", "Notify me", (
-            Field(P, "notify.on_interview", "select", "Interview invite", default="push", options=("push", "none")),
-            Field(P, "notify.on_offer", "select", "Offer", default="push", options=("push", "none")),
+            Field(P, "notify.on_interview", "select", "Interview invite", default="push", options=("push", "none"),
+                  **UNUSED),
+            Field(P, "notify.on_offer", "select", "Offer", default="push", options=("push", "none"), **UNUSED),
             Field(P, "notify.on_qa_fail", "select", "QA failure", default="action_item_only",
-                  options=("action_item_only", "push", "none")),
-            _switch(P, "notify.daily_digest", "Daily digest", True),
+                  options=("action_item_only", "push", "none"), **UNUSED),
+            _switch(P, "notify.daily_digest", "Daily digest", True, **UNUSED),
         )),
     )),
     Section("runs", "Runs & schedule", (
@@ -378,6 +411,10 @@ SECTIONS: tuple[Section, ...] = (
             _switch(P, "runs.stop_on_timeout", "Stop the run on a timeout", True,
                     "A hung call usually means a login or prompt wait."),
             _num(P, "runs.max_consecutive_failures", "Stop after failures in a row", 3, lo=1),
+            Field(P, "runs.on_usage_limit", "select", "When Claude hits your usage limit",
+                  default=runs_cfg.RunsConfig.on_usage_limit, options=runs_cfg.ON_USAGE_LIMIT,
+                  help="The run stops and says so. Stop: the next scheduled run tries again. "
+                       "Pause: all runs stay paused until you resume them."),
         )),
         Group("ranking", "Ranking", (
             _num(P, "runs.ranking.freshness_weight", "Freshness", R["freshness_weight"], hi=100, control="slider",
@@ -417,6 +454,7 @@ SECTIONS: tuple[Section, ...] = (
             _tags(P, "runs.required_mcp_servers", "Required MCP servers", [],
                   help="Servers every run needs logged in. Inbox sync carries its own gmail."),
             _num(P, "runs.job_lock_minutes", "Job lock expires after", 120, lo=1, unit="min"),
+            MANUAL_LOCK,
         )),
         Group("tools", "Allowed tools", (
             _tags(P, "llm.allowed_tools", "Tools a run may use", runs_cfg.DEFAULT_ALLOWED_TOOLS,
@@ -424,7 +462,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("schedule", "Schedule", (
             Field(P, "schedule.jobs.scout", "schedule", "Scout", default=JOBS["scout"],
-                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours."),
+                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours unless Scout follows quiet hours is on."),
             Field(P, "schedule.jobs.inbox_sync", "schedule", "Inbox sync", default=JOBS["inbox_sync"],
                   check=_schedule_check("inbox_sync"), help="Off until the inbox-sync skill is finished."),
             Field(P, "schedule.jobs.score", "schedule", "Score", default=JOBS["score"],
@@ -435,12 +473,18 @@ SECTIONS: tuple[Section, ...] = (
                   check=_schedule_check("prune")),
             _num(P, "schedule.tick_minutes", "Check every", 15, lo=1, unit="min"),
             _num(P, "schedule.missed_after_minutes", "Missed after", 60, lo=1, unit="min",
-                 help="Slots missed while the Mac was off collapse into one catch-up you start."),
+                 help="A slot more than this late (Mac asleep or off) counts as missed; handled per Missed runs below."),
         )),
-        Group("quiet", "Quiet hours", (
+        Group("quiet", "Quiet hours and missed runs", (
             Field(P, "schedule.quiet_hours", "time_range", "Quiet hours",
                   default={"start": schedule.DEFAULT_QUIET[0], "end": schedule.DEFAULT_QUIET[1]}, nullable=True,
-                  help="Score, prepare and inbox sync never start inside it. Scout and prune ignore it."),
+                  help="Score, prepare and inbox sync never start inside it. Prune ignores it."),
+            _switch(P, "schedule.scout_quiet_hours", "Scout follows quiet hours",
+                    schedule.ScheduleConfig.scout_quiet_hours, "Scout uses no Claude quota, so it runs any time."),
+            Field(P, "schedule.missed_runs", "select", "Missed runs", default=schedule.ScheduleConfig.missed_runs,
+                  options=schedule.MISSED_RUNS,
+                  help="Mac off or asleep at run time. Missed runs never start on their own. Ask: one catch-up "
+                       "prompt on Today and Runs. Skip: they are dropped."),
             Field(P, "schedule.timezone", "text", "Time zone", default="local",
                   help="local, or an IANA name like America/New_York."),
         )),
@@ -484,8 +528,10 @@ SECTIONS: tuple[Section, ...] = (
             _num(Q, "cover_letter.min_words", "Minimum length", 120, lo=1, unit="words"),
             _num(Q, "cover_letter.max_words", "Maximum length", 250, lo=1, unit="words"),
             _num(Q, "cover_letter.hard.company_facts_min", "Company facts at least", 2),
-            _num(Q, "cover_letter.soft.voice_match_min", "Voice match at least", 7, lo=1, hi=10),
-            _num(Q, "cover_letter.soft.specificity_min", "Specificity at least", 7, lo=1, hi=10),
+            Field(Q, "cover_letter.soft.voice_match_min", "number", "Voice match at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
+            Field(Q, "cover_letter.soft.specificity_min", "number", "Specificity at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
         )),
         Group("resume", "Résumé", (
             _num(Q, "resume.soft.keyword_coverage_min", "Keyword coverage at least", 0.6, hi=1, integer=False,
@@ -496,7 +542,8 @@ SECTIONS: tuple[Section, ...] = (
                    "tasked with"]),
         )),
         Group("answers", "Application answers", (
-            _num(Q, "answers.soft.voice_match_min", "Voice match at least", 7, lo=1, hi=10),
+            Field(Q, "answers.soft.voice_match_min", "number", "Voice match at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
         )),
         Group("banned", "Banned phrases", (
             _tags(Q, "banned_phrases", "Never write", [

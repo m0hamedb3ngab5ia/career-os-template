@@ -34,20 +34,28 @@ describe("keysForChange", () => {
       ["contacts"],
       ["status"],
       ["today"],
+      ["pipeline"],
     ]);
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
+      ["storage"],
+      ["advise"],
       ["status"],
       ["today"],
       ["actions"],
+      ["pipeline"],
     ]);
     expect(keysForChange({ jobs: [], runs: [], actions: false, config: true, status: false })).toEqual([
       ["meta"],
+      ["runs"],
       ["settings"],
+      ["advise"],
+      ["storage"],
       ["status"],
+      ["pipeline"],
     ]);
-    expect(keysForChange({ status: true })).toEqual([["status"], ["today"]]);
+    expect(keysForChange({ status: true })).toEqual([["status"], ["runs"], ["today"]]);
     expect(keysForChange({})).toEqual([]);
   });
 

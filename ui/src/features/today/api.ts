@@ -15,10 +15,21 @@ export function useTodayStatus() {
   });
 }
 
+/** The viewer's time zone, so date-only deadlines end at local midnight (as on /api/actions). */
+function todayUrl(): string {
+  let tz: string | undefined;
+  try {
+    tz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch {
+    tz = undefined;
+  }
+  return tz ? `/api/today?tz=${encodeURIComponent(tz)}` : "/api/today";
+}
+
 export function useToday() {
   return useQuery({
     queryKey: ["today"],
-    queryFn: () => apiFetch<TodayData>("/api/today"),
+    queryFn: () => apiFetch<TodayData>(todayUrl()),
     staleTime: 30_000,
   });
 }
@@ -30,13 +41,15 @@ function useRefreshToday() {
   return () => Promise.all([qc.invalidateQueries({ queryKey: ["today"] }), qc.invalidateQueries({ queryKey: ["status"] })]);
 }
 
+/** POST /api/actions/{id}/done|reopen (the Action Items API): ids written, queued (Excel open) and missing. */
 interface DoneResult {
-  ok: boolean;
-  queued?: boolean;
+  ok: string[];
+  queued: string[];
+  missing: string[];
 }
 
 const actionPath = (item: ActionItem, verb: "done" | "reopen") =>
-  `/api/today/actions/${encodeURIComponent(String(item.id))}/${verb}`;
+  `/api/actions/${encodeURIComponent(String(item.id))}/${verb}`;
 
 /** Mark done: the row leaves the list at once; on failure it comes back. */
 export function useMarkDone() {
@@ -92,7 +105,7 @@ export function usePrepareQueued() {
   const refresh = useRefreshToday();
   return useMutation({
     mutationFn: (preset: string | undefined) =>
-      apiSend<RunStarted>("POST", "/api/runs/batches/prepare", preset ? { preset } : {}),
+      apiSend<RunStarted>("POST", "/api/runs", preset ? { kind: "prepare", preset } : { kind: "prepare" }),
     onSettled: refresh,
   });
 }

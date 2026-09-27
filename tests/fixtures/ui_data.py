@@ -115,7 +115,8 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
     actions = {
         "high": tr.add_action_item("Review and submit", type="review", job_id=ids["review"], company="Umbrella Labs",
                                    role="Infrastructure Engineer", link="https://boards.example.com/review",
-                                   priority="H", needs="laptop"),
+                                   priority="H", needs="laptop", due=iso(now + timedelta(days=1)),
+                                   due_reason="posting closes"),
         "medium": tr.add_action_item("Answer the salary question", type="salary", job_id=ids["queued"],
                                      company="Initech", role="Platform Engineer", priority="M", needs="anytime"),
         "low": tr.add_action_item("Send the LinkedIn note", type="send_linkedin", job_id=ids["interview"],
@@ -137,3 +138,36 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                                     else "usage_limit", "duration_s": 400, "session_id": "sess-1", "detail": ""})
         runs[name] = run["id"]
     return {"settings": s, "jobs": ids, "actions": actions, "runs": runs, "now": now}
+
+
+def add_scam_case(data: dict[str, Any]) -> dict[str, Any]:
+    """A blocked posting at a made-up company, its flagged-registry entry and the open `scam_suspected` item the
+    safety gate writes (Action Items' Block company / Mark posting safe). Kept out of build_ui_data so the counts
+    other tests rely on stay put. Returns {"job_id", "action_id", "company"}."""
+    from careeros.safety import registry
+
+    s, now = data["settings"], data["now"]
+    store = Store(s)
+    company = "Obsidian Quant Partners"
+    found = now - timedelta(days=2)
+    p = Posting(company=company, title="Quant Developer", location="Remote", ats="custom", ats_job_id="scam-1",
+                url="https://obsidian-careers.example/jobs/1", fetched_at=iso(found),
+                description_text="Buy the equipment kit before your first day.")
+    jid = p.job_id
+    store._write(jid, "posting.json", p.model_dump())
+    hist = [{"status": st, "at": iso(found + timedelta(hours=i)), "note": None}
+            for i, st in enumerate(["found", "scored", "needs_review"])]
+    store._write(jid, "status.json", {"status": "needs_review", "updated_at": hist[-1]["at"], "history": hist})
+    store.save_score(Score(job_id=jid, category="swe_backend", fit=74, tier=None, reasons=["fixture"]))
+    store._write(jid, "safety.json", {"job_id": jid, "checked_at": iso(found), "verdict": "block", "runs": [],
+                                      "flags": [{"code": "SCAM_PAYMENT_REQUEST", "level": "block",
+                                                 "detail": "asks for payment", "evidence": []}]})
+    registry.add_or_bump(registry.default_path(s), company, domain="obsidian-careers.example",
+                         reason="SCAM_PAYMENT_REQUEST", job_id=jid)
+    aid = Tracker(settings=s).add_action_item(
+        "Posting asks for a paid equipment kit. Block the company or mark the posting safe", type="scam_suspected",
+        job_id=jid, company=company, role="Quant Developer", link="https://obsidian-careers.example/jobs/1",
+        priority="H", needs="phone")
+    data["jobs"]["scam"] = jid
+    data["actions"]["scam"] = aid
+    return {"job_id": jid, "action_id": aid, "company": company}

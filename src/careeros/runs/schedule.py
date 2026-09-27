@@ -9,10 +9,12 @@ last tick, else now, and it runs once for the latest slot after that point.
 
 - not_due      the interval has not passed / no slot since the last run
 - run          due; runs now
-- wait_quiet   due, but a claude-using job (score, prepare) and `now` is inside quiet_hours: it runs when they end
+- wait_quiet   due, but a claude-using job (inbox_sync, score, prepare), or scout with `scout_quiet_hours: true`,
+               and `now` is inside quiet_hours: it runs when they end
 - missed       due while the Mac was asleep or off (the gap since the last tick is over missed_after_minutes)
-               and more than missed_after_minutes late: it does NOT run. Every missed slot collapses into ONE
-               pending catch-up record; the candidate starts it with `careeros run catch-up`
+               and more than missed_after_minutes late: it does NOT run. With `missed_runs: ask` every missed
+               slot collapses into ONE pending catch-up record the candidate starts with `careeros run catch-up`;
+               with `missed_runs: skip` missed slots are only recorded (no catch-up prompt)
 - skip_paused  due while runs are paused (`careeros run pause`): skipped, not stored up for later
 - disabled     `enabled: false`
 
@@ -31,7 +33,9 @@ from careeros.config import ConfigError
 
 JOB_KINDS = ("scout", "inbox_sync", "score", "prepare", "prune")
 CLAUDE_KINDS = ("inbox_sync", "score", "prepare")
-SCHEDULE_KEYS = ("tick_minutes", "timezone", "quiet_hours", "missed_after_minutes", "jobs", "launchd_label")
+SCHEDULE_KEYS = ("tick_minutes", "timezone", "quiet_hours", "missed_after_minutes", "missed_runs", "scout_quiet_hours",
+                 "jobs", "launchd_label")
+MISSED_RUNS = ("ask", "skip")   # ask (Recommended): one catch-up prompt; skip: drop missed slots
 JOB_KEYS = ("enabled", "every_hours", "every_days", "at", "preset", "mcp_servers", "allowed_tools_extra")
 DEFAULT_JOBS: dict[str, dict[str, Any]] = {
     "scout": {"every_hours": 3},
@@ -60,6 +64,8 @@ class JobSchedule:
     mcp_servers: list[str] = field(default_factory=list)
     allowed_tools_extra: list[str] = field(default_factory=list)
 
+    quiet: bool = False                        # waits out quiet hours (claude jobs always; scout if configured)
+
     @property
     def claude(self) -> bool:
         return self.kind in CLAUDE_KINDS
@@ -72,6 +78,8 @@ class ScheduleConfig:
     quiet_start: time | None = time(9)
     quiet_end: time | None = time(18)
     missed_after_minutes: float = 60
+    missed_runs: str = "ask"
+    scout_quiet_hours: bool = False
     jobs: dict[str, JobSchedule] = field(default_factory=dict)
     launchd_label: str = DEFAULT_LABEL
 
@@ -145,7 +153,7 @@ def _job(kind: str, raw: Any, presets: tuple[str, ...]) -> JobSchedule:
             raise _err(f"{where}.preset only applies to score and prepare")
         if preset not in presets:
             raise _err(f"{where}.preset must be one of {' | '.join(presets)}, got {preset!r}")
-    return JobSchedule(kind, minutes, enabled, preset, at, **lists)
+    return JobSchedule(kind, minutes, enabled, preset, at, **lists, quiet=kind in CLAUDE_KINDS)
 
 
 def load_schedule(settings: Any) -> ScheduleConfig:
@@ -168,6 +176,14 @@ def load_schedule(settings: Any) -> ScheduleConfig:
         c.tick_minutes = _pos(raw["tick_minutes"], ".tick_minutes")
     if "missed_after_minutes" in raw:
         c.missed_after_minutes = _pos(raw["missed_after_minutes"], ".missed_after_minutes")
+    if "missed_runs" in raw:
+        if raw["missed_runs"] not in MISSED_RUNS:
+            raise _err(f".missed_runs must be one of {' | '.join(MISSED_RUNS)}, got {raw['missed_runs']!r}")
+        c.missed_runs = raw["missed_runs"]
+    if "scout_quiet_hours" in raw:
+        if not isinstance(raw["scout_quiet_hours"], bool):
+            raise _err(f".scout_quiet_hours must be true or false, got {raw['scout_quiet_hours']!r}")
+        c.scout_quiet_hours = raw["scout_quiet_hours"]
     tzname = raw.get("timezone", "local")
     if tzname not in (None, "local"):
         from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
@@ -200,6 +216,7 @@ def load_schedule(settings: Any) -> ScheduleConfig:
             block = {**{k: v for k, v in DEFAULT_JOBS[kind].items() if k in ("mcp_servers", "allowed_tools_extra")},
                      **given}
         c.jobs[kind] = _job(kind, block, PRESET_NAMES)
+    c.jobs["scout"].quiet = c.scout_quiet_hours
     label = raw.get("launchd_label", DEFAULT_LABEL)
     if not isinstance(label, str) or not re.match(r"^[A-Za-z0-9._-]+$", label):
         raise _err(f".launchd_label must be a reverse-DNS name like {DEFAULT_LABEL}")
@@ -235,7 +252,7 @@ def _local(dt: datetime, tz: tzinfo | None) -> datetime:
 
 
 def effective_due(cfg: ScheduleConfig, job: JobSchedule, due: datetime) -> datetime:
-    if not job.claude:
+    if not job.quiet:
         return due
     return quiet_end_after(_local(due, cfg.tz), cfg.quiet_start, cfg.quiet_end)
 
@@ -296,7 +313,7 @@ def plan_tick(cfg: ScheduleConfig, state: dict[str, Any], now: datetime, paused:
             out.append(Decision(kind, "missed", eff, n_slots, f"{n_slots} slot(s) since {eff.isoformat()}"))
         elif paused:
             out.append(Decision(kind, "skip_paused", eff))
-        elif job.claude and in_quiet(_local(now, cfg.tz).timetz().replace(tzinfo=None), cfg.quiet_start, cfg.quiet_end):
+        elif job.quiet and in_quiet(_local(now, cfg.tz).timetz().replace(tzinfo=None), cfg.quiet_start, cfg.quiet_end):
             out.append(Decision(kind, "wait_quiet", eff, detail=f"quiet hours until {eff.isoformat()}"))
         else:
             out.append(Decision(kind, "run", eff))

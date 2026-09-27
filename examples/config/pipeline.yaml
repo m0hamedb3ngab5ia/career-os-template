@@ -32,6 +32,10 @@ schedule:                                  # reusable default: fine to keep. `ca
   missed_after_minutes: 60                 # 60 (Recommended): slots missed while the Mac slept or was off (by more
                                            # than this) never auto-run; they collapse into ONE pending catch-up you
                                            # start with `careeros run catch-up` (or dismiss with --dismiss)
+  missed_runs: ask                         # ask (Recommended): missed slots become that one catch-up prompt | skip:
+                                           # drop them (recorded in data/runs/schedule.json, no prompt). Never auto-run
+  scout_quiet_hours: false                 # false (Recommended): scout uses no Claude quota, so it ignores quiet
+                                           # hours; true = scout waits for them to end too
   jobs:                                    # each job: every_hours: N | every_days: N | at: ["HH:MM", ...] (local time)
     scout:   {every_hours: 3}              # 3 (Recommended: 2-3): `careeros scout --sync`; no quiet hours
     inbox_sync:                            # /inbox-sync (Gmail) twice a day. OFF until the inbox-sync skill is finished
@@ -87,6 +91,8 @@ runs:                                      # reusable default: fine to keep. `ca
   required_mcp_servers: []                 # MCP servers a run needs logged in (e.g. [gmail] for inbox work);
                                            # one reported needs-auth stops the run with auth_required
   job_lock_minutes: 120                     # 120 (Recommended): a `careeros job lock` taken by a skill expires after this
+  on_usage_limit: stop                     # stop (Recommended): the run stops and the next scheduled run tries again |
+                                           # pause: stop and pause all runs until `careeros run resume`
   retry:
     max_attempts: 2                        # 2 (Recommended): a failed job is retried once in a later run...
     action_item: true                      # ...then becomes an Action Item (true, Recommended); it is never skipped
@@ -131,7 +137,10 @@ ui:                                        # reusable default: fine to keep. `ca
   page_size: 100                           # 100 (Recommended): rows per page in Jobs and Runs history (20 to 1000)
   watch_debounce_ms: 300                   # 300 (Recommended): the app refreshes once files are quiet this long
   index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
+  due_soon_hours: 48                       # 48 (Recommended): Action Items due within this many hours show orange
+  pause_until_tomorrow_at: "08:00"         # "08:00" (Recommended): Runs › Pause all › "Until tomorrow" ends then (local)
   pipeline:
+    card_limit: 10                         # 10 (Recommended): cards per Pipeline column before "Show all" (1 to 500)
     columns:                               # (Recommended) the six below. Each status sits in at most one column;
       - {name: Found, statuses: [found, scored]}          # statuses in no column (skipped, rejected, withdrawn,
       - {name: Queued, statuses: [queued, prepared]}      # ghosted) are counted in the "Closed" line
@@ -148,7 +157,8 @@ notify:
 
 outreach:                                  # reusable default: fine to keep
   manual_if_connected: true                # already connected on LinkedIn (1st degree): never automate; you tailor it
-  manual_if_mutuals: true                  # any mutual connections: same. Record with `careeros outreach mark`
+  manual_if_mutuals: true                  # mutual connections (see below): same. Record with `careeros outreach mark`
+  mutuals_threshold: 1                     # 1 (Recommended): this many mutual connections or more counts (1 to 50)
 
 resume_build:
   engine: tectonic                         # tectonic | pdflatex

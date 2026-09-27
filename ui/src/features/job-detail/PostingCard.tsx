@@ -73,7 +73,7 @@ export function PostingCard({ jobId, detail, pipeline }: { jobId: string; detail
         <div className={styles.inlineConfirm}>
           <ConfirmPanel
             question={`Mark ${company} as submitted?`}
-            description="Use this when you sent the application yourself. The status becomes Applied here and in the tracker."
+            detail="Use this when you sent the application yourself. The status becomes Applied here and in the tracker."
             cancelLabel="Not yet"
             confirmLabel="Mark submitted"
             pending={submit.isPending}

@@ -69,8 +69,8 @@ def client(data, tmp_path, popen):
     ix.rebuild()
     app = create_app(data["settings"], index=ix, allowed_hosts=LOOPBACK | {"testserver"},
                      static_dir=tmp_path / "no-static", now=lambda: NOW)
-    app.state.ctx.run_control = RunControl(data["settings"], popen=popen, python="python", now=lambda: NOW,
-                                           pid_alive=lambda pid: False)
+    app.state.run_control = lambda settings: RunControl(settings, popen=popen, python="python", now=lambda: NOW,
+                                                        pid_alive=lambda pid: False)
     with TestClient(app) as c:
         c.ix = ix  # type: ignore[attr-defined]
         yield c
@@ -82,20 +82,20 @@ def client(data, tmp_path, popen):
 def test_today_lists_open_items_and_the_prepare_queue(client):
     t = client.get("/api/today").json()
     assert [a["company"] for a in t["actions"]] == ["Umbrella Labs", "Initech", "Stark Industries"]
-    assert t["actions"][0]["due"] is None and t["prepare_queue"]["error"] is None
+    assert {"due", "due_date_only", "level"} <= t["actions"][0].keys() and t["prepare_queue"]["error"] is None
 
 
 def test_mark_done_and_undo(client, data):
     aid = data["actions"]["medium"]
-    assert client.post(f"/api/today/actions/{aid}/done").status_code == 403       # no X-CareerOS header
-    assert client.post(f"/api/today/actions/{aid}/done", headers=H).json() == {"ok": True, "queued": False}
+    assert client.post(f"/api/actions/{aid}/done").status_code == 403       # no X-CareerOS header
+    assert client.post(f"/api/actions/{aid}/done", headers=H).json() == {"ok": [aid], "queued": [], "missing": []}
     open_ids = {i["ID"] for i in Tracker(settings=data["settings"]).list_action_items()}
     assert aid not in open_ids
     client.ix.update_tracker()
     assert aid not in {a["id"] for a in client.get("/api/today").json()["actions"]}
-    assert client.post(f"/api/today/actions/{aid}/reopen", headers=H).json()["ok"] is True
+    assert client.post(f"/api/actions/{aid}/reopen", headers=H).json()["ok"] == [aid]
     assert aid in {i["ID"] for i in Tracker(settings=data["settings"]).list_action_items()}
-    assert client.post("/api/today/actions/nope/done", headers=H).status_code == 404
+    assert client.post("/api/actions/nope/done", headers=H).status_code == 404
 
 
 def test_status_has_the_response_breakdown(client):
@@ -106,12 +106,12 @@ def test_status_has_the_response_breakdown(client):
 def test_run_controls(client, data, popen):
     r = client.post("/api/runs/steps/scout", headers=H)
     assert r.status_code == 200 and r.json()["kind"] == "scout" and "scout" in popen.calls[-1]
-    r = client.post("/api/runs/batches/prepare", json={"preset": "medium"}, headers=H)
+    r = client.post("/api/runs", json={"kind": "prepare", "preset": "medium"}, headers=H)
     assert r.status_code == 200 and popen.calls[-1][-5:] == ["run", "prepare", "--preset", "medium", "--json"]
-    assert client.post("/api/runs/batches/prepare", json={"preset": "huge"}, headers=H).status_code == 400
+    assert client.post("/api/runs", json={"kind": "prepare", "preset": "huge"}, headers=H).status_code == 422
     rs = RunStore(data["settings"])
     rs.set_pause(None, "testing", NOW)
-    r = client.post("/api/runs/batches/prepare", json={}, headers=H)
+    r = client.post("/api/runs", json={"kind": "prepare"}, headers=H)
     assert r.status_code == 409 and "paused" in r.json()["detail"]
     assert client.post("/api/runs/resume", headers=H).json() == {"resumed": True}
     assert rs.pause_state(NOW) is None
@@ -203,11 +203,11 @@ def test_status_writes_409_while_the_job_is_locked_and_applied_needs_submitted(c
 def test_set_status_withdraw_undo_and_submitted(client, data):
     s, jid = data["settings"], data["jobs"]["queued"]
     r = client.post(f"/api/jobs/{jid}/status", json={"status": "prepared", "note": "by hand"}, headers=H)
-    assert r.json() == {"status": "prepared", "previous": "queued"}
+    assert r.json() == {"job_id": jid, "status": "prepared", "previous": "queued"}
     assert Store(s).get_status(jid) == "prepared" and Tracker(settings=s).get_job(jid)["Status"] == "prepared"
     assert client.post(f"/api/jobs/{jid}/status", json={"status": "bogus"}, headers=H).status_code == 400
     r = client.post(f"/api/jobs/{jid}/withdraw", headers=H)
-    assert r.json() == {"status": "withdrawn", "previous": "prepared"}
+    assert r.json() == {"job_id": jid, "status": "withdrawn", "previous": "prepared"}
     client.post(f"/api/jobs/{jid}/status", json={"status": "prepared", "note": "undo withdraw"}, headers=H)
     assert Store(s).get_status(jid) == "prepared"
     assert client.post(f"/api/jobs/{jid}/submitted", headers=H).json()["status"] == "applied"

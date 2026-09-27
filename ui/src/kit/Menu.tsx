@@ -1,4 +1,4 @@
-import { Check } from "lucide-react";
+import { Check, ChevronDown } from "lucide-react";
 import {
   createContext,
   use,
@@ -35,8 +35,29 @@ function items(menu: HTMLElement | null): HTMLElement[] {
   return menu ? Array.from(menu.querySelectorAll<HTMLElement>(ITEM)) : [];
 }
 
-/** Menu button (WAI-ARIA APG): the trigger opens a `role="menu"`; arrows move, Escape and Tab close. */
-function MenuRoot({ label, children }: { label: string; children: ReactNode }) {
+export interface MenuItem {
+  key: string;
+  label: string;
+  /** Shown instead of acting (e.g. the card's current column). */
+  disabled?: boolean;
+  onSelect: () => void;
+}
+
+interface MenuRootProps {
+  /** Accessible name of the menu itself ("Move Acme to"). */
+  label: string;
+  /** Compound parts (Menu.Trigger + Menu.Content), or, with `items`, the trigger's text ("Move to…"). */
+  children: ReactNode;
+  /** Shorthand for a plain action menu: renders the trigger and one Menu.Item per entry. */
+  items?: MenuItem[];
+  size?: "regular" | "small";
+}
+
+/**
+ * Menu button (WAI-ARIA APG): the trigger opens a `role="menu"`; arrows, Home and End move (skipping disabled
+ * items), Enter picks, Escape closes and returns focus to the trigger, Tab closes.
+ */
+function MenuRoot({ label, children, items: list, size }: MenuRootProps) {
   const [open, setOpenState] = useState(false);
   const menuId = useId();
   const triggerRef = useRef<HTMLButtonElement>(null);
@@ -47,7 +68,25 @@ function MenuRoot({ label, children }: { label: string; children: ReactNode }) {
   };
   return (
     <MenuContext value={{ open, setOpen, label, menuId, triggerRef, menuRef }}>
-      <div className={styles.menuRoot}>{children}</div>
+      <div className={styles.menuRoot}>
+        {list ? (
+          <>
+            <Trigger size={size}>
+              {children}
+              <ChevronDown size={12} strokeWidth={1.7} aria-hidden="true" />
+            </Trigger>
+            <Content align="end">
+              {list.map((it) => (
+                <Item key={it.key} disabled={it.disabled} onSelect={it.onSelect}>
+                  {it.label}
+                </Item>
+              ))}
+            </Content>
+          </>
+        ) : (
+          children
+        )}
+      </div>
     </MenuContext>
   );
 }

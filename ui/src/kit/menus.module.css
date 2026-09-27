@@ -1,0 +1,126 @@
+/* Listbox and Menu (popup lists under a small button) and form fields. Mockup: 28px trigger, 7px
+   radius, 12px text; popups use the popover shadow. */
+.anchor {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.caption {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 10px;
+  border-radius: var(--r-nav);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.trigger[data-size="small"] {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: var(--r-segment);
+}
+.popup {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 30;
+  min-width: 180px;
+  max-height: 320px;
+  overflow-y: auto;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  border-radius: 10px;
+  background: var(--card);
+  border: 1px solid var(--sep);
+  box-shadow: var(--shadow-popover);
+  outline: none;
+}
+.popup[data-align="end"] {
+  left: auto;
+  right: 0;
+}
+.option {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 0;
+  border-radius: var(--r-segment);
+  background: transparent;
+  color: var(--label);
+  font-size: var(--fs-body);
+  text-align: left;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.option[data-active],
+.option:hover,
+.option:focus-visible {
+  background: var(--hover);
+  outline: none;
+}
+.option[aria-disabled="true"] {
+  color: var(--sec);
+  cursor: default;
+}
+.check {
+  display: inline-flex;
+  width: 14px;
+  color: var(--accent);
+}
+
+@media (pointer: coarse) {
+  .trigger,
+  .option {
+    min-height: var(--touch);
+  }
+}
+
+/* Form fields (sheets) */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.fieldLabel {
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--label);
+}
+.fieldHint {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.input {
+  height: var(--control-h);
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-body);
+}
+.input:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: var(--touch);
+    font-size: 16px; /* no zoom on focus (iOS) */
+  }
+}
