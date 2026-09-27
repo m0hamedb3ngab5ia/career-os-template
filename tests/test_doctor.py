@@ -278,18 +278,74 @@ def test_optional_bullet_keys_absent_is_fine():
     prof["master"].pop("metric_questions")
     for e in prof["master"]["experience"] + prof["master"]["projects"]:
         for b in e["bullets"]:
-            for k in ("resume_default", "weak", "estimate"):
+            for k in ("resume_default", "weak", "estimate", "resume_pin"):
                 b.pop(k, None)
     assert schema_problems(cfg, prof) == []
 
 
-@pytest.mark.parametrize("key", ["resume_default", "weak", "estimate"])
+@pytest.mark.parametrize("key", ["resume_default", "weak", "estimate", "resume_pin"])
 def test_optional_bullet_flag_must_be_bool(key: str):
     cfg, prof = _examples_cfg_prof()
     prof["master"]["experience"][0]["bullets"][0][key] = "yes"
     assert any(f"acme.1.{key} must be true or false" in p for p in schema_problems(cfg, prof))
     prof["master"]["experience"][0]["bullets"][0][key] = False
     assert schema_problems(cfg, prof) == []
+
+
+def test_project_links_shape():
+    cfg, prof = _examples_cfg_prof()
+    proj = prof["master"]["projects"][0]
+    assert proj["links"] and schema_problems(cfg, prof) == []          # example ships a valid links list
+    proj["links"] = [{"label": "Demo"}]
+    assert any("widgetizer.links must be a list of {label, url}" in p for p in schema_problems(cfg, prof))
+    proj["links"] = "https://example.com/x"
+    assert any("widgetizer.links must be a list of {label, url}" in p for p in schema_problems(cfg, prof))
+    proj.pop("links")
+    assert schema_problems(cfg, prof) == []
+
+
+@pytest.mark.parametrize("link", [
+    {"label": " ", "url": "https://example.com/x"},
+    {"label": "Demo", "url": ""},
+    {"label": "Demo", "url": "   "},
+    {"label": "Demo", "url": "example.com/x"},
+    {"label": "Demo", "url": "ftp://example.com/x"},
+])
+def test_project_links_need_label_and_http_url(link):
+    cfg, prof = _examples_cfg_prof()
+    prof["master"]["projects"][0]["links"] = [link]
+    probs = schema_problems(cfg, prof)
+    assert any("widgetizer.links" in p for p in probs), probs
+
+
+def _copy_project(prof, new_id):
+    import copy
+    proj = copy.deepcopy(prof["master"]["projects"][0])
+    proj["id"] = new_id
+    for i, b in enumerate(proj["bullets"], 1):
+        b["id"] = f"{new_id}.{i}"
+    prof["master"]["projects"].append(proj)
+    return proj
+
+
+def test_resume_pin_at_most_two_per_entry():
+    cfg, prof = _examples_cfg_prof()
+    for b in prof["master"]["experience"][0]["bullets"][:2]:
+        b["resume_pin"] = True
+    assert schema_problems(cfg, prof) == []
+    prof["master"]["experience"][0]["bullets"][2]["resume_pin"] = True
+    probs = schema_problems(cfg, prof)
+    assert any("acme has 3 resume_pin bullets" in p and "one-page" in p for p in probs), probs
+
+
+def test_resume_pin_at_most_two_pinned_projects():
+    cfg, prof = _examples_cfg_prof()
+    assert any(b.get("resume_pin") for b in prof["master"]["projects"][0]["bullets"])   # example pins one
+    _copy_project(prof, "second")
+    assert schema_problems(cfg, prof) == []
+    _copy_project(prof, "third")
+    probs = schema_problems(cfg, prof)
+    assert any("3 projects carry a resume_pin bullet" in p and "one-page" in p for p in probs), probs
 
 
 @pytest.mark.parametrize("mq", [

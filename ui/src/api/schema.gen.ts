@@ -750,6 +750,8 @@ export interface components {
       columns?: string[] | null;
       /** Job Ids */
       job_ids?: string[] | null;
+      /** Location */
+      location?: string | null;
       /** Q */
       q?: string | null;
       /**
@@ -2475,6 +2477,7 @@ export interface operations {
         safety?: string[];
         category?: string[];
         q?: string | null;
+        location?: string | null;
         sort?: string;
         cursor?: string | null;
         tab?: string | null;
@@ -2523,6 +2526,7 @@ export interface operations {
     parameters: {
       query?: {
         q?: string | null;
+        location?: string | null;
       };
     };
     responses: {

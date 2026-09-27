@@ -44,7 +44,7 @@ except ImportError:  # standalone checkout without the package installed: load t
 CATEGORIES_YAML = REPO / "config" / "categories.yaml"
 
 SECTION_ORDER_DEFAULT = ["experience", "projects", "education", "skills"]
-URL_KEYS = {"email", "linkedin", "github", "website", "link"}
+URL_KEYS = {"email", "linkedin", "github", "website", "link", "url"}   # `url`: projects[].links[].url
 # "[FILL IN ...]" (tailor TODOs) and "[OPEN: ...]" (placeholder bullets in profile/master.yaml)
 PLACEHOLDER_RE = re.compile(r"\[(FILL IN|OPEN\b)", re.I)
 
@@ -300,6 +300,7 @@ def render(resume_json_path: str | Path, template: str | None = None, pdf: bool 
         for k in ("name", "date", "link", "link_raw"):
             p.setdefault(k, "")
         p.setdefault("stack", [])
+        p.setdefault("links", [])
         p.setdefault("bullets", [])
     for ed in ctx["education"]:
         for k in ("school", "degree", "gpa", "location", "start", "end"):
@@ -354,6 +355,7 @@ def render_txt(resume_json_path: str | Path) -> Path:
                     lines.append(", ".join(p["stack"]))
                 if p.get("link"):
                     lines.append(p["link"])
+                lines += [f"{l['label']}: {l['url']}" for l in p.get("links") or []]
                 lines += [f"- {strip_bold(b['text'])}" for b in p.get("bullets", [])]
                 lines.append("")
         elif t == "education" and d["education"]:

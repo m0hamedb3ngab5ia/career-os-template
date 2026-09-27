@@ -1,5 +1,5 @@
-import { Download, FolderOpen, RefreshCw, Search, Table2 } from "lucide-react";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { Download, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
@@ -84,8 +84,18 @@ function HeaderActions() {
   );
 }
 
-/** The search box commits to the URL after a short pause; it follows the URL when the sidebar search sets it. */
-function SearchField({ q, onCommit }: { q: string; onCommit: (q: string) => void }) {
+interface FilterFieldProps {
+  value: string;
+  onCommit: (value: string) => void;
+  name: string;
+  label: string;
+  placeholder: string;
+  icon: ReactNode;
+}
+
+/** A text filter that commits to the URL after a short pause; it follows the URL when something else sets it (the
+ * sidebar search, a deep link). */
+function FilterField({ value: q, onCommit, name, label, placeholder, icon }: FilterFieldProps) {
   const [text, setText] = useState(q);
   const committed = useRef(q);
   useEffect(() => {
@@ -104,14 +114,14 @@ function SearchField({ q, onCommit }: { q: string; onCommit: (q: string) => void
   }, [text, onCommit]);
   return (
     <label className={styles.search}>
-      <Search size={14} strokeWidth={1.7} aria-hidden="true" />
-      <span className="sr-only">Search jobs</span>
+      {icon}
+      <span className="sr-only">{label}</span>
       <input
         type="search"
-        name="jobs-q"
+        name={name}
         autoComplete="off"
         spellCheck={false}
-        placeholder="Company, role or location…"
+        placeholder={placeholder}
         value={text}
         onChange={(e) => setText(e.target.value)}
       />
@@ -122,11 +132,11 @@ function SearchField({ q, onCommit }: { q: string; onCommit: (q: string) => void
 export function JobsPage() {
   const toast = useToast();
   const [view, update] = useJobsView();
-  const { tab, q, sort } = view;
+  const { tab, q, location, sort } = view;
   const meta = useMeta();
   const pageSize = meta.data?.ui?.page_size ?? DEFAULT_PAGE_SIZE;
-  const list = useJobsList({ tab, q, sort, limit: pageSize }, !meta.isPending);
-  const tabs = useJobsTabs(q);
+  const list = useJobsList({ tab, q, location, sort, limit: pageSize }, !meta.isPending);
+  const tabs = useJobsTabs(q, location);
   const exporter = useExportJobs();
   const captionId = useId();
   const panelId = useId();
@@ -159,6 +169,7 @@ export function JobsPage() {
   };
   const onSort = useCallback((key: SortKey) => update({ sort: toggleSort(sort, key) }), [update, sort]);
   const onSearch = useCallback((text: string) => update({ q: text }, true), [update]);
+  const onLocation = useCallback((text: string) => update({ location: text }, true), [update]);
 
   const serverTabs = new Map((tabs.data?.tabs ?? []).map((t) => [t.key, t]));
   const nSel = selected.size;
@@ -166,7 +177,9 @@ export function JobsPage() {
   function onExport() {
     const cols = ["job_id", ...columns.map((c) => c.exportField)];
     const body =
-      nSel > 0 ? { job_ids: [...selected], columns: cols } : { tab, q: q || undefined, sort, columns: cols };
+      nSel > 0
+        ? { job_ids: [...selected], columns: cols }
+        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols };
     exporter.mutate(body, {
       onSuccess: (name) => toast.show({ message: `Downloaded ${name}` }),
       onError: (e) => toast.show({ message: errorText(e) }),
@@ -190,11 +203,11 @@ export function JobsPage() {
   } else if (list.isPending) {
     body = <p className={styles.loading}>Loading jobs…</p>;
   } else if (rows.length === 0) {
-    body = q ? (
+    body = q || location ? (
       <EmptyState
-        title={`No jobs match “${q}”`}
+        title={q ? `No jobs match “${q}”` : `No jobs in “${location}”`}
         action={
-          <Button size="small" onClick={() => update({ q: "" }, true)}>
+          <Button size="small" onClick={() => update({ q: "", location: "" }, true)}>
             Clear search
           </Button>
         }
@@ -239,7 +252,22 @@ export function JobsPage() {
               </Tabs.Tab>
             ))}
           </Tabs>
-          <SearchField q={q} onCommit={onSearch} />
+          <FilterField
+            value={q}
+            onCommit={onSearch}
+            name="jobs-q"
+            label="Search jobs"
+            placeholder="Company, role or location…"
+            icon={<Search size={14} strokeWidth={1.7} aria-hidden="true" />}
+          />
+          <FilterField
+            value={location}
+            onCommit={onLocation}
+            name="jobs-loc"
+            label="Filter by location"
+            placeholder="Location…"
+            icon={<MapPin size={14} strokeWidth={1.7} aria-hidden="true" />}
+          />
           <span className={styles.grow} />
           <div role="status" aria-live="polite" className={styles.bulk}>
             {nSel > 0 ? (

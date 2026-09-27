@@ -53,9 +53,16 @@ Procedure:
    bullet count (step 2) and project selection (step 1b).
    1b. Projects: pick up to 3 by relevance: first projects whose `tags` include `score.category`, then
    projects whose `stack` overlaps `required_skills`, then `bullet_priority` order; ties newest first.
+   A project with any `resume_pin: true` bullet is always one of the picked projects (it takes the
+   first slot; the rest follow the relevance order above), even if that exceeds the 3-project cap:
+   the cap grows to fit every pinned project (`careeros doctor` allows at most 2 pinned projects).
 2. Bullet count per entry: tag-matched entries (entry `tags` include `score.category`, or `stack`
    overlaps >= 2 `required_skills`) get 3-4 bullets; other entries get 1-2. Always include at least
-   1 bullet per included entry. Choose bullets by: (a) text contains a `required_skills` term (per
+   1 bullet per included entry. Bullets flagged `resume_pin: true` are always selected for their entry;
+   they count toward the entry's budget (a pin displaces the least relevant non-pinned bullet rather than
+   adding one). Pins are selected even when that exceeds the entry's bullet budget: the
+   budget grows to the pin count (a 1-2 bullet entry with 2 pins gets exactly those 2, and nothing else;
+   `careeros doctor` allows at most 2 pins per entry). Fill the rest by: (a) text contains a `required_skills` term (per
    `score.skill_evidence`), (b) `resume_default: true` when present, (c) has `metrics`, (d) the rest.
    Use a bullet marked `weak: true` only when no other bullet covers that requirement or the entry would
    otherwise be empty. Variant choice: between a bullet's `text` and its `variants`, take the one that best
@@ -103,8 +110,9 @@ add a term without evidence.
 
 Exactly the shape in `templates/resume/resume_schema.md`: `identity` (copied from profile),
 `summary`, `sections[{type, order}]`, `experience[]` (id, company, title, team, location, start, end,
-`bullets[{id, text}]`), `projects[]` (id, name, date, stack (subset of profile stack), link,
-`bullets[{id, text}]`), `education[]`, `skills{}`, and `meta`:
+`bullets[{id, text}]`), `projects[]` (id, name, date, stack (subset of profile stack), link, `links` copied
+from the profile when present, `bullets[{id, text}]`), `education[]`, `skills{}`, and `meta`. When an entry
+has `title_display` in the profile, that is the `title` verbatim (never the HR title, never reworded):
 
 ```json
 "meta": {
@@ -138,7 +146,9 @@ never edit a number to make it pass) and re-render. Max 2 fix loops; then leave 
 `pdf_page_count` fix loop (only when `resume.pdf` was built): if the check reports 2 pages, apply
 the first applicable step below, re-render, re-run QA, and repeat until 1 page. Record every swap or
 drop in `meta.dropped_for_fit`. Invariants at every step: never drop a project's descriptive bullet,
-never drop an entry's last bullet (entries stay at >= 1 bullet), never drop an entry.
+never drop a `resume_pin: true` bullet (the loop may only short-swap a pinned bullet, i.e. switch it to
+`variants.short`; it never drops or replaces it), never drop an entry's last bullet (entries stay at >= 1
+bullet), never drop an entry.
 
 1. Short-variant swap: if any included bullet has `variants.short` in the profile and the long text
    is in use, swap it to the short variant (least relevant bullet first). This is a fit step, not a

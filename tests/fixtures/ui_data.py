@@ -59,7 +59,9 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
     for key, (company, title, status, fit, tier, safety, found_days, applied_days) in JOBS.items():
         found = now - timedelta(days=found_days)
         applied = now - timedelta(days=applied_days) if applied_days is not None else None
-        p = Posting(company=company, title=title, location="New York, NY", ats="greenhouse",
+        # One remote posting so the location filter and sort have something to separate.
+        p = Posting(company=company, title=title, location="Remote" if company == "Globex" else "New York, NY",
+                    ats="greenhouse",
                     ats_job_id=f"{key}-1", url=f"https://boards.example.com/{key}", fetched_at=iso(found),
                     description_text=f"{title} at {company}.")
         jid = p.job_id

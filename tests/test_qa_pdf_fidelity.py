@@ -5,6 +5,7 @@ URI link annotations, optional /Info metadata and an optional (fake) embedded fo
 """
 from __future__ import annotations
 
+import json
 from pathlib import Path
 
 import pytest
@@ -199,6 +200,80 @@ def test_link_normalization_scheme_www_trailing_slash_case(tmp_path: Path) -> No
 def test_links_required_config_limits_fields(tmp_path: Path) -> None:
     ck = run(make_job(tmp_path, links=GOOD_LINKS[:1]), cfg={"links_required": ["email"]})
     assert by_name(ck, "pdf_links_clickable")["ok"]
+
+
+PROJECT_LINK = "https://example.com/widgetizer"
+PROJECT_LINKS = [{"label": "App Store", "url": "https://example.com/widgetizer/app"},
+                 {"label": "Demo video", "url": "https://example.com/widgetizer/demo"}]
+PROJECT_TXT = RESUME_TXT + "\n\nPROJECTS\nWidgetizer | Nov 2025\n" + PROJECT_LINK + "\n" + "\n".join(
+    f"{l['label']}: {l['url']}" for l in PROJECT_LINKS) + "\n- Built an iOS app in Swift\n"
+PROJECT_PDF = RESUME_TXT + "\n\nPROJECTS\nWidgetizer Nov 2025\nApp Store · Demo video\n- Built an iOS app in Swift\n"
+
+
+def make_project_job(tmp_path: Path, links: list[str], project_links: list[dict] | None = None) -> Path:
+    job = make_job(tmp_path, pdf_text=PROJECT_PDF, resume_txt=PROJECT_TXT, links=links)
+    (job / "resume.json").write_text(json.dumps({"projects": [
+        {"id": "widgetizer", "name": "Widgetizer", "link": PROJECT_LINK,
+         "links": PROJECT_LINKS if project_links is None else project_links, "bullets": []}]}))
+    return job
+
+
+def test_project_links_must_be_clickable(tmp_path: Path) -> None:
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK, PROJECT_LINKS[0]["url"]]))
+    c = by_name(ck, "pdf_links_clickable")
+    assert c["level"] == "hard" and not c["ok"] and "Demo video" in c["detail"], c["detail"]
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[Demo video]"]
+    ck = run(make_project_job(tmp_path / "b", GOOD_LINKS + [PROJECT_LINKS[0]["url"], PROJECT_LINKS[1]["url"]]))
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.link"]
+
+
+def test_project_links_pass_and_txt_urls_count_via_annotations(tmp_path: Path) -> None:
+    """resume.txt prints `label: url`; the PDF shows only the label but carries the URL as a link annotation,
+    so the URL tokens count as present for text recall (and never as hidden text)."""
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK] + [l["url"] for l in PROJECT_LINKS]))
+    c = by_name(ck, "pdf_links_clickable")
+    assert c["ok"] and "projects.widgetizer.link" in c["detail"], c["detail"]
+    t = by_name(ck, "pdf_text_matches_resume")
+    assert t["ok"] and ck.extras["pdf_fidelity"]["missing_tokens"] == [], t["detail"]
+    assert not any(c["check"] == "pdf_hidden_text" for c in ck.checks)
+
+
+APP_IOS = "https://example.com/widgetizer/app?platform=ios"
+
+
+def test_project_link_query_and_fragment_must_match_exactly(tmp_path: Path) -> None:
+    """Project links are compared strictly: a different query string is a different link."""
+    declared = [{"label": "App Store", "url": APP_IOS}]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK, APP_IOS.replace("ios", "android")], declared))
+    c = by_name(ck, "pdf_links_clickable")
+    assert not c["ok"] and "App Store" in c["detail"], c["detail"]
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+    ck = run(make_project_job(tmp_path / "b", GOOD_LINKS + [PROJECT_LINK, APP_IOS + "#top"], declared))
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+
+
+def test_project_link_host_case_and_trailing_slash_tolerated_but_path_case_kept(tmp_path: Path) -> None:
+    declared = [{"label": "App Store", "url": APP_IOS}]
+    ok = ["HTTPS://EXAMPLE.com/widgetizer/app?platform=ios/", "https://Example.com/widgetizer/"]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + ok, declared))
+    assert by_name(ck, "pdf_links_clickable")["ok"], by_name(ck, "pdf_links_clickable")["detail"]
+    ck = run(make_project_job(tmp_path / "b", GOOD_LINKS + [PROJECT_LINK, APP_IOS.replace("widgetizer", "Widgetizer")], declared))
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+
+
+def test_project_link_with_blank_url_is_reported_missing(tmp_path: Path) -> None:
+    declared = [{"label": "App Store", "url": PROJECT_LINKS[0]["url"]}, {"label": "Demo video", "url": "  "}]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK, PROJECT_LINKS[0]["url"]], declared))
+    c = by_name(ck, "pdf_links_clickable")
+    assert not c["ok"] and "projects.widgetizer.links[Demo video]: blank url" in c["detail"], c["detail"]
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[Demo video]"]
+
+
+def test_project_links_checked_even_without_identity_links(tmp_path: Path) -> None:
+    job = make_project_job(tmp_path, [])
+    ck = run(job, cfg={"links_required": ["website"]})   # example identity has no website -> no identity fields
+    c = by_name(ck, "pdf_links_clickable")
+    assert c["level"] == "hard" and not c["ok"] and "projects.widgetizer.link" in c["detail"]
 
 
 def test_profile_without_link_fields_is_ok(tmp_path: Path) -> None:
