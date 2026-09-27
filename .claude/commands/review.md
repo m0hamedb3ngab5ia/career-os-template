@@ -24,8 +24,9 @@ their findings. Method, invariants and output format: `docs/CODE_REVIEW_PROMPT.m
    (point to `.reviews/pr-<PR>/codex.log`) and continue with Claude's findings only.
    **Codex stalling or failing → check its status.** If the job is still running about 10 minutes after
    you finished your own review with no `codex.md` yet, or `scripts/review.sh` exited nonzero, run
-   `scripts/codex-status.sh <PR>`. This is the non-interactive equivalent of Codex's `/status`: it scans
-   `codex.log` for a usage-limit error, checks login, and sends a tiny probe.
+   `scripts/codex-status.sh <PR>`. This is the non-interactive equivalent of Codex's `/status`: it notes
+   (stderr) a usage-limit error in `codex.log` if present (the log can predate a reset, so this is a hint,
+   not the answer), then checks login and sends a tiny live probe, which decides the exit code.
    - Exit 3 (out of usage): stop waiting (TaskStop the job), report `Codex out of usage: <try again at …>`
      in one line, continue Claude-only, and head the posted comment `## Review (Claude; Codex pending: usage limit until <time>)`.
      Offer to re-run Codex after the reset.

@@ -14,7 +14,7 @@ from typing import Any, Literal, cast
 from typing_extensions import NotRequired, TypedDict
 
 from careeros.store import Store
-from careeros.ui.services.runs import BATCH_KINDS, RunControl
+from careeros.ui.services.runs import BATCH_KINDS, RunControl, _parse_dt
 
 PREPARE_STEPS = (  # (pill, files in the job folder that mean the step is done)
     ("Score", ("score.json",)),
@@ -231,14 +231,24 @@ def _names(store: Store, job_id: str) -> dict[str, Any]:
     return {"company": p.company, "title": p.title} if p else {"company": None, "title": None}
 
 
-def _steps(store: Store, kind: str, job_id: str, state: str) -> list[dict[str, str]]:
+def _steps(store: Store, kind: str, job_id: str, state: str, since: datetime | None = None) -> list[dict[str, str]]:
+    """`since`: this attempt's start (the job lock's acquired_at). A job folder can be reused across attempts
+    (e.g. a retry), so a file must be at least as new as the current attempt to count as its output; an older
+    file is left over from a previous attempt and the step still shows as not done."""
     steps = PREPARE_STEPS if kind == "prepare" else (("Score", ("score.json",)),)
     if state == "done":
         return [{"name": n, "state": "done"} for n, _ in steps]
     if state != "active":
         return [{"name": n, "state": "pending"} for n, _ in steps]
     d = store.job_dir(job_id)
-    have = [kind == "prepare" and any((d / f).exists() for f in files) for _, files in steps]
+
+    def _fresh(f: str) -> bool:
+        p = d / f
+        if not p.exists():
+            return False
+        return since is None or p.stat().st_mtime >= since.timestamp()
+
+    have = [kind == "prepare" and any(_fresh(f) for f in files) for _, files in steps]
     # A later step's output means every earlier step finished; one with no output of its own was skipped
     # (prepare-job skips the cover letter when the tier rule is `if_required` and the posting doesn't ask).
     last = max((i for i, h in enumerate(have) if h), default=-1)
@@ -290,8 +300,9 @@ def current_view(rc: RunControl) -> CurrentRun | None:
         seen.add(jid)
     active = cur.get("current_job")
     if active and active not in seen:
+        since = _parse_dt(cur.get("current_job_started_at"))
         rows.append({"job_id": active, **_names(store, active), "state": "active", "outcome": None,
-                     "duration_s": None, "detail": "", "steps": _steps(store, kind, active, "active")})
+                     "duration_s": None, "detail": "", "steps": _steps(store, kind, active, "active", since)})
         seen.add(active)
     for item in cur.get("queue") or []:
         jid = item.get("job_id")

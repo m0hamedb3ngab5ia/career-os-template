@@ -40,8 +40,10 @@ PROMPT_EOF
 
 if ! codex exec -C "$WT" --sandbox read-only --ephemeral -o "$OUT_DIR/codex.md" "$PROMPT" > "$OUT_DIR/codex.log" 2>&1; then
   # Out of usage is the common failure: say so (with the reset time) instead of a generic error.
-  if grep -qiE 'usage limit|rate limit|quota|try again at' "$OUT_DIR/codex.log"; then
-    echo "codex review failed: out of usage: $(grep -iE 'usage limit|try again at' "$OUT_DIR/codex.log" | tail -1 | sed 's/^ERROR: *//')" >&2
+  # Only Codex's own ERROR lines: the transcript can quote reviewed code/docs that mention "usage limit" or "quota".
+  hit="$(grep -E '^(ERROR|error):' "$OUT_DIR/codex.log" | grep -iE 'usage limit|rate limit|quota|try again at' | tail -1 | sed -E 's/^(ERROR|error): *//')"
+  if [ -n "$hit" ]; then
+    echo "codex review failed: out of usage: $hit" >&2
     exit 3
   fi
   echo "codex review failed; see $OUT_DIR/codex.log" >&2
