@@ -156,3 +156,46 @@ describe("AppShell", () => {
     });
   });
 });
+
+describe("AppShell route changes", () => {
+  it("moves focus to the main region and announces the new page's title", async () => {
+    const user = userEvent.setup();
+    renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    await user.click(within(nav).getByRole("link", { name: /^Runs/ }));
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Runs" });
+    const main = screen.getByRole("main");
+    await waitFor(() => expect(main).toHaveFocus());
+    expect(main.contains(h1)).toBe(true);
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Runs");
+  });
+
+  it("does not announce or move focus on the first load", async () => {
+    renderAt("/runs");
+    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    expect(screen.getByRole("main")).not.toHaveFocus();
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
+  });
+
+  it("leaves focus alone when only the query string changes (e.g. ?sel=)", async () => {
+    const { router } = renderAt("/runs");
+    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    const search = screen.getByRole("searchbox", { name: "Search jobs and companies" });
+    search.focus();
+    await act(() => router.navigate("/runs?sel=abc"));
+    expect(search).toHaveFocus();
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
+  });
+
+  it("Ctrl+K and Cmd+K focus the sidebar search", async () => {
+    const user = userEvent.setup();
+    renderAt("/runs");
+    const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
+    await user.keyboard("{Control>}k{/Control}");
+    expect(search).toHaveFocus();
+    search.blur();
+    await user.keyboard("{Meta>}k{/Meta}");
+    expect(search).toHaveFocus();
+    expect(search).toHaveAttribute("aria-keyshortcuts", "Control+K Meta+K");
+  });
+});

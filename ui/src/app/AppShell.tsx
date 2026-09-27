@@ -1,6 +1,6 @@
 import type { LucideIcon } from "lucide-react";
 import { Activity, Inbox, KanbanSquare, ListChecks, Search, Settings, Sun, Table2, Users, Zap } from "lucide-react";
-import { useEffect, useState, type FormEvent } from "react";
+import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
 import { useStatus } from "../api/queries";
@@ -78,6 +78,20 @@ function SidebarSearch() {
   const q = onJobs ? (new URLSearchParams(location.search).get("q") ?? "") : "";
   const [text, setText] = useState(q);
   useEffect(() => setText(q), [q]);
+  const input = useRef<HTMLInputElement>(null);
+
+  // Cmd+K / Ctrl+K jumps to the search from anywhere.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        input.current?.focus();
+        input.current?.select();
+      }
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, []);
 
   function onSubmit(e: FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -94,7 +108,9 @@ function SidebarSearch() {
     <form role="search" className={styles.search} onSubmit={onSubmit}>
       <Search size={14} strokeWidth={1.7} aria-hidden="true" />
       <input
+        ref={input}
         type="search"
+        aria-keyshortcuts="Control+K Meta+K"
         name="q"
         autoComplete="off"
         spellCheck={false}
@@ -107,9 +123,34 @@ function SidebarSearch() {
   );
 }
 
+/**
+ * On a route change (a new path, not just a new query string such as ?sel=, so a sheet's focus return is left
+ * alone) move focus to the main region and announce the new page's title. Skipped on the first load. Focus that
+ * the new page already put inside main (or kept there, e.g. a section tab) stays where it is.
+ */
+function useRouteFocus(main: RefObject<HTMLElement | null>): string {
+  const { pathname } = useLocation();
+  const [message, setMessage] = useState("");
+  const first = useRef(true);
+  useEffect(() => {
+    if (first.current) {
+      first.current = false;
+      return;
+    }
+    const el = main.current;
+    if (!el) return;
+    const active = document.activeElement;
+    if (!active || active === document.body || !el.contains(active)) el.focus({ preventScroll: true });
+    setMessage(el.querySelector("h1")?.textContent?.trim() || document.title.replace(/ · career-os$/, ""));
+  }, [pathname, main]);
+  return message;
+}
+
 export function AppShell() {
   const connection = useLiveEvents();
   const { data: status } = useStatus();
+  const main = useRef<HTMLElement>(null);
+  const routeMessage = useRouteFocus(main);
 
   return (
     <div className={styles.shell}>
@@ -147,7 +188,10 @@ export function AppShell() {
         ))}
         <Freshness status={status} connection={connection} />
       </nav>
-      <main id="main" tabIndex={-1} className={styles.main}>
+      <div role="status" aria-live="polite" className="sr-only" data-testid="route-announcer">
+        {routeMessage}
+      </div>
+      <main ref={main} id="main" tabIndex={-1} className={styles.main}>
         <Outlet />
       </main>
     </div>

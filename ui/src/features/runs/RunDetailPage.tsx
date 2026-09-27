@@ -124,7 +124,7 @@ export function RunDetailPage() {
           <h2 id="log-h" className={styles.h2}>
             {live ? "Live output" : "run.log"}
           </h2>
-          <LogPane label={live ? "Live run output" : "Run log"} lines={logLines} empty="Nothing logged." />
+          <LogPane label={live ? "Live run output" : "Run log"} lines={logLines} empty="Nothing logged." live={live} />
         </section>
       </div>
     </Page>
