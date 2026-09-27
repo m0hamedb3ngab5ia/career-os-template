@@ -53,7 +53,8 @@ education:
 # How to write them: .claude/skills/_shared/resume_writing_rules.md (X-Y-Z / tech formula, verb first, 15-28 words,
 # never an invented number). Optional per-bullet flags:
 #   resume_default: true   tailor-resume prefers this bullet when choosing between bullets of equal relevance
-#   resume_pin: true       always selected for its entry (counts toward the bullet budget); the one-page trim never drops it
+#   resume_pin: true       always selected for its entry (the bullet budget grows to fit pins; max 2 per entry, 2 pinned
+#                          projects); the one-page trim never drops it
 #   weak: true             you know it is weak; used only when nothing stronger covers the posting
 #   estimate: true         the number is your own estimate; the text then carries a "~" prefix (e.g. ~40%)
 # Bold: wrap tech names and metrics in **...** inside `text` / `variants` (e.g. "Built a **FastAPI** service ...

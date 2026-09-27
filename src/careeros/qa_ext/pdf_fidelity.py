@@ -125,6 +125,16 @@ def _norm_url(u: str) -> str:
     return u.split("?")[0].split("#")[0].rstrip("/")
 
 
+def _strict_url(u: str) -> str:
+    """Exact-match key for project links: scheme and host lowercased, one trailing slash dropped; path case,
+    query and fragment kept (`?platform=ios` and `?platform=android` are different links)."""
+    u = u.strip()
+    m = re.match(r"^([a-zA-Z][a-zA-Z0-9+.-]*://)([^/?#]*)(.*)$", u)
+    if m:
+        u = m.group(1).lower() + m.group(2).lower() + m.group(3)
+    return u[:-1] if u.endswith("/") else u
+
+
 def _domain(u: str) -> str:
     return _norm_url(u).split("/")[0]
 
@@ -202,7 +212,10 @@ def _identity(ck: Any) -> dict[str, Any]:
 
 
 def _project_links(ck: Any) -> list[tuple[str, str]]:
-    """(field label, url) for every project `link` and `links[].url` in resume.json."""
+    """(field label, url) for every project `link` and `links[].url` in resume.json.
+
+    A declared `links[]` entry with a blank or non-string url yields url "" so `_check_links` reports it as
+    missing instead of silently skipping it; a blank `link` (the optional name link) is simply absent."""
     rj = getattr(ck, "resume_json", None)
     out: list[tuple[str, str]] = []
     for p in (rj.get("projects") or []) if isinstance(rj, dict) else []:
@@ -212,8 +225,9 @@ def _project_links(ck: Any) -> list[tuple[str, str]]:
         if isinstance(p.get("link"), str) and p["link"].strip():
             out.append((f"projects.{pid}.link", p["link"]))
         for l in p.get("links") or []:
-            if isinstance(l, dict) and isinstance(l.get("url"), str) and l["url"].strip():
-                out.append((f"projects.{pid}.links[{l.get('label')}]", l["url"]))
+            if isinstance(l, dict):
+                url = l.get("url")
+                out.append((f"projects.{pid}.links[{l.get('label')}]", url.strip() if isinstance(url, str) else ""))
     return out
 
 
@@ -239,8 +253,12 @@ def _check_links(ck: Any, reader: Any, cfg: dict[str, Any], ex: dict[str, Any]) 
         wrong = [u for u in uris if _domain(u) == _domain(want)]
         notes.append(f"{f} link points at {', '.join(wrong)} (want {want})" if wrong else f"{f}: no {want} link")
     ex["project_link_uris"] = []
+    strict_web = {_strict_url(u) for u in uris if not u.lower().startswith("mailto:")}
     for f, want in project_links:
-        if _norm_url(want) not in web:
+        if not want:
+            missing.append(f)
+            notes.append(f"{f}: blank url")
+        elif _strict_url(want) not in strict_web:
             missing.append(f)
             notes.append(f"{f}: no {want} link")
         else:

@@ -210,10 +210,11 @@ PROJECT_TXT = RESUME_TXT + "\n\nPROJECTS\nWidgetizer | Nov 2025\n" + PROJECT_LIN
 PROJECT_PDF = RESUME_TXT + "\n\nPROJECTS\nWidgetizer Nov 2025\nApp Store · Demo video\n- Built an iOS app in Swift\n"
 
 
-def make_project_job(tmp_path: Path, links: list[str]) -> Path:
+def make_project_job(tmp_path: Path, links: list[str], project_links: list[dict] | None = None) -> Path:
     job = make_job(tmp_path, pdf_text=PROJECT_PDF, resume_txt=PROJECT_TXT, links=links)
     (job / "resume.json").write_text(json.dumps({"projects": [
-        {"id": "widgetizer", "name": "Widgetizer", "link": PROJECT_LINK, "links": PROJECT_LINKS, "bullets": []}]}))
+        {"id": "widgetizer", "name": "Widgetizer", "link": PROJECT_LINK,
+         "links": PROJECT_LINKS if project_links is None else project_links, "bullets": []}]}))
     return job
 
 
@@ -235,6 +236,37 @@ def test_project_links_pass_and_txt_urls_count_via_annotations(tmp_path: Path) -
     t = by_name(ck, "pdf_text_matches_resume")
     assert t["ok"] and ck.extras["pdf_fidelity"]["missing_tokens"] == [], t["detail"]
     assert not any(c["check"] == "pdf_hidden_text" for c in ck.checks)
+
+
+APP_IOS = "https://example.com/widgetizer/app?platform=ios"
+
+
+def test_project_link_query_and_fragment_must_match_exactly(tmp_path: Path) -> None:
+    """Project links are compared strictly: a different query string is a different link."""
+    declared = [{"label": "App Store", "url": APP_IOS}]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK, APP_IOS.replace("ios", "android")], declared))
+    c = by_name(ck, "pdf_links_clickable")
+    assert not c["ok"] and "App Store" in c["detail"], c["detail"]
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+    ck = run(make_project_job(tmp_path / "b", GOOD_LINKS + [PROJECT_LINK, APP_IOS + "#top"], declared))
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+
+
+def test_project_link_host_case_and_trailing_slash_tolerated_but_path_case_kept(tmp_path: Path) -> None:
+    declared = [{"label": "App Store", "url": APP_IOS}]
+    ok = ["HTTPS://EXAMPLE.com/widgetizer/app?platform=ios/", "https://Example.com/widgetizer/"]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + ok, declared))
+    assert by_name(ck, "pdf_links_clickable")["ok"], by_name(ck, "pdf_links_clickable")["detail"]
+    ck = run(make_project_job(tmp_path / "b", GOOD_LINKS + [PROJECT_LINK, APP_IOS.replace("widgetizer", "Widgetizer")], declared))
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[App Store]"]
+
+
+def test_project_link_with_blank_url_is_reported_missing(tmp_path: Path) -> None:
+    declared = [{"label": "App Store", "url": PROJECT_LINKS[0]["url"]}, {"label": "Demo video", "url": "  "}]
+    ck = run(make_project_job(tmp_path, GOOD_LINKS + [PROJECT_LINK, PROJECT_LINKS[0]["url"]], declared))
+    c = by_name(ck, "pdf_links_clickable")
+    assert not c["ok"] and "projects.widgetizer.links[Demo video]: blank url" in c["detail"], c["detail"]
+    assert ck.extras["pdf_fidelity"]["links_missing"] == ["projects.widgetizer.links[Demo video]"]
 
 
 def test_project_links_checked_even_without_identity_links(tmp_path: Path) -> None:

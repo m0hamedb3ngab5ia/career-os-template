@@ -304,6 +304,50 @@ def test_project_links_shape():
     assert schema_problems(cfg, prof) == []
 
 
+@pytest.mark.parametrize("link", [
+    {"label": " ", "url": "https://example.com/x"},
+    {"label": "Demo", "url": ""},
+    {"label": "Demo", "url": "   "},
+    {"label": "Demo", "url": "example.com/x"},
+    {"label": "Demo", "url": "ftp://example.com/x"},
+])
+def test_project_links_need_label_and_http_url(link):
+    cfg, prof = _examples_cfg_prof()
+    prof["master"]["projects"][0]["links"] = [link]
+    probs = schema_problems(cfg, prof)
+    assert any("widgetizer.links" in p for p in probs), probs
+
+
+def _copy_project(prof, new_id):
+    import copy
+    proj = copy.deepcopy(prof["master"]["projects"][0])
+    proj["id"] = new_id
+    for i, b in enumerate(proj["bullets"], 1):
+        b["id"] = f"{new_id}.{i}"
+    prof["master"]["projects"].append(proj)
+    return proj
+
+
+def test_resume_pin_at_most_two_per_entry():
+    cfg, prof = _examples_cfg_prof()
+    for b in prof["master"]["experience"][0]["bullets"][:2]:
+        b["resume_pin"] = True
+    assert schema_problems(cfg, prof) == []
+    prof["master"]["experience"][0]["bullets"][2]["resume_pin"] = True
+    probs = schema_problems(cfg, prof)
+    assert any("acme has 3 resume_pin bullets" in p and "one-page" in p for p in probs), probs
+
+
+def test_resume_pin_at_most_two_pinned_projects():
+    cfg, prof = _examples_cfg_prof()
+    assert any(b.get("resume_pin") for b in prof["master"]["projects"][0]["bullets"])   # example pins one
+    _copy_project(prof, "second")
+    assert schema_problems(cfg, prof) == []
+    _copy_project(prof, "third")
+    probs = schema_problems(cfg, prof)
+    assert any("3 projects carry a resume_pin bullet" in p and "one-page" in p for p in probs), probs
+
+
 @pytest.mark.parametrize("mq", [
     "ask me later",
     [{"bullet_id": "acme.3"}],
