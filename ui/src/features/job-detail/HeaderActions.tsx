@@ -12,7 +12,8 @@ export function StatusMenu({ jobId, status }: { jobId: string; status: string | 
   const toast = useToast();
   const meta = useMeta();
   const set = useSetStatus(jobId);
-  const statuses = meta.data?.statuses ?? [];
+  // "applied" is reached only through the confirmed Mark submitted path, never this menu.
+  const statuses = (meta.data?.statuses ?? []).filter((s) => s !== "applied");
   const seconds = meta.data?.ui?.undo_seconds;
   function pick(next: string) {
     if (next === status) return;

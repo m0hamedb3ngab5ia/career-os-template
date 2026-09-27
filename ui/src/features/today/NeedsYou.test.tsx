@@ -137,6 +137,39 @@ describe("NeedsYou", () => {
     );
   });
 
+  it("after mark done, focus moves to the next row's mark-done control", async () => {
+    const user = userEvent.setup();
+    let open = today.actions!;
+    setup("/", {
+      "GET /api/today": () => json({ ...today, actions: open }),
+      "POST /api/today/actions/12/done": () => {
+        open = open.filter((a) => a.id !== 12);
+        return json({ ok: true, queued: false });
+      },
+    });
+    await screen.findByText("Globex");
+    const names = rowNames();
+    const i = names.indexOf("Globex");
+    const next = names[i + 1] ?? names[i - 1];
+    await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: / }));
+    await waitFor(() => expect(screen.queryByText("Globex")).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: new RegExp(`^Mark ${next}: `) })).toHaveFocus());
+  });
+
+  it("after mark done on the last row, focus moves to the list heading", async () => {
+    const user = userEvent.setup();
+    let open = today.actions!.filter((a) => a.id === 12);
+    setup("/", {
+      "GET /api/today": () => json({ ...today, actions: open }),
+      "POST /api/today/actions/12/done": () => {
+        open = [];
+        return json({ ok: true, queued: false });
+      },
+    });
+    await user.click(await screen.findByRole("checkbox", { name: /^Mark Globex: / }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: /^Needs you/ })).toHaveFocus());
+  });
+
   it("puts the row back and shows the server's reason when mark done fails", async () => {
     const user = userEvent.setup();
     setup("/", { "POST /api/today/actions/12/done": { $status: 409, body: { detail: "Tracker is busy" } } });

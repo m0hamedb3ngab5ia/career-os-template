@@ -1,6 +1,6 @@
 import { useId, useRef, useState, type FormEvent } from "react";
 import { Button } from "../../kit/Button";
-import { Sheet } from "../../kit/Dialog";
+import { Sheet } from "../../kit/Sheet";
 import { useToast } from "../../kit/Toast";
 import { errorText, useFlagCompany, useVerifyCompany } from "./api";
 import { lines } from "./Evidence";
@@ -116,7 +116,6 @@ export function VerifySheet({ jobId, company, open, onClose }: SheetProps) {
       open={open}
       onClose={onClose}
       title={`Verify ${company}`}
-      description="Record why this company is real. Verified companies skip the company check on future postings."
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -126,6 +125,7 @@ export function VerifySheet({ jobId, company, open, onClose }: SheetProps) {
         </>
       }
     >
+      <p className={styles.hint}>Record why this company is real. Verified companies skip the company check on future postings.</p>
       <form id={formId} className={styles.form} onSubmit={onSubmit} noValidate>
         <Radios
           legend="Risk"
@@ -223,7 +223,6 @@ export function FlagSheet({ jobId, company, open, onClose }: SheetProps) {
       open={open}
       onClose={onClose}
       title={`Flag ${company} as suspicious`}
-      description="Flagged companies are blocked or sent for review on every posting until you clear the flag."
       footer={
         <>
           <Button onClick={onClose}>Cancel</Button>
@@ -233,6 +232,7 @@ export function FlagSheet({ jobId, company, open, onClose }: SheetProps) {
         </>
       }
     >
+      <p className={styles.hint}>Flagged companies are blocked or sent for review on every posting until you clear the flag.</p>
       <form id={formId} className={styles.form} onSubmit={onSubmit}>
         <Field label="Reason">
           {({ id }) => (
