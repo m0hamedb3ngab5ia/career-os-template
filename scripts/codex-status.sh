@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Non-interactive stand-in for Codex's `/status` (TUI-only): can Codex run right now?
 # Usage: scripts/codex-status.sh [PR_NUMBER]
-#   With a PR number, first scans .reviews/pr-<N>/codex.log (a stalled or failed /review run).
+#   With a PR number, first scans .reviews/pr-<N>/codex.log (a stalled or failed /review run); a usage-limit
+#   hit there is only a note (stderr), since the log can predate a reset. The live probe below is authoritative.
 #   Then checks login and sends a tiny `codex exec` probe (90 s cap).
 # Prints one line. Exit: 0 ok | 3 usage limit (line includes "try again at ...") | 4 not logged in | 5 other error/timeout
 set -uo pipefail
@@ -10,11 +11,13 @@ ROOT="$(git rev-parse --show-toplevel)"
 LIMIT_RE='usage limit|rate limit|quota|try again at'
 PR="${1:-}"
 
-limit_line() { grep -iE "$LIMIT_RE" | grep -iv '^ *tokens used' | tail -1 | sed 's/^ERROR: *//'; }
+# Only Codex's own error lines: the log also holds the reviewed transcript (code/docs can themselves
+# mention "usage limit" or "quota"), which caused false out-of-usage alarms.
+limit_line() { grep -E '^(ERROR|error):' | grep -iE "$LIMIT_RE" | tail -1 | sed -E 's/^(ERROR|error): *//'; }
 
 if [ -n "$PR" ] && [ -f "$ROOT/.reviews/pr-$PR/codex.log" ]; then
   hit="$(limit_line < "$ROOT/.reviews/pr-$PR/codex.log")"
-  if [ -n "$hit" ]; then echo "codex: out of usage (pr-$PR log): $hit"; exit 3; fi
+  if [ -n "$hit" ]; then echo "codex: pr-$PR log shows a usage limit (may be stale): $hit" >&2; fi
 fi
 
 if ! codex login status >/dev/null 2>&1; then

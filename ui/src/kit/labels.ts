@@ -75,6 +75,7 @@ export const STOP_REASONS: CodeTable = {
   paused: { label: "Paused", tone: "gray" },
   cancelled: { label: "Cancelled", tone: "gray" },
   usage_limit: { label: "Usage limit", tone: "orange" },
+  busy: { label: "Busy", tone: "orange" },
   auth_required: { label: "Login needed", tone: "orange" },
   permission_denied: { label: "Tool not allowed", tone: "orange" },
   timeout: { label: "Job timed out", tone: "orange" },
