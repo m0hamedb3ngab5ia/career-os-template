@@ -106,6 +106,60 @@ describe("PipelineCard", () => {
     expect(FakeEventSource.last.closed).toBe(true);
   });
 
+  /** Start on a found job; the first POST scores it, the stream end flips the server state to `after`. */
+  async function scoreThen(after: Partial<PipelineState>, stopAfter = false) {
+    let current: PipelineState = { ...base, stage: "score", next_action: "start", next_label: "Start pipeline", next_kind: "score" };
+    let n = 0;
+    const api = mockApi({
+      "GET /api/jobs/j1/pipeline": () => current,
+      "POST /api/jobs/j1/pipeline": () => {
+        n += 1;
+        const kind = n === 1 ? "score" : "prepare";
+        current = { ...current, active_run_id: `run-${n}-${kind}` };
+        return { run_id: `run-${n}-${kind}`, kind };
+      },
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    if (stopAfter) await userEvent.click(await screen.findByRole("checkbox", { name: "Stop after this stage" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Start pipeline" }));
+    await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
+    expect(FakeEventSource.last.url).toBe("/api/runs/run-1-score/stream");
+    current = { ...base, ...after, active_run_id: null };
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed" }));
+    return api;
+  }
+
+  it("chains a scored job straight into prepare after Start pipeline", async () => {
+    const api = await scoreThen({ stage: "prepare", next_action: "continue", next_kind: "prepare", force: false });
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(2));
+    expect(api.callsTo("POST /api/jobs/j1/pipeline")[1]?.body).toEqual({ action: "continue" });
+    expect(await screen.findByText(/Scored — continuing to prepare…/)).toBeInTheDocument();
+    await waitFor(() => expect(FakeEventSource.instances.length).toBe(2));
+    expect(FakeEventSource.last.url).toBe("/api/runs/run-2-prepare/stream");
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed" }));
+    await waitFor(() => expect(screen.queryByText(/Scored — continuing to prepare…/)).not.toBeInTheDocument());
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(2);
+  });
+
+  it("never chains into apply", async () => {
+    const api = await scoreThen({ stage: "apply", next_action: "continue", next_kind: "apply", force: false });
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("does not chain when score blocked the job", async () => {
+    const api = await scoreThen({ stage: "prepare", next_action: null, next_label: null, next_kind: null,
+                                  blocked_reason: "Skipped by score: fit 20 below threshold" });
+    expect(await screen.findByText("Skipped by score: fit 20 below threshold")).toBeInTheDocument();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("does not chain when Stop after this stage is on", async () => {
+    const api = await scoreThen({ stage: "prepare", next_action: "continue", next_kind: "prepare", force: false }, true);
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
   it("shows the server's refusal as a toast", async () => {
     setup({ next_action: "continue", next_kind: "apply" }, {
       "POST /api/jobs/j1/pipeline": { status: 409, body: { detail: "Another run is already running (prepare, pid 4)." } },
