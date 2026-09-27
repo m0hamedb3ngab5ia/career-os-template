@@ -131,6 +131,7 @@ export function autonomyData(): SectionData {
     defaults: {},
     files: { pipeline: "config/pipeline.yaml", targets: "config/targets.yaml" },
     version: "v1",
+    warnings: {},
   };
 }
 
@@ -184,6 +185,7 @@ export function runsData(): SectionData {
     defaults: {},
     files: { pipeline: "config/pipeline.yaml" },
     version: "v1",
+    warnings: {},
   };
 }
 
@@ -219,6 +221,7 @@ export function safetyData(): SectionData {
     defaults: {},
     files: { targets: "config/targets.yaml" },
     version: "v1",
+    warnings: {},
   };
 }
 

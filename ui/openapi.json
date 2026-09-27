@@ -371,6 +371,127 @@
         "title": "ActionsPage",
         "type": "object"
       },
+      "Advice": {
+        "description": "GET /api/advise: storage and run advice plus every recommendation (storage first).",
+        "properties": {
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          },
+          "runs": {
+            "$ref": "#/components/schemas/RunsAdvice"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageAdvice"
+          }
+        },
+        "required": [
+          "storage",
+          "runs",
+          "recommendations"
+        ],
+        "title": "Advice",
+        "type": "object"
+      },
+      "AdvisorConfig": {
+        "properties": {
+          "advisor": {
+            "$ref": "#/components/schemas/AdvisorLimits"
+          },
+          "storage": {
+            "$ref": "#/components/schemas/StorageLimits"
+          }
+        },
+        "required": [
+          "storage",
+          "advisor"
+        ],
+        "title": "AdvisorConfig",
+        "type": "object"
+      },
+      "AdvisorLimits": {
+        "properties": {
+          "advise_after_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Advise After Days"
+          },
+          "failure_rate_warn": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Failure Rate Warn"
+          },
+          "min_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Min Runs"
+          },
+          "prune_idle_weeks": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Prune Idle Weeks"
+          },
+          "usage_limit_stops": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Usage Limit Stops"
+          },
+          "window_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Window Days"
+          }
+        },
+        "required": [
+          "advise_after_days",
+          "prune_idle_weeks",
+          "min_runs",
+          "window_days",
+          "usage_limit_stops",
+          "failure_rate_warn"
+        ],
+        "title": "AdvisorLimits",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -428,6 +549,9 @@
           },
           "duration_s": {
             "anyOf": [
+              {
+                "type": "integer"
+              },
               {
                 "type": "number"
               },
@@ -1034,6 +1158,9 @@
           "duration_s": {
             "anyOf": [
               {
+                "type": "integer"
+              },
+              {
                 "type": "number"
               },
               {
@@ -1168,6 +1295,36 @@
         "title": "CurrentRun",
         "type": "object"
       },
+      "DiskUsage": {
+        "properties": {
+          "free": {
+            "title": "Free",
+            "type": "integer"
+          },
+          "free_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Free Pct"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "total",
+          "free",
+          "free_pct"
+        ],
+        "title": "DiskUsage",
+        "type": "object"
+      },
       "Due": {
         "properties": {
           "due": {
@@ -1274,6 +1431,144 @@
         "title": "Export",
         "type": "object"
       },
+      "FieldSchema": {
+        "properties": {
+          "control": {
+            "title": "Control",
+            "type": "string"
+          },
+          "default": {
+            "title": "Default"
+          },
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "help": {
+            "title": "Help",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "integer": {
+            "title": "Integer",
+            "type": "boolean"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "locked": {
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "max": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max"
+          },
+          "min": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Min"
+          },
+          "note": {
+            "title": "Note",
+            "type": "string"
+          },
+          "nullable": {
+            "title": "Nullable",
+            "type": "boolean"
+          },
+          "options": {
+            "items": {},
+            "title": "Options",
+            "type": "array"
+          },
+          "personal": {
+            "title": "Personal",
+            "type": "boolean"
+          },
+          "readonly": {
+            "title": "Readonly",
+            "type": "boolean"
+          },
+          "recommended": {
+            "title": "Recommended",
+            "type": "boolean"
+          },
+          "step": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Step"
+          },
+          "strict_options": {
+            "title": "Strict Options",
+            "type": "boolean"
+          },
+          "unit": {
+            "title": "Unit",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "file",
+          "key",
+          "control",
+          "label",
+          "help",
+          "default",
+          "recommended",
+          "personal",
+          "options",
+          "strict_options",
+          "min",
+          "max",
+          "step",
+          "integer",
+          "nullable",
+          "unit",
+          "locked",
+          "readonly",
+          "note"
+        ],
+        "title": "FieldSchema",
+        "type": "object"
+      },
       "FlagBody": {
         "properties": {
           "confidence": {
@@ -1305,6 +1600,44 @@
           }
         },
         "title": "FlagBody",
+        "type": "object"
+      },
+      "GroupSchema": {
+        "properties": {
+          "help": {
+            "title": "Help",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "items": {
+            "items": {
+              "anyOf": [
+                {
+                  "$ref": "#/components/schemas/PolicyItem"
+                },
+                {
+                  "$ref": "#/components/schemas/FieldSchema"
+                }
+              ]
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "help",
+          "items"
+        ],
+        "title": "GroupSchema",
         "type": "object"
       },
       "HTTPValidationError": {
@@ -2408,6 +2741,42 @@
         "title": "PipelineCounts",
         "type": "object"
       },
+      "PolicyItem": {
+        "description": "A locked row: a rule the code enforces whatever the config says.",
+        "properties": {
+          "control": {
+            "const": "policy",
+            "title": "Control",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "locked": {
+            "const": true,
+            "title": "Locked",
+            "type": "boolean"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "control",
+          "label",
+          "value",
+          "why",
+          "locked"
+        ],
+        "title": "PolicyItem",
+        "type": "object"
+      },
       "Presets": {
         "properties": {
           "current": {
@@ -2461,6 +2830,24 @@
         "title": "Preview",
         "type": "object"
       },
+      "Projection": {
+        "properties": {
+          "30d": {
+            "title": "30D",
+            "type": "integer"
+          },
+          "90d": {
+            "title": "90D",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "30d",
+          "90d"
+        ],
+        "title": "Projection",
+        "type": "object"
+      },
       "PruneBody": {
         "properties": {
           "dry_run": {
@@ -2488,6 +2875,76 @@
           "end"
         ],
         "title": "QuietHours",
+        "type": "object"
+      },
+      "Recommendation": {
+        "properties": {
+          "change": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RecommendationChange"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "severity": {
+            "title": "Severity",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "severity",
+          "title",
+          "why",
+          "change"
+        ],
+        "title": "Recommendation",
+        "type": "object"
+      },
+      "RecommendationChange": {
+        "properties": {
+          "file": {
+            "title": "File",
+            "type": "string"
+          },
+          "from": {
+            "title": "From"
+          },
+          "path": {
+            "title": "Path",
+            "type": "string"
+          },
+          "to": {
+            "title": "To"
+          }
+        },
+        "required": [
+          "file",
+          "path",
+          "from",
+          "to"
+        ],
+        "title": "RecommendationChange",
         "type": "object"
       },
       "ResponseBreakdown": {
@@ -2595,6 +3052,9 @@
           "max_minutes": {
             "anyOf": [
               {
+                "type": "integer"
+              },
+              {
                 "type": "number"
               },
               {
@@ -2637,8 +3097,15 @@
             "type": "string"
           },
           "multiplier": {
-            "title": "Multiplier",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Multiplier"
           },
           "reached": {
             "title": "Reached",
@@ -2697,6 +3164,9 @@
           },
           "duration_s": {
             "anyOf": [
+              {
+                "type": "integer"
+              },
               {
                 "type": "number"
               },
@@ -2825,6 +3295,9 @@
           "duration_s": {
             "anyOf": [
               {
+                "type": "integer"
+              },
+              {
                 "type": "number"
               },
               {
@@ -2888,6 +3361,99 @@
           "steps"
         ],
         "title": "RunJobRow",
+        "type": "object"
+      },
+      "RunMetrics": {
+        "properties": {
+          "attempts": {
+            "title": "Attempts",
+            "type": "integer"
+          },
+          "avg_job_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Avg Job S"
+          },
+          "budget_used": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Budget Used"
+          },
+          "failed": {
+            "title": "Failed",
+            "type": "integer"
+          },
+          "failure_rate": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Failure Rate"
+          },
+          "p90_job_s": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "P90 Job S"
+          },
+          "prepare_share": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Prepare Share"
+          },
+          "runs": {
+            "title": "Runs",
+            "type": "integer"
+          },
+          "stops": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Stops",
+            "type": "object"
+          }
+        },
+        "required": [
+          "runs",
+          "attempts",
+          "failed",
+          "avg_job_s",
+          "p90_job_s",
+          "failure_rate",
+          "budget_used",
+          "stops"
+        ],
+        "title": "RunMetrics",
         "type": "object"
       },
       "RunPause": {
@@ -2956,6 +3522,9 @@
           },
           "duration_s": {
             "anyOf": [
+              {
+                "type": "integer"
+              },
               {
                 "type": "number"
               },
@@ -3228,6 +3797,9 @@
           "max_minutes": {
             "anyOf": [
               {
+                "type": "integer"
+              },
+              {
                 "type": "number"
               },
               {
@@ -3238,6 +3810,9 @@
           },
           "minutes": {
             "anyOf": [
+              {
+                "type": "integer"
+              },
               {
                 "type": "number"
               },
@@ -3255,6 +3830,47 @@
           "max_minutes"
         ],
         "title": "RunUsed",
+        "type": "object"
+      },
+      "RunsAdvice": {
+        "properties": {
+          "metrics": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/RunMetrics"
+            },
+            "title": "Metrics",
+            "type": "object"
+          },
+          "min_runs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Min Runs"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ready",
+          "min_runs",
+          "metrics",
+          "recommendations"
+        ],
+        "title": "RunsAdvice",
         "type": "object"
       },
       "Schedule": {
@@ -3331,8 +3947,15 @@
             ]
           },
           "tick_minutes": {
-            "title": "Tick Minutes",
-            "type": "number"
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Tick Minutes"
           }
         },
         "required": [
@@ -3369,6 +3992,9 @@
           },
           "every_minutes": {
             "anyOf": [
+              {
+                "type": "integer"
+              },
               {
                 "type": "number"
               },
@@ -3486,6 +4112,137 @@
           "error"
         ],
         "title": "ScheduleState",
+        "type": "object"
+      },
+      "SectionData": {
+        "properties": {
+          "defaults": {
+            "additionalProperties": true,
+            "title": "Defaults",
+            "type": "object"
+          },
+          "files": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "object"
+          },
+          "section": {
+            "$ref": "#/components/schemas/SectionSchema"
+          },
+          "values": {
+            "additionalProperties": true,
+            "title": "Values",
+            "type": "object"
+          },
+          "version": {
+            "title": "Version",
+            "type": "string"
+          },
+          "warnings": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/UnquotedWarning"
+            },
+            "title": "Warnings",
+            "type": "object"
+          }
+        },
+        "required": [
+          "section",
+          "values",
+          "defaults",
+          "warnings",
+          "files",
+          "version"
+        ],
+        "title": "SectionData",
+        "type": "object"
+      },
+      "SectionList": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SectionSummary"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sections"
+        ],
+        "title": "SectionList",
+        "type": "object"
+      },
+      "SectionSchema": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/GroupSchema"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "help": {
+            "title": "Help",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "help",
+          "files",
+          "groups"
+        ],
+        "title": "SectionSchema",
+        "type": "object"
+      },
+      "SectionSummary": {
+        "properties": {
+          "files": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Files",
+            "type": "array"
+          },
+          "help": {
+            "title": "Help",
+            "type": "string"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "help",
+          "files"
+        ],
+        "title": "SectionSummary",
         "type": "object"
       },
       "StartBody": {
@@ -3629,6 +4386,191 @@
           "status"
         ],
         "title": "StatusBody",
+        "type": "object"
+      },
+      "StorageAdvice": {
+        "properties": {
+          "budget": {
+            "title": "Budget",
+            "type": "integer"
+          },
+          "current": {
+            "title": "Current",
+            "type": "integer"
+          },
+          "days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Days"
+          },
+          "need_days": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Need Days"
+          },
+          "projection": {
+            "$ref": "#/components/schemas/Projection"
+          },
+          "rate_per_day": {
+            "title": "Rate Per Day",
+            "type": "integer"
+          },
+          "ready": {
+            "title": "Ready",
+            "type": "boolean"
+          },
+          "recommendations": {
+            "items": {
+              "$ref": "#/components/schemas/Recommendation"
+            },
+            "title": "Recommendations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "ready",
+          "days",
+          "need_days",
+          "recommendations"
+        ],
+        "title": "StorageAdvice",
+        "type": "object"
+      },
+      "StorageLimits": {
+        "properties": {
+          "budget_mb": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Budget Mb"
+          },
+          "disk_free_warn_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Disk Free Warn Pct"
+          },
+          "warn_at_pct": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              }
+            ],
+            "title": "Warn At Pct"
+          }
+        },
+        "required": [
+          "budget_mb",
+          "warn_at_pct",
+          "disk_free_warn_pct"
+        ],
+        "title": "StorageLimits",
+        "type": "object"
+      },
+      "StorageSnapshot": {
+        "description": "One line of the snapshots log (appended after each run / prune; older lines may lack keys).",
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "bytes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Bytes",
+            "type": "object"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsage"
+          },
+          "pruned_bytes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pruned Bytes"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          }
+        },
+        "required": [
+          "total"
+        ],
+        "title": "StorageSnapshot",
+        "type": "object"
+      },
+      "StorageView": {
+        "description": "GET /api/storage: bytes per category, the disk, the snapshot history and the advisor config.",
+        "properties": {
+          "bytes": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Bytes",
+            "type": "object"
+          },
+          "config": {
+            "$ref": "#/components/schemas/AdvisorConfig"
+          },
+          "disk": {
+            "$ref": "#/components/schemas/DiskUsage"
+          },
+          "snapshots": {
+            "items": {
+              "$ref": "#/components/schemas/StorageSnapshot"
+            },
+            "title": "Snapshots",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "bytes",
+          "total",
+          "disk",
+          "snapshots",
+          "config"
+        ],
+        "title": "StorageView",
         "type": "object"
       },
       "TileRow": {
@@ -3794,6 +4736,23 @@
           }
         },
         "title": "UndoSafe",
+        "type": "object"
+      },
+      "UnquotedWarning": {
+        "properties": {
+          "intended": {
+            "title": "Intended"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "message",
+          "intended"
+        ],
+        "title": "UnquotedWarning",
         "type": "object"
       },
       "ValidationError": {
@@ -4435,9 +5394,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Advise Api Advise Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Advice"
                 }
               }
             },
@@ -6267,9 +7224,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Sections Api Settings Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SectionList"
                 }
               }
             },
@@ -6344,9 +7299,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Read Api Settings  Section  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/SectionData"
                 }
               }
             },
@@ -6549,9 +7502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Storage Api Storage Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/StorageView"
                 }
               }
             },

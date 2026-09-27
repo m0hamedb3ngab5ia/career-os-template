@@ -37,7 +37,8 @@ function weekStart(d: Date): Date {
 export function weeklySnapshots(snaps: Snapshot[], locale?: string): Week[] {
   const fmt = new Intl.DateTimeFormat(locale, { month: "short", day: "numeric" });
   const byWeek = new Map<string, { start: Date; snap: Snapshot }>();
-  for (const s of [...snaps].sort((a, b) => a.at.localeCompare(b.at))) {
+  const dated = snaps.filter((s): s is Snapshot & { at: string } => typeof s.at === "string");
+  for (const s of dated.sort((a, b) => a.at.localeCompare(b.at))) {
     const t = new Date(s.at);
     if (Number.isNaN(t.getTime())) continue;
     const start = weekStart(t);

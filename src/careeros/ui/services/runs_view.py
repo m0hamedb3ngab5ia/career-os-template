@@ -37,7 +37,7 @@ _RELATIVE = re.compile(r"^\+(\d+)([mhd])$")
 class RunBudget(TypedDict):
     preset: NotRequired[str | None]
     max_jobs: NotRequired[int | None]
-    max_minutes: NotRequired[float | None]
+    max_minutes: NotRequired[int | float | None]
 
 
 class RunBase(TypedDict):
@@ -52,7 +52,7 @@ class RunBase(TypedDict):
     detail: str
     started_at: str | None
     ended_at: str | None
-    duration_s: float | None
+    duration_s: int | float | None
     pid: NotRequired[int | None]
     counters: dict[str, int]
     warnings: NotRequired[list[str]]
@@ -85,7 +85,7 @@ class Attempt(TypedDict):
     result: NotRequired[dict[str, Any] | None]
     started_at: NotRequired[str | None]
     ended_at: NotRequired[str | None]
-    duration_s: NotRequired[float | None]
+    duration_s: NotRequired[int | float | None]
     stream: NotRequired[str]
     headless: NotRequired[dict[str, Any]]
 
@@ -107,7 +107,7 @@ class RunJobRow(TypedDict):
     title: str | None
     state: Literal["done", "failed", "active", "queued"]
     outcome: str | None
-    duration_s: float | None
+    duration_s: int | float | None
     detail: str
     steps: list[JobStep]
 
@@ -115,8 +115,8 @@ class RunJobRow(TypedDict):
 class RunUsed(TypedDict):
     jobs: int
     max_jobs: int | None
-    minutes: float | None
-    max_minutes: float | None
+    minutes: int | float | None
+    max_minutes: int | float | None
 
 
 class RunCap(TypedDict):
@@ -124,7 +124,7 @@ class RunCap(TypedDict):
     cap: int
     applied: int
     remaining: int
-    multiplier: float
+    multiplier: int | float
     base: int
     reached: bool
 
@@ -165,7 +165,7 @@ class QuietHours(TypedDict):
 class ScheduleJob(TypedDict):
     kind: str
     enabled: bool
-    every_minutes: float | None
+    every_minutes: int | float | None
     at: list[str]
     preset: str | None
     claude: bool
@@ -179,7 +179,7 @@ class Schedule(TypedDict):
     installed: bool
     loaded: bool
     last_tick: str | None
-    tick_minutes: float
+    tick_minutes: int | float
     quiet_hours: QuietHours | None
     jobs: list[ScheduleJob]
     catch_up: CatchUp | None

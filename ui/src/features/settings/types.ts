@@ -1,5 +1,9 @@
-// Matches src/careeros/ui/settings_schema/model.py (Section/Group/Field/Policy.to_dict) and the Settings and
-// Storage routes (src/careeros/ui/routers/settings.py, storage.py).
+// JSON shapes of the Settings and Storage routes (src/careeros/ui/routers/settings.py, storage.py). The GET views are
+// generated from the backend TypedDicts (services/settings_page.py, services/storage_view.py; ui/openapi.json ->
+// src/api/schema.gen.ts); POST bodies/results (save errors, ranking preview, prune plan) stay hand-written.
+import type { components } from "../../api/schema.gen";
+
+type Schemas = components["schemas"];
 
 export type Control =
   | "switch"
@@ -17,71 +21,22 @@ export type Control =
   | "key_value"
   | "records";
 
-export interface FieldSchema {
-  id: string;
-  file: string;
-  key: string;
-  control: Control | string;
-  label: string;
-  help: string;
-  default: unknown;
-  recommended: boolean;
-  personal: boolean;
-  options: unknown[];
-  strict_options: boolean;
-  min: number | null;
-  max: number | null;
-  step: number | null;
-  integer: boolean;
-  nullable: boolean;
-  unit: string;
-  locked: boolean;
-  readonly: boolean;
-  note: string;
-}
-
-export interface PolicyItem {
-  control: "policy";
-  label: string;
-  value: string;
-  why: string;
-  locked: true;
-}
+/** One settings field (settings_schema/model.py Field.to_dict); `control` is one of Control or a newer kind. */
+export type FieldSchema = Schemas["FieldSchema"];
+/** A locked row: a rule the code enforces whatever the config says. */
+export type PolicyItem = Schemas["PolicyItem"];
 
 export type Item = FieldSchema | PolicyItem;
 
-export interface GroupSchema {
-  id: string;
-  title: string;
-  help: string;
-  items: Item[];
-}
-
-export interface SectionSchema {
-  id: string;
-  title: string;
-  help: string;
-  files: string[];
-  groups: GroupSchema[];
-}
-
-export interface SectionSummary {
-  id: string;
-  title: string;
-  help: string;
-  files: string[];
-}
+export type GroupSchema = Schemas["GroupSchema"];
+export type SectionSchema = Schemas["SectionSchema"];
+/** GET /api/settings rows. */
+export type SectionSummary = Schemas["SectionSummary"];
 
 export type Values = Record<string, unknown>;
 
-export interface SectionData {
-  section: SectionSchema;
-  values: Values;
-  defaults: Values;
-  /** {file: path relative to the repo}, e.g. {pipeline: "config/pipeline.yaml"} */
-  files: Record<string, string>;
-  version: string;
-}
+/** GET /api/settings/{section}; `files` is {file: path relative to the repo}, e.g. {pipeline: "config/pipeline.yaml"}. */
+export type SectionData = Schemas["SectionData"];
 
 export interface SaveErrorBody {
   detail: string;
@@ -106,59 +61,13 @@ export interface RankingPreview {
 
 export type StorageCategory = "postings" | "resumes_pdfs" | "screenshots" | "run_logs" | "tracker" | "other";
 
-export interface Snapshot {
-  at: string;
-  trigger?: string;
-  bytes: Partial<Record<StorageCategory, number>>;
-  total: number;
-  disk?: { total: number; free: number; free_pct: number };
-}
-
-export interface StorageData {
-  bytes: Partial<Record<StorageCategory, number>>;
-  total: number;
-  disk: { total: number; free: number; free_pct: number };
-  snapshots: Snapshot[];
-  config: {
-    storage: { budget_mb: number; warn_at_pct: number; disk_free_warn_pct: number };
-    advisor: { advise_after_days: number; min_runs: number; window_days: number };
-  };
-}
-
-export interface Recommendation {
-  id: string;
-  kind: "storage" | "runs" | string;
-  severity: "warn" | "info" | string;
-  title: string;
-  why: string;
-  change: { file: string; path: string; from: unknown; to: unknown } | null;
-}
-
-export interface RunMetrics {
-  runs: number;
-  attempts: number;
-  failed?: number;
-  avg_job_s: number;
-  p90_job_s: number;
-  failure_rate: number;
-  budget_used: number;
-  stops: Record<string, number>;
-  prepare_share?: number | null;
-}
-
-export interface Advice {
-  storage: {
-    ready: boolean;
-    days: number;
-    need_days: number;
-    current?: number;
-    rate_per_day?: number;
-    projection?: { "30d": number; "90d": number };
-    budget?: number;
-  };
-  runs: { ready: boolean; min_runs: number; metrics: Partial<Record<"score" | "prepare", RunMetrics>> };
-  recommendations: Recommendation[];
-}
+export type Snapshot = Schemas["StorageSnapshot"];
+/** GET /api/storage. */
+export type StorageData = Schemas["StorageView"];
+export type Recommendation = Schemas["Recommendation"];
+export type RunMetrics = Schemas["RunMetrics"];
+/** GET /api/advise. */
+export type Advice = Schemas["Advice"];
 
 export interface PruneItem {
   job_id: string;

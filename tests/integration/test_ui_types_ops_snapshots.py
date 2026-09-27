@@ -6,7 +6,7 @@ from __future__ import annotations
 import json
 import os
 import re
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
@@ -16,6 +16,7 @@ from fixtures.ui_data import add_outreach_data, add_scam_case, build_ui_data
 pytest.importorskip("fastapi")
 from fastapi.testclient import TestClient  # noqa: E402
 
+from careeros.runs import locks  # noqa: E402
 from careeros.runs.store import RunStore  # noqa: E402
 from careeros.runs.tick import _save_catch_up  # noqa: E402
 from careeros.ui.app import create_app  # noqa: E402
@@ -88,8 +89,35 @@ def test_response_matches_snapshot(api, name):
     url = PATHS[name].format(run=data["runs"]["score"], job=data["jobs"]["interview"])
     r = c.get(url)
     assert r.status_code == 200, r.text
-    got = _stable(r.json(), tmp, dict(sorted(ids.items(), key=lambda kv: -len(kv[1]))), name in SIZES)
+    _check(name, r.json(), tmp, ids)
+
+
+def _check(name, body, tmp, ids):
+    got = _stable(body, tmp, dict(sorted(ids.items(), key=lambda kv: -len(kv[1]))), name in SIZES)
     snap = SNAPSHOTS / f"ops_{name}.json"
     if os.environ.get("CAREEROS_UPDATE_SNAPSHOTS"):
         snap.write_text(json.dumps(got, indent=2, sort_keys=True) + "\n")
     assert got == json.loads(snap.read_text())
+
+
+def test_current_run_while_a_batch_runs_matches_snapshot(api):
+    """/api/runs/current is null in the shared fixture; hold the runner lock and a job lock to pin CurrentRun."""
+    c, data, tmp = api
+    rs = RunStore(data["settings"])
+    run = rs.new_run("prepare", "manual", {"preset": "small", "max_jobs": 2, "max_minutes": 30},
+                     NOW - timedelta(minutes=5), counters={"attempted": 0},
+                     queue=[{"job_id": data["jobs"]["queued"], "rank": 1, "score": 60, "why": "posted 4d ago (+50)"}])
+    locks.acquire(rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=os.getpid(), note="prepare",
+                  pid_alive=lambda p: True)
+    (rs.dir / "locks").mkdir(parents=True, exist_ok=True)
+    locks.acquire(rs.dir / "locks" / f"{data['jobs']['queued']}.lock", owner=f"run:{run['id']}", ttl_seconds=3600,
+                  pid=os.getpid(), note="prepare", pid_alive=lambda p: True)
+    r = c.get("/api/runs/current")
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["id"] == run["id"] and body["current_job"] == data["jobs"]["queued"]
+    # the lock's wall-clock stamps, host and token, today's cap date and the elapsed minutes vary per run
+    body["holder"].update({k: f"<{k}>" for k in ("acquired_at", "expires_at", "host", "token")})
+    body["cap"]["date"], body["used"]["minutes"] = "<date>", "<minutes>"
+    ids = {f"job_{k}": v for k, v in data["jobs"].items()} | {"run_current": run["id"]}
+    _check("runs_current_running", body, tmp, ids)
