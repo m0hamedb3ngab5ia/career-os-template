@@ -50,7 +50,7 @@ STANDARD_KEYS = (
 IDENTITY_KEYS = ("name", "email", "phone", "linkedin", "github")
 ENTRY_SECTIONS = ("experience", "projects", "education", "leadership")
 MARKER_RE = re.compile(r"#\s*(INSERT\b|EDIT\b)")
-BULLET_FLAGS = ("resume_default", "weak", "estimate")   # optional per-bullet booleans (resume_writing_rules.md)
+BULLET_FLAGS = ("resume_default", "weak", "estimate", "resume_pin")   # optional per-bullet booleans (resume_writing_rules.md)
 EXAMPLE_EMAIL_RE = re.compile(r"[\w.+-]+@example\.com\b", re.I)
 
 
@@ -166,6 +166,12 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
         for e in m.get(sec) or []:
             for b in (e.get("bullets") or []) if isinstance(e, dict) else []:
                 need(isinstance(b, dict) and isinstance(b.get("text"), str), f"profile/master.yaml: bullet {b.get('id') if isinstance(b, dict) else b} needs text")
+    for e in m.get("projects") or []:
+        links = e.get("links") if isinstance(e, dict) else None
+        if links is not None:
+            need(isinstance(links, list) and all(isinstance(l, dict) and isinstance(l.get("label"), str)
+                                                 and isinstance(l.get("url"), str) for l in links),
+                 f"profile/master.yaml: {e.get('id')}.links must be a list of {{label, url}}")
     for sec in ("experience", "projects", "leadership"):
         for e in m.get(sec) or []:
             for b in (e.get("bullets") or []) if isinstance(e, dict) else []:

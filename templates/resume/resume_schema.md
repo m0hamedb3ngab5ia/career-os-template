@@ -54,7 +54,8 @@ Rules:
       "name": "Widgetizer",
       "date": "Nov 2025",
       "stack": ["Swift", "SwiftUI", "Supabase"],
-      "link": null,
+      "link": "https://example.com/widgetizer",
+      "links": [{"label": "App Store", "url": "https://example.com/widgetizer/app"}],
       "bullets": [{"id": "widgetizer.1", "text": "..."}]
     }
   ],
@@ -97,6 +98,7 @@ Rules:
 | `experience[].team` | no | Rendered after the title: "Title, Team". |
 | `experience[].end` | yes | Use `Present` for current roles. |
 | `projects[].link` | no | Rendered as a hyperlink on the project name. |
+| `projects[].links` | no | `[{label, url}]` copied from the profile. PDF: one line under the project header, each `label` a clickable link, joined by " · ". `resume.txt`: one `label: url` line each. QA `pdf_links_clickable` requires `link` and every `links[].url` to be a link annotation in the PDF. |
 | `education[].location` | no | |
 | `skill_groups` | no | `[{label, items}]` copied in order from `profile.skill_groups`; when present it replaces `skills`. Empty groups are omitted. |
 | `skills_heading` | no | Section heading for skills (default `Skills`; from `profile.skills_heading`). |

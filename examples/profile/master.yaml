@@ -53,6 +53,7 @@ education:
 # How to write them: .claude/skills/_shared/resume_writing_rules.md (X-Y-Z / tech formula, verb first, 15-28 words,
 # never an invented number). Optional per-bullet flags:
 #   resume_default: true   tailor-resume prefers this bullet when choosing between bullets of equal relevance
+#   resume_pin: true       always selected for its entry (counts toward the bullet budget); the one-page trim never drops it
 #   weak: true             you know it is weak; used only when nothing stronger covers the posting
 #   estimate: true         the number is your own estimate; the text then carries a "~" prefix (e.g. ~40%)
 # Bold: wrap tech names and metrics in **...** inside `text` / `variants` (e.g. "Built a **FastAPI** service ...
@@ -111,13 +112,17 @@ projects:
   - id: widgetizer                                # INSERT: short unique id, e.g. tasklight
     name: Widgetizer                              # INSERT: project name
     date: 2025-11                                 # INSERT: date, YYYY-MM, e.g. 2023-06
-    link: null                                    # INSERT: repo or demo URL, or null
+    link: https://example.com/widgetizer          # INSERT: repo or demo URL (project name links to it), or null
+    links:                                        # INSERT: optional extra links printed under the project name
+      - {label: App Store, url: https://example.com/widgetizer/app}
+      - {label: Demo video, url: https://example.com/widgetizer/demo}
     stack: [Swift, SwiftUI, Supabase]             # INSERT: main tools; the first 3 are printed
     tags: [swe_mobile, swe_fullstack]             # INSERT: category names this project supports
     bullets:
       - id: widgetizer.1                          # INSERT: <entry id>.<n>
         text: Built an iOS app in **Swift** and **SwiftUI** with a **Supabase** backend, reaching **300 beta users**   # INSERT: one fact per bullet
         metrics: ["300"]                          # INSERT: every number in `text`
+        resume_pin: true                          # INSERT: optional; true = always on the résumé, never trimmed for fit
       - id: widgetizer.2                          # INSERT: <entry id>.<n>
         text: Wrote 15 XCTest suites for the Swift sync and offline logic, catching merge-conflict bugs before each TestFlight beta build   # INSERT: one fact per bullet
         metrics: ["15"]                           # INSERT: every number in `text`

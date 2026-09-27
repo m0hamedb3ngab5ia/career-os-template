@@ -130,6 +130,9 @@ unsupported even with a cited id.
 1. Relevance first (tailor-resume section 2): a bullet that carries a `required_skills` term beats one that
    does not.
 2. Among equally relevant bullets, prefer `resume_default: true`, then bullets with `metrics`, then the rest.
+   A bullet flagged `resume_pin: true` is always selected for its entry regardless of relevance and is never
+   dropped by the one-page trim; it counts toward the entry's bullet budget (it displaces the least relevant
+   non-pinned bullet rather than adding one).
    Bullets flagged `weak: true` are used only when no other bullet covers that requirement or the entry
    would otherwise have no bullet.
 3. Between a bullet's `text` and its `variants`, pick the one that best matches the tech bullet formula

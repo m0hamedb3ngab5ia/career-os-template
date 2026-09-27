@@ -24,7 +24,10 @@
 \fi
 \usepackage{enumitem}
 \usepackage{titlesec}
-\usepackage[hidelinks]{hyperref}
+\usepackage{color}
+\definecolor{linkblue}{RGB}{0,51,153}
+((= colorlinks (no boxes) so a reader sees links are clickable; extracted text is unchanged =))
+\usepackage[colorlinks=true,linkcolor=black,citecolor=black,filecolor=black,urlcolor=linkblue]{hyperref}
 ((= PDF /Title and /Author (what a recruiter's viewer and some ATSs show), from profile identity.name =))
 \hypersetup{pdftitle={(((identity.name))) Resume}, pdfauthor={(((identity.name)))}}
 
@@ -75,6 +78,9 @@
 \section{Projects}
 ((* for p in projects *))
 \entry{((* if p.link *))\href{(((p.link_raw)))}{(((p.name)))}((* else *))(((p.name)))((* endif *))}{(((p.date)))}{((* if p.stack *))(((p.stack | join(", "))))((* endif *))}{}
+((* if p.links *))
+\noindent((* for l in p.links *))\href{(((l.url_raw)))}{(((l.label)))}((* if not loop.last *))~\textperiodcentered~((* endif *))((* endfor *))\par
+((* endif *))
 ((* if p.bullets *))
 \begin{itemize}
 ((* for b in p.bullets *))

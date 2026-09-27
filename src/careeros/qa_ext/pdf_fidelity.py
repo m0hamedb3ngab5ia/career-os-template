@@ -2,7 +2,8 @@
 
 `Checker.check_pdf` (careeros.qa) already covers page count and contact extraction; this module adds:
 
-  pdf_links_clickable      hard  identity links (email -> mailto:, linkedin, github, website) exist as URI link
+  pdf_links_clickable      hard  identity links (email -> mailto:, linkedin, github, website) and resume.json
+                                 projects[].link / projects[].links[].url exist as URI link
                                  annotations pointing at the profile's targets
   pdf_text_matches_resume  hard  token recall of resume.txt in the PDF's extracted text >= text_recall_hard;
                                  soft (warning) when in [text_recall_soft, text_recall_hard); hard below that
@@ -42,7 +43,7 @@ NUMERIC_CFG: dict[str, tuple[type, float, float, float | None]] = {
     "missing_sample": (int, 15, 0, None),
     "extra_tokens_max": (int, 0, 0, None),
 }
-LINK_FIELDS = ("email", "linkedin", "github", "website")
+LINK_FIELDS = ("email", "linkedin", "github", "website")   # identity; project links are always checked
 DEFAULT_PLACEHOLDERS = ("latex", "untitled", "anonymous", "author", "title", "document", "name", "your name",
                         "microsoft word", "resume.tex", "main.tex")
 # The renderer (templates/resume/render.py) always writes <job_dir>/resume.pdf; there is no per-candidate
@@ -200,11 +201,28 @@ def _identity(ck: Any) -> dict[str, Any]:
     return ident if isinstance(ident, dict) else {}
 
 
+def _project_links(ck: Any) -> list[tuple[str, str]]:
+    """(field label, url) for every project `link` and `links[].url` in resume.json."""
+    rj = getattr(ck, "resume_json", None)
+    out: list[tuple[str, str]] = []
+    for p in (rj.get("projects") or []) if isinstance(rj, dict) else []:
+        if not isinstance(p, dict):
+            continue
+        pid = p.get("id") or p.get("name") or "?"
+        if isinstance(p.get("link"), str) and p["link"].strip():
+            out.append((f"projects.{pid}.link", p["link"]))
+        for l in p.get("links") or []:
+            if isinstance(l, dict) and isinstance(l.get("url"), str) and l["url"].strip():
+                out.append((f"projects.{pid}.links[{l.get('label')}]", l["url"]))
+    return out
+
+
 def _check_links(ck: Any, reader: Any, cfg: dict[str, Any], ex: dict[str, Any]) -> None:
     ident = _identity(ck)
     fields = [f for f in (cfg.get("links_required") or LINK_FIELDS) if ident.get(f)]
     uris = _link_uris(reader)
     ex["links_found"] = uris
+    project_links = _project_links(ck)
     mailto = {_norm_url(u[len("mailto:"):]) for u in uris if u.lower().startswith("mailto:")}
     web = {_norm_url(u) for u in uris if not u.lower().startswith("mailto:")}
     missing, notes = [], []
@@ -220,15 +238,24 @@ def _check_links(ck: Any, reader: Any, cfg: dict[str, Any], ex: dict[str, Any]) 
         missing.append(f)
         wrong = [u for u in uris if _domain(u) == _domain(want)]
         notes.append(f"{f} link points at {', '.join(wrong)} (want {want})" if wrong else f"{f}: no {want} link")
+    ex["project_link_uris"] = []
+    for f, want in project_links:
+        if _norm_url(want) not in web:
+            missing.append(f)
+            notes.append(f"{f}: no {want} link")
+        else:
+            ex["project_link_uris"].append(want)
+    fields += [f for f, _ in project_links]
     ex["links_missing"] = missing
     if not fields:
-        ck.add("pdf_links_clickable", "hard", True, "no identity links in profile to check")
+        ck.add("pdf_links_clickable", "hard", True, "no identity or project links to check")
         return
     ck.add("pdf_links_clickable", "hard", not missing,
            f"clickable: {', '.join(fields)}" if not missing else "; ".join(notes))
 
 
-def _check_text(ck: Any, pdf_text: str, cfg: dict[str, Any], ex: dict[str, Any]) -> None:
+def _check_text(ck: Any, pdf_text: str, cfg: dict[str, Any], ex: dict[str, Any],
+                link_uris: list[str] | None = None) -> None:
     if ck.resume_txt is None:
         ck.skip("pdf_text_matches_resume", "hard", "resume.txt missing")
         return
@@ -241,6 +268,9 @@ def _check_text(ck: Any, pdf_text: str, cfg: dict[str, Any], ex: dict[str, Any])
 
     txt_toks, pdf_toks = text_tokens(ck.resume_txt), text_tokens(pdf_text)
     cr, cp = Counter(txt_toks), Counter(pdf_toks)
+    # resume.txt prints project link URLs (`label: url`) that the PDF carries only as clickable annotations:
+    # those URL tokens count as present for recall (`extra` below still uses the visible PDF text only).
+    cp = cp + Counter(text_tokens(" ".join(link_uris or [])))
     missing = Counter({t: n - cp.get(t, 0) for t, n in cr.items() if n > cp.get(t, 0)})
     recovered, fragment_idx = _split_recoveries(missing, pdf_toks)
     total = sum(cr.values())
@@ -352,7 +382,7 @@ def check_pdf_fidelity(ck: Any) -> None:
     ex: dict[str, Any] = {}
     ck.extras["pdf_fidelity"] = ex
     steps = (("pdf_links_clickable", lambda: _check_links(ck, reader, cfg, ex)),
-             ("pdf_text_matches_resume", lambda: _check_text(ck, pdf_text, cfg, ex)),
+             ("pdf_text_matches_resume", lambda: _check_text(ck, pdf_text, cfg, ex, ex.get("project_link_uris"))),
              ("pdf_fonts_embedded", lambda: _check_fonts(ck, reader, ex)),
              ("pdf_metadata", lambda: _check_metadata(ck, reader, cfg, ex)))
     for name, step in steps:

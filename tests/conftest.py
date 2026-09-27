@@ -127,7 +127,8 @@ def build_resume_json(profile: dict, bullet_ids: list[str], job_id: str = "job00
             "location": e.get("location", ""), "start": _mon(e["start"]), "end": _mon(e["end"]), "bullets": pick(e)}
            for e in profile["experience"] if pick(e)]
     proj = [{"id": p["id"], "name": p["name"], "date": _mon(p["date"]), "stack": p.get("stack", [])[:3],
-             "link": p.get("link"), "bullets": pick(p)} for p in profile.get("projects") or [] if pick(p)]
+             "link": p.get("link"), "links": p.get("links") or [], "bullets": pick(p)}
+            for p in profile.get("projects") or [] if pick(p)]
     edu = [{"id": e["id"], "school": e["school"], "degree": e["degree"], "gpa": e.get("gpa"),
             "start": _mon(e["start"]), "end": _mon(e["end"]), "coursework": e.get("coursework", [])}
            for e in profile["education"]]

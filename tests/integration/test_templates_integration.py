@@ -101,6 +101,12 @@ def test_resume_pdf_passes_fidelity_checks(temp_root: Path, home: Path, resume_j
         assert checks[name]["ok"], (name, checks[name]["detail"])
     assert "pdf_text_split_words" not in checks, checks.get("pdf_text_split_words")
     assert res["pdf_fidelity"]["split_tokens"] == []
+    # the example project's link + links[] are clickable URI annotations, counted by the hard link check
+    found = set(res["pdf_fidelity"]["links_found"])
+    proj = json.loads(resume_json.read_text())["projects"][0]
+    want = {proj["link"], *(l["url"] for l in proj["links"])}
+    assert want and want <= found, (want, found)
+    assert "projects" in checks["pdf_links_clickable"]["detail"]
 
 
 def test_resume_placeholder_exits_nonzero(temp_root: Path, home: Path, resume_json: Path):
