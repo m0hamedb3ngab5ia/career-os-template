@@ -78,4 +78,7 @@ def test_committed_openapi_schema_is_current():
     from careeros.ui.openapi import dump
 
     committed = (REPO / "ui" / "openapi.json").read_text()
-    assert committed == dump(), "ui/openapi.json is stale: run `python -m careeros.ui.openapi > ui/openapi.json`"
+    assert committed == dump(), (
+        "ui/openapi.json is stale (a response shape changed, or FastAPI/pydantic was bumped, which also requires "
+        "regenerating): run `python -m careeros.ui.openapi > ui/openapi.json && (cd ui && npm run gen:api)`"
+    )

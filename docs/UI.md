@@ -65,6 +65,8 @@ After changing a response shape, regenerate and commit both files:
 cd ui && npm run gen:api                                     # openapi.json -> src/api/schema.gen.ts
 ```
 
+A FastAPI or pydantic bump (`fastapi` is pinned to one minor in the `ui` extra) also requires regenerating both files.
+
 `tests/integration/test_ui_openapi_integration.py` fails when `ui/openapi.json` is stale, and CI fails when
 `schema.gen.ts` differs from a fresh `npm run gen:api`. Use the generated types through aliases
 (`components["schemas"]["Status"]`) in `ui/src/api/types.ts`. A `TypedDict` return filters the response to its
