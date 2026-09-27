@@ -361,7 +361,7 @@ def test_an_unquoted_ambiguous_mapping_key_is_requoted_on_save(root):
 
 # --- review fixes: tracker path, board ATS -------------------------------------------------------------------
 
-@pytest.mark.parametrize("value", ["", "   ", "data"])
+@pytest.mark.parametrize("value", ["", "   ", "data", "~nosuchuser-careeros/x.xlsx"])
 def test_a_blank_or_directory_tracker_path_is_refused(root, value):
     (root / "data").mkdir(exist_ok=True)
     p = root / "config" / "pipeline.yaml"

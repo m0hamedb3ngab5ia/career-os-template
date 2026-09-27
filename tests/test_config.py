@@ -246,6 +246,13 @@ def test_a_non_string_or_blank_tracker_path_is_a_config_error(tmp_path, bad):
         Settings.load(root)
 
 
+@pytest.mark.parametrize("key", ["tracker_xlsx", "jobs_dir"])
+def test_an_unknown_user_tilde_path_is_a_config_error_naming_the_key(tmp_path, key):
+    root = _root(tmp_path, {"paths": {key: "~nosuchuser-careeros/x.xlsx"}})
+    with pytest.raises(ConfigError, match=rf"paths\.{key}"):  # not a bare RuntimeError (UI save would 500)
+        Settings.load(root)
+
+
 def test_a_null_tracker_path_uses_the_default(tmp_path):
     root = _root(tmp_path, {"paths": {"tracker_xlsx": None}})
     assert Settings.load(root).paths["tracker_xlsx"] == root / "data" / "JobTracker.xlsx"

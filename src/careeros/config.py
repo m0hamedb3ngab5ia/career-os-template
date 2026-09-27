@@ -112,7 +112,11 @@ class Settings:
         raw_paths = s.pipeline.get("paths", {}) or {}
         for key, val in raw_paths.items():
             if isinstance(val, str):
-                p = Path(val).expanduser()
+                try:
+                    p = Path(val).expanduser()
+                except RuntimeError as e:  # ~unknownuser/...: a field error, not a crash
+                    raise ConfigError(f"config/pipeline.yaml: paths.{key} could not expand "
+                                      f"{val!r} (unknown user?): {e}") from None
                 s.paths[key] = p if p.is_absolute() else (root / p).resolve()
         tracker = raw_paths.get("tracker_xlsx")  # null/absent = the default below
         if tracker is not None and (not isinstance(tracker, str) or not tracker.strip()
