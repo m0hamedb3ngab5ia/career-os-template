@@ -106,6 +106,52 @@ def _txt(tmp_path: Path, data: dict) -> list[str]:
     return resume.render_txt(p).read_text().splitlines()
 
 
+LINKS = [{"label": "App Store", "url": "https://example.com/widgetizer?ref=a_b"},
+         {"label": "Demo video", "url": "https://example.com/widgetizer/demo"}]
+
+
+def _links_resume() -> dict:
+    data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()),
+                             ["acme.1", "widgetizer.1"])
+    data["projects"][0]["link"] = "https://example.com/widgetizer"
+    data["projects"][0]["links"] = LINKS
+    return data
+
+
+def test_escape_tree_nested_link_urls_get_raw():
+    tree = resume.escape_tree({"projects": [{"link": "https://x.com/a_b", "links": LINKS}]})
+    proj = tree["projects"][0]
+    assert proj["link_raw"] == "https://x.com/a_b" and proj["links"][0]["url"] == r"https://example.com/widgetizer?ref=a\_b"
+    assert proj["links"][0]["url_raw"] == "https://example.com/widgetizer?ref=a_b"
+    assert "label_raw" not in proj["links"][0]
+
+
+def test_txt_prints_project_links_as_label_url(tmp_path: Path):
+    lines = _txt(tmp_path, _links_resume())
+    i = lines.index("Widgetizer | Nov 2025")
+    assert lines[i + 1 : i + 5] == ["Swift, SwiftUI, Supabase", "https://example.com/widgetizer",
+                                    "App Store: https://example.com/widgetizer?ref=a_b",
+                                    "Demo video: https://example.com/widgetizer/demo"]
+
+
+def test_txt_without_links_unchanged(tmp_path: Path):
+    data = _links_resume()
+    data["projects"][0].pop("links")
+    lines = _txt(tmp_path, data)
+    assert not any(line.startswith("App Store") for line in lines)
+
+
+def test_tex_renders_project_links_clickable(tmp_path: Path):
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(_links_resume()))
+    tex = resume.render(p, pdf=False).read_text()
+    assert r"\href{https://example.com/widgetizer}{Widgetizer}" in tex
+    assert r"\href{https://example.com/widgetizer?ref=a_b}{App Store}" in tex
+    assert r"\href{https://example.com/widgetizer/demo}{Demo video}" in tex
+    assert tex.index("{App Store}") < tex.index("{Demo video}") < tex.index("Built an iOS app")
+    assert "colorlinks=true" in tex and "hidelinks" not in tex    # links visibly clickable (blue), text unchanged
+
+
 def test_txt_section_order_follows_sections(tmp_path: Path):
     data = build_resume_json(yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()),
                              ["acme.1", "widgetizer.1"])

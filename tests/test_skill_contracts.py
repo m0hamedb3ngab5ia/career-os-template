@@ -442,3 +442,16 @@ def test_apply_job_honours_the_runner_auto_submit_verdict():
     assert "CAREEROS_AUTO_SUBMIT" in text and "CAREEROS_AUTO_SUBMIT_REASON" in text
     block = text[text.index("CAREEROS_AUTO_SUBMIT"):]
     assert "assisted" in block[:1500] and "staged" in block
+
+
+def test_tailor_resume_pins_bullets_and_renders_title_display():
+    tailor = _skill("tailor-resume")
+    assert "resume_pin: true" in tailor and "title_display" in tailor
+    fit_rule = tailor.split("`pdf_page_count` fix loop", 1)[1]
+    assert "resume_pin" in fit_rule                              # the one-page trim never drops a pinned bullet
+    select = tailor.split("## 2. Select content", 1)[1].split("\n## 3", 1)[0]
+    assert "budget grows to the pin count" in select              # pins overflow the entry's bullet budget
+    assert "exceeds the 3-project cap" in select                  # and the project cap
+    assert "only short-swap" in fit_rule or "short-swap" in fit_rule
+    rules = (ROOT / ".claude" / "skills" / "_shared" / "resume_writing_rules.md").read_text()
+    assert "resume_pin" in rules

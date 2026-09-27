@@ -53,9 +53,13 @@ describe("Jobs screen", () => {
     setup();
     const table = await screen.findByRole("table");
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.replace(/,.*$/, ""));
-    expect(headers).toEqual(["Select all shown jobs", "Company", "Role", "Tier", "Fit", "Status", "Safety", "QA", "ATS",
-      "Found", "Applied", "Next action"]);
+    expect(headers).toEqual(["Select all shown jobs", "Company", "Role", "Location", "Tier", "Fit", "Status", "Safety",
+      "QA", "ATS", "Found", "Applied", "Next action"]);
     const nw = within(table).getByRole("rowheader", { name: "Northwind Labs" }).closest("tr")!;
+    expect(within(nw).getByRole("cell", { name: "Software Engineer" })).toBeInTheDocument();
+    expect(within(nw).getByRole("cell", { name: "Springfield" })).toBeInTheDocument();
+    const globex = within(table).getByRole("rowheader", { name: "Globex Analytics" }).closest("tr")!;
+    expect(within(globex).getByRole("cell", { name: "Remote" })).toBeInTheDocument();
     expect(within(nw).getByText("Needs review")).toHaveAttribute("data-tone", "orange");
     expect(within(nw).getByText("Pass")).toHaveAttribute("data-tone", "green");
     expect(within(nw).getByText("Not applied")).toHaveClass("sr-only");
@@ -135,6 +139,27 @@ describe("Jobs screen", () => {
     await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.get("q")).toBe("north"));
   });
 
+  it("the location filter has its own column sort and commits to the URL and the request", async () => {
+    const { router, api } = setup();
+    const user = userEvent.setup();
+    const table = await screen.findByRole("table");
+    await user.click(within(table).getByRole("button", { name: "Location" }));
+    expect(router.state.location.search).toBe("?sort=location");
+    expect(await screen.findByRole("table", { name: "Tracked jobs, sorted by location, A to Z" })).toBeInTheDocument();
+    await user.type(screen.getByRole("searchbox", { name: "Filter by location" }), "remote");
+    await waitFor(() => expect(router.state.location.search).toBe("?sort=location&loc=remote"));
+    await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.get("location")).toBe("remote"));
+    await waitFor(() => expect(api.callsTo("GET /api/jobs/tabs").at(-1)!.search.get("location")).toBe("remote"));
+    expect(api.callsTo("GET /api/jobs").at(-1)!.search.has("q")).toBe(false);
+  });
+
+  it("reads the location filter from the URL", async () => {
+    const { api } = setup("/jobs?loc=springfield");
+    await screen.findByRole("table");
+    expect(screen.getByRole("searchbox", { name: "Filter by location" })).toHaveValue("springfield");
+    expect(api.callsTo("GET /api/jobs")[0]!.search.get("location")).toBe("springfield");
+  });
+
   it("the column chooser hides a column and keeps it in the URL", async () => {
     const { router } = setup();
     const user = userEvent.setup();
@@ -185,7 +210,7 @@ describe("Jobs screen", () => {
     expect(req.headers["x-careeros"]).toBe("1");
     expect(req.body).toEqual({
       job_ids: ["nw01"],
-      columns: ["job_id", "company", "title", "tier", "fit", "status", "safety", "qa_score", "found_at", "applied_at",
+      columns: ["job_id", "company", "title", "location", "tier", "fit", "status", "safety", "qa_score", "found_at", "applied_at",
         "next_action"],
     });
     expect(click).toHaveBeenCalled();

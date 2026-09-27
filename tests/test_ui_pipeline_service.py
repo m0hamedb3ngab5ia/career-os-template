@@ -88,8 +88,8 @@ def test_filters(idx, data):
     assert sum(c["count"] for c in b["columns"]) == 2
     b = svc.board(s, idx, safety=["block"])
     assert [c["job_id"] for c in col(b, "Needs review")["cards"]] == [data["jobs"]["scam"]]
-    b = svc.board(s, idx, location=["Remote"])
-    assert sum(c["count"] for c in b["columns"]) == 1 and b["closed"]["count"] == 0
+    b = svc.board(s, idx, location=["Remote"])   # the Globex posting and the scam case
+    assert sum(c["count"] for c in b["columns"]) == 2 and b["closed"]["count"] == 0
     b = svc.board(s, idx, category=["nope"])
     assert sum(c["count"] for c in b["columns"]) == 0
     opts = svc.board(s, idx)["options"]

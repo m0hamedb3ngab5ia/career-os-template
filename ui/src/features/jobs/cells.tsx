@@ -50,16 +50,18 @@ export const COLUMNS: Column[] = [
     key: "role",
     label: "Role",
     exportField: "title",
-    title: (j) => [j.title, j.location].filter(Boolean).join(" · ") || undefined,
-    cell: (j) =>
-      j.title || j.location ? (
-        <>
-          {j.title ?? ""}
-          {j.location ? <span className={styles.sec}> · {j.location}</span> : null}
-        </>
-      ) : (
-        <Empty sr="No role" />
-      ),
+    title: (j) => j.title ?? undefined,
+    cell: (j) => j.title || <Empty sr="No role" />,
+  },
+  {
+    key: "location",
+    label: "Location",
+    width: 130,
+    sort: "location",
+    exportField: "location",
+    className: styles.sec,
+    title: (j) => j.location ?? undefined,
+    cell: (j) => j.location || <Empty sr="No location" />,
   },
   { key: "tier", label: "Tier", width: 48, sort: "tier", exportField: "tier", cell: (j) => <TierBadge tier={j.tier} /> },
   {
