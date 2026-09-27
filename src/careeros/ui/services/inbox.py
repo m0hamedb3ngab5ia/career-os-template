@@ -83,7 +83,10 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
     Manual comes from the saved `manual_tailor` flag OR, with a `policy`, from the contact's current degree / mutuals
     (careeros.outreach.needs_manual_outreach): a person marked Connected after the draft was written is never
     treated as automatable."""
-    manual_reason = d.get("manual_reason")
+    def _str(x: Any) -> str | None:
+        return x if isinstance(x, str) else None
+
+    manual_reason = _str(d.get("manual_reason"))
     manual = bool(d.get("manual_tailor"))
     if contact is not None and policy is not None:
         from careeros.outreach import needs_manual_outreach
@@ -92,10 +95,11 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         if now_manual:
             manual, manual_reason = True, manual_reason or reason
     email = d.get("email") if isinstance(d.get("email"), dict) else None
-    to = d.get("to") or None
+    to = _str(d.get("to"))
     verified = bool(to) and (d.get("to_confidence") == "verified" or bool(
         contact and contact.get("email_confidence") == "verified" and contact.get("email") == to))
-    body = (email or {}).get("body") or d.get("linkedin_message") or d.get("linkedin_note") or d.get("body") or ""
+    body = _str((email or {}).get("body")) or _str(d.get("linkedin_message")) or _str(d.get("linkedin_note")) \
+        or _str(d.get("body")) or ""
     if d.get("sent"):
         mode = "sent"
     elif d.get("kind") == THANKS:
@@ -106,17 +110,20 @@ def draft_view(d: dict[str, Any], contact: dict[str, Any] | None = None, policy:
         mode = "verified_email"
     else:
         mode = "linkedin"
-    texts = [(email or {}).get("subject"), body, d.get("linkedin_note"), d.get("linkedin_message")]
+    subject = _str((email or {}).get("subject"))
+    linkedin_note = _str(d.get("linkedin_note"))
+    linkedin_message = _str(d.get("linkedin_message"))
+    texts = [subject, body, linkedin_note, linkedin_message]
     ph: list[str] = []
     for t in texts:
         for p in placeholders(t):
             if p not in ph:
                 ph.append(p)
     return {
-        "contact": d.get("contact") or "", "role": d.get("role") or "", "kind": d.get("kind") or "",
+        "contact": _str(d.get("contact")) or "", "role": _str(d.get("role")) or "", "kind": _str(d.get("kind")) or "",
         "channel": d.get("channel") or ("email" if email else "linkedin"), "to": to, "verified": verified,
-        "subject": (email or {}).get("subject"), "body": body, "linkedin_note": d.get("linkedin_note"),
-        "linkedin_message": d.get("linkedin_message"), "manual_tailor": manual,
+        "subject": subject, "body": body, "linkedin_note": linkedin_note,
+        "linkedin_message": linkedin_message, "manual_tailor": manual,
         "manual_reason": manual_reason, "sent": bool(d.get("sent")), "sent_by": d.get("sent_by"),
         "sent_date": d.get("sent_date"), "mode": mode, "placeholders": ph, "words": _words(body),
     }
@@ -186,7 +193,7 @@ def _primary(status: str, drafts: list[dict[str, Any]]) -> int | None:
     for i, d in enumerate(drafts):
         if not d["sent"]:
             return i
-    return 0 if drafts else None
+    return None
 
 
 def _status_followup(ix: Any, job: dict[str, Any], cfg: Any, mode: str, last_email: dict[str, Any] | None,

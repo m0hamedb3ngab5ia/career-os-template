@@ -330,3 +330,34 @@ def test_bare_list_outreach_and_nested_followups_are_read_like_qa_ext(data):
     assert got[1]["contact"] == first["contact"] and got[1]["body"] == "Hi again"
     f.write_text(json.dumps({"drafts": [{**first, "followups": [nested]}], "followups": []}))
     assert len(inbox_svc.job_drafts(Path(f).parent)) == 2
+
+
+# --- SHOULD-FIX: malformed outreach.json shapes must not crash --------------------------------------------------
+
+@pytest.mark.parametrize("bad", [
+    {"drafts": [{"email": {"subject": 5}}]},
+    {"drafts": [{"linkedin_message": 7}]},
+    {"drafts": [{"followups": [{"body": {}}]}]},
+])
+def test_non_string_draft_fields_are_treated_as_missing_not_crashed(data, bad):
+    from pathlib import Path
+
+    f = _outreach(data, "applied")
+    f.write_text(json.dumps(bad))
+    got = inbox_svc.job_drafts(Path(f).parent)
+    assert got  # normalized, no exception raised above
+    for d in got:
+        assert d["placeholders"] == []
+        assert isinstance(d["words"], int)
+
+
+def test_interview_thank_you_all_sent_is_not_reported_as_sent_mode(data, idx):
+    f = _outreach(data, "interview")
+    o = json.loads(f.read_text())
+    for d in o["followups"]:
+        d["sent"], d["sent_date"] = True, (NOW - timedelta(days=1)).isoformat()
+    f.write_text(json.dumps(o))
+    jid = data["jobs"]["interview"]
+    row = next(r for r in inbox_svc.list_inbox(data["settings"], idx, NOW)["items"] if r["job_id"] == jid)
+    assert row["next"]["kind"] == "status_followup"
+    assert row["next"]["mode"] != "sent"
