@@ -1,9 +1,13 @@
 import "@testing-library/jest-dom/vitest";
 import { configure } from "@testing-library/react";
+import { setAppLocale } from "../lib/format";
 
 configure({ asyncUtilTimeout: 4000 });
 
-// Pin the default locale to en-US so number, date and relative-time assertions pass whatever the machine's
+// Formatting must not depend on the machine running the tests (LC_ALL, OS language).
+setAppLocale("en-US");
+
+// Also pin the default locale to en-US so number, date and relative-time assertions pass whatever the machine's
 // locale is (e.g. LC_ALL=fr_FR.UTF-8). Code that passes an explicit locale is unaffected.
 const LOCALE = "en-US";
 for (const name of ["NumberFormat", "DateTimeFormat", "RelativeTimeFormat", "PluralRules", "ListFormat"] as const) {

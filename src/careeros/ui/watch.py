@@ -1,9 +1,9 @@
 """Live updates: watch the data and config folders, re-index what changed, tell the browser once per batch.
 
-watchfiles groups changes into one batch until the files have been quiet for `ui.watch_debounce_ms`; plan_changes() turns the
-batch into job ids, run ids and flags; handle() re-indexes those (skipping files whose signature is unchanged)
-and publishes one `changed` SSE event, or nothing when the batch changed nothing the UI shows. A scout run that
-writes hundreds of files therefore costs a few events, not hundreds.
+watchfiles groups changes into one batch until the files have been quiet for `ui.watch_debounce_ms`;
+plan_changes() turns the batch into job ids, run ids and flags; handle() re-indexes those (skipping files whose
+signature is unchanged) and publishes one `changed` SSE event, or nothing when the batch changed nothing the UI
+shows. A scout run that writes hundreds of files therefore costs a few events, not hundreds.
 """
 from __future__ import annotations
 
@@ -52,6 +52,14 @@ def _under(p: Path, root: Path) -> tuple[str, ...] | None:
         return None
 
 
+_RUN_STATE = {"pause.json", "catch_up.json", "runner.lock", "locks"}
+
+
+def _is_run_state(name: str) -> bool:
+    """Files the runner keeps beside the run folders (not runs themselves)."""
+    return name in _RUN_STATE or (name.startswith("queue-") and name.endswith(".json"))
+
+
 def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
     plan = Plan()
     index_names = {roots.index.name + s for s in ("", "-wal", "-shm", "-journal")}
@@ -72,7 +80,12 @@ def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
                 plan.jobs.add(parts[0])
             continue
         if (parts := _under(p, roots.runs)) is not None:
-            if len(parts) == 1 or parts[0] == "locks":
+            if len(parts) == 1 and not _is_run_state(parts[0]) and not _is_finder_copy(parts[0]):
+                if not p.is_file():
+                    plan.runs.add(parts[0])          # a run folder created, moved in or moved away
+                if not p.is_dir():
+                    plan.status = True               # schedule.json, storage.jsonl, launchd logs, or a deleted file
+            elif len(parts) == 1 or parts[0] == "locks":
                 plan.status = True                   # queue-*.json, pause.json, catch_up.json, runner.lock, ...
             elif not _is_finder_copy(parts[0]):
                 plan.runs.add(parts[0])
