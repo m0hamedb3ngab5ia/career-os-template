@@ -70,3 +70,8 @@ Personal context (who the candidate is, where their private files live) lives in
 ## Response format
 Every reply that finishes a piece of work ends with a `**Next:**` block: numbered, concrete next steps split into
 "you" (inputs/decisions the candidate owes) and "me" (what I'll do on go-ahead). Keep it to the top 3–5 items.
+
+## Learning
+Evidence lives in `.agent/LESSONS.md`, stable design decisions in `.agent/DECISIONS.md`; search them when relevant,
+don't load whole. Record/promote per `~/.agent-learning/PROTOCOL.md` (or the `learn` skill). Promoted rules go in
+this file; AGENTS.md points here.
