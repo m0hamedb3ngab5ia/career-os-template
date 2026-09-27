@@ -247,7 +247,7 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
 
       <Button
         variant="primary"
-        {...help(batch && dryFirst && !selection ? "showSelection" : "startRun")}
+        {...help(!batch ? "startStep" : dryFirst && !selection ? "showSelection" : "startRun")}
         className={styles.startButton}
         icon={<Play size={14} strokeWidth={1.7} aria-hidden="true" />}
         onClick={onStart}
