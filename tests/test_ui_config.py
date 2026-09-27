@@ -7,9 +7,11 @@ import pytest
 import yaml
 from conftest import EXAMPLE_REPO
 
+from pathlib import Path
+
 from careeros.config import ConfigError
 from careeros.models import STATUSES
-from careeros.ui.config import DEFAULT_COLUMNS, UiConfig, load_ui_config
+from careeros.ui.config import UI_KEYS, DEFAULT_COLUMNS, UiConfig, load_ui_config
 
 pytestmark = pytest.mark.unit
 
@@ -140,3 +142,9 @@ def test_duplicate_column_names_fail_closed(names):
     cols = [{"name": names[0], "statuses": ["queued"]}, {"name": names[1], "statuses": ["applied"]}]
     with pytest.raises(ConfigError, match="already"):
         load_ui_config(S({"ui": {"pipeline": {"columns": cols}}}))
+
+
+def test_every_ui_key_is_documented_in_ui_md():
+    doc = (Path(__file__).parents[1] / "docs" / "UI.md").read_text()
+    missing = [k for k in UI_KEYS if k not in doc]
+    assert not missing, f"docs/UI.md is missing pipeline.yaml: ui keys: {missing}"

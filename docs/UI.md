@@ -6,8 +6,9 @@ server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/stat
 `/api/jobs/export`, `/api/jobs/{id}/files/…` and the Job detail writes, `/api/tracker/sync|open`, and the Today run
 controls `/api/runs/catch-up|resume|steps/scout|batches/prepare`), the Contacts and Inbox & follow-ups screens (`/api/contacts`,
 `/api/contacts/{job_id}/{name}/mark`, `/api/inbox`, `/api/inbox/{job_id}`; sending, inbox sync from the app and draft
-edits are shown off with a reason). Everything else in this file is not built yet unless
-it says so.
+edits are shown off with a reason), the Action Items, Pipeline and Runs screens, Settings (every section, generic
+form renderer, Storage & efficiency) and the components sheet (`/kit`). Everything else in this file is not built
+yet unless it says so.
 
 ## Goals
 
@@ -262,12 +263,15 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
 ## Phase 2 implementation outline
 
 - `careeros ui [--port 8765] [--host 127.0.0.1] [--reindex] [--no-open]` subcommand; server binds to `127.0.0.1` by
-  default (any other `--host` requires auth; see Phone below).
+  default. Currently any other `--host` is refused outright (loopback only); the LAN mode with auth described under
+  Phone below is not built yet.
 - `pipeline.yaml: ui` (built): port, host, open_browser, theme, undo_seconds, page_size, watch_debounce_ms,
-  index_path, `due_soon_hours` (Action Items' orange window) and the Pipeline board's `pipeline.columns` and
-  `pipeline.card_limit` (status -> column; statuses in no column form the "Closed"
-  line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier, action type and
-  stop reason from the models, so the frontend renders codes it was never told about (grey fallback).
+  index_path, `due_soon_hours` (Action Items' orange window), `pause_until_tomorrow_at` (Runs › Pause all ›
+  "Until tomorrow"), `followup_after_apply_days` / `followup_no_response_days` (Inbox & follow-ups due windows) and
+  the Pipeline board's `pipeline.columns` and `pipeline.card_limit` (status -> column; statuses in no column form
+  the "Closed" line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier,
+  action type and stop reason from the models, so the frontend renders codes it was never told about (grey
+  fallback).
 - Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write
   needs the `X-CareerOS: 1` header.
 - Optional extra in `pyproject.toml` (built): `ui = ["fastapi", "uvicorn", "watchfiles"]`, so the core CLI keeps its own
@@ -278,10 +282,11 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
   (`services/runs.py` starts `careeros.runs` batches and other steps; `services/settings_io.py` + `settings_schema/`
   ruamel round-trip + validate + rollback, shared with `careeros advise apply`), `static/` (built frontend).
 - Frontend: React + TypeScript, built to static files and served by FastAPI; no Node needed at runtime.
-- Phone: the same app, responsive. The default bind stays `127.0.0.1`, so the phone path is a tunnel of the
-  candidate's choice to that loopback port (e.g. an SSH tunnel or a private-network VPN such as Tailscale). An opt-in
-  `careeros ui --host 0.0.0.0` LAN mode exists for home Wi-Fi, but it refuses to start without auth (a token set in
-  config or generated and printed on first run, required on every request); no unauthenticated non-loopback bind.
+- Phone: deferred. No phone-specific layout is built, and the phone screens in this file are still mockup only.
+  The default bind stays `127.0.0.1`, so today the only phone path is a tunnel of the candidate's choice to that
+  loopback port (e.g. an SSH tunnel or a private-network VPN such as Tailscale). A LAN mode (`careeros ui --host
+  0.0.0.0` with a required auth token) is planned for home Wi-Fi but not yet available; `--host` currently refuses
+  to start on anything but loopback.
 - Tests (repo rule, tests first): unit tests for the indexer, settings round-trip (comments preserved, invalid
   values rolled back), `RESULT:` parsing; integration tests that start the app with a temp root and drive the API.
 - Also needed before the Inbox & follow-ups screen is fully live: the follow-up scheduler (backlog P4).
@@ -303,6 +308,10 @@ The mockups were audited against the [Vercel Web Interface Guidelines](https://g
 Design-level fixes are in the mockup: focus and hover states, 44 pt phone targets, confirm or undo on destructive
 actions, plain-language labels in place of raw codes, and real tables and headings. These items can only be met in
 the React build:
+
+Done: axe (`vitest-axe`) runs against every page in its test file; Tabs, PillGroup and SegmentedControl use a
+roving tabindex with arrow keys; Sheet and Dialog trap focus and return it to the control that opened them on
+close; a skip-to-content link is the first thing in `AppShell`.
 
 - **Formatting:** dates, times and relative times through `Intl.DateTimeFormat` / `Intl.RelativeTimeFormat`, and
   numbers, percentages and sizes through `Intl.NumberFormat`. Hardcoded examples in the mockup ("Mon 16:40",

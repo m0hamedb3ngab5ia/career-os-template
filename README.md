@@ -104,6 +104,7 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros schedule install           # also: schedule status | uninstall; launchd calls `careeros tick`
 .venv/bin/careeros storage [--snapshot]       # bytes by category + disk free
 .venv/bin/careeros advise                     # suggestions; advise apply <id> writes one to config/pipeline.yaml
+.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]  # browser app; install with pip install -e ".[ui]" first
 .venv/bin/python -m careeros.qa data/jobs/<id>   # deterministic QA
 ```
 
