@@ -173,6 +173,13 @@ def test_plan_unknown_root_files_in_runs_mark_status(roots, name):
     assert plan.runs == set()
 
 
+def test_plan_event_on_runs_dir_itself_marks_status(roots):
+    roots.runs.mkdir(parents=True)
+    plan = plan_changes([roots.runs], roots)
+    assert plan.status
+    assert plan.runs == set()
+
+
 def test_plan_run_folder_existing_or_moved_away_is_a_run(roots):
     rid = "20260924-020000-score-cd34"
     (roots.runs / rid).mkdir(parents=True)

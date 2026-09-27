@@ -28,6 +28,7 @@ def test_defaults_without_ui_block():
     assert cfg == UiConfig()
     assert (cfg.port, cfg.host, cfg.open_browser, cfg.theme) == (8765, "127.0.0.1", True, "system")
     assert (cfg.undo_seconds, cfg.page_size, cfg.watch_debounce_ms) == (8, 100, 300)
+    assert (cfg.followup_after_apply_days, cfg.followup_no_response_days) == (3, 7)
     assert [c["name"] for c in cfg.columns] == ["Found", "Queued", "Needs review", "Applied",
                                                 "Screening · Interview", "Offer"]
 
@@ -69,16 +70,37 @@ def test_overrides_and_custom_columns():
     {"ui": {"undo_seconds": 0}},
     {"ui": {"page_size": 5}},
     {"ui": {"watch_debounce_ms": 10}},
+    {"ui": {"followup_after_apply_days": -1}},
+    {"ui": {"followup_no_response_days": 0}},
+    {"ui": {"followup_no_response_days": "7"}},
     {"ui": {"pipeline": {"columns": []}}},
     {"ui": {"pipeline": {"columns": [{"name": "X", "statuses": ["nope"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "", "statuses": ["found"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"]}, {"name": "B", "statuses": ["found"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"], "x": 1}]}}},
     {"ui": {"pipeline": {"nope": 1}}},
+    {"ui": {"pipeline": {"card_limit": 0}}},
+    {"ui": {"pipeline": {"card_limit": "10"}}},
+    {"ui": {"due_soon_hours": 0}},
+    {"ui": {"due_soon_hours": 24 * 15}},
+    {"ui": {"pause_until_tomorrow_at": "8:00"}},
+    {"ui": {"pause_until_tomorrow_at": "24:00"}},
+    {"ui": {"pause_until_tomorrow_at": 800}},
 ])
 def test_invalid_config_fails_closed(bad):
     with pytest.raises(ConfigError):
         load_ui_config(S(bad))
+
+
+def test_board_card_limit_and_due_soon_window():
+    cfg = load_ui_config(S({}))
+    assert cfg.card_limit == 10 and cfg.due_soon_hours == 48
+    cfg = load_ui_config(S({"ui": {"due_soon_hours": 24, "pipeline": {"card_limit": 25}}}))
+    assert cfg.card_limit == 25 and cfg.due_soon_hours == 24
+    assert [c["name"] for c in cfg.columns][0] == "Found"      # card_limit alone keeps the default columns
+def test_pause_until_tomorrow_at_defaults_to_eight_and_takes_hh_mm():
+    assert load_ui_config(S({})).pause_until_tomorrow_at == "08:00"
+    assert load_ui_config(S({"ui": {"pause_until_tomorrow_at": "06:30"}})).pause_until_tomorrow_at == "06:30"
 
 
 def test_default_columns_are_not_shared_state():
@@ -109,3 +131,12 @@ def test_index_path_resolution(tmp_path, monkeypatch):
     assert default_path(St("idx/ui.db")) == (tmp_path / "repo" / "idx" / "ui.db").resolve()
     assert default_path(St(str(tmp_path / "abs.db"))) == tmp_path / "abs.db"
     assert default_path(St("~/x/ui.db")) == tmp_path / "home" / "x" / "ui.db"
+
+
+@pytest.mark.parametrize("names", [["Queued", "Queued"], ["Queued", " queued "], ["Applied", "APPLIED"]])
+def test_duplicate_column_names_fail_closed(names):
+    from careeros.config import ConfigError
+
+    cols = [{"name": names[0], "statuses": ["queued"]}, {"name": names[1], "statuses": ["applied"]}]
+    with pytest.raises(ConfigError, match="already"):
+        load_ui_config(S({"ui": {"pipeline": {"columns": cols}}}))

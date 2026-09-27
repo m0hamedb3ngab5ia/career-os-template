@@ -28,6 +28,8 @@ JOBS: dict[str, tuple[str, str, str, int | None, str | None, str | None, int, in
     "rejected":  ("Wayne Enterprises", "Data Engineer", "rejected", 77, "C", "pass", 30, 20),
     "skipped":   ("Vandelay Imports", "Sales Engineer", "skipped", 40, "C", "skip", 40, None),
 }
+# The smallest valid PNG (1x1, transparent): a screenshot stand-in.
+PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000""1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
 REVIEW_FLOW = ["found", "scored", "queued", "prepared", "needs_review"]
 
 
@@ -83,6 +85,23 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                 "regenerate_suggestions": [], "regenerations": 0})
             (store.job_dir(jid) / "resume.pdf").write_bytes(b"%PDF-1.4 fixture\n")
             (store.job_dir(jid) / "cover_letter.md").write_text("Hi,\n\nFixture letter.\n", encoding="utf-8")
+    # Job detail's Safety flags, Apply session timeline and screenshot for the needs-review job.
+    rid = ids["review"]
+    store._write(rid, "safety.json", {
+        "job_id": rid, "checked_at": iso(now - timedelta(days=5)), "verdict": "review", "runs": [],
+        "flags": [{"code": "GHOST_OLD_POST", "level": "review", "detail": "Posted 45 days ago",
+                   "evidence": ["https://boards.example.com/review"], "at": iso(now - timedelta(days=5))}]})
+    shots = store.job_dir(rid) / "screenshots"
+    shots.mkdir(exist_ok=True)
+    (shots / "01_form.png").write_bytes(PNG_1PX)
+    store._write(rid, "apply_session.json", {
+        "job_id": rid, "ats": "greenhouse", "started": iso(now - timedelta(days=1)),
+        "finished": iso(now - timedelta(days=1, minutes=-6)), "tier": "A", "auto_submit": False,
+        "steps": [{"time": iso(now - timedelta(days=1)), "action": "open_form", "ok": True, "note": ""},
+                  {"time": iso(now - timedelta(days=1, minutes=-5)), "action": "finish", "ok": False,
+                   "note": "needs_review: Tier A: you submit"}],
+        "screenshots": [str(shots / "01_form.png")], "outcome": "needs_review", "reason": "Tier A: you submit",
+        "submit_clicked": False, "status": "needs_review", "n_steps": 2})
     contacts = {"contacts": [
         {"name": "Pat Rivers", "role": "Engineering Manager", "linkedin": "https://www.linkedin.com/in/example-pat",
          "email": "pat@example.com", "linkedin_degree": 1},
@@ -96,7 +115,8 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
     actions = {
         "high": tr.add_action_item("Review and submit", type="review", job_id=ids["review"], company="Umbrella Labs",
                                    role="Infrastructure Engineer", link="https://boards.example.com/review",
-                                   priority="H", needs="laptop"),
+                                   priority="H", needs="laptop", due=iso(now + timedelta(days=1)),
+                                   due_reason="posting closes"),
         "medium": tr.add_action_item("Answer the salary question", type="salary", job_id=ids["queued"],
                                      company="Initech", role="Platform Engineer", priority="M", needs="anytime"),
         "low": tr.add_action_item("Send the LinkedIn note", type="send_linkedin", job_id=ids["interview"],
@@ -118,3 +138,93 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                                     else "usage_limit", "duration_s": 400, "session_id": "sess-1", "detail": ""})
         runs[name] = run["id"]
     return {"settings": s, "jobs": ids, "actions": actions, "runs": runs, "now": now}
+
+
+def add_outreach_data(data: dict[str, Any]) -> dict[str, Any]:
+    """Opt-in extra for the Contacts and Inbox screens: contacts + outreach drafts (the find-contacts and
+    draft-outreach skills' shapes), an inbox-sync log line and a pending sync update. Kept out of build_ui_data so
+    the counts other tests assert stay as they are. All names and addresses are fictional (example.com)."""
+    s, ids, now = data["settings"], data["jobs"], data["now"]
+    store = Store(s)
+    hooli, stark = ids["applied"], ids["interview"]
+    (store.job_dir(hooli) / "contacts.json").write_text(json.dumps({"job_id": hooli, "company": "Hooli", "contacts": [
+        {"name": "Dana Cruz", "title": "Technical Recruiter", "role": "recruiter", "confidence": "high",
+         "linkedin": "https://www.linkedin.com/in/example-dana", "email": "dana.cruz@example.com",
+         "email_confidence": "verified", "email_candidates": ["dana.cruz@example.com"],
+         "linkedin_degree": None, "mutuals": None},
+    ]}, indent=2), encoding="utf-8")
+    base = {"linkedin_note_chars": 0, "bullet_ids": [], "narrative_ids": [], "facts_used": [],
+            "manual_tailor": False, "manual_reason": None, "send_after": None, "linkedin_send_after": None,
+            "auto_send": False, "sent": False, "sent_by": None, "followup_7d": None, "followup_14d": None}
+    (store.job_dir(hooli) / "outreach.json").write_text(json.dumps({
+        "job_id": hooli, "company": "Hooli", "drafted_at": iso(now - timedelta(days=1)),
+        "drafts": [{**base, "contact": "Dana Cruz", "role": "recruiter", "to": "dana.cruz@example.com",
+                    "to_confidence": "verified", "kind": "post_apply_outreach", "channel": "email",
+                    "linkedin_note": "Hi Dana, I applied to the New Grad Engineer role at Hooli.",
+                    "linkedin_message": None,
+                    "email": {"subject": "New Grad Engineer application",
+                              "body": "Hi Dana,\n\nI applied for the New Grad Engineer role this week. "
+                                      "[SPECIFIC CONNECTION]\n\nHappy to share more about "
+                                      "[MOST RELEVANT EXPERIENCE]. Thanks for reading.\n\nAlex"}}],
+        "followups": [], "review_required": True}, indent=2), encoding="utf-8")
+    (store.job_dir(stark) / "outreach.json").write_text(json.dumps({
+        "job_id": stark, "company": "Stark Industries", "drafted_at": iso(now - timedelta(days=9)),
+        "drafts": [
+            {**base, "contact": "Pat Rivers", "role": "hiring_manager", "to": "pat@example.com",
+             "to_confidence": "low", "kind": "cold_email", "channel": "linkedin", "manual_tailor": True,
+             "manual_reason": "LINKEDIN_CONNECTED", "linkedin_note": "Hi Pat, good to see the team growing.",
+             "linkedin_message": "Hi Pat,\n\nI applied to the Software Engineer role on your team.",
+             "email": {"subject": "Software Engineer", "body": "Hi Pat,\n\nShort note."}},
+            {**base, "contact": "Sam Lee", "role": "recruiter", "to": None, "to_confidence": "low",
+             "kind": "cold_email", "channel": "linkedin",
+             "linkedin_note": "Hi Sam, I applied to the Software Engineer role at Stark Industries.",
+             "linkedin_message": "Hi Sam,\n\nI applied to the Software Engineer role and would like to connect.",
+             "email": None},
+        ],
+        "followups": [{**base, "contact": "Pat Rivers", "kind": "post_interview_thanks", "channel": "email",
+                       "to": "pat@example.com", "to_confidence": "low",
+                       "email": {"subject": "Thank you", "body": "Hi Pat,\n\nThank you for [INTERVIEW DETAIL]."}}],
+        "review_required": True}, indent=2), encoding="utf-8")
+    invite_at = now - timedelta(days=2)
+    # the inbox-sync skill's log line (section 4), stamped at a fixed local time so tests are deterministic
+    with (store.job_dir(stark) / "log.md").open("a", encoding="utf-8") as f:
+        f.write(f"- {invite_at.astimezone().strftime('%Y-%m-%d %H:%M:%S')} [inbox-sync] interview_invite from "
+                f"recruiting@example.com {invite_at.date().isoformat()} -> status interview "
+                f"(https://mail.google.com/mail/u/0/#all/thread-stark-1)\n")
+    Path(s.paths["jobs_dir"]).parent.joinpath("sync_updates.json").write_text(json.dumps([
+        {"job_id": hooli, "company": "Hooli", "status": "screening", "note": "assessment invite",
+         "source_thread": "thread-hooli-1", "date": invite_at.date().isoformat(), "applied": False}]), encoding="utf-8")
+    return data
+
+
+def add_scam_case(data: dict[str, Any]) -> dict[str, Any]:
+    """A blocked posting at a made-up company, its flagged-registry entry and the open `scam_suspected` item the
+    safety gate writes (Action Items' Block company / Mark posting safe). Kept out of build_ui_data so the counts
+    other tests rely on stay put. Returns {"job_id", "action_id", "company"}."""
+    from careeros.safety import registry
+
+    s, now = data["settings"], data["now"]
+    store = Store(s)
+    company = "Obsidian Quant Partners"
+    found = now - timedelta(days=2)
+    p = Posting(company=company, title="Quant Developer", location="Remote", ats="custom", ats_job_id="scam-1",
+                url="https://obsidian-careers.example/jobs/1", fetched_at=iso(found),
+                description_text="Buy the equipment kit before your first day.")
+    jid = p.job_id
+    store._write(jid, "posting.json", p.model_dump())
+    hist = [{"status": st, "at": iso(found + timedelta(hours=i)), "note": None}
+            for i, st in enumerate(["found", "scored", "needs_review"])]
+    store._write(jid, "status.json", {"status": "needs_review", "updated_at": hist[-1]["at"], "history": hist})
+    store.save_score(Score(job_id=jid, category="swe_backend", fit=74, tier=None, reasons=["fixture"]))
+    store._write(jid, "safety.json", {"job_id": jid, "checked_at": iso(found), "verdict": "block", "runs": [],
+                                      "flags": [{"code": "SCAM_PAYMENT_REQUEST", "level": "block",
+                                                 "detail": "asks for payment", "evidence": []}]})
+    registry.add_or_bump(registry.default_path(s), company, domain="obsidian-careers.example",
+                         reason="SCAM_PAYMENT_REQUEST", job_id=jid)
+    aid = Tracker(settings=s).add_action_item(
+        "Posting asks for a paid equipment kit. Block the company or mark the posting safe", type="scam_suspected",
+        job_id=jid, company=company, role="Quant Developer", link="https://obsidian-careers.example/jobs/1",
+        priority="H", needs="phone")
+    data["jobs"]["scam"] = jid
+    data["actions"]["scam"] = aid
+    return {"job_id": jid, "action_id": aid, "company": company}

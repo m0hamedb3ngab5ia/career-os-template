@@ -49,7 +49,10 @@ DEFAULT_AUTH_PATTERNS = [r"/login", r"not logged in", r"invalid api key", r"oaut
                          r"unauthori[sz]ed", r"credentials? (expired|missing|invalid)"]
 RUN_KEYS = ("preset", "presets", "custom", "job_timeout_minutes", "max_consecutive_failures", "stop_on_timeout",
             "preflight_doctor", "ranking", "required_mcp_servers", "usage_limit_patterns", "auth_patterns",
-            "retry", "prepare", "auto_submit", "job_lock_minutes")
+            "retry", "prepare", "auto_submit", "job_lock_minutes", "on_usage_limit")
+# What a run does when Claude reports the subscription usage limit (careeros.runs.service):
+# stop (Recommended) = stop, the next scheduled run tries again; pause = stop and pause all runs until you resume.
+ON_USAGE_LIMIT = ("stop", "pause")
 
 
 @dataclass
@@ -71,6 +74,7 @@ class RunsConfig:
     stop_on_timeout: bool = True
     preflight_doctor: bool = True
     job_lock_minutes: float = 120
+    on_usage_limit: str = "stop"
     ranking: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_RANKING))
     required_mcp_servers: list[str] = field(default_factory=list)
     usage_limit_patterns: list[str] = field(default_factory=lambda: list(DEFAULT_USAGE_LIMIT_PATTERNS))
@@ -167,6 +171,10 @@ def load_runs_config(settings: Any) -> RunsConfig:
                                             ge=1, whole=True)
     if "job_lock_minutes" in raw:
         cfg.job_lock_minutes = _num(raw["job_lock_minutes"], "runs.job_lock_minutes", gt=0)
+    if "on_usage_limit" in raw:
+        if raw["on_usage_limit"] not in ON_USAGE_LIMIT:
+            raise _err(f"runs.on_usage_limit must be one of {' | '.join(ON_USAGE_LIMIT)}, got {raw['on_usage_limit']!r}")
+        cfg.on_usage_limit = raw["on_usage_limit"]
     for key in ("stop_on_timeout", "preflight_doctor"):
         if key in raw:
             setattr(cfg, key, _bool(raw[key], f"runs.{key}"))

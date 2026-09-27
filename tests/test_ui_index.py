@@ -73,6 +73,13 @@ def test_action_items_and_contacts_and_runs(idx, data):
     assert att[0]["outcome"] == "ok" and att[0]["job_id"] == data["jobs"]["queued"]
 
 
+def test_action_item_due_is_indexed(idx, data):
+    acts = {r["id"]: r for r in idx.query("SELECT * FROM action_items")}
+    high = acts[data["actions"]["high"]]
+    assert high["due"] and high["due"].startswith("20") and high["due_reason"] == "posting closes"
+    assert acts[data["actions"]["medium"]]["due"] is None
+
+
 def test_wal_mode_and_schema_version(idx):
     assert idx.query("PRAGMA journal_mode")[0]["journal_mode"] == "wal"
     assert idx.get_meta("schema_version") == str(index_mod.SCHEMA_VERSION)
@@ -339,6 +346,53 @@ def test_legacy_qa_results_list_still_indexed(idx, data):
     idx.update_jobs([jid])
     row = _jobs(idx)[jid]
     assert row["qa_passed"] == 1 and row["qa_score"] == pytest.approx(7.0)
+
+
+def test_excel_date_cell_due_is_indexed_as_a_date(idx, data):
+    """Excel turns a typed date into a datetime at 00:00; that means the whole day, not midnight (overdue)."""
+    from openpyxl import load_workbook
+
+    from careeros.ui.services import actions as svc
+
+    st = data["settings"].paths["tracker_xlsx"]
+    wb = load_workbook(st)
+    ws = wb["Action Items"]
+    hdr = {c.value: c.column for c in ws[1] if c.value}
+    row = next(r for r in range(2, ws.max_row + 1) if ws.cell(r, hdr["ID"]).value == data["actions"]["medium"])
+    ws.cell(row, hdr["Due"]).value = datetime(2026, 9, 24)
+    wb.save(st)
+    os.utime(st, (st.stat().st_atime, st.stat().st_mtime + 5))
+    assert idx.update_tracker() is True
+    due = idx.query("SELECT due FROM action_items WHERE id = ?", (data["actions"]["medium"],))[0]["due"]
+    assert due == "2026-09-24"
+    assert svc.due_bucket(due, NOW, timezone.utc) == "today"
+
+
+def test_dir_sig_changes_on_rename_and_same_size_edit(tmp_path):
+    import os
+
+    from careeros.ui.index import _dir_sig
+
+    d = tmp_path / "job"
+    d.mkdir()
+    f = d / "a.json"
+    f.write_text("aaaa", encoding="utf-8")
+    os.utime(f, ns=(1_000_000_000, 1_000_000_000))
+    s0 = _dir_sig(d)
+    f.rename(d / "b.json")
+    s1 = _dir_sig(d)
+    assert s1 != s0
+    (d / "b.json").write_text("bbbb", encoding="utf-8")
+    os.utime(d / "b.json", ns=(1_000_000_000, 1_000_000_000))
+    (d / "c.json").write_text("cc", encoding="utf-8")
+    s2 = _dir_sig(d)
+    (d / "c.json").write_text("dd", encoding="utf-8")
+    os.utime(d / "c.json", ns=(2_000_000_000, 2_000_000_000))
+    os.utime(d / "b.json", ns=(3_000_000_000, 3_000_000_000))
+    s3 = _dir_sig(d)
+    assert s3 != s2
+    (d / "x.json.tmp").write_text("partial", encoding="utf-8")
+    assert _dir_sig(d) == s3
 
 
 def _foreign_sqlite(path):

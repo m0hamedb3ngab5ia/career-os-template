@@ -24,7 +24,7 @@ from openpyxl.worksheet.datavalidation import DataValidation
 from openpyxl.worksheet.worksheet import Worksheet
 
 from careeros.config import Settings, get_settings, normalize_company
-from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, ActionItem, Contact, TrackerRow
+from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, ActionItem, Contact, TrackerRow, parse_due
 
 MAX_ROWS = 5000
 
@@ -57,7 +57,12 @@ JOB_COLUMNS: list[tuple[str, str, int]] = [
 ACTION_COLUMNS = [
     ("ID", 10), ("Created", 18), ("JobID", 14), ("Company", 22), ("Role", 36), ("Type", 14),
     ("What to do", 50), ("Link", 40), ("Priority", 9), ("Needs", 9), ("Done", 7), ("DoneDate", 12),
+    ("Due", 18), ("Due reason", 28),
 ]
+# Action Items columns added after the first release, appended to older workbooks in this order on open.
+# (header, width, value for existing rows or None)
+ACTION_MIGRATIONS: list[tuple[str, int, str | None]] = [("Needs", 9, "anytime"), ("Due", 18, None),
+                                                        ("Due reason", 28, None)]
 CONTACT_COLUMNS = [
     ("JobID", 14), ("Company", 22), ("Name", 24), ("Title", 28), ("LinkedIn", 40), ("Email", 30),
     ("EmailConfidence", 15), ("DraftMessage", 60), ("Sent", 7), ("SentDate", 12), ("Replied", 10),
@@ -294,19 +299,23 @@ class Tracker:
         ws = wb["Action Items"]
         hdr = _header_index(ws)
         _refresh_type_validation(ws, hdr)
-        if "Needs" in hdr:
-            return
-        # never move existing columns: append at the end so user data stays put
-        col = max(hdr.values(), default=0) + 1
-        c = ws.cell(row=1, column=col, value="Needs")
-        c.font = Font(bold=True)
-        c.fill = HEADER_FILL
-        c.alignment = Alignment(vertical="center")
-        ws.column_dimensions[get_column_letter(col)].width = 9
-        _add_list_validation(ws, col, list(ACTION_NEEDS))
-        for r in range(2, ws.max_row + 1):
-            if ws.cell(row=r, column=hdr["ID"]).value not in (None, ""):
-                _put(ws, r, col, "anytime")
+        for name, width, fill in ACTION_MIGRATIONS:
+            if name in hdr:
+                continue
+            # never move existing columns: append at the end so user data stays put
+            col = max(hdr.values(), default=0) + 1
+            c = ws.cell(row=1, column=col, value=name)
+            c.font = Font(bold=True)
+            c.fill = HEADER_FILL
+            c.alignment = Alignment(vertical="center")
+            ws.column_dimensions[get_column_letter(col)].width = width
+            if name == "Needs":
+                _add_list_validation(ws, col, list(ACTION_NEEDS))
+            if fill is not None and "ID" in hdr:
+                for r in range(2, ws.max_row + 1):
+                    if ws.cell(row=r, column=hdr["ID"]).value not in (None, ""):
+                        _put(ws, r, col, fill)
+            hdr[name] = col
 
     def _save(self, wb: Workbook) -> None:
         tmp = self.path.with_name(f".{self.path.stem}.tmp-{os.getpid()}{self.path.suffix}")
@@ -318,7 +327,16 @@ class Tracker:
                 tmp.unlink(missing_ok=True)
 
     def _mutate(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
+        """Every write replays the pending queue first, so an op queued while Excel held the file lands before
+        this one instead of being replayed over it by a later flush. If the file is still locked, the replay
+        re-queues and this op queues after it, keeping the order."""
         with self._lock():
+            if self._lock_depth == 1 and self._read_pending():  # depth > 1: we are the flush's own replay
+                try:
+                    self._flush_locked()
+                except Exception as e:  # a broken queued op must not block every later write; it stays queued
+                    warnings.warn(f"could not replay queued tracker ops ({e}); run `careeros tracker flush`",
+                                  stacklevel=3)
             return self._mutate_locked(op, payload, fn)
 
     def _mutate_locked(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
@@ -542,11 +560,14 @@ class Tracker:
         priority: str = "M",
         id: str | None = None,
         needs: str = "anytime",
+        due: str | None = None,
+        due_reason: str | None = None,
     ) -> str:
         item = ActionItem(
             id=id or uuid.uuid4().hex[:8],
             what=what, type=type, job_id=job_id, company=company, role=role,  # type: ignore[arg-type]
             link=link, priority=priority, needs=needs,  # type: ignore[arg-type]
+            due=due, due_reason=(due_reason or None) if due else None,
         )
 
         def fn(wb: Workbook) -> str:
@@ -557,14 +578,16 @@ class Tracker:
             r = ws.max_row + 1
             vals = {"ID": item.id, "Created": item.created[:19].replace("T", " "), "JobID": item.job_id,
                     "Company": item.company, "Role": item.role, "Type": item.type, "What to do": item.what,
-                    "Link": item.link, "Priority": item.priority, "Needs": item.needs, "Done": "N", "DoneDate": ""}
+                    "Link": item.link, "Priority": item.priority, "Needs": item.needs, "Done": "N", "DoneDate": "",
+                    "Due": item.due or "", "Due reason": item.due_reason or ""}
             for h, v in vals.items():
                 if h in hdr:
                     _put(ws, r, hdr[h], v)
             self._append_log_ws(wb, item.job_id, "action", f"[{item.type}/{item.priority}/{item.needs}] {item.what}")
             return item.id
 
-        payload = item.model_dump(include={"what", "type", "job_id", "company", "role", "link", "priority", "id", "needs"})
+        payload = item.model_dump(include={"what", "type", "job_id", "company", "role", "link", "priority", "id", "needs",
+                                           "due", "due_reason"})
         return self._mutate("add_action_item", payload, fn) or item.id
 
     def list_action_items(self, open_only: bool = True) -> list[dict[str, Any]]:
@@ -594,6 +617,38 @@ class Tracker:
             return True
 
         return self._mutate("mark_action_done", {"id": id}, fn)
+
+    def reopen_action(self, id: str) -> bool | None:
+        """Undo `mark_action_done` (the UI's Undo toast). True = reopened, False = no such id, None = queued."""
+        def fn(wb: Workbook) -> bool:
+            ws = wb["Action Items"]
+            hdr = _header_index(ws)
+            r = _find_row(ws, hdr["ID"], id)
+            if r is None:
+                return False
+            _put(ws, r, hdr["Done"], "N")
+            _put(ws, r, hdr["DoneDate"], "")
+            return True
+
+        return self._mutate("reopen_action", {"id": id}, fn)
+
+    def set_action_due(self, id: str, due: str | None, due_reason: str | None = None) -> bool | None:
+        """Set (or, with due=None, clear) an item's due date and reason. Raises ValueError on a malformed date.
+        True / False (no such id) / None (queued)."""
+        due = parse_due(due)
+        reason = (due_reason or "").strip() if due else ""
+
+        def fn(wb: Workbook) -> bool:
+            ws = wb["Action Items"]
+            hdr = _header_index(ws)
+            r = _find_row(ws, hdr["ID"], id)
+            if r is None:
+                return False
+            _put(ws, r, hdr["Due"], due or "")
+            _put(ws, r, hdr["Due reason"], reason)
+            return True
+
+        return self._mutate("set_action_due", {"id": id, "due": due, "due_reason": reason or None}, fn)
 
     # --- contacts ----------------------------------------------------------
 
@@ -673,7 +728,8 @@ def set_status_both(settings: Settings, job_id: str, status: str, note: str) -> 
 
 
 def add_action(settings: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
-               link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False) -> str:
+               link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False,
+               due: str | None = None, due_reason: str | None = None) -> str:
     """Add an Action Item (company/role filled from the job's posting). `dedupe`: no-op when an open item with the
     same job + type exists. Returns the line `careeros action add` prints."""
     from careeros.store import Store
@@ -688,7 +744,7 @@ def add_action(settings: Settings, what: str, type: str, job_id: str = "", compa
             if str(it.get("JobID") or "") == job_id and str(it.get("Type") or "") == type:
                 return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
     aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
-                             role=role, link=link, priority=priority, needs=needs)
+                             role=role, link=link, priority=priority, needs=needs, due=due, due_reason=due_reason)
     return f"action item {aid} added ({type}/{priority}/{needs})"
 
 

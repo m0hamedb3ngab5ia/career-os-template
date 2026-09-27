@@ -85,8 +85,8 @@ def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
                     plan.runs.add(parts[0])          # a run folder created, moved in or moved away
                 if not p.is_dir():
                     plan.status = True               # schedule.json, storage.jsonl, launchd logs, or a deleted file
-            elif len(parts) == 1 or parts[0] == "locks":
-                plan.status = True                   # queue-*.json, pause.json, catch_up.json, runner.lock, ...
+            elif len(parts) <= 1 or parts[0] == "locks":
+                plan.status = True                   # runs/ itself, queue-*.json, pause.json, catch_up.json, runner.lock, ...
             elif not _is_finder_copy(parts[0]):
                 plan.runs.add(parts[0])
             continue
@@ -127,11 +127,12 @@ class Watcher:
         jobs = self.index.update_jobs(sorted(plan.jobs)) if plan.jobs else []
         runs = self.index.update_runs(sorted(plan.runs)) if plan.runs else []
         actions = self.index.update_tracker() if plan.tracker else False
-        if plan.config and self.on_config:
+        config = plan.config and self.index.update_config()   # False when a UI write already took this change
+        if config and self.on_config:
             self.on_config()
-        if not (jobs or runs or actions or plan.config or plan.status):
+        if not (jobs or runs or actions or config or plan.status):
             return None
-        payload = {"jobs": jobs, "runs": runs, "actions": actions, "config": plan.config, "status": plan.status}
+        payload = {"jobs": jobs, "runs": runs, "actions": actions, "config": config, "status": plan.status}
         self.broker.publish("changed", payload)
         return payload
 

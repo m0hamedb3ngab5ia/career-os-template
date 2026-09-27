@@ -78,3 +78,42 @@ def test_verified_record_needs_two_signals_for_low_risk(tmp_path):
                               evidence=["https://linkedin.com/company/nimbusq"])
     assert len(registry.load(path)) == 1 and len(e["signals"]) == 3 and len(e["evidence"]) == 2
     assert e["risk"] == "low" and e["domain"] == "nimbusq.com" and e["checked_at"]
+
+
+def test_restore_puts_back_a_cleared_entry(tmp_path):
+    """The UI's undo of "Mark posting safe": the entry as it was before `clear`."""
+    p = tmp_path / "flagged_registry.yaml"
+    e = registry.add_or_bump(p, "Obsidian Quant Partners", domain="obsidian-careers.example", reason="SCAM_PAYMENT")
+    before = dict(e)
+    registry.clear(p, "Obsidian Quant Partners", note="checked")
+    assert registry.is_flagged(registry.load(p), "Obsidian Quant Partners") is None
+    registry.restore(p, before)
+    got = registry.load(p)
+    assert len(got) == 1 and got[0]["state"] == "active" and got[0]["review_note"] == before["review_note"]
+    assert registry.is_flagged(got, "Obsidian Quant Partners") is not None
+
+
+def test_restore_adds_a_missing_entry(tmp_path):
+    p = tmp_path / "flagged_registry.yaml"
+    registry.restore(p, {"company": "Nimbus Hiring", "state": "active", "confidence": "high"})
+    assert [e["company"] for e in registry.load(p)] == ["Nimbus Hiring"]
+
+
+def test_restore_replaces_the_entry_clear_changed_not_another_fuzzy_match(tmp_path):
+    """Undo must put back the exact entry `clear` changed, even when another entry also fuzzy-matches its name."""
+    p = tmp_path / "flagged_registry.yaml"
+    registry._save(p, [
+        {"company": "Acme Health West", "domain": "", "reason": "SCAM_PAYMENT", "confidence": "high",
+         "state": "active", "review_note": "west", "count": 1},
+        {"company": "Acme Health", "domain": "", "reason": "SCAM_PAYMENT", "confidence": "high",
+         "state": "active", "review_note": "plain", "count": 2},
+    ])
+    west_before = next(dict(e) for e in registry.load(p) if e["company"] == "Acme Health West")
+    before = next(dict(e) for e in registry.load(p) if e["company"] == "Acme Health")
+    cleared = registry.clear(p, "Acme Health East", note="checked")
+    assert cleared is not None and cleared["company"] == "Acme Health"
+    registry.restore(p, before)
+    got = {e["company"]: e for e in registry.load(p)}
+    assert len(registry.load(p)) == 2
+    assert got["Acme Health"] == before
+    assert got["Acme Health West"] == west_before

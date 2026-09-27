@@ -1,0 +1,27 @@
+.group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pill {
+  height: 26px;
+  padding: 0 10px;
+  border-radius: var(--r-pill);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-caption);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.pill[aria-checked="true"] {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: var(--accent-fg);
+  font-weight: 600;
+}
+@media (pointer: coarse) {
+  .pill {
+    min-height: var(--touch);
+  }
+}

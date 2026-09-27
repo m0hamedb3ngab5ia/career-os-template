@@ -1,0 +1,209 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+.banner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 12px 16px;
+  border-radius: 10px;
+  background: var(--orange-bg);
+  color: var(--label);
+}
+.bannerIcon {
+  color: var(--orange);
+  flex-shrink: 0;
+}
+.bannerText {
+  flex-grow: 1;
+  margin: 0;
+}
+.bannerText code {
+  font-size: var(--fs-caption);
+}
+.bannerLink {
+  white-space: nowrap;
+}
+.card {
+  background: var(--card);
+  border: 1px solid var(--sep);
+  border-radius: var(--r-card);
+  box-shadow: var(--shadow-card);
+  overflow: hidden;
+}
+.loading {
+  margin: 0;
+  padding: var(--space-5);
+  color: var(--sec);
+}
+.scroll {
+  overflow-x: auto;
+  padding: 0 16px;
+}
+.table {
+  width: 100%;
+  min-width: 820px;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+.colName {
+  width: 240px;
+}
+.colCompany {
+  width: 140px;
+}
+.colConn {
+  width: 170px;
+}
+.colMutuals {
+  width: 110px;
+}
+.colActions {
+  width: 220px;
+}
+.table thead th {
+  height: 36px;
+  padding: 0 12px 0 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--sec);
+  text-align: left;
+}
+.table tbody th,
+.table tbody td {
+  padding: 10px 12px 10px 0;
+  border-top: 1px solid var(--sep);
+  vertical-align: middle;
+  text-align: left;
+  font-weight: 400;
+}
+.table tbody tr {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 53px;
+}
+.person {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.min0 {
+  min-width: 0;
+}
+.avatar {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 16px;
+  font-size: var(--fs-caption);
+  font-weight: 700;
+  flex-shrink: 0;
+}
+.name,
+.title,
+.truncate {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.name {
+  font-weight: 600;
+}
+.name a {
+  color: inherit;
+}
+.title {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.badges {
+  display: inline-flex;
+  gap: 4px;
+  flex-wrap: wrap;
+}
+.sec,
+.dash {
+  color: var(--sec);
+}
+.mode {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-caption);
+}
+.lock {
+  color: var(--orange);
+  flex-shrink: 0;
+}
+.actionsCell {
+  text-align: right !important;
+  padding-right: 0 !important;
+}
+.rowActions {
+  display: inline-flex;
+  gap: 6px;
+  justify-content: flex-end;
+}
+
+.avatar[data-tone="green"] { color: var(--green); background: var(--green-bg); }
+.avatar[data-tone="purple"] { color: var(--purple); background: var(--purple-bg); }
+.avatar[data-tone="blue"] { color: var(--blue); background: var(--blue-bg); }
+.avatar[data-tone="teal"] { color: var(--teal); background: var(--teal-bg); }
+.avatar[data-tone="gray"] { color: var(--gray); background: var(--gray-bg); }
+
+/* Mark connection sheet */
+.markForm {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding-bottom: var(--space-3);
+}
+.markWho,
+.markHint {
+  margin: 0;
+}
+.markHint {
+  color: var(--sec);
+}
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fieldLabel {
+  font-weight: 600;
+}
+.input {
+  width: 140px;
+  height: var(--control-h);
+  padding: 0 10px;
+  border-radius: var(--r-control);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  font-variant-numeric: tabular-nums;
+}
+.error {
+  margin: 0;
+  color: var(--red);
+  font-weight: 600;
+}
+.markActions {
+  display: flex;
+  justify-content: flex-end;
+}
+
+@media (max-width: 600px) {
+  .banner {
+    flex-wrap: wrap;
+  }
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: var(--touch);
+    font-size: 16px;
+  }
+}
