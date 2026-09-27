@@ -144,13 +144,33 @@ exec "$PY" -m careeros.cli sync check-template-push "$remote" "$url"
 """
 
 
+def _read_or_empty(p: Path) -> str:
+    try:
+        return p.read_text(errors="replace")
+    except OSError:  # dangling symlink
+        return ""
+
+
+def _free_backup(hook: Path) -> Path:
+    """<hook>.bak, or the first free <hook>.bak.N: never overwrite an earlier backup (the first is the original)."""
+    bak, n = hook.with_name(hook.name + ".bak"), 0
+    while bak.exists() or bak.is_symlink():
+        n += 1
+        bak = hook.with_name(f"{hook.name}.bak.{n}")
+    return bak
+
+
 def install_hook(hook: Path, python: str, force: bool = False) -> str:
     """Write the guard to `hook`. Returns installed | unchanged | updated | replaced (foreign hook, --force,
     old one kept as <hook>.bak). Raises HookExists for a foreign hook without force."""
     new = hook_script(python)
     result = "installed"
-    if hook.exists():
-        old = hook.read_text(errors="replace")
+    if hook.is_symlink() and force and HOOK_MARKER not in _read_or_empty(hook):
+        # move the link itself aside, never write through it: its target may be shared by other repos
+        hook.rename(_free_backup(hook))
+        result = "replaced"
+    elif hook.exists() or hook.is_symlink():  # a dangling link counts as a foreign hook, never write through it
+        old = _read_or_empty(hook)
         if HOOK_MARKER in old:
             if old == new:
                 return "unchanged"
@@ -159,11 +179,7 @@ def install_hook(hook: Path, python: str, force: bool = False) -> str:
             raise HookExists(f"{hook} exists and was not written by careeros; rerun with --force "
                              f"(the current hook is kept as {hook.name}.bak)")
         else:
-            bak, n = hook.with_name(hook.name + ".bak"), 0
-            while bak.exists():  # never overwrite an earlier backup: the first one is the user's original hook
-                n += 1
-                bak = hook.with_name(f"{hook.name}.bak.{n}")
-            bak.write_text(old)
+            _free_backup(hook).write_text(old)
             result = "replaced"
     hook.parent.mkdir(parents=True, exist_ok=True)
     hook.write_text(new)
@@ -407,10 +423,15 @@ def remote_is_template_only(g: Git, remote: str, pattern: str) -> bool:
 
 def tracking_refs_owned(g: Git, remote: str) -> bool:
     """True when nothing but `remote` itself can write under refs/remotes/<remote>/ (the `--remotes=<remote>`
-    glob): no other remote is named `<remote>/...` and no other remote's fetch refspec lands there."""
-    target = f"refs/remotes/{remote}/"
-    if any(r != remote and r.startswith(target[len("refs/remotes/"):]) for r in g.lines("remote")):
-        return False
+    glob): no other remote is named `<remote>/...` and no other remote's fetch refspec lands there. Compared
+    casefolded: on a case-insensitive filesystem (APFS) refs/remotes/Template/x resolves as refs/remotes/template/x,
+    so a differently cased name or refspec destination is treated as a collision (full scan, fail safe)."""
+    target = f"refs/remotes/{remote}/".casefold()
+    folded = remote.casefold()
+    for r in g.lines("remote"):
+        rf = r.casefold()
+        if r != remote and (rf == folded or rf.startswith(target[len("refs/remotes/"):])):
+            return False
     cfg = g.run("config", "--get-regexp", r"^remote\..*\.fetch$", check=False).stdout
     for line in cfg.splitlines():
         key, _, spec = line.partition(" ")
@@ -418,7 +439,7 @@ def tracking_refs_owned(g: Git, remote: str) -> bool:
         spec = spec.strip()
         if name == remote or not spec or spec.startswith("^"):
             continue
-        dst = spec.lstrip("+").partition(":")[2]
+        dst = spec.lstrip("+").partition(":")[2].casefold()
         prefix = dst.split("*", 1)[0]
         if prefix.startswith(target) or ("*" in dst and target.startswith(prefix)):
             return False

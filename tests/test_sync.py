@@ -142,6 +142,20 @@ def test_install_hook_force_never_overwrites_an_existing_backup(tmp_path: Path):
     assert (tmp_path / "hooks" / "pre-push.bak.2").read_text() == "#!/bin/sh\necho third\n"
 
 
+def test_install_hook_force_replaces_a_symlinked_hook_not_its_target(tmp_path: Path):
+    shared = tmp_path / "shared-hooks" / "pre-push"
+    shared.parent.mkdir()
+    shared.write_text("#!/bin/sh\necho shared\n")
+    hook = tmp_path / "hooks" / "pre-push"
+    hook.parent.mkdir()
+    hook.symlink_to(shared)
+    assert sync.install_hook(hook, "/usr/bin/python3", force=True) == "replaced"
+    assert shared.read_text() == "#!/bin/sh\necho shared\n"  # the shared target is untouched
+    bak = tmp_path / "hooks" / "pre-push.bak"
+    assert bak.is_symlink() and bak.resolve() == shared.resolve()  # the link itself is the backup
+    assert not hook.is_symlink() and sync.HOOK_MARKER in hook.read_text()
+
+
 def test_pr_command_quotes_body_and_names_branch():
     cmd = sync.pr_command(branch="sync/2026-03-04", base="main", remote="template", template_branch="main",
                           commits=["abc123 feat: thing"], results=[("pytest", "passed"), ("ui", "skipped")])
