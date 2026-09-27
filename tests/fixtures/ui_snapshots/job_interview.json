@@ -3,11 +3,13 @@
     {
       "at": "2026-09-22T15:00:00",
       "component": "inbox-sync",
+      "label": "Inbox: interview invite from recruiting@example.com; status set to interview",
       "message": "interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://mail.google.com/mail/u/0/#all/thread-stark-1)"
     },
     {
       "at": "<wall>",
       "component": "fixture",
+      "label": "Status changed to interview",
       "message": "status -> interview"
     }
   ],
@@ -46,18 +48,13 @@
   "documents": [
     {
       "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    },
-    {
-      "modified": "<mtime>",
-      "name": "outreach.json",
-      "size": 2388
-    },
-    {
-      "modified": "<mtime>",
       "name": "resume.pdf",
       "size": 17
+    },
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
     }
   ],
   "history": [
@@ -112,6 +109,13 @@
     "url": "https://boards.example.com/interview"
   },
   "log": "- <wall> [fixture] status -> interview\n- 2026-09-22 15:00:00 [inbox-sync] interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://mail.google.com/mail/u/0/#all/thread-stark-1)\n",
+  "other_files": [
+    {
+      "modified": "<mtime>",
+      "name": "outreach.json",
+      "size": 2388
+    }
+  ],
   "outreach": {
     "company": "Stark Industries",
     "drafted_at": "2026-09-15T15:00:00+00:00",
@@ -278,7 +282,7 @@
     "missing_skills": [],
     "prestige": null,
     "reasons": [
-      "fixture"
+      "Fixture."
     ],
     "required_skills": [],
     "salary_ok": null,

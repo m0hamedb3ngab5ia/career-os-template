@@ -546,3 +546,26 @@
 .reviewReasons {
   margin-top: var(--space-3);
 }
+
+/* Score "Why": one short sentence per line, tighter than the default bullets. */
+.why {
+  margin: 4px 0 0;
+  padding-left: 18px;
+  font-size: var(--fs-caption);
+  line-height: 1.4;
+}
+.why li + li {
+  margin-top: 2px;
+}
+
+/* Collapsed lists (older activity, all files). */
+.details {
+  margin-top: var(--space-2);
+}
+.details summary {
+  cursor: pointer;
+  color: var(--sec);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  min-height: 24px;
+}

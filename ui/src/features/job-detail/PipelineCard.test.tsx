@@ -64,7 +64,10 @@ describe("PipelineCard", () => {
       next_kind: "apply",
       review_reasons: ["QA warning: long letter", "Open action item: Review and submit"],
     });
-    expect(await screen.findByRole("button", { name: "Approve & continue" })).toHaveAttribute("title", "Approve & continue");
+    expect(await screen.findByRole("button", { name: "Approve & continue" })).toHaveAttribute(
+      "title",
+      "Approves the current documents and lets the pipeline continue to the next step.",
+    );
     expect(screen.getByText("Waiting on you")).toBeInTheDocument();
     expect(screen.getByText("Open action item: Review and submit")).toBeInTheDocument();
     const steps = within(screen.getByRole("list", { name: "Pipeline stages" })).getAllByRole("listitem");

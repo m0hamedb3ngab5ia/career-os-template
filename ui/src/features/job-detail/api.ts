@@ -18,6 +18,7 @@ export function normalize(d: Partial<JobDetail>): JobDetail {
     safety: d.safety ?? null,
     qa: d.qa ?? null,
     documents: d.documents ?? [],
+    other_files: d.other_files ?? [],
     submitted: d.submitted ?? [],
     apply_session: d.apply_session ?? null,
     screenshots: d.screenshots ?? [],

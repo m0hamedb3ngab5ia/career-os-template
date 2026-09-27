@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { FakeEventSource } from "../../test/fakeEventSource";
+import { ACTION_HELP } from "../job-detail/actionHelp";
 import { RunDetailPage } from "./RunDetailPage";
 import { RunsPage } from "./RunsPage";
 import { fakeLayout, mockApi, renderRoute, schedule, type ApiData } from "./testUtils";
@@ -163,6 +164,7 @@ describe("Runs page", () => {
     await user.click(await screen.findByRole("button", { name: "Cancel run" }));
     const dialog = screen.getByRole("alertdialog", { name: /Cancel this run/ });
     expect(within(dialog).getByRole("button", { name: "Keep running" })).toHaveFocus();
+    expect(screen.getByRole("button", { name: "Pause all runs" })).toHaveAttribute("title", ACTION_HELP.pause);
     await user.click(within(dialog).getByRole("button", { name: "Cancel run" }));
     expect(await screen.findByText("Cancelling at the next safe point…")).toBeInTheDocument();
     const post = api.posts()[0]!;
@@ -216,6 +218,7 @@ describe("Runs page", () => {
     const region = await screen.findByRole("region", { name: "Dry run selection" });
     expect(within(region).getByText("1 of 4 jobs would run")).toBeInTheDocument();
     expect(within(region).getByText("Fit 88 +44")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start prepare run" })).toHaveAttribute("title", ACTION_HELP.startRun);
     await user.click(screen.getByRole("button", { name: "Start prepare run" }));
     expect(await screen.findByText("Prepare run started.")).toBeInTheDocument();
     expect(api.posts().map((c) => c.body)).toEqual([

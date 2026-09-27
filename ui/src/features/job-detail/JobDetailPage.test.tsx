@@ -5,6 +5,7 @@ import { mockApi, type Call, type Routes } from "../../test/apiMock";
 import { axeViolations } from "../../test/axe";
 import { renderApp } from "../../test/renderApp";
 import { META } from "../jobs/fixtures";
+import { ACTION_HELP } from "./actionHelp";
 import { detail } from "./fixtures";
 
 function setup(routes: Routes = {}, path = "/jobs/nw01") {
@@ -47,6 +48,13 @@ describe("Job detail screen", () => {
       expect(screen.getByRole("region", { name })).toBeInTheDocument();
     }
     expect(document.title).toBe("Northwind Labs · career-os");
+  });
+
+  it("header actions carry one-sentence help as their title", async () => {
+    setup();
+    expect(await screen.findByRole("button", { name: "Set status" })).toHaveAttribute("title", ACTION_HELP.setStatus);
+    expect(screen.getByRole("button", { name: /Status override/ })).toHaveAttribute("title", ACTION_HELP.override);
+    expect(screen.getByRole("button", { name: "Withdraw…" })).toHaveAttribute("title", ACTION_HELP.withdraw);
   });
 
   it("Set status never offers applied: that goes only through the confirmed Mark submitted path", async () => {

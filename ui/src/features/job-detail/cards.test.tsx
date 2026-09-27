@@ -1,8 +1,10 @@
 import { screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { formatDateTime } from "../../lib/format";
-import { ActivityCard } from "./ActivityCard";
+import { ACTION_HELP } from "./actionHelp";
+import { ACTIVITY_PREVIEW, ActivityCard } from "./ActivityCard";
 import { ContactsCard } from "./ContactsCard";
 import { detail } from "./fixtures";
 import { ScoreCard } from "./ScoreCard";
@@ -16,7 +18,11 @@ describe("ScoreCard", () => {
     const card = screen.getByRole("region", { name: "Score" });
     expect(within(card).getByText("91").parentElement).toHaveTextContent("Fit 91");
     expect(within(card).getByText("None failed")).toBeInTheDocument();
-    expect(within(card).getByText("Dream company")).toBeInTheDocument();
+    const why = within(card).getByRole("list", { name: "Why this score" });
+    expect(within(why).getAllByRole("listitem").map((li) => li.textContent)).toEqual([
+      "Dream company.",
+      "Skills: 2 of 3 required matched; missing Rust.",
+    ]);
     expect(within(card).getByText("Kubernetes")).toHaveAttribute("data-tone", "green");
     expect(within(card).getByText("Rust")).toBeInTheDocument();
     expect(within(card).queryByRole("list", { name: "Sub-scores" })).not.toBeInTheDocument();
@@ -68,19 +74,49 @@ describe("ContactsCard", () => {
 });
 
 describe("ActivityCard", () => {
-  it("lists log activity newest first and the status history", async () => {
+  it("shows the plain-English label of the newest entries, the raw line as a tooltip, and the status history", async () => {
     const { container } = renderWithProviders(<ActivityCard activity={d.activity!} history={d.history} />);
     const card = screen.getByRole("region", { name: "Activity" });
-    expect(within(card).getByText("Found by scout")).toBeInTheDocument();
+    const recent = within(card).getByRole("list", { name: "Recent activity" });
+    const rows = within(recent).getAllByRole("listitem");
+    expect(rows).toHaveLength(ACTIVITY_PREVIEW);
+    expect(rows[0]).toHaveTextContent("Status changed to needs review: prepare-job: Tier A");
+    expect(rows[0]).toHaveAttribute("title", "[store] status -> needs_review: prepare-job: Tier A");
+    expect(within(card).getByText("Found by scout on greenhouse")).not.toBeVisible();
     expect(within(card).getAllByText(formatDateTime("2026-09-24T18:04:00")!).length).toBeGreaterThan(0);
     expect(within(card).getByRole("heading", { name: "Status history" })).toBeInTheDocument();
     expect(within(card).getByText("prepare-job: Tier A")).toBeInTheDocument();
     expect(await axeViolations(container)).toEqual([]);
   });
 
+  it("Show all (N) expands the older entries; no toggle when everything fits", async () => {
+    const { rerender } = renderWithProviders(<ActivityCard activity={d.activity!} history={[]} />);
+    const toggle = screen.getByText(`Show all (${d.activity!.length})`);
+    expect(toggle.closest("details")).not.toHaveAttribute("open");
+    await userEvent.setup().click(toggle);
+    expect(toggle.closest("details")).toHaveAttribute("open");
+    expect(screen.getByText("Found by scout on greenhouse")).toBeVisible();
+    rerender(<ActivityCard activity={d.activity!.slice(0, ACTIVITY_PREVIEW)} history={[]} />);
+    expect(screen.queryByText(/^Show all/)).not.toBeInTheDocument();
+  });
+
+  it("falls back to the raw message when a label is missing", () => {
+    renderWithProviders(<ActivityCard activity={[{ at: "2026-09-24T18:04:00", component: "x", message: "odd line", label: "" }]} history={[]} />);
+    expect(screen.getByText("odd line")).toBeInTheDocument();
+  });
+
   it("empty states", () => {
     renderWithProviders(<ActivityCard activity={[]} history={[]} />);
     expect(screen.getByText("No activity logged yet.")).toBeInTheDocument();
     expect(screen.getByText("No status changes yet.")).toBeInTheDocument();
+  });
+});
+
+describe("action help", () => {
+  it("every entry is one plain sentence", () => {
+    for (const text of Object.values(ACTION_HELP)) {
+      expect(text).toMatch(/^[A-Z].*\.$/);
+      expect(text).not.toMatch(/\.\s+[A-Z]/);
+    }
   });
 });

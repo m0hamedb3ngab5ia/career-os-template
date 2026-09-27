@@ -11,6 +11,7 @@ import { useRunHistory } from "./api";
 import { STOP_FIX, kindLabel, needsYou, runChipCode, runTone, triggerLabel } from "./labels";
 import styles from "./Runs.module.css";
 import type { RunRecord } from "./types";
+import { help } from "../job-detail/actionHelp";
 
 export const HISTORY_KINDS = ["", "scout", "score", "prepare", "inbox_sync", "tracker", "prune"] as const;
 
@@ -122,6 +123,7 @@ export function HistoryCard() {
       {q.hasNextPage ? (
         <Button
           size="small"
+          {...help("loadOlderRuns")}
           onClick={() => void q.fetchNextPage()}
           pending={q.isFetchingNextPage}
           pendingLabel="Loading…"

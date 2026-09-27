@@ -13,6 +13,7 @@ import { kindLabel, triggerLabel } from "./labels";
 import { LogPane } from "./LogPane";
 import styles from "./Runs.module.css";
 import type { CurrentRun, JobRow, Step } from "./types";
+import { help } from "../job-detail/actionHelp";
 
 function StepPill({ step }: { step: Step }) {
   const words = { done: " done", active: " in progress", pending: " not started", skipped: " skipped" }[step.state];
@@ -105,6 +106,7 @@ export function CurrentRunCard({ run }: { run: CurrentRun | null | undefined }) 
           ) : stopping || asking ? null : (
             <Button
               ref={cancelButton}
+              {...help("cancelRun")}
               size="small"
               icon={<Square size={14} strokeWidth={1.7} aria-hidden="true" />}
               onClick={() => setAsking(true)}

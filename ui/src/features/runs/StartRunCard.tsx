@@ -5,6 +5,7 @@ import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
 import { SegmentedControl } from "../../kit/SegmentedControl";
+import { help } from "../job-detail/actionHelp";
 import { Switch } from "../../kit/Switch";
 import { useToast } from "../../kit/Toast";
 import { formatNumber } from "../../lib/format";
@@ -246,6 +247,7 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
 
       <Button
         variant="primary"
+        {...help(!batch ? "startStep" : dryFirst && !selection ? "showSelection" : "startRun")}
         className={styles.startButton}
         icon={<Play size={14} strokeWidth={1.7} aria-hidden="true" />}
         onClick={onStart}
@@ -257,7 +259,7 @@ export function StartRunCard({ meta, schedule, paused }: StartRunCardProps) {
         {batch && dryFirst && !selection ? "Show the selection" : label}
       </Button>
       {selection ? (
-        <Button size="small" className={styles.startButton} onClick={() => setSelection(null)}>
+        <Button size="small" {...help("changeBudget")} className={styles.startButton} onClick={() => setSelection(null)}>
           Change the budget
         </Button>
       ) : null}

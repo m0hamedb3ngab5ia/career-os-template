@@ -10,6 +10,7 @@ import { useScheduleAction } from "./api";
 import { SCHEDULE_NAMES, cadence } from "./labels";
 import styles from "./Runs.module.css";
 import type { Schedule } from "./types";
+import { help } from "../job-detail/actionHelp";
 
 interface SchedulePanelProps {
   schedule: Schedule | undefined;
@@ -95,11 +96,11 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
           </div>
           {asking === null ? (
             schedule.installed ? (
-              <Button ref={trigger} size="small" variant="destructive" onClick={() => setAsking("uninstall")}>
+              <Button ref={trigger} size="small" variant="destructive" {...help("uninstallSchedule")} onClick={() => setAsking("uninstall")}>
                 Uninstall
               </Button>
             ) : (
-              <Button ref={trigger} size="small" onClick={() => setAsking("install")}>
+              <Button ref={trigger} size="small" {...help("installSchedule")} onClick={() => setAsking("install")}>
                 Install
               </Button>
             )

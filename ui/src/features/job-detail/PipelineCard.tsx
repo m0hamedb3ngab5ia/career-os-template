@@ -7,10 +7,17 @@ import { useToast } from "../../kit/Toast";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
+import { type ActionKey, help } from "./actionHelp";
 import { errorText, usePipeline, useStartPipeline } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import type { PipelineState } from "./types";
+
+const NEXT_ACTION_HELP_KEY: Record<string, ActionKey> = {
+  start: "startPipeline",
+  continue: "continuePipeline",
+  approve_continue: "approveContinue",
+};
 
 export const STAGES: { id: PipelineState["stage"]; label: string }[] = [
   { id: "score", label: "Score" },
@@ -177,6 +184,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             <Button
               variant="destructive"
               disabled={cancel.isPending}
+              {...help("cancelRun")}
               onClick={() =>
                 cancel.mutate(runId, { onError: (e) => toast.show({ message: errorText(e) }) })
               }
@@ -188,7 +196,15 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         </>
       ) : state.next_action ? (
         <div className={styles.buttons}>
-          <Button variant="primary" title={label} disabled={busy} onClick={run}>
+          <Button
+            variant="primary"
+            title={(() => {
+              const key = state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
+              return key ? help(key).title : label;
+            })()}
+            disabled={busy}
+            onClick={run}
+          >
             {started ? "Starting…" : label}
           </Button>
           <span className={styles.sec}>
@@ -204,7 +220,11 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         </div>
       )}
       {state.next_kind === "score" || chaining || startedKind.current === "score" ? (
-        <label className={styles.caption} style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}>
+        <label
+          className={styles.caption}
+          style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}
+          {...help("stopAfterStage")}
+        >
           <input type="checkbox" checked={stopAfter} onChange={(e) => setStopAfter(e.target.checked)} />
           Stop after this stage
         </label>

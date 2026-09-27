@@ -11,6 +11,7 @@ import { useCatchUp, useMeta, usePause, useResume } from "./api";
 import { kindLabel } from "./labels";
 import styles from "./Runs.module.css";
 import type { CatchUp, Pause } from "./types";
+import { help } from "../job-detail/actionHelp";
 
 type PauseChoice = "hour" | "tomorrow" | "resume";
 
@@ -42,6 +43,7 @@ export function PauseAllControl({ paused }: { paused: Pause | null | undefined }
   if (paused) {
     return (
       <Button
+        {...help("resume")}
         icon={<Play size={14} strokeWidth={1.7} aria-hidden="true" />}
         pending={resume.isPending}
         pendingLabel="Resuming…"
@@ -60,6 +62,7 @@ export function PauseAllControl({ paused }: { paused: Pause | null | undefined }
     <div className={styles.popoverAnchor}>
       <Button
         ref={anchor}
+        {...help("pause")}
         icon={<PauseIcon size={14} strokeWidth={1.7} aria-hidden="true" />}
         aria-expanded={open}
         aria-haspopup="dialog"
@@ -124,7 +127,7 @@ export function PausedBanner({ paused }: { paused: Pause }) {
           Scheduled runs are skipped until you resume. The current batch stops at the next safe point.
         </div>
       </div>
-      <Button variant="primary" size="small" pending={resume.isPending} pendingLabel="Resuming…" onClick={() => resume.mutate()}>
+      <Button variant="primary" size="small" {...help("resume")} pending={resume.isPending} pendingLabel="Resuming…" onClick={() => resume.mutate()}>
         Resume
       </Button>
     </div>
@@ -187,12 +190,13 @@ export function CatchUpBanner({ record }: { record: CatchUp }) {
       </div>
       {asking ? null : (
         <>
-          <Button ref={skipButton} size="small" onClick={() => setAsking(true)}>
+          <Button ref={skipButton} size="small" {...help("skipMissed")} onClick={() => setAsking(true)}>
             Skip missed runs
           </Button>
           <Button
             size="small"
             variant="primary"
+            {...help("catchUp")}
             icon={<Play size={14} strokeWidth={1.7} aria-hidden="true" />}
             pending={catchUp.isPending}
             pendingLabel="Starting…"
