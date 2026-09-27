@@ -1,7 +1,8 @@
 # career-os — UI design spec
 
-Status: design. A mockup comes first; code (Phase 2) starts after the mockup is signed off.
-Nothing in this file is built yet except where it says so.
+Status: building. The mockup is signed off; Phase 2 is being built in slices. Built so far: the `careeros ui`
+server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/status`, `/api/jobs`, `/api/events`,
+`pipeline.yaml: ui`). Everything else in this file is not built yet unless it says so.
 
 ## Goals
 
@@ -24,7 +25,7 @@ Minimal, Apple Human Interface Guidelines look and behaviour (see [HIG notes](#h
 |---|---|---|
 | `data/jobs/<id>/*.json` (`status.json`, `score.json`, `safety.json`, `qa.json`, `apply_session.json`, `contacts.json`, `outreach.json`, …) | source of truth | skills + CLI, unchanged |
 | `data/runs/` (`<run_id>/run.json`, `<run_id>/attempts/NNN.json` + `NNN.stream.jsonl`, `<run_id>/run.log`, `queue-<kind>.json`, `schedule.json`, `catch_up.json`, `pause.json`, `failures.json`, `storage.jsonl`, lock files) | source of truth for runs, the schedule, pause, catch-up and storage snapshots | `careeros run`, `careeros tick`, `careeros prune`, `careeros storage`; built |
-| `data/careeros.db` (SQLite, WAL mode) | read index for the UI: jobs, status history, action items, contacts, runs | UI indexer only (rebuildable; delete it and it rebuilds); not built yet |
+| `data/careeros.db` (SQLite, WAL mode) | read index for the UI: jobs, status history, action items, contacts, runs | UI indexer only (rebuildable; delete it or run `careeros ui --reindex` and it rebuilds); built |
 | `JobTracker.xlsx` | human-readable export, backup, and the place people already look | `careeros tracker sync`, unchanged |
 
 Run history is already canonical in files (`data/runs/`, written atomically by `src/careeros/runs/store.py`), the
@@ -224,10 +225,18 @@ Every run is a subprocess the server owns, one row in the `runs` table, and a st
 
 - `careeros ui [--port 8765] [--host 127.0.0.1] [--reindex] [--no-open]` subcommand; server binds to `127.0.0.1` by
   default (any other `--host` requires auth; see Phone below).
-- Optional extra in `pyproject.toml`: `ui = ["fastapi", "uvicorn", "watchfiles"]`, so the core CLI keeps its own
+- `pipeline.yaml: ui` (built): port, host, open_browser, theme, undo_seconds, page_size, watch_debounce_ms,
+  index_path and the Pipeline board's `pipeline.columns` (status -> column; statuses in no column form the "Closed"
+  line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier, action type and
+  stop reason from the models, so the frontend renders codes it was never told about (grey fallback).
+- Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write
+  needs the `X-CareerOS: 1` header.
+- Optional extra in `pyproject.toml` (built): `ui = ["fastapi", "uvicorn", "watchfiles"]`, so the core CLI keeps its own
   dependencies. `ruamel.yaml` is already a core dependency (`careeros advise apply` writes config with it), so the
   UI's settings forms reuse that round-trip code instead of adding it.
-- `src/careeros/ui/`: `app.py` (FastAPI routes + SSE), `index.py` (SQLite schema + indexer from `Store`),
+- `src/careeros/ui/` (built: `app.py`, `index.py`, `watch.py`, `events.py`, `security.py`, `server.py`,
+  `routers/` one per area, `services/` the logic routes call; still to come: `runs.py`, `settings_io.py`, `static/`):
+  `app.py` (FastAPI routes + SSE), `index.py` (SQLite schema + indexer from `Store`),
   `runs.py` (starts `careeros.runs` batches and other steps, `RESULT:` parsing), `settings_io.py` (ruamel
   round-trip + validate + rollback, shared with `careeros advise apply`), `static/` (built frontend).
 - Frontend: React + TypeScript, built to static files and served by FastAPI; no Node needed at runtime.

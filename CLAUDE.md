@@ -31,6 +31,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros run score|prepare [--preset small|medium|large|max|custom] [--max-jobs N] [--max-minutes M] [--dry-run] [--json]` — budgeted batches, one headless skill call per job, never applies
 - `.venv/bin/careeros run list|show <id> [--json|--log]|status|cap [--check]|pause [--until +2h|ISO] [--reason]|resume|catch-up [--dry-run|--dismiss]`
 - `.venv/bin/careeros job lock|unlock|check <id>` (exit 6 = held), `tick [--dry-run]`, `schedule install|uninstall|status` (LaunchAgent → `careeros tick`)
+- `.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]` — local web app on 127.0.0.1 (needs `pip install -e ".[ui]"`); SQLite index `data/careeros.db` is disposable
 - `.venv/bin/careeros prune [--yes]`, `storage [--json] [--snapshot]`, `advise [--json]`, `advise apply <id>` (suggest-only; writes config/pipeline.yaml only on apply)
 - `.venv/bin/python -m careeros.qa data/jobs/<id>` — deterministic QA
 - `.venv/bin/python templates/resume/render.py data/jobs/<id>/resume.json` — tex+pdf+txt

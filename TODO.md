@@ -21,7 +21,11 @@ belong in each candidate's own private repo, not here.
 - [x] Scheduler: `careeros tick` + macOS LaunchAgent (`careeros schedule install`), quiet hours, pause/resume,
       one pending catch-up for missed slots, weekly prune, run-log retention
 - [x] `careeros storage` (bytes by category, snapshots) + `careeros advise` / `advise apply <id>` (suggest-only)
-- [ ] SQLite run index (`data/careeros.db` `runs` table) for the UI, rebuilt from `data/runs/` (`docs/UI.md`)
+- [x] SQLite run index (`data/careeros.db` `runs` table) for the UI, rebuilt from `data/runs/` (`docs/UI.md`)
+- [x] `careeros ui` server: index (jobs, status history, action items, contacts, runs), file watcher + SSE,
+      `/api/health|meta|status|jobs|events`, `pipeline.yaml: ui` (slice 1 of the UI build; frontend next)
+- [ ] Move Action Items source of truth from the xlsx to data/action_items.json (+ due/due_reason); the UI writes
+      through Tracker until then (docs/UI.md)
 - [ ] Scheduled apply path: honour `runs.auto_submit.enabled`, gated by the daily cap (`careeros run cap --check`)
       and `auto_submit_decision` (Tier A and non-pass safety always manual); off by default
 - [ ] Finish the inbox-sync skill, then set `schedule.jobs.inbox_sync.enabled: true` (the job, 08:00 + 18:00 with a
