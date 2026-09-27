@@ -224,7 +224,7 @@ class _FakeGit(sync.Git):
 def test_pushed_paths_reads_nul_separated_unquoted_names():
     g = _FakeGit({"rev-list": "c1\n", "diff-tree": "src/a.py\0personal/résumé.md\0",
                   "ls-tree": "src/a.py\0profile/my \"cv\".pdf\0", "rev-parse": ""})
-    got = sync.pushed_paths(g, "template", "a" * 40, sync.ZERO_SHA)
+    got = sync.pushed_paths(g, "a" * 40, sync.ZERO_SHA)
     assert got == {"src/a.py", "personal/résumé.md", 'profile/my "cv".pdf'}
     assert sync.blocked_paths(sorted(got), PERSONAL) == ["personal/résumé.md", 'profile/my "cv".pdf']
 
@@ -238,7 +238,7 @@ def test_pushed_paths_uses_plumbing_not_log_so_signatures_cannot_corrupt_paths()
     sig = 'Good "git" signature for test@example.invalid with ED25519 key SHA256:abc\n'
     g = _FakeGit({"log": sig + "personal/cv.md\0src/a.py\0", "rev-list": "c1\nc2\n",
                   "diff-tree": "personal/cv.md\0src/a.py\0", "ls-tree": "src/a.py\0", "rev-parse": ""})
-    got = sync.pushed_paths(g, "template", "a" * 40, sync.ZERO_SHA)
+    got = sync.pushed_paths(g, "a" * 40, sync.ZERO_SHA)
     assert got == {"personal/cv.md", "src/a.py"}
     assert sync.blocked_paths(sorted(got), PERSONAL) == ["personal/cv.md"]
     dt = [(a, i) for a, i in g.calls if a[0] == "diff-tree"]
@@ -283,12 +283,30 @@ def test_hook_script_falls_back_to_default_on_empty_pattern():
     assert f"[ -n \"$pattern\" ] || pattern='{sync.DEFAULT_URL_PATTERN}'" in s
 
 
-def test_fold_nfc_normalises_before_casefold():
-    assert sync._fold("Témplate") == sync._fold("témplate") == "témplate"
+def test_pushed_paths_excludes_only_tips_present_here_as_commits():
+    g = _FakeGit({"cat-file": "t1 commit 200\nt2 missing\nt3 tag 150\nr1 commit 90\n", "rev-list": "c1\n",
+                  "diff-tree": "src/a.py\0", "ls-tree": "src/a.py\0"})
+    assert sync.pushed_paths(g, "L", "r1", ["t1", "t2", "t3"]) == {"src/a.py"}
+    cat = [i for a, i in g.calls if a[0] == "cat-file"]
+    assert cat == ["t1\nt2\nt3\nr1\n"]
+    rl = [(a, i) for a, i in g.calls if a[0] == "rev-list"]
+    assert rl == [(("rev-list", "--stdin"), "L\n^t1\n^r1\n")]
 
 
-@pytest.mark.parametrize("dst, expected", [
-    ("refs/remotes/template/x", "refs/remotes/template/x"), ("remotes/template/x", "refs/remotes/template/x"),
-    ("heads/x", "refs/heads/x"), ("tags/v1", "refs/tags/v1"), ("", ""), ("template/x", None), ("x", None)])
-def test_qualify_dst_expands_like_git_and_flags_ambiguous(dst, expected):
-    assert sync._qualify_dst(dst) == expected
+def test_pushed_paths_without_tips_scans_everything():
+    g = _FakeGit({"rev-list": "c1\n", "ls-tree": ""})
+    sync.pushed_paths(g, "L", sync.ZERO_SHA, [])
+    assert not [a for a, _ in g.calls if a[0] == "cat-file"]
+    assert [i for a, i in g.calls if a[0] == "rev-list"] == ["L\n"]
+
+
+@pytest.mark.parametrize("url, local", [("../tpl.git", True), ("/srv/career-os-template.git", True),
+                                        ("git@github.com:o/career-os-template.git", False),
+                                        ("https://github.com/o/career-os-template", False),
+                                        ("file:///srv/career-os-template.git", False)])
+def test_is_local_path(url, local):
+    assert sync._is_local_path(url) is local
+
+
+def test_remote_tips_unreachable_is_empty(tmp_path: Path):
+    assert sync.remote_tips(tmp_path, str(tmp_path / "no-such-career-os-template.git")) == []

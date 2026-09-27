@@ -379,8 +379,7 @@ def test_hook_scans_full_history_when_another_remote_writes_under_differently_ca
 
 @pytest.mark.parametrize("nested", ["name", "refspec"])
 def test_hook_scans_full_history_when_another_remote_writes_under_template_refs(repos, env, tmp_path, nested):
-    # --remotes=template globs refs/remotes/template/*: a remote named template/bak, or one whose fetch refspec
-    # writes there, must not hide personal history from the scan
+    # a remote named template/bak, or one whose fetch refspec writes under refs/remotes/template/, must not hide personal history from the scan
     priv = repos["private"]
     assert cli(priv, env, "install-hook").returncode == 0
     side = tmp_path / "side.git"
@@ -430,6 +429,73 @@ def test_hook_scans_full_history_when_template_refs_are_written_by_unusual_fetch
     r = git(priv, env, "push", "template", "leak", check=False)
     assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/b.md" in r.stderr
     assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
+
+
+def _leak_branch(priv, env, side, name="personal/b.md"):
+    """A `leak` branch off template/main whose history adds then removes a personal file, pushed to `side`."""
+    git(priv, env, "switch", "-q", "-c", "leak", "template/main")
+    commit(priv, env, {name: "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", name)
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    git(priv, env, "push", "-q", str(side), "leak:main")
+
+
+@pytest.mark.parametrize("how", ["update_ref", "fetch_url_refspec", "one_off_config", "include_if_onbranch",
+                                 "worktree_config"])
+def test_hook_blocks_history_behind_planted_template_tracking_refs(repos, env, tmp_path, how):
+    # the guard asks the template itself (ls-remote) what it already has; a local refs/remotes/template/* ref,
+    # however it was written, never hides history from the scan
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    side = tmp_path / "side.git"
+    git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(side))
+    _leak_branch(priv, env, side)
+    dst = "refs/remotes/template/leak"
+    if how == "update_ref":
+        git(priv, env, "update-ref", dst, "leak")
+    elif how == "fetch_url_refspec":
+        git(priv, env, "fetch", "-q", str(side), f"main:{dst}")
+    elif how == "one_off_config":
+        git(priv, env, "-c", f"remote.o.url={side}", "-c", f"remote.o.fetch=refs/heads/main:{dst}", "fetch", "-q", "o")
+    elif how == "include_if_onbranch":
+        inc = tmp_path / "inc.cfg"
+        inc.write_text(f'[remote "o"]\n\turl = {side}\n\tfetch = refs/heads/main:{dst}\n')
+        git(priv, env, "config", "includeIf.onbranch:tmp-*.path", str(inc))
+        git(priv, env, "switch", "-q", "-c", "tmp-x")
+        git(priv, env, "fetch", "-q", "o")
+        git(priv, env, "switch", "-q", "leak")
+    else:
+        git(priv, env, "config", "extensions.worktreeConfig", "true")
+        wt = tmp_path / "wt"
+        git(priv, env, "worktree", "add", "-q", "--detach", str(wt))
+        git(wt, env, "config", "--worktree", "remote.o.url", str(side))
+        git(wt, env, "config", "--worktree", "remote.o.fetch", f"refs/heads/main:{dst}")
+        git(wt, env, "fetch", "-q", "o")
+    assert git(priv, env, "rev-parse", dst).stdout.strip() == git(priv, env, "rev-parse", "leak").stdout.strip()
+    r = git(priv, env, "push", "template", "leak", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/b.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""
+
+
+def test_hook_skips_history_the_template_already_has(repos, env, tmp_path):
+    # template history that itself touched a personal-looking path is excluded via the template's real tips
+    template_commit(repos, env, {"data/sample.txt": "x\n"}, "add sample")
+    git(repos["upstream"], env, "rm", "-q", "data/sample.txt")
+    git(repos["upstream"], env, "commit", "-q", "-m", "drop sample")
+    git(repos["upstream"], env, "push", "-q", "origin", "main")
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    git(priv, env, "fetch", "-q", "template")
+    git(priv, env, "switch", "-q", "-c", "fix/z", "template/main")
+    commit(priv, env, {"src/app.py": "VALUE = 3\n"}, "fix: value")
+    git(priv, env, "update-ref", "-d", "refs/remotes/template/main")  # no local tracking refs needed
+    r = git(priv, env, "push", "template", "fix/z", check=False)
+    assert r.returncode == 0, r.stderr
+    # when the template can't be asked (ls-remote fails), the whole history is scanned: fail safe
+    sha = git(priv, env, "rev-parse", "HEAD").stdout.strip()
+    missing = tmp_path / "career-os-template-missing.git"
+    r = cli(priv, env, "check-template-push", "x", str(missing), stdin=f"refs/heads/fix/z {sha} refs/heads/fix/z {'0' * 40}\n")
+    assert r.returncode == 1 and "data/sample.txt" in r.stderr
 
 
 def test_hook_empty_pattern_config_falls_back_to_default(repos, env):

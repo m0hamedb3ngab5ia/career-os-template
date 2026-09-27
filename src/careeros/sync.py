@@ -7,6 +7,7 @@ and a few files it keeps different on purpose, listed in `.template-sync-keep` (
   personal paths and the keep list (those should be ported to the template).
 - `pull`: merge the template's branch on a `sync/<date>` branch, run the local checks, print the PR command.
 - `install-hook` / `check-template-push`: a pre-push guard that refuses personal paths going to a template URL.
+  "Already on the template" comes from `git ls-remote` of the push URL, never from local refs or config.
 
 Settings via git config: `careeros.personalPaths` (comma/space separated) and `careeros.templateUrlPattern`.
 """
@@ -416,83 +417,57 @@ def hook_path(root: Path) -> Path:
     return p if p.is_absolute() else root / p
 
 
-def remote_is_template_only(g: Git, remote: str, pattern: str) -> bool:
-    """True only for a configured remote whose fetch URL(s) and every push URL match the template pattern."""
-    fetch = g.run("remote", "get-url", "--all", remote, check=False)
-    push = g.run("remote", "get-url", "--push", "--all", remote, check=False)
-    if fetch.returncode != 0 or push.returncode != 0:
-        return False
-    urls = [u.strip() for u in (fetch.stdout + push.stdout).splitlines() if u.strip()]
-    return bool(urls) and all(url_matches(u, pattern) for u in urls)
+# Environment that could point ls-remote at another repo or rewrite its URL; stripped (global config stays, so
+# ssh/credential setup keeps working). GIT_CONFIG_PARAMETERS carries one-off `git -c` settings into hooks.
+_LS_REMOTE_DROP = ("GIT_DIR", "GIT_WORK_TREE", "GIT_COMMON_DIR", "GIT_INDEX_FILE", "GIT_OBJECT_DIRECTORY",
+                   "GIT_ALTERNATE_OBJECT_DIRECTORIES", "GIT_NAMESPACE", "GIT_CONFIG", "GIT_CONFIG_PARAMETERS",
+                   "GIT_CONFIG_COUNT", "GIT_CEILING_DIRECTORIES", "GIT_DISCOVERY_ACROSS_FILESYSTEM")
 
 
-def _fold(name: str) -> str:
-    """NFC then casefold: APFS treats differently cased and differently composed ref names as one file."""
-    return unicodedata.normalize("NFC", name).casefold()
+def _is_local_path(url: str) -> bool:
+    return "://" not in url and not re.match(r"^[^/]+:", url)
 
 
-def _qualify_dst(dst: str) -> str | None:
-    """A fetch refspec destination as git stores it: `refs/...` as is, `heads/`, `tags/`, `remotes/` get a
-    `refs/` prefix; "" (fetch without storing) stays "". Any other unqualified name is ambiguous: None."""
-    if not dst or dst.startswith("refs/"):
-        return dst
-    if dst.startswith(("heads/", "tags/", "remotes/")):
-        return "refs/" + dst
-    return None
+def remote_tips(root: Path, url: str) -> list[str]:
+    """Every object id the remote at `url` advertises (`git ls-remote`), i.e. what it already has. Run outside
+    the repo with repo-scoped env stripped, so no local/worktree/includeIf/one-off config can redirect it.
+    [] when the remote can't be asked: nothing is excluded then (full scan, fail safe)."""
+    import os
+    import tempfile
+
+    if _is_local_path(url) and not Path(url).is_absolute():
+        url = str(root / url)
+    env = {k: v for k, v in os.environ.items()
+           if k not in _LS_REMOTE_DROP and not k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
+    env["GIT_TERMINAL_PROMPT"] = "0"
+    with tempfile.TemporaryDirectory() as neutral:
+        try:
+            r = subprocess.run(["git", *GIT_OVERRIDES, "ls-remote", "--", url], cwd=neutral, env=env,
+                               capture_output=True, text=True, timeout=120)
+        except (OSError, subprocess.TimeoutExpired):
+            return []
+    if r.returncode != 0:
+        return []
+    return sorted({ln.split()[0] for ln in r.stdout.splitlines() if re.match(r"^[0-9a-f]{40,64}\s", ln)})
 
 
-def _legacy_remote_files(g: Git) -> bool:
-    """True when <git-common-dir>/remotes/ holds any file: legacy remotes carry `Pull:` fetch rules that
-    `git config` never shows, so their destinations can't be checked (callers fall back to a full scan)."""
-    common = Path(g.out("rev-parse", "--git-common-dir"))
-    d = common if common.is_absolute() else g.root / common
-    try:
-        return any(True for _ in (d / "remotes").iterdir())
-    except OSError:  # missing (the usual case) or unreadable
-        return (d / "remotes").exists()
+def local_commits(g: Git, shas: Iterable[str]) -> list[str]:
+    """The given object ids that exist here as commits (tips we never fetched can't be excluded, and needn't be)."""
+    shas = [s for s in dict.fromkeys(shas) if s and s != ZERO_SHA]
+    if not shas:
+        return []
+    out = g.run("cat-file", "--batch-check", input="\n".join(shas) + "\n", check=False).stdout
+    return [p[0] for p in (ln.split() for ln in out.splitlines()) if len(p) == 3 and p[1] == "commit"]
 
 
-def tracking_refs_owned(g: Git, remote: str) -> bool:
-    """True when nothing but `remote` itself can write under refs/remotes/<remote>/ (the `--remotes=<remote>`
-    glob): no other remote is named `<remote>/...` and no other remote's fetch refspec lands there. Compared
-    casefolded: on a case-insensitive filesystem (APFS) refs/remotes/Template/x resolves as refs/remotes/template/x,
-    so a differently cased name or refspec destination is treated as a collision (full scan, fail safe)."""
-    if _legacy_remote_files(g):
-        return False
-    target = _fold(f"refs/remotes/{remote}/")
-    folded = _fold(remote)
-    for r in g.lines("remote"):
-        rf = _fold(r)
-        if r != remote and (rf == folded or rf.startswith(target[len("refs/remotes/"):])):
-            return False
-    cfg = g.run("config", "--get-regexp", r"^remote\..*\.fetch$", check=False).stdout
-    for line in cfg.splitlines():
-        key, _, spec = line.partition(" ")
-        name = key[len("remote."):-len(".fetch")]
-        spec = spec.strip()
-        if name == remote or not spec or spec.startswith("^"):
-            continue
-        dst = _qualify_dst(_fold(spec.lstrip("+").partition(":")[2].strip()))
-        if dst is None:
-            return False
-        prefix = dst.split("*", 1)[0]
-        if prefix.startswith(target) or ("*" in dst and target.startswith(prefix)):
-            return False
-    return True
-
-
-def pushed_paths(g: Git, remote: str, lsha: str, rsha: str, pattern: str = DEFAULT_URL_PATTERN) -> set[str]:
-    """Every path touched by the commits this update sends (not under rsha, and not on `remote`'s tracking refs
-    when that remote only ever points at the template), plus the tip tree. A raw URL, or a remote that also
-    fetches/pushes elsewhere, or whose tracking-ref namespace another remote can write into (its tracking refs may
-    hold history the template never got), is scanned in full (fail closed)."""
-    exclude = ["--not"]
-    if remote_is_template_only(g, remote, pattern) and tracking_refs_owned(g, remote):
-        exclude.append(f"--remotes={remote}")
-    if rsha != ZERO_SHA and g.ref_exists(rsha):
-        exclude.append(rsha)
+def pushed_paths(g: Git, lsha: str, rsha: str, tips: Iterable[str] = ()) -> set[str]:
+    """Every path touched by the commits this update sends, plus the tip tree. "Already on the template" is only
+    what the template itself says it has (`tips`, from ls-remote, and `rsha`, the pushed ref's current remote
+    value): each such commit and its ancestors are public already. Local refs are never trusted for this."""
+    exclude = local_commits(g, [*tips, rsha])
     # plumbing only: porcelain `log` output can carry signatures/decorations from user config
-    commits = g.lines("rev-list", lsha, *exclude) if len(exclude) > 1 else g.lines("rev-list", lsha)
+    revs = "\n".join([lsha, *(f"^{s}" for s in exclude)]) + "\n"
+    commits = [c for c in g.run("rev-list", "--stdin", input=revs).stdout.splitlines() if c.strip()]
     paths: set[str] = set()
     if commits:
         paths.update(g.paths("diff-tree", "-r", "-m", "--root", "--no-commit-id", "--name-only", "--no-renames",
@@ -503,18 +478,22 @@ def pushed_paths(g: Git, remote: str, lsha: str, rsha: str, pattern: str = DEFAU
 
 def check_push(root: Path, url: str, updates: str, remote: str = "") -> list[str]:
     """Error lines if this push (pre-push stdin: `<lref> <lsha> <rref> <rsha>` per line) would send personal
-    paths, in the tip or anywhere in the history being pushed, to a template URL; [] when allowed."""
+    paths, in the tip or anywhere in the history being pushed, to a template URL; [] when allowed. `remote` (the
+    hook's remote name) is informational only: what counts as already published comes from the URL itself."""
     g = Git(root)
     pattern = g.config(CFG_URL_PATTERN) or DEFAULT_URL_PATTERN
     if not url_matches(url, pattern):
         return []
     personal = personal_paths(g)
+    tips: list[str] | None = None
     for line in updates.splitlines():
         parts = line.split()
         if len(parts) != 4 or parts[1] == ZERO_SHA:
             continue
         lref, lsha, rsha = parts[0], parts[1], parts[3]
-        bad = sorted(blocked_paths(pushed_paths(g, remote or url, lsha, rsha, pattern), personal))
+        if tips is None:  # asked once per push, only when something is actually sent
+            tips = remote_tips(root, url)
+        bad = sorted(blocked_paths(pushed_paths(g, lsha, rsha, tips), personal))
         if bad:
             shown = [f"  {p}" for p in bad[:10]] + ([f"  ... and {len(bad) - 10} more"] if len(bad) > 10 else [])
             return [f"BLOCKED: {lref} contains personal paths (tip or history); never push them to the template ({url}):", *shown,
