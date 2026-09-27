@@ -161,6 +161,24 @@ describe("ConfirmPanel", () => {
   });
 });
 
+describe("ConfirmPanel pending", () => {
+  it("keeps the outcome on the busy button: Withdraw…", () => {
+    render(
+      <ConfirmPanel
+        question="Withdraw from Acme?"
+        cancelLabel="Keep application"
+        confirmLabel="Withdraw"
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+        pending
+      />,
+    );
+    const b = screen.getByRole("button", { name: "Withdraw…" });
+    expect(b).toBeDisabled();
+    expect(b).toHaveAttribute("aria-busy", "true");
+  });
+});
+
 describe("MarkDoneCircle", () => {
   it("is a checkbox named after the item", () => {
     const onChange = vi.fn();

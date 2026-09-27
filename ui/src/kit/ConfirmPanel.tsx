@@ -73,7 +73,7 @@ export function ConfirmPanel({
       <Button ref={cancelRef} size="small" onClick={onCancel}>
         {cancelLabel}
       </Button>
-      <Button size="small" variant={confirmVariant} onClick={onConfirm} pending={pending}>
+      <Button size="small" variant={confirmVariant} onClick={onConfirm} pending={pending} pendingLabel={`${confirmLabel}…`}>
         {confirmLabel}
       </Button>
     </div>

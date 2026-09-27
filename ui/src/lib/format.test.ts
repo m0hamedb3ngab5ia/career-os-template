@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatCount, formatDuration, formatNumber, formatRelative, formatWhen } from "./format";
+import { formatClock, formatCount, formatDuration, formatNumber, formatRelative, formatWhen, getAppLocale, setAppLocale } from "./format";
 
 describe("format", () => {
   const now = new Date("2026-09-26T12:00:00Z");
@@ -50,5 +50,17 @@ describe("format", () => {
     expect(formatDuration(7500, en)).toBe("2 hr 5 min");
     expect(formatDuration(null, en)).toBeNull();
     expect(formatNumber(12.5, "fr-FR")).toBe("12,5");
+  });
+
+  it("uses the app locale when no locale is passed (tests pin en-US in setup)", () => {
+    expect(getAppLocale()).toBe("en-US");
+    expect(formatRelative("2026-09-26T11:58:00Z", now)).toBe("2 minutes ago");
+    setAppLocale("fr-FR");
+    try {
+      expect(formatRelative("2026-09-26T11:58:00Z", now)).toBe("il y a 2 minutes");
+      expect(formatCount(1736)).toBe("1\u202f736");
+    } finally {
+      setAppLocale("en-US");
+    }
   });
 });

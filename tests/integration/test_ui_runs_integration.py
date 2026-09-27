@@ -22,9 +22,28 @@ from careeros.ui.services.runs import Busy, RunControl
 pytestmark = pytest.mark.integration
 
 
-@pytest.fixture
-def root(temp_root: Path) -> Path:
-    return personalize(temp_root)  # doctor must pass: runs refuse to start on the example candidate
+@pytest.fixture(autouse=True)
+def _no_leftovers(tmp_path: Path):
+    """A failing test must not leave its detached run or fake claude behind (they would hang for 10 minutes)."""
+    yield
+    import signal
+    import subprocess
+
+    out = subprocess.run(["ps", "-ww", "-eo", "pid=,args="], capture_output=True, text=True).stdout
+    for line in out.splitlines():
+        pid, _, args = line.strip().partition(" ")
+        if str(tmp_path) in args or str(tmp_path.resolve()) in args:
+            try:
+                os.kill(int(pid), signal.SIGKILL)
+            except (ProcessLookupError, PermissionError, ValueError):
+                pass
+
+
+@pytest.fixture(params=["repo", "My Jobs/repo"], ids=["plain", "spaced"])
+def root(request, tmp_path: Path) -> Path:
+    from conftest import make_temp_root
+
+    return personalize(make_temp_root(tmp_path / request.param))  # doctor must pass on runs
 
 
 @pytest.fixture
@@ -100,7 +119,8 @@ def test_cancel_stops_a_hung_run_with_stop_reason_cancelled(root, env):
     with pytest.raises(Busy):
         rc.start("prepare")
     wait_for(lambda: any(e["type"] == "system" for e in rc.tail(cur["id"], follow=False)))  # claude is up
-    assert rc.cancel()["status"] == "cancelling"
+    got = rc.cancel()
+    assert got["status"] == "cancelling", got
     run = wait_for(lambda: finished(rc, "score"), timeout=30)
     assert run["stop_reason"] == "cancelled" and run["counters"]["attempted"] == 1 and rc.current() is None
 
@@ -112,3 +132,32 @@ def test_tracker_step_records_a_run(root, env):
     run = wait_for(lambda: finished(rc, "tracker"))
     assert run["stop_reason"] == "completed" and "synced 2 jobs" in run["detail"]
     assert (root / "JobTracker.xlsx").exists()
+
+
+def claude_pids(fake_bin: str) -> list[int]:
+    import subprocess
+
+    out = subprocess.run(["ps", "-ww", "-eo", "pid=,args="], capture_output=True, text=True).stdout  # -ww: procps cuts at 80 columns
+    return [int(line.split(None, 1)[0]) for line in out.splitlines() if fake_bin in line]
+
+
+def test_cancel_a_ui_catch_up_stops_the_batch_and_leaves_no_claude(root, env):
+    ids = add_jobs(root, 2)
+    for jid in ids:
+        (root / "data" / "jobs" / jid / ".fake_mode").write_text("hang")
+    rs = RunStore(Settings.load(root))
+    rs.dir.mkdir(parents=True, exist_ok=True)
+    (rs.dir / "catch_up.json").write_text(json.dumps({"kinds": {"score": {"slots": 2}}}))
+    rc = RunControl(Settings.load(root), env=env)
+    out = rc.catch_up()
+    assert out["kinds"] == ["score"]
+    cur = wait_for(lambda: (c := rc.current()) and c.get("current_job") and c)
+    assert cur["trigger"] == "catch_up"
+    wait_for(lambda: any(e["type"] == "system" for e in rc.tail(cur["id"], follow=False)))  # claude is up
+    fake_bin = env["PATH"].split(os.pathsep)[0]
+    assert claude_pids(fake_bin)
+    got = rc.cancel()
+    assert got["status"] == "cancelling", got
+    run = wait_for(lambda: finished(rc, "score"), timeout=30)
+    assert run["stop_reason"] == "cancelled"
+    wait_for(lambda: not claude_pids(fake_bin), timeout=15)

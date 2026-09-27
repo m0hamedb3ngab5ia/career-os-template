@@ -145,9 +145,9 @@ def test_writes_go_through_a_symlinked_config(root, tmp_path):
     (root / "config").mkdir()
     for f in private.iterdir():
         (root / "config" / f.name).symlink_to(f)
-    settings_io.save_section(_s(root), "notifications", {"pipeline:notify.daily_digest": False})
+    settings_io.save_section(_s(root), "outreach", {"pipeline:outreach.manual_if_mutuals": False})
     assert (root / "config" / "pipeline.yaml").is_symlink()
-    assert "daily_digest: false" in (private / "pipeline.yaml").read_text()
+    assert "manual_if_mutuals: false" in (private / "pipeline.yaml").read_text()
 
 
 def test_a_stale_version_is_refused(root):
@@ -183,3 +183,200 @@ def test_reset_group_then_save_restores_recommended(root):
 def test_unknown_section():
     with pytest.raises(KeyError):
         settings_io.read_section(None, "nope")  # type: ignore[arg-type]
+
+
+# --- values the CLI's PyYAML loaders would misread if written unquoted -----------------------------------
+
+def test_quiet_hours_after_ten_load_as_times(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.quiet_hours": {"start": "22:00", "end": "07:00"}})
+    cfg = load_schedule(_s(root))
+    assert (cfg.quiet_start, cfg.quiet_end) == (time(22, 0), time(7, 0))
+
+
+def test_a_schedule_time_after_ten_round_trips(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.jobs.score": {"at": ["11:15"]}})
+    assert load_schedule(_s(root)).jobs["score"].at == [time(11, 15)]
+    assert settings_io.read_section(_s(root), "runs")["values"]["pipeline:schedule.jobs.score"] == {"at": ["11:15"]}
+
+
+def test_level_off_turns_the_check_off(root):
+    from careeros.safety.scam import Flag, apply_levels
+
+    settings_io.save_section(_s(root), "safety", {"targets:safety.levels": {"GHOST_OLD_POST": "off"}})
+    flags = [Flag("GHOST_OLD_POST", "info", "old"), Flag("SCAM_NO_INTERVIEW", "review", "x")]
+    assert [f.code for f in apply_levels(flags, _s(root))] == ["SCAM_NO_INTERVIEW"]
+
+
+def test_reset_schedule_to_recommended_saves(root):
+    settings_io.save_section(_s(root), "runs", {"pipeline:schedule.jobs.score": {"at": ["11:15"]}})
+    settings_io.save_section(_s(root), "runs", settings_io.reset_changes("runs", "schedule"))
+    settings_io.save_section(_s(root), "runs", settings_io.reset_changes("runs", "quiet"))
+    vals = settings_io.read_section(_s(root), "runs")["values"]
+    assert vals["pipeline:schedule.jobs.score"] == {"at": ["01:00"]}
+
+
+def test_every_option_of_every_string_field_round_trips_through_the_loaders(root):
+    """Property-style: each select option, tag option and reason level, saved into its field, reads back the
+    same through PyYAML (the CLI's reader), whatever YAML 1.1 would make of it unquoted."""
+    import yaml
+
+    from careeros.ui.settings_schema import SECTIONS
+
+    for sec in SECTIONS:
+        for f in sec.fields():
+            if not f.editable or f.control not in ("select", "tags", "reason_levels", "text"):
+                continue
+            if f.control == "select":
+                samples = list(f.options)
+            elif f.control == "tags":
+                samples = [list(f.options)] if f.options else [["off", "10:30", "yes", "12"]]
+            elif f.control == "reason_levels":
+                samples = [{code: lvl} for code, lvl in zip(f.options, ("off", "block", "skip", "review", "info"))]
+            else:
+                samples = ["off", "10:30"] if not f.pattern else []
+            for v in samples:
+                try:
+                    settings_io.save_section(_s(root), sec.id, {f.id: v})
+                except settings_io.SettingsInvalid:
+                    continue  # the loaders refuse this value for this key; that's a checked failure, not a misread
+                data = yaml.safe_load(settings_io.config_path(_s(root), f.file).read_text())
+                cur = data
+                for k in f.key.split("."):
+                    cur = cur[k]
+                assert cur == v, (f.id, v, cur)
+
+
+# --- files hand-written with unquoted YAML-1.1-ambiguous values ---------------------------------------------
+
+def _edit(path: Path, old: str, new: str) -> None:
+    text = path.read_text()
+    assert old in text, old
+    path.write_text(text.replace(old, new, 1))
+
+
+def test_unquoted_off_level_reads_as_the_cli_applies_it_and_saving_repairs_it(root):
+    from careeros.safety.scam import Flag, apply_levels
+
+    t = root / "config" / "targets.yaml"
+    _edit(t, "  levels: {}", "  levels: {GHOST_OLD_POST: off}")
+    flags = [Flag("GHOST_OLD_POST", "info", "old")]
+    assert [f.code for f in apply_levels(flags, _s(root))] == ["GHOST_OLD_POST"]  # the CLI keeps the check
+    out = settings_io.read_section(_s(root), "safety")
+    fid = "targets:safety.levels"
+    assert out["values"][fid] == {}  # not off: the check runs at its built-in level, as the CLI does
+    w = out["warnings"][fid]
+    assert "off" in w["message"] and "quotes" in w["message"] and w["intended"] == {"GHOST_OLD_POST": "off"}
+    settings_io.save_section(_s(root), "safety", {fid: w["intended"]})
+    assert apply_levels(flags, _s(root)) == []
+    after = settings_io.read_section(_s(root), "safety")
+    assert after["values"][fid] == {"GHOST_OLD_POST": "off"} and fid not in after["warnings"]
+
+
+def test_unquoted_yes_switch_reads_true_and_saving_writes_true(root):
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, "  stop_on_timeout: true", "  stop_on_timeout: yes")
+    out = settings_io.read_section(_s(root), "runs")
+    fid = "pipeline:runs.stop_on_timeout"
+    assert out["values"][fid] is True and out["warnings"][fid]["intended"] is True
+    settings_io.save_section(_s(root), "runs", {fid: True})
+    assert "stop_on_timeout: true" in p.read_text()
+    assert fid not in settings_io.read_section(_s(root), "runs")["warnings"]
+
+
+def test_unquoted_time_after_ten_is_flagged_and_saving_the_same_time_repairs_it(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, 'score:   {at: ["01:00"]}', "score:   {at: [10:30]}")
+    with pytest.raises(ConfigError):
+        load_schedule(_s(root))  # PyYAML read 630
+    out = settings_io.read_section(_s(root), "runs")
+    fid = "pipeline:schedule.jobs.score"
+    assert out["values"][fid] == {"at": [630]}
+    assert out["warnings"][fid]["intended"] == {"at": ["10:30"]} and "10:30" in out["warnings"][fid]["message"]
+    settings_io.save_section(_s(root), "runs", {fid: {"at": ["10:30"]}})
+    assert load_schedule(_s(root)).jobs["score"].at == [time(10, 30)]
+    assert fid not in settings_io.read_section(_s(root), "runs")["warnings"]
+
+
+def test_the_shipped_examples_have_no_warnings(root):
+    from careeros.ui.settings_schema import SECTIONS
+
+    for sec in SECTIONS:
+        assert settings_io.read_section(_s(root), sec.id)["warnings"] == {}, sec.id
+
+
+def test_saving_lists_into_pyyaml_written_config_files(tmp_path):
+    """make_temp_root writes companies.yaml / pipeline.yaml with PyYAML (`- item` level with its key)."""
+    import yaml
+
+    r = make_temp_root(tmp_path / "plain")
+    settings_io.save_section(_s(r), "companies", {"companies:blocklist.companies": ["Globex Bank", "Initrode"],
+                                                  "companies:dream_list": ["Stripe", "Zeta Labs"]})
+    settings_io.save_section(_s(r), "runs", {"pipeline:llm.allowed_tools": ["Read", "Grep"],
+                                             "pipeline:runs.auto_submit.manual": ["tier_a", "fit_gte_90"]})
+    c = yaml.safe_load((r / "config" / "companies.yaml").read_text())
+    assert c["blocklist"]["companies"] == ["Globex Bank", "Initrode"] and c["dream_list"] == ["Stripe", "Zeta Labs"]
+    vals = settings_io.read_section(_s(r), "runs")["values"]
+    assert vals["pipeline:llm.allowed_tools"] == ["Read", "Grep"]
+
+
+def test_intended_is_chosen_per_leaf(root):
+    from datetime import time
+
+    from careeros.runs.schedule import load_schedule
+
+    p = root / "config" / "pipeline.yaml"
+    _edit(p, 'score:   {at: ["01:00"]}', "score:   {at: [10:30], enabled: no}")
+    fid = "pipeline:schedule.jobs.score"
+    w = settings_io.read_section(_s(root), "runs")["warnings"][fid]
+    assert w["intended"] == {"at": ["10:30"], "enabled": False}
+    settings_io.save_section(_s(root), "runs", {fid: w["intended"]})
+    job = load_schedule(_s(root)).jobs["score"]
+    assert job.at == [time(10, 30)] and job.enabled is False
+
+
+def test_an_unquoted_ambiguous_mapping_key_is_requoted_on_save(root):
+    import yaml
+
+    c = root / "config" / "companies.yaml"
+    _edit(c, "company_domains: {}", "company_domains: {ON: onsemi.com}")
+    fid = "companies:company_domains"
+    w = settings_io.read_section(_s(root), "companies")["warnings"][fid]
+    assert w["intended"] == {"ON": "onsemi.com"}
+    settings_io.save_section(_s(root), "companies", {fid: w["intended"]})
+    assert yaml.safe_load(c.read_text())["company_domains"] == {"ON": "onsemi.com"}
+    assert fid not in settings_io.read_section(_s(root), "companies")["warnings"]
+
+
+# --- review fixes: tracker path, board ATS -------------------------------------------------------------------
+
+@pytest.mark.parametrize("value", ["", "   ", "data", "~nosuchuser-careeros/x.xlsx"])
+def test_a_blank_or_directory_tracker_path_is_refused(root, value):
+    (root / "data").mkdir(exist_ok=True)
+    p = root / "config" / "pipeline.yaml"
+    before = p.read_text()
+    with pytest.raises(SettingsInvalid) as e:
+        settings_io.save_section(_s(root), "general", {"pipeline:paths.tracker_xlsx": value})
+    assert "pipeline:paths.tracker_xlsx" in e.value.fields
+    assert p.read_text() == before
+
+
+def test_a_board_with_an_ats_doctor_does_not_know_is_refused(root):
+    c = root / "config" / "companies.yaml"
+    before = c.read_text()
+    with pytest.raises(SettingsInvalid) as e:
+        settings_io.save_section(_s(root), "companies", {"companies:boards": [
+            {"company": "Acme", "ats": "workday", "url": "https://acme.example/careers"}]})
+    assert "workday" in e.value.fields["companies:boards"]
+    assert c.read_text() == before

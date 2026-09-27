@@ -81,6 +81,12 @@ the UI has to stand on its own as an application, without a Claude Code session 
   change as a diff, and saves several keys across files at once (`runs/yamledit.apply_changes_many`): per-field
   errors first, then the CLI's own loaders; any failure restores every file. A test fails when a key in
   `examples/config` has neither a field nor a reasoned entry in `NOT_IN_UI`.
+- **What the form shows is what the pipeline applies.** Values are read with PyYAML (YAML 1.1), the reader every
+  CLI loader uses. A value hand-written without quotes that YAML 1.1 misreads (`off` -> false, `yes` -> true,
+  10:30 -> 630) comes back with a warning next to its field ("Written without quotes, so the pipeline reads off as
+  false. Save this setting to fix it.") and the value the author meant; saving writes it quoted. A check level
+  read as a bool is shown as not set, because the check then runs at its built-in level. The writer always quotes
+  such strings, so the UI never creates one.
 
 ### Settings › Runs
 
