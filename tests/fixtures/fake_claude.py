@@ -1,7 +1,7 @@
 """A stand-in for `claude -p ... --output-format stream-json` in tests. Never calls a model.
 
 Copied to <tmp>/bin/claude by the runs tests and put first on PATH. It reads the prompt (last argv),
-handles `/score-job data/jobs/<id>` and `/prepare-job data/jobs/<id>` like the real skills would at the
+handles `/score-job`, `/prepare-job` and `/apply-job data/jobs/<id>` like the real skills would at the
 file level, and prints stream-json events: `system/init`, one `assistant`, then the final `result`.
 
 Behaviour per job: FAKE_CLAUDE_MODE (env) or data/jobs/<id>/.fake_mode (file, wins) is one of
@@ -89,6 +89,13 @@ def main() -> int:
         (job_dir / "prepare.json").write_text(json.dumps({"job_id": job_id, "status": "queued", "qa_pass": True}))
         res = {"skill": "prepare-job", "job_id": job_id, "status": "queued", "tier": "C", "fit": 80,
                "decision": "prepare", "skip_reason": None, "qa_pass": True, "ACTION_ITEMS": []}
+    elif skill == "/apply-job":
+        st = json.loads((job_dir / "status.json").read_text()) if (job_dir / "status.json").exists() else {}
+        st["status"] = "applied"
+        st.setdefault("history", []).append({"status": "applied", "at": "2026-01-01T00:00:00+00:00", "note": "fake"})
+        (job_dir / "status.json").write_text(json.dumps(st))
+        res = {"job_id": job_id, "ats": "greenhouse", "outcome": "submitted", "status": "applied", "reason": None,
+               "submit_clicked": True, "screenshots": [], "action_item": None, "resume_version": None}
     else:
         emit({"type": "result", "subtype": "success", "is_error": False, "session_id": sid,
               "result": f"unknown skill {skill}", "num_turns": 1, "duration_ms": 10})

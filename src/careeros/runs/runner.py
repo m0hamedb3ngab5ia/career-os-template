@@ -35,11 +35,19 @@ from careeros.runs.ranking import Candidate, fit_first_within_company, rank
 from careeros.runs.store import RunStore, iso
 from careeros.store import Store
 
-SKILLS = {"score": "score-job", "prepare": "prepare-job"}
+SKILLS = {"score": "score-job", "prepare": "prepare-job", "apply": "apply-job"}
 STOP_REASONS = ("completed", "budget_reached", "time_budget", "usage_limit", "auth_required", "permission_denied",
                 "timeout", "consecutive_failures", "daily_cap", "paused", "cancelled", "doctor_failed")
 # Stops that mean "nothing wrong, the run did its job": the CLI exits 0 on these.
 CLEAN_STOPS = ("completed", "budget_reached", "time_budget", "daily_cap", "paused", "cancelled")
+
+
+class JobNotRunnable(ValueError):
+    """`--job` named jobs and none is a candidate: {job_id: reason} (not found, status, already scored, ...)."""
+
+    def __init__(self, kind: str, reasons: dict[str, str]):
+        self.kind, self.reasons = kind, reasons
+        super().__init__(f"run {kind}: " + "; ".join(f"{j}: {r}" for j, r in reasons.items()))
 
 
 class RunBusy(RuntimeError):
@@ -88,30 +96,44 @@ def _prefilter(settings: Settings):
     return Prefilter(settings, flagged=flagged, filters=scout_config(settings)["filters"])
 
 
-def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], prepared_ok: bool) -> str | None:
+def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], prepared_ok: bool,
+                force: bool = False) -> str | None:
     """Why a job is not a candidate for this kind of run (None = it is). Only job-state rules; the scout
-    filters and the pruned check run separately."""
+    filters and the pruned check run separately. `force` (an explicit `--job` rerun) only lets a job the stage
+    already finished (scored / prepared) through again; a status that makes the stage meaningless (applied,
+    skipped, ...) is never forced, and `apply` is never forced at all."""
     if kind == "score":
-        if status != "found":
-            return "status"
-        return "already scored" if has_score else None
+        if status != "found" and not (force and status == "scored"):
+            return f"status {status}"
+        return "already scored" if has_score and not force else None
+    if kind == "apply":
+        from careeros.runs.policy import is_tier_a
+
+        if status not in ("queued", "prepared"):
+            return f"status {status}"
+        if not prepared_ok:
+            return "qa not passed"
+        return "tier A (never applied by a run)" if is_tier_a(score.get("tier")) else None
     from careeros.company_policy import DEFERRED_REASONS
 
-    if status not in ("found", "scored"):
-        return "status"
+    if status not in ("found", "scored") and not (force and status in ("queued", "needs_review", "prepared")):
+        return f"status {status}"
     if not has_score:
         return "not scored"
     requeued = status == "scored" and score.get("skip_reason") in DEFERRED_REASONS  # `company requeue`
     if score.get("decision") != "prepare" and not requeued:
         return f"score decision {score.get('decision')}"
-    return "already prepared" if prepared_ok else None
+    return "already prepared" if prepared_ok and not force else None
 
 
 def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datetime,
                       retry_ids: set[str] | None = None, skip_ids: dict[str, str] | None = None,
+                      job_ids: list[str] | None = None, force: bool = False,
                       ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """(ranked candidates, excluded [{job_id, reason}]). Excluded lists only jobs that would otherwise be
-    candidates (pruned postings, scout filters that now fail, `skip_ids`), not every other status."""
+    candidates (pruned postings, scout filters that now fail, `skip_ids`), not every other status. With
+    `job_ids` only those jobs are considered and every one left out is in `excluded` with its reason
+    (`not found`, an eligibility reason, ...); `force` reruns a job that is already scored/prepared."""
     from careeros.company_policy import posting_closes_at
 
     store = Store(settings)
@@ -119,12 +141,19 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
     retry_ids, skip_ids = retry_ids or set(), skip_ids or {}
     cands: list[Candidate] = []
     excluded: list[dict[str, Any]] = []
-    for jid in store.iter_job_ids():
+    explicit = job_ids is not None
+    for jid in (dict.fromkeys(job_ids) if explicit else store.iter_job_ids()):
+        if explicit and not (store.job_dir(jid) / "posting.json").exists():
+            excluded.append({"job_id": jid, "reason": "not found"})
+            continue
         status = store.get_status(jid) or "found"
         score = store._read(jid, "score.json") or {}
         prep = store._read(jid, "prepare.json") or {}
-        if eligibility(kind, status, bool(score) or (store.job_dir(jid) / "score.json").exists(), score,
-                       bool(prep.get("qa_pass"))):
+        why = eligibility(kind, status, bool(score) or (store.job_dir(jid) / "score.json").exists(), score,
+                          bool(prep.get("qa_pass")), force=force)
+        if why:
+            if explicit:
+                excluded.append({"job_id": jid, "reason": why})
             continue
         raw = store._read(jid, "posting.json") or {}
         if raw.get("pruned"):
@@ -132,6 +161,8 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
             continue
         p = store.load_posting(jid)
         if p is None:
+            if explicit:
+                excluded.append({"job_id": jid, "reason": "posting.json unreadable"})
             continue
         ok, why, _ = pre.check(p)
         if not ok:
@@ -194,7 +225,7 @@ class _Loop:
         n, stream_path = self.rs.next_attempt(self.run["id"])
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
         sid = str(uuid.uuid4())
-        cmd = build_command(self.cfg, prompt, session_id=sid)
+        cmd = build_command(self.cfg, prompt, session_id=sid, kind=self.kind)
         job_s = float(self.cfg.job_timeout_minutes[self.kind]) * 60
         left_s = float(self.budget.max_minutes) * 60 - (self.clock() - self.t_start)
         timeout_s = max(1e-3, min(job_s, left_s))  # the run's time budget also caps the job in flight
@@ -217,7 +248,7 @@ class _Loop:
         result = parse_result_line(res.result_text) if res.saw_result else None
         if outcome == "ok" and self.kind == "score" and result:
             _record_score_verdict(self.s, self.store, jid, result, self.run["id"])
-        if outcome == "ok" and self.kind == "prepare" and result:
+        if outcome == "ok" and self.kind in ("prepare", "apply") and result:  # the skill sets the status itself
             st = self.store.get_status(jid)
             if st != result.get("status"):
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
@@ -298,14 +329,22 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 extra_stop: Callable[[], tuple[str, str] | None] | None = None,
                 after_attempt: Callable[[dict[str, Any]], None] | None = None,
                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,
-                finalize: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
+                finalize: Callable[[dict[str, Any]], None] | None = None,
+                job_ids: list[str] | None = None, force: bool = False) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
-    another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock."""
+    another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock.
+    `job_ids` restricts the run to those jobs (JobNotRunnable when none is a candidate; the batch queue file
+    is left alone); `force` reruns an already scored/prepared job."""
     cfg = cfg or load_runs_config(settings)
     rs = RunStore(settings)
     t_now = now()
-    ranked, excluded = select_candidates(settings, kind, cfg, t_now, retry_ids=retry_ids, skip_ids=skip_ids)
-    rs.write_queue(kind, ranked, excluded, t_now)
+    ranked, excluded = select_candidates(settings, kind, cfg, t_now, retry_ids=retry_ids, skip_ids=skip_ids,
+                                         job_ids=job_ids, force=force)
+    if job_ids is not None:
+        if not ranked:
+            raise JobNotRunnable(kind, {e["job_id"]: e["reason"] for e in excluded})
+    else:
+        rs.write_queue(kind, ranked, excluded, t_now)
     if dry_run:
         return {"dry_run": True, "kind": kind, "budget": budget.to_dict(), "candidates": len(ranked),
                 "selected": ranked[:budget.max_jobs], "excluded": excluded}
@@ -323,7 +362,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
         raise RunBusy(e.holder) from None
     try:
         run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False,
-                         cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>"),
+                         cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>", kind=kind),
                          counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0,
                                    "gated": 0},
                          queue=[{k: r[k] for k in ("job_id", "rank", "score", "why")}

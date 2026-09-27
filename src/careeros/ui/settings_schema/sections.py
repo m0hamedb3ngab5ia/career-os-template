@@ -414,6 +414,7 @@ SECTIONS: tuple[Section, ...] = (
         Group("timeouts", "Timeouts and failures", (
             _num(P, "runs.job_timeout_minutes.score", "Score timeout per job", TO["score"], lo=1, unit="min"),
             _num(P, "runs.job_timeout_minutes.prepare", "Prepare timeout per job", TO["prepare"], lo=1, unit="min"),
+            _num(P, "runs.job_timeout_minutes.apply", "Apply timeout per job", TO["apply"], lo=1, unit="min"),
             _num(P, "runs.job_timeout_minutes.inbox_sync", "Inbox sync timeout", TO["inbox_sync"], lo=1, unit="min"),
             _switch(P, "runs.stop_on_timeout", "Stop the run on a timeout", True,
                     "A hung call usually means a login or prompt wait."),

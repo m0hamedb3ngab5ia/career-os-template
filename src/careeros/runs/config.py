@@ -12,7 +12,8 @@ from typing import Any
 
 from careeros.config import ConfigError
 
-KINDS = ("score", "prepare")
+KINDS = ("score", "prepare", "apply")
+BATCH_KINDS = ("score", "prepare")  # ranked batches; `apply` runs one explicit job only (never scheduled)
 PRESET_NAMES = ("small", "medium", "large", "max", "custom")
 RECOMMENDED_PRESET = "medium"
 BUDGET_KEYS = ("max_score_jobs", "max_prepare_jobs", "max_minutes")
@@ -32,8 +33,8 @@ DEFAULT_RANKING: dict[str, float] = {
     "fit_weight": 0.5,        # prepare runs only: points per fit point (fit 80 -> +40)
     "retry_bonus": 30,        # a job that failed once goes near the front of the next run
 }
-DEFAULT_TIMEOUTS: dict[str, float] = {"score": 10, "prepare": 45, "inbox_sync": 20}
-TIMEOUT_KINDS = ("score", "prepare", "inbox_sync")
+DEFAULT_TIMEOUTS: dict[str, float] = {"score": 10, "prepare": 45, "apply": 30, "inbox_sync": 20}
+TIMEOUT_KINDS = ("score", "prepare", "apply", "inbox_sync")
 # Verified against `claude --help` (Claude Code 2.1): -p prints and exits; stream-json needs --verbose and ends
 # with one `result` event; dontAsk denies any tool not in --allowedTools instead of prompting (nobody is there).
 DEFAULT_HEADLESS_CMD: list[str] = ["claude", "-p", "--output-format", "stream-json", "--verbose",
@@ -43,6 +44,8 @@ DEFAULT_ALLOWED_TOOLS: list[str] = [
     "Bash(.venv/bin/careeros *)", "Bash(.venv/bin/python *)", "Bash(date *)",
     "WebSearch", "WebFetch",
 ]
+# Extra tools per run kind, on top of llm.allowed_tools: apply-job drives Chrome through the MCP server.
+KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"]}
 DEFAULT_USAGE_LIMIT_PATTERNS = [r"usage limit", r"hit your limit", r"limit reached", r"rate.?limit",
                                 r"out of (extra )?usage", r"quota"]
 DEFAULT_AUTH_PATTERNS = [r"/login", r"not logged in", r"invalid api key", r"oauth token", r"authenticat",
@@ -166,7 +169,7 @@ def load_runs_config(settings: Any) -> RunsConfig:
     cfg.preset = preset
     timeouts = raw.get("job_timeout_minutes") or {}
     if not isinstance(timeouts, dict):
-        raise _err("runs.job_timeout_minutes must be a mapping {score: N, prepare: N, inbox_sync: N}")
+        raise _err("runs.job_timeout_minutes must be a mapping {score: N, prepare: N, apply: N, inbox_sync: N}")
     for k, v in timeouts.items():
         if k not in TIMEOUT_KINDS:
             raise _err(f"runs.job_timeout_minutes: unknown kind {k!r}; valid: {', '.join(TIMEOUT_KINDS)}")
@@ -216,6 +219,12 @@ def load_runs_config(settings: Any) -> RunsConfig:
     return cfg
 
 
+def allowed_tools_for(cfg: "RunsConfig", kind: str | None) -> list[str]:
+    """`llm.allowed_tools` plus the kind's extras (KIND_TOOLS), without duplicates."""
+    extra = [t for t in KIND_TOOLS.get(kind or "", []) if t not in cfg.allowed_tools]
+    return list(cfg.allowed_tools) + extra
+
+
 def budget_for(cfg: RunsConfig, kind: str, preset: str | None = None, max_jobs: int | None = None,
                max_minutes: float | None = None) -> Budget:
     """The budget for one run: the preset (config default unless given), then CLI overrides. ValueError on bad input."""
@@ -225,7 +234,7 @@ def budget_for(cfg: RunsConfig, kind: str, preset: str | None = None, max_jobs: 
     if name not in cfg.presets:
         raise ValueError(f"unknown preset {name!r}; valid: {' | '.join(PRESET_NAMES)}")
     block = cfg.presets[name]
-    jobs = block[f"max_{kind}_jobs"] if max_jobs is None else max_jobs
+    jobs = block.get(f"max_{kind}_jobs", 1) if max_jobs is None else max_jobs  # apply: one job, no preset key
     minutes = block["max_minutes"] if max_minutes is None else max_minutes
     if not isinstance(jobs, int) or jobs < 1:
         raise ValueError(f"--max-jobs must be >= 1, got {jobs!r}")

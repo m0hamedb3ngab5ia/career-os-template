@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from careeros.runs.config import RunsConfig
+from careeros.runs.config import RunsConfig, allowed_tools_for
 
 OUTCOMES = ("ok", "usage_limit", "auth_required", "permission_denied", "timeout", "cancelled", "skill_error",
             "invalid_result", "error", "time_budget")  # time_budget: the runner cut the job at the run's budget
@@ -35,6 +35,8 @@ HARD_STOPS = ("usage_limit", "auth_required", "permission_denied", "cancelled")
 RESULT_RE = re.compile(r"^\s*RESULT:\s*(\{.*\})\s*$")
 SCORE_DECISIONS = ("prepare", "skip")
 PREPARE_STATUSES = ("queued", "needs_review", "skipped")
+# apply-job sets applied | needs_review itself; a refused/failed attempt leaves the job where it was.
+APPLY_STATUSES = ("applied", "needs_review", "queued", "prepared", "skipped")
 _AUTH_ERRORS = ("authentication_failed",)
 _LIMIT_ERRORS = ("rate_limit", "billing_error")
 
@@ -68,10 +70,12 @@ class HeadlessResult:
                 "api_errors": self.api_errors, "events": self.events, "duration_s": round(self.duration_s, 1)}
 
 
-def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None) -> list[str]:
+def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
+                  ) -> list[str]:
     cmd = list(cfg.headless_cmd)
-    if cfg.allowed_tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
-        cmd += ["--allowedTools", ",".join(cfg.allowed_tools)]
+    tools = allowed_tools_for(cfg, kind)
+    if tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
+        cmd += ["--allowedTools", ",".join(tools)]
     if cfg.model and "--model" not in cmd:
         cmd += ["--model", cfg.model]
     if session_id and "--session-id" not in cmd:
@@ -149,6 +153,11 @@ def validate_result(stage: str, job_id: str, res: dict[str, Any]) -> list[str]:
         probs.append(f"RESULT decision {res.get('decision')!r} not in {SCORE_DECISIONS}")
     if stage == "prepare" and res.get("status") not in PREPARE_STATUSES:
         probs.append(f"RESULT status {res.get('status')!r} not in {PREPARE_STATUSES}")
+    if stage == "apply":
+        if not res.get("outcome"):
+            probs.append("RESULT has no outcome")
+        if res.get("status") not in APPLY_STATUSES:
+            probs.append(f"RESULT status {res.get('status')!r} not in {APPLY_STATUSES}")
     return probs
 
 

@@ -398,3 +398,153 @@ def test_teardown_error_is_warned_when_run_log_is_unwritable(settings, store, mo
     with pytest.warns(UserWarning, match="pause hook failed"), pytest.raises(RuntimeError, match="invoke exploded"):
         _exec(settings, _boom_invoke, finalize=finalize)
     assert not RunStore(settings).runner_lock_path.exists()
+
+
+# --- single-job runs (`--job`, `--force`) and the apply kind ---------------------------------------------
+
+def _scored(store: Store, jid: str, tier: str = "C", decision: str = "prepare", status: str = "scored") -> None:
+    (store.job_dir(jid) / "score.json").write_text(json.dumps({"job_id": jid, "decision": decision, "fit": 80,
+                                                               "tier": tier, "category": "swe_backend"}))
+    store.set_status(jid, status, "test")
+
+
+def _prepared(store: Store, jid: str, qa_pass: bool = True, status: str = "queued", tier: str = "C") -> None:
+    _scored(store, jid, tier=tier, status=status)
+    (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"job_id": jid, "status": status,
+                                                                 "qa_pass": qa_pass}))
+
+
+def test_job_ids_selects_only_those_jobs_and_keeps_the_ranking(settings, store):
+    ids = [add_job(store, i, hours_old=50 + i * 10) for i in range(1, 4)]
+    cfg = cfg_of(settings)
+    ranked, excluded = select_candidates(settings, "score", cfg, NOW, job_ids=[ids[2], ids[0]])
+    assert [r["job_id"] for r in ranked] == [ids[0], ids[2]] and excluded == []
+
+
+def test_job_ids_reports_why_a_job_is_not_a_candidate(settings, store):
+    scored = add_job(store, 1)
+    _scored(store, scored)
+    pruned = add_job(store, 2, pruned=True)
+    cfg = cfg_of(settings)
+    ranked, excluded = select_candidates(settings, "score", cfg, NOW, job_ids=[scored, pruned, "nope"])
+    assert ranked == []
+    assert {e["job_id"]: e["reason"] for e in excluded} == {scored: "status scored", pruned: "pruned",
+                                                             "nope": "not found"}
+
+
+def test_force_reruns_a_scored_or_prepared_job_but_never_the_wrong_status(settings, store):
+    from careeros.runs.runner import eligibility
+
+    assert eligibility("score", "found", True, {}, False) == "already scored"  # score.json but status never set
+    assert eligibility("score", "found", True, {}, False, force=True) is None
+    assert eligibility("score", "scored", True, {}, False) == "status scored"
+    assert eligibility("score", "scored", True, {}, False, force=True) is None
+    assert eligibility("score", "applied", True, {}, False, force=True) == "status applied"
+    assert eligibility("score", "skipped", True, {}, False, force=True) == "status skipped"
+    prep = {"decision": "prepare"}
+    assert eligibility("prepare", "scored", True, prep, True) == "already prepared"  # prepare.json, status never set
+    assert eligibility("prepare", "scored", True, prep, True, force=True) is None
+    assert eligibility("prepare", "queued", True, prep, True) == "status queued"
+    assert eligibility("prepare", "queued", True, prep, True, force=True) is None
+    assert eligibility("prepare", "needs_review", True, prep, False, force=True) is None
+    assert eligibility("prepare", "applied", True, prep, True, force=True) == "status applied"
+    assert eligibility("prepare", "scored", True, {"decision": "skip"}, False, force=True).startswith("score decision")
+    assert eligibility("apply", "applied", True, prep, True, force=True) == "status applied"
+
+
+def test_force_selects_an_already_scored_job(settings, store):
+    jid = add_job(store, 1)
+    _scored(store, jid, status="found")
+    cfg = cfg_of(settings)
+    assert select_candidates(settings, "score", cfg, NOW, job_ids=[jid])[0] == []
+    ranked, _ = select_candidates(settings, "score", cfg, NOW, job_ids=[jid], force=True)
+    assert [r["job_id"] for r in ranked] == [jid]
+
+
+@pytest.mark.parametrize("setup,reason", [
+    (lambda s, j: _prepared(s, j), None),
+    (lambda s, j: _prepared(s, j, status="prepared"), None),
+    (lambda s, j: _prepared(s, j, qa_pass=False), "qa not passed"),
+    (lambda s, j: _scored(s, j), "status scored"),
+    (lambda s, j: _prepared(s, j, status="applied"), "status applied"),
+    (lambda s, j: _prepared(s, j, status="needs_review"), "status needs_review"),
+    (lambda s, j: _prepared(s, j, tier="A"), "tier A (never applied by a run)"),
+    (lambda s, j: _prepared(s, j, tier="a"), "tier A (never applied by a run)"),
+])
+def test_apply_eligibility(settings, store, setup, reason):
+    jid = add_job(store, 1)
+    setup(store, jid)
+    ranked, excluded = select_candidates(settings, "apply", cfg_of(settings), NOW, job_ids=[jid], force=True)
+    if reason is None:
+        assert [r["job_id"] for r in ranked] == [jid]
+    else:
+        assert ranked == [] and excluded == [{"job_id": jid, "reason": reason}]
+
+
+def test_apply_run_refuses_tier_a_before_spawning_and_names_the_reason(settings, store):
+    from careeros.runs.runner import JobNotRunnable
+
+    jid = add_job(store, 1)
+    _prepared(store, jid, tier="A")
+    inv = FakeInvoke(settings)
+    cfg = cfg_of(settings, preflight_doctor=False)
+    with pytest.raises(JobNotRunnable) as ei:
+        execute_run(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg, invoke=inv,
+                    now=lambda: NOW, clock=Clock(), job_ids=[jid])
+    assert ei.value.reasons == {jid: "tier A (never applied by a run)"} and inv.calls == []
+    assert not any((settings.paths["jobs_dir"].parent / "runs").glob("2*"))
+
+
+def test_apply_run_calls_apply_job_with_chrome_tools_and_checks_the_status(settings, store):
+    jid = add_job(store, 1)
+    _prepared(store, jid)
+
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        Path(stream_path).write_text("{}")
+        store.set_status(jid, "applied", "fake apply")
+        return parse_stream(events(jid, {"job_id": jid, "outcome": "submitted", "status": "applied"}))
+
+    cfg = cfg_of(settings, preflight_doctor=False)
+    rec = execute_run(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
+                      invoke=invoke, now=lambda: NOW, clock=Clock(), job_ids=[jid])
+    assert rec["stop_reason"] == "completed" and rec["counters"]["ok"] == 1
+    att = RunStore(settings).load_attempts(rec["id"])[0]
+    assert att["outcome"] == "ok" and att["result"]["status"] == "applied"
+    cmd = rec["cmd"]
+    assert cmd[-1] == "/apply-job <job_dir>"
+    assert "mcp__claude-in-chrome__*" in cmd[cmd.index("--allowedTools") + 1].split(",")
+
+
+def test_apply_result_that_lies_about_the_status_is_invalid(settings, store):
+    jid = add_job(store, 1)
+    _prepared(store, jid)
+
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        Path(stream_path).write_text("{}")
+        return parse_stream(events(jid, {"job_id": jid, "outcome": "submitted", "status": "applied"}))
+
+    cfg = cfg_of(settings, preflight_doctor=False)
+    rec = execute_run(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
+                      invoke=invoke, now=lambda: NOW, clock=Clock(), job_ids=[jid])
+    att = RunStore(settings).load_attempts(rec["id"])[0]
+    assert att["outcome"] == "invalid_result" and "status.json says queued" in att["detail"]
+
+
+def test_single_job_run_leaves_the_batch_queue_alone(settings, store):
+    ids = [add_job(store, i, hours_old=50 + i * 10) for i in range(1, 3)]
+    inv = FakeInvoke(settings)
+    run(settings, inv, max_jobs=1)  # a batch: writes queue.json
+    q_before = RunStore(settings).load_queue("score")
+    cfg = cfg_of(settings)
+    execute_run(settings, "score", budget_for(cfg, "score", max_jobs=1, max_minutes=30), cfg=cfg, invoke=inv,
+                now=lambda: NOW, clock=Clock(), job_ids=[ids[1]])
+    assert [c["job_id"] for c in inv.calls] == [ids[0], ids[1]]
+    assert RunStore(settings).load_queue("score") == q_before
+
+
+def test_apply_is_never_a_scheduled_or_batch_kind():
+    from careeros.runs import schedule
+    from careeros.runs.config import BATCH_KINDS
+
+    assert "apply" not in schedule.JOB_KINDS and "apply" not in schedule.CLAUDE_KINDS
+    assert "apply" not in BATCH_KINDS

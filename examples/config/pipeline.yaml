@@ -75,7 +75,7 @@ runs:                                      # reusable default: fine to keep. `ca
     large:  {max_score_jobs: 50, max_prepare_jobs: 10, max_minutes: 180}
     max:    {max_score_jobs: 150, max_prepare_jobs: 25, max_minutes: 480}
   custom: {max_score_jobs: 25, max_prepare_jobs: 5, max_minutes: 90}       # used when preset: custom
-  job_timeout_minutes: {score: 10, prepare: 45, inbox_sync: 20}   # (Recommended) one skill call is killed after this
+  job_timeout_minutes: {score: 10, prepare: 45, apply: 30, inbox_sync: 20}   # (Recommended) one skill call is killed after this
   stop_on_timeout: true                    # true (Recommended): a hung call usually means a prompt or auth wait
   max_consecutive_failures: 3              # 3 (Recommended): stop after this many failed jobs in a row
   preflight_doctor: true                   # true (Recommended): never run on example data or a broken setup

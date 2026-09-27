@@ -815,13 +815,15 @@ def _cancel_on_signals(hard: bool = False):
 
 def _run_kind(args: argparse.Namespace, kind: str) -> int:
     from careeros.runs.config import budget_for, load_runs_config
-    from careeros.runs.runner import CLEAN_STOPS, RunBusy
+    from careeros.runs.runner import CLEAN_STOPS, JobNotRunnable, RunBusy
     from careeros.runs.service import run_batch
 
     s = _settings(args)
     cfg = load_runs_config(s)
+    job_ids = [args.job] if args.job else None
+    max_jobs = args.max_jobs if args.max_jobs is not None or not job_ids else 1
     try:
-        budget = budget_for(cfg, kind, preset=args.preset, max_jobs=args.max_jobs, max_minutes=args.max_minutes)
+        budget = budget_for(cfg, kind, preset=args.preset, max_jobs=max_jobs, max_minutes=args.max_minutes)
     except ValueError as e:
         print(f"run {kind}: {e}", file=sys.stderr)
         return 2
@@ -829,10 +831,24 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     try:
         with _cancel_on_signals() as cancel:
             rec = run_batch(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
-                            echo=echo)
+                            echo=echo, job_ids=job_ids, force=args.force)
     except RunBusy as e:
         print(f"run {kind}: {e}; not started", file=sys.stderr)
         return RUN_BUSY_EXIT
+    except JobNotRunnable as e:
+        if args.json:
+            print(json.dumps({"error": str(e), "kind": kind, "reasons": e.reasons}, indent=2))
+        else:
+            done = ("already", "status scored", "status queued", "status needs_review", "status prepared")
+            hint = (" (--force reruns a job this stage already finished)" if kind != "apply"
+                    and any(r.startswith(done) for r in e.reasons.values()) else "")
+            print(f"{e}; not started{hint}", file=sys.stderr)
+        return 2
+    except ValueError as e:  # `run apply` without --job
+        if args.json:
+            print(json.dumps({"error": str(e), "kind": kind}))
+        print(f"run {kind}: {e}", file=sys.stderr)
+        return 2
     if args.json:
         print(json.dumps(rec, indent=2, default=str))
     elif rec.get("dry_run"):
@@ -860,6 +876,11 @@ def cmd_run_score(args: argparse.Namespace) -> int:
 def cmd_run_prepare(args: argparse.Namespace) -> int:
     """/prepare-job the best-ranked scored jobs (fit-first within a company, company gate before each call)."""
     return _run_kind(args, "prepare")
+
+
+def cmd_run_apply(args: argparse.Namespace) -> int:
+    """/apply-job one prepared job (--job required; Tier A refused; the skill itself submits or stages)."""
+    return _run_kind(args, "apply")
 
 
 def cmd_run_cap(args: argparse.Namespace) -> int:
@@ -1288,6 +1309,9 @@ def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-jobs", type=int, help="override the preset's job count")
     p.add_argument("--max-minutes", type=float, help="override the preset's wall-clock minutes")
     p.add_argument("--dry-run", action="store_true", help="rank and show what would run, with the reasons; run nothing")
+    p.add_argument("--job", metavar="JOB_ID", help="run this one job only (exit 2 with the reason if it is not a "
+                                                  "candidate); locks, pruned and the company gate still apply")
+    p.add_argument("--force", action="store_true", help="with --job: rerun a job that is already scored/prepared")
     p.add_argument("--trigger", choices=("manual", "schedule", "catch_up"), default="manual", help=argparse.SUPPRESS)
     p.add_argument("--json", action="store_true")
 
@@ -1487,12 +1511,16 @@ def build_parser() -> argparse.ArgumentParser:
     rpp = rns.add_parser("prepare", help="/prepare-job the best-ranked scored jobs (never applies)")
     _run_budget_args(rpp)
     rpp.set_defaults(fn=cmd_run_prepare)
+    rap = rns.add_parser("apply", help="/apply-job one prepared job: --job <id> required (never a batch); Tier A "
+                                       "is refused; the skill submits or stages for review per auto_submit")
+    _run_budget_args(rap)
+    rap.set_defaults(fn=cmd_run_apply)
     rcp = rns.add_parser("cap", help="today's daily apply cap; --check exits 3 when it is reached")
     rcp.add_argument("--check", action="store_true")
     rcp.add_argument("--json", action="store_true")
     rcp.set_defaults(fn=cmd_run_cap)
     rls = rns.add_parser("list", help="past and current runs, newest first")
-    rls.add_argument("--kind", choices=("score", "prepare", "inbox_sync"))
+    rls.add_argument("--kind", choices=("score", "prepare", "apply", "inbox_sync"))
     rls.add_argument("--limit", type=int, default=20)
     rls.add_argument("--json", action="store_true")
     rls.set_defaults(fn=cmd_run_list)

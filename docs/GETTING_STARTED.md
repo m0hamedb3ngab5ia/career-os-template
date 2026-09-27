@@ -219,6 +219,7 @@ jobs end `queued` or `needs_review` and you still run `/apply-job` yourself.
 ```sh
 .venv/bin/careeros run score --dry-run          # which jobs would go first, and why; calls nothing
 .venv/bin/careeros run score --preset small     # 10 jobs or 30 minutes, whichever comes first
+.venv/bin/careeros run prepare --job <id>         # one job only; run apply --job <id> once it is queued
 .venv/bin/careeros run status                   # what is running, last runs, what goes next and why
 .venv/bin/careeros run list                     # past runs and their stop reasons
 .venv/bin/careeros run show <run_id> --log      # one run's log; --json for every attempt
