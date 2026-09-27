@@ -119,7 +119,13 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             <ScoreCard score={detail.score} />
           </div>
           <div className={styles.column}>
-            <DocumentsCard jobId={jobId} documents={detail.documents} submitted={detail.submitted} qa={detail.qa} />
+            <DocumentsCard
+              jobId={jobId}
+              documents={detail.documents}
+              otherFiles={detail.other_files}
+              submitted={detail.submitted}
+              qa={detail.qa}
+            />
             <ContactsCard
               contacts={detail.contacts}
               policy={detail.contacts_policy ?? []}

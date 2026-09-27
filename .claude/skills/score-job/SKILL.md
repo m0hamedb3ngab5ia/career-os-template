@@ -141,7 +141,10 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 | prestige_bonus | +/- | `prestige_scoring.bonus[prestige_tier]` (0 if null) |
 
 `fit = min(100, max(0, sum))`. Put each component's value in `fit_breakdown` and one sentence per
-component in `fit_reasons[]` (e.g. "skills 7/10 matched: missing Go, Kafka, Terraform").
+component in `fit_reasons[]`. Each is a proper sentence a person reads in the UI's "Why" list: capitalized, ends
+with a period, no internal keys or point tallies (never `-> skills_overlap 20/40`), e.g.
+"Skills: 7 of 10 required matched; missing Go, Kafka and Terraform." / "Seniority: early-career role, a match." /
+"Location: remote, allowed."
 
 ## 6. Tier
 
@@ -191,7 +194,7 @@ If both apply, join the messages with `; `. Entries that mix usable and partial 
   "job_id": "...", "company": "...", "title": "...",
   "category": "swe_backend", "category_confidence": 0.86,
   "fit": 78, "fit_breakdown": {"skills_overlap": 28, "experience_relevance": 22, "seniority_match": 15, "location_pref": 10, "industry_boost": 5, "prestige_bonus": 0},
-  "fit_reasons": ["..."], "reasons": ["...same list..."],
+  "fit_reasons": ["Skills: 7 of 10 required matched; missing Go, Kafka and Terraform.", "..."], "reasons": ["...same list..."],
   "hard_filter_fails": [],
   "required_skills": [], "nice_to_have_skills": [], "matched_skills": [], "missing_skills": [], "skill_evidence": {},
   "prestige_tier": null, "prestige": null, "industry": "fintech", "seniority_guess": "new_grad",

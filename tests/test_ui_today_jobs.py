@@ -4,6 +4,7 @@ existing domain code (Store / Tracker / safety registry / careeros.qa)."""
 from __future__ import annotations
 
 import io
+import json
 import os
 import sys
 from datetime import datetime, timezone
@@ -369,3 +370,88 @@ def test_sync_tracker(data):
 @pytest.mark.skipif(sys.platform == "win32", reason="posix paths")
 def test_platform_default_is_sys_platform():
     assert desktop._platform() == sys.platform
+
+
+# --- readability: score reasons, activity labels, key documents -------------------------------------------------
+
+@pytest.mark.parametrize("raw, want", [
+    ("skills 3/6 matched (python, sql, docker) -> skills_overlap 20/40", "Skills 3/6 matched (python, sql, docker)."),
+    ("new_grad role -> seniority_match 15", "New_grad role."),
+    ("  location   preferred  ", "Location preferred."),
+    ("Skills: 3 of 6 required matched; missing Go and Kafka.", "Skills: 3 of 6 required matched; missing Go and Kafka."),
+    ("dream company!", "Dream company!"),
+])
+def test_humanize_reasons_makes_sentences(raw, want):
+    assert jobs_svc.humanize_reasons([raw]) == [want]
+
+
+def test_humanize_reasons_drops_blank_and_non_strings():
+    assert jobs_svc.humanize_reasons(["", "   ", 3, None, " -> skills_overlap 20/40"]) == []
+
+
+@pytest.mark.parametrize("component, message, want", [
+    ("store", "status -> needs_review: prepare-job: Tier A", "Status changed to needs review: prepare-job: Tier A"),
+    ("tracker", "status -> interview", "Status changed to interview"),
+    ("ui", "qa (deterministic) pass: 0 hard, 1 soft", "QA re-run passed: 0 hard fails, 1 soft fail"),
+    ("ui", "qa (deterministic) fail: 2 hard, 0 soft", "QA re-run failed: 2 hard fails, 0 soft fails"),
+    ("qa-review", "pass=True mean=8.2 hard_fails=0 unsupported=0 next=queue",
+     "QA review passed (mean 8.2, 0 hard fails, next: queue)"),
+    ("score-job", "category=swe_backend fit=74 tier=C decision=prepare", "Scored: fit 74, tier C, decision prepare"),
+    ("prepare-job", "status=needs_review tier=A fit=91 qa_pass=True regenerations=0 action_items=1",
+     "Prepared: status needs review, tier A, fit 91, QA passed"),
+    ("tailor-resume", "version=v3 bullets=12 words=410 pages=1 coverage=0.8 gaps=go", "Résumé tailored (12 bullets, 410 words, 1 page)"),
+    ("write-cover-letter", "words=260 facts=2 bullets=b1,b2 narratives=n1 voice_verified=False regeneration=0",
+     "Cover letter written (260 words, 2 company facts)"),
+    ("find-contacts", "2 contacts (recruiter, hiring_manager), web=True, domain=example.com (high)", "Found 2 contacts"),
+    ("draft-outreach", "2 contacts drafted, templates=linkedin,email", "Outreach drafted for 2 contacts"),
+    ("answer-question", '"Why do you want to work here" type=essay class=motivation needs_review=True',
+     "Answered a form question: “Why do you want to work here” (needs review)"),
+    ("inbox-sync", "interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://example.com/t)",
+     "Inbox: interview invite from recruiting@example.com; status set to interview"),
+    ("scout", "found via greenhouse/northwind; prefilter category=swe", "Found by scout on greenhouse"),
+    ("applier", "greenhouse session needs_review: Tier A is always you-submit (3 steps, 2 screenshot(s))",
+     "Apply session needs review on greenhouse: Tier A is always you-submit (3 steps)"),
+    ("safety", "safety block: SCAM_PAYMENT_REQUEST", "Safety check: block (SCAM_PAYMENT_REQUEST)"),
+    ("safety", "safety pass", "Safety check: pass"),
+    ("snapshot", "frozen as-submitted copy -> submitted/2026-09-24", "Submitted copy frozen"),
+    ("action", "[form/high/laptop] Upload transcript", "Action item added (form): Upload transcript"),
+    ("runner", "locked by run-1", "Job locked by run-1"),
+    ("runner", "unlocked", "Job unlocked"),
+    ("runner", "attempt 2 prepare nw01 -> ok", "Run attempt 2 (prepare) ok"),
+    ("runner", "skill prepare-job started", "prepare-job started"),
+    ("tracker", "tracker synced", "Tracker synced"),
+    ("prune", "posting.json trimmed to a stub (retention)", "Posting.json trimmed to a stub (retention)"),
+    ("x", "something   odd  here", "Something odd here"),
+])
+def test_humanize_activity_known_shapes(component, message, want):
+    assert jobs_svc.humanize_activity(component, message) == want
+
+
+def test_parse_log_carries_a_label_and_the_raw_message():
+    rows = jobs_svc.parse_log("- 2026-09-24 18:04:00 [store] status -> interview\nnot a log line\n")
+    assert rows == [{"at": "2026-09-24T18:04:00", "component": "store", "message": "status -> interview",
+                     "label": "Status changed to interview"}]
+
+
+def test_job_detail_humanizes_old_score_reasons(data, idx):
+    s, jid = data["settings"], data["jobs"]["review"]
+    p = Store(s).job_dir(jid) / "score.json"
+    score = json.loads(p.read_text(encoding="utf-8"))
+    score["reasons"] = ["skills 3/6 matched (python) -> skills_overlap 20/40"]
+    p.write_text(json.dumps(score), encoding="utf-8")
+    d = jobs_svc.job_detail(s, idx, jid)
+    assert d["score"]["reasons"] == ["Skills 3/6 matched (python)."]
+    assert d["activity"][0]["label"].startswith("Status changed to ")
+
+
+def test_job_detail_splits_key_documents_from_other_files(data, idx):
+    s, jid = data["settings"], data["jobs"]["review"]
+    jd = Store(s).job_dir(jid)
+    for name in ("cover_letter.txt", "resume.txt", "cover_letter.pdf", "resume.json", "resume.tex"):
+        (jd / name).write_text("x", encoding="utf-8")
+    d = jobs_svc.job_detail(s, idx, jid)
+    assert [f["name"] for f in d["documents"]] == ["resume.pdf", "cover_letter.pdf", "resume.txt", "cover_letter.txt"]
+    others = [f["name"] for f in d["other_files"]]
+    assert "resume.json" in others and "resume.tex" in others and "cover_letter.md" in others
+    assert not {"posting.json", "score.json", "log.md"} & set(others)
+    assert not set(others) & {f["name"] for f in d["documents"]}

@@ -3,6 +3,7 @@
     {
       "at": "<wall>",
       "component": "fixture",
+      "label": "Status changed to applied",
       "message": "status -> applied"
     }
   ],
@@ -33,16 +34,6 @@
     }
   ],
   "documents": [
-    {
-      "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    },
-    {
-      "modified": "<mtime>",
-      "name": "outreach.json",
-      "size": 1101
-    },
     {
       "modified": "<mtime>",
       "name": "resume.pdf",
@@ -91,6 +82,18 @@
     "url": "https://boards.example.com/applied"
   },
   "log": "- <wall> [fixture] status -> applied\n",
+  "other_files": [
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
+    },
+    {
+      "modified": "<mtime>",
+      "name": "outreach.json",
+      "size": 1101
+    }
+  ],
   "outreach": {
     "company": "Hooli",
     "drafted_at": "2026-09-23T15:00:00+00:00",
@@ -208,7 +211,7 @@
     "missing_skills": [],
     "prestige": null,
     "reasons": [
-      "fixture"
+      "Fixture."
     ],
     "required_skills": [],
     "salary_ok": null,

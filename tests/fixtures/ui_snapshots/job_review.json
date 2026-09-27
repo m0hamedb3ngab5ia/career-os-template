@@ -3,6 +3,7 @@
     {
       "at": "<wall>",
       "component": "fixture",
+      "label": "Status changed to needs review",
       "message": "status -> needs_review"
     }
   ],
@@ -39,11 +40,6 @@
   "contacts": [],
   "contacts_policy": [],
   "documents": [
-    {
-      "modified": "<mtime>",
-      "name": "cover_letter.md",
-      "size": 21
-    },
     {
       "modified": "<mtime>",
       "name": "resume.pdf",
@@ -97,6 +93,13 @@
     "url": "https://boards.example.com/review"
   },
   "log": "- <wall> [fixture] status -> needs_review\n",
+  "other_files": [
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
+    }
+  ],
   "outreach": null,
   "override": null,
   "posting": {
@@ -189,7 +192,7 @@
     "missing_skills": [],
     "prestige": null,
     "reasons": [
-      "fixture"
+      "Fixture."
     ],
     "required_skills": [],
     "salary_ok": null,

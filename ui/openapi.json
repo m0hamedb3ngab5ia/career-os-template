@@ -425,6 +425,10 @@
             "title": "Component",
             "type": "string"
           },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
           "message": {
             "title": "Message",
             "type": "string"
@@ -433,7 +437,8 @@
         "required": [
           "at",
           "component",
-          "message"
+          "message",
+          "label"
         ],
         "title": "ActivityEntry",
         "type": "object"
@@ -2862,6 +2867,13 @@
             "title": "Log",
             "type": "string"
           },
+          "other_files": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Other Files",
+            "type": "array"
+          },
           "outreach": {
             "anyOf": [
               {
@@ -2964,6 +2976,7 @@
           "safety",
           "qa",
           "documents",
+          "other_files",
           "submitted",
           "apply_session",
           "screenshots",

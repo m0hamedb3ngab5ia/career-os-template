@@ -4,6 +4,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockApi } from "../../test/apiMock";
 import { axeViolations } from "../../test/axe";
 import { formatDecimal } from "../../lib/format";
+import { ACTION_HELP } from "./actionHelp";
 import { DocumentsCard } from "./DocumentsCard";
 import { detail } from "./fixtures";
 import { renderWithProviders } from "./testUtils";
@@ -18,24 +19,45 @@ function renderCard(over: Partial<Parameters<typeof DocumentsCard>[0]> = {}, rou
     ...routes,
   });
   const utils = renderWithProviders(
-    <DocumentsCard jobId="nw01" documents={d.documents} submitted={d.submitted} qa={d.qa} {...over} />,
+    <DocumentsCard jobId="nw01" documents={d.documents} otherFiles={d.other_files} submitted={d.submitted} qa={d.qa} {...over} />,
   );
   return { api, ...utils };
 }
 
 describe("DocumentsCard", () => {
-  it("lists known documents first, each opening the file in a new tab", () => {
+  it("shows the key documents in the server's order, each opening the file in a new tab", () => {
     renderCard();
     const card = screen.getByRole("region", { name: "Documents" });
     const links = within(card).getAllByRole("link");
     expect(links.map((a) => a.getAttribute("href"))).toEqual([
       "/api/jobs/nw01/files/resume.pdf",
+      "/api/jobs/nw01/files/cover_letter.pdf",
       "/api/jobs/nw01/files/cover_letter.md",
       "/api/jobs/nw01/files/notes.txt",
+      "/api/jobs/nw01/files/resume.json",
     ]);
     expect(links[0]).toHaveAccessibleName("View résumé (resume.pdf, opens in a new tab)");
     expect(links[0]).toHaveAttribute("target", "_blank");
     expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
+  });
+
+  it("folds every other file under a closed All files (N) toggle, sorted by name", async () => {
+    renderCard();
+    const toggle = screen.getByText("All files (3)");
+    expect(toggle.closest("details")).not.toHaveAttribute("open");
+    await userEvent.setup().click(toggle);
+    const list = screen.getByRole("list", { name: "All files" });
+    expect(within(list).getAllByRole("link").map((a) => a.textContent)).toEqual([
+      "cover_letter.md (opens in a new tab)",
+      "notes.txt (opens in a new tab)",
+      "resume.json (opens in a new tab)",
+    ]);
+  });
+
+  it("action buttons carry one-sentence help as their title", () => {
+    renderCard();
+    expect(screen.getByRole("button", { name: "Re-run QA" })).toHaveAttribute("title", ACTION_HELP.rerunQa);
+    expect(screen.getByRole("button", { name: "Open folder" })).toHaveAttribute("title", ACTION_HELP.openFolder);
   });
 
   it("submitted copy is disabled with a reason until there is one", () => {
@@ -82,7 +104,8 @@ describe("DocumentsCard", () => {
   });
 
   it("empty: no documents, not reviewed", () => {
-    renderCard({ documents: [], qa: null });
+    renderCard({ documents: [], otherFiles: [], qa: null });
+    expect(screen.queryByText(/^All files/)).not.toBeInTheDocument();
     expect(screen.getByText(/No documents yet/)).toBeInTheDocument();
     expect(screen.getByText("Not reviewed")).toBeInTheDocument();
   });

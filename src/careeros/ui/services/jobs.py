@@ -18,6 +18,8 @@ JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
 # Files Job detail shows in its own sections; everything else in the folder is listed as a document.
 SECTION_FILES = {"posting.json", "status.json", "score.json", "safety.json", "qa.json", "contacts.json",
                  "apply_session.json", "log.md"}
+# The documents Job detail shows prominently, in this order; every other file in the folder is under "All files".
+KEY_DOCUMENTS = ("resume.pdf", "cover_letter.pdf", "resume.txt", "cover_letter.txt")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
                "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at")
 
@@ -87,7 +89,8 @@ class Registry(TypedDict):
 class ActivityEntry(TypedDict):
     at: str
     component: str
-    message: str
+    message: str                 # the raw log.md line body
+    label: str                   # plain-English version of `message` (humanize_activity)
 
 
 class JobDetail(TypedDict):
@@ -98,7 +101,8 @@ class JobDetail(TypedDict):
     score: dict[str, Any] | None
     safety: dict[str, Any] | None
     qa: dict[str, Any] | None
-    documents: list[FileEntry]
+    documents: list[FileEntry]   # KEY_DOCUMENTS that exist, in that order
+    other_files: list[FileEntry]
     submitted: list[str]
     apply_session: dict[str, Any] | None
     screenshots: list[FileEntry]
@@ -299,16 +303,22 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> JobDetail | None:
         log = (d / "log.md").read_text(encoding="utf-8")
     except OSError:
         log = ""
+    score = _obj(d / "score.json")
+    if score is not None and isinstance(score.get("reasons"), list):
+        score = {**score, "reasons": humanize_reasons(score["reasons"])}
+    files = _files(d, SECTION_FILES)
+    by_name = {f["name"]: f for f in files}
     return {
         "job": rows[0] if rows else None,
         "posting": posting,
         "status": status["status"] if isinstance(status.get("status"), str) else None,
         "history": [h for h in status.get("history") or [] if isinstance(h, dict)]
         if isinstance(status.get("history"), list) else [],
-        "score": _obj(d / "score.json"),
+        "score": score,
         "safety": _obj(d / "safety.json"),
         "qa": qa,                                        # the qa-review skill's qa.json as written
-        "documents": _files(d, SECTION_FILES),
+        "documents": [by_name[n] for n in KEY_DOCUMENTS if n in by_name],
+        "other_files": [f for f in files if f["name"] not in KEY_DOCUMENTS],
         "submitted": sorted(p.name for p in submitted.iterdir() if p.is_dir()) if submitted.is_dir() else [],
         "apply_session": _obj(d / "apply_session.json"),
         "screenshots": _files(d / "screenshots"),
@@ -332,8 +342,125 @@ def parse_log(log: str) -> list[ActivityEntry]:
     for line in log.splitlines():
         m = _LOG_LINE.match(line.strip())
         if m:
-            out.append({"at": m[1].replace(" ", "T"), "component": m[2], "message": m[3]})
+            out.append({"at": m[1].replace(" ", "T"), "component": m[2], "message": m[3],
+                        "label": humanize_activity(m[2], m[3])})
     return out[::-1]
+
+
+_REASON_TAIL = re.compile(r"\s*->\s*[A-Za-z_][\w.]*(?:\s+[-+]?\d+(?:\.\d+)?(?:\s*/\s*\d+)?)?\s*$")
+
+
+def humanize_reasons(reasons: list[Any]) -> list[str]:
+    """Score reasons as sentences: `skills 3/6 matched (...) -> skills_overlap 20/40` -> `Skills 3/6 matched (...).`.
+
+    Old score.json files hold lowercase fragments with the scoring key appended; newer ones are already sentences
+    and pass through unchanged apart from whitespace."""
+    out: list[str] = []
+    for r in reasons:
+        if not isinstance(r, str):
+            continue
+        text = " ".join(_REASON_TAIL.sub("", r).split())
+        if not text:
+            continue
+        text = text[0].upper() + text[1:]
+        if text[-1] not in ".!?":
+            text += "."
+        out.append(text)
+    return out
+
+
+def _kv(message: str) -> dict[str, str]:
+    """`key=value` pairs in a skill's log line."""
+    return dict(re.findall(r"(\w+)=(\S+)", message))
+
+
+def _words(code: str) -> str:
+    return code.replace("_", " ").replace("-", " ").strip()
+
+
+def _plural(n: str, noun: str) -> str:
+    return f"{n} {noun}" + ("" if n == "1" else "s")
+
+
+def _cap(text: str) -> str:
+    text = " ".join(text.split())
+    return text[0].upper() + text[1:] if text else text
+
+
+def humanize_activity(component: str, message: str) -> str:  # noqa: C901 - one branch per known log line shape
+    """A plain-English label for a log.md line; unknown shapes come back as the message with a capital letter."""
+    msg = message.strip()
+    kv = _kv(msg)
+    m = re.match(r"^status -> (\S+)(?::\s*(.*))?$", msg)
+    if m:  # store.set_status / tracker.set_status
+        return f"Status changed to {_words(m[1])}" + (f": {m[2]}" if m[2] else "")
+    m = re.match(r"^qa \(deterministic\) (pass|fail): (\d+) hard, (\d+) soft$", msg)
+    if m:  # ui rerun QA
+        return f"QA re-run {'passed' if m[1] == 'pass' else 'failed'}: {_plural(m[2], 'hard fail')}, {_plural(m[3], 'soft fail')}"
+    if component == "qa-review" and "pass" in kv:
+        verdict = "passed" if kv["pass"].lower() == "true" else "failed"
+        extra = [f"mean {kv['mean']}" if "mean" in kv else "",
+                 _plural(kv["hard_fails"], "hard fail") if "hard_fails" in kv else "",
+                 f"next: {_words(kv['next'])}" if "next" in kv else ""]
+        return f"QA review {verdict} (" + ", ".join(e for e in extra if e) + ")" if any(extra) else f"QA review {verdict}"
+    if component == "score-job" and "fit" in kv:
+        parts = [f"fit {kv['fit']}", f"tier {kv['tier']}" if "tier" in kv else "",
+                 f"decision {_words(kv['decision'])}" if "decision" in kv else ""]
+        return "Scored: " + ", ".join(p for p in parts if p)
+    if component == "prepare-job" and "status" in kv:
+        parts = [f"status {_words(kv['status'])}", f"tier {kv['tier']}" if "tier" in kv else "",
+                 f"fit {kv['fit']}" if "fit" in kv else "",
+                 ("QA passed" if kv["qa_pass"].lower() == "true" else "QA failed") if "qa_pass" in kv else ""]
+        return "Prepared: " + ", ".join(p for p in parts if p)
+    if component == "tailor-resume" and "bullets" in kv:
+        parts = [_plural(kv["bullets"], "bullet"), _plural(kv["words"], "word") if "words" in kv else "",
+                 _plural(kv["pages"], "page") if "pages" in kv else ""]
+        return "Résumé tailored (" + ", ".join(p for p in parts if p) + ")"
+    if component == "write-cover-letter" and "words" in kv:
+        parts = [_plural(kv["words"], "word"), _plural(kv["facts"], "company fact") if "facts" in kv else ""]
+        return "Cover letter written (" + ", ".join(p for p in parts if p) + ")"
+    m = re.match(r"^(\d+) contacts? drafted", msg)
+    if m and component == "draft-outreach":
+        return f"Outreach drafted for {_plural(m[1], 'contact')}"
+    m = re.match(r"^(\d+) contacts?\b", msg)
+    if m and component == "find-contacts":
+        return f"Found {_plural(m[1], 'contact')}"
+    m = re.match(r'^"(.*)" type=', msg)
+    if m and component == "answer-question":
+        return f"Answered a form question: \u201c{m[1]}\u201d" + (" (needs review)" if kv.get("needs_review", "").lower() == "true" else "")
+    m = re.match(r"^(\S+) from (\S+) (\S+) -> status (\S+)", msg)
+    if m and component == "inbox-sync":
+        return f"Inbox: {_words(m[1])} from {m[2]}; status set to {_words(m[4])}"
+    m = re.match(r"^found via (\S+?)/(\S+?);", msg)
+    if m:  # scout
+        return f"Found by scout on {m[1]}"
+    m = re.match(r"^(\S+) session (\S+): (.*?) \((\d+) steps?", msg)
+    if m:  # applier
+        return f"Apply session {_words(m[2])} on {m[1]}: {m[3]} ({_plural(m[4], 'step')})"
+    m = re.match(r"^safety (pass|block|skip|review)(?::\s*(.*))?$", msg)
+    if m:
+        return f"Safety check: {m[1]}" + (f" ({m[2]})" if m[2] else "")
+    if msg.startswith("frozen as-submitted copy"):
+        return "Submitted copy frozen"
+    m = re.match(r"^\[(\w+)/\w+/\w+\] (.*)$", msg)
+    if m and component == "action":
+        return f"Action item added ({_words(m[1])}): {m[2]}"
+    m = re.match(r"^(?:job )?locked(?: by (\S+))?", msg)
+    if m:
+        return "Job locked" + (f" by {m[1]}" if m[1] else "")
+    if re.match(r"^(?:job )?unlocked", msg):
+        return "Job unlocked"
+    m = re.match(r"^attempt (\d+) (\S+) \S+ -> (\S+)(?::\s*(.*))?$", msg)
+    if m:  # runner attempt line (run logs; here for jobs whose log mirrors it)
+        return f"Run attempt {m[1]} ({m[2]}) {_words(m[3])}" + (f": {m[4]}" if m[4] else "")
+    m = re.match(r"^skill (\S+) (start|started|done|finished|failed)\b(.*)$", msg)
+    if m:
+        verb = {"start": "started", "started": "started", "done": "finished", "finished": "finished", "failed": "failed"}[m[2]]
+        return f"{m[1]} {verb}{m[3]}"
+    m = re.match(r"^tracker sync(?:ed)?\b(.*)$", msg)
+    if m:
+        return "Tracker synced" + m[1]
+    return _cap(msg)
 
 
 def _override(settings: Any, job_id: str) -> str | None:
