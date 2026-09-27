@@ -8,12 +8,17 @@ check-and-takeover runs under a short `flock` on `<lock>.guard`, so two processe
 A lock taken from the CLI (`careeros job lock`) has no pid (the CLI exits at once), so only its expiry frees it.
 The runner's locks carry its pid. The same token re-acquires a lock without changing it (`reentrant`): a skill
 run by the runner sees the runner's job lock through `CAREEROS_LOCK_TOKEN`.
+
+`config_lock(root)` is different: a short blocking `flock` on `data/locks/config.lock` that serialises every config
+write (Settings saves, `careeros advise apply`) so a check-then-write never interleaves with another writer. It
+waits up to `CONFIG_LOCK_TIMEOUT_S`, then raises `LockBusy`; the kernel drops it if the holder dies.
 """
 from __future__ import annotations
 
 import json
 import os
 import socket
+import time
 import uuid
 from contextlib import contextmanager
 from dataclasses import dataclass, field
@@ -185,3 +190,37 @@ def refresh(path: Path, token: str, ttl_seconds: float, now: datetime | None = N
 @contextmanager
 def _nullctx() -> Iterator[None]:
     yield
+
+
+CONFIG_LOCK_TIMEOUT_S = 10.0
+
+
+def config_lock_path(root: Path) -> Path:
+    """Under data/ (gitignored): never committed."""
+    return Path(root) / "data" / "locks" / "config.lock"
+
+
+@contextmanager
+def config_lock(root: Path, timeout: float | None = None, poll: float = 0.05) -> Iterator[None]:
+    """Hold the config-write lock for the block; wait up to `timeout` (default CONFIG_LOCK_TIMEOUT_S) or raise
+    LockBusy. Not reentrant: take it once around the whole check + write. A no-op where fcntl is unavailable
+    (non-POSIX): writes are then not serialised."""
+    path = config_lock_path(root)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    if fcntl is None:  # pragma: no cover
+        yield
+        return
+    deadline = time.monotonic() + (CONFIG_LOCK_TIMEOUT_S if timeout is None else timeout)
+    with path.open("a") as fh:
+        while True:
+            try:
+                fcntl.flock(fh, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic() >= deadline:
+                    raise LockBusy(path, {"owner": "another config write"}) from None
+                time.sleep(poll)
+        try:
+            yield
+        finally:
+            fcntl.flock(fh, fcntl.LOCK_UN)

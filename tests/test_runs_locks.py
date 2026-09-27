@@ -106,3 +106,14 @@ def test_no_tmp_files_left_behind(tmp_path):
     locks.release(p, lk.token)
     locks.acquire(p, owner="y", ttl_seconds=60, now=NOW)
     assert sorted(f.name for f in tmp_path.iterdir() if not f.name.endswith(".guard")) == ["job.lock"]
+
+
+def test_config_lock_times_out_with_lock_busy_and_frees_on_exit(tmp_path):
+    from careeros.runs import locks as lk
+
+    with lk.config_lock(tmp_path):
+        with pytest.raises(lk.LockBusy):
+            with lk.config_lock(tmp_path, timeout=0.1):
+                pass
+    with lk.config_lock(tmp_path, timeout=0.1):  # released: taken at once
+        assert lk.config_lock_path(tmp_path).exists()

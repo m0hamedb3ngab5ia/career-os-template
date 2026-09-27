@@ -16,6 +16,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from typing_extensions import TypedDict
 
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, parse_due
+from careeros.runs import locks
 
 TABS = ("open", "today", "done")
 GROUPS = ("due", "priority", "needs")
@@ -327,7 +328,7 @@ def _set_blocklist(settings: Any, companies: list[str]) -> None:
     from careeros.runs import yamledit
     from careeros.ui.services.settings_io import validate_root
 
-    root = settings.root
+    root = settings.root  # caller holds locks.config_lock: the read that produced `companies` + this write are one step
     yamledit.apply_changes(_blocklist_path(settings), [("blocklist.companies", companies)],
                            validate=lambda _p: validate_root(root))
 
@@ -346,11 +347,13 @@ def block_company(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
 
     it = _scam_item(ix, aid)
     company = _company(settings, it)
-    current = _current_blocklist(settings)
     key = normalize_company(company)
-    added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
-    if added:
-        _set_blocklist(settings, [*current, company])
+    # read + write under the config lock: a Settings save or a second click can't land in between (LockBusy -> 409)
+    with locks.config_lock(settings.root):
+        current = _current_blocklist(settings)
+        added = not any(_fuzzy_eq(key, normalize_company(c)) for c in current)
+        if added:
+            _set_blocklist(settings, [*current, company])
     done = _tracker(settings).mark_action_done(aid)
     return {"company": company, "added": added, "queued": done is None, "job_id": it["job_id"]}
 
@@ -361,10 +364,11 @@ def unblock_company(settings: Any, ix: Any, aid: str, company: str, remove: bool
     it = _scam_item(ix, aid)
     if company.strip().lower() != _company(settings, it).lower():
         raise ValueError("that company isn't this item's company")
-    current = _current_blocklist(settings)
-    kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
-    if kept != current:
-        _set_blocklist(settings, kept)
+    with locks.config_lock(settings.root):  # read + write as one step, like block_company
+        current = _current_blocklist(settings)
+        kept = [c for c in current if c.strip().lower() != company.strip().lower()] if remove else current
+        if kept != current:
+            _set_blocklist(settings, kept)
     done = _tracker(settings).reopen_action(aid)
     return {"company": company, "removed": kept != current, "queued": done is None}
 

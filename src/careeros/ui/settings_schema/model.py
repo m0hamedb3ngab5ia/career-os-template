@@ -46,6 +46,7 @@ class Field:
     note: str = ""                  # why locked / readonly
     pattern: str | None = None      # text: the value must match; tags / rule_list: every item must match
     check: Check | None = None      # extra per-value check -> error text
+    options_from: str | None = None # tags: ids read from config/<this>.yaml at read/save time (settings_io)
 
     @property
     def id(self) -> str:

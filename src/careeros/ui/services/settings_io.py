@@ -18,7 +18,7 @@ from typing import Any
 import yaml
 
 from careeros.config import ConfigError, Settings
-from careeros.runs import yamledit
+from careeros.runs import locks, yamledit
 from careeros.ui.settings_schema import Field, Section, get_section, reset_group, validate_value
 
 _MISSING = object()
@@ -179,10 +179,31 @@ def read_section(settings: Settings, section_id: str) -> dict[str, Any]:
     docs = {file: _load(p) for file, p in paths.items()}
     rt_docs = {file: _load_rt(p) for file, p in paths.items()}
     py_docs = {file: yaml.safe_load(p.read_text(encoding="utf-8")) or {} for file, p in paths.items()}
-    return {"section": sec.to_dict(), "values": effective_values(sec, docs),
+    return {"section": _section_dict(settings, sec), "values": effective_values(sec, docs),
             "warnings": unquoted_warnings(sec, rt_docs, py_docs),
             "defaults": {f.id: f.default for f in sec.fields()},
             "files": {file: str(p) for file, p in paths.items()}, "version": _version(list(paths.values()))}
+
+
+def known_ids(settings: Settings, source: str) -> list[str]:
+    """The top-level ids of config/<source>.yaml (e.g. the category ids), read fresh from disk; [] when the file
+    is absent or not valid YAML (id validation is then skipped, as for an empty file)."""
+    try:
+        data = _load(config_path(settings, source))
+    except (OSError, yaml.YAMLError):
+        return []
+    return [str(k) for k, v in data.items() if isinstance(v, dict)] if isinstance(data, dict) else []
+
+
+def _section_dict(settings: Settings, sec: Section) -> dict[str, Any]:
+    """The schema with `options_from` fields filled with the ids on disk (as suggestions: strict_options False)."""
+    out = sec.to_dict()
+    sources = {f.id: f.options_from for f in sec.fields() if f.options_from}
+    for g in out["groups"]:
+        for item in g["items"]:
+            if item.get("id") in sources:
+                item["options"], item["strict_options"] = known_ids(settings, sources[item["id"]]), False
+    return out
 
 
 def _check_changes(settings: Settings, sec: Section, changes: dict[str, Any]) -> None:
@@ -195,6 +216,12 @@ def _check_changes(settings: Settings, sec: Section, changes: dict[str, Any]) ->
             errors[fid] = f"This can't be changed here. {f.note}".strip()
         else:
             err = validate_value(f, v)
+            if not err and f.options_from and isinstance(v, list):
+                known = known_ids(settings, f.options_from)
+                bad = [x for x in v if x not in known]
+                if known and bad:
+                    err = (f"Unknown {f.options_from} id: {', '.join(map(str, bad))}. "
+                           f"Known in {f.options_from}.yaml: {', '.join(known)}.")
             if err:
                 errors[fid] = err
     if not errors:
@@ -259,6 +286,15 @@ def save_section(settings: Settings, section_id: str, changes: dict[str, Any],
     Returns {old: {field id: previous value}, version}. Raises SettingsInvalid or SettingsConflict."""
     sec = _section(section_id)
     paths = _paths(settings, sec)
+    try:
+        with locks.config_lock(settings.root):  # version check + write as one step (other tabs, advise apply)
+            return _save_locked(settings, sec, paths, changes, version)
+    except locks.LockBusy:
+        raise SettingsConflict("Another save is in progress; try again in a moment.") from None
+
+
+def _save_locked(settings: Settings, sec: Section, paths: dict[str, Path], changes: dict[str, Any],
+                 version: str | None) -> dict[str, Any]:
     if version is not None and version != _version(list(paths.values())):
         raise SettingsConflict("The settings files changed since this page was opened; reload to see them.")
     _check_changes(settings, sec, changes)

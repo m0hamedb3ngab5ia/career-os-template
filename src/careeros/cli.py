@@ -1147,11 +1147,15 @@ def cmd_advise_apply(args: argparse.Namespace) -> int:
     from datetime import timezone
 
     from careeros.runs.advisor import apply_recommendation
+    from careeros.runs.locks import LockBusy
 
     try:
         out = apply_recommendation(_settings(args), args.id, datetime.now(timezone.utc))
     except LookupError as e:
         print(f"advise apply: {e.args[0]}", file=sys.stderr)
+        return 1
+    except LockBusy:
+        print("advise apply: another config save is in progress; config left unchanged, try again", file=sys.stderr)
         return 1
     except (ConfigError, ValueError) as e:
         msg = str(e)
