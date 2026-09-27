@@ -42,10 +42,25 @@ belong in each candidate's own private repo, not here.
 - [x] `careeros doctor`: validate the candidate's own config/profile against the example schema, fail on
       untouched example data; `docs/GETTING_STARTED.md`
 
+## UI — backlog (after the UI build, PRs #34–#59)
+- [ ] Phone layout: make the UI usable at phone width (deferred)
+- [ ] LAN mode: deferred; needs real auth (token/pairing) and TLS before binding beyond loopback
+- [ ] Live end-to-end pass of the UI against a real candidate's data (deferred)
+- [ ] Runs page: scout/tracker/prune runs never show under "Now" (`RunControl.current()` only reads runner.lock)
+- [ ] Watcher: nested screenshot dirs; tracker dir missing when the watcher starts
+- [ ] Template sync guard: `pull` lets untracked files through; refs planted with `git fetch <url> x:refs/remotes/template/x`
+      or `update-ref` bypass the ls-remote check (full fix: exclude only the remote sha + `git ls-remote template` heads)
+- [ ] Verify then fix: `undo_mark_safe` needs an exact company-name match (`ui/services/actions.py`); a companies.yaml
+      change emits two SSE `changed` events (`ui/reindex.py`)
+- [ ] Runner: a raising finalize hook masks the original error (no test that the lock is still released);
+      `rs.save_run`/`rs.log` raising in an outer `finally` leaves the lock held; `run_skill` records done when invoke raises
+- [ ] Remove unused old sheet styles in `ui/src/kit/overlay.module.css`
+- [ ] Action Items: move the source of truth off the xlsx (see System backlog) so the UI stops writing through Tracker
+
 ## Future (not now)
 - [ ] Action Items redesign: group by `Type` + `Needs` column = `laptop` (Chrome/Handshake/Workday session, candidate present) | `phone` (approve/send from anywhere) | `anytime`; sort by Priority then NextActionDate; separate "Today" view. Tier A submits, Handshake, Workday review pages = `laptop`. LinkedIn sends, email approvals, cover-letter reviews = `phone`.
 - [ ] Handshake apply sessions: candidate logged in + present; system drives Chrome, candidate debugs live. Assisted mode only.
-- [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats). Design spec: `docs/UI.md`. Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
+- [x] Web UI dashboard (jobs pipeline, action items, contacts, stats); built as `careeros ui` (PRs #34–#59). Design spec: `docs/UI.md`. Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
 - [ ] Action Items tab: answer box on question/salary items that calls `POST /actions/{id}/answer` (learns the answer, closes the item); lessons list/add UI on top of `GET|POST /learning/lessons`. Backend shipped with `careeros learn`.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
 
