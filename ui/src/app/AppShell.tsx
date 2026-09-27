@@ -67,6 +67,8 @@ function Freshness({ status, connection }: { status: StatusSummary | undefined; 
   );
 }
 
+const isMac = () => /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+
 /**
  * Sidebar search: Enter opens Jobs filtered by the text (?q=). On the Jobs screen it shows the current q and keeps
  * the rest of the view (tab, sort, columns) and follows the page's own search box.
@@ -80,14 +82,16 @@ function SidebarSearch() {
   useEffect(() => setText(q), [q]);
   const input = useRef<HTMLInputElement>(null);
 
-  // Cmd+K / Ctrl+K jumps to the search from anywhere.
+  // Cmd+K (Mac) / Ctrl+K (elsewhere) jumps to the search from anywhere but an open modal. Only one modifier per
+  // platform: on a Mac Ctrl+K is the text fields' delete-to-end-of-line and must reach them.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
-      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        input.current?.focus();
-        input.current?.select();
-      }
+      if (e.defaultPrevented || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
+      if (isMac() ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      e.preventDefault();
+      input.current?.focus();
+      input.current?.select();
     }
     document.addEventListener("keydown", onKey);
     return () => document.removeEventListener("keydown", onKey);
@@ -110,7 +114,7 @@ function SidebarSearch() {
       <input
         ref={input}
         type="search"
-        aria-keyshortcuts="Control+K Meta+K"
+        aria-keyshortcuts={isMac() ? "Meta+K" : "Control+K"}
         name="q"
         autoComplete="off"
         spellCheck={false}
@@ -141,7 +145,19 @@ function useRouteFocus(main: RefObject<HTMLElement | null>): string {
     if (!el) return;
     const active = document.activeElement;
     if (!active || active === document.body || !el.contains(active)) el.focus({ preventScroll: true });
-    setMessage(el.querySelector("h1")?.textContent?.trim() || document.title.replace(/ · career-os$/, ""));
+    // A page still loading shows a placeholder title (aria-busy); announce the real one once it arrives.
+    const announce = () => {
+      const h1 = el.querySelector("h1");
+      const title = h1?.textContent?.trim();
+      if (!h1 || h1.getAttribute("aria-busy") === "true" || !title) return false;
+      // A zero-width toggle makes an identical title (same h1 on two routes) still count as a change and be re-read.
+      setMessage((prev) => (prev === title ? `${title}\u200B` : title));
+      return true;
+    };
+    if (announce()) return;
+    const watch = new MutationObserver(() => announce() && watch.disconnect());
+    watch.observe(el, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ["aria-busy"] });
+    return () => watch.disconnect();
   }, [pathname, main]);
   return message;
 }

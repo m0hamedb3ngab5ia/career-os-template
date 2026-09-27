@@ -37,7 +37,8 @@ function useLogSummary(lines: LogLine[], live: boolean): string {
   useEffect(() => {
     if (lastKey === seen.current) return;
     const at = seen.current === undefined ? -1 : lines.findIndex((l) => l.key === seen.current);
-    const fresh = lines.slice(at + 1);
+    // The last line we saw was dropped from the buffer: how many are new is unknown, so say nothing this time.
+    const fresh = at === -1 && seen.current !== undefined ? [] : lines.slice(at + 1);
     seen.current = lastKey;
     if (!live || fresh.length === 0) return;
     pending.current.lines += fresh.length;
@@ -48,14 +49,22 @@ function useLogSummary(lines: LogLine[], live: boolean): string {
       const { lines: n, errors } = pending.current;
       pending.current = { lines: 0, errors: 0 };
       spokeAt.current = Date.now();
-      setMessage(plural(n, "new log line") + (errors ? `, ${plural(errors, "error")}` : ""));
+      const text = plural(n, "new log line") + (errors ? `, ${plural(errors, "error")}` : "");
+      // A zero-width toggle so an identical summary still changes the region and is read again.
+      setMessage((prev) => (prev === text ? `${text}\u200B` : text));
     };
     const wait = spokeAt.current + LOG_ANNOUNCE_MS - Date.now();
     if (wait <= 0) flush();
     else timer.current = setTimeout(flush, wait);
   }, [lastKey, lines, live]);
 
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(
+    () => () => {
+      clearTimeout(timer.current);
+      timer.current = undefined;
+    },
+    [],
+  );
   return message;
 }
 

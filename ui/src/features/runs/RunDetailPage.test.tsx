@@ -27,17 +27,8 @@ function detail(over: Partial<RunDetail> = {}): RunDetail {
     duration_s: null,
     counters: { attempted: 1, ok: 1 },
     attempts: [
-      {
-        n: 1,
-        job_id: "j1",
-        company: "Initech",
-        title: "Platform Engineer",
-        outcome: "ok",
-        duration_s: 60,
-        session_id: null,
-        detail: "",
-      },
-    ],
+      { n: 1, job_id: "j1", company: "Initech", title: "Platform Engineer", outcome: "ok", duration_s: 60 },
+    ].map((a) => ({ ...a, session_id: null, detail: "" })),
     log: "",
     ...over,
   };
@@ -64,12 +55,7 @@ describe("RunDetailPage (live run)", () => {
     expect(es.url).toBe("/api/runs/r1/stream");
     act(() => {
       es.dispatch("event", { type: "log", text: "scoring j2", attempt: 2 });
-      es.dispatch("event", {
-        type: "log",
-        text: "failed j2",
-        attempt: 2,
-        error: true,
-      });
+      es.dispatch("event", { type: "log", text: "failed j2", attempt: 2, error: true });
     });
     const log = screen.getByRole("log", { name: "Live run output" });
     expect(await within(log).findByText("failed j2")).toBeInTheDocument();
@@ -81,13 +67,7 @@ describe("RunDetailPage (live run)", () => {
   it("a finished run shows run.log without live announcements", async () => {
     mockApi({
       detail: {
-        r2: detail({
-          id: "r2",
-          status: "done",
-          state: "done",
-          stop_reason: "completed",
-          log: "- start\n- stop\n",
-        }),
+        r2: detail({ id: "r2", status: "done", state: "done", stop_reason: "completed", log: "- start\n- stop\n" }),
       },
     });
     renderRoute(routes, "/runs/r2");

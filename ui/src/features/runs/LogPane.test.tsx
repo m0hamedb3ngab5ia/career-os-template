@@ -55,6 +55,28 @@ describe("LogPane", () => {
     }
   });
 
+  it("re-reads an identical summary and stays quiet when the last seen line left the buffer", () => {
+    vi.useFakeTimers();
+    try {
+      const { rerender } = render(<LogPane label="Live run output" lines={lines(1, 1)} empty="—" live />);
+      const status = screen.getByTestId("log-announcer");
+      rerender(<LogPane label="Live run output" lines={lines(1, 3)} empty="—" live />);
+      const first = status.textContent;
+      act(() => vi.advanceTimersByTime(LOG_ANNOUNCE_MS));
+      rerender(<LogPane label="Live run output" lines={lines(1, 5)} empty="—" live />);
+      expect(status).toHaveTextContent("2 new log lines");
+      expect(status.textContent).not.toBe(first);
+      // Line 5 is gone from a buffer of 100 fresh lines: the count is unknown, so nothing new is said.
+      act(() => vi.advanceTimersByTime(LOG_ANNOUNCE_MS));
+      const before = status.textContent;
+      rerender(<LogPane label="Live run output" lines={lines(200, 100)} empty="—" live />);
+      act(() => vi.advanceTimersByTime(LOG_ANNOUNCE_MS));
+      expect(status.textContent).toBe(before);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
   it("announces nothing for a finished run's log", () => {
     const { rerender } = render(<LogPane label="Run log" lines={lines(1, 1)} empty="—" />);
     rerender(<LogPane label="Run log" lines={lines(1, 5)} empty="—" />);

@@ -35,7 +35,7 @@ export function RunDetailPage() {
   }
   if (!run) {
     return (
-      <Page title="Run">
+      <Page busy title="Run">
         {back}
         <p className={styles.sub}>Loading…</p>
       </Page>
