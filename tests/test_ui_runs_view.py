@@ -110,9 +110,11 @@ def test_active_steps_ignore_stale_files_left_over_in_a_reused_job_folder(rc):
                      queue=[{"job_id": j, "rank": i, "score": 1, "why": ""} for i, j in enumerate((a, b), 1)])
     store = Store(s)
     d = store.job_dir(a)
-    (d / "score.json").write_text("{}")  # stale: from a previous attempt, before the job lock started
     old = (NOW - timedelta(hours=1)).timestamp()
+    (d / "score.json").write_text("{}")  # prepare reuses score.json, never rewrites it: counts even though old
     os.utime(d / "score.json", (old, old))
+    (d / "resume.json").write_text("{}")  # stale: from a previous attempt, before the job lock started
+    os.utime(d / "resume.json", (old, old))
     locks.acquire(rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="prepare",
                   pid_alive=lambda p: True)
     locks.acquire(rs.job_lock_path(a), owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, pid_alive=lambda p: True,
@@ -121,7 +123,7 @@ def test_active_steps_ignore_stale_files_left_over_in_a_reused_job_folder(rc):
     cur = view.current_view(rc)
     rows = {r["job_id"]: r for r in cur["jobs"]}
     assert [(st["name"], st["state"]) for st in rows[a]["steps"]] == [
-        ("Score", "active"), ("Tailor", "pending"), ("Cover", "pending"), ("QA", "pending")]
+        ("Score", "done"), ("Tailor", "active"), ("Cover", "pending"), ("QA", "pending")]
 
 
 def test_steps_mark_a_skipped_cover_letter_once_a_later_step_has_output(rc):

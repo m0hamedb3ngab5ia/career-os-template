@@ -234,7 +234,8 @@ def _names(store: Store, job_id: str) -> dict[str, Any]:
 def _steps(store: Store, kind: str, job_id: str, state: str, since: datetime | None = None) -> list[dict[str, str]]:
     """`since`: this attempt's start (the job lock's acquired_at). A job folder can be reused across attempts
     (e.g. a retry), so a file must be at least as new as the current attempt to count as its output; an older
-    file is left over from a previous attempt and the step still shows as not done."""
+    file is left over from a previous attempt and the step still shows as not done. Score is the exception:
+    prepare reuses the existing score.json and never rewrites it, so it counts whenever it exists."""
     steps = PREPARE_STEPS if kind == "prepare" else (("Score", ("score.json",)),)
     if state == "done":
         return [{"name": n, "state": "done"} for n, _ in steps]
@@ -242,13 +243,14 @@ def _steps(store: Store, kind: str, job_id: str, state: str, since: datetime | N
         return [{"name": n, "state": "pending"} for n, _ in steps]
     d = store.job_dir(job_id)
 
-    def _fresh(f: str) -> bool:
+    def _fresh(name: str, f: str) -> bool:
         p = d / f
         if not p.exists():
             return False
-        return since is None or p.stat().st_mtime >= since.timestamp()
+        # 2 s slack: some filesystems (exFAT, SMB) store mtime in whole or 2-second steps
+        return name == "Score" or since is None or p.stat().st_mtime >= since.timestamp() - 2
 
-    have = [kind == "prepare" and any(_fresh(f) for f in files) for _, files in steps]
+    have = [kind == "prepare" and any(_fresh(name, f) for f in files) for name, files in steps]
     # A later step's output means every earlier step finished; one with no output of its own was skipped
     # (prepare-job skips the cover letter when the tier rule is `if_required` and the posting doesn't ask).
     last = max((i for i, h in enumerate(have) if h), default=-1)
