@@ -272,3 +272,42 @@ def test_inbox_sync_usage_limit_pauses_too(settings):
                                                        "on_usage_limit": "pause"}}
     rec = run_skill(settings, "inbox_sync", "inbox-sync", invoke=invoke, now=lambda: NOW)
     assert rec["stop_reason"] == "usage_limit" and RunStore(settings).pause_state(NOW) is not None
+
+
+def _pause_seen_at_runner_release(settings, monkeypatch):
+    """Record, at each release of the runner lock, whether pause.json was already set (no gap for another run)."""
+    from careeros.runs import locks
+    seen: list[bool] = []
+    real = locks.release
+
+    def release(path, token, force=False):
+        if Path(path) == RunStore(settings).runner_lock_path:
+            seen.append(RunStore(settings).pause_state(NOW) is not None)
+        return real(path, token, force)
+
+    monkeypatch.setattr(locks, "release", release)
+    return seen
+
+
+def test_batch_usage_limit_pause_is_set_before_the_runner_lock_is_released(settings, monkeypatch):
+    jid = add_job(Store(settings), 1, hours_old=60)
+    seen = _pause_seen_at_runner_release(settings, monkeypatch)
+    _batch(settings, FakeInvoke(settings, modes={jid: "usage_limit"}), on_usage_limit="pause")
+    assert seen == [True]
+
+
+def test_skill_usage_limit_pause_is_set_before_the_runner_lock_is_released(settings, monkeypatch):
+    from careeros.runs.headless import parse_stream
+    import json
+
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        Path(stream_path).write_text("{}")
+        r = parse_stream([json.dumps({"type": "result", "is_error": True, "result": "You've hit your limit"})])
+        r.exit_code = 1
+        return r
+
+    settings.pipeline = {**settings.pipeline, "runs": {**settings.pipeline["runs"], "preflight_doctor": False,
+                                                       "on_usage_limit": "pause"}}
+    seen = _pause_seen_at_runner_release(settings, monkeypatch)
+    run_skill(settings, "inbox_sync", "inbox-sync", invoke=invoke, now=lambda: NOW)
+    assert seen == [True]

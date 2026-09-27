@@ -146,14 +146,14 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
     run = execute_run(settings, kind, budget, cfg=cfg, trigger=trigger, dry_run=dry_run, invoke=invoke,
                       doctor=doctor, now=now, clock=clock, cancel=cancel, echo=echo,
                       retry_ids=fails.retry_ids(kind, max_attempts), skip_ids=fails.exhausted(kind, max_attempts),
-                      extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt)
+                      extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt,
+                      finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()))
     if not dry_run:
         run["warnings"] = warnings
         rs = RunStore(settings)
         rs.save_run(run)
         for w in warnings:
             rs.log(run["id"], w)
-        pause_after_usage_limit(settings, cfg, run, now())
     return run
 
 
@@ -231,6 +231,8 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
                    duration_s=round((end - start).total_seconds(), 1))
         rs.save_run(run)
         rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
-        locks.release(rs.runner_lock_path, lk.token)
-    pause_after_usage_limit(settings, cfg, run, now())
+        try:
+            pause_after_usage_limit(settings, cfg, run, now())  # under the lock: no run starts unpaused in between
+        finally:
+            locks.release(rs.runner_lock_path, lk.token)
     return run

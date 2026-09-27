@@ -441,7 +441,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("schedule", "Schedule", (
             Field(P, "schedule.jobs.scout", "schedule", "Scout", default=JOBS["scout"],
-                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours."),
+                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours unless Scout follows quiet hours is on."),
             Field(P, "schedule.jobs.inbox_sync", "schedule", "Inbox sync", default=JOBS["inbox_sync"],
                   check=_schedule_check("inbox_sync"), help="Off until the inbox-sync skill is finished."),
             Field(P, "schedule.jobs.score", "schedule", "Score", default=JOBS["score"],
@@ -452,7 +452,7 @@ SECTIONS: tuple[Section, ...] = (
                   check=_schedule_check("prune")),
             _num(P, "schedule.tick_minutes", "Check every", 15, lo=1, unit="min"),
             _num(P, "schedule.missed_after_minutes", "Missed after", 60, lo=1, unit="min",
-                 help="Slots missed while the Mac was off collapse into one catch-up you start."),
+                 help="A slot more than this late (Mac asleep or off) counts as missed; handled per Missed runs below."),
         )),
         Group("quiet", "Quiet hours and missed runs", (
             Field(P, "schedule.quiet_hours", "time_range", "Quiet hours",
