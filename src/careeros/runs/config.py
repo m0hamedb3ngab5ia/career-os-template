@@ -49,7 +49,8 @@ DEFAULT_AUTH_PATTERNS = [r"/login", r"not logged in", r"invalid api key", r"oaut
                          r"unauthori[sz]ed", r"credentials? (expired|missing|invalid)"]
 RUN_KEYS = ("preset", "presets", "custom", "job_timeout_minutes", "max_consecutive_failures", "stop_on_timeout",
             "preflight_doctor", "ranking", "required_mcp_servers", "usage_limit_patterns", "auth_patterns",
-            "retry", "prepare", "auto_submit", "job_lock_minutes", "on_usage_limit")
+            "retry", "prepare", "auto_submit", "job_lock_minutes", "on_usage_limit", "scout_waits_for_batch",
+            "lock_wait_s")
 # What a run does when Claude reports the subscription usage limit (careeros.runs.service):
 # stop (Recommended) = stop, the next scheduled run tries again; pause = stop and pause all runs until you resume.
 ON_USAGE_LIMIT = ("stop", "pause")
@@ -74,6 +75,10 @@ class RunsConfig:
     stop_on_timeout: bool = True
     preflight_doctor: bool = True
     job_lock_minutes: float = 120
+    # scout / prune started while a batch holds data/runs/runner.lock: wait up to lock_wait_s (True, Recommended)
+    # or refuse at once (False). See careeros.runs.locks.pipeline_lock.
+    scout_waits_for_batch: bool = True
+    lock_wait_s: float = 300
     on_usage_limit: str = "stop"
     ranking: dict[str, float] = field(default_factory=lambda: dict(DEFAULT_RANKING))
     required_mcp_servers: list[str] = field(default_factory=list)
@@ -175,7 +180,9 @@ def load_runs_config(settings: Any) -> RunsConfig:
         if raw["on_usage_limit"] not in ON_USAGE_LIMIT:
             raise _err(f"runs.on_usage_limit must be one of {' | '.join(ON_USAGE_LIMIT)}, got {raw['on_usage_limit']!r}")
         cfg.on_usage_limit = raw["on_usage_limit"]
-    for key in ("stop_on_timeout", "preflight_doctor"):
+    if "lock_wait_s" in raw:
+        cfg.lock_wait_s = _num(raw["lock_wait_s"], "runs.lock_wait_s", ge=0)
+    for key in ("stop_on_timeout", "preflight_doctor", "scout_waits_for_batch"):
         if key in raw:
             setattr(cfg, key, _bool(raw[key], f"runs.{key}"))
     ranking = raw.get("ranking") or {}

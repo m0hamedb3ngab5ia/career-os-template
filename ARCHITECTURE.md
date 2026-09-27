@@ -174,7 +174,13 @@ failures in a row (Recommended) end it as `consecutive_failures`. A usage-limit 
 never parsed or trusted; the next scheduled slot simply tries again (`runs.on_usage_limit: stop`, Recommended), or
 with `pause` the run also pauses all runs until `careeros run resume`.
 
-**Locks.** `data/runs/runner.lock`: one batch at a time. `data/runs/locks/<job_id>.lock`: one worker per job. Lock
+**Locks.** `data/runs/runner.lock` is the one pipeline lock: one batch (or headless skill run) at a time, and
+scout and prune take it too (`locks.pipeline_lock`: `careeros scout`, `careeros prune --yes`, the scheduler's scout
+and prune, UI scout/prune steps), so a prune never deletes a job folder a batch is preparing and a scout never writes
+while a batch reads. Scout/prune started while a batch holds it wait up to `runs.lock_wait_s` (300, Recommended)
+when `runs.scout_waits_for_batch: true` (Recommended), else refuse at once; still held = exit 6 (CLI) or `busy`
+(the tick keeps the job due). A batch started while scout/prune holds it gets `RunBusy` (UI: 409). The tracker sync
+writes atomically per op and does not take it. `data/runs/locks/<job_id>.lock`: one worker per job. Lock
 files carry owner, pid, host and expiry, are created atomically, and a stale one (expired, dead pid on this host,
 unreadable) is taken over under a short `flock`. prepare-job and apply-job take the job lock themselves
 (`careeros job lock <id> --owner <skill>`, exit 6 when held); inside a run they re-enter the runner's lock through

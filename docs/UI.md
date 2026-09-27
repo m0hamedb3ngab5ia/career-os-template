@@ -213,6 +213,8 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    - **Now**: the running batch (from the runner lock and its `run.json`): kind, trigger (manual / schedule /
      catch-up), budget used ("7 of 25 jobs, 41 of 90 min"), the current job and its live stream-json events. Cancel
      sends SIGTERM; the batch stops before its next job with stop reason `cancelled`.
+     While a scout, tracker or prune step runs it shows that step's run; while `careeros scout|prune` or the
+     scheduler holds the pipeline lock it shows the holder (kind, start, pid) with no budget.
    - **Queue ("why next")**: the ranked jobs for the next score and prepare run, from `data/runs/queue-<kind>.json`
      (rewritten by every `careeros run score|prepare`, including `--dry-run`; `careeros run status` computes the live top 5 without writing it): rank, company, role, points, and the `why` text ("posted 20h ago (+60);
      dream company (+25)"). Excluded jobs (pruned, filtered, out of retries) sit in a collapsed "Not in queue" group
@@ -264,6 +266,8 @@ Built: `careeros.ui.services.runs.RunControl` (no web layer yet). Batches start 
 `careeros run <kind> --json` (own session, output in `data/runs/ui/`), so they outlive a UI restart; scout, tracker
 sync, prune and inbox sync start as `python -m careeros.ui.services.step <kind>` and record a run (kind `scout`,
 `tracker`, `prune`) with the same `run.json` + `run.log` shape, one per kind at a time (`data/runs/step-<kind>.lock`).
+Scout and prune also hold the pipeline lock (`data/runs/runner.lock`, owner `step:<id>`): starting one while a batch
+runs is refused with 409, and a batch started while one runs is refused the same way.
 Cancel sends SIGTERM only to a careeros run or step process; a batch started by the scheduler (`careeros tick`) is
 stopped with Pause all instead. A `running` run whose process no longer holds its lock reads as `interrupted`.
 

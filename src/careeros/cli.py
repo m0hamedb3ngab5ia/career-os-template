@@ -60,8 +60,28 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return exit_code(checks)
 
 
+def _pipeline_busy(e: Exception) -> int:
+    print(f"{e}. Nothing was changed.", file=sys.stderr)
+    return 6
+
+
+def _announce_wait(holder: dict, wait_s: float) -> None:
+    print(f"waiting up to {wait_s:.0f}s for {holder.get('owner')} ({holder.get('note') or '-'})…", flush=True)
+
+
 def cmd_scout(args: argparse.Namespace) -> int:
+    """Holds the pipeline lock (data/runs/runner.lock) so it never writes while a batch reads; exit 6 = busy."""
+    from careeros.runs import locks
+
     s = _settings(args)
+    try:
+        with locks.pipeline_lock(s, "cli:scout", note="scout", on_wait=_announce_wait):
+            return _scout(s, args)
+    except locks.PipelineBusy as e:
+        return _pipeline_busy(e)
+
+
+def _scout(s: Settings, args: argparse.Namespace) -> int:
     store = Store(s)
     summary = run_scout(s, store, only=args.only)
     t = summary.totals
@@ -619,11 +639,24 @@ def cmd_action_done(args: argparse.Namespace) -> int:
 
 
 def cmd_prune(args: argparse.Namespace) -> int:
-    from careeros import retention
+    """--yes holds the pipeline lock (never deletes beside a batch); exit 6 = busy. A dry run only reads."""
+    from contextlib import nullcontext
+
+    from careeros.runs import locks
 
     s = _settings(args)
-    items = retention.plan(s)
     dry = args.dry_run or not args.yes
+    try:
+        with nullcontext() if dry else locks.pipeline_lock(s, "cli:prune", note="prune", on_wait=_announce_wait):
+            return _prune(s, args, dry)
+    except locks.PipelineBusy as e:
+        return _pipeline_busy(e)
+
+
+def _prune(s: Settings, args: argparse.Namespace, dry: bool) -> int:
+    from careeros import retention
+
+    items = retention.plan(s)
     summary = retention.summarize(items)
     if args.json:
         freed = 0 if dry else retention.execute(s, items)
