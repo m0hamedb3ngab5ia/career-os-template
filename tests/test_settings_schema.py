@@ -233,6 +233,15 @@ def test_safety_codes_match_the_checks_in_the_source():
     assert set(SAFETY_CODES) == found
 
 
+def test_schedule_help_does_not_contradict_the_scout_quiet_hours_and_missed_runs_keys():
+    """Scout and Missed-after help must hold whatever schedule.scout_quiet_hours / schedule.missed_runs say."""
+    fields = {f.key: f for _, f in _fields()}
+    scout = fields["schedule.jobs.scout"].help
+    assert "Ignores quiet hours." not in scout and "Scout follows quiet hours" in scout
+    missed = fields["schedule.missed_after_minutes"].help
+    assert "catch-up you start" not in missed and "Missed runs" in missed
+
+
 def test_every_editable_field_has_a_reader():
     """A setting nothing reads is a lie in the UI: it must be read-only with a "Not used yet" note."""
     import subprocess

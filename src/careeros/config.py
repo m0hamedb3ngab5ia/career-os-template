@@ -13,7 +13,7 @@ ATS_WITH_SLUG = ("greenhouse", "lever", "ashby")  # adapters that fetch by board
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
     "pipeline": ("paths", "outreach"),
-    "targets": ("candidate", "location", "seniority", "categories", "volume"),
+    "targets": ("candidate", "location", "seniority", "categories", "volume", "safety"),
     "companies": ("blocklist", "prestige_scoring", "prestige_tiers", "company_caps"),
 }
 # targets.yaml `volume` keys read by careeros.company_policy: key -> (default, minimum).
@@ -244,6 +244,7 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
             if data.get(key) is not None and not isinstance(data[key], dict):
                 raise ConfigError(f"config/{name}.yaml: {key} must be a mapping, got {type(data[key]).__name__}")
     _check_volume(cfg.get("targets", {}).get("volume"))
+    _check_safety(cfg.get("targets", {}).get("safety"))
     _check_company_caps(cfg.get("companies", {}).get("company_caps"))
     boards = cfg.get("companies", {}).get("boards")
     if boards is not None:
@@ -272,6 +273,16 @@ def _check_volume(volume: Any) -> None:
         if key in volume and not _whole(volume[key], minimum):
             raise ConfigError(f"config/targets.yaml: volume.{key} must be a whole number >= {minimum}, "
                               f"got {volume[key]!r}")
+
+
+def _check_safety(safety: Any) -> None:
+    """targets.yaml `safety.pause_auto_submit` (read by careeros.safety.scam.auto_submit_allowed). The rest of
+    `safety` is checked by the code that reads it (ghost_settings, apply_levels)."""
+    if not isinstance(safety, dict) or "pause_auto_submit" not in safety:
+        return
+    if not isinstance(safety["pause_auto_submit"], bool):
+        raise ConfigError("config/targets.yaml: safety.pause_auto_submit must be true or false, "
+                          f"got {safety['pause_auto_submit']!r}")
 
 
 def _check_company_caps(caps: Any) -> None:

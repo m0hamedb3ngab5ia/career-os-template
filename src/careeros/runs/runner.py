@@ -296,9 +296,10 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 skip_ids: dict[str, str] | None = None,
                 extra_stop: Callable[[], tuple[str, str] | None] | None = None,
                 after_attempt: Callable[[dict[str, Any]], None] | None = None,
-                pre_attempt: Callable[[dict[str, Any]], str | None] | None = None) -> dict[str, Any]:
+                pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,
+                finalize: Callable[[dict[str, Any]], None] | None = None) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
-    another run holds the global lock."""
+    another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock."""
     cfg = cfg or load_runs_config(settings)
     rs = RunStore(settings)
     t_now = now()
@@ -347,5 +348,9 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                    duration_s=round((end - t_now).total_seconds(), 1))
         rs.save_run(run)
         rs.log(rid, f"stop {stop}" + (f": {detail}" if detail else ""))
-        locks.release(rs.runner_lock_path, glock.token)
+        try:
+            if finalize is not None:
+                finalize(run)
+        finally:
+            locks.release(rs.runner_lock_path, glock.token)
     return run

@@ -171,7 +171,8 @@ as `time_budget`, not `timeout`, and does not count against the job. A run that 
 never starts (exit 5). `usage_limit`, `auth_required`, `permission_denied` and `cancelled` end the run at once
 (the next job would hit the same wall); `timeout` does with `runs.stop_on_timeout` (true, Recommended); three job
 failures in a row (Recommended) end it as `consecutive_failures`. A usage-limit reset time in the error text is
-never parsed or trusted; the next scheduled slot simply tries again.
+never parsed or trusted; the next scheduled slot simply tries again (`runs.on_usage_limit: stop`, Recommended), or
+with `pause` the run also pauses all runs until `careeros run resume`.
 
 **Locks.** `data/runs/runner.lock`: one batch at a time. `data/runs/locks/<job_id>.lock`: one worker per job. Lock
 files carry owner, pid, host and expiry, are created atomically, and a stale one (expired, dead pid on this host,
@@ -216,7 +217,8 @@ failure). Slots missed while the Mac slept or was off (more than
 `missed_after_minutes` late; "asleep" = the gap since the previous tick ENDED, so a long run inside a tick never
 counts) never auto-run: they collapse into one pending record (`data/runs/catch_up.json`, written under
 `tick.lock`; `careeros run catch-up` holds the same lock and removes only the kinds it ran) that
-the candidate starts with `careeros run catch-up` or drops with `--dismiss`. `careeros run pause [--until +2h|ISO]`
+the candidate starts with `careeros run catch-up` or drops with `--dismiss` (`schedule.missed_runs: ask`,
+Recommended; `skip` records missed slots in schedule.json without a catch-up). `careeros run pause [--until +2h|ISO]`
 stops the current batch before its next job and makes ticks skip due slots (not stored up); `careeros run resume`
 lifts it. State: `data/runs/schedule.json` (last tick, last run per job).
 

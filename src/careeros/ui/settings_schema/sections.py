@@ -10,7 +10,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from careeros import retention
+from careeros import outreach, retention
 from careeros.doctor import KNOWN_ATS
 from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
@@ -167,7 +167,16 @@ OUTREACH_FIELDS = (
             "1st-degree LinkedIn connections never get an automated message; they become an Action Item."),
     _switch(P, "outreach.manual_if_mutuals", "Tailor by hand when you have mutual connections", True,
             "Anyone with mutuals is handled by hand. Record what LinkedIn shows with `careeros outreach mark`."),
+    _num(P, "outreach.mutuals_threshold", "Minimum mutual connections", outreach.OutreachPolicy.mutuals_threshold,
+         lo=outreach.MUTUALS_THRESHOLD_RANGE[0], hi=outreach.MUTUALS_THRESHOLD_RANGE[1], unit="or more",
+         help="Counts people with at least this many mutual connections."),
 )
+# Rules the code enforces with no key to change them (shown as locked rows).
+DREAM_FLAG_ONLY = Policy("Dream companies", "Flag only",
+                         "Ghost-job checks only flag a dream company for review; they never skip it.")
+MANUAL_LOCK = Policy("Manual commands during a run", "Share the job lock",
+                     "/prepare-job, /apply-job and `careeros job status` take the same per-job lock as runs; on a job "
+                     "a run is working on they stop and say so. Run them again once the run moves on.")
 
 
 def _tier(t: str, desc: str, auto: bool, cover: str, outreach: str, review: list[str]) -> Group:
@@ -298,6 +307,8 @@ SECTIONS: tuple[Section, ...] = (
                   ["workday", "icims", "taleo", "smartrecruiters", "jobvite", "successfactors", "custom"],
                   options=ATS_FAMILIES, strict=True),
             _tags(T, "safety.pause_on", "Always stop and ask on", list(PAUSE_TRIGGERS), options=PAUSE_TRIGGERS),
+            _switch(T, "safety.pause_auto_submit", "Pause all auto-submit", False,
+                    "Everything stops at Prepared until you turn this off: Apply fills the form and you submit."),
         )),
         Group("scam", "Scam checks", (
             _num(T, "safety.scam.salary_max_multiple", "Review salaries above", 3, lo=1, integer=False,
@@ -317,6 +328,7 @@ SECTIONS: tuple[Section, ...] = (
                  unit="days"),
             _num(T, "safety.ghost.layoff_window_days", "Layoffs count for", G["layoff_window_days"], lo=1,
                  unit="days"),
+            DREAM_FLAG_ONLY,
         )),
         Group("levels", "Check levels", (
             Field(T, "safety.levels", "reason_levels", "Change a check's level", default={}, options=SAFETY_CODES,
@@ -390,6 +402,10 @@ SECTIONS: tuple[Section, ...] = (
             _switch(P, "runs.stop_on_timeout", "Stop the run on a timeout", True,
                     "A hung call usually means a login or prompt wait."),
             _num(P, "runs.max_consecutive_failures", "Stop after failures in a row", 3, lo=1),
+            Field(P, "runs.on_usage_limit", "select", "When Claude hits your usage limit",
+                  default=runs_cfg.RunsConfig.on_usage_limit, options=runs_cfg.ON_USAGE_LIMIT,
+                  help="The run stops and says so. Stop: the next scheduled run tries again. "
+                       "Pause: all runs stay paused until you resume them."),
         )),
         Group("ranking", "Ranking", (
             _num(P, "runs.ranking.freshness_weight", "Freshness", R["freshness_weight"], hi=100, control="slider",
@@ -429,6 +445,7 @@ SECTIONS: tuple[Section, ...] = (
             _tags(P, "runs.required_mcp_servers", "Required MCP servers", [],
                   help="Servers every run needs logged in. Inbox sync carries its own gmail."),
             _num(P, "runs.job_lock_minutes", "Job lock expires after", 120, lo=1, unit="min"),
+            MANUAL_LOCK,
         )),
         Group("tools", "Allowed tools", (
             _tags(P, "llm.allowed_tools", "Tools a run may use", runs_cfg.DEFAULT_ALLOWED_TOOLS,
@@ -436,7 +453,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("schedule", "Schedule", (
             Field(P, "schedule.jobs.scout", "schedule", "Scout", default=JOBS["scout"],
-                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours."),
+                  check=_schedule_check("scout"), help="Every 2–3 hours. Ignores quiet hours unless Scout follows quiet hours is on."),
             Field(P, "schedule.jobs.inbox_sync", "schedule", "Inbox sync", default=JOBS["inbox_sync"],
                   check=_schedule_check("inbox_sync"), help="Off until the inbox-sync skill is finished."),
             Field(P, "schedule.jobs.score", "schedule", "Score", default=JOBS["score"],
@@ -447,12 +464,18 @@ SECTIONS: tuple[Section, ...] = (
                   check=_schedule_check("prune")),
             _num(P, "schedule.tick_minutes", "Check every", 15, lo=1, unit="min"),
             _num(P, "schedule.missed_after_minutes", "Missed after", 60, lo=1, unit="min",
-                 help="Slots missed while the Mac was off collapse into one catch-up you start."),
+                 help="A slot more than this late (Mac asleep or off) counts as missed; handled per Missed runs below."),
         )),
-        Group("quiet", "Quiet hours", (
+        Group("quiet", "Quiet hours and missed runs", (
             Field(P, "schedule.quiet_hours", "time_range", "Quiet hours",
                   default={"start": schedule.DEFAULT_QUIET[0], "end": schedule.DEFAULT_QUIET[1]}, nullable=True,
-                  help="Score, prepare and inbox sync never start inside it. Scout and prune ignore it."),
+                  help="Score, prepare and inbox sync never start inside it. Prune ignores it."),
+            _switch(P, "schedule.scout_quiet_hours", "Scout follows quiet hours",
+                    schedule.ScheduleConfig.scout_quiet_hours, "Scout uses no Claude quota, so it runs any time."),
+            Field(P, "schedule.missed_runs", "select", "Missed runs", default=schedule.ScheduleConfig.missed_runs,
+                  options=schedule.MISSED_RUNS,
+                  help="Mac off or asleep at run time. Missed runs never start on their own. Ask: one catch-up "
+                       "prompt on Today and Runs. Skip: they are dropped."),
             Field(P, "schedule.timezone", "text", "Time zone", default="local",
                   help="local, or an IANA name like America/New_York."),
         )),
