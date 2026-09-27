@@ -1,47 +1,18 @@
-// Matches src/careeros/ui/services/actions.py (GET /api/actions and the write responses).
+// JSON shapes of the Actions API (src/careeros/ui/services/actions.py).
+// The GET view is generated from the backend TypedDicts (ui/openapi.json -> src/api/schema.gen.ts); write results stay hand-written.
+import type { components } from "../../api/schema.gen";
+
+type Schemas = components["schemas"];
 
 export type Tab = "open" | "today" | "done";
 export type GroupBy = "due" | "priority" | "needs";
 export type SortBy = "soonest" | "priority" | "newest";
 export type DueLevel = "overdue" | "soon" | "later" | "none";
 
-export interface ActionItem {
-  id: string;
-  created: string | null;
-  job_id: string | null;
-  company: string;
-  role: string;
-  type: string;
-  what: string;
-  link: string;
-  priority: string;
-  needs: string;
-  done: boolean;
-  done_date: string | null;
-  due: string | null;
-  due_date_only: boolean;
-  due_reason: string | null;
-  bucket: string;
-  level: DueLevel;
-  scam_actions: boolean;
-}
-
-export interface ActionGroup {
-  key: string;
-  count: number;
-  items: ActionItem[];
-}
-
-export interface ActionsView {
-  tab: Tab;
-  group: GroupBy;
-  sort: SortBy;
-  counts: { open: number; today: number; done: number };
-  head: { overdue: number; soon: number };
-  groups: ActionGroup[];
-  more_done: number;
-  now: string;
-}
+/** GET /api/actions (services/actions.py). The tab/group/sort/level fields arrive as plain strings. */
+export type ActionItem = Schemas["ActionItem"];
+export type ActionGroup = Schemas["ActionGroup"];
+export type ActionsView = Schemas["ActionsPage"];
 
 export interface WriteResult {
   ok: string[];
