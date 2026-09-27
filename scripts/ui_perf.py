@@ -9,10 +9,14 @@ folders under data/jobs (posting/status/score/safety/qa, some contacts.json + ou
 the runs dir, and the tracker workbook via careeros.tracker. Companies are "Acme <n>", addresses example.com.
 
 --root times: a full reindex into a fresh index file, the median of 5 GETs of each screen's first page through
-FastAPI's TestClient, and (unless --no-burst) a 200-job-file burst through the real watcher (watchfiles ->
-Watcher.handle -> Index.update_jobs) until the index reflects every change, plus the handler alone. The index goes
-to --index (default: a temp file), never the root's data/. Without --no-burst the root is written to (the burst
-rewrites 200 status.json files), so use --no-burst on any real data.
+FastAPI's TestClient, and a 200-job-file burst through the real watcher (watchfiles -> Watcher.handle ->
+Index.update_jobs) until the index reflects every change, plus the handler alone. The index goes to --index
+(default: a temp file), never the root's data/.
+
+The burst rewrites 200 status.json files, so it only runs when --root is a --synth output: --synth marks its
+root with a `.ui-perf-synthetic` file, and the burst is skipped (with a printed note) unless that marker is
+present. This makes running --root against real job data safe by default. --no-burst still forces the burst
+off explicitly; it is otherwise a no-op now that the marker guard covers real data.
 """
 from __future__ import annotations
 
@@ -30,6 +34,7 @@ from pathlib import Path
 from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
+SYNTHETIC_MARKER = ".ui-perf-synthetic"
 SCREENS = ("/api/jobs", "/api/pipeline", "/api/today", "/api/contacts", "/api/inbox", "/api/runs")
 LIMITS_MS = {"screen": 1000, "reindex": 30_000, "burst": 5000}
 FLOW = ["found", "scored", "queued", "prepared", "needs_review", "applied", "screening", "interview"]
@@ -63,6 +68,8 @@ def _make_root(out: Path) -> Path:
     pipeline = yaml.safe_load((out / "config" / "pipeline.yaml").read_text())
     pipeline.setdefault("paths", {})["tracker_xlsx"] = "data/JobTracker.xlsx"
     (out / "config" / "pipeline.yaml").write_text(yaml.safe_dump(pipeline, sort_keys=False))
+    (out / SYNTHETIC_MARKER).write_text("written by ui_perf.py --synth; the watcher burst only runs when this "
+                                         "file is present at --root, since the burst rewrites status.json files\n")
     return out
 
 
@@ -240,7 +247,11 @@ def measure(root: Path, index_path: Path | None = None, *, burst: bool = True) -
         res: dict[str, Any] = {"jobs": ix.query("SELECT COUNT(*) AS n FROM jobs")[0]["n"], "reindex_ms": _ms(t0)}
         res["screens_ms"] = _screens(settings, ix)
         if burst:
-            res["burst"] = _burst(settings, ix)
+            if (Path(root) / SYNTHETIC_MARKER).is_file():
+                res["burst"] = _burst(settings, ix)
+            else:
+                print(f"skipping watcher burst: no {SYNTHETIC_MARKER} marker at {root} (only a --synth root is "
+                      "safe to burst-write; pass --root a --synth output to time the watcher)", file=sys.stderr)
         return res
     finally:
         ix.close()
@@ -269,7 +280,9 @@ def main(argv: list[str] | None = None) -> int:
     ap.add_argument("--out", type=Path, help="where --synth writes (must not exist)")
     ap.add_argument("--root", type=Path, help="repo root to time")
     ap.add_argument("--index", type=Path, help="index file to build (default: a temp file)")
-    ap.add_argument("--no-burst", action="store_true", help="skip the watcher burst (never writes to --root)")
+    ap.add_argument("--no-burst", action="store_true",
+                     help="force-skip the watcher burst; the burst is already skipped unless --root carries "
+                          f"the {SYNTHETIC_MARKER} marker a --synth run writes, so this is mostly a no-op alias")
     ap.add_argument("--json", action="store_true")
     a = ap.parse_args(argv)
     if a.synth is not None:

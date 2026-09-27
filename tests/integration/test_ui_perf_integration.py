@@ -24,3 +24,32 @@ def test_measure_small_root_keeps_index_outside(tmp_path):
     assert res["jobs"] == 12 and set(res["screens_ms"]) == set(ui_perf.SCREENS)
     assert not (root / "data" / "careeros.db").exists() and (tmp_path / "ix" / "careeros.db").exists()
     assert "full reindex" in ui_perf.table(res)
+
+
+def _job_file_snapshot(root: Path) -> dict[Path, tuple[float, int]]:
+    return {p: (p.stat().st_mtime_ns, len(p.read_bytes()))
+            for p in (root / "data" / "jobs").glob("*/status.json")}
+
+
+def test_measure_skips_burst_without_synthetic_marker(tmp_path):
+    """A root written by --synth carries the .ui-perf-synthetic marker; a real data root does not, so the burst
+    (which rewrites status.json files) must never run against it even if burst=True is requested."""
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    root = ui_perf.synth(12, tmp_path / "root", now=NOW)["root"]
+    marker = root / ui_perf.SYNTHETIC_MARKER
+    assert marker.is_file()                            # --synth writes it
+    marker.unlink()                                     # simulate a real, non-synthetic root
+    before = _job_file_snapshot(root)
+    res = ui_perf.measure(root, tmp_path / "ix" / "careeros.db", burst=True)
+    assert "burst" not in res
+    assert _job_file_snapshot(root) == before           # not a single status.json touched
+
+
+def test_measure_runs_burst_with_synthetic_marker(tmp_path):
+    pytest.importorskip("fastapi")
+    pytest.importorskip("httpx")
+    root = ui_perf.synth(12, tmp_path / "root", now=NOW)["root"]
+    assert (root / ui_perf.SYNTHETIC_MARKER).is_file()
+    res = ui_perf.measure(root, tmp_path / "ix" / "careeros.db", burst=True)
+    assert "burst" in res and res["burst"]["files"] == 12

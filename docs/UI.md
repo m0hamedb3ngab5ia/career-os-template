@@ -314,10 +314,13 @@ Re-run (the index goes to `--index` or a temp file, never the root's `data/`):
 ```bash
 PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --synth 5000 --out /tmp/cos-perf   # fictional root
 PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --root /tmp/cos-perf              # timings + watcher burst
-PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --root . --index /tmp/real.db --no-burst  # own data, read-only
+PYTHONPATH=src .venv/bin/python scripts/ui_perf.py --root . --index /tmp/real.db     # own data, read-only
 ```
 
-`--no-burst` skips the watcher burst, which rewrites 200 `status.json` files; always pass it on real data.
+The watcher burst rewrites 200 `status.json` files, so it only runs when `--root` is a `--synth` output: `--synth`
+marks its root with a `.ui-perf-synthetic` file, and the burst is skipped (with a printed note) unless that marker
+is present at `--root`. Running against real data (like the last command above) is safe by default. `--no-burst`
+still force-skips the burst explicitly; it's otherwise a no-op alias now that the marker guards real data.
 
 ## HIG notes
 
