@@ -3,14 +3,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from careeros.ui.settings_schema.model import (
-    CONTROLS,
-    Field,
-    Group,
-    Policy,
-    Section,
-    validate_value,
-)
+from careeros.ui.settings_schema.model import CONTROLS, Field, Group, Policy, Section, validate_value
 from careeros.ui.settings_schema.sections import NOT_IN_UI, SAFETY_CODES, SECTIONS
 
 __all__ = ["CONTROLS", "NOT_IN_UI", "SAFETY_CODES", "SECTIONS", "Field", "Group", "Policy", "Section",

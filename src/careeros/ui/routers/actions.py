@@ -47,7 +47,7 @@ class UndoSafe(BaseModel):
     registry_before: dict[str, Any] | None = None
 
 
-def _run(fn, *args: Any) -> Any:
+def _run(fn, *args: Any) -> Any:  # noqa: ANN001
     try:
         return fn(*args)
     except LookupError as e:

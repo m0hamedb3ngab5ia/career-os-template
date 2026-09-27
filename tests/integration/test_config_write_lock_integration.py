@@ -7,7 +7,6 @@ import json
 import subprocess
 import threading
 import time
-from datetime import UTC
 from pathlib import Path
 
 import pytest
@@ -79,7 +78,8 @@ def _seed_snapshots(root: Path) -> None:
     mb = 1024 * 1024
     runs = root / "data" / "runs"
     runs.mkdir(parents=True, exist_ok=True)
-    now = datetime.now(UTC)
+    from datetime import datetime, timedelta, timezone
+    now = datetime.now(timezone.utc)
     lines = []
     for i, day in enumerate((21, 10, 0)):
         total = int((100 + 800 * i / 2) * mb)

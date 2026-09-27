@@ -244,7 +244,7 @@ def status(settings: Any, ix: Any, now: datetime) -> Status:
     from careeros.runs.tick import load_catch_up
 
     rs = RunStore(settings)
-    one = lambda sql, params=(): ix.query(sql, params)[0]["n"]
+    one = lambda sql, params=(): ix.query(sql, params)[0]["n"]  # noqa: E731
     return {
         "now": now.isoformat(),
         "tiles": tiles(ix, settings, now),

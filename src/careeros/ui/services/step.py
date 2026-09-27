@@ -15,11 +15,10 @@ import io
 import os
 import signal
 import sys
-from collections.abc import Callable
 from contextlib import redirect_stderr, redirect_stdout
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from careeros.config import Settings
 from careeros.runs import locks
@@ -78,7 +77,7 @@ def default_actions(settings: Settings) -> dict[str, Callable[[], tuple[str, str
 
 
 def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], tuple[str, str]]] | None = None,
-             now: Callable[[], datetime] = lambda: datetime.now(UTC)) -> dict[str, Any]:
+             now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> dict[str, Any]:
     """Run scout | tracker | prune once, recorded as a run. Raises StepBusy when one of that kind is running."""
     if kind not in ("scout", "tracker", "prune"):
         raise ValueError(f"unknown step {kind!r}")

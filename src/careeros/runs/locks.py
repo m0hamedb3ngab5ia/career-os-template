@@ -20,12 +20,11 @@ import os
 import socket
 import time
 import uuid
-from collections.abc import Callable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass, field
-from datetime import UTC, datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterator
 
 try:
     import fcntl
@@ -51,7 +50,7 @@ class Lock:
 
 
 def _now() -> datetime:
-    return datetime.now(UTC)
+    return datetime.now(timezone.utc)
 
 
 def pid_alive(pid: int) -> bool:
@@ -69,7 +68,7 @@ def _parse(ts: Any) -> datetime | None:
         dt = datetime.fromisoformat(str(ts))
     except ValueError:
         return None
-    return dt if dt.tzinfo else dt.replace(tzinfo=UTC)
+    return dt if dt.tzinfo else dt.replace(tzinfo=timezone.utc)
 
 
 def read(path: Path) -> dict[str, Any] | None:

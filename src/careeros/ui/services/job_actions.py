@@ -23,7 +23,7 @@ from careeros.ui.services.jobs import job_dir_for
 
 OVERRIDES = ("", "A", "B", "C", "skip", "manual")      # the tracker's Override list validation
 SUBMITTED_NOTE = "submitted by you (marked in careeros ui)"
-_URL = re.compile(r"^https?://\S+$", re.IGNORECASE)
+_URL = re.compile(r"^https?://\S+$", re.I)
 
 
 def _job(settings: Any, job_id: str) -> Path:

@@ -4,7 +4,7 @@ timing the stream out."""
 from __future__ import annotations
 
 import asyncio
-from collections.abc import AsyncIterator
+from typing import AsyncIterator
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -26,7 +26,7 @@ async def events(request: Request, c=Depends(ctx)) -> StreamingResponse:
             while not await request.is_disconnected():
                 try:
                     event, data, eid = await asyncio.wait_for(q.get(), HEARTBEAT_S)
-                except TimeoutError:
+                except asyncio.TimeoutError:
                     yield ": keep-alive\n\n"
                     continue
                 yield format_sse(event, data, id=str(eid))

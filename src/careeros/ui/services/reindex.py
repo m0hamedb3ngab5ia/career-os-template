@@ -3,8 +3,7 @@ tell every open tab with the same `changed` event the file watcher sends. The wa
 change, finds them already indexed, and stays quiet, so each write produces one event."""
 from __future__ import annotations
 
-from collections.abc import Iterable
-from typing import Any
+from typing import Any, Iterable
 
 
 def after_write(ctx: Any, *, jobs: Iterable[str] = (), tracker: bool = False, config: bool = False) -> dict[str, Any]:

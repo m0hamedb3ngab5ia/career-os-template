@@ -11,8 +11,8 @@ from __future__ import annotations
 from typing import Any
 
 from careeros import outreach, retention
-from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.doctor import KNOWN_ATS
+from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
 from careeros.safety import ghost

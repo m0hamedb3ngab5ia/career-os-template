@@ -8,9 +8,8 @@ Tests (and nothing else) swap the process edges by setting `app.state.run_contro
 from __future__ import annotations
 
 import threading
-from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
-from typing import Any, Literal
+from typing import Any, AsyncIterator, Iterator, Literal
 
 import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Query, Request

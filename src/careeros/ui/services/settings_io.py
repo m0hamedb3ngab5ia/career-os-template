@@ -19,13 +19,7 @@ import yaml
 
 from careeros.config import ConfigError, Settings
 from careeros.runs import locks, yamledit
-from careeros.ui.settings_schema import (
-    Field,
-    Section,
-    get_section,
-    reset_group,
-    validate_value,
-)
+from careeros.ui.settings_schema import Field, Section, get_section, reset_group, validate_value
 
 _MISSING = object()
 

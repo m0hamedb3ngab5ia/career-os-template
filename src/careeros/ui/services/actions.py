@@ -9,9 +9,8 @@ browser sends its IANA name; the server's own zone otherwise). A due date withou
 from __future__ import annotations
 
 import re
-from collections.abc import Iterable
 from datetime import date, datetime, time, timedelta, tzinfo
-from typing import Any
+from typing import Any, Iterable
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from careeros.models import ACTION_NEEDS, ACTION_TYPES, parse_due
@@ -24,7 +23,7 @@ BUCKETS = ("overdue", "today", "tomorrow", "week", "later", "nodate")
 TODAY_TAB = ("overdue", "today", "tomorrow")
 PRIORITIES = ("H", "M", "L")
 _PRIO_RANK = {p: i for i, p in enumerate(PRIORITIES)}
-_HTTP = re.compile(r"^https?://[^\s]+$", re.IGNORECASE)
+_HTTP = re.compile(r"^https?://[^\s]+$", re.I)
 MAX_WHAT = 500
 
 
@@ -101,7 +100,7 @@ def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> dict
     }
 
 
-def _sort_key(sort: str):
+def _sort_key(sort: str):  # noqa: ANN202
     def due_k(i: dict[str, Any]) -> tuple[int, float]:
         return (0, datetime.fromisoformat(i["due"]).timestamp()) if i["due"] else (1, 0.0)
 
@@ -196,7 +195,7 @@ def validate_new_item(body: dict[str, Any]) -> dict[str, Any]:
             "role": str(body.get("role") or "").strip(), "due": due, "due_reason": reason or None}
 
 
-def _tracker(settings: Any):
+def _tracker(settings: Any):  # noqa: ANN202
     from careeros.tracker import Tracker
 
     return Tracker(settings=settings)
@@ -266,18 +265,17 @@ def _company(settings: Any, it: dict[str, Any]) -> str:
     return company.strip()
 
 
-def _blocklist_path(settings: Any):
+def _blocklist_path(settings: Any):  # noqa: ANN202
     from careeros.ui.services.settings_io import config_path
 
     return config_path(settings, "companies")
 
 
 def _set_blocklist(settings: Any, companies: list[str]) -> None:
-    """Caller holds locks.config_lock (the read that produced `companies` + this write are one step)."""
     from careeros.runs import yamledit
     from careeros.ui.services.settings_io import validate_root
 
-    root = settings.root
+    root = settings.root  # caller holds locks.config_lock: the read that produced `companies` + this write are one step
     yamledit.apply_changes(_blocklist_path(settings), [("blocklist.companies", companies)],
                            validate=lambda _p: validate_root(root))
 
@@ -332,6 +330,7 @@ def mark_safe(settings: Any, ix: Any, aid: str) -> dict[str, Any]:
     from careeros.safety import registry
     from careeros.store import Store
     from careeros.tracker import set_status_both
+
     from careeros.ui.services.job_actions import ensure_unlocked
 
     it = _scam_item(ix, aid)

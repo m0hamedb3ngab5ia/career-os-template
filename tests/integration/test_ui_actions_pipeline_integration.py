@@ -3,7 +3,7 @@ data. Every write lands in the real files (tracker, status.json, companies.yaml,
 answers the next GET, and one `changed` event goes to open tabs."""
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 
 import pytest
 import yaml
@@ -11,19 +11,19 @@ from conftest import make_temp_root
 from fixtures.ui_data import add_scam_case, build_ui_data
 
 pytest.importorskip("fastapi")
-from fastapi.testclient import TestClient
+from fastapi.testclient import TestClient  # noqa: E402
 
-from careeros.safety import registry
-from careeros.store import Store
-from careeros.tracker import Tracker
-from careeros.ui.app import create_app
-from careeros.ui.events import Broker
-from careeros.ui.index import Index
-from careeros.ui.security import LOOPBACK
+from careeros.safety import registry  # noqa: E402
+from careeros.store import Store  # noqa: E402
+from careeros.tracker import Tracker  # noqa: E402
+from careeros.ui.app import create_app  # noqa: E402
+from careeros.ui.events import Broker  # noqa: E402
+from careeros.ui.index import Index  # noqa: E402
+from careeros.ui.security import LOOPBACK  # noqa: E402
 
 pytestmark = pytest.mark.integration
 
-NOW = datetime(2026, 9, 24, 15, 0, tzinfo=UTC)
+NOW = datetime(2026, 9, 24, 15, 0, tzinfo=timezone.utc)
 W = {"X-CareerOS": "1"}
 
 
@@ -32,7 +32,7 @@ class Spy(Broker):
         super().__init__()
         self.sent: list[tuple[str, dict]] = []
 
-    def publish(self, event, data):
+    def publish(self, event, data):  # noqa: ANN001, ANN201
         self.sent.append((event, data))
         return super().publish(event, data)
 
@@ -206,7 +206,7 @@ def test_undo_block_leaves_an_existing_blocklist_entry(env, data):
     assert scam["action_id"] in _items(c.get("/api/actions").json())
 
 
-def _hold_lock(s, job_id):
+def _hold_lock(s, job_id):  # noqa: ANN001, ANN202
     import os
 
     from careeros.runs import locks

@@ -7,7 +7,7 @@ cross-site form or image cannot add without a CORS preflight, which this server 
 """
 from __future__ import annotations
 
-from collections.abc import Mapping
+from typing import Mapping
 from urllib.parse import urlsplit
 
 LOOPBACK = frozenset({"127.0.0.1", "localhost", "::1"})

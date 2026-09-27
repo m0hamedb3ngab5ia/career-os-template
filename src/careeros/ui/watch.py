@@ -10,10 +10,9 @@ from __future__ import annotations
 import logging
 import os
 import threading
-from collections.abc import Callable, Iterable
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable, Iterable
 
 from careeros.store import _is_finder_copy
 
@@ -179,14 +178,14 @@ class Watcher:
     def _handle_batch(self, paths: Iterable[Path | str]) -> None:
         try:
             self.handle(paths)
-        except Exception:
+        except Exception:  # noqa: BLE001 - one bad batch must not stop live updates
             log.exception("careeros ui: re-index after a file change failed")
 
     def _loop(self, dirs: list[Path], recursive: bool) -> None:
         try:
             for changes in self._watch(dirs, recursive):
                 self._handle_batch(p for _, p in changes)
-        except Exception:
+        except Exception:  # noqa: BLE001
             log.exception("careeros ui: file watcher stopped; restart `careeros ui` for live updates")
 
     def _tracker_loop(self) -> None:
@@ -208,7 +207,7 @@ class Watcher:
                     self._stop.wait(backoff)
                     if not self._stop.is_set() and folder.is_dir() and self.roots.tracker.exists():
                         self._handle_batch([self.roots.tracker])   # may have changed while the watch was down
-        except Exception:
+        except Exception:  # noqa: BLE001
             log.exception("careeros ui: tracker watcher stopped; restart `careeros ui` for live updates")
         finally:
             self._tracker_watching = None

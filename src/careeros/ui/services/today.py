@@ -5,7 +5,7 @@ fields); Mark done / Undo go through /api/actions/{id}/done|reopen.
 """
 from __future__ import annotations
 
-from datetime import UTC, datetime, tzinfo
+from datetime import datetime, timezone, tzinfo
 from typing import Any
 
 from careeros.config import ConfigError
@@ -35,6 +35,6 @@ def prepare_queue(settings: Any, now: datetime) -> dict[str, Any]:
     return {"total": len(ranked), "error": None}
 
 
-def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = UTC,
+def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
           soon_hours: int = 48) -> dict[str, Any]:
     return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, now)}

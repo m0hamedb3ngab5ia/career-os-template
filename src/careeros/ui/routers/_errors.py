@@ -3,8 +3,8 @@ macOS) -> 409 with the plain-language reason. A job
 locked by a run (JobLocked) -> 409 is handled app-wide in app.py, like ValueError -> 400. ValueError -> 400 is handled app-wide in app.py."""
 from __future__ import annotations
 
-from collections.abc import Iterator
 from contextlib import contextmanager
+from typing import Iterator
 
 from fastapi import HTTPException
 
