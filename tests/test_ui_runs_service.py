@@ -194,6 +194,26 @@ def test_step_run_records_cancel(settings):
     assert rec["stop_reason"] == "cancelled"
 
 
+def test_step_output_streams_to_run_log_while_running(settings, rc):
+    """Scout prints progress; each line reaches run.log (and so the tail endpoint) before the step ends."""
+    import sys
+
+    seen: list[list[str]] = []
+
+    def scout():
+        print("scanning board 1")
+        print("half", end="")
+        print(" line done", file=sys.stderr)
+        rid = RunStore(settings).run_ids()[-1]
+        seen.append([e["text"] for e in rc.tail(rid, follow=False) if e["type"] == "log"])
+        return "ok", "fetched=1"
+
+    rec = step_mod.run_step(settings, "scout", actions={"scout": scout})
+    assert any(t.endswith("scanning board 1") for t in seen[0])
+    log = RunStore(settings).read_log(rec["id"])
+    assert "scanning board 1" in log and "half line done" in log
+
+
 def test_step_run_busy_when_locked(settings):
     rs = RunStore(settings)
     locks.acquire(step_mod.step_lock_path(rs, "scout"), owner="step:x", ttl_seconds=600, pid=1,

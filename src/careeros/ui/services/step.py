@@ -5,14 +5,17 @@ restart) and records it like a batch: data/runs/<id>/run.json (kind scout|tracke
 so Runs › History shows it. The work itself is the scheduler's (`tick.default_actions`) or the CLI's
 (`tracker.sync_all`); nothing is reimplemented. One step of a kind at a time: data/runs/step-<kind>.lock.
 Inbox sync is a headless skill call; `service.run_skill` records its own run and holds the runner lock.
+The step's stdout/stderr lines go to its run.log, so the Runs log tail streams them.
 SIGTERM (the UI's Cancel) ends the step with stop reason `cancelled`.
 """
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import signal
 import sys
+from contextlib import redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable
@@ -29,6 +32,29 @@ LOCK_TTL_S = 3 * 3600  # a dead pid frees it sooner
 class StepBusy(Busy):
     def __init__(self, holder: dict[str, Any]):
         super().__init__(holder, f"a {holder.get('note') or 'step'} step is already running")
+
+
+class _RunLogWriter(io.TextIOBase):
+    """stdout/stderr of a step, one run.log line per printed line, so the Runs log tail shows progress live."""
+
+    def __init__(self, rs: RunStore, run_id: str):
+        self.rs, self.run_id, self.buf = rs, run_id, ""
+
+    def writable(self) -> bool:
+        return True
+
+    def write(self, s: str) -> int:
+        self.buf += s
+        *lines, self.buf = self.buf.split("\n")
+        for line in lines:
+            if line.strip():
+                self.rs.log(self.run_id, line.rstrip())
+        return len(s)
+
+    def flush(self) -> None:
+        if self.buf.strip():
+            self.rs.log(self.run_id, self.buf.rstrip())
+        self.buf = ""
 
 
 def step_lock_path(rs: RunStore, kind: str) -> Path:
@@ -66,9 +92,11 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
     run = rs.new_run(kind, "manual", {}, start, run_id=rid, step=True)
     rs.log(rid, f"start {kind}")
     status, stop, detail = "done", "completed", ""
+    out = _RunLogWriter(rs, rid)
     try:
         actions = actions if actions is not None else default_actions(settings)
-        result, detail = actions[kind]()
+        with redirect_stdout(out), redirect_stderr(out):
+            result, detail = actions[kind]()
         if result != "ok":
             status, stop = "failed", "error"
     except KeyboardInterrupt:
@@ -76,6 +104,7 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
     except Exception as e:  # noqa: BLE001 - recorded on the run; the UI shows it
         status, stop, detail = "failed", "error", f"{type(e).__name__}: {e}"[:500]
     finally:
+        out.flush()
         end = now()
         run.update(status=status, stop_reason=stop, detail=detail, ended_at=iso(end),
                    duration_s=round((end - start).total_seconds(), 1))
