@@ -35,7 +35,7 @@ export function RunDetailPage() {
   }
   if (!run) {
     return (
-      <Page title="Run">
+      <Page busy title="Run">
         {back}
         <p className={styles.sub}>Loading…</p>
       </Page>
@@ -124,7 +124,7 @@ export function RunDetailPage() {
           <h2 id="log-h" className={styles.h2}>
             {live ? "Live output" : "run.log"}
           </h2>
-          <LogPane label={live ? "Live run output" : "Run log"} lines={logLines} empty="Nothing logged." />
+          <LogPane label={live ? "Live run output" : "Run log"} lines={logLines} empty="Nothing logged." live={live} />
         </section>
       </div>
     </Page>

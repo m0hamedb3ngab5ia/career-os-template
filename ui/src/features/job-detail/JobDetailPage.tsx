@@ -142,7 +142,7 @@ export function JobDetailPage() {
 
   if (job.isPending) {
     return (
-      <Page title="Job" subtitle={<Breadcrumb company="Loading…" />}>
+      <Page busy title="Job" subtitle={<Breadcrumb company="Loading…" />}>
         <p className={styles.muted}>Loading job…</p>
       </Page>
     );
