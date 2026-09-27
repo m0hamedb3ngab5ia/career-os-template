@@ -513,3 +513,24 @@ def test_status_reads_keep_file_from_head_not_working_tree(repos, env):
     (priv / ".template-sync-keep").write_text("README.md  # private\nsrc/app.py  # uncommitted\n")
     r = cli(priv, env, "status")
     assert r.returncode == 2 and "src/app.py" in r.stdout, r.stdout + r.stderr
+
+
+def test_hook_scans_full_history_when_ls_remote_would_rewrite_the_push_url_to_another_repo(repos, env, tmp_path):
+    # git hands the hook the URL after pushInsteadOf; ls-remote applies insteadOf again, so a global rule can point
+    # it at a mirror that already has the leak branch: its tips must not be excluded, the full history is scanned
+    priv = repos["private"]
+    assert cli(priv, env, "install-hook").returncode == 0
+    mirror = tmp_path / "mirror.git"
+    git(tmp_path, env, "init", "-q", "--bare", "-b", "main", str(mirror))
+    git(priv, env, "switch", "-q", "-c", "leak", "template/main")
+    commit(priv, env, {"personal/c.md": "secret\n"}, "add personal by mistake")
+    git(priv, env, "rm", "-q", "personal/c.md")
+    git(priv, env, "commit", "-q", "-m", "remove it again")
+    git(priv, env, "push", "-q", str(mirror), "leak")
+    t = str(repos["bare"])
+    git(tmp_path, env, "config", "--global", f"url.{t}.pushInsteadOf", "tmpl:")
+    git(tmp_path, env, "config", "--global", f"url.{mirror}.insteadOf", t)
+    git(priv, env, "remote", "add", "tmpl", "tmpl:")
+    r = git(priv, env, "push", "tmpl", "leak", check=False)
+    assert r.returncode != 0 and "BLOCKED" in r.stderr and "personal/c.md" in r.stderr
+    assert git(repos["bare"], env, "branch", "--list", "leak").stdout.strip() == ""

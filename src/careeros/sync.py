@@ -7,7 +7,8 @@ and a few files it keeps different on purpose, listed in `.template-sync-keep` (
   personal paths and the keep list (those should be ported to the template).
 - `pull`: merge the template's branch on a `sync/<date>` branch, run the local checks, print the PR command.
 - `install-hook` / `check-template-push`: a pre-push guard that refuses personal paths going to a template URL.
-  "Already on the template" comes from `git ls-remote` of the push URL, never from local refs or config.
+  "Already on the template" comes from `git ls-remote` of the push URL, never from local refs or config; if an
+  insteadOf rule would make ls-remote ask a different URL, nothing counts as already there (full scan).
 
 Settings via git config: `careeros.personalPaths` (comma/space separated) and `careeros.templateUrlPattern`.
 """
@@ -431,7 +432,8 @@ def _is_local_path(url: str) -> bool:
 def remote_tips(root: Path, url: str) -> list[str]:
     """Every object id the remote at `url` advertises (`git ls-remote`), i.e. what it already has. Run outside
     the repo with repo-scoped env stripped, so no local/worktree/includeIf/one-off config can redirect it.
-    [] when the remote can't be asked: nothing is excluded then (full scan, fail safe)."""
+    [] when the remote can't be asked, or when (global) url.*.insteadOf would send ls-remote somewhere other than
+    `url`: nothing is excluded then (full scan, fail safe)."""
     import os
     import tempfile
 
@@ -441,7 +443,15 @@ def remote_tips(root: Path, url: str) -> list[str]:
            if k not in _LS_REMOTE_DROP and not k.startswith(("GIT_CONFIG_KEY_", "GIT_CONFIG_VALUE_"))}
     env["GIT_TERMINAL_PROMPT"] = "0"
     with tempfile.TemporaryDirectory() as neutral:
+        # the temp dir may sit inside a repo (TMPDIR): don't let git discover it and read its config
+        env["GIT_CEILING_DIRECTORIES"] = str(Path(neutral).resolve().parent)
         try:
+            # git gave us the URL after pushInsteadOf; ls-remote would apply insteadOf on top and could ask another
+            # repo. Only trust the answer when the URL resolves to itself.
+            g = subprocess.run(["git", *GIT_OVERRIDES, "ls-remote", "--get-url", "--", url], cwd=neutral, env=env,
+                               capture_output=True, text=True, timeout=30)
+            if g.returncode != 0 or g.stdout.strip() != url:
+                return []
             r = subprocess.run(["git", *GIT_OVERRIDES, "ls-remote", "--", url], cwd=neutral, env=env,
                                capture_output=True, text=True, timeout=120)
         except (OSError, subprocess.TimeoutExpired):

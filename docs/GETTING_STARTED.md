@@ -302,7 +302,8 @@ Settings (git config in the private copy):
 (the old one is kept as `pre-push.bak`).
 The guard checks the tip tree and every commit the push sends. To know what the template already has, it asks
 the template itself (`git ls-remote <push URL>`), never local remote-tracking refs; if the template can't be
-reached it scans the whole pushed history instead (slower, never less safe).
+reached, or a `url.*.insteadOf` rule would send that query to a different URL, it scans the whole pushed history
+instead (slower, never less safe).
 
 ## FAQ
 
