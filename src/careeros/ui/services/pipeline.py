@@ -8,7 +8,9 @@ from __future__ import annotations
 import json
 import threading
 from pathlib import Path
-from typing import Any
+from typing import Any, Literal, Union
+
+from typing_extensions import TypedDict
 
 from careeros.ui.config import load_ui_config
 
@@ -17,6 +19,81 @@ CARD_FIELDS = ("job_id", "company", "title", "location", "category", "fit", "tie
 FILTERS = ("tier", "category", "safety", "location")
 _PRIO = {"H": 0, "M": 1, "L": 2}
 PREPARE_STAGE = ("queued", "prepared", "needs_review")
+
+
+# Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable TEXT/INTEGER.
+class ActionHint(TypedDict):
+    kind: Literal["action"]
+    type: str
+    due: str | None
+    due_reason: str | None
+
+
+class SafetyHint(TypedDict):
+    kind: Literal["safety"]
+    text: str
+
+
+class NotScoredHint(TypedDict):
+    kind: Literal["not_scored"]
+
+
+class TierAHint(TypedDict):
+    kind: Literal["tier_a"]
+
+
+class QaFailedHint(TypedDict):
+    kind: Literal["qa_failed"]
+
+
+Hint = Union[ActionHint, SafetyHint, NotScoredHint, TierAHint, QaFailedHint]
+
+
+class Card(TypedDict):
+    job_id: str
+    company: str | None
+    title: str | None
+    location: str | None
+    category: str | None
+    fit: int | None
+    tier: str | None
+    status: str
+    safety: str | None
+    qa_passed: bool | None
+    qa_score: float | None
+    found_at: str | None
+    updated_at: str | None
+    override: str | None
+    hint: Hint | None
+
+
+class Column(TypedDict):
+    name: str
+    statuses: list[str]
+    count: int
+    cards: list[Card]
+
+
+class Closed(TypedDict):
+    count: int
+    by_status: dict[str, int]
+
+
+class LocationOption(TypedDict):
+    value: str
+    count: int
+
+
+class BoardOptions(TypedDict):
+    categories: list[str]
+    locations: list[LocationOption]
+
+
+class Board(TypedDict):
+    columns: list[Column]
+    closed: Closed
+    card_limit: int
+    options: BoardOptions
 
 
 def _where(filters: dict[str, list[str] | None]) -> tuple[str, list[Any]]:
@@ -87,7 +164,7 @@ def _safety_text(jobs_dir: Path, job_id: str) -> str | None:
     return None
 
 
-def card_hint(card: dict[str, Any], action: dict[str, Any] | None, safety_text: str | None) -> dict[str, Any] | None:
+def card_hint(card: dict[str, Any], action: dict[str, Any] | None, safety_text: str | None) -> Hint | None:
     """The one-line "what's next" under a card: an open Action Item, else a safety flag, else the stage."""
     if action:
         return {"kind": "action", "type": action.get("type") or "other", "due": action.get("due"),
@@ -125,7 +202,7 @@ def _open_actions(ix: Any, job_ids: list[str]) -> dict[str, dict[str, Any]]:
 
 def board(settings: Any, ix: Any, *, tier: list[str] | None = None, category: list[str] | None = None,
           safety: list[str] | None = None, location: list[str] | None = None,
-          expand: list[str] | None = None) -> dict[str, Any]:
+          expand: list[str] | None = None) -> Board:
     ui = load_ui_config(settings)
     where, params = _where({"tier": tier, "category": category, "safety": safety, "location": location})
     clause = f" AND {where}" if where else ""

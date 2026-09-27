@@ -1,0 +1,68 @@
+{
+  "actions": [
+    {
+      "bucket": "tomorrow",
+      "company": "Umbrella Labs",
+      "created": "<created>",
+      "done": false,
+      "done_date": null,
+      "due": "2026-09-25T15:00:00+00:00",
+      "due_date_only": false,
+      "due_reason": "posting closes",
+      "id": "<action:high>",
+      "job_id": "<job:review>",
+      "level": "soon",
+      "link": "https://boards.example.com/review",
+      "needs": "laptop",
+      "priority": "H",
+      "role": "Infrastructure Engineer",
+      "scam_actions": false,
+      "type": "review",
+      "what": "Review and submit"
+    },
+    {
+      "bucket": "nodate",
+      "company": "Initech",
+      "created": "<created>",
+      "done": false,
+      "done_date": null,
+      "due": null,
+      "due_date_only": false,
+      "due_reason": null,
+      "id": "<action:medium>",
+      "job_id": "<job:queued>",
+      "level": "none",
+      "link": "",
+      "needs": "anytime",
+      "priority": "M",
+      "role": "Platform Engineer",
+      "scam_actions": false,
+      "type": "salary",
+      "what": "Answer the salary question"
+    },
+    {
+      "bucket": "nodate",
+      "company": "Stark Industries",
+      "created": "<created>",
+      "done": false,
+      "done_date": null,
+      "due": null,
+      "due_date_only": false,
+      "due_reason": null,
+      "id": "<action:low>",
+      "job_id": "<job:interview>",
+      "level": "none",
+      "link": "",
+      "needs": "phone",
+      "priority": "L",
+      "role": "Software Engineer",
+      "scam_actions": false,
+      "type": "send_linkedin",
+      "what": "Send the LinkedIn note"
+    }
+  ],
+  "prepare_queue": {
+    "error": null,
+    "total": 0
+  }
+}

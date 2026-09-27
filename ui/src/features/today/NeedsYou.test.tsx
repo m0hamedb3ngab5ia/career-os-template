@@ -114,7 +114,7 @@ describe("NeedsYou", () => {
     const { calls } = setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
       "POST /api/actions/12/done": () => {
-        open = open.filter((a) => a.id !== 12);
+        open = open.filter((a) => a.id !== "12");
         return json({ ok: ["12"], queued: [], missing: [] });
       },
       "POST /api/actions/12/reopen": () => {
@@ -143,7 +143,7 @@ describe("NeedsYou", () => {
     setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
       "POST /api/actions/12/done": () => {
-        open = open.filter((a) => a.id !== 12);
+        open = open.filter((a) => a.id !== "12");
         return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
@@ -158,7 +158,7 @@ describe("NeedsYou", () => {
 
   it("after mark done on the last row, focus moves to the list heading", async () => {
     const user = userEvent.setup();
-    let open = today.actions!.filter((a) => a.id === 12);
+    let open = today.actions!.filter((a) => a.id === "12");
     setup("/", {
       "GET /api/today": () => json({ ...today, actions: open }),
       "POST /api/actions/12/done": () => {

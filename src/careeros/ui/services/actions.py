@@ -30,6 +30,7 @@ MAX_WHAT = 500
 
 # Response shapes (GET /api/actions): FastAPI turns these into the OpenAPI schema behind ui/src/api/schema.gen.ts.
 class ActionItem(TypedDict):
+    """One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape)."""
     id: str
     created: str | None
     job_id: str | None
@@ -136,7 +137,7 @@ def due_level(due: str | None, now: datetime, tz: tzinfo, soon_hours: int) -> st
 
 # --- the list ---------------------------------------------------------------------------------------------------
 
-def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> dict[str, Any]:
+def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> ActionItem:
     at = due_at(r.get("due"), tz)
     return {
         "id": r["id"], "created": r.get("created"), "job_id": r.get("job_id") or None,

@@ -23,6 +23,11 @@ export function normalize(d: Partial<JobDetail>): JobDetail {
     screenshots: d.screenshots ?? [],
     contacts: d.contacts ?? [],
     log: d.log ?? "",
+    override: d.override ?? null,
+    registry: d.registry ?? { verified: null, flagged: null },
+    outreach: d.outreach ?? null,
+    contacts_policy: d.contacts_policy ?? [],
+    activity: d.activity ?? [],
   };
 }
 

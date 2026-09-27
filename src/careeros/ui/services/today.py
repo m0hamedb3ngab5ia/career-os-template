@@ -8,12 +8,26 @@ from __future__ import annotations
 from datetime import datetime, timezone, tzinfo
 from typing import Any
 
+from typing_extensions import TypedDict
+
 from careeros.config import ConfigError
+from careeros.ui.services.actions import ActionItem
 
 PRIORITY = {"H": 0, "M": 1, "L": 2}
 
 
-def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[dict[str, Any]]:
+# Response shapes (OpenAPI -> ui/src/api/schema.gen.ts).
+class PrepareQueue(TypedDict):
+    total: int | None
+    error: str | None
+
+
+class Today(TypedDict):
+    actions: list[ActionItem]
+    prepare_queue: PrepareQueue
+
+
+def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[ActionItem]:
     """Every open item, shaped by the Action Items service (same due fields: `due`, `due_date_only`, `level`),
     highest priority first."""
     from careeros.ui.services.actions import _item
@@ -23,7 +37,7 @@ def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[di
     return sorted(items, key=lambda i: (PRIORITY.get(i["priority"], 3), i["created"] or "", i["id"]))
 
 
-def prepare_queue(settings: Any, now: datetime) -> dict[str, Any]:
+def prepare_queue(settings: Any, now: datetime) -> PrepareQueue:
     """How many jobs the next prepare run could pick (the same ranking `careeros run status` uses)."""
     from careeros.runs.config import load_runs_config
     from careeros.runs.runner import select_candidates
@@ -36,5 +50,5 @@ def prepare_queue(settings: Any, now: datetime) -> dict[str, Any]:
 
 
 def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
-          soon_hours: int = 48) -> dict[str, Any]:
+          soon_hours: int = 48) -> Today:
     return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, now)}
