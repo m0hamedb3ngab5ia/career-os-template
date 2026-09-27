@@ -107,6 +107,20 @@ export interface paths {
     /** Set Override */
     post: operations["set_override_api_jobs__job_id__override_post"];
   };
+  "/api/jobs/{job_id}/pipeline": {
+    /**
+     * Job Pipeline
+     * @description The job's stage, the one next action (Start / Continue / Approve & continue), why it is blocked, what a
+     * needs_review job waits on, and the running run that names it.
+     */
+    get: operations["job_pipeline_api_jobs__job_id__pipeline_get"];
+    /**
+     * Start Job Pipeline
+     * @description Run the job's next stage as a detached `careeros run <kind> --job <id>`; approve_continue first moves
+     * needs_review -> queued. 409 when a run is active or paused, or the job is not runnable (Tier A never applies).
+     */
+    post: operations["start_job_pipeline_api_jobs__job_id__pipeline_post"];
+  };
   "/api/jobs/{job_id}/qa": {
     /** Rerun Qa */
     post: operations["rerun_qa_api_jobs__job_id__qa_post"];
@@ -1325,6 +1339,19 @@ export interface components {
       /** Until */
       until?: string | null;
     };
+    /** PipelineBody */
+    PipelineBody: {
+      /**
+       * Action
+       * @enum {string}
+       */
+      action: "start" | "continue" | "approve_continue";
+      /**
+       * Force
+       * @default false
+       */
+      force?: boolean;
+    };
     /** PipelineColumnCount */
     PipelineColumnCount: {
       /** Count */
@@ -1348,6 +1375,32 @@ export interface components {
       closed: components["schemas"]["ClosedCount"];
       /** Columns */
       columns: components["schemas"]["PipelineColumnCount"][];
+    };
+    /** PipelineStarted */
+    PipelineStarted: {
+      /** Kind */
+      kind: string;
+      /** Run Id */
+      run_id: string;
+    };
+    /** PipelineState */
+    PipelineState: {
+      /** Active Run Id */
+      active_run_id: string | null;
+      /** Blocked Reason */
+      blocked_reason: string | null;
+      /** Force */
+      force: boolean;
+      /** Next Action */
+      next_action: ("start" | "continue" | "approve_continue") | null;
+      /** Next Kind */
+      next_kind: string | null;
+      /** Next Label */
+      next_label: string | null;
+      /** Review Reasons */
+      review_reasons: string[];
+      /** Stage */
+      stage: string;
     };
     /**
      * PolicyItem
@@ -2628,6 +2681,63 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Job Pipeline
+   * @description The job's stage, the one next action (Start / Continue / Approve & continue), why it is blocked, what a
+   * needs_review job waits on, and the running run that names it.
+   */
+  job_pipeline_api_jobs__job_id__pipeline_get: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PipelineState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Start Job Pipeline
+   * @description Run the job's next stage as a detached `careeros run <kind> --job <id>`; approve_continue first moves
+   * needs_review -> queued. 409 when a run is active or paused, or the job is not runnable (Tier A never applies).
+   */
+  start_job_pipeline_api_jobs__job_id__pipeline_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PipelineBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PipelineStarted"];
         };
       };
       /** @description Validation Error */

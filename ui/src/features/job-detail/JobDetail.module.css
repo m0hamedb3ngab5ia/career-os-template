@@ -541,3 +541,8 @@
     min-height: var(--touch);
   }
 }
+
+/* Pipeline */
+.reviewReasons {
+  margin-top: var(--space-3);
+}

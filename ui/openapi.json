@@ -3793,6 +3793,29 @@
         "title": "PauseBody",
         "type": "object"
       },
+      "PipelineBody": {
+        "properties": {
+          "action": {
+            "enum": [
+              "start",
+              "continue",
+              "approve_continue"
+            ],
+            "title": "Action",
+            "type": "string"
+          },
+          "force": {
+            "default": false,
+            "title": "Force",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "action"
+        ],
+        "title": "PipelineBody",
+        "type": "object"
+      },
       "PipelineColumnCount": {
         "properties": {
           "count": {
@@ -3866,6 +3889,115 @@
           "closed"
         ],
         "title": "PipelineCounts",
+        "type": "object"
+      },
+      "PipelineStarted": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "run_id",
+          "kind"
+        ],
+        "title": "PipelineStarted",
+        "type": "object"
+      },
+      "PipelineState": {
+        "properties": {
+          "active_run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Active Run Id"
+          },
+          "blocked_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Blocked Reason"
+          },
+          "force": {
+            "title": "Force",
+            "type": "boolean"
+          },
+          "next_action": {
+            "anyOf": [
+              {
+                "enum": [
+                  "start",
+                  "continue",
+                  "approve_continue"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action"
+          },
+          "next_kind": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Kind"
+          },
+          "next_label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Label"
+          },
+          "review_reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Review Reasons",
+            "type": "array"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          }
+        },
+        "required": [
+          "stage",
+          "next_action",
+          "next_label",
+          "next_kind",
+          "force",
+          "blocked_reason",
+          "review_reasons",
+          "active_run_id"
+        ],
+        "title": "PipelineState",
         "type": "object"
       },
       "PolicyItem": {
@@ -7325,6 +7457,100 @@
           }
         },
         "summary": "Set Override",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/pipeline": {
+      "get": {
+        "description": "The job's stage, the one next action (Start / Continue / Approve & continue), why it is blocked, what a\nneeds_review job waits on, and the running run that names it.",
+        "operationId": "job_pipeline_api_jobs__job_id__pipeline_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Pipeline",
+        "tags": [
+          "jobs"
+        ]
+      },
+      "post": {
+        "description": "Run the job's next stage as a detached `careeros run <kind> --job <id>`; approve_continue first moves\nneeds_review -> queued. 409 when a run is active or paused, or the job is not runnable (Tier A never applies).",
+        "operationId": "start_job_pipeline_api_jobs__job_id__pipeline_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/PipelineBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Job Pipeline",
         "tags": [
           "jobs"
         ]

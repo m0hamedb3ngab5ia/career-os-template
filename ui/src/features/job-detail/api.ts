@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
-import type { JobDetail, QaRun, StatusReply } from "./types";
+import type { JobDetail, PipelineStarted, PipelineState, QaRun, StatusReply } from "./types";
 
 export const jobPath = (id: string) => `/api/jobs/${encodeURIComponent(id)}`;
 export const fileUrl = (id: string, name: string) =>
@@ -64,4 +64,30 @@ export const useClearFlag = (id: string) => useJobWrite<{ note?: string }, unkno
 
 export function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong";
+}
+
+// --- the job's pipeline (GET/POST /api/jobs/{id}/pipeline) --------------------------------------------------------
+
+export const pipelineKey = (id: string) => ["job", id, "pipeline"] as const;
+
+/** The stage, next action and running run; `poll` refetches every second (right after a start, until the run
+ * record exists and `active_run_id` names it). Under the ["job", id] prefix, so every job write refreshes it. */
+export function usePipeline(id: string, poll = false) {
+  return useQuery({
+    queryKey: pipelineKey(id),
+    queryFn: () => apiFetch<PipelineState>(`${jobPath(id)}/pipeline`),
+    refetchInterval: poll ? 1000 : false,
+    retry: false,
+  });
+}
+
+export function useStartPipeline(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { action: PipelineState["next_action"]; force?: boolean }) =>
+      apiSend<PipelineStarted>("POST", `${jobPath(id)}/pipeline`, body),
+    onSettled: () => {
+      for (const queryKey of [["job", id], ["jobs"], ["jobs-tabs"], ["status"], ["runs"]]) void qc.invalidateQueries({ queryKey });
+    },
+  });
 }

@@ -9,6 +9,8 @@ type Schemas = components["schemas"];
 export type FileEntry = Schemas["FileEntry"];
 export type ContactPolicy = Schemas["ContactPolicy"];
 export type ActivityEntry = Schemas["ActivityEntry"];
+export type PipelineState = Schemas["PipelineState"];
+export type PipelineStarted = Schemas["PipelineStarted"];
 
 export interface Posting {
   company?: string;

@@ -779,3 +779,73 @@ def test_cancel_marker_removed_between_exists_and_read_is_no_marker(rc, monkeypa
     (marker_dir / f"cancel-{rc2._holder_of(None)[0]}").write_text("1 old\n")
     monkeypatch.setattr(Path, "read_text", racing)
     assert rc2.cancel()["status"] == "cancelling" and sent == [777]
+
+
+# --- one job (`--job`) -----------------------------------------------------------------------------------------
+
+def _prepared(settings, jid: str, tier: str = "B", status: str = "queued") -> None:
+    store = Store(settings)
+    store._write(jid, "score.json", {"job_id": jid, "category": "swe_backend", "fit": 80, "tier": tier,
+                                     "decision": "prepare", "reasons": ["t"]})
+    store._write(jid, "prepare.json", {"job_id": jid, "qa_pass": True, "status": status})
+    store.set_status(jid, status, "test")
+
+
+def test_start_one_job_spawns_run_with_job_force_and_a_run_id(rc, settings):
+    (jid,) = add_jobs(settings, 1)
+    out = rc.start("score", job_id=jid)
+    cmd = FakePopen.calls[0]["cmd"]
+    assert cmd[:5] == ["/venv/bin/python", "-m", "careeros.cli", "run", "score"]
+    assert cmd[cmd.index("--job") + 1] == jid and "--force" not in cmd and "--max-jobs" not in cmd
+    assert cmd[cmd.index("--run-id") + 1] == out["run_id"] and cmd[-1] == "--json"
+    assert out["run_id"].startswith(NOW.astimezone().strftime("%Y%m%d-%H%M%S") + "-score-")
+    assert out["kind"] == "score" and out["started"]
+
+
+def test_start_one_job_refuses_a_job_that_is_not_a_candidate_before_spawning(rc, settings):
+    from careeros.runs.runner import JobNotRunnable
+
+    (jid,) = add_jobs(settings, 1)
+    Store(settings).set_status(jid, "skipped", "t")
+    with pytest.raises(JobNotRunnable) as e:
+        rc.start("prepare", job_id=jid)
+    assert e.value.reasons == {jid: "status skipped"} and FakePopen.calls == []
+    with pytest.raises(JobNotRunnable) as e:
+        rc.start("prepare", job_id=add_jobs(settings, 2)[1])
+    assert list(e.value.reasons.values()) == ["not scored"]
+    with pytest.raises(JobNotRunnable) as e:
+        rc.start("score", job_id="nope")
+    assert e.value.reasons == {"nope": "not found"}
+
+
+def test_apply_needs_a_job_and_never_runs_tier_a(rc, settings):
+    from careeros.runs.runner import JobNotRunnable
+
+    with pytest.raises(ValueError):
+        rc.start("apply")
+    jid, other = add_jobs(settings, 2)
+    _prepared(settings, jid, tier="A")
+    with pytest.raises(JobNotRunnable) as e:
+        rc.start("apply", job_id=jid, force=True)
+    assert "tier A" in e.value.reasons[jid] and FakePopen.calls == []
+    _prepared(settings, other, tier="B")
+    out = rc.start("apply", job_id=other)
+    cmd = FakePopen.calls[0]["cmd"]
+    assert cmd[3:5] == ["run", "apply"] and cmd[cmd.index("--job") + 1] == other and out["kind"] == "apply"
+
+
+def test_force_is_passed_through_for_a_rerun(rc, settings):
+    (jid,) = add_jobs(settings, 1)
+    _prepared(settings, jid, status="queued")
+    rc.start("prepare", job_id=jid, force=True)
+    assert "--force" in FakePopen.calls[0]["cmd"]
+
+
+def test_active_run_for_names_the_running_job_run(rc, settings):
+    (jid,) = add_jobs(settings, 1)
+    assert rc.active_run_for(jid) is None
+    run = rc.rs.new_run("apply", "manual", {"max_jobs": 1, "max_minutes": 30}, NOW, counters={"attempted": 0},
+                        queue=[{"job_id": jid, "rank": 1, "score": 1, "why": ""}])
+    locks.acquire(rc.rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="apply",
+                  pid_alive=lambda p: True)
+    assert rc.active_run_for(jid) == run["id"] and rc.active_run_for("other") is None
