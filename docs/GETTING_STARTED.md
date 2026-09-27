@@ -220,7 +220,8 @@ prepare nightly at 02:00, prune weekly (all Recommended). Each job takes `every_
 (`at: ["01:00"]`). A nightly job waits for its time after you install the schedule; it does not run at once.
 `inbox_sync` (08:00 and 18:00) is in the file but `enabled: false` until the inbox-sync skill is finished; once you
 turn it on it needs the Gmail MCP logged in (step 2 above), or it stops with `auth_required`. Score, prepare and
-inbox sync never start inside quiet hours (09:00 to 18:00, Recommended); scout and prune ignore them. A slot held
+inbox sync never start inside quiet hours (09:00 to 18:00, Recommended); scout and prune ignore them
+(`schedule.scout_quiet_hours: true` makes scout wait too). A slot held
 back by quiet hours (or a busy runner) runs as soon as it may; it is not lost. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
 Code login, only while you are logged in to your Mac. Nothing runs while the Mac sleeps, is off or you are logged out.
 
@@ -235,7 +236,9 @@ Code login, only while you are logged in to your Mac. Nothing runs while the Mac
 ```
 
 Pausing stops the current run before its next job, and ticks skip what falls due (it is not stored up). Missed
-slots never run on their own: they collapse into one pending catch-up that you start or dismiss.
+slots never run on their own: they collapse into one pending catch-up that you start or dismiss
+(`schedule.missed_runs: skip` drops them instead). With `runs.on_usage_limit: pause` a run that hits your Claude usage
+limit also pauses all runs until `careeros run resume` (the Recommended `stop` just waits for the next slot).
 
 **Where the logs are:** `data/runs/<run_id>/` (`run.json`, `run.log`, `attempts/` with each call's raw output),
 `data/runs/launchd.out.log` and `data/runs/launchd.err.log` (the scheduler's own output). `careeros prune` removes

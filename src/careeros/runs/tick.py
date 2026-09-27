@@ -3,7 +3,8 @@
 A tick is idempotent: it takes `data/runs/tick.lock` without waiting (a tick already going means this one does
 nothing), plans with schedule.plan_tick, runs what is due in order (scout, score, prepare, prune), and records
 each job's last run in `data/runs/schedule.json`. A score/prepare run that finds the runner busy stays due for
-the next tick. Missed slots go to `data/runs/catch_up.json` (one record) and never run by themselves.
+the next tick. Missed slots never run by themselves: with `schedule.missed_runs: ask` (Recommended) they go to
+`data/runs/catch_up.json` (one record, the catch-up prompt); with `skip` they are only recorded in schedule.json.
 """
 from __future__ import annotations
 
@@ -156,7 +157,8 @@ def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[],
     try:
         actions = actions if actions is not None else default_actions(settings, echo)
         jobs = state.setdefault("jobs", {})
-        _save_catch_up(rs, merge_catch_up(load_catch_up(rs), decisions, now))
+        if cfg.missed_runs == "ask":
+            _save_catch_up(rs, merge_catch_up(load_catch_up(rs), decisions, now))
         for d in decisions:
             entry = jobs.setdefault(d.kind, {})
             entry.setdefault("since", now.isoformat())

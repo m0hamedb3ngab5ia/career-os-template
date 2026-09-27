@@ -36,6 +36,8 @@ describe("keysForChange", () => {
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
+      ["storage"],
+      ["advise"],
       ["status"],
       ["actions"],
     ]);
@@ -43,6 +45,8 @@ describe("keysForChange", () => {
       ["meta"],
       ["runs"],
       ["settings"],
+      ["advise"],
+      ["storage"],
       ["status"],
     ]);
     expect(keysForChange({ status: true })).toEqual([["status"], ["runs"]]);

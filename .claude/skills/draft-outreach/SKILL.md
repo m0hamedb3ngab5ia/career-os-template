@@ -20,7 +20,8 @@ first). This skill writes drafts only. It never sends, never creates Gmail draft
   `followup_7d.md`, `followup_14d.md`. Treat each as structure + length guidance, not text to copy. If a
   template is missing, use the structure below and set `templates_used` accordingly.
 - Relationship gate: run `careeros outreach check <job_id>` (JSON per contact: `manual`, `reason`
-  `LINKEDIN_CONNECTED|LINKEDIN_MUTUALS`, `detail`, plus top-level `action_text`; switches in `config/pipeline.yaml: outreach`). A `manual` contact is
+  `LINKEDIN_CONNECTED|LINKEDIN_MUTUALS`, `detail`, plus top-level `action_text`; switches and the minimum mutual
+  connections, `mutuals_threshold`, in `config/pipeline.yaml: outreach`). A `manual` contact is
   someone the candidate already knows on LinkedIn: never automate it (step 3a).
 - `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
   wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.

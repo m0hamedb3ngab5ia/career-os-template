@@ -31,6 +31,8 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   if (p.runs?.length) {
     add(["runs"]);
     for (const id of p.runs) add(["run", id]);
+    add(["storage"]); // storage.jsonl and run history live under data/runs
+    add(["advise"]);
     add(["status"]);
   }
   if (p.actions) {
@@ -41,6 +43,8 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["meta"]);
     add(["runs"]); // schedule, presets, inbox sync on/off
     add(["settings"]);
+    add(["advise"]); // advice depends on the config
+    add(["storage"]);
     add(["status"]);
   }
   if (p.status) {
