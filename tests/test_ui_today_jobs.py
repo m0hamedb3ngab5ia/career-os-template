@@ -92,6 +92,8 @@ def test_tabs_count_each_view(data, idx):
     assert tabs["active"]["count"] == 6             # not rejected / skipped
     assert tabs["tier_a"]["count"] == 2 and tabs["tier_a"]["label"] == "Tier A"
     assert {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), q="hooli")}["all"] == 1
+    by_loc = {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), location="REMOTE")}
+    assert by_loc["all"] == 1 and by_loc["applied"] == 0
 
 
 def test_list_by_tab_and_next_action(data, idx):
@@ -118,6 +120,9 @@ def test_export_xlsx_by_filter_and_bad_input(data, idx):
     raw = jobs_svc.export_xlsx(idx, tab="applied", closed=closed(data))
     rows = list(load_workbook(io.BytesIO(raw)).active.iter_rows(values_only=True))
     assert len(rows) == 3 and "Next action" in rows[0]
+    rows = list(load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, location="remote", closed=closed(data)))).active
+                .iter_rows(values_only=True))
+    assert len(rows) == 2 and rows[1][rows[0].index("Company")] == "Globex"
     with pytest.raises(ValueError):
         jobs_svc.export_xlsx(idx, columns=["bogus"])
     with pytest.raises(ValueError):
