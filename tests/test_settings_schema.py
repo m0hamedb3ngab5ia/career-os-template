@@ -240,3 +240,29 @@ def test_schedule_help_does_not_contradict_the_scout_quiet_hours_and_missed_runs
     assert "Ignores quiet hours." not in scout and "Scout follows quiet hours" in scout
     missed = fields["schedule.missed_after_minutes"].help
     assert "catch-up you start" not in missed and "Missed runs" in missed
+
+
+def test_every_editable_field_has_a_reader():
+    """A setting nothing reads is a lie in the UI: it must be read-only with a "Not used yet" note."""
+    import subprocess
+
+    repo = Path(__file__).resolve().parents[1]
+    dirs = [d for d in ("src", ".claude", "templates", "scripts") if (repo / d).is_dir()]
+
+    def files_with(word: str) -> set[str]:
+        out = subprocess.run(["grep", "-rlw", "--exclude-dir=__pycache__", "--exclude-dir=*.egg-info", word, *dirs],
+                             capture_output=True, text=True, cwd=repo).stdout.split()
+        return {f for f in out if "settings_schema" not in f and "ui/services/settings_io" not in f}
+
+    unread = []
+    for _, f in _fields():
+        parts = f.key.split(".")
+        hits = files_with(parts[-1])
+        parents = [p for p in parts[:-1] if len(p) > 1 and not p.isdigit()]
+        if parents:
+            hits &= files_with(parents[-1])
+        if not hits and f.editable:
+            unread.append(f.id)
+        if not f.editable and not f.locked and "Not used yet" in f.note:
+            assert not hits, f"{f.id} has a reader now; make it editable"
+    assert not unread, unread

@@ -4,6 +4,7 @@ import argparse
 import json
 import sys
 from collections import Counter
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 
@@ -747,10 +748,39 @@ def _print_queue(items: list, limit: int) -> None:
               f"{str(r.get('title') or '')[:36]:<36} {r['score']:>6g}  {r['why']}")
 
 
-def _run_kind(args: argparse.Namespace, kind: str) -> int:
+@contextmanager
+def _cancel_on_signals(hard: bool = False):
+    """SIGINT/SIGTERM set a cancel event instead of killing the process, so a run stops at its next safe point
+    (stop reason cancelled) and its headless `claude` child is ended with it, never orphaned. With `hard` (catch-up),
+    the event is a CancelFlag and a signal raises KeyboardInterrupt when nothing watches the flag (scout, prune,
+    between kinds) or when it is the second one."""
     import signal
-    import threading
 
+    from careeros.runs.tick import CancelFlag
+
+    cancel = CancelFlag()
+    cancel.soft = not hard
+
+    def handler(*_):
+        if hard and (cancel.is_set() or not cancel.soft):
+            cancel.set()
+            raise KeyboardInterrupt
+        cancel.set()
+
+    old = {}
+    for sig in (signal.SIGINT, signal.SIGTERM):
+        try:
+            old[sig] = signal.signal(sig, handler)
+        except ValueError:  # not the main thread
+            pass
+    try:
+        yield cancel
+    finally:
+        for sig, h in old.items():
+            signal.signal(sig, h)
+
+
+def _run_kind(args: argparse.Namespace, kind: str) -> int:
     from careeros.runs.config import budget_for, load_runs_config
     from careeros.runs.runner import CLEAN_STOPS, RunBusy
     from careeros.runs.service import run_batch
@@ -762,23 +792,14 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     except ValueError as e:
         print(f"run {kind}: {e}", file=sys.stderr)
         return 2
-    cancel = threading.Event()
-    old = {}
-    for sig in (signal.SIGINT, signal.SIGTERM):
-        try:
-            old[sig] = signal.signal(sig, lambda *_: cancel.set())
-        except ValueError:  # not the main thread
-            pass
     echo = (lambda line: None) if args.json else print
     try:
-        rec = run_batch(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
-                        echo=echo)
+        with _cancel_on_signals() as cancel:
+            rec = run_batch(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
+                            echo=echo)
     except RunBusy as e:
         print(f"run {kind}: {e}; not started", file=sys.stderr)
         return RUN_BUSY_EXIT
-    finally:
-        for sig, h in old.items():
-            signal.signal(sig, h)
     if args.json:
         print(json.dumps(rec, indent=2, default=str))
     elif rec.get("dry_run"):
@@ -959,10 +980,15 @@ def cmd_run_catch_up(args: argparse.Namespace) -> int:
                 f"{k} ({v.get('slots')} slot(s) since {v.get('first_missed')})" for k, v in rec["kinds"].items())))
         return 0
     try:
-        res = run_catch_up(s, dismiss=args.dismiss, echo=(lambda line: None) if args.json else print)
+        with _cancel_on_signals(hard=True) as cancel:
+            res = run_catch_up(s, dismiss=args.dismiss, echo=(lambda line: None) if args.json else print,
+                               cancel=cancel)
     except RuntimeError as e:
         print(f"run catch-up: {e}", file=sys.stderr)
         return 1
+    except KeyboardInterrupt:
+        print("run catch-up: cancelled; missed runs that did not finish stay pending", file=sys.stderr)
+        return 130
     if res.get("status") == "busy":
         print(json.dumps(res) if args.json else "run catch-up: a tick is running; try again in a moment",
               file=None if args.json else sys.stderr)

@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import os
+import threading
 from datetime import datetime, timezone
 from typing import Any, Callable
 
@@ -20,7 +21,16 @@ from careeros.runs.schedule import JOB_KINDS, load_schedule, merge_catch_up, nex
 from careeros.runs.store import RunStore
 
 Action = Callable[[str], tuple[str, str]]  # trigger -> (status, detail)
-TICK_LOCK_SECONDS = 12 * 3600  # a tick that runs score + prepare can take hours; a dead pid frees it sooner
+TICK_LOCK_SECONDS = 12 * 3600
+SOFT_CANCEL_KINDS = ("score", "prepare", "inbox_sync")  # they watch the cancel event and stop at a safe point
+
+
+class CancelFlag(threading.Event):
+    """The cancel event of `careeros run catch-up`. `soft` is True while a kind that watches it (a batch, the inbox
+    sync) is running: a signal then only sets it. Otherwise (scout, prune, between kinds) the signal handler raises
+    KeyboardInterrupt, since nothing would ever look at the flag."""
+
+    soft = False  # a tick that runs score + prepare can take hours; a dead pid frees it sooner
 
 
 def _utcnow() -> datetime:
@@ -59,8 +69,10 @@ def _save_catch_up(rs: RunStore, rec: dict[str, Any] | None) -> None:
         p.unlink()
 
 
-def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: None) -> dict[str, Action]:
-    """The real work behind each job kind. Tests pass their own."""
+def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: None,
+                    cancel: threading.Event | None = None) -> dict[str, Action]:
+    """The real work behind each job kind. Tests pass their own. `cancel` (set by SIGTERM in `careeros run
+    catch-up`) stops a batch or the inbox sync at its next safe point, like `careeros run` does."""
     from careeros.runs.config import budget_for, load_runs_config
     from careeros.runs.service import run_batch
 
@@ -80,7 +92,7 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
         def run(trigger: str) -> tuple[str, str]:
             cfg = load_runs_config(settings)
             rec = run_batch(settings, kind, budget_for(cfg, kind, preset=sched.jobs[kind].preset), cfg=cfg,
-                            trigger=trigger, echo=echo)
+                            trigger=trigger, echo=echo, cancel=cancel)
             return str(rec["stop_reason"]), f"run {rec['id']}"
         return run
 
@@ -103,7 +115,8 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
 
         job = sched.jobs["inbox_sync"]
         rec = run_skill(settings, "inbox_sync", "inbox-sync", mcp_servers=job.mcp_servers,
-                        allowed_tools_extra=job.allowed_tools_extra, trigger=trigger, echo=echo)
+                        allowed_tools_extra=job.allowed_tools_extra, trigger=trigger, echo=echo,
+                        cancel=cancel)
         return str(rec["stop_reason"]), f"run {rec['id']}"
 
     return {"scout": scout, "inbox_sync": inbox_sync, "score": batch("score"), "prepare": batch("prepare"),
@@ -172,11 +185,13 @@ def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[],
 
 
 def run_catch_up(settings: Settings, *, actions: dict[str, Action] | None = None, now: datetime | None = None,
-                 dismiss: bool = False, echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+                 dismiss: bool = False, echo: Callable[[str], None] = lambda s: None,
+                 cancel: threading.Event | None = None) -> dict[str, Any]:
     """Run each kind in the pending catch-up record once (trigger catch_up; quiet hours do not apply: the
     candidate asked for it). Kinds that found the runner busy stay pending. RuntimeError while paused.
     Holds tick.lock (status busy while a tick runs), and re-reads the record before saving, removing only the
-    kinds it ran, so a slot missed meanwhile is never lost."""
+    kinds it ran, so a slot missed meanwhile is never lost. `cancel` is passed to each batch; once it is set, the
+    kinds not started yet stay pending."""
     now = now or _utcnow()
     rs = RunStore(settings)
     try:
@@ -194,18 +209,29 @@ def run_catch_up(settings: Settings, *, actions: dict[str, Action] | None = None
             return {"status": "ok", "ran": [], "left": [], "results": {}, "pending": False}
         if rs.pause_state(now):
             raise RuntimeError("runs are paused; `careeros run resume` first")
-        actions = actions if actions is not None else default_actions(settings, echo)
+        actions = actions if actions is not None else default_actions(settings, echo, cancel)
         ran, left, results = [], [], {}
-        for kind in JOB_KINDS:
-            if kind not in rec["kinds"]:
-                continue
-            echo(f"catch-up: {kind}")
-            status, detail = _run_one(actions[kind], "catch_up")
-            results[kind] = {"status": status, "detail": detail}
-            (left if status == "busy" else ran).append(kind)
-        latest = load_catch_up(rs) or {"kinds": {}}
-        latest["kinds"] = {k: v for k, v in latest["kinds"].items() if k not in ran}
-        _save_catch_up(rs, latest)
+        try:
+            for kind in JOB_KINDS:
+                if kind not in rec["kinds"]:
+                    continue
+                if cancel is not None and cancel.is_set():
+                    left.append(kind)
+                    continue
+                echo(f"catch-up: {kind}")
+                if isinstance(cancel, CancelFlag):
+                    cancel.soft = kind in SOFT_CANCEL_KINDS
+                try:
+                    status, detail = _run_one(actions[kind], "catch_up")
+                finally:
+                    if isinstance(cancel, CancelFlag):
+                        cancel.soft = False
+                results[kind] = {"status": status, "detail": detail}
+                (left if status == "busy" else ran).append(kind)
+        finally:  # also on an interrupt: what ran is done, the rest stays pending
+            latest = load_catch_up(rs) or {"kinds": {}}
+            latest["kinds"] = {k: v for k, v in latest["kinds"].items() if k not in ran}
+            _save_catch_up(rs, latest)
         return {"status": "ok", "ran": ran, "left": left, "results": results, "pending": bool(latest["kinds"])}
     finally:
         locks.release(rs.dir / "tick.lock", lk.token)

@@ -127,7 +127,7 @@ safety:
     layoff_window_days: 180            # layoffs -> lowers confidence only
   # Change any check's level: block | skip | review | info | off. Codes are listed in the docstrings of
   # src/careeros/safety/scam.py and ghost.py, e.g.:
-  levels: {}                           # {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}
+  levels: {}                           # {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: "off"} (quote "off")
 
 # Scout: which job-board sources to fetch and which prefilters to apply. Defaults: all on.
 scout:

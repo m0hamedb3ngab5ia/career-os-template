@@ -112,8 +112,17 @@ class Settings:
         raw_paths = s.pipeline.get("paths", {}) or {}
         for key, val in raw_paths.items():
             if isinstance(val, str):
-                p = Path(val).expanduser()
+                try:
+                    p = Path(val).expanduser()
+                except RuntimeError as e:  # ~unknownuser/...: a field error, not a crash
+                    raise ConfigError(f"config/pipeline.yaml: paths.{key} could not expand "
+                                      f"{val!r} (unknown user?): {e}") from None
                 s.paths[key] = p if p.is_absolute() else (root / p).resolve()
+        tracker = raw_paths.get("tracker_xlsx")  # null/absent = the default below
+        if tracker is not None and (not isinstance(tracker, str) or not tracker.strip()
+                                    or s.paths["tracker_xlsx"].is_dir()):
+            raise ConfigError("config/pipeline.yaml: paths.tracker_xlsx must be a file path like "
+                              f"data/JobTracker.xlsx, got {raw_paths['tracker_xlsx']!r}")
         s.paths.setdefault("jobs_dir", root / "data" / "jobs")
         s.paths.setdefault("seen_file", root / "data" / "seen.json")
         s.paths.setdefault("tracker_xlsx", root / "data" / "JobTracker.xlsx")
