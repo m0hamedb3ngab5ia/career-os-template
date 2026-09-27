@@ -66,6 +66,16 @@ def test_jobs_list_filters_and_paging(client):
     remote = client.get("/api/jobs", params={"location": "REMOTE", "sort": "location"}).json()
     assert [j["location"] for j in remote["items"]] == ["Remote"]
     assert client.get("/api/jobs", params={"location": "new york"}).json()["total"] == 7
+    tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"location": "remote"}).json()["tabs"]}
+    assert tabs["all"] == 1
+    xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
+                       json={"tab": "all", "location": "remote", "sort": "-fit", "columns": ["company"]})
+    assert xlsx.status_code == 200
+    from io import BytesIO
+
+    from openpyxl import load_workbook
+    rows = list(load_workbook(BytesIO(xlsx.content)).active.iter_rows(values_only=True))
+    assert [r[1] for r in rows[1:]] == ["Globex"]
     assert client.get("/api/jobs", params={"sort": "bogus"}).status_code == 400
     assert client.get("/api/jobs", params={"limit": 0}).status_code == 422
 
