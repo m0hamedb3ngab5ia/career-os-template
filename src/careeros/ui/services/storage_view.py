@@ -91,7 +91,7 @@ class RunMetrics(TypedDict):
     p90_job_s: Num
     failure_rate: Num
     budget_used: Num
-    stops: dict[Any, int]
+    stops: dict[str, int]  # stop_reason -> count; a run without one counts as "unknown"
     prepare_share: NotRequired[Num | None]
 
 

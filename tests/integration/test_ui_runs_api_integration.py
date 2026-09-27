@@ -98,6 +98,19 @@ def test_history_newest_first_with_kind_filter_and_cursor(client, data):
     assert client.get("/api/runs", params={"limit": 0}).status_code == 422
 
 
+def test_history_survives_a_run_json_missing_optional_fields(client, data):
+    rs = RunStore(data["settings"])
+    rid = data["runs"]["score"]
+    path = rs.run_dir(rid) / "run.json"
+    rec = json.loads(path.read_text())
+    for k in ("budget", "detail", "duration_s", "counters"):
+        rec.pop(k, None)
+    path.write_text(json.dumps(rec))
+    r = client.get("/api/runs")
+    assert r.status_code == 200
+    assert rid in [x["id"] for x in r.json()["runs"]]
+    assert client.get(f"/api/runs/{rid}").status_code == 200
+
 def test_detail_has_attempts_with_names_and_the_log(client, data):
     d = client.get(f"/api/runs/{data['runs']['prepare']}").json()
     assert d["attempts"][0]["company"] == "Initech" and d["attempts"][0]["outcome"] == "usage_limit"

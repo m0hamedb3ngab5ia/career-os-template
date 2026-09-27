@@ -44,17 +44,18 @@ class RunBase(TypedDict):
     id: str
     kind: str
     trigger: str
-    budget: RunBudget
+    # budget/detail/duration_s/counters are optional: an old or hand-edited run.json may lack one and must not 500
+    budget: NotRequired[RunBudget]
     status: str
     # running | done | failed | interrupted (a running run whose process no longer holds its lock)
     state: str
     stop_reason: str | None
-    detail: str
+    detail: NotRequired[str]
     started_at: str | None
     ended_at: str | None
-    duration_s: int | float | None
+    duration_s: NotRequired[int | float | None]
     pid: NotRequired[int | None]
-    counters: dict[str, int]
+    counters: NotRequired[dict[str, int]]
     warnings: NotRequired[list[str]]
     dry_run: NotRequired[bool]
     step: NotRequired[bool]

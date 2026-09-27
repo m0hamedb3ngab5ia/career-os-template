@@ -329,3 +329,10 @@ def test_apply_compares_against_the_effective_value(tmp_path):
 def test_effective_value_null_retention_is_off():
     assert advisor.effective_value({"retention": {"run_logs_days": None}}, "retention.run_logs_days") == 0
     assert advisor.effective_value({}, "runs.preset") == "medium"
+
+
+def test_stops_count_a_missing_stop_reason_as_unknown():
+    runs = [run(stop="usage_limit"), run()]
+    runs[1]["stop_reason"] = None
+    stops = advisor.run_advice(runs, RUNS_CFG, NOW)["metrics"]["score"]["stops"]
+    assert stops == {"usage_limit": 1, "unknown": 1} and all(isinstance(k, str) for k in stops)
