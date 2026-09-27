@@ -13,3 +13,11 @@ Scope: repo
 Occurrences: 1
 Confidence: high
 Status: promoted (CLAUDE.md#Testing (TDD))
+
+## 2026-09-27 — Stacked/parallel UI PRs conflict on the committed bundle
+Every PR that touches `ui/src` commits a rebuilt `src/careeros/ui/static/` with new content hashes, so two
+open UI PRs always conflict there (rename/rename on every asset) and again in the UI snapshots.
+Resolve by deleting the bundle and rebuilding, never by hand-merging: `git rm -rq --cached src/careeros/ui/static &&
+rm -rf src/careeros/ui/static && (cd ui && npx -p node@22 -- npm run build)`; then
+`CAREEROS_UPDATE_SNAPSHOTS=1 pytest tests/integration/test_ui_types_*` and inspect the snapshot diff.
+Merge UI PRs one at a time and re-merge `main` into the next before its CI run.
