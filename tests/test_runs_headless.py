@@ -174,3 +174,23 @@ def test_classify_nonzero_exit_without_result():
 def test_missing_binary_is_an_error():
     r = res_of([], exit_code=127, stderr_tail="claude: not found")
     assert classify(r, CFG, "score", "j")[0] == "error"
+
+
+def test_apply_kind_adds_the_chrome_mcp_tools_and_other_kinds_stay_unchanged():
+    base = build_command(CFG, "/x", session_id="u")
+    tools = lambda cmd: cmd[cmd.index("--allowedTools") + 1].split(",")  # noqa: E731
+    assert tools(build_command(CFG, "/x", session_id="u", kind="score")) == tools(base)
+    assert tools(build_command(CFG, "/x", session_id="u", kind="prepare")) == tools(base)
+    assert tools(build_command(CFG, "/x", session_id="u", kind="apply")) == tools(base) + ["mcp__claude-in-chrome__*"]
+
+
+def test_apply_result_needs_outcome_and_a_known_status():
+    from careeros.runs.headless import validate_result
+
+    assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "submitted", "status": "applied"}) == []
+    assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "failed", "status": "queued"}) == []
+    assert validate_result("apply", "j1", {"job_id": "j1", "outcome": "staged", "status": "needs_review"}) == []
+    assert any("outcome" in p for p in validate_result("apply", "j1", {"job_id": "j1", "outcome": "done",
+                                                                        "status": "applied"}))
+    assert validate_result("apply", "j1", {"job_id": "j1", "status": "applied"}) == ["RESULT has no outcome"]
+    assert any("status" in p for p in validate_result("apply", "j1", {"job_id": "j1", "outcome": "x", "status": "found"}))

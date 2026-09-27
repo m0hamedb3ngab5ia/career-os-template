@@ -130,11 +130,16 @@ def _matches(token: str, job: dict[str, Any]) -> bool:
     return False
 
 
+def is_tier_a(tier: Any) -> bool:
+    """Tier A = the dream/manual tier: never auto-submitted, never applied by a run."""
+    return str(tier or "").upper() == "A"
+
+
 def auto_submit_decision(job: dict[str, Any], policy: AutoSubmitPolicy) -> tuple[bool, str]:
     """(may auto-submit, reason). `job`: tier, fit, dream, category, safety_pass. Manual rules win over allow."""
     if not policy.enabled:
         return False, "auto_submit disabled"
-    if str(job.get("tier") or "").upper() == "A":
+    if is_tier_a(job.get("tier")):
         return False, "manual: tier_a (never auto-submitted)"
     if not job.get("safety_pass"):
         return False, "safety verdict is not pass"

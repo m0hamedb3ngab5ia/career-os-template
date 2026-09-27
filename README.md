@@ -98,6 +98,7 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros stats
 .venv/bin/careeros prune [--yes] [--json]     # retention: dry run lists old files; --yes removes them
 .venv/bin/careeros run score [--preset medium] [--dry-run]   # also: run prepare; --max-jobs N --max-minutes M
+.venv/bin/careeros run prepare --job <id> [--force]         # one job (also run score/apply --job; apply needs --job)
 .venv/bin/careeros run status                 # also: run list | show <id> [--log] | cap [--check]
 .venv/bin/careeros run pause [--until +2h]    # also: run resume | catch-up [--dry-run | --dismiss]
 .venv/bin/careeros job lock <id>              # also: job unlock <id> --token T | job check <id>

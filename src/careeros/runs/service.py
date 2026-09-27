@@ -105,9 +105,17 @@ def pause_after_usage_limit(settings: Settings, cfg: RunsConfig, run: dict[str, 
 def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig | None = None,
               trigger: str = "manual", dry_run: bool = False, invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, clock: Callable[[], float] = time.monotonic, cancel=None,
-              echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+              echo: Callable[[str], None] = lambda s: None, job_ids: list[str] | None = None,
+              force: bool = False) -> dict[str, Any]:
+    """`job_ids`: run only those jobs (`careeros run <kind> --job <id>`); `force` reruns a done job. `apply`
+    always needs `job_ids` (one explicit job): applications never run in bulk. JobNotRunnable / ValueError
+    before anything is ranked, locked or called."""
     from careeros.tracker import add_action
 
+    if kind == "apply" and not job_ids:
+        raise ValueError("run apply needs --job <id>: applications never run in bulk")
+    if force and not job_ids:
+        raise ValueError("--force needs --job <id>: a batch never reruns finished jobs")
     cfg = cfg or load_runs_config(settings)
     retry = load_retry_config(cfg.raw)
     fails = Failures(RunStore(settings))
@@ -139,15 +147,17 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
     extra_stop = None
     pre_attempt = None
     warnings: list[str] = []
-    if kind == "prepare":
+    if kind in ("prepare", "apply"):
         pre_attempt = gate_check(settings, warnings, echo)
+    if kind == "prepare":
         if load_prepare_config(cfg.raw)["stop_at_daily_cap"]:
             extra_stop = daily_cap_stop(settings)
     run = execute_run(settings, kind, budget, cfg=cfg, trigger=trigger, dry_run=dry_run, invoke=invoke,
                       doctor=doctor, now=now, clock=clock, cancel=cancel, echo=echo,
                       retry_ids=fails.retry_ids(kind, max_attempts), skip_ids=fails.exhausted(kind, max_attempts),
                       extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt,
-                      finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()))
+                      finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()),
+                      job_ids=job_ids, force=force)
     if not dry_run:
         run["warnings"] = warnings
         rs = RunStore(settings)

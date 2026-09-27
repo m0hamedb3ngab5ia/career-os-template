@@ -233,3 +233,14 @@ def test_prepare_warns_when_the_company_still_has_unscored_jobs(settings, store)
     assert any("Acme" in w and "unscored" in w for w in rec["warnings"])
     assert any("unscored" in line for line in lines)
     assert "unscored" in RunStore(settings).read_log(rec["id"])
+
+
+def test_run_apply_needs_a_job_id(settings):
+    """No bulk apply: `run apply` without --job is refused before anything is ranked or called."""
+    settings.pipeline = {**settings.pipeline, "runs": {**(settings.pipeline.get("runs") or {}),
+                                                       "preflight_doctor": False}}
+    cfg = load_runs_config(settings)
+    with pytest.raises(ValueError, match="--job"):
+        run_batch(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
+                  invoke=Fake(settings), now=lambda: NOW)
+    assert not any((settings.paths["jobs_dir"].parent / "runs").glob("2*"))

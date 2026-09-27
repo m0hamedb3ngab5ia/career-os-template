@@ -45,6 +45,7 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | detected ATS (adapters.md table, from `posting.apply_url` or `url`) | posting.json | record in session |
 | tier from `score.json: tier`; the tracker `Override` column wins if set: read it with `.venv/bin/careeros tracker show <job_id> --json` (`Override` key; `A`/`B`/`C` replace the tier, `manual` or `skip` = no auto-submit) | score.json, tracker | if the command fails: `auto_submit` = false |
 | `auto_submit` = tiers[tier].auto_submit AND ats in `safety.auto_submit_ats` AND `safety.json: auto_submit_allowed` (from `careeros safety check`, section 1b: true only when the verdict is pass, "Pause all auto-submit" `safety.pause_auto_submit` is off, and the ATS is allowlisted on its own or the company's domain, reached from the company's board) | targets.yaml, safety.json | if false: proceed in assisted mode (stop before submit) |
+| runner verdict: when `CAREEROS_AUTO_SUBMIT` is set (a `careeros run apply` attempt; the runner computed `runs.auto_submit` from `score.json`, `safety.json` and the dream list, reason in `CAREEROS_AUTO_SUBMIT_REASON`) it overrides the `auto_submit` derivation above: `0` = assisted mode, `auto_submit` = false whatever the rows above say (fill and stage the form, never click submit, finish `staged` with status `needs_review`, section 5); `1` = the runner allows it, and the rows above still all have to hold (ATS allowlist, override column, safety, bot detection) for `auto_submit` to be true. Unset = the derivation above | environment | never submit with `CAREEROS_AUTO_SUBMIT=0` |
 | company not in `detection.yaml` with `skip_auto: true` | detection.yaml | Action Item `bot_detection` "known bot detection at <company>; apply by hand with prepared materials"; status needs_review; no browser |
 | daily cap: `.venv/bin/careeros run cap --check` exits 0 (applications today, by DateApplied, < `volume.max_applications_per_day` x `season_multiplier[month]`; code: `careeros.runs.policy`) | tracker, status history | exit 3: outcome failed, reason "daily cap" |
 | company gate: `.venv/bin/careeros company gate <job_id> --json` exits 0. One check for the per-company cap (`volume.max_per_company_per_90_days`, or the company's `company_caps` entry), the rejection cooldown (`volume.same_company_cooldown_days`, lifted for a posting that closes before it ends) and a closed posting | tracker, job dirs, config | exit 3: outcome failed, reason "company <reason>: <detail>"; no browser. `company_cap` / `cooldown`: status unchanged (still queued, retried next session). `closed`, `not_similar`, `already_applied`: permanent, so run `.venv/bin/careeros job status <job_id> skipped --note "company <reason>: <detail>" --lock-token <token>` (a dead job must not keep its slot or retry forever). Keep the JSON as `gate` |
@@ -180,10 +181,11 @@ value the helper did not return.
    - name, email, phone equal the profile values exactly;
    - the bot scan is still clean.
    Any failure → fix once if trivial (retype a value); else STOP, Action Item type `review`.
-3. If `not s.can_click_submit()` (tier A, assisted ATS, or already clicked): status `needs_review`,
+3. If `not s.can_click_submit()` (tier A, `CAREEROS_AUTO_SUBMIT=0`, assisted ATS, or already clicked): status `needs_review`,
    Action Item type `review`, priority H for tier A, `what`: "Review & submit <company> <role>. Form is
    filled in the open tab. Screenshot: <prefill_review path>", `link`: apply_url. Leave the tab open.
-   `s.finish("needs_review", reason="assisted: review & submit")`. Go to 7. When the user submits and
+   `s.finish("staged", reason="assisted: review & submit")` (outcome `staged` = filled, nothing clicked;
+   its `status` is `needs_review`). Go to 7. When the user submits and
    runs `careeros job status <job_id> applied --lock-token <token>`, the snapshot is frozen then (reason `assisted_stop`, with
    the values recorded here), so do not freeze on this path.
 4. Auto-submit: `s.mark_submit_clicked(job_dir)` (writes `submit_clicked: true` to `apply_session.json`

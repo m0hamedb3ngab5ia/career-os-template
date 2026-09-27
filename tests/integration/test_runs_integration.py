@@ -191,3 +191,91 @@ def test_fake_claude_not_on_path_means_doctor_fails(root, home, tmp_path):
         pytest.skip("a real claude is on the system PATH")
     r = cli(root, env, "run", "score", "--json")
     assert r.returncode == 1 and json.loads(r.stdout)["stop_reason"] == "doctor_failed"
+
+
+def test_run_prepare_with_job_runs_only_that_job_and_reports_json(root, home, fake_bin, tmp_path):
+    ids = add_jobs(root, 3)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    r = cli(root, env, "run", "score", "--job", ids[1], "--json")
+    assert r.returncode == 0, r.stderr
+    assert status_of(root, ids[1]) == "scored" and status_of(root, ids[0]) == "found"
+    r = cli(root, env, "run", "prepare", "--job", ids[1], "--json")
+    assert r.returncode == 0, r.stderr
+    rec = json.loads(r.stdout)
+    assert rec["kind"] == "prepare" and rec["counters"]["attempted"] == 1 and rec["counters"]["ok"] == 1
+    assert [q["job_id"] for q in rec["queue"]] == [ids[1]]
+    assert status_of(root, ids[1]) == "queued"
+    argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
+    assert argv[-1][-1] == f"/prepare-job data/jobs/{ids[1]}"
+    # done already (status queued): refused with the reason unless --force
+    r = cli(root, env, "run", "prepare", "--job", ids[1], "--json")
+    assert r.returncode == 2 and json.loads(r.stdout)["reasons"] == {ids[1]: "status queued"}
+    r = cli(root, env, "run", "prepare", "--job", ids[1])
+    assert r.returncode == 2 and "status queued" in r.stderr and "--force" in r.stderr
+    r = cli(root, env, "run", "prepare", "--job", ids[1], "--force", "--json")
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["counters"]["attempted"] == 1
+    r = cli(root, env, "run", "prepare", "--job", "nope", "--json")
+    assert r.returncode == 2 and json.loads(r.stdout)["reasons"] == {"nope": "not found"}
+    r = cli(root, env, "run", "prepare", "--job", "nope")
+    assert r.returncode == 2 and "not found" in r.stderr
+
+
+def test_run_apply_needs_job_and_uses_the_apply_skill(root, home, fake_bin, tmp_path):
+    ids = add_jobs(root, 1)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    r = cli(root, env, "run", "apply")
+    assert r.returncode == 2 and "--job" in r.stderr
+    assert not (tmp_path / "argv.jsonl").exists()
+    r = cli(root, env, "run", "apply", "--job", ids[0], "--json")
+    assert r.returncode == 2 and json.loads(r.stdout)["reasons"] == {ids[0]: "status found"}
+    assert cli(root, env, "run", "score", "--job", ids[0]).returncode == 0
+    assert cli(root, env, "run", "prepare", "--job", ids[0]).returncode == 0
+    r = cli(root, env, "run", "apply", "--job", ids[0], "--json")
+    assert r.returncode == 0, r.stderr
+    rec = json.loads(r.stdout)
+    assert rec["kind"] == "apply" and rec["counters"]["ok"] == 1 and status_of(root, ids[0]) == "applied"
+    argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
+    assert argv[-1][-1] == f"/apply-job data/jobs/{ids[0]}"
+    assert "mcp__claude-in-chrome__*" in argv[-1][argv[-1].index("--allowedTools") + 1]
+    assert "mcp__claude-in-chrome__*" not in argv[0][argv[0].index("--allowedTools") + 1]
+
+
+def test_run_force_without_job_exits_2_before_anything_runs(root, home, fake_bin, tmp_path):
+    add_jobs(root, 1)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    r = cli(root, env, "run", "score", "--force", "--json")
+    assert r.returncode == 2, r.stderr
+    assert "--force" in json.loads(r.stdout)["error"] and "--job" in json.loads(r.stdout)["error"]
+    assert not (tmp_path / "argv.jsonl").exists()
+    assert not list((root / "data" / "runs").glob("2*")) if (root / "data" / "runs").exists() else True
+    r = cli(root, env, "run", "score", "--force")
+    assert r.returncode == 2 and "--job" in r.stderr
+
+
+def test_run_job_on_a_locked_job_exits_5_busy(root, home, fake_bin, tmp_path):
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    ids = add_jobs(root, 1)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    rs = RunStore(Settings.load(root))
+    locks.acquire(rs.job_lock_path(ids[0]), owner="skill:test", pid=os.getpid(), ttl_seconds=600)
+    r = cli(root, env, "run", "score", "--job", ids[0], "--json")
+    assert r.returncode == 5, r.stdout + r.stderr
+    assert "skill:test" in r.stderr and not (tmp_path / "argv.jsonl").exists()
+    assert status_of(root, ids[0]) == "found"
+
+
+def test_run_job_refused_by_the_company_gate_exits_2(root, home, fake_bin, tmp_path):
+    ids = add_jobs(root, 1)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    assert cli(root, env, "run", "score", "--job", ids[0]).returncode == 0
+    p = root / "data" / "jobs" / ids[0] / "posting.json"
+    p.write_text(json.dumps({**json.loads(p.read_text()), "closes_at": "2020-01-01"}))  # closed: a gate verdict
+    r = cli(root, env, "run", "prepare", "--job", ids[0], "--json")
+    assert r.returncode == 2, r.stdout + r.stderr
+    body = json.loads(r.stdout)
+    assert "closed" in body["reasons"][ids[0]] and "error" in body
+    argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
+    assert len(argv) == 1  # only the score call; prepare-job was never spawned
