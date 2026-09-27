@@ -229,3 +229,46 @@ def test_status_writes_refuse_a_locked_job(env, data):
     assert registry.is_flagged(registry.load(registry.default_path(s)), scam["company"]) is not None
     r = c.post(f"/api/actions/{scam['action_id']}/mark-safe/undo", headers=W, json={"previous_status": "queued"})
     assert r.status_code == 409
+
+
+def test_mark_safe_undo_restores_an_entry_matched_by_a_similar_name(env, data):
+    """The registry entry may carry a fuzzy-equal name ("Acme Health" for "Acme Health Careers"): undo must put
+    back that same entry, not refuse it or append a second one."""
+    c, _ = env
+    s, scam = data["settings"], data["scam"]
+    reg = registry.default_path(s)
+    entries = registry.load(reg)
+    entry = registry._find(entries, scam["company"])
+    alias = f"{scam['company']} Careers"
+    entry["company"] = alias
+    registry._save(reg, entries)
+    assert registry.is_flagged(registry.load(reg), scam["company"]) is not None   # alias still matches
+    out = c.post(f"/api/actions/{scam['action_id']}/mark-safe", headers=W).json()
+    assert out["registry_before"]["company"] == alias
+    assert registry.is_flagged(registry.load(reg), scam["company"]) is None
+    r = c.post(f"/api/actions/{scam['action_id']}/mark-safe/undo", headers=W,
+               json={"previous_status": out["previous_status"], "registry_before": out["registry_before"]})
+    assert r.status_code == 200
+    after = registry.load(reg)
+    assert len(after) == len(entries)
+    assert registry.is_flagged(after, scam["company"])["company"] == alias
+
+
+def test_config_write_sends_one_changed_event_with_the_watcher(env, data):
+    """Block company writes companies.yaml and publishes; the watcher then sees that same write and stays quiet.
+    A later real edit to config still publishes."""
+    from careeros.ui.watch import Watcher
+
+    c, spy = env
+    s, scam = data["settings"], data["scam"]
+    ix = c.app.state.ctx.index
+    companies = s.root / "config" / "companies.yaml"
+    n = len(spy.sent)
+    assert c.post(f"/api/actions/{scam['action_id']}/block-company", headers=W).status_code == 200
+    assert len(spy.sent) == n + 1
+    w = Watcher(s, ix, spy)
+    assert w.handle([companies]) is None
+    assert len(spy.sent) == n + 1
+    companies.write_text(companies.read_text() + "\n# edited by hand\n")
+    assert w.handle([companies])["config"] is True
+    assert len(spy.sent) == n + 2

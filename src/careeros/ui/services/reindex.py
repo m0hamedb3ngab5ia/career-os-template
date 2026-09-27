@@ -11,6 +11,7 @@ def after_write(ctx: Any, *, jobs: Iterable[str] = (), tracker: bool = False, co
     changed_jobs = ctx.index.update_jobs(ids) if ids else []
     actions = ctx.index.update_tracker() if tracker else False
     if config:
+        ctx.index.update_config()   # the watcher then finds this write already taken
         ctx.reload_settings()
     payload = {"jobs": changed_jobs, "runs": [], "actions": actions, "config": config, "status": False}
     if changed_jobs or actions or config:

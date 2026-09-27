@@ -151,14 +151,12 @@ def clear(path: Path, company: str, note: str = "") -> dict[str, Any] | None:
 
 
 def restore(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
-    """Put an entry back exactly as it was (undo of `clear` in the UI): replaces the entry for the same company,
-    or appends it when there is none."""
+    """Put an entry back exactly as it was (undo of `clear` in the UI): replaces the entry `clear` found (same
+    fuzzy company match as _find), or appends it when there is none."""
     entries = load(path)
-    key = normalize_company(str(entry.get("company") or ""))
-    for i, e in enumerate(entries):
-        if normalize_company(str(e.get("company") or "")) == key:
-            entries[i] = dict(entry)
-            break
+    found = _find(entries, str(entry.get("company") or ""))
+    if found is not None:
+        entries[next(i for i, e in enumerate(entries) if e is found)] = dict(entry)
     else:
         entries.append(dict(entry))
     _save(path, entries)

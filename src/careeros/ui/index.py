@@ -309,6 +309,19 @@ class Index:
 
     # --- tracker (action items) ----------------------------------------------------------------------------
 
+    def update_config(self) -> bool:
+        """Record the config folder's signature; True when it differs from the last one recorded. A UI write
+        records it first, so the watcher, seeing that same write, finds nothing new and stays quiet."""
+        root = Path(self.settings.root) / "config"
+        files = sorted(f for f in root.rglob("*") if f.is_file() and not f.name.startswith(".")
+                       and not f.name.endswith(".tmp")) if root.is_dir() else []
+        sig = _sig(files)
+        with self._lock:
+            if self.get_meta("config_sig") == sig:
+                return False
+            self.set_meta("config_sig", sig)
+            return True
+
     def update_tracker(self) -> bool:
         """Re-read the Action Items tab when the workbook changed. Read-only: never through Tracker, whose load
         creates a missing workbook and renames a damaged one. A missing tracker indexes as no items."""
