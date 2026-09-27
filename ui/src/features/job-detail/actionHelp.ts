@@ -23,6 +23,7 @@ export const ACTION_HELP = {
   installSchedule: "Installs the background schedule so runs start on their own.",
   uninstallSchedule: "Removes the background schedule; runs then start only when you start them.",
   loadOlderRuns: "Loads the next page of past runs.",
+  stopAfterStage: "Stops the chained score → prepare run after scoring, instead of continuing on to prepare.",
 } as const;
 
 export type ActionKey = keyof typeof ACTION_HELP;

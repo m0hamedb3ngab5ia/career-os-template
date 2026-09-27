@@ -542,6 +542,11 @@
   }
 }
 
+/* Pipeline */
+.reviewReasons {
+  margin-top: var(--space-3);
+}
+
 /* Score "Why": one short sentence per line, tighter than the default bullets. */
 .why {
   margin: 4px 0 0;

@@ -30,6 +30,7 @@ from careeros.runs.store import RunStore
 from careeros.ui.services.stream import parse_event
 
 BATCH_KINDS = ("score", "prepare")
+JOB_KINDS = ("score", "prepare", "apply")  # `--job <id>` runs: one explicit job, apply only this way
 STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync")
 KEEP_OUTPUTS = 50  # launch output files kept under data/runs/ui/
 
@@ -75,7 +76,7 @@ def ps_started(pid: int) -> datetime | None:
         return None
 
 
-CANCELLABLE_RUNS = ("score", "prepare", "catch-up")
+CANCELLABLE_RUNS = ("score", "prepare", "apply", "catch-up")
 # `ps lstart` is whole seconds and, on Linux, derived from boot time plus jiffies, which drifts by seconds on VMs.
 # A pid reused within a minute of the lock being taken AND running a careeros run or step is not a real case.
 START_SLACK_S = 60
@@ -208,29 +209,65 @@ class RunControl:
         return {"started": True, "pid": proc.pid, "output": str(out)}
 
     def start(self, kind: str, preset: str | None = None, max_jobs: int | None = None,
-              max_minutes: float | None = None, dry_run: bool = False) -> dict[str, Any]:
-        """Start a score or prepare batch (same as `careeros run <kind> ...`). A dry run ranks and returns the
-        selection in-process: it never calls Claude and takes no lock, so there is nothing to detach."""
+              max_minutes: float | None = None, dry_run: bool = False, *, job_id: str | None = None,
+              force: bool = False) -> dict[str, Any]:
+        """Start a score or prepare batch (same as `careeros run <kind> ...`), or with `job_id` one job's
+        score / prepare / apply run (`careeros run <kind> --job <id> [--force]`, run id chosen here and returned
+        as `run_id`). A dry run ranks and returns the selection in-process: it never calls Claude and takes no
+        lock, so there is nothing to detach. JobNotRunnable (the runner's own reasons) before anything is
+        spawned when the job is not a candidate; Tier A is never applied."""
         from careeros.runs.config import budget_for, load_runs_config
 
-        if kind not in BATCH_KINDS:
-            raise ValueError(f"unknown run kind {kind!r}; use {' or '.join(BATCH_KINDS)}")
+        kinds = JOB_KINDS if job_id else BATCH_KINDS
+        if kind not in kinds:
+            raise ValueError(f"unknown run kind {kind!r}; use {' or '.join(kinds)}")
         cfg = load_runs_config(self.settings)
+        if job_id:
+            max_jobs = 1
         budget_for(cfg, kind, preset=preset, max_jobs=max_jobs, max_minutes=max_minutes)  # ValueError on bad input
         if dry_run:
             from careeros.runs.service import run_batch
 
             return run_batch(self.settings, kind, budget_for(cfg, kind, preset=preset, max_jobs=max_jobs,
-                                                             max_minutes=max_minutes), cfg=cfg, dry_run=True)
+                                                             max_minutes=max_minutes), cfg=cfg, dry_run=True,
+                             job_ids=[job_id] if job_id else None, force=force)
+        run_id = None
+        if job_id:
+            from careeros.runs.runner import JobNotRunnable, new_run_id, select_candidates
+
+            ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force)
+            if not ranked:
+                raise JobNotRunnable(kind, {e["job_id"]: e["reason"] for e in excluded})
+            run_id = new_run_id(kind, self.now())
         self._check_can_start()
         argv = ["careeros.cli", "run", kind]
         if preset:
             argv += ["--preset", preset]
-        if max_jobs is not None:
+        if max_jobs is not None and not job_id:
             argv += ["--max-jobs", str(max_jobs)]
         if max_minutes is not None:
             argv += ["--max-minutes", f"{max_minutes:g}"]
-        return {"kind": kind, **self._spawn(kind, [*argv, "--json"])}
+        if job_id:
+            argv += ["--job", job_id, *(["--force"] if force else []), "--run-id", run_id]
+        out = {"kind": kind, **self._spawn(kind, [*argv, "--json"])}
+        return {**out, "run_id": run_id} if job_id else out
+
+    def active_run_for(self, job_id: str) -> str | None:
+        """The id of the running batch whose job in flight (its job lock) is this job, else None. A job that is
+        only queued in the batch is `queued_in_run`: cancelling for it would kill the whole batch."""
+        run = self.current()
+        if run and run.get("state") == "running" and run.get("current_job") == job_id:
+            return run["id"]
+        return None
+
+    def queued_in_run(self, job_id: str) -> str | None:
+        """The id of the running batch whose queue names this job while another job is in flight, else None."""
+        run = self.current()
+        if not run or run.get("state") != "running" or run.get("current_job") == job_id:
+            return None
+        if any(q.get("job_id") == job_id for q in run.get("queue") or []):
+            return run["id"]
+        return None
 
     def start_step(self, kind: str) -> dict[str, Any]:
         """Start scout | tracker | prune (--yes) | inbox_sync as a recorded step run."""

@@ -106,7 +106,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
               trigger: str = "manual", dry_run: bool = False, invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, clock: Callable[[], float] = time.monotonic, cancel=None,
               echo: Callable[[str], None] = lambda s: None, job_ids: list[str] | None = None,
-              force: bool = False) -> dict[str, Any]:
+              force: bool = False, run_id: str | None = None) -> dict[str, Any]:
     """`job_ids`: run only those jobs (`careeros run <kind> --job <id>`); `force` reruns a done job. `apply`
     always needs `job_ids` (one explicit job): applications never run in bulk. JobNotRunnable / ValueError
     before anything is ranked, locked or called."""
@@ -157,7 +157,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
                       retry_ids=fails.retry_ids(kind, max_attempts), skip_ids=fails.exhausted(kind, max_attempts),
                       extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt,
                       finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()),
-                      job_ids=job_ids, force=force)
+                      job_ids=job_ids, force=force, run_id=run_id)
     if not dry_run:
         run["warnings"] = warnings
         rs = RunStore(settings)

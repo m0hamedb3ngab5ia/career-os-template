@@ -15,6 +15,7 @@ import { ContactsCard } from "./ContactsCard";
 import { DocumentsCard } from "./DocumentsCard";
 import { OverrideMenu, StatusMenu, WithdrawButton } from "./HeaderActions";
 import styles from "./JobDetail.module.css";
+import { PipelineCard } from "./PipelineCard";
 import { PostingCard } from "./PostingCard";
 import { SafetyCard } from "./SafetyCard";
 import { ScoreCard } from "./ScoreCard";
@@ -106,6 +107,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             onConfirm={doWithdraw}
           />
         ) : null}
+        <PipelineCard jobId={jobId} />
         <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
         <div className={styles.grid}>
           <div className={styles.column}>

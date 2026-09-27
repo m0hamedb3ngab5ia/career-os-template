@@ -3,14 +3,16 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
 from careeros.ui.routers import ctx
 from careeros.ui.routers._errors import refusals
 from careeros.ui.services import job_actions as acts
+from careeros.ui.services import job_pipeline as pipe
 from careeros.ui.services import jobs as svc
+from careeros.ui.services.runs import RunControl
 from careeros.ui.services.reindex import after_write
 
 router = APIRouter(tags=["jobs"])
@@ -150,6 +152,40 @@ def set_override(job_id: str, body: OverrideBody, c=Depends(ctx)) -> dict[str, A
         out = acts.set_override(c.settings, job_id, body.value)
     after_write(c, jobs=[job_id], tracker=True)
     return out
+
+
+class PipelineBody(BaseModel):
+    action: Literal["start", "continue", "approve_continue"]
+    force: bool = False
+
+
+class PipelineStarted(BaseModel):
+    run_id: str
+    kind: str
+
+
+def _rc(request: Request, c: Any) -> RunControl:
+    factory = getattr(request.app.state, "run_control", None) or RunControl
+    return factory(c.settings)
+
+
+@router.get("/jobs/{job_id}/pipeline")
+def job_pipeline(job_id: str, request: Request, c=Depends(ctx)) -> pipe.PipelineState:
+    """The job's stage, the one next action (Start / Continue / Approve & continue), why it is blocked, what a
+    needs_review job waits on, and the running run that names it."""
+    with refusals():
+        return pipe.pipeline_state(c.settings, job_id, _rc(request, c))
+
+
+@router.post("/jobs/{job_id}/pipeline")
+def start_job_pipeline(job_id: str, body: PipelineBody, request: Request, c=Depends(ctx)) -> PipelineStarted:
+    """Run the job's next stage as a detached `careeros run <kind> --job <id>`; approve_continue first moves
+    needs_review -> queued. 409 when a run is active or paused, or the job is not runnable (Tier A never applies)."""
+    with refusals():
+        out = pipe.start_pipeline(c.settings, job_id, body.action, _rc(request, c), force=body.force)
+    if body.action == "approve_continue":
+        after_write(c, jobs=[job_id], tracker=True)
+    return PipelineStarted(**out)
 
 
 @router.post("/jobs/{job_id}/qa")

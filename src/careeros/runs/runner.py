@@ -150,6 +150,11 @@ def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], 
     return "already prepared" if prepared_ok and not force else None
 
 
+def new_run_id(kind: str, now: datetime) -> str:
+    """A run id: local timestamp, kind, four hex chars (also what the UI passes as `--run-id`)."""
+    return f"{now.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
+
+
 def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datetime,
                       retry_ids: set[str] | None = None, skip_ids: dict[str, str] | None = None,
                       job_ids: list[str] | None = None, force: bool = False,
@@ -367,12 +372,15 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 after_attempt: Callable[[dict[str, Any]], None] | None = None,
                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,
                 finalize: Callable[[dict[str, Any]], None] | None = None,
-                job_ids: list[str] | None = None, force: bool = False) -> dict[str, Any]:
+                job_ids: list[str] | None = None, force: bool = False,
+                run_id: str | None = None) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
     another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock.
     `job_ids` restricts the run to those jobs (JobNotRunnable when none is a candidate, or when the company gate
     refuses it; JobBusy when its lock is held: an explicit run never reports `completed` for a job it did not
-    run; the batch queue file is left alone); `force` reruns an already scored/prepared job."""
+    run; the batch queue file is left alone); `force` reruns an already scored/prepared job. `run_id` names the
+    run (the UI picks it before spawning the CLI so it can stream the run from the start); default: a fresh
+    timestamped id."""
     cfg = cfg or load_runs_config(settings)
     rs = RunStore(settings)
     t_now = now()
@@ -391,7 +399,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
             return default_invoke(cmd, cwd, env, timeout_s, stream_path, cancel=cancel)
     if doctor is None and cfg.preflight_doctor:
         doctor = default_doctor
-    rid = f"{t_now.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
+    rid = run_id or new_run_id(kind, t_now)
     ttl = float(budget.max_minutes) * 60 + float(cfg.job_timeout_minutes[kind]) * 60 + 600
     try:
         glock = locks.acquire(rs.runner_lock_path, owner=f"run:{rid}", ttl_seconds=ttl, pid=os.getpid(), now=t_now,
