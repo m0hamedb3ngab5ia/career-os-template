@@ -1,0 +1,29 @@
+{
+  "tabs": [
+    {
+      "count": 6,
+      "key": "active",
+      "label": "Active"
+    },
+    {
+      "count": 1,
+      "key": "review",
+      "label": "Needs review"
+    },
+    {
+      "count": 2,
+      "key": "applied",
+      "label": "Applied"
+    },
+    {
+      "count": 2,
+      "key": "tier_a",
+      "label": "Tier A"
+    },
+    {
+      "count": 8,
+      "key": "all",
+      "label": "All"
+    }
+  ]
+}

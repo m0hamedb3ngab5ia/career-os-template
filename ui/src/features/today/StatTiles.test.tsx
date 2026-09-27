@@ -32,8 +32,8 @@ describe("StatTiles", () => {
   it("shows — when the response rate is unknown and leaves out a missing daily cap", () => {
     setup({
       ...status.tiles,
-      applied_week: { value: 0, rows: [], daily_cap: null },
-      response_rate: { rate: null, responded: 0, applied: 0, days: 30, rows: [] },
+      applied_week: { value: 0, since: "2026-09-21T00:00:00+00:00", rows: [], daily_cap: null },
+      response_rate: { rate: null, responded: 0, applied: 0, days: 30, definition: "", breakdown: [], rows: [] },
     });
     expect(tile(/Response rate/)).toHaveTextContent("—");
     expect(tile(/Applied this week/)).not.toHaveTextContent("Limit");

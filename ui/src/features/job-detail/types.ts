@@ -1,12 +1,14 @@
-// GET /api/jobs/{id} (src/careeros/ui/services/jobs.py job_detail + the today-jobs contract) and the write replies.
-import type { JobListItem } from "../jobs/types";
+// GET /api/jobs/{id}: the envelope is generated from the FastAPI OpenAPI schema (src/api/schema.gen.ts;
+// services/jobs.py JobDetail). The job's own files (posting.json, score.json, safety.json, qa.json,
+// apply_session.json, contacts.json, status.json history, the registry YAML entries) are returned as written, so the
+// schema has them as open mappings; their contents are described by hand below. The write replies stay hand-written.
+import type { components } from "../../api/schema.gen";
 
-export interface FileEntry {
-  name: string;
-  size: number;
-  /** Epoch seconds. */
-  modified: number;
-}
+type Schemas = components["schemas"];
+
+export type FileEntry = Schemas["FileEntry"];
+export type ContactPolicy = Schemas["ContactPolicy"];
+export type ActivityEntry = Schemas["ActivityEntry"];
 
 export interface Posting {
   company?: string;
@@ -99,14 +101,6 @@ export interface Contact {
   mutuals?: number | null;
 }
 
-export interface ContactPolicy {
-  name: string;
-  role?: string;
-  manual: boolean;
-  reason: string | null;
-  detail?: string;
-}
-
 export interface Registry {
   verified: null | { company: string; risk: string; signals: string[]; evidence: string[]; checked_at?: string };
   flagged: null | {
@@ -121,32 +115,19 @@ export interface Registry {
   };
 }
 
-export interface ActivityEntry {
-  at: string;
-  component: string;
-  message: string;
-}
-
-export interface JobDetail {
-  job: JobListItem | null;
+export type JobDetail = Omit<
+  Schemas["JobDetail"],
+  "posting" | "history" | "score" | "safety" | "qa" | "apply_session" | "contacts" | "registry"
+> & {
   posting: Posting;
-  status: string | null;
   history: HistoryEntry[];
   score: Score | null;
   safety: Safety | null;
   qa: Qa | null;
-  documents: FileEntry[];
-  submitted: string[];
   apply_session: ApplySession | null;
-  screenshots: FileEntry[];
   contacts: Contact[];
-  log: string;
-  override?: string | null;
-  registry?: Registry;
-  outreach?: Record<string, unknown> | null;
-  contacts_policy?: ContactPolicy[];
-  activity?: ActivityEntry[];
-}
+  registry: Registry;
+};
 
 export interface StatusReply {
   status: string;
