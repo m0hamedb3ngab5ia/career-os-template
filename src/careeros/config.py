@@ -114,8 +114,9 @@ class Settings:
             if isinstance(val, str):
                 p = Path(val).expanduser()
                 s.paths[key] = p if p.is_absolute() else (root / p).resolve()
-        if "tracker_xlsx" in raw_paths and (not str(raw_paths["tracker_xlsx"] or "").strip()
-                                            or s.paths["tracker_xlsx"].is_dir()):
+        tracker = raw_paths.get("tracker_xlsx")  # null/absent = the default below
+        if tracker is not None and (not isinstance(tracker, str) or not tracker.strip()
+                                    or s.paths["tracker_xlsx"].is_dir()):
             raise ConfigError("config/pipeline.yaml: paths.tracker_xlsx must be a file path like "
                               f"data/JobTracker.xlsx, got {raw_paths['tracker_xlsx']!r}")
         s.paths.setdefault("jobs_dir", root / "data" / "jobs")
