@@ -12,6 +12,7 @@ data/action_items.json). Every table is derived; the index never writes back. A 
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import sqlite3
@@ -23,7 +24,7 @@ from typing import Any, Iterable
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2: action_items.due, due_reason
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -36,7 +37,7 @@ CREATE TABLE status_history (job_id TEXT, seq INTEGER, status TEXT, at TEXT, not
 CREATE INDEX status_history_job ON status_history(job_id);
 CREATE TABLE action_items (
     id TEXT PRIMARY KEY, created TEXT, job_id TEXT, company TEXT, role TEXT, type TEXT, what TEXT, link TEXT,
-    priority TEXT, needs TEXT, done INTEGER, done_date TEXT);
+    priority TEXT, needs TEXT, done INTEGER, done_date TEXT, due TEXT, due_reason TEXT);
 CREATE TABLE contacts (
     job_id TEXT, seq INTEGER, name TEXT, title TEXT, company TEXT, linkedin TEXT, email TEXT,
     email_confidence TEXT, linkedin_degree INTEGER, mutuals INTEGER, sent INTEGER, replied TEXT);
@@ -70,19 +71,22 @@ def _obj(path: Path) -> dict[str, Any]:
 
 
 def _sig(paths: Iterable[Path]) -> str:
-    n = newest = size = 0
+    """Hash of sorted (name, mtime_ns, size) per file, so renames and same-size edits change it too.
+    Names are parent/name, enough to tell run.json from attempts/001.json."""
+    rows = []
     for p in paths:
         try:
             st = p.stat()
         except OSError:
             continue
-        n, newest, size = n + 1, max(newest, st.st_mtime_ns), size + st.st_size
-    return f"{n}:{newest}:{size}"
+        rows.append((f"{p.parent.name}/{p.name}", st.st_mtime_ns, st.st_size))
+    return hashlib.sha1(repr(sorted(rows)).encode("utf-8")).hexdigest()
 
 
 def _dir_sig(d: Path) -> str:
     try:
-        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name))
+        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name)
+                    and not f.name.endswith(".tmp"))
     except OSError:
         return ""
 
@@ -415,6 +419,19 @@ class Index:
 
     # --- tracker (action items) ----------------------------------------------------------------------------
 
+    def update_config(self) -> bool:
+        """Record the config folder's signature; True when it differs from the last one recorded. A UI write
+        records it first, so the watcher, seeing that same write, finds nothing new and stays quiet."""
+        root = Path(self.settings.root) / "config"
+        files = sorted(f for f in root.rglob("*") if f.is_file() and not f.name.startswith(".")
+                       and not f.name.endswith(".tmp")) if root.is_dir() else []
+        sig = _sig(files)
+        with self._lock:
+            if self.get_meta("config_sig") == sig:
+                return False
+            self.set_meta("config_sig", sig)
+            return True
+
     def update_tracker(self) -> bool:
         """Re-read the Action Items tab when the workbook changed. Read-only: never through Tracker, whose load
         creates a missing workbook and renames a damaged one. A missing tracker indexes as no items."""
@@ -430,11 +447,12 @@ class Index:
                     return False                 # and no signature, so the next change retries
             self.con.execute("DELETE FROM action_items")
             self.con.executemany(
-                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(str(it.get("ID")), _s(it.get("Created")), _s(it.get("JobID")), _s(it.get("Company")),
                   _s(it.get("Role")), _s(it.get("Type")), _s(it.get("What to do")), _s(it.get("Link")),
                   _s(it.get("Priority")), _s(it.get("Needs")), int(str(it.get("Done") or "N").upper() == "Y"),
-                  _s(it.get("DoneDate"))) for it in items if it.get("ID")])
+                  _s(it.get("DoneDate")), _due(it.get("Due")), _s(it.get("Due reason")))
+                 for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
             self.set_meta("indexed_at", _now())
             return True
@@ -466,6 +484,13 @@ def read_action_items(path: Path) -> list[dict[str, Any]]:
         return [dict(zip(header, r)) for r in rows if r and r[0] not in (None, "")]
     finally:
         wb.close()
+
+
+def _due(v: Any) -> str | None:
+    """A typed Excel date comes back as a datetime at 00:00: keep only the date (due = the end of that day)."""
+    if isinstance(v, datetime) and v.time() == datetime.min.time() and v.tzinfo is None:
+        return v.date().isoformat()
+    return _s(v)
 
 
 def _s(v: Any) -> str | None:

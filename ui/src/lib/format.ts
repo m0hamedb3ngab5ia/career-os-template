@@ -63,6 +63,61 @@ function dtf(locale: string | undefined, opts: Intl.DateTimeFormatOptions): Intl
   return f;
 }
 
+function capitalize(s: string): string {
+  return s ? s[0]!.toLocaleUpperCase() + s.slice(1) : s;
+}
+
+function dayNumber(d: Date): number {
+  return Math.floor(new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime() / 86_400_000);
+}
+
+/** "Fri, Oct 3" (weekday, month, day in the viewer's locale). */
+export function formatDay(iso: string | null | undefined, locale?: string): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return dtf(locale, { weekday: "short", month: "short", day: "numeric" }).format(t);
+}
+
+/**
+ * A deadline as the Action Items screen words it: relative when close ("Today, 6:00 PM", "Tomorrow",
+ * "In 3 days · Sun, Sep 28", "Overdue by 1 day"), an absolute date further out ("Fri, Oct 3"). `dateOnly`
+ * deadlines have no time of day.
+ */
+export function formatDue(
+  iso: string | null | undefined,
+  dateOnly: boolean,
+  now: Date = new Date(),
+  locale?: string,
+): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  const due = new Date(t);
+  const time = dateOnly ? "" : dtf(locale, { hour: "numeric", minute: "2-digit" }).format(due);
+  if (t < now.getTime()) {
+    const hours = (now.getTime() - t) / 3_600_000;
+    const [n, unit] = hours < 24 && !dateOnly ? [Math.max(1, Math.round(hours)), "hour"] : [Math.max(1, dayNumber(now) - dayNumber(due)), "day"];
+    const amount = new Intl.NumberFormat(locale ?? appLocale, { style: "unit", unit, unitDisplay: "long" }).format(n);
+    return `Overdue by ${amount}`;
+  }
+  const days = dayNumber(due) - dayNumber(now);
+  if (days <= 1) {
+    const word = capitalize(rtf(locale).format(days, "day"));
+    return time ? `${word}, ${time}` : word;
+  }
+  if (days <= 7) return `${capitalize(rtf(locale).format(days, "day"))} · ${formatDay(iso, locale)}`;
+  return formatDay(iso, locale);
+}
+
+/** "Sep 29" (month and day in the viewer's locale). */
+export function formatMonthDay(iso: string | null | undefined, locale?: string): string | null {
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  if (Number.isNaN(t)) return null;
+  return dtf(locale, { month: "short", day: "numeric" }).format(t);
+}
+
 function sameDay(a: Date, b: Date): boolean {
   return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
 }

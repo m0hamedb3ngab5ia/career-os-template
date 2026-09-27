@@ -221,6 +221,12 @@ SECTIONS: tuple[Section, ...] = (
                   default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
             Field(P, "ui.pipeline.columns", "records", "Pipeline columns", default=ui_cfg.DEFAULT_COLUMNS,
                   check=_ui_columns, help="One column per stage; statuses in no column count as Closed."),
+            Field(P, "ui.pipeline.card_limit", "number", "Cards per Pipeline column",
+                  default=ui_cfg.UiConfig.card_limit, min=1, max=500, integer=True,
+                  help="The rest of a column opens with Show all."),
+            Field(P, "ui.due_soon_hours", "number", "Action Items are due soon within",
+                  default=ui_cfg.UiConfig.due_soon_hours, min=1, max=24 * 14, integer=True, unit="h",
+                  help="Due soon shows orange; overdue shows red."),
         )),
         Group("claude", "Claude", (
             Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),

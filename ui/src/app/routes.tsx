@@ -9,10 +9,10 @@ export const routes: RouteObject[] = [
     element: <AppShell />,
     children: [
       { index: true, element: <PlaceholderPage title="Today" /> },
-      { path: "pipeline", element: <PlaceholderPage title="Pipeline" /> },
+      { path: "pipeline", lazy: () => import("../features/pipeline/PipelinePage").then((m) => ({ Component: m.PipelinePage })) },
       { path: "jobs", element: <PlaceholderPage title="Jobs" /> },
       { path: "jobs/:jobId", element: <PlaceholderPage title="Job detail" /> },
-      { path: "actions", element: <PlaceholderPage title="Action Items" /> },
+      { path: "actions", lazy: () => import("../features/actions/ActionItemsPage").then((m) => ({ Component: m.ActionItemsPage })) },
       { path: "inbox", element: <PlaceholderPage title="Inbox & Follow-ups" /> },
       { path: "inbox/:jobId", element: <PlaceholderPage title="Inbox & Follow-ups" /> },
       { path: "contacts", element: <PlaceholderPage title="Contacts" /> },

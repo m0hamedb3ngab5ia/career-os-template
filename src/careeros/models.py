@@ -4,7 +4,7 @@ import hashlib
 from datetime import datetime, timezone
 from typing import Any, Literal
 
-from pydantic import BaseModel, Field, model_validator
+from pydantic import BaseModel, Field, field_validator, model_validator
 
 STATUSES: tuple[str, ...] = (
     "found",
@@ -127,6 +127,21 @@ class QAResult(BaseModel):
         return [c for c in self.checks if c.kind == "hard" and not c.passed]
 
 
+def parse_due(v: Any) -> str | None:
+    """An Action Item due value: None/"" -> None, else an ISO date or datetime string (kept as given, stripped).
+    Raises ValueError on anything else."""
+    if v is None or (isinstance(v, str) and not v.strip()):
+        return None
+    if isinstance(v, datetime):
+        return v.isoformat()
+    s = str(v).strip()
+    try:
+        datetime.fromisoformat(s)
+    except ValueError:
+        raise ValueError(f"due must be an ISO date or date-time (e.g. 2026-10-03 or 2026-10-03T18:00), got {v!r}") from None
+    return s
+
+
 class ActionItem(BaseModel):
     id: str = ""
     created: str = Field(default_factory=now_iso)
@@ -140,6 +155,14 @@ class ActionItem(BaseModel):
     needs: ActionNeeds = "anytime"
     done: bool = False
     done_date: str | None = None
+    # Optional natural deadline (ISO date or datetime) and why ("posting closes"); never invented.
+    due: str | None = None
+    due_reason: str | None = None
+
+    @field_validator("due")
+    @classmethod
+    def _iso_due(cls, v: str | None) -> str | None:
+        return parse_due(v)
 
 
 class Contact(BaseModel):

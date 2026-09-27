@@ -14,7 +14,8 @@ from careeros.config import ConfigError
 from careeros.models import STATUSES
 
 UI_KEYS = ("port", "host", "open_browser", "theme", "undo_seconds", "page_size", "watch_debounce_ms", "index_path",
-           "pause_until_tomorrow_at", "pipeline")
+           "due_soon_hours", "pause_until_tomorrow_at", "pipeline")
+PIPELINE_KEYS = ("columns", "card_limit")
 THEMES = ("system", "light", "dark")
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
 # The mockup's board: one column per stage; statuses left out (skipped, rejected, withdrawn, ghosted) are
@@ -39,6 +40,8 @@ class UiConfig:
     page_size: int = 100
     watch_debounce_ms: int = 300
     index_path: str | None = None          # None: data/careeros.db next to data/jobs
+    due_soon_hours: int = 48               # Action Items: orange "due soon" within this many hours
+    card_limit: int = 10                   # Pipeline: cards per column before "Show all"
     pause_until_tomorrow_at: str = "08:00"   # Runs › Pause all › "Until tomorrow": this local time tomorrow
     columns: list[dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_COLUMNS))
 
@@ -62,6 +65,7 @@ def _columns(raw: Any) -> list[dict[str, Any]]:
     if not isinstance(raw, list) or not raw:
         raise _err("pipeline.columns must be a non-empty list of {name, statuses}")
     seen: set[str] = set()
+    names: set[str] = set()
     out = []
     for i, col in enumerate(raw):
         where = f"pipeline.columns[{i}]"
@@ -70,6 +74,9 @@ def _columns(raw: Any) -> list[dict[str, Any]]:
         name, statuses = col.get("name"), col.get("statuses")
         if not isinstance(name, str) or not name.strip():
             raise _err(f"{where}.name must be a non-empty string")
+        if name.strip().casefold() in names:
+            raise _err(f"{where}.name: {name.strip()!r} is already another column's name")
+        names.add(name.strip().casefold())
         if not isinstance(statuses, list) or not statuses:
             raise _err(f"{where}.statuses must be a non-empty list")
         for st in statuses:
@@ -116,6 +123,8 @@ def load_ui_config(settings: Any) -> UiConfig:
         if not isinstance(raw["index_path"], str) or not raw["index_path"].strip():
             raise _err(f"index_path must be a file path or null, got {raw['index_path']!r}")
         cfg.index_path = raw["index_path"]
+    if "due_soon_hours" in raw:
+        cfg.due_soon_hours = _int(raw["due_soon_hours"], "due_soon_hours", 1, 24 * 14)
     if "pause_until_tomorrow_at" in raw:
         v = raw["pause_until_tomorrow_at"]
         if not isinstance(v, str) or not _HHMM.match(v):
@@ -123,8 +132,10 @@ def load_ui_config(settings: Any) -> UiConfig:
         cfg.pause_until_tomorrow_at = v
     pl = raw.get("pipeline")
     if pl is not None:
-        if not isinstance(pl, dict) or set(pl) - {"columns"}:
-            raise _err("pipeline must be a mapping with only columns")
+        if not isinstance(pl, dict) or set(pl) - set(PIPELINE_KEYS):
+            raise _err(f"pipeline must be a mapping with only {' and '.join(PIPELINE_KEYS)}")
         if "columns" in pl:
             cfg.columns = _columns(pl["columns"])
+        if "card_limit" in pl:
+            cfg.card_limit = _int(pl["card_limit"], "pipeline.card_limit", 1, 500)
     return cfg

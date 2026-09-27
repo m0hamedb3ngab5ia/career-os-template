@@ -20,6 +20,7 @@ from careeros.config import ConfigError, Settings
 from careeros.ui.events import Broker
 from careeros.ui.index import Index
 from careeros.ui.security import LOOPBACK, check_request
+from careeros.ui.services.job_actions import JobLocked
 
 STATIC_DIR = Path(__file__).resolve().parent / "static"
 
@@ -116,7 +117,7 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import events, health, jobs, meta, runs, status
+    from careeros.ui.routers import actions, events, health, job_actions, jobs, meta, pipeline, runs, status
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -133,6 +134,10 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     async def bad_value(_: Request, e: ValueError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=400)
 
+    @app.exception_handler(JobLocked)
+    async def job_locked(_: Request, e: JobLocked) -> JSONResponse:
+        return JSONResponse({"detail": str(e)}, status_code=409)
+
     @app.exception_handler(RequestValidationError)
     async def bad_request(_: Request, e: RequestValidationError) -> JSONResponse:
         return JSONResponse({"detail": plain_validation(e.errors())}, status_code=422)
@@ -141,7 +146,7 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=503)
 
-    for r in (health, meta, status, jobs, events, runs):
+    for r in (health, meta, status, jobs, events, runs, actions, pipeline, job_actions):
         app.include_router(r.router, prefix="/api")
     from careeros.ui.routers import settings as settings_r, storage as storage_r  # Settings + Storage slice
     for r in (settings_r, storage_r):

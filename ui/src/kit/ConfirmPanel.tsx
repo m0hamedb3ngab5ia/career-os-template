@@ -11,7 +11,9 @@ interface ConfirmPanelProps {
   onCancel: () => void;
   onConfirm: () => void;
   pending?: boolean;
-  /** Irreversible and destructive (default) or just consequential ("Install the scheduler?"): primary. */
+  /** A second line under the question: what happens next and how to undo it. */
+  detail?: string;
+  /** Irreversible and destructive (default) or just consequential/reversible ("Install the scheduler?"): primary. */
   confirmVariant?: Extract<ButtonVariant, "destructive-filled" | "primary">;
   /** The control that opened the panel. When the panel closes (Cancel, Escape, or after confirming) and focus
    * would otherwise fall to the page, it goes back here; the trigger may re-mount as the panel closes. */
@@ -26,6 +28,7 @@ export function ConfirmPanel({
   onCancel,
   onConfirm,
   pending,
+  detail,
   confirmVariant = "destructive-filled",
   returnFocusRef,
 }: ConfirmPanelProps) {
@@ -63,19 +66,28 @@ export function ConfirmPanel({
       ref={panelRef}
       role="alertdialog"
       aria-labelledby={id}
+      aria-describedby={detail ? `${id}-detail` : undefined}
       className={styles.confirm}
       data-variant={confirmVariant}
+      data-stacked={detail ? true : undefined}
       onKeyDown={onKeyDown}
     >
       <span id={id} className={styles.confirmQuestion}>
         {question}
       </span>
-      <Button ref={cancelRef} size="small" onClick={onCancel}>
-        {cancelLabel}
-      </Button>
-      <Button size="small" variant={confirmVariant} onClick={onConfirm} pending={pending} pendingLabel={`${confirmLabel}…`}>
-        {confirmLabel}
-      </Button>
+      {detail ? (
+        <span id={`${id}-detail`} className={styles.confirmDetail}>
+          {detail}
+        </span>
+      ) : null}
+      <span className={styles.confirmButtons}>
+        <Button ref={cancelRef} size="small" onClick={onCancel}>
+          {cancelLabel}
+        </Button>
+        <Button size="small" variant={confirmVariant} onClick={onConfirm} pending={pending} pendingLabel={`${confirmLabel}…`}>
+          {confirmLabel}
+        </Button>
+      </span>
     </div>
   );
 }

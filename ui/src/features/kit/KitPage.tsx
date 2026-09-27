@@ -13,12 +13,17 @@ import {
 import { ConfirmPanel } from "../../kit/ConfirmPanel";
 import { EmptyState } from "../../kit/EmptyState";
 import { ExternalLink } from "../../kit/ExternalLink";
+import { SelectField, TextField } from "../../kit/FormField";
 import { ACTION_TYPES, NEEDS, PRIORITIES, SAFETY, STATUSES, STOP_REASONS, TIERS } from "../../kit/labels";
+import { Listbox } from "../../kit/Listbox";
 import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
+import { Menu } from "../../kit/Menu";
 import { Popover } from "../../kit/Popover";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Switch } from "../../kit/Switch";
+import { Sheet } from "../../kit/Sheet";
 import { useToast } from "../../kit/Toast";
+import { UnavailableButton } from "../../kit/UnavailableButton";
 import styles from "./KitPage.module.css";
 
 // Developer page for visual checks against the mockup's Components artboard, in both themes side by side.
@@ -52,6 +57,8 @@ function Interactive() {
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
   const [open, setOpen] = useState(false);
+  const [sheet, setSheet] = useState(false);
+  const [col, setCol] = useState("found");
   const tile = useRef<HTMLButtonElement>(null);
 
   return (
@@ -162,6 +169,37 @@ function Interactive() {
           />
         ) : null}
         <p className={styles.note}>Reversible: act now, show Undo for 8 s. Irreversible: confirm first, name the outcome on the button.</p>
+      </section>
+
+      <section className={styles.stack}>
+        <h3 className={styles.h3}>Menus, fields and sheets</h3>
+        <div className={styles.row}>
+          <Menu
+            label="More actions"
+            items={[
+              { key: "snooze", label: "Snooze a day", onSelect: () => toast.show({ message: "Snoozed." }) },
+              { key: "archive", label: "Archive", disabled: true, onSelect: () => undefined },
+            ]}
+          >
+            More…
+          </Menu>
+          <Listbox
+            label="Column"
+            labelPlacement="inline"
+            value={col}
+            options={[
+              { value: "found", label: "Found" },
+              { value: "applied", label: "Applied" },
+            ]}
+            onValueChange={setCol}
+          />
+          <UnavailableButton reason="This needs a backend that isn't built yet">Sync</UnavailableButton>
+          <Button onClick={() => setSheet(true)}>Open sheet</Button>
+        </div>
+        <Sheet open={sheet} onClose={() => setSheet(false)} title="Add item">
+          <TextField label="Title" hint="What needs doing" />
+          <SelectField label="Priority" options={[{ value: "high", label: "High" }, { value: "low", label: "Low" }]} />
+        </Sheet>
       </section>
     </>
   );

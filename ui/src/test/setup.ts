@@ -4,6 +4,9 @@ import { setAppLocale } from "../lib/format";
 
 configure({ asyncUtilTimeout: 4000 });
 
+// Dates are read in one time zone whatever the machine uses.
+process.env.TZ = "UTC";
+
 // Formatting must not depend on the machine running the tests (LC_ALL, OS language).
 setAppLocale("en-US");
 

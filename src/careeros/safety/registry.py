@@ -150,6 +150,25 @@ def clear(path: Path, company: str, note: str = "") -> dict[str, Any] | None:
     return e
 
 
+def restore(path: Path, entry: dict[str, Any]) -> dict[str, Any]:
+    """Put an entry back exactly as it was (undo of `clear` in the UI): replaces the entry with the same
+    normalized company name (the one `clear` changed), else the first fuzzy match (_find), else appends it.
+    Exact first: several entries may fuzzy-match one name, and only the saved one must be overwritten."""
+    entries = load(path)
+    name = str(entry.get("company") or "")
+    key = normalize_company(name)
+    idx = next((i for i, e in enumerate(entries) if normalize_company(str(e.get("company") or "")) == key), None)
+    if idx is None:
+        found = _find(entries, name)
+        idx = next((i for i, e in enumerate(entries) if e is found), None) if found is not None else None
+    if idx is not None:
+        entries[idx] = dict(entry)
+    else:
+        entries.append(dict(entry))
+    _save(path, entries)
+    return dict(entry)
+
+
 # --- verified companies (made-up company protection) ------------------------------------------------
 
 RISKS = ("low", "medium", "high")

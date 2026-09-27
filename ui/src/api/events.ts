@@ -27,6 +27,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
     add(["status"]);
+    add(["pipeline"]);
   }
   if (p.runs?.length) {
     add(["runs"]);
@@ -38,6 +39,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   if (p.actions) {
     add(["status"]);
     add(["actions"]);
+    add(["pipeline"]); // card hints and overrides come from the tracker
   }
   if (p.config) {
     add(["meta"]);
@@ -46,6 +48,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["advise"]); // advice depends on the config
     add(["storage"]);
     add(["status"]);
+    add(["pipeline"]); // columns come from ui.pipeline
   }
   if (p.status) {
     add(["status"]);

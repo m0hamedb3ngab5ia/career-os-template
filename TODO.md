@@ -26,6 +26,9 @@ belong in each candidate's own private repo, not here.
       `/api/health|meta|status|jobs|events`, `pipeline.yaml: ui` (slice 1 of the UI build; frontend next)
 - [ ] Move Action Items source of truth from the xlsx to data/action_items.json (+ due/due_reason); the UI writes
       through Tracker until then (docs/UI.md)
+- [ ] Action Item due dates from the producers: inbox-sync (interview reply window, assessment deadline), apply-job
+      (saved-form expiry), prepare-job (posting close date), follow-ups (after-apply window). `ActionItem.due` /
+      `due_reason`, the tracker's Due columns and the UI's "Add date" exist; nothing sets them automatically yet
 - [ ] Scheduled apply path: honour `runs.auto_submit.enabled`, gated by the daily cap (`careeros run cap --check`)
       and `auto_submit_decision` (Tier A and non-pass safety always manual); off by default
 - [ ] Finish the inbox-sync skill, then set `schedule.jobs.inbox_sync.enabled: true` (the job, 08:00 + 18:00 with a
