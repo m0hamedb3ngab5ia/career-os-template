@@ -86,7 +86,7 @@ export function ScoreCard({ score }: { score: Score | null }) {
       {reasons.length ? (
         <>
           <h3 className={styles.h3}>Why</h3>
-          <ul className={styles.bullets}>
+          <ul className={styles.why} aria-label="Why this score">
             {reasons.map((r) => (
               <li key={r}>{r}</li>
             ))}

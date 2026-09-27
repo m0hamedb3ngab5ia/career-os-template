@@ -5,6 +5,7 @@ import { Button } from "../../kit/Button";
 import { Menu } from "../../kit/Menu";
 import { STATUSES, describeCode } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
+import { help } from "./actionHelp";
 import { errorText, useSetOverride, useSetStatus } from "./api";
 import { OVERRIDE_LABELS, OVERRIDES } from "./labels";
 
@@ -38,7 +39,7 @@ export function StatusMenu({ jobId, status }: { jobId: string; status: string | 
   }
   return (
     <Menu label="Set status">
-      <Menu.Trigger pending={set.isPending} pendingLabel="Saving…" disabled={statuses.length === 0}>
+      <Menu.Trigger {...help("setStatus")} pending={set.isPending} pendingLabel="Saving…" disabled={statuses.length === 0}>
         Set status
       </Menu.Trigger>
       <Menu.Content align="end">
@@ -59,6 +60,7 @@ export function OverrideMenu({ jobId, override }: { jobId: string; override: str
   return (
     <Menu label="Status override">
       <Menu.Trigger
+        {...help("override")}
         pending={set.isPending}
         pendingLabel="Saving…"
         icon={<SlidersHorizontal size={14} strokeWidth={1.7} aria-hidden="true" />}
@@ -106,7 +108,7 @@ export function WithdrawButton({
   ref?: Ref<HTMLButtonElement>;
 }) {
   return (
-    <Button ref={ref} variant="destructive" aria-expanded={expanded} onClick={onClick}>
+    <Button ref={ref} {...help("withdraw")} variant="destructive" aria-expanded={expanded} onClick={onClick}>
       Withdraw…
     </Button>
   );

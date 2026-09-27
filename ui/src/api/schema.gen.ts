@@ -379,6 +379,8 @@ export interface components {
       at: string;
       /** Component */
       component: string;
+      /** Label */
+      label: string;
       /** Message */
       message: string;
     };
@@ -1071,6 +1073,8 @@ export interface components {
       job: components["schemas"]["JobRow"] | null;
       /** Log */
       log: string;
+      /** Other Files */
+      other_files: components["schemas"]["FileEntry"][];
       /** Outreach */
       outreach: {
         [key: string]: unknown;

@@ -5,6 +5,7 @@ import { Chip } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatBytes, formatCount, formatDate, formatDecimal } from "../../lib/format";
+import { help } from "./actionHelp";
 import { errorText, fileUrl, useOpenFolder, useRerunQa } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -107,6 +108,7 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
       <div className={styles.buttons}>
         <Button
           size="small"
+          {...help("rerunQa")}
           pending={rerun.isPending}
           pendingLabel="Running…"
           onClick={() =>
@@ -129,11 +131,13 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
 export function DocumentsCard({
   jobId,
   documents,
+  otherFiles = [],
   submitted,
   qa,
 }: {
   jobId: string;
   documents: FileEntry[];
+  otherFiles?: FileEntry[];
   submitted: string[];
   qa: Qa | null;
 }) {
@@ -154,6 +158,7 @@ export function DocumentsCard({
       aside={
         <Button
           size="small"
+          {...help("openFolder")}
           icon={<FolderOpen size={14} strokeWidth={1.7} aria-hidden="true" />}
           pending={folder.isPending}
           pendingLabel="Opening…"
@@ -179,7 +184,7 @@ export function DocumentsCard({
             </div>
           </div>
           {latest ? (
-            <Button size="small" onClick={openFolder}>
+            <Button size="small" {...help("showInFolder")} onClick={openFolder}>
               Show in folder
             </Button>
           ) : (
@@ -189,6 +194,24 @@ export function DocumentsCard({
           )}
         </li>
       </ul>
+      {otherFiles.length ? (
+        <details className={styles.details}>
+          <summary>All files ({formatCount(otherFiles.length)})</summary>
+          <ul className={styles.list} aria-label="All files">
+            {otherFiles.toSorted((a, b) => a.name.localeCompare(b.name)).map((f) => (
+              <li key={f.name} className={styles.docRow}>
+                <div className={styles.grow}>
+                  <a translate="no" href={fileUrl(jobId, f.name)} target="_blank" rel="noopener noreferrer">
+                    {f.name}
+                    <span className="sr-only"> (opens in a new tab)</span>
+                  </a>
+                  <div className={styles.caption}>{formatBytes(f.size)}{formatDate(f.modified) ? ` · ${formatDate(f.modified)}` : ""}</div>
+                </div>
+              </li>
+            ))}
+          </ul>
+        </details>
+      ) : null}
       <QaSection jobId={jobId} qa={qa} />
     </Card>
   );

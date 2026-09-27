@@ -24,7 +24,7 @@ export function detail(over: Partial<JobDetail> = {}): JobDetail {
       tier: "A",
       category: "swe",
       hard_filter_fails: [],
-      reasons: ["Dream company"],
+      reasons: ["Dream company.", "Skills: 2 of 3 required matched; missing Rust."],
       matched_skills: ["Python", "Kubernetes"],
       missing_skills: ["Rust"],
     },
@@ -51,9 +51,13 @@ export function detail(over: Partial<JobDetail> = {}): JobDetail {
       next_action: "queue",
     },
     documents: [
-      { name: "notes.txt", size: 120, modified: 1790000000 },
       { name: "resume.pdf", size: 48_300, modified: 1790000000 },
+      { name: "cover_letter.pdf", size: 31_000, modified: 1790000000 },
+    ],
+    other_files: [
+      { name: "notes.txt", size: 120, modified: 1790000000 },
       { name: "cover_letter.md", size: 2_100, modified: 1790000000 },
+      { name: "resume.json", size: 4_000, modified: 1790000000 },
     ],
     submitted: [],
     apply_session: {
@@ -86,8 +90,10 @@ export function detail(over: Partial<JobDetail> = {}): JobDetail {
       { name: "Riley Kim", role: "Technical Recruiter", manual: false, reason: null, detail: "" },
     ],
     activity: [
-      { at: "2026-09-24T18:04:00", component: "prepare-job", message: "Status changed to Needs review" },
-      { at: "2026-09-23T07:02:00", component: "scout", message: "Found by scout" },
+      { at: "2026-09-24T18:04:00", component: "store", message: "status -> needs_review: prepare-job: Tier A", label: "Status changed to needs review: prepare-job: Tier A" },
+      { at: "2026-09-24T18:03:00", component: "qa-review", message: "pass=True mean=8.6 hard_fails=0 unsupported=0 next=queue", label: "QA review passed (mean 8.6, 0 hard fails, next: queue)" },
+      { at: "2026-09-24T17:50:00", component: "score-job", message: "category=swe fit=91 tier=A decision=prepare", label: "Scored: fit 91, tier A, decision prepare" },
+      { at: "2026-09-23T07:02:00", component: "scout", message: "found via greenhouse/northwind; prefilter category=swe", label: "Found by scout on greenhouse" },
     ],
     ...over,
   };
