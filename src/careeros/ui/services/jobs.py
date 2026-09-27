@@ -7,6 +7,8 @@ import re
 from pathlib import Path
 from typing import Any
 
+from typing_extensions import TypedDict
+
 from careeros.store import _is_finder_copy
 
 SORTS = ("fit", "company", "status", "tier", "found_at", "applied_at", "updated_at")
@@ -18,6 +20,95 @@ SECTION_FILES = {"posting.json", "status.json", "score.json", "safety.json", "qa
                  "apply_session.json", "log.md"}
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
                "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at")
+
+
+# Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable (qa_passed is the index's 0/1
+# INTEGER). The job's own files (posting.json, score.json, ...) are returned as written, so they stay open mappings
+# (a typed shape would drop keys it does not list); the UI describes their contents by hand.
+class JobRow(TypedDict):
+    job_id: str
+    company: str | None
+    title: str | None
+    location: str | None
+    ats: str | None
+    url: str | None
+    category: str | None
+    fit: int | None
+    tier: str | None
+    status: str | None
+    safety: str | None
+    qa_passed: int | None
+    qa_score: float | None
+    found_at: str | None
+    applied_at: str | None
+    updated_at: str | None
+    closes_at: str | None
+
+
+class JobListItem(JobRow):
+    next_action: str | None      # the highest-priority open Action Item's "what"
+
+
+class JobsPage(TypedDict):
+    items: list[JobListItem]
+    total: int
+    next_cursor: str | None
+
+
+class JobsTab(TypedDict):
+    key: str
+    label: str
+    count: int
+
+
+class JobsTabs(TypedDict):
+    tabs: list[JobsTab]
+
+
+class FileEntry(TypedDict):
+    name: str
+    size: int
+    modified: float              # epoch seconds
+
+
+class ContactPolicy(TypedDict):
+    name: str
+    role: str
+    manual: bool
+    reason: str | None
+    detail: str
+
+
+class Registry(TypedDict):
+    verified: dict[str, Any] | None
+    flagged: dict[str, Any] | None
+
+
+class ActivityEntry(TypedDict):
+    at: str
+    component: str
+    message: str
+
+
+class JobDetail(TypedDict):
+    job: JobRow | None
+    posting: dict[str, Any]
+    status: str | None
+    history: list[dict[str, Any]]
+    score: dict[str, Any] | None
+    safety: dict[str, Any] | None
+    qa: dict[str, Any] | None
+    documents: list[FileEntry]
+    submitted: list[str]
+    apply_session: dict[str, Any] | None
+    screenshots: list[FileEntry]
+    contacts: list[dict[str, Any]]
+    log: str
+    override: str | None
+    registry: Registry
+    outreach: dict[str, Any] | None
+    contacts_policy: list[ContactPolicy]
+    activity: list[ActivityEntry]
 
 
 def _order(sort: str) -> str:
@@ -91,7 +182,7 @@ def _where(*, status: list[str] | None = None, tier: list[str] | None = None, sa
 def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | None = None,
               safety: list[str] | None = None, category: list[str] | None = None, q: str | None = None,
               sort: str = DEFAULT_SORT, cursor: str | None = None, limit: int = 100, tab: str | None = None,
-              closed: list[str] | None = None) -> dict[str, Any]:
+              closed: list[str] | None = None) -> JobsPage:
     clause, params = _where(status=status, tier=tier, safety=safety, category=category, q=q, tab=tab, closed=closed)
     try:
         offset = int(cursor) if cursor else 0
@@ -107,8 +198,8 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
 
 
-def tabs(ix: Any, closed: list[str], q: str | None = None) -> list[dict[str, Any]]:
-    out = []
+def tabs(ix: Any, closed: list[str], q: str | None = None) -> list[JobsTab]:
+    out: list[JobsTab] = []
     for key, label in TABS:
         clause, params = _where(q=q, tab=key, closed=closed)
         out.append({"key": key, "label": label, "count": ix.query(f"SELECT COUNT(*) AS n FROM jobs{clause}", params)[0]["n"]})
@@ -159,10 +250,16 @@ def _json(path: Path) -> Any:
         return None
 
 
-def _files(d: Path, skip: set[str] | None = None) -> list[dict[str, Any]]:
+def _obj(path: Path) -> dict[str, Any] | None:
+    """A JSON file that must hold an object; anything else (missing, broken, a list) reads as None."""
+    v = _json(path)
+    return v if isinstance(v, dict) else None
+
+
+def _files(d: Path, skip: set[str] | None = None) -> list[FileEntry]:
     if not d.is_dir():
         return []
-    out = []
+    out: list[FileEntry] = []
     for f in sorted(d.iterdir()):
         if not f.is_file() or f.name.startswith(".") or _is_finder_copy(f.name) or f.name.endswith(".tmp"):
             continue
@@ -186,17 +283,17 @@ def job_dir_for(settings: Any, job_id: str) -> Path | None:
     return d if inside and (d / "posting.json").is_file() else None
 
 
-def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:
+def job_detail(settings: Any, ix: Any, job_id: str) -> JobDetail | None:
     d = job_dir_for(settings, job_id)
     if d is None:
         return None
     rows = ix.query(f"SELECT {', '.join(LIST_FIELDS)} FROM jobs WHERE job_id = ?", (job_id,))
-    posting = _json(d / "posting.json") or {}
+    posting = _obj(d / "posting.json") or {}
     posting.pop("description_html", None)
     posting.pop("raw", None)
-    status = _json(d / "status.json") or {}
-    qa = _json(d / "qa.json")
-    contacts = (_json(d / "contacts.json") or {}).get("contacts")
+    status = _obj(d / "status.json") or {}
+    qa = _obj(d / "qa.json")
+    contacts = (_obj(d / "contacts.json") or {}).get("contacts")
     submitted = d / "submitted"
     try:
         log = (d / "log.md").read_text(encoding="utf-8")
@@ -205,21 +302,22 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:
     return {
         "job": rows[0] if rows else None,
         "posting": posting,
-        "status": status.get("status"),
-        "history": status.get("history") if isinstance(status.get("history"), list) else [],
-        "score": _json(d / "score.json"),
-        "safety": _json(d / "safety.json"),
-        "qa": qa if isinstance(qa, dict) else None,      # the qa-review skill's qa.json as written
+        "status": status["status"] if isinstance(status.get("status"), str) else None,
+        "history": [h for h in status.get("history") or [] if isinstance(h, dict)]
+        if isinstance(status.get("history"), list) else [],
+        "score": _obj(d / "score.json"),
+        "safety": _obj(d / "safety.json"),
+        "qa": qa,                                        # the qa-review skill's qa.json as written
         "documents": _files(d, SECTION_FILES),
         "submitted": sorted(p.name for p in submitted.iterdir() if p.is_dir()) if submitted.is_dir() else [],
-        "apply_session": _json(d / "apply_session.json"),
+        "apply_session": _obj(d / "apply_session.json"),
         "screenshots": _files(d / "screenshots"),
-        "contacts": contacts if isinstance(contacts, list) else [],
+        "contacts": [c for c in contacts if isinstance(c, dict)] if isinstance(contacts, list) else [],
         "log": log,
         "override": _override(settings, job_id),
         "registry": _registry(settings, str(posting.get("company") or ""), str(posting.get("apply_url") or
                                                                               posting.get("url") or "")),
-        "outreach": _json(d / "outreach.json"),
+        "outreach": _obj(d / "outreach.json"),
         "contacts_policy": _contacts_policy(settings, contacts if isinstance(contacts, list) else []),
         "activity": parse_log(log),
     }
@@ -228,9 +326,9 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> dict[str, Any] | None:
 _LOG_LINE = re.compile(r"^- (\d{4}-\d{2}-\d{2} \d{2}:\d{2}(?::\d{2})?) \[([^\]]*)\] (.*)$")
 
 
-def parse_log(log: str) -> list[dict[str, Any]]:
+def parse_log(log: str) -> list[ActivityEntry]:
     """log.md lines (`- 2026-09-24 18:04:00 [component] message`), newest first; other lines are skipped."""
-    out = []
+    out: list[ActivityEntry] = []
     for line in log.splitlines():
         m = _LOG_LINE.match(line.strip())
         if m:
@@ -250,7 +348,7 @@ def _override(settings: Any, job_id: str) -> str | None:
     return str(v).strip() if v not in (None, "") else None
 
 
-def _registry(settings: Any, company: str, url: str) -> dict[str, Any]:
+def _registry(settings: Any, company: str, url: str) -> Registry:
     from careeros.config import normalize_company
     from careeros.safety import registry
 
@@ -264,8 +362,10 @@ def _registry(settings: Any, company: str, url: str) -> dict[str, Any]:
     return {"verified": verified, "flagged": flagged}
 
 
-def _contacts_policy(settings: Any, contacts: list[Any]) -> list[dict[str, Any]]:
+def _contacts_policy(settings: Any, contacts: list[Any]) -> list[ContactPolicy]:
     from careeros.outreach import OutreachPolicy, check_contacts
 
-    return check_contacts({"contacts": [c for c in contacts if isinstance(c, dict)]},
+    rows = check_contacts({"contacts": [c for c in contacts if isinstance(c, dict)]},
                           OutreachPolicy.from_settings(settings))
+    return [{"name": str(r["name"] or ""), "role": str(r["role"] or ""), "manual": bool(r["manual"]),
+             "reason": r["reason"], "detail": str(r["detail"] or "")} for r in rows]

@@ -1,6 +1,183 @@
 {
   "components": {
     "schemas": {
+      "ActionHint": {
+        "properties": {
+          "due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "due_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Reason"
+          },
+          "kind": {
+            "const": "action",
+            "title": "Kind",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "type",
+          "due",
+          "due_reason"
+        ],
+        "title": "ActionHint",
+        "type": "object"
+      },
+      "ActionItem": {
+        "description": "One Action Item as /api/actions and Today's \"Needs you\" list return it (the OpenAPI shape).",
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "done_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done Date"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "due_date_only": {
+            "title": "Due Date Only",
+            "type": "boolean"
+          },
+          "due_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Reason"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "link": {
+            "title": "Link",
+            "type": "string"
+          },
+          "needs": {
+            "title": "Needs",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "scam_actions": {
+            "title": "Scam Actions",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created",
+          "job_id",
+          "company",
+          "role",
+          "type",
+          "what",
+          "link",
+          "priority",
+          "needs",
+          "done",
+          "done_date",
+          "due",
+          "due_date_only",
+          "due_reason",
+          "bucket",
+          "level",
+          "scam_actions"
+        ],
+        "title": "ActionItem",
+        "type": "object"
+      },
       "ActionRow": {
         "properties": {
           "company": {
@@ -122,6 +299,29 @@
         "title": "ActionRow",
         "type": "object"
       },
+      "ActivityEntry": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "component": {
+            "title": "Component",
+            "type": "string"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "component",
+          "message"
+        ],
+        "title": "ActivityEntry",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -160,6 +360,59 @@
         "title": "AppliedWeekTile",
         "type": "object"
       },
+      "Board": {
+        "properties": {
+          "card_limit": {
+            "title": "Card Limit",
+            "type": "integer"
+          },
+          "closed": {
+            "$ref": "#/components/schemas/Closed"
+          },
+          "columns": {
+            "items": {
+              "$ref": "#/components/schemas/Column"
+            },
+            "title": "Columns",
+            "type": "array"
+          },
+          "options": {
+            "$ref": "#/components/schemas/BoardOptions"
+          }
+        },
+        "required": [
+          "columns",
+          "closed",
+          "card_limit",
+          "options"
+        ],
+        "title": "Board",
+        "type": "object"
+      },
+      "BoardOptions": {
+        "properties": {
+          "categories": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Categories",
+            "type": "array"
+          },
+          "locations": {
+            "items": {
+              "$ref": "#/components/schemas/LocationOption"
+            },
+            "title": "Locations",
+            "type": "array"
+          }
+        },
+        "required": [
+          "categories",
+          "locations"
+        ],
+        "title": "BoardOptions",
+        "type": "object"
+      },
       "CancelBody": {
         "properties": {
           "run_id": {
@@ -175,6 +428,192 @@
           }
         },
         "title": "CancelBody",
+        "type": "object"
+      },
+      "Card": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit"
+          },
+          "found_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found At"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ActionHint"
+              },
+              {
+                "$ref": "#/components/schemas/SafetyHint"
+              },
+              {
+                "$ref": "#/components/schemas/NotScoredHint"
+              },
+              {
+                "$ref": "#/components/schemas/TierAHint"
+              },
+              {
+                "$ref": "#/components/schemas/QaFailedHint"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "qa_passed": {
+            "anyOf": [
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Passed"
+          },
+          "qa_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Score"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "location",
+          "category",
+          "fit",
+          "tier",
+          "status",
+          "safety",
+          "qa_passed",
+          "qa_score",
+          "found_at",
+          "updated_at",
+          "override",
+          "hint"
+        ],
+        "title": "Card",
         "type": "object"
       },
       "CatchUpBody": {
@@ -221,6 +660,27 @@
         "title": "ClearBody",
         "type": "object"
       },
+      "Closed": {
+        "properties": {
+          "by_status": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "By Status",
+            "type": "object"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "count",
+          "by_status"
+        ],
+        "title": "Closed",
+        "type": "object"
+      },
       "ClosedCount": {
         "properties": {
           "by_status": {
@@ -242,6 +702,40 @@
         "title": "ClosedCount",
         "type": "object"
       },
+      "Column": {
+        "properties": {
+          "cards": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "title": "Cards",
+            "type": "array"
+          },
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "statuses": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Statuses",
+            "type": "array"
+          }
+        },
+        "required": [
+          "name",
+          "statuses",
+          "count",
+          "cards"
+        ],
+        "title": "Column",
+        "type": "object"
+      },
       "ColumnConfig": {
         "properties": {
           "name": {
@@ -261,6 +755,46 @@
           "statuses"
         ],
         "title": "ColumnConfig",
+        "type": "object"
+      },
+      "ContactPolicy": {
+        "properties": {
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "manual": {
+            "title": "Manual",
+            "type": "boolean"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "role",
+          "manual",
+          "reason",
+          "detail"
+        ],
+        "title": "ContactPolicy",
         "type": "object"
       },
       "Counts": {
@@ -397,6 +931,29 @@
         "title": "Export",
         "type": "object"
       },
+      "FileEntry": {
+        "properties": {
+          "modified": {
+            "title": "Modified",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size",
+          "modified"
+        ],
+        "title": "FileEntry",
+        "type": "object"
+      },
       "FlagBody": {
         "properties": {
           "confidence": {
@@ -500,6 +1057,699 @@
           "rows"
         ],
         "title": "InterviewsTile",
+        "type": "object"
+      },
+      "JobDetail": {
+        "properties": {
+          "activity": {
+            "items": {
+              "$ref": "#/components/schemas/ActivityEntry"
+            },
+            "title": "Activity",
+            "type": "array"
+          },
+          "apply_session": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apply Session"
+          },
+          "contacts": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Contacts",
+            "type": "array"
+          },
+          "contacts_policy": {
+            "items": {
+              "$ref": "#/components/schemas/ContactPolicy"
+            },
+            "title": "Contacts Policy",
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "history": {
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "History",
+            "type": "array"
+          },
+          "job": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/JobRow"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "outreach": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outreach"
+          },
+          "override": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Override"
+          },
+          "posting": {
+            "additionalProperties": true,
+            "title": "Posting",
+            "type": "object"
+          },
+          "qa": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa"
+          },
+          "registry": {
+            "$ref": "#/components/schemas/Registry"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety"
+          },
+          "score": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score"
+          },
+          "screenshots": {
+            "items": {
+              "$ref": "#/components/schemas/FileEntry"
+            },
+            "title": "Screenshots",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "submitted": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Submitted",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job",
+          "posting",
+          "status",
+          "history",
+          "score",
+          "safety",
+          "qa",
+          "documents",
+          "submitted",
+          "apply_session",
+          "screenshots",
+          "contacts",
+          "log",
+          "override",
+          "registry",
+          "outreach",
+          "contacts_policy",
+          "activity"
+        ],
+        "title": "JobDetail",
+        "type": "object"
+      },
+      "JobListItem": {
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit"
+          },
+          "found_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found At"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "next_action": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Action"
+          },
+          "qa_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Passed"
+          },
+          "qa_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Score"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "location",
+          "ats",
+          "url",
+          "category",
+          "fit",
+          "tier",
+          "status",
+          "safety",
+          "qa_passed",
+          "qa_score",
+          "found_at",
+          "applied_at",
+          "updated_at",
+          "closes_at",
+          "next_action"
+        ],
+        "title": "JobListItem",
+        "type": "object"
+      },
+      "JobRow": {
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "closes_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes At"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit"
+          },
+          "found_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found At"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Location"
+          },
+          "qa_passed": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Passed"
+          },
+          "qa_score": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Score"
+          },
+          "safety": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Safety"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          },
+          "url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Url"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "location",
+          "ats",
+          "url",
+          "category",
+          "fit",
+          "tier",
+          "status",
+          "safety",
+          "qa_passed",
+          "qa_score",
+          "found_at",
+          "applied_at",
+          "updated_at",
+          "closes_at"
+        ],
+        "title": "JobRow",
+        "type": "object"
+      },
+      "JobsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/JobListItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "items",
+          "total",
+          "next_cursor"
+        ],
+        "title": "JobsPage",
+        "type": "object"
+      },
+      "JobsTab": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label",
+          "count"
+        ],
+        "title": "JobsTab",
+        "type": "object"
+      },
+      "JobsTabs": {
+        "properties": {
+          "tabs": {
+            "items": {
+              "$ref": "#/components/schemas/JobsTab"
+            },
+            "title": "Tabs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "tabs"
+        ],
+        "title": "JobsTabs",
+        "type": "object"
+      },
+      "LocationOption": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "value",
+          "count"
+        ],
+        "title": "LocationOption",
         "type": "object"
       },
       "MarkBody": {
@@ -713,6 +1963,20 @@
         "title": "NewItem",
         "type": "object"
       },
+      "NotScoredHint": {
+        "properties": {
+          "kind": {
+            "const": "not_scored",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "NotScoredHint",
+        "type": "object"
+      },
       "NoteBody": {
         "properties": {
           "note": {
@@ -842,6 +2106,38 @@
         "title": "PipelineCounts",
         "type": "object"
       },
+      "PrepareQueue": {
+        "properties": {
+          "error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Error"
+          },
+          "total": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Total"
+          }
+        },
+        "required": [
+          "total",
+          "error"
+        ],
+        "title": "PrepareQueue",
+        "type": "object"
+      },
       "Presets": {
         "properties": {
           "current": {
@@ -904,6 +2200,54 @@
           }
         },
         "title": "PruneBody",
+        "type": "object"
+      },
+      "QaFailedHint": {
+        "properties": {
+          "kind": {
+            "const": "qa_failed",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "QaFailedHint",
+        "type": "object"
+      },
+      "Registry": {
+        "properties": {
+          "flagged": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Flagged"
+          },
+          "verified": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Verified"
+          }
+        },
+        "required": [
+          "verified",
+          "flagged"
+        ],
+        "title": "Registry",
         "type": "object"
       },
       "ResponseBreakdown": {
@@ -1145,6 +2489,25 @@
         "title": "RunRow",
         "type": "object"
       },
+      "SafetyHint": {
+        "properties": {
+          "kind": {
+            "const": "safety",
+            "title": "Kind",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "text"
+        ],
+        "title": "SafetyHint",
+        "type": "object"
+      },
       "ScheduleState": {
         "properties": {
           "error": {
@@ -1335,6 +2698,20 @@
         "title": "StatusBody",
         "type": "object"
       },
+      "TierAHint": {
+        "properties": {
+          "kind": {
+            "const": "tier_a",
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "TierAHint",
+        "type": "object"
+      },
       "TileRow": {
         "properties": {
           "company": {
@@ -1418,6 +2795,26 @@
           "response_rate"
         ],
         "title": "Tiles",
+        "type": "object"
+      },
+      "Today": {
+        "properties": {
+          "actions": {
+            "items": {
+              "$ref": "#/components/schemas/ActionItem"
+            },
+            "title": "Actions",
+            "type": "array"
+          },
+          "prepare_queue": {
+            "$ref": "#/components/schemas/PrepareQueue"
+          }
+        },
+        "required": [
+          "actions",
+          "prepare_queue"
+        ],
+        "title": "Today",
         "type": "object"
       },
       "UiSettings": {
@@ -2533,9 +3930,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Jobs Api Jobs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/JobsPage"
                 }
               }
             },
@@ -2623,9 +4018,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Job Tabs Api Jobs Tabs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/JobsTabs"
                 }
               }
             },
@@ -2667,9 +4060,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Job Detail Api Jobs  Job Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/JobDetail"
                 }
               }
             },
@@ -3324,9 +4715,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Board Api Pipeline Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Board"
                 }
               }
             },
@@ -4309,9 +5698,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Today Api Today Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Today"
                 }
               }
             },

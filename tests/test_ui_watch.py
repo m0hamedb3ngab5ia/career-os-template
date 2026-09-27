@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from pathlib import Path
 
 import pytest
 from conftest import make_temp_root
@@ -186,3 +187,190 @@ def test_plan_run_folder_existing_or_moved_away_is_a_run(roots):
     assert plan_changes([roots.runs / rid], roots).runs == {rid}
     (roots.runs / rid).rmdir()
     assert plan_changes([roots.runs / rid], roots).runs == {rid}
+
+
+# --- nested paths map to their job / run at every depth ----------------------------------------------------------
+
+@pytest.mark.parametrize("sub", [(), ("screenshots",), ("screenshots", "sub"), ("screenshots", "a", "b", "c")])
+def test_plan_nested_job_paths_map_to_the_job(roots, sub):
+    j = roots.jobs / "abc123"
+    for p in (j.joinpath(*sub), j.joinpath(*sub, "x.png")):
+        plan = plan_changes([p], roots)
+        assert plan.jobs == {"abc123"} and not (plan.runs or plan.status or plan.config or plan.tracker), p
+
+
+@pytest.mark.parametrize("sub", [(), ("attempts",), ("attempts", "a", "b")])
+def test_plan_nested_run_paths_map_to_the_run(roots, sub):
+    rid = "20260924-010000-score-ab12"
+    plan = plan_changes([roots.runs.joinpath(rid, *sub, "x.json")], roots)
+    assert plan.runs == {rid} and not plan.jobs
+
+
+def test_plan_events_on_the_watched_dirs_themselves_do_not_crash(roots):
+    assert not plan_changes([roots.jobs], roots).jobs                    # jobs/ itself: no job id
+    assert plan_changes([roots.config], roots).config
+    assert plan_changes([roots.config / "a" / "b" / "c.yaml"], roots).config
+    assert plan_changes([roots.runs / "locks" / "a" / "b.lock"], roots).status
+    assert plan_changes([roots.jobs.parent], roots).status
+    assert plan_changes([roots.jobs.parent / "a" / "b" / "c.json"], roots).status
+
+
+# --- a missing tracker folder: watch the nearest existing ancestor inside the repo, pick the folder up later -------
+
+def test_tracker_watch_dir_prefers_the_folder_then_nearest_ancestor_inside_root(tmp_path):
+    from careeros.ui.watch import _tracker_watch_dir
+
+    root = tmp_path / "repo"
+    (root / "a").mkdir(parents=True)
+    assert _tracker_watch_dir(root / "a", root) == root / "a"
+    assert _tracker_watch_dir(root / "a" / "b" / "c", root) == root / "a"
+    assert _tracker_watch_dir(root / "x" / "y", root) == root
+    assert _tracker_watch_dir(tmp_path / "elsewhere" / "t", root) is None   # never outside the repo root
+    assert _tracker_watch_dir(tmp_path / "elsewhere", root) is None
+
+
+def _wait_for(cond, timeout=10.0):
+    import time
+
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if cond():
+            return True
+        time.sleep(0.05)
+    return False
+
+
+def test_missing_tracker_folder_is_picked_up_once_created(data):
+    s = data["settings"]
+    tracker = s.root / "trk" / "deep" / "JobTracker.xlsx"
+    s.paths["tracker_xlsx"] = tracker
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    seen: list = []
+    w.handle = lambda paths: seen.extend(str(p) for p in paths)
+    w.start()
+    try:
+        assert _wait_for(lambda: w._tracker_watching == s.root.resolve(), 5)     # the ancestor watch is attached
+        tracker.parent.mkdir(parents=True)
+        tracker.write_bytes(b"x")
+        assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen)), seen
+        seen.clear()
+        assert _wait_for(lambda: w._tracker_watching == tracker.parent.resolve(), 5)   # now the folder itself
+        tracker.write_bytes(b"xy")                            # now the folder itself is watched
+        assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen)), seen
+    finally:
+        w.stop()
+        ix.close()
+
+
+def test_tracker_folder_created_as_the_ancestor_watch_attaches_is_picked_up(data):
+    """The folder appears between choosing the ancestor and attaching its watch: no event ever arrives, so the
+    watcher must re-check the target on its own every poll and index the tracker file already there."""
+    s = data["settings"]
+    tracker = s.root / "trk" / "deep" / "JobTracker.xlsx"
+    s.paths["tracker_xlsx"] = tracker
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    w.tracker_poll_s = 0.2
+    seen: list = []
+    w.handle = lambda paths: seen.extend(str(p) for p in paths)
+    real_watch = w._watch
+
+    def racing_watch(dirs, recursive, **kw):
+        if not recursive and not tracker.parent.exists():     # the tracker thread, about to watch the ancestor
+            tracker.parent.mkdir(parents=True)                # lands before the ancestor watch attaches
+            tracker.write_bytes(b"x")
+        return real_watch(dirs, recursive, **kw)
+
+    w._watch = racing_watch
+    w.start()
+    try:
+        assert _wait_for(lambda: any(p.endswith("JobTracker.xlsx") for p in seen), 3), seen
+        assert _wait_for(lambda: w._tracker_watching == tracker.parent.resolve(), 3)
+    finally:
+        w.stop()
+        ix.close()
+
+
+def test_tracker_watch_permission_error_retries_with_backoff(data, caplog):
+    s = data["settings"]
+    tracker = s.root / "trk" / "JobTracker.xlsx"
+    tracker.parent.mkdir(parents=True)
+    s.paths["tracker_xlsx"] = tracker
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    w.tracker_poll_s = 0.05
+    w.tracker_backoff_max_s = 0.2
+    calls: list = []
+
+    def failing_watch(dirs, recursive, **kw):
+        calls.append(dirs)
+        if len(calls) <= 3:
+            raise PermissionError("denied")
+        w._stop.wait(5)
+        return iter(())
+
+    w._watch = failing_watch
+    with caplog.at_level("WARNING", logger="careeros.ui"):
+        w._spawn(w._tracker_loop)
+        try:
+            assert _wait_for(lambda: len(calls) >= 4, 5), calls     # still retrying after three failures
+        finally:
+            w.stop()
+    assert not w._threads[0].is_alive()                               # the stop event ends the backoff wait
+    msgs = [r.getMessage() for r in caplog.records if "tracker watcher" in r.getMessage()]
+    assert len(msgs) == 3 and all("denied" in m for m in msgs), msgs
+    ix.close()
+
+
+def test_missing_tracker_folder_outside_root_is_never_watched(data, monkeypatch, tmp_path):
+    import watchfiles
+
+    s = data["settings"]
+    s.paths["tracker_xlsx"] = tmp_path / "outside" / "gone" / "JobTracker.xlsx"
+    watched: list = []
+
+    def fake_watch(*dirs, stop_event=None, **kw):
+        watched.extend(dirs)
+        stop_event.wait(5)
+        return iter(())
+
+    monkeypatch.setattr(watchfiles, "watch", fake_watch)
+    ix = Index(s)
+    w = Watcher(s, ix, FakeBroker(), debounce_ms=50)
+    w.tracker_poll_s = 0.05
+    w.start()
+    try:
+        assert _wait_for(lambda: len(watched) >= 1)
+        import time
+        time.sleep(0.3)
+        root = s.root.resolve()
+        assert watched and all(Path(d).resolve().is_relative_to(root) for d in watched), watched
+    finally:
+        w.stop()
+        ix.close()
+
+
+# --- robustness: one bad batch is logged, the watcher keeps going ---------------------------------------------------
+
+def test_loop_logs_a_failing_batch_and_keeps_running(data, monkeypatch, caplog):
+    import watchfiles
+
+    batches = [{(1, "/a")}, {(1, "/b")}, {(1, "/c")}]
+    monkeypatch.setattr(watchfiles, "watch", lambda *d, **kw: iter(batches))
+    ix = Index(data["settings"])
+    w = Watcher(data["settings"], ix, FakeBroker())
+    handled: list = []
+
+    def handle(paths):
+        paths = list(paths)
+        if paths == ["/a"]:
+            raise RuntimeError("boom")
+        handled.extend(paths)
+
+    w.handle = handle
+    with caplog.at_level("ERROR", logger="careeros.ui"):
+        w._loop([w.roots.jobs], True)
+    assert handled == ["/b", "/c"]
+    assert any("re-index after a file change failed" in r.getMessage() for r in caplog.records)
+    ix.close()

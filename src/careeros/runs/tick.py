@@ -18,6 +18,7 @@ from careeros.config import Settings
 from careeros.runs import locks
 from careeros.runs.runner import RunBusy
 from careeros.runs.schedule import JOB_KINDS, load_schedule, merge_catch_up, next_runs, plan_tick
+from careeros.runs.atomic import write_json
 from careeros.runs.store import RunStore
 
 Action = Callable[[str], tuple[str, str]]  # trigger -> (status, detail)
@@ -45,10 +46,7 @@ def _read(path) -> Any:
 
 
 def _write(path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2), encoding="utf-8")
-    tmp.replace(path)
+    write_json(path, data, indent=2)
 
 
 def load_state(rs: RunStore) -> dict[str, Any]:

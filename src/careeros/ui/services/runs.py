@@ -24,6 +24,7 @@ from typing import Any, Callable, Iterator
 
 from careeros.config import Settings
 from careeros.runs import locks
+from careeros.runs.atomic import write_text
 from careeros.runs.status import run_state
 from careeros.runs.store import RunStore
 from careeros.ui.services.stream import parse_event
@@ -312,9 +313,7 @@ class RunControl:
             return {"status": "refused", "run_id": rid, "detail": f"not allowed to signal pid {pid}"}
         marker.parent.mkdir(parents=True, exist_ok=True)
         # Write then rename, so _spawn never reads a half-written marker and prunes it.
-        tmp = marker.with_name(f".{marker.name}.{os.getpid()}.tmp")
-        tmp.write_text(f"{holder}\n{self.now().isoformat()}\n")
-        os.replace(tmp, marker)
+        write_text(marker, f"{holder}\n{self.now().isoformat()}\n")
         return {"status": "cancelling", "run_id": rid, "pid": pid}
 
     def pause(self, until: datetime | None = None, reason: str = "") -> dict[str, Any]:

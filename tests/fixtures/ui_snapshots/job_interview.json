@@ -1,0 +1,291 @@
+{
+  "activity": [
+    {
+      "at": "2026-09-22T15:00:00",
+      "component": "inbox-sync",
+      "message": "interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://mail.google.com/mail/u/0/#all/thread-stark-1)"
+    },
+    {
+      "at": "<wall>",
+      "component": "fixture",
+      "message": "status -> interview"
+    }
+  ],
+  "apply_session": null,
+  "contacts": [
+    {
+      "email": "pat@example.com",
+      "linkedin": "https://www.linkedin.com/in/example-pat",
+      "linkedin_degree": 1,
+      "name": "Pat Rivers",
+      "role": "Engineering Manager"
+    },
+    {
+      "linkedin": "https://www.linkedin.com/in/example-sam",
+      "mutuals": 0,
+      "name": "Sam Lee",
+      "role": "Recruiter"
+    }
+  ],
+  "contacts_policy": [
+    {
+      "detail": "connected on LinkedIn",
+      "manual": true,
+      "name": "Pat Rivers",
+      "reason": "LINKEDIN_CONNECTED",
+      "role": "Engineering Manager"
+    },
+    {
+      "detail": "",
+      "manual": false,
+      "name": "Sam Lee",
+      "reason": null,
+      "role": "Recruiter"
+    }
+  ],
+  "documents": [
+    {
+      "modified": "<mtime>",
+      "name": "cover_letter.md",
+      "size": 21
+    },
+    {
+      "modified": "<mtime>",
+      "name": "outreach.json",
+      "size": 2388
+    },
+    {
+      "modified": "<mtime>",
+      "name": "resume.pdf",
+      "size": 17
+    }
+  ],
+  "history": [
+    {
+      "at": "2026-09-04T15:00:00+00:00",
+      "note": null,
+      "status": "found"
+    },
+    {
+      "at": "2026-09-04T16:00:00+00:00",
+      "note": null,
+      "status": "scored"
+    },
+    {
+      "at": "2026-09-04T17:00:00+00:00",
+      "note": null,
+      "status": "queued"
+    },
+    {
+      "at": "2026-09-12T15:00:00+00:00",
+      "note": null,
+      "status": "applied"
+    },
+    {
+      "at": "2026-09-15T15:00:00+00:00",
+      "note": null,
+      "status": "screening"
+    },
+    {
+      "at": "2026-09-18T15:00:00+00:00",
+      "note": null,
+      "status": "interview"
+    }
+  ],
+  "job": {
+    "applied_at": "2026-09-12T15:00:00+00:00",
+    "ats": "greenhouse",
+    "category": "swe_backend",
+    "closes_at": null,
+    "company": "Stark Industries",
+    "fit": 86,
+    "found_at": "2026-09-04T15:00:00+00:00",
+    "job_id": "<job:interview>",
+    "location": "New York, NY",
+    "qa_passed": 1,
+    "qa_score": 8.2,
+    "safety": "pass",
+    "status": "interview",
+    "tier": "A",
+    "title": "Software Engineer",
+    "updated_at": "2026-09-18T15:00:00+00:00",
+    "url": "https://boards.example.com/interview"
+  },
+  "log": "- <wall> [fixture] status -> interview\n- 2026-09-22 15:00:00 [inbox-sync] interview_invite from recruiting@example.com 2026-09-22 -> status interview (https://mail.google.com/mail/u/0/#all/thread-stark-1)\n",
+  "outreach": {
+    "company": "Stark Industries",
+    "drafted_at": "2026-09-15T15:00:00+00:00",
+    "drafts": [
+      {
+        "auto_send": false,
+        "bullet_ids": [],
+        "channel": "linkedin",
+        "contact": "Pat Rivers",
+        "email": {
+          "body": "Hi Pat,\n\nShort note.",
+          "subject": "Software Engineer"
+        },
+        "facts_used": [],
+        "followup_14d": null,
+        "followup_7d": null,
+        "kind": "cold_email",
+        "linkedin_message": "Hi Pat,\n\nI applied to the Software Engineer role on your team.",
+        "linkedin_note": "Hi Pat, good to see the team growing.",
+        "linkedin_note_chars": 0,
+        "linkedin_send_after": null,
+        "manual_reason": "LINKEDIN_CONNECTED",
+        "manual_tailor": true,
+        "narrative_ids": [],
+        "role": "hiring_manager",
+        "send_after": null,
+        "sent": false,
+        "sent_by": null,
+        "to": "pat@example.com",
+        "to_confidence": "low"
+      },
+      {
+        "auto_send": false,
+        "bullet_ids": [],
+        "channel": "linkedin",
+        "contact": "Sam Lee",
+        "email": null,
+        "facts_used": [],
+        "followup_14d": null,
+        "followup_7d": null,
+        "kind": "cold_email",
+        "linkedin_message": "Hi Sam,\n\nI applied to the Software Engineer role and would like to connect.",
+        "linkedin_note": "Hi Sam, I applied to the Software Engineer role at Stark Industries.",
+        "linkedin_note_chars": 0,
+        "linkedin_send_after": null,
+        "manual_reason": null,
+        "manual_tailor": false,
+        "narrative_ids": [],
+        "role": "recruiter",
+        "send_after": null,
+        "sent": false,
+        "sent_by": null,
+        "to": null,
+        "to_confidence": "low"
+      }
+    ],
+    "followups": [
+      {
+        "auto_send": false,
+        "bullet_ids": [],
+        "channel": "email",
+        "contact": "Pat Rivers",
+        "email": {
+          "body": "Hi Pat,\n\nThank you for [INTERVIEW DETAIL].",
+          "subject": "Thank you"
+        },
+        "facts_used": [],
+        "followup_14d": null,
+        "followup_7d": null,
+        "kind": "post_interview_thanks",
+        "linkedin_note_chars": 0,
+        "linkedin_send_after": null,
+        "manual_reason": null,
+        "manual_tailor": false,
+        "narrative_ids": [],
+        "send_after": null,
+        "sent": false,
+        "sent_by": null,
+        "to": "pat@example.com",
+        "to_confidence": "low"
+      }
+    ],
+    "job_id": "<job:interview>",
+    "review_required": true
+  },
+  "override": null,
+  "posting": {
+    "apply_url": "",
+    "ats": "greenhouse",
+    "ats_job_id": "interview-1",
+    "closes_at": null,
+    "company": "Stark Industries",
+    "departments": [],
+    "description_text": "Software Engineer at Stark Industries.",
+    "fetched_at": "2026-09-04T15:00:00+00:00",
+    "first_published": null,
+    "job_id": "<job:interview>",
+    "last_updated": null,
+    "location": "New York, NY",
+    "posted_at": null,
+    "remote": null,
+    "salary_currency": null,
+    "salary_max": null,
+    "salary_min": null,
+    "source_slug": "",
+    "title": "Software Engineer",
+    "url": "https://boards.example.com/interview"
+  },
+  "qa": {
+    "deterministic": {
+      "checks": [],
+      "pass": true
+    },
+    "fabrication_audit": [],
+    "fail_reasons": [],
+    "job_id": "<job:interview>",
+    "mean": 8.2,
+    "pass": true,
+    "regenerate_suggestions": [],
+    "regenerations": 0,
+    "reviewed_at": "2026-09-04T15:00:00+00:00",
+    "rubric": {
+      "ats_safety": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "relevance": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "specificity": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "voice_match": {
+        "score": 8,
+        "why": "fixture"
+      },
+      "zero_fabrication": {
+        "score": 9,
+        "why": "fixture"
+      }
+    },
+    "unsupported_count": 0
+  },
+  "registry": {
+    "flagged": null,
+    "verified": null
+  },
+  "safety": {
+    "checked_at": "2026-09-04T15:00:00+00:00",
+    "flags": [],
+    "job_id": "<job:interview>",
+    "runs": [],
+    "verdict": "pass"
+  },
+  "score": {
+    "category": "swe_backend",
+    "fit": 86,
+    "hard_filter_fails": [],
+    "job_id": "<job:interview>",
+    "location_ok": null,
+    "matched_skills": [],
+    "missing_skills": [],
+    "prestige": null,
+    "reasons": [
+      "fixture"
+    ],
+    "required_skills": [],
+    "salary_ok": null,
+    "scored_at": "<wall>",
+    "tier": "A"
+  },
+  "screenshots": [],
+  "status": "interview",
+  "submitted": []
+}
