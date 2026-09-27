@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { formatClock, formatCount, formatDay, formatDue, formatDuration, formatMonthDay, formatNumber, formatRelative, formatWhen, getAppLocale, setAppLocale } from "./format";
+import { formatBytes, formatClock, formatCount, formatDate, formatDateTime, formatDecimal, formatDay, formatDue, formatDuration, formatMonthDay, formatNumber, formatRelative, formatWhen, getAppLocale, setAppLocale } from "./format";
 
 describe("format", () => {
   const now = new Date("2026-09-26T12:00:00Z");
@@ -96,5 +96,30 @@ describe("formatMonthDay", () => {
   it("gives month and day", () => {
     expect(formatMonthDay("2026-09-29T12:00:00Z", "en-US")).toBe("Sep 29");
     expect(formatMonthDay(null)).toBeNull();
+  });
+});
+
+describe("dates, decimals and sizes", () => {
+  const en = "en-US";
+
+  it("formats a short date and a date with time in the given locale", () => {
+    expect(formatDate("2026-09-23T12:00:00", en)).toBe("Sep 23");
+    expect(formatDate("2026-09-23T12:00:00", "fr-FR")).toBe("23 sept.");
+    expect(formatDateTime("2026-09-24T18:02:00", en)).toMatch(/^Sep 24, 6:02\sPM$/);
+  });
+
+  it("accepts epoch seconds (file mtimes) and returns null for nothing", () => {
+    expect(formatDate(Date.parse("2026-09-23T12:00:00") / 1000, en)).toBe("Sep 23");
+    expect(formatDate(null, en)).toBeNull();
+    expect(formatDate("garbage", en)).toBeNull();
+  });
+
+  it("formats one-decimal scores and file sizes", () => {
+    expect(formatDecimal(8.6, 1, en)).toBe("8.6");
+    expect(formatDecimal(8.6, 1, "fr-FR")).toBe("8,6");
+    expect(formatDecimal(8, 1, en)).toBe("8.0");
+    expect(formatBytes(512, en)).toBe("512 bytes");
+    expect(formatBytes(48_300, en)).toBe("48 kB");
+    expect(formatBytes(1_800_000, en)).toBe("1.8 MB");
   });
 });

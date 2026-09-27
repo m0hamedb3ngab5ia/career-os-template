@@ -18,7 +18,7 @@ export function Page({ title, subtitle, actions, children }: PageProps) {
       <header className={styles.header}>
         <div>
           <h1 className={styles.title}>{title}</h1>
-          {subtitle ? <p className={styles.subtitle}>{subtitle}</p> : null}
+          {subtitle ? <div className={styles.subtitle}>{subtitle}</div> : null}
         </div>
         {actions ? <div className={styles.actions}>{actions}</div> : null}
       </header>

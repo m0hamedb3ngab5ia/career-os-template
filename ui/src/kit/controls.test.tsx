@@ -161,6 +161,24 @@ describe("ConfirmPanel", () => {
   });
 });
 
+describe("ConfirmPanel detail", () => {
+  it("adds an optional second line as the accessible description", () => {
+    render(
+      <ConfirmPanel
+        question="Withdraw from Acme?"
+        detail="career-os stops all work on this job."
+        cancelLabel="Keep application"
+        confirmLabel="Withdraw"
+        onCancel={() => undefined}
+        onConfirm={() => undefined}
+      />,
+    );
+    expect(screen.getByRole("alertdialog", { name: "Withdraw from Acme?" })).toHaveAccessibleDescription(
+      "career-os stops all work on this job.",
+    );
+  });
+});
+
 describe("ConfirmPanel pending", () => {
   it("keeps the outcome on the busy button: Withdraw…", () => {
     render(

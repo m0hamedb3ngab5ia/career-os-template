@@ -54,6 +54,43 @@ export function formatCount(n: number, locale?: string): string {
   return nf(locale).format(n);
 }
 
+type When = string | number | null | undefined;
+
+/** ISO strings, or epoch seconds (file mtimes from the API). */
+function toTime(v: When): number | null {
+  if (v === null || v === undefined || v === "") return null;
+  const t = typeof v === "number" ? v * 1000 : Date.parse(v);
+  return Number.isNaN(t) ? null : t;
+}
+
+/** "Sep 23" (locale order and month names). */
+export function formatDate(v: When, locale?: string): string | null {
+  const t = toTime(v);
+  return t === null ? null : dtf(locale, { month: "short", day: "numeric" }).format(t);
+}
+
+/** "Sep 24, 6:02 PM". */
+export function formatDateTime(v: When, locale?: string): string | null {
+  const t = toTime(v);
+  return t === null ? null : dtf(locale, { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" }).format(t);
+}
+
+export function formatDecimal(n: number, digits = 1, locale?: string): string {
+  return new Intl.NumberFormat(locale, { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
+}
+
+/** File sizes: "512 byte", "48 kB", "1.8 MB". */
+export function formatBytes(n: number, locale?: string): string {
+  const [value, unit] =
+    n >= 1e6 ? [n / 1e6, "megabyte"] : n >= 1e3 ? [n / 1e3, "kilobyte"] : [n, "byte"];
+  return new Intl.NumberFormat(locale, {
+    style: "unit",
+    unit,
+    unitDisplay: unit === "byte" ? "long" : "short", // "17 bytes", "48 kB"
+    maximumFractionDigits: value < 10 && unit !== "byte" ? 1 : 0,
+  }).format(value);
+}
+
 const dtfs = new Map<string, Intl.DateTimeFormat>();
 
 function dtf(locale: string | undefined, opts: Intl.DateTimeFormatOptions): Intl.DateTimeFormat {

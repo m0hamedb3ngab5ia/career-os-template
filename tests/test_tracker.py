@@ -92,6 +92,63 @@ def test_action_items_and_contacts(tmp_path: Path):
     assert ws.max_row == 2
 
 
+def test_reopen_action_undoes_mark_done(tmp_path: Path):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    aid = tr.add_action_item("Solve captcha", type="captcha", job_id="j1", company="Acme", priority="H")
+    assert tr.mark_action_done(aid)
+    assert tr.list_action_items() == []
+    assert tr.reopen_action(aid) is True
+    [item] = tr.list_action_items()
+    assert item["ID"] == aid and item["Done"] == "N" and item["DoneDate"] in (None, "")
+    assert tr.reopen_action("nope") is False
+
+
+def test_reopen_after_a_queued_mark_done_flushes_first(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    aid = tr.add_action_item("Solve captcha", type="captcha", job_id="j1", company="Acme", priority="H")
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+    monkeypatch.setattr(Workbook, "save", lambda self, filename: (_ for _ in ()).throw(PermissionError(13, "locked")))
+    with pytest.warns(UserWarning):
+        assert tr.mark_action_done(aid) is None  # Excel holds the file: queued
+    monkeypatch.setattr(Workbook, "save", real_save)
+    assert tr.reopen_action(aid) is True  # Undo after Excel closed
+    tr.flush_pending()
+    [item] = tr.list_action_items()
+    assert item["ID"] == aid and item["Done"] == "N"
+    assert tr.pending_count() == 0
+
+
+def test_a_direct_write_replays_the_queue_first(tmp_path: Path, monkeypatch):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    tr.upsert_job({"job_id": "o1", "company": "Acme", "role": "SWE"})
+    from openpyxl.workbook.workbook import Workbook
+
+    real_save = Workbook.save
+    monkeypatch.setattr(Workbook, "save", lambda self, filename: (_ for _ in ()).throw(PermissionError(13, "locked")))
+    with pytest.warns(UserWarning):
+        assert tr.upsert_job({"job_id": "o1", "override": "skip"}) == "queued"
+    monkeypatch.setattr(Workbook, "save", real_save)
+    tr.upsert_job({"job_id": "o1", "override": "B"})  # Excel closed: the queued "skip" lands first
+    assert tr.pending_count() == 0
+    tr.flush_pending()
+    assert tr.read_overrides()["o1"] == "B"
+
+
+def test_a_broken_queued_op_does_not_block_new_writes(tmp_path: Path):
+    tr = Tracker(path=tmp_path / "JobTracker.xlsx")
+    tr.init()
+    tr._write_pending([{"op": "upsert_job", "payload": {"bogus": 1}, "queued_at": "x"}])  # replay raises TypeError
+    with pytest.warns(UserWarning, match="could not replay"):
+        tr.upsert_job({"job_id": "w1", "company": "Acme", "role": "SWE"})
+    assert tr.get_job("w1") is not None
+    assert tr.pending_count() == 1  # the broken op stays queued for `careeros tracker flush` to report
+
+
 def test_locked_file_queues_and_flushes(tmp_path: Path, monkeypatch):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()

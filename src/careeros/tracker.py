@@ -327,7 +327,16 @@ class Tracker:
                 tmp.unlink(missing_ok=True)
 
     def _mutate(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
+        """Every write replays the pending queue first, so an op queued while Excel held the file lands before
+        this one instead of being replayed over it by a later flush. If the file is still locked, the replay
+        re-queues and this op queues after it, keeping the order."""
         with self._lock():
+            if self._lock_depth == 1 and self._read_pending():  # depth > 1: we are the flush's own replay
+                try:
+                    self._flush_locked()
+                except Exception as e:  # a broken queued op must not block every later write; it stays queued
+                    warnings.warn(f"could not replay queued tracker ops ({e}); run `careeros tracker flush`",
+                                  stacklevel=3)
             return self._mutate_locked(op, payload, fn)
 
     def _mutate_locked(self, op: str, payload: dict[str, Any], fn: Callable[[Workbook], Any]) -> Any:
@@ -610,7 +619,7 @@ class Tracker:
         return self._mutate("mark_action_done", {"id": id}, fn)
 
     def reopen_action(self, id: str) -> bool | None:
-        """Undo Mark done: Done back to N, DoneDate cleared. True / False (no such id) / None (queued)."""
+        """Undo `mark_action_done` (the UI's Undo toast). True = reopened, False = no such id, None = queued."""
         def fn(wb: Workbook) -> bool:
             ws = wb["Action Items"]
             hdr = _header_index(ws)

@@ -17,10 +17,13 @@ import { SelectField, TextField } from "../../kit/FormField";
 import { ACTION_TYPES, NEEDS, PRIORITIES, SAFETY, STATUSES, STOP_REASONS, TIERS } from "../../kit/labels";
 import { Listbox } from "../../kit/Listbox";
 import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
+import { Dialog } from "../../kit/Dialog";
 import { Menu } from "../../kit/Menu";
 import { Popover } from "../../kit/Popover";
+import { PillGroup } from "../../kit/PillGroup";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Switch } from "../../kit/Switch";
+import { Tabs } from "../../kit/Tabs";
 import { Sheet } from "../../kit/Sheet";
 import { useToast } from "../../kit/Toast";
 import { UnavailableButton } from "../../kit/UnavailableButton";
@@ -53,6 +56,11 @@ function Interactive() {
   const [on, setOn] = useState(true);
   const [off, setOff] = useState(false);
   const [sort, setSort] = useState("priority");
+  const [filter, setFilter] = useState("all");
+  const [tab, setTab] = useState("active");
+  const [pick, setPick] = useState("queued");
+  const [showCols, setShowCols] = useState(true);
+  const [dialogOpen, setDialogOpen] = useState(false);
   const [done, setDone] = useState(false);
   const [confirming, setConfirming] = useState(false);
   const [pending, setPending] = useState(false);
@@ -124,6 +132,15 @@ function Interactive() {
       </section>
 
       <section className={styles.stack}>
+        <h3 className={styles.h3}>Filter pills</h3>
+        <PillGroup label="Filter" value={filter} onValueChange={setFilter}>
+          <PillGroup.Pill value="all">All</PillGroup.Pill>
+          <PillGroup.Pill value="overdue">Overdue</PillGroup.Pill>
+          <PillGroup.Pill value="high">High priority</PillGroup.Pill>
+        </PillGroup>
+      </section>
+
+      <section className={styles.stack}>
         <h3 className={styles.h3}>Stat tile and popover</h3>
         <div className={styles.anchor}>
           <button
@@ -169,6 +186,39 @@ function Interactive() {
           />
         ) : null}
         <p className={styles.note}>Reversible: act now, show Undo for 8 s. Irreversible: confirm first, name the outcome on the button.</p>
+      </section>
+
+      <section className={styles.stack}>
+        <h3 className={styles.h3}>Tabs, menu parts and dialog</h3>
+        <Tabs label="Jobs" value={tab} onValueChange={setTab}>
+          <Tabs.Tab value="active" count={12}>
+            Active
+          </Tabs.Tab>
+          <Tabs.Tab value="closed" count={3}>
+            Closed
+          </Tabs.Tab>
+        </Tabs>
+        <div className={styles.row}>
+          <Menu label="Set status">
+            <Menu.Trigger size="small">Set status</Menu.Trigger>
+            <Menu.Content>
+              {["queued", "prepared"].map((s) => (
+                <Menu.RadioItem key={s} checked={s === pick} onSelect={() => setPick(s)}>
+                  {s}
+                </Menu.RadioItem>
+              ))}
+              <Menu.CheckboxItem checked={showCols} onCheckedChange={setShowCols}>
+                Show columns
+              </Menu.CheckboxItem>
+            </Menu.Content>
+          </Menu>
+          <Button size="small" onClick={() => setDialogOpen(true)}>
+            Open dialog
+          </Button>
+        </div>
+        <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} title="Verify posting" description="Evidence links only.">
+          <p className={styles.note}>A centred dialog for short forms; side panels use the Sheet.</p>
+        </Dialog>
       </section>
 
       <section className={styles.stack}>
