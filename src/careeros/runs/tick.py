@@ -67,6 +67,11 @@ def _save_catch_up(rs: RunStore, rec: dict[str, Any] | None) -> None:
         p.unlink()
 
 
+def scout_detail(summary: Any) -> str:
+    t = summary.totals
+    return f"fetched={t['fetched']} new={t['new']} stored={t['stored']}"
+
+
 def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: None,
                     cancel: threading.Event | None = None) -> dict[str, Action]:
     """The real work behind each job kind. Tests pass their own. `cancel` (set by SIGTERM in `careeros run
@@ -89,8 +94,7 @@ def default_actions(settings: Settings, echo: Callable[[str], None] = lambda s: 
             store = Store(settings)
             summary = run_scout(settings, store)
         sync_to_tracker(settings, store, summary)  # outside the lock: a locked tracker file never holds batches off
-        t = summary.totals
-        return "ok", f"fetched={t['fetched']} new={t['new']} stored={t['stored']}"
+        return "ok", scout_detail(summary)
 
     def batch(kind: str) -> Action:
         def run(trigger: str) -> tuple[str, str]:

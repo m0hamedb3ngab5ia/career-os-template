@@ -85,6 +85,19 @@ def test_today_lists_open_items_and_the_prepare_queue(client):
     assert {"due", "due_date_only", "level"} <= t["actions"][0].keys() and t["prepare_queue"]["error"] is None
 
 
+def test_today_prepare_queue_is_ranked_from_the_index(client, data):
+    from fixtures.ui_data import add_prepare_candidates
+
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.runner import select_candidates
+
+    s = data["settings"]
+    add_prepare_candidates(s, NOW)
+    client.ix.rebuild()  # type: ignore[attr-defined]
+    expected = len(select_candidates(s, "prepare", load_runs_config(s), NOW)[0])
+    assert expected >= 4 and client.get("/api/today").json()["prepare_queue"] == {"total": expected, "error": None}
+
+
 def test_mark_done_and_undo(client, data):
     aid = data["actions"]["medium"]
     assert client.post(f"/api/actions/{aid}/done").status_code == 403       # no X-CareerOS header

@@ -5,6 +5,7 @@ fields); Mark done / Undo go through /api/actions/{id}/done|reopen.
 """
 from __future__ import annotations
 
+import sqlite3
 from datetime import datetime, timezone, tzinfo
 from typing import Any
 
@@ -37,18 +38,31 @@ def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[Ac
     return sorted(items, key=lambda i: (PRIORITY.get(i["priority"], 3), i["created"] or "", i["id"]))
 
 
-def prepare_queue(settings: Any, now: datetime) -> PrepareQueue:
-    """How many jobs the next prepare run could pick (the same ranking `careeros run status` uses)."""
+def ranked_from_index(settings: Any, ix: Any, kind: str, cfg: Any, now: datetime,
+                      ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """runner.select_candidates, read from the index's `candidates` table instead of every job folder."""
+    import json
+
+    from careeros.runs.runner import CandidateRecord, rank_records
+
+    rows = ix.query("SELECT * FROM candidates ORDER BY job_id")
+    records = (CandidateRecord(job_id=r["job_id"], status=r["status"], score=json.loads(r["score"] or "{}"),
+                               has_score=bool(r["has_score"]), prepared_ok=bool(r["prepared_ok"]),
+                               posting=json.loads(r["posting"] or "{}")) for r in rows)
+    return rank_records(settings, kind, cfg, now, records)
+
+
+def prepare_queue(settings: Any, ix: Any, now: datetime) -> PrepareQueue:
+    """How many jobs the next prepare run could pick (the ranking `careeros run status` uses, over the index)."""
     from careeros.runs.config import load_runs_config
-    from careeros.runs.runner import select_candidates
 
     try:
-        ranked, _ = select_candidates(settings, "prepare", load_runs_config(settings), now)
-    except (ConfigError, OSError, ValueError) as e:
+        ranked, _ = ranked_from_index(settings, ix, "prepare", load_runs_config(settings), now)
+    except (ConfigError, OSError, ValueError, sqlite3.Error) as e:
         return {"total": None, "error": str(e)}
     return {"total": len(ranked), "error": None}
 
 
 def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
           soon_hours: int = 48) -> Today:
-    return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, now)}
+    return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now)}

@@ -69,8 +69,8 @@ def test_open_actions_are_the_action_items_services_items(data, idx):
     assert items[0]["link"] == "https://boards.example.com/review" and items[0]["needs"] == "laptop"
 
 
-def test_prepare_queue_counts_real_candidates(data):
-    q = today_svc.prepare_queue(data["settings"], NOW)
+def test_prepare_queue_counts_real_candidates(data, idx):
+    q = today_svc.prepare_queue(data["settings"], idx, NOW)
     assert q["error"] is None and isinstance(q["total"], int) and q["total"] >= 0
 
 

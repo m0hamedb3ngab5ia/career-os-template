@@ -31,7 +31,7 @@ Minimal, Apple Human Interface Guidelines look and behaviour (see [HIG notes](#h
 |---|---|---|
 | `data/jobs/<id>/*.json` (`status.json`, `score.json`, `safety.json`, `qa.json`, `apply_session.json`, `contacts.json`, `outreach.json`, …) | source of truth | skills + CLI, unchanged |
 | `data/runs/` (`<run_id>/run.json`, `<run_id>/attempts/NNN.json` + `NNN.stream.jsonl`, `<run_id>/run.log`, `queue-<kind>.json`, `schedule.json`, `catch_up.json`, `pause.json`, `failures.json`, `storage.jsonl`, lock files) | source of truth for runs, the schedule, pause, catch-up and storage snapshots | `careeros run`, `careeros tick`, `careeros prune`, `careeros storage`; built |
-| `data/careeros.db` (SQLite, WAL mode) | read index for the UI: jobs, status history, action items, contacts, runs | UI indexer only (rebuildable; delete it or run `careeros ui --reindex` and it rebuilds); built |
+| `data/careeros.db` (SQLite, WAL mode) | read index for the UI: jobs, prepare candidates, status history, action items, contacts, runs | UI indexer only (rebuildable; delete it or run `careeros ui --reindex` and it rebuilds); built |
 | `JobTracker.xlsx` | human-readable export, backup, and the place people already look | `careeros tracker sync`, unchanged |
 
 Run history is already canonical in files (`data/runs/`, written atomically by `src/careeros/runs/store.py`), the
@@ -348,9 +348,9 @@ TestClient (no network, no browser render).
 | 200 job files changed: real watcher until the index shows all | 0.66 s | 5 s |
 | 200 job files changed: `Watcher.handle` alone | 0.10 s | 5 s |
 
-Nothing crosses a limit. `/api/today` grows fastest: its prepare queue uses the runner's own candidate selection
-(`runs.runner.select_candidates`), which reads every job's files from disk rather than the index, so it is linear
-in the number of job folders. Worth moving onto the index if job counts grow well past 5,000.
+Nothing crosses a limit. `/api/today`'s prepare queue ranks with the runner's own candidate rules
+(`runs.runner.rank_records`, the core of `select_candidates`) over the index's `candidates` table, so it no longer
+reads every job folder on each request.
 
 Re-run (the index goes to `--index` or a temp file, never the root's `data/`):
 

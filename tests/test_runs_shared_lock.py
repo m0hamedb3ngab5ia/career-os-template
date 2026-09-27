@@ -277,6 +277,56 @@ def test_step_holds_the_pipeline_lock_under_its_own_owner(settings):
     assert seen[0]["owner"] == f"step:{run['id']}" and locks.read(rs.runner_lock_path) is None
 
 
+def _fake_scout(monkeypatch, settings, seen, sync=None):
+    from types import SimpleNamespace
+
+    rs = RunStore(settings)
+    monkeypatch.setattr("careeros.scout.run_scout", lambda *a, **k: seen.append(("scout", locks.read(
+        rs.runner_lock_path))) or SimpleNamespace(totals={"fetched": 2, "new": 1, "stored": 1}))
+    monkeypatch.setattr("careeros.scout.sync_to_tracker", sync or (lambda *a, **k: seen.append(("sync", locks.read(
+        rs.runner_lock_path)))))
+
+
+def test_ui_scout_step_syncs_the_tracker_after_releasing_the_pipeline_lock(settings, monkeypatch):
+    """The tracker sync (Excel may hold the file) must never keep a batch or the scheduler's tick waiting."""
+    from careeros.ui.services import step
+
+    seen = []
+    _fake_scout(monkeypatch, settings, seen)
+    run = step.run_step(settings, "scout")
+    assert [k for k, _ in seen] == ["scout", "sync"]
+    assert seen[0][1]["owner"] == f"step:{run['id']}" and seen[1][1] is None
+    assert run["status"] == "done" and run["detail"] == "fetched=2 new=1 stored=1"
+
+
+def test_a_batch_can_start_while_the_ui_scout_step_syncs(settings, monkeypatch):
+    from careeros.ui.services import step
+
+    got = []
+
+    def sync(*a, **k):  # a batch taking the pipeline lock mid-sync must not be refused
+        lk = hold_batch(settings)
+        got.append(lk)
+        locks.release(RunStore(settings).runner_lock_path, lk.token)
+
+    _fake_scout(monkeypatch, settings, [], sync=sync)
+    assert step.run_step(settings, "scout")["status"] == "done" and len(got) == 1
+
+
+def test_ui_scout_step_sync_failure_fails_the_run_like_the_tick(settings, monkeypatch):
+    """Same semantics as tick's scout: a sync error is the step's error; both locks are released."""
+    from careeros.ui.services import step
+
+    def sync(*a, **k):
+        raise OSError("tracker locked")
+
+    _fake_scout(monkeypatch, settings, [], sync=sync)
+    run = step.run_step(settings, "scout")
+    rs = RunStore(settings)
+    assert run["status"] == "failed" and run["stop_reason"] == "error" and "tracker locked" in run["detail"]
+    assert locks.read(rs.runner_lock_path) is None and locks.read(step.step_lock_path(rs, "scout")) is None
+
+
 def test_current_reports_a_step_and_an_unrecorded_cli_holder(settings):
     from test_ui_runs_service import make_rc
 
