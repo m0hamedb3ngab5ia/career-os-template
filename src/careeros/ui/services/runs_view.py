@@ -9,7 +9,9 @@ from __future__ import annotations
 
 import re
 from datetime import datetime, timedelta
-from typing import Any
+from typing import Any, Literal, cast
+
+from typing_extensions import NotRequired, TypedDict
 
 from careeros.store import Store
 from careeros.ui.services.runs import BATCH_KINDS, RunControl
@@ -27,6 +29,162 @@ _REASON_CODES = (("posted", "fresh"), ("posting date", "fresh"), ("dream", "drea
                  ("fit-first", "other"), ("fit", "fit"), ("retry", "retry"))
 _RELATIVE = re.compile(r"^\+(\d+)([mhd])$")
 
+
+
+# Response shapes: FastAPI turns these into the OpenAPI schema that ui/src/api/schema.gen.ts is generated from. A run
+# record is the RunStore JSON (runs/store.py new_run + the runner's updates) plus the view keys added here; every key
+# the store can write is listed, since a TypedDict response drops unlisted keys.
+class RunBudget(TypedDict):
+    preset: NotRequired[str | None]
+    max_jobs: NotRequired[int | None]
+    max_minutes: NotRequired[float | None]
+
+
+class RunBase(TypedDict):
+    id: str
+    kind: str
+    trigger: str
+    budget: RunBudget
+    status: str
+    # running | done | failed | interrupted (a running run whose process no longer holds its lock)
+    state: str
+    stop_reason: str | None
+    detail: str
+    started_at: str | None
+    ended_at: str | None
+    duration_s: float | None
+    pid: NotRequired[int | None]
+    counters: dict[str, int]
+    warnings: NotRequired[list[str]]
+    dry_run: NotRequired[bool]
+    step: NotRequired[bool]
+    cmd: NotRequired[list[str]]
+
+
+class RunRecord(RunBase):
+    attempts: NotRequired[list[int]]  # the attempt numbers (the detail views carry the attempts themselves)
+
+
+class HistoryPage(TypedDict):
+    runs: list[RunRecord]
+    next_cursor: str | None
+
+
+class Attempt(TypedDict):
+    n: int
+    run_id: NotRequired[str]
+    job_id: str | None
+    company: NotRequired[str | None]
+    title: NotRequired[str | None]
+    stage: NotRequired[str]
+    rank: NotRequired[int | None]
+    why: NotRequired[str | None]
+    session_id: NotRequired[str | None]
+    outcome: str
+    detail: NotRequired[str]
+    result: NotRequired[dict[str, Any] | None]
+    started_at: NotRequired[str | None]
+    ended_at: NotRequired[str | None]
+    duration_s: NotRequired[float | None]
+    stream: NotRequired[str]
+    headless: NotRequired[dict[str, Any]]
+
+
+class RunDetail(RunBase):
+    attempts: list[Attempt]
+    log: str
+
+
+class JobStep(TypedDict):
+    name: str
+    # skipped: a later step has output but this one has none (e.g. a cover letter the tier rule left out)
+    state: Literal["done", "active", "pending", "skipped"]
+
+
+class RunJobRow(TypedDict):
+    job_id: str
+    company: str | None
+    title: str | None
+    state: Literal["done", "failed", "active", "queued"]
+    outcome: str | None
+    duration_s: float | None
+    detail: str
+    steps: list[JobStep]
+
+
+class RunUsed(TypedDict):
+    jobs: int
+    max_jobs: int | None
+    minutes: float | None
+    max_minutes: float | None
+
+
+class RunCap(TypedDict):
+    date: str
+    cap: int
+    applied: int
+    remaining: int
+    multiplier: float
+    base: int
+    reached: bool
+
+
+class CurrentRun(RunBase):
+    attempts: list[Attempt]
+    holder: dict[str, Any] | None
+    current_job: str | None
+    used: RunUsed
+    scheduled: bool
+    jobs: list[RunJobRow]
+    cap: RunCap | None
+
+
+class RunPause(TypedDict):
+    paused_at: str
+    until: str | None
+    reason: str
+
+
+class CatchUpKind(TypedDict):
+    first_missed: str | None
+    slots: int
+    last_missed: NotRequired[str | None]
+
+
+class CatchUp(TypedDict):
+    created_at: str
+    updated_at: NotRequired[str]
+    kinds: dict[str, CatchUpKind]
+
+
+class QuietHours(TypedDict):
+    start: str
+    end: str
+
+
+class ScheduleJob(TypedDict):
+    kind: str
+    enabled: bool
+    every_minutes: float | None
+    at: list[str]
+    preset: str | None
+    claude: bool
+    next: str | None
+    last_run: str | None
+    last_status: str | None
+
+
+class Schedule(TypedDict):
+    label: str | None
+    installed: bool
+    loaded: bool
+    last_tick: str | None
+    tick_minutes: float
+    quiet_hours: QuietHours | None
+    jobs: list[ScheduleJob]
+    catch_up: CatchUp | None
+    paused: RunPause | None
+    inbox_ready: bool
 
 def check_run_id(run_id: str) -> str:
     if not _RUN_ID.match(run_id or ""):
@@ -104,7 +262,7 @@ def _cap(rc: RunControl) -> dict[str, Any] | None:
         return None
 
 
-def current_view(rc: RunControl) -> dict[str, Any] | None:
+def current_view(rc: RunControl) -> CurrentRun | None:
     """rc.current() plus one row per job of the batch: done / failed (attempted), active (holds its job lock),
     queued (the rest of the run's selection), each with step pills; today's apply cap for prepare runs."""
     cur = rc.current()
@@ -140,17 +298,17 @@ def current_view(rc: RunControl) -> dict[str, Any] | None:
             rows.append({"job_id": jid, **_names(store, jid), "state": "queued", "outcome": None,
                          "duration_s": None, "detail": "", "steps": _steps(store, kind, jid, "queued")})
             seen.add(jid)
-    return {**cur, "scheduled": cur.get("trigger") == "schedule", "jobs": rows,
-            "cap": _cap(rc) if kind == "prepare" else None}
+    return cast(CurrentRun, {**cur, "scheduled": cur.get("trigger") == "schedule", "jobs": rows,
+                             "cap": _cap(rc) if kind == "prepare" else None})
 
 
-def history_view(rc: RunControl, kind: str | None, limit: int, cursor: str | None) -> dict[str, Any]:
+def history_view(rc: RunControl, kind: str | None, limit: int, cursor: str | None) -> HistoryPage:
     if cursor:
         check_run_id(cursor)
-    return rc.history(kind=kind or None, limit=limit, cursor=cursor)
+    return cast(HistoryPage, rc.history(kind=kind or None, limit=limit, cursor=cursor))
 
 
-def detail_view(rc: RunControl, run_id: str) -> dict[str, Any] | None:
+def detail_view(rc: RunControl, run_id: str) -> RunDetail | None:
     d = rc.detail(check_run_id(run_id))
     if d is None:
         return None
@@ -160,7 +318,7 @@ def detail_view(rc: RunControl, run_id: str) -> dict[str, Any] | None:
         if a.get("job_id") and not a.get("company"):
             a = {**a, **_names(store, a["job_id"])}
         atts.append(a)
-    return {**d, "attempts": atts}
+    return cast(RunDetail, {**d, "attempts": atts})
 
 
 def queue_view(rc: RunControl, kind: str, limit: int) -> dict[str, Any]:
@@ -179,7 +337,7 @@ def selection_view(dry: dict[str, Any]) -> dict[str, Any]:
     return {**dry, "selected": [{**i, "reasons": reasons(i.get("why"))} for i in dry.get("selected") or []]}
 
 
-def schedule_view(rc: RunControl) -> dict[str, Any]:
+def schedule_view(rc: RunControl) -> Schedule:
     """rc.schedule_status() (LaunchAgent, last tick, next times, catch-up, pause) plus each job's cadence from
     `pipeline.yaml: schedule` and the quiet hours."""
     from careeros.runs.schedule import JOB_KINDS, load_schedule
@@ -198,7 +356,7 @@ def schedule_view(rc: RunControl) -> dict[str, Any]:
                      "last_status": last.get("last_status")})
     quiet = ({"start": cfg.quiet_start.strftime("%H:%M"), "end": cfg.quiet_end.strftime("%H:%M")}
              if cfg.quiet_start and cfg.quiet_end else None)
-    return {"label": st.get("label"), "installed": bool(st.get("installed")), "loaded": bool(st.get("loaded")),
+    return cast(Schedule, {"label": st.get("label"), "installed": bool(st.get("installed")), "loaded": bool(st.get("loaded")),
             "last_tick": st.get("last_tick"), "tick_minutes": cfg.tick_minutes, "quiet_hours": quiet,
             "jobs": jobs, "catch_up": st.get("catch_up"), "paused": st.get("paused"),
-            "inbox_ready": cfg.jobs["inbox_sync"].enabled}
+            "inbox_ready": cfg.jobs["inbox_sync"].enabled})

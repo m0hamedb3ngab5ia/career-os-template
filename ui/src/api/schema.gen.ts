@@ -252,6 +252,70 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /** ActionCounts */
+    ActionCounts: {
+      /** Done */
+      done: number;
+      /** Open */
+      open: number;
+      /** Today */
+      today: number;
+    };
+    /** ActionGroup */
+    ActionGroup: {
+      /** Count */
+      count: number;
+      /** Items */
+      items: components["schemas"]["ActionItem"][];
+      /** Key */
+      key: string;
+    };
+    /** ActionHead */
+    ActionHead: {
+      /** Overdue */
+      overdue: number;
+      /** Soon */
+      soon: number;
+    };
+    /** ActionItem */
+    ActionItem: {
+      /** Bucket */
+      bucket: string;
+      /** Company */
+      company: string;
+      /** Created */
+      created: string | null;
+      /** Done */
+      done: boolean;
+      /** Done Date */
+      done_date: string | null;
+      /** Due */
+      due: string | null;
+      /** Due Date Only */
+      due_date_only: boolean;
+      /** Due Reason */
+      due_reason: string | null;
+      /** Id */
+      id: string;
+      /** Job Id */
+      job_id: string | null;
+      /** Level */
+      level: string;
+      /** Link */
+      link: string;
+      /** Needs */
+      needs: string;
+      /** Priority */
+      priority: string;
+      /** Role */
+      role: string;
+      /** Scam Actions */
+      scam_actions: boolean;
+      /** Type */
+      type: string;
+      /** What */
+      what: string;
+    };
     /** ActionRow */
     ActionRow: {
       /** Company */
@@ -275,6 +339,23 @@ export interface components {
       /** What */
       what: string | null;
     };
+    /** ActionsPage */
+    ActionsPage: {
+      counts: components["schemas"]["ActionCounts"];
+      /** Group */
+      group: string;
+      /** Groups */
+      groups: components["schemas"]["ActionGroup"][];
+      head: components["schemas"]["ActionHead"];
+      /** More Done */
+      more_done: number;
+      /** Now */
+      now: string;
+      /** Sort */
+      sort: string;
+      /** Tab */
+      tab: string;
+    };
     /** AppliedWeekTile */
     AppliedWeekTile: {
       /** Daily Cap */
@@ -286,10 +367,62 @@ export interface components {
       /** Value */
       value: number;
     };
+    /** Attempt */
+    Attempt: {
+      /** Company */
+      company?: string | null;
+      /** Detail */
+      detail?: string;
+      /** Duration S */
+      duration_s?: number | null;
+      /** Ended At */
+      ended_at?: string | null;
+      /** Headless */
+      headless?: {
+        [key: string]: unknown;
+      };
+      /** Job Id */
+      job_id: string | null;
+      /** N */
+      n: number;
+      /** Outcome */
+      outcome: string;
+      /** Rank */
+      rank?: number | null;
+      /** Result */
+      result?: {
+        [key: string]: unknown;
+      } | null;
+      /** Run Id */
+      run_id?: string;
+      /** Session Id */
+      session_id?: string | null;
+      /** Stage */
+      stage?: string;
+      /** Started At */
+      started_at?: string | null;
+      /** Stream */
+      stream?: string;
+      /** Title */
+      title?: string | null;
+      /** Why */
+      why?: string | null;
+    };
     /** CancelBody */
     CancelBody: {
       /** Run Id */
       run_id?: string | null;
+    };
+    /** CatchUp */
+    CatchUp: {
+      /** Created At */
+      created_at: string;
+      /** Kinds */
+      kinds: {
+        [key: string]: components["schemas"]["CatchUpKind"];
+      };
+      /** Updated At */
+      updated_at?: string;
     };
     /** CatchUpBody */
     CatchUpBody: {
@@ -298,6 +431,15 @@ export interface components {
        * @default false
        */
       dismiss?: boolean;
+    };
+    /** CatchUpKind */
+    CatchUpKind: {
+      /** First Missed */
+      first_missed: string | null;
+      /** Last Missed */
+      last_missed?: string | null;
+      /** Slots */
+      slots: number;
     };
     /** Changes */
     Changes: {
@@ -332,6 +474,59 @@ export interface components {
       /** Statuses */
       statuses: string[];
     };
+    /** ContactRow */
+    ContactRow: {
+      /** Company */
+      company: string | null;
+      draft: components["schemas"]["InboxDraft"] | null;
+      /** Email */
+      email: string | null;
+      /** Email Confidence */
+      email_confidence: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Job Status */
+      job_status: string | null;
+      /** Job Title */
+      job_title: string | null;
+      /** Linkedin */
+      linkedin: string | null;
+      /** Linkedin Degree */
+      linkedin_degree: number | null;
+      /** Manual */
+      manual: boolean;
+      /** Manual Detail */
+      manual_detail: string | null;
+      /** Manual Reason */
+      manual_reason: string | null;
+      /** Mode */
+      mode: string;
+      /** Mutuals */
+      mutuals: number | null;
+      /** Name */
+      name: string;
+      /** Replied */
+      replied: string | null;
+      /** Sent */
+      sent: boolean;
+      /** Title */
+      title: string;
+    };
+    /** ContactsPage */
+    ContactsPage: {
+      /** Items */
+      items: components["schemas"]["ContactRow"][];
+      /** Linkedin Drafts */
+      linkedin_drafts: number;
+      policy: components["schemas"]["ContactsPolicy"];
+    };
+    /** ContactsPolicy */
+    ContactsPolicy: {
+      /** Manual If Connected */
+      manual_if_connected: boolean;
+      /** Manual If Mutuals */
+      manual_if_mutuals: boolean;
+    };
     /** Counts */
     Counts: {
       /** Action Items Open */
@@ -342,6 +537,58 @@ export interface components {
       inbox: number;
       /** Jobs */
       jobs: number;
+    };
+    /** CurrentRun */
+    CurrentRun: {
+      /** Attempts */
+      attempts: components["schemas"]["Attempt"][];
+      budget: components["schemas"]["RunBudget"];
+      cap: components["schemas"]["RunCap"] | null;
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters: {
+        [key: string]: number;
+      };
+      /** Current Job */
+      current_job: string | null;
+      /** Detail */
+      detail: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Holder */
+      holder: {
+        [key: string]: unknown;
+      } | null;
+      /** Id */
+      id: string;
+      /** Jobs */
+      jobs: components["schemas"]["RunJobRow"][];
+      /** Kind */
+      kind: string;
+      /** Pid */
+      pid?: number | null;
+      /** Scheduled */
+      scheduled: boolean;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      used: components["schemas"]["RunUsed"];
+      /** Warnings */
+      warnings?: string[];
     };
     /** Due */
     Due: {
@@ -405,10 +652,177 @@ export interface components {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** HistoryPage */
+    HistoryPage: {
+      /** Next Cursor */
+      next_cursor: string | null;
+      /** Runs */
+      runs: components["schemas"]["RunRecord"][];
+    };
     /** Ids */
     Ids: {
       /** Ids */
       ids: string[];
+    };
+    /** InboxAvailability */
+    InboxAvailability: {
+      /** Available */
+      available: boolean;
+      /** Reason */
+      reason: string;
+    };
+    /** InboxDetail */
+    InboxDetail: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Days Since Applied */
+      days_since_applied: number | null;
+      /** Drafts */
+      drafts: components["schemas"]["InboxDraft"][];
+      /** Job Id */
+      job_id: string;
+      last_email: components["schemas"]["InboxEmail"] | null;
+      next: components["schemas"]["InboxNext"];
+      /** Placeholders */
+      placeholders: number;
+      /** Primary */
+      primary: number | null;
+      sending: components["schemas"]["InboxAvailability"];
+      /** Status */
+      status: string;
+      sync: components["schemas"]["InboxAvailability"];
+      /** Thread */
+      thread: components["schemas"]["InboxThreadEvent"][];
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /** InboxDraft */
+    InboxDraft: {
+      /** Body */
+      body: string;
+      /** Channel */
+      channel: string;
+      /** Contact */
+      contact: string;
+      /** Due */
+      due: string | null;
+      /** Followup */
+      followup: boolean;
+      /** Kind */
+      kind: string;
+      /** Linkedin Message */
+      linkedin_message: string | null;
+      /** Linkedin Note */
+      linkedin_note: string | null;
+      /** Manual Reason */
+      manual_reason: string | null;
+      /** Manual Tailor */
+      manual_tailor: boolean;
+      /** Mode */
+      mode: string;
+      /** Placeholders */
+      placeholders: string[];
+      /** Role */
+      role: string;
+      /** Sent */
+      sent: boolean;
+      /** Sent By */
+      sent_by: string | null;
+      /** Sent Date */
+      sent_date: string | null;
+      /** Subject */
+      subject: string | null;
+      /** To */
+      to: string | null;
+      /** Verified */
+      verified: boolean;
+      /** Words */
+      words: number;
+    };
+    /** InboxEmail */
+    InboxEmail: {
+      /** At */
+      at: string | null;
+      /** Class */
+      class: string;
+      /** From */
+      from: string;
+      /** Link */
+      link: string | null;
+      /** Status */
+      status: string;
+    };
+    /** InboxNext */
+    InboxNext: {
+      /** Due */
+      due: string | null;
+      /** Kind */
+      kind: string;
+      /** Mode */
+      mode: string;
+    };
+    /** InboxPage */
+    InboxPage: {
+      /** Items */
+      items: components["schemas"]["InboxRow"][];
+      /** Last Sync */
+      last_sync: string | null;
+      sending: components["schemas"]["InboxAvailability"];
+      sync: components["schemas"]["InboxAvailability"];
+    };
+    /** InboxRow */
+    InboxRow: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Days Since Applied */
+      days_since_applied: number | null;
+      /** Drafts */
+      drafts: number;
+      /** Job Id */
+      job_id: string;
+      last_email: components["schemas"]["InboxEmail"] | null;
+      next: components["schemas"]["InboxNext"];
+      /** Placeholders */
+      placeholders: number;
+      /** Status */
+      status: string;
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /** InboxThreadEvent */
+    InboxThreadEvent: {
+      /** At */
+      at: string;
+      /** Class */
+      class?: string;
+      /** Contact */
+      contact?: string;
+      /** From */
+      from?: string;
+      /** Kind */
+      kind?: string;
+      /** Link */
+      link?: string | null;
+      /** Note */
+      note?: string | null;
+      /** Sent By */
+      sent_by?: string | null;
+      /** Status */
+      status?: string | null;
+      /** Type */
+      type: string;
     };
     /** IndexState */
     IndexState: {
@@ -421,6 +835,16 @@ export interface components {
       rows: components["schemas"]["TileRow"][];
       /** Value */
       value: number;
+    };
+    /** JobStep */
+    JobStep: {
+      /** Name */
+      name: string;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "done" | "active" | "pending" | "skipped";
     };
     /** MarkBody */
     MarkBody: {
@@ -583,6 +1007,13 @@ export interface components {
        */
       dry_run?: boolean;
     };
+    /** QuietHours */
+    QuietHours: {
+      /** End */
+      end: string;
+      /** Start */
+      start: string;
+    };
     /** ResponseBreakdown */
     ResponseBreakdown: {
       /** Companies */
@@ -608,6 +1039,145 @@ export interface components {
       responded: number;
       /** Rows */
       rows: components["schemas"]["TileRow"][];
+    };
+    /** RunBudget */
+    RunBudget: {
+      /** Max Jobs */
+      max_jobs?: number | null;
+      /** Max Minutes */
+      max_minutes?: number | null;
+      /** Preset */
+      preset?: string | null;
+    };
+    /** RunCap */
+    RunCap: {
+      /** Applied */
+      applied: number;
+      /** Base */
+      base: number;
+      /** Cap */
+      cap: number;
+      /** Date */
+      date: string;
+      /** Multiplier */
+      multiplier: number;
+      /** Reached */
+      reached: boolean;
+      /** Remaining */
+      remaining: number;
+    };
+    /** RunDetail */
+    RunDetail: {
+      /** Attempts */
+      attempts: components["schemas"]["Attempt"][];
+      budget: components["schemas"]["RunBudget"];
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters: {
+        [key: string]: number;
+      };
+      /** Detail */
+      detail: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Log */
+      log: string;
+      /** Pid */
+      pid?: number | null;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      /** Warnings */
+      warnings?: string[];
+    };
+    /** RunJobRow */
+    RunJobRow: {
+      /** Company */
+      company: string | null;
+      /** Detail */
+      detail: string;
+      /** Duration S */
+      duration_s: number | null;
+      /** Job Id */
+      job_id: string;
+      /** Outcome */
+      outcome: string | null;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "done" | "failed" | "active" | "queued";
+      /** Steps */
+      steps: components["schemas"]["JobStep"][];
+      /** Title */
+      title: string | null;
+    };
+    /** RunPause */
+    RunPause: {
+      /** Paused At */
+      paused_at: string;
+      /** Reason */
+      reason: string;
+      /** Until */
+      until: string | null;
+    };
+    /** RunRecord */
+    RunRecord: {
+      /** Attempts */
+      attempts?: number[];
+      budget: components["schemas"]["RunBudget"];
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters: {
+        [key: string]: number;
+      };
+      /** Detail */
+      detail: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Pid */
+      pid?: number | null;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      /** Warnings */
+      warnings?: string[];
     };
     /** RunRow */
     RunRow: {
@@ -637,6 +1207,58 @@ export interface components {
       stop_reason: string | null;
       /** Trigger */
       trigger: string | null;
+    };
+    /** RunUsed */
+    RunUsed: {
+      /** Jobs */
+      jobs: number;
+      /** Max Jobs */
+      max_jobs: number | null;
+      /** Max Minutes */
+      max_minutes: number | null;
+      /** Minutes */
+      minutes: number | null;
+    };
+    /** Schedule */
+    Schedule: {
+      catch_up: components["schemas"]["CatchUp"] | null;
+      /** Inbox Ready */
+      inbox_ready: boolean;
+      /** Installed */
+      installed: boolean;
+      /** Jobs */
+      jobs: components["schemas"]["ScheduleJob"][];
+      /** Label */
+      label: string | null;
+      /** Last Tick */
+      last_tick: string | null;
+      /** Loaded */
+      loaded: boolean;
+      paused: components["schemas"]["RunPause"] | null;
+      quiet_hours: components["schemas"]["QuietHours"] | null;
+      /** Tick Minutes */
+      tick_minutes: number;
+    };
+    /** ScheduleJob */
+    ScheduleJob: {
+      /** At */
+      at: string[];
+      /** Claude */
+      claude: boolean;
+      /** Enabled */
+      enabled: boolean;
+      /** Every Minutes */
+      every_minutes: number | null;
+      /** Kind */
+      kind: string;
+      /** Last Run */
+      last_run: string | null;
+      /** Last Status */
+      last_status: string | null;
+      /** Next */
+      next: string | null;
+      /** Preset */
+      preset: string | null;
     };
     /** ScheduleState */
     ScheduleState: {
@@ -808,9 +1430,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["ActionsPage"];
         };
       };
       /** @description Validation Error */
@@ -1119,9 +1739,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["ContactsPage"];
         };
       };
     };
@@ -1186,9 +1804,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["InboxPage"];
         };
       };
     };
@@ -1204,9 +1820,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["InboxDetail"];
         };
       };
       /** @description Validation Error */
@@ -1669,9 +2283,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["HistoryPage"];
         };
       };
       /** @description Validation Error */
@@ -1763,9 +2375,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          } | null;
+          "application/json": components["schemas"]["CurrentRun"] | null;
         };
       };
     };
@@ -1869,9 +2479,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["RunDetail"];
         };
       };
       /** @description Validation Error */
@@ -1914,9 +2522,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Schedule"];
         };
       };
     };

@@ -1,86 +1,28 @@
 // JSON shapes of the Runs API (src/careeros/ui/routers/runs.py, services/runs_view.py, services/runs.py).
-// TODO(openapi): replace with the generated types when they land.
+// The GET views are generated from the backend's TypedDicts (ui/openapi.json -> src/api/schema.gen.ts, docs/UI.md);
+// the POST results, the ranking queue and the SSE lines stay hand-written until their routes are typed.
+import type { components } from "../../api/schema.gen";
+
+type Schemas = components["schemas"];
+
+/** GET /api/runs rows and GET /api/runs/{id}, /api/runs/current (services/runs_view.py). */
+export type Budget = Schemas["RunBudget"];
+export type RunRecord = Schemas["RunRecord"];
+export type Attempt = Schemas["Attempt"];
+export type RunDetail = Schemas["RunDetail"];
+export type HistoryPage = Schemas["HistoryPage"];
+export type Step = Schemas["JobStep"];
+export type JobRow = Schemas["RunJobRow"];
+export type Cap = Schemas["RunCap"];
+export type CurrentRun = Schemas["CurrentRun"];
+/** GET /api/schedule (services/runs_view.py: Schedule). */
+export type Pause = Schemas["RunPause"];
+export type CatchUp = Schemas["CatchUp"];
+export type ScheduleJob = Schemas["ScheduleJob"];
+export type Schedule = Schemas["Schedule"];
 
 export type BatchKind = "score" | "prepare";
 export type StepKind = "scout" | "tracker" | "prune" | "inbox_sync";
-
-export interface Budget {
-  preset?: string;
-  max_jobs?: number;
-  max_minutes?: number;
-}
-
-export interface RunRecord {
-  id: string;
-  kind: string;
-  trigger: string;
-  budget?: Budget;
-  status: string;
-  /** running | done | failed | interrupted (a running run whose process no longer holds its lock) */
-  state: string;
-  stop_reason: string | null;
-  detail?: string;
-  started_at: string | null;
-  ended_at: string | null;
-  duration_s: number | null;
-  counters?: Record<string, number>;
-  warnings?: string[];
-}
-
-export interface Attempt {
-  n: number;
-  job_id: string;
-  company?: string | null;
-  title?: string | null;
-  stage?: string;
-  outcome: string;
-  detail?: string;
-  duration_s?: number | null;
-  session_id?: string | null;
-  started_at?: string | null;
-}
-
-export interface RunDetail extends RunRecord {
-  attempts: Attempt[];
-  log: string;
-}
-
-export interface HistoryPage {
-  runs: RunRecord[];
-  next_cursor: string | null;
-}
-
-export interface Step {
-  name: string;
-  /** skipped: a later step has output but this one has none (e.g. a cover letter the tier rule left out). */
-  state: "done" | "active" | "pending" | "skipped";
-}
-
-export interface JobRow {
-  job_id: string;
-  company: string | null;
-  title: string | null;
-  state: "done" | "failed" | "active" | "queued";
-  outcome: string | null;
-  duration_s: number | null;
-  detail: string;
-  steps: Step[];
-}
-
-export interface Cap {
-  cap: number;
-  applied: number;
-  remaining: number;
-  reached: boolean;
-}
-
-export interface CurrentRun extends RunRecord {
-  scheduled: boolean;
-  current_job: string | null;
-  used: { jobs: number; max_jobs: number | null; minutes: number | null; max_minutes: number | null };
-  jobs: JobRow[];
-  cap: Cap | null;
-}
 
 export interface Reason {
   code: "fresh" | "dream" | "deadline" | "fit" | "retry" | "other" | string;
@@ -126,42 +68,6 @@ export interface Started {
   kind: string;
   started: boolean;
   pid: number;
-}
-
-export interface Pause {
-  paused_at: string;
-  until: string | null;
-  reason: string;
-}
-
-export interface CatchUp {
-  created_at: string;
-  kinds: Record<string, { first_missed: string | null; slots: number; last_missed?: string }>;
-}
-
-export interface ScheduleJob {
-  kind: string;
-  enabled: boolean;
-  every_minutes: number | null;
-  at: string[];
-  preset: string | null;
-  claude: boolean;
-  next: string | null;
-  last_run: string | null;
-  last_status: string | null;
-}
-
-export interface Schedule {
-  label: string;
-  installed: boolean;
-  loaded: boolean;
-  last_tick: string | null;
-  tick_minutes: number;
-  quiet_hours: { start: string; end: string } | null;
-  jobs: ScheduleJob[];
-  catch_up: CatchUp | null;
-  paused: Pause | null;
-  inbox_ready: boolean;
 }
 
 export interface CancelResult {

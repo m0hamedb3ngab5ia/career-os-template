@@ -1,6 +1,206 @@
 {
   "components": {
     "schemas": {
+      "ActionCounts": {
+        "properties": {
+          "done": {
+            "title": "Done",
+            "type": "integer"
+          },
+          "open": {
+            "title": "Open",
+            "type": "integer"
+          },
+          "today": {
+            "title": "Today",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "open",
+          "today",
+          "done"
+        ],
+        "title": "ActionCounts",
+        "type": "object"
+      },
+      "ActionGroup": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ActionItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "count",
+          "items"
+        ],
+        "title": "ActionGroup",
+        "type": "object"
+      },
+      "ActionHead": {
+        "properties": {
+          "overdue": {
+            "title": "Overdue",
+            "type": "integer"
+          },
+          "soon": {
+            "title": "Soon",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "overdue",
+          "soon"
+        ],
+        "title": "ActionHead",
+        "type": "object"
+      },
+      "ActionItem": {
+        "properties": {
+          "bucket": {
+            "title": "Bucket",
+            "type": "string"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "created": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created"
+          },
+          "done": {
+            "title": "Done",
+            "type": "boolean"
+          },
+          "done_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Done Date"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "due_date_only": {
+            "title": "Due Date Only",
+            "type": "boolean"
+          },
+          "due_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due Reason"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "link": {
+            "title": "Link",
+            "type": "string"
+          },
+          "needs": {
+            "title": "Needs",
+            "type": "string"
+          },
+          "priority": {
+            "title": "Priority",
+            "type": "string"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "scam_actions": {
+            "title": "Scam Actions",
+            "type": "boolean"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "created",
+          "job_id",
+          "company",
+          "role",
+          "type",
+          "what",
+          "link",
+          "priority",
+          "needs",
+          "done",
+          "done_date",
+          "due",
+          "due_date_only",
+          "due_reason",
+          "bucket",
+          "level",
+          "scam_actions"
+        ],
+        "title": "ActionItem",
+        "type": "object"
+      },
       "ActionRow": {
         "properties": {
           "company": {
@@ -122,6 +322,55 @@
         "title": "ActionRow",
         "type": "object"
       },
+      "ActionsPage": {
+        "properties": {
+          "counts": {
+            "$ref": "#/components/schemas/ActionCounts"
+          },
+          "group": {
+            "title": "Group",
+            "type": "string"
+          },
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/ActionGroup"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "head": {
+            "$ref": "#/components/schemas/ActionHead"
+          },
+          "more_done": {
+            "title": "More Done",
+            "type": "integer"
+          },
+          "now": {
+            "title": "Now",
+            "type": "string"
+          },
+          "sort": {
+            "title": "Sort",
+            "type": "string"
+          },
+          "tab": {
+            "title": "Tab",
+            "type": "string"
+          }
+        },
+        "required": [
+          "tab",
+          "group",
+          "sort",
+          "counts",
+          "head",
+          "groups",
+          "more_done",
+          "now"
+        ],
+        "title": "ActionsPage",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -160,6 +409,157 @@
         "title": "AppliedWeekTile",
         "type": "object"
       },
+      "Attempt": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "headless": {
+            "additionalProperties": true,
+            "title": "Headless",
+            "type": "object"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "outcome": {
+            "title": "Outcome",
+            "type": "string"
+          },
+          "rank": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Rank"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
+          },
+          "run_id": {
+            "title": "Run Id",
+            "type": "string"
+          },
+          "session_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Session Id"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "stream": {
+            "title": "Stream",
+            "type": "string"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "why": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Why"
+          }
+        },
+        "required": [
+          "n",
+          "job_id",
+          "outcome"
+        ],
+        "title": "Attempt",
+        "type": "object"
+      },
       "CancelBody": {
         "properties": {
           "run_id": {
@@ -177,6 +577,31 @@
         "title": "CancelBody",
         "type": "object"
       },
+      "CatchUp": {
+        "properties": {
+          "created_at": {
+            "title": "Created At",
+            "type": "string"
+          },
+          "kinds": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/CatchUpKind"
+            },
+            "title": "Kinds",
+            "type": "object"
+          },
+          "updated_at": {
+            "title": "Updated At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "created_at",
+          "kinds"
+        ],
+        "title": "CatchUp",
+        "type": "object"
+      },
       "CatchUpBody": {
         "properties": {
           "dismiss": {
@@ -186,6 +611,42 @@
           }
         },
         "title": "CatchUpBody",
+        "type": "object"
+      },
+      "CatchUpKind": {
+        "properties": {
+          "first_missed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "First Missed"
+          },
+          "last_missed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Missed"
+          },
+          "slots": {
+            "title": "Slots",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "first_missed",
+          "slots"
+        ],
+        "title": "CatchUpKind",
         "type": "object"
       },
       "Changes": {
@@ -263,6 +724,230 @@
         "title": "ColumnConfig",
         "type": "object"
       },
+      "ContactRow": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "draft": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxDraft"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "email_confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Confidence"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "job_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Status"
+          },
+          "job_title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Title"
+          },
+          "linkedin": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin"
+          },
+          "linkedin_degree": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Degree"
+          },
+          "manual": {
+            "title": "Manual",
+            "type": "boolean"
+          },
+          "manual_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Detail"
+          },
+          "manual_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Reason"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "mutuals": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mutuals"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "replied": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Replied"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "job_title",
+          "job_status",
+          "name",
+          "title",
+          "linkedin",
+          "email",
+          "email_confidence",
+          "linkedin_degree",
+          "mutuals",
+          "sent",
+          "replied",
+          "manual",
+          "manual_reason",
+          "manual_detail",
+          "draft",
+          "mode"
+        ],
+        "title": "ContactRow",
+        "type": "object"
+      },
+      "ContactsPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/ContactRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "linkedin_drafts": {
+            "title": "Linkedin Drafts",
+            "type": "integer"
+          },
+          "policy": {
+            "$ref": "#/components/schemas/ContactsPolicy"
+          }
+        },
+        "required": [
+          "items",
+          "linkedin_drafts",
+          "policy"
+        ],
+        "title": "ContactsPage",
+        "type": "object"
+      },
+      "ContactsPolicy": {
+        "properties": {
+          "manual_if_connected": {
+            "title": "Manual If Connected",
+            "type": "boolean"
+          },
+          "manual_if_mutuals": {
+            "title": "Manual If Mutuals",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "manual_if_connected",
+          "manual_if_mutuals"
+        ],
+        "title": "ContactsPolicy",
+        "type": "object"
+      },
       "Counts": {
         "properties": {
           "action_items_open": {
@@ -289,6 +974,198 @@
           "contacts"
         ],
         "title": "Counts",
+        "type": "object"
+      },
+      "CurrentRun": {
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/Attempt"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget"
+          },
+          "cap": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunCap"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "cmd": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cmd",
+            "type": "array"
+          },
+          "counters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counters",
+            "type": "object"
+          },
+          "current_job": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Current Job"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "holder": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Holder"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/RunJobRow"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "scheduled": {
+            "title": "Scheduled",
+            "type": "boolean"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "boolean"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          },
+          "used": {
+            "$ref": "#/components/schemas/RunUsed"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "trigger",
+          "budget",
+          "status",
+          "state",
+          "stop_reason",
+          "detail",
+          "started_at",
+          "ended_at",
+          "duration_s",
+          "counters",
+          "attempts",
+          "holder",
+          "current_job",
+          "used",
+          "scheduled",
+          "jobs",
+          "cap"
+        ],
+        "title": "CurrentRun",
         "type": "object"
       },
       "Due": {
@@ -443,6 +1320,34 @@
         "title": "HTTPValidationError",
         "type": "object"
       },
+      "HistoryPage": {
+        "properties": {
+          "next_cursor": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next Cursor"
+          },
+          "runs": {
+            "items": {
+              "$ref": "#/components/schemas/RunRecord"
+            },
+            "title": "Runs",
+            "type": "array"
+          }
+        },
+        "required": [
+          "runs",
+          "next_cursor"
+        ],
+        "title": "HistoryPage",
+        "type": "object"
+      },
       "Ids": {
         "properties": {
           "ids": {
@@ -459,6 +1364,643 @@
           "ids"
         ],
         "title": "Ids",
+        "type": "object"
+      },
+      "InboxAvailability": {
+        "properties": {
+          "available": {
+            "title": "Available",
+            "type": "boolean"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "available",
+          "reason"
+        ],
+        "title": "InboxAvailability",
+        "type": "object"
+      },
+      "InboxDetail": {
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "days_since_applied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Since Applied"
+          },
+          "drafts": {
+            "items": {
+              "$ref": "#/components/schemas/InboxDraft"
+            },
+            "title": "Drafts",
+            "type": "array"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "last_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxEmail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "$ref": "#/components/schemas/InboxNext"
+          },
+          "placeholders": {
+            "title": "Placeholders",
+            "type": "integer"
+          },
+          "primary": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Primary"
+          },
+          "sending": {
+            "$ref": "#/components/schemas/InboxAvailability"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/InboxAvailability"
+          },
+          "thread": {
+            "items": {
+              "$ref": "#/components/schemas/InboxThreadEvent"
+            },
+            "title": "Thread",
+            "type": "array"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "status",
+          "tier",
+          "applied_at",
+          "updated_at",
+          "days_since_applied",
+          "last_email",
+          "next",
+          "drafts",
+          "placeholders",
+          "thread",
+          "primary",
+          "sync",
+          "sending"
+        ],
+        "title": "InboxDetail",
+        "type": "object"
+      },
+      "InboxDraft": {
+        "properties": {
+          "body": {
+            "title": "Body",
+            "type": "string"
+          },
+          "channel": {
+            "title": "Channel",
+            "type": "string"
+          },
+          "contact": {
+            "title": "Contact",
+            "type": "string"
+          },
+          "due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "followup": {
+            "title": "Followup",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "linkedin_message": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Message"
+          },
+          "linkedin_note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Linkedin Note"
+          },
+          "manual_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Manual Reason"
+          },
+          "manual_tailor": {
+            "title": "Manual Tailor",
+            "type": "boolean"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          },
+          "placeholders": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Placeholders",
+            "type": "array"
+          },
+          "role": {
+            "title": "Role",
+            "type": "string"
+          },
+          "sent": {
+            "title": "Sent",
+            "type": "boolean"
+          },
+          "sent_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent By"
+          },
+          "sent_date": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent Date"
+          },
+          "subject": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Subject"
+          },
+          "to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "To"
+          },
+          "verified": {
+            "title": "Verified",
+            "type": "boolean"
+          },
+          "words": {
+            "title": "Words",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "contact",
+          "role",
+          "kind",
+          "channel",
+          "to",
+          "verified",
+          "subject",
+          "body",
+          "linkedin_note",
+          "linkedin_message",
+          "manual_tailor",
+          "manual_reason",
+          "sent",
+          "sent_by",
+          "sent_date",
+          "mode",
+          "followup",
+          "due",
+          "placeholders",
+          "words"
+        ],
+        "title": "InboxDraft",
+        "type": "object"
+      },
+      "InboxEmail": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "class": {
+            "title": "Class",
+            "type": "string"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "class",
+          "from",
+          "status",
+          "link"
+        ],
+        "title": "InboxEmail",
+        "type": "object"
+      },
+      "InboxNext": {
+        "properties": {
+          "due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Due"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "mode": {
+            "title": "Mode",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind",
+          "due",
+          "mode"
+        ],
+        "title": "InboxNext",
+        "type": "object"
+      },
+      "InboxPage": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/InboxRow"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "last_sync": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Sync"
+          },
+          "sending": {
+            "$ref": "#/components/schemas/InboxAvailability"
+          },
+          "sync": {
+            "$ref": "#/components/schemas/InboxAvailability"
+          }
+        },
+        "required": [
+          "items",
+          "last_sync",
+          "sync",
+          "sending"
+        ],
+        "title": "InboxPage",
+        "type": "object"
+      },
+      "InboxRow": {
+        "properties": {
+          "applied_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied At"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "days_since_applied": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Days Since Applied"
+          },
+          "drafts": {
+            "title": "Drafts",
+            "type": "integer"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "last_email": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/InboxEmail"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "next": {
+            "$ref": "#/components/schemas/InboxNext"
+          },
+          "placeholders": {
+            "title": "Placeholders",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "tier": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tier"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Updated At"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "status",
+          "tier",
+          "applied_at",
+          "updated_at",
+          "days_since_applied",
+          "last_email",
+          "next",
+          "drafts",
+          "placeholders"
+        ],
+        "title": "InboxRow",
+        "type": "object"
+      },
+      "InboxThreadEvent": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "class": {
+            "title": "Class",
+            "type": "string"
+          },
+          "contact": {
+            "title": "Contact",
+            "type": "string"
+          },
+          "from": {
+            "title": "From",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "link": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Link"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "sent_by": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Sent By"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "at",
+          "type"
+        ],
+        "title": "InboxThreadEvent",
         "type": "object"
       },
       "IndexState": {
@@ -500,6 +2042,30 @@
           "rows"
         ],
         "title": "InterviewsTile",
+        "type": "object"
+      },
+      "JobStep": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "done",
+              "active",
+              "pending",
+              "skipped"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "state"
+        ],
+        "title": "JobStep",
         "type": "object"
       },
       "MarkBody": {
@@ -906,6 +2472,24 @@
         "title": "PruneBody",
         "type": "object"
       },
+      "QuietHours": {
+        "properties": {
+          "end": {
+            "title": "End",
+            "type": "string"
+          },
+          "start": {
+            "title": "Start",
+            "type": "string"
+          }
+        },
+        "required": [
+          "start",
+          "end"
+        ],
+        "title": "QuietHours",
+        "type": "object"
+      },
       "ResponseBreakdown": {
         "properties": {
           "companies": {
@@ -993,6 +2577,485 @@
           "breakdown"
         ],
         "title": "ResponseRateTile",
+        "type": "object"
+      },
+      "RunBudget": {
+        "properties": {
+          "max_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Jobs"
+          },
+          "max_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Minutes"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          }
+        },
+        "title": "RunBudget",
+        "type": "object"
+      },
+      "RunCap": {
+        "properties": {
+          "applied": {
+            "title": "Applied",
+            "type": "integer"
+          },
+          "base": {
+            "title": "Base",
+            "type": "integer"
+          },
+          "cap": {
+            "title": "Cap",
+            "type": "integer"
+          },
+          "date": {
+            "title": "Date",
+            "type": "string"
+          },
+          "multiplier": {
+            "title": "Multiplier",
+            "type": "number"
+          },
+          "reached": {
+            "title": "Reached",
+            "type": "boolean"
+          },
+          "remaining": {
+            "title": "Remaining",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "date",
+          "cap",
+          "applied",
+          "remaining",
+          "multiplier",
+          "base",
+          "reached"
+        ],
+        "title": "RunCap",
+        "type": "object"
+      },
+      "RunDetail": {
+        "properties": {
+          "attempts": {
+            "items": {
+              "$ref": "#/components/schemas/Attempt"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget"
+          },
+          "cmd": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cmd",
+            "type": "array"
+          },
+          "counters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counters",
+            "type": "object"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "log": {
+            "title": "Log",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "boolean"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "trigger",
+          "budget",
+          "status",
+          "state",
+          "stop_reason",
+          "detail",
+          "started_at",
+          "ended_at",
+          "duration_s",
+          "counters",
+          "attempts",
+          "log"
+        ],
+        "title": "RunDetail",
+        "type": "object"
+      },
+      "RunJobRow": {
+        "properties": {
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Outcome"
+          },
+          "state": {
+            "enum": [
+              "done",
+              "failed",
+              "active",
+              "queued"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "steps": {
+            "items": {
+              "$ref": "#/components/schemas/JobStep"
+            },
+            "title": "Steps",
+            "type": "array"
+          },
+          "title": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Title"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "state",
+          "outcome",
+          "duration_s",
+          "detail",
+          "steps"
+        ],
+        "title": "RunJobRow",
+        "type": "object"
+      },
+      "RunPause": {
+        "properties": {
+          "paused_at": {
+            "title": "Paused At",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          },
+          "until": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Until"
+          }
+        },
+        "required": [
+          "paused_at",
+          "until",
+          "reason"
+        ],
+        "title": "RunPause",
+        "type": "object"
+      },
+      "RunRecord": {
+        "properties": {
+          "attempts": {
+            "items": {
+              "type": "integer"
+            },
+            "title": "Attempts",
+            "type": "array"
+          },
+          "budget": {
+            "$ref": "#/components/schemas/RunBudget"
+          },
+          "cmd": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Cmd",
+            "type": "array"
+          },
+          "counters": {
+            "additionalProperties": {
+              "type": "integer"
+            },
+            "title": "Counters",
+            "type": "object"
+          },
+          "detail": {
+            "title": "Detail",
+            "type": "string"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Duration S"
+          },
+          "ended_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ended At"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "pid": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pid"
+          },
+          "started_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Started At"
+          },
+          "state": {
+            "title": "State",
+            "type": "string"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "step": {
+            "title": "Step",
+            "type": "boolean"
+          },
+          "stop_reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop Reason"
+          },
+          "trigger": {
+            "title": "Trigger",
+            "type": "string"
+          },
+          "warnings": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Warnings",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "trigger",
+          "budget",
+          "status",
+          "state",
+          "stop_reason",
+          "detail",
+          "started_at",
+          "ended_at",
+          "duration_s",
+          "counters"
+        ],
+        "title": "RunRecord",
         "type": "object"
       },
       "RunRow": {
@@ -1143,6 +3206,239 @@
           "interrupted"
         ],
         "title": "RunRow",
+        "type": "object"
+      },
+      "RunUsed": {
+        "properties": {
+          "jobs": {
+            "title": "Jobs",
+            "type": "integer"
+          },
+          "max_jobs": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Jobs"
+          },
+          "max_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Minutes"
+          },
+          "minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Minutes"
+          }
+        },
+        "required": [
+          "jobs",
+          "max_jobs",
+          "minutes",
+          "max_minutes"
+        ],
+        "title": "RunUsed",
+        "type": "object"
+      },
+      "Schedule": {
+        "properties": {
+          "catch_up": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CatchUp"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "inbox_ready": {
+            "title": "Inbox Ready",
+            "type": "boolean"
+          },
+          "installed": {
+            "title": "Installed",
+            "type": "boolean"
+          },
+          "jobs": {
+            "items": {
+              "$ref": "#/components/schemas/ScheduleJob"
+            },
+            "title": "Jobs",
+            "type": "array"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "last_tick": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Tick"
+          },
+          "loaded": {
+            "title": "Loaded",
+            "type": "boolean"
+          },
+          "paused": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/RunPause"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "quiet_hours": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/QuietHours"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "tick_minutes": {
+            "title": "Tick Minutes",
+            "type": "number"
+          }
+        },
+        "required": [
+          "label",
+          "installed",
+          "loaded",
+          "last_tick",
+          "tick_minutes",
+          "quiet_hours",
+          "jobs",
+          "catch_up",
+          "paused",
+          "inbox_ready"
+        ],
+        "title": "Schedule",
+        "type": "object"
+      },
+      "ScheduleJob": {
+        "properties": {
+          "at": {
+            "items": {
+              "type": "string"
+            },
+            "title": "At",
+            "type": "array"
+          },
+          "claude": {
+            "title": "Claude",
+            "type": "boolean"
+          },
+          "enabled": {
+            "title": "Enabled",
+            "type": "boolean"
+          },
+          "every_minutes": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Every Minutes"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "last_status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Status"
+          },
+          "next": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Next"
+          },
+          "preset": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Preset"
+          }
+        },
+        "required": [
+          "kind",
+          "enabled",
+          "every_minutes",
+          "at",
+          "preset",
+          "claude",
+          "next",
+          "last_run",
+          "last_status"
+        ],
+        "title": "ScheduleJob",
         "type": "object"
       },
       "ScheduleState": {
@@ -1643,9 +3939,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Actions Api Actions Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ActionsPage"
                 }
               }
             },
@@ -2208,9 +4502,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Contacts Api Contacts Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/ContactsPage"
                 }
               }
             },
@@ -2336,9 +4628,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response List Inbox Api Inbox Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InboxPage"
                 }
               }
             },
@@ -2370,9 +4660,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Inbox Detail Api Inbox  Job Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/InboxDetail"
                 }
               }
             },
@@ -3452,9 +5740,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response History Api Runs Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/HistoryPage"
                 }
               }
             },
@@ -3629,8 +5915,7 @@
                 "schema": {
                   "anyOf": [
                     {
-                      "additionalProperties": true,
-                      "type": "object"
+                      "$ref": "#/components/schemas/CurrentRun"
                     },
                     {
                       "type": "null"
@@ -3841,9 +6126,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Detail Api Runs  Run Id  Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/RunDetail"
                 }
               }
             },
@@ -3915,9 +6198,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "additionalProperties": true,
-                  "title": "Response Schedule Api Schedule Get",
-                  "type": "object"
+                  "$ref": "#/components/schemas/Schedule"
                 }
               }
             },
