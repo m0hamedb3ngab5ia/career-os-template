@@ -53,6 +53,8 @@ Procedure:
    bullet count (step 2) and project selection (step 1b).
    1b. Projects: pick up to 3 by relevance: first projects whose `tags` include `score.category`, then
    projects whose `stack` overlaps `required_skills`, then `bullet_priority` order; ties newest first.
+   A project with any `resume_pin: true` bullet is always one of the picked projects (it takes the
+   first slot; the rest follow the relevance order above).
 2. Bullet count per entry: tag-matched entries (entry `tags` include `score.category`, or `stack`
    overlaps >= 2 `required_skills`) get 3-4 bullets; other entries get 1-2. Always include at least
    1 bullet per included entry. Bullets flagged `resume_pin: true` are always selected for their entry;
