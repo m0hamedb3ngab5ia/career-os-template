@@ -16,5 +16,6 @@ export function useMeta() {
     queryKey: ["meta"],
     queryFn: () => apiFetch<Meta>("/api/meta"),
     staleTime: Infinity, // changes only with config; the `changed` event invalidates it
+    retry: false,
   });
 }

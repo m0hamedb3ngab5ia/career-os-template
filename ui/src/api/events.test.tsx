@@ -32,6 +32,7 @@ describe("keysForChange", () => {
       ["job", "a1"],
       ["job", "b2"],
       ["contacts"],
+      ["inbox"],
       ["status"],
       ["today"],
       ["pipeline"],
@@ -41,6 +42,7 @@ describe("keysForChange", () => {
       ["run", "r1"],
       ["storage"],
       ["advise"],
+      ["inbox"],
       ["status"],
       ["today"],
       ["actions"],
@@ -52,10 +54,13 @@ describe("keysForChange", () => {
       ["settings"],
       ["advise"],
       ["storage"],
+      ["inbox"],
+      ["contacts"],
       ["status"],
       ["pipeline"],
     ]);
-    expect(keysForChange({ status: true })).toEqual([["status"], ["runs"], ["today"]]);
+    // data/sync_updates.json (pending inbox-sync updates) arrives as a bare status change: the Inbox refetches too
+    expect(keysForChange({ status: true })).toEqual([["status"], ["runs"], ["today"], ["inbox"]]);
     expect(keysForChange({})).toEqual([]);
   });
 

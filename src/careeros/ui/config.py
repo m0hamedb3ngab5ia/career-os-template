@@ -14,7 +14,8 @@ from careeros.config import ConfigError
 from careeros.models import STATUSES
 
 UI_KEYS = ("port", "host", "open_browser", "theme", "undo_seconds", "page_size", "watch_debounce_ms", "index_path",
-           "due_soon_hours", "pause_until_tomorrow_at", "pipeline")
+           "due_soon_hours", "pause_until_tomorrow_at", "followup_after_apply_days", "followup_no_response_days",
+           "pipeline")
 PIPELINE_KEYS = ("columns", "card_limit")
 THEMES = ("system", "light", "dark")
 _HHMM = re.compile(r"^([01]\d|2[0-3]):[0-5]\d$")
@@ -43,6 +44,9 @@ class UiConfig:
     due_soon_hours: int = 48               # Action Items: orange "due soon" within this many hours
     card_limit: int = 10                   # Pipeline: cards per column before "Show all"
     pause_until_tomorrow_at: str = "08:00"   # Runs › Pause all › "Until tomorrow": this local time tomorrow
+    # Inbox & follow-ups: when a follow-up shows as due (templates/followup_email/README.md windows)
+    followup_after_apply_days: int = 3     # after-applying note: same day to 3 days after applying
+    followup_no_response_days: int = 7     # status follow-up: 7 to 14 days after the last reply
     columns: list[dict[str, Any]] = field(default_factory=lambda: deepcopy(DEFAULT_COLUMNS))
 
     @property
@@ -119,6 +123,10 @@ def load_ui_config(settings: Any) -> UiConfig:
         cfg.page_size = _int(raw["page_size"], "page_size", 20, 1000)
     if "watch_debounce_ms" in raw:
         cfg.watch_debounce_ms = _int(raw["watch_debounce_ms"], "watch_debounce_ms", 50, 10000)
+    if "followup_after_apply_days" in raw:
+        cfg.followup_after_apply_days = _int(raw["followup_after_apply_days"], "followup_after_apply_days", 0, 60)
+    if "followup_no_response_days" in raw:
+        cfg.followup_no_response_days = _int(raw["followup_no_response_days"], "followup_no_response_days", 1, 60)
     if raw.get("index_path") is not None:
         if not isinstance(raw["index_path"], str) or not raw["index_path"].strip():
             raise _err(f"index_path must be a file path or null, got {raw['index_path']!r}")

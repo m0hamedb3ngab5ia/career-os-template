@@ -4,7 +4,9 @@ Status: building. The mockup is signed off; Phase 2 is being built in slices. Bu
 server (SQLite index, file watcher + SSE, `/api/health`, `/api/meta`, `/api/status`, `/api/jobs`, `/api/events`,
 `pipeline.yaml: ui`), and the Today, Jobs and Job detail screens (`/api/today`, `/api/jobs/tabs`,
 `/api/jobs/export`, `/api/jobs/{id}/files/…` and the Job detail writes, `/api/tracker/sync|open`, and the Today run
-controls `/api/runs/catch-up|resume|steps/scout|batches/prepare`). Everything else in this file is not built yet unless
+controls `/api/runs/catch-up|resume|steps/scout|batches/prepare`), the Contacts and Inbox & follow-ups screens (`/api/contacts`,
+`/api/contacts/{job_id}/{name}/mark`, `/api/inbox`, `/api/inbox/{job_id}`; sending, inbox sync from the app and draft
+edits are shown off with a reason). Everything else in this file is not built yet unless
 it says so.
 
 ## Goals

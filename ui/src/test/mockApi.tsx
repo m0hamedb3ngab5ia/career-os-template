@@ -9,6 +9,7 @@ export interface Call {
   method: string;
   url: string;
   body: unknown;
+  headers: Record<string, string>;
 }
 
 type Handler = (call: Call) => unknown;
@@ -21,10 +22,11 @@ export function mockApi(handlers: Record<string, Handler | unknown>): Call[] {
   const calls: Call[] = [];
   vi.stubGlobal(
     "fetch",
-    vi.fn(async (url: string, init: RequestInit = {}) => {
+    vi.fn(async (input: RequestInfo | URL, init: RequestInit = {}) => {
+      const url = String(input);
       const method = (init.method ?? "GET").toUpperCase();
       const body = typeof init.body === "string" ? JSON.parse(init.body) : undefined;
-      const call = { method, url, body };
+      const call: Call = { method, url, body, headers: (init.headers ?? {}) as Record<string, string> };
       calls.push(call);
       const key = `${method} ${url.split("?")[0]}`;
       if (!(key in handlers)) return new Response(JSON.stringify({ detail: `no mock for ${key}` }), { status: 404 });

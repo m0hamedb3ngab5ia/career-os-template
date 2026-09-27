@@ -139,6 +139,10 @@ ui:                                        # reusable default: fine to keep. `ca
   index_path: null                         # null (Recommended) = data/careeros.db next to data/jobs; rebuildable
   due_soon_hours: 48                       # 48 (Recommended): Action Items due within this many hours show orange
   pause_until_tomorrow_at: "08:00"         # "08:00" (Recommended): Runs › Pause all › "Until tomorrow" ends then (local)
+  followup_after_apply_days: 3             # 3 (Recommended): Inbox shows the after-applying note as due this many
+                                           # days after you apply (0 = same day). Display only; nothing sends
+  followup_no_response_days: 7             # 7 (Recommended: 7 to 14): a status follow-up is due this long after the
+                                           # last reply (screening)
   pipeline:
     card_limit: 10                         # 10 (Recommended): cards per Pipeline column before "Show all" (1 to 500)
     columns:                               # (Recommended) the six below. Each status sits in at most one column;

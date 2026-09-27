@@ -1,0 +1,116 @@
+.who {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+.company {
+  font-size: 15px;
+  font-weight: 600;
+}
+.jobTitle {
+  color: var(--sec);
+}
+.meta {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.address {
+  overflow-wrap: anywhere;
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.letterBlock {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.letterLabel {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--sec);
+}
+.letter {
+  padding: var(--space-4);
+  border-radius: var(--r-card);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  font-size: 15px;
+  line-height: 1.55;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.placeholder {
+  background: var(--orange-bg);
+  color: var(--label);
+  border-radius: 4px;
+  padding: 0 2px;
+}
+.note {
+  min-height: 1lh;
+  font-size: var(--fs-body);
+  font-weight: 600;
+  color: var(--orange);
+}
+.note:empty {
+  min-height: 0;
+}
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  color: var(--sec);
+}
+.actions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.actions > * {
+  flex: 1 1 auto;
+  justify-content: center;
+}
+.big {
+  justify-content: center;
+}
+.discarded {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex: 1 1 100%;
+  padding: 0 6px 0 14px;
+  border-radius: var(--r-card);
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+}
+.discarded span {
+  flex-grow: 1;
+}
+.undo {
+  min-width: var(--touch);
+  min-height: var(--touch);
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--toast-link);
+  font-weight: 600;
+  cursor: pointer;
+}
+@media (max-width: 600px) {
+  .actions :is(button) {
+    height: 50px;
+    border-radius: var(--r-card);
+    font-size: 16px;
+    font-weight: 600;
+  }
+}

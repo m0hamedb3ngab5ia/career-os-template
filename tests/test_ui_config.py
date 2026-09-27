@@ -28,6 +28,7 @@ def test_defaults_without_ui_block():
     assert cfg == UiConfig()
     assert (cfg.port, cfg.host, cfg.open_browser, cfg.theme) == (8765, "127.0.0.1", True, "system")
     assert (cfg.undo_seconds, cfg.page_size, cfg.watch_debounce_ms) == (8, 100, 300)
+    assert (cfg.followup_after_apply_days, cfg.followup_no_response_days) == (3, 7)
     assert [c["name"] for c in cfg.columns] == ["Found", "Queued", "Needs review", "Applied",
                                                 "Screening · Interview", "Offer"]
 
@@ -69,6 +70,9 @@ def test_overrides_and_custom_columns():
     {"ui": {"undo_seconds": 0}},
     {"ui": {"page_size": 5}},
     {"ui": {"watch_debounce_ms": 10}},
+    {"ui": {"followup_after_apply_days": -1}},
+    {"ui": {"followup_no_response_days": 0}},
+    {"ui": {"followup_no_response_days": "7"}},
     {"ui": {"pipeline": {"columns": []}}},
     {"ui": {"pipeline": {"columns": [{"name": "X", "statuses": ["nope"]}]}}},
     {"ui": {"pipeline": {"columns": [{"name": "", "statuses": ["found"]}]}}},
