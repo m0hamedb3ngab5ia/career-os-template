@@ -1,4 +1,4 @@
-import { createContext, use, useCallback, useMemo, useState, type ReactNode } from "react";
+import { createContext, use, useCallback, useEffect, useMemo, useState, type ReactNode } from "react";
 import { equal } from "./format";
 import type { FieldSchema, SectionData, Values } from "./types";
 import { isPolicy } from "./types";
@@ -64,6 +64,12 @@ export function SettingsFormProvider({ data, children }: { data: SectionData; ch
     }
     return out;
   }, [fields, drafts, data.values]);
+
+  // Every field back to its original value: the form is clean again, so drop the conflict baseline.
+  const dirty = Object.keys(changes).length > 0;
+  useEffect(() => {
+    if (!dirty) setBaseVersion(null);
+  }, [dirty]);
 
   const clearError = useCallback((ids: string[]) => {
     setErrorState((e) => {
