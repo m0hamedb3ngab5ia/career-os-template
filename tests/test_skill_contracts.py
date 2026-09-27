@@ -434,3 +434,11 @@ def test_apply_job_daily_cap_is_the_cli_check():
 def test_checker_allows_optional_subcommands():
     assert _check_cli(["advise"]) is None and _check_cli(["advise", "apply"]) is None
     assert _check_cli(["run"]) == "`careeros run` needs a subcommand"
+
+
+def test_apply_job_honours_the_runner_auto_submit_verdict():
+    """`careeros run apply` decides auto-submit in code (runs.auto_submit) and hands the verdict to the skill."""
+    text = _skill("apply-job")
+    assert "CAREEROS_AUTO_SUBMIT" in text and "CAREEROS_AUTO_SUBMIT_REASON" in text
+    block = text[text.index("CAREEROS_AUTO_SUBMIT"):]
+    assert "assisted" in block[:1500] and "staged" in block

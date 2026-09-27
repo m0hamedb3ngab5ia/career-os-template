@@ -20,8 +20,8 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Literal
 
-Outcome = Literal["submitted", "needs_review", "blocked", "failed"]
-OUTCOMES: tuple[str, ...] = ("submitted", "needs_review", "blocked", "failed")
+Outcome = Literal["submitted", "staged", "needs_review", "blocked", "failed"]
+OUTCOMES: tuple[str, ...] = ("submitted", "staged", "needs_review", "blocked", "failed")
 
 SESSION_FILE = "apply_session.json"
 LOG_FILE = "log.md"
@@ -174,8 +174,8 @@ class ApplySession:
     @property
     def status(self) -> str:
         """Tracker status implied by the outcome."""
-        return {"submitted": "applied", "needs_review": "needs_review", "blocked": "needs_review",
-                "failed": "needs_review"}.get(self.outcome or "", "needs_review")
+        return {"submitted": "applied", "staged": "needs_review", "needs_review": "needs_review",
+                "blocked": "needs_review", "failed": "needs_review"}.get(self.outcome or "", "needs_review")
 
     def to_dict(self) -> dict[str, Any]:
         d = asdict(self)

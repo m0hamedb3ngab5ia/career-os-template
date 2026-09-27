@@ -102,7 +102,7 @@ runs:                                      # reusable default: fine to keep. `ca
   prepare:
     stop_at_daily_cap: true                # true (Recommended): stop preparing once the queued (ready to submit)
                                            # jobs fill today's apply cap (targets.yaml volume)
-  auto_submit:                             # config only for now: runs NEVER apply in this version
+  auto_submit:                             # `run apply --job <id>` (one explicit job): 1 = may click submit, 0 = stage only
     enabled: false                         # false (Recommended)
     allow: [tier_c, tier_b]                # rules: tier_a|tier_b|tier_c, fit_gte_<n>, fit_lt_<n>, dream, category_<name>
     manual: [tier_a, fit_gte_85]           # (Recommended) always manual; wins over allow. Tier A is manual regardless.

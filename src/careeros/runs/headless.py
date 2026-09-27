@@ -37,6 +37,8 @@ SCORE_DECISIONS = ("prepare", "skip")
 PREPARE_STATUSES = ("queued", "needs_review", "skipped")
 # apply-job sets applied | needs_review itself; a refused/failed attempt leaves the job where it was.
 APPLY_STATUSES = ("applied", "needs_review", "queued", "prepared", "skipped")
+# `staged`: assisted mode (CAREEROS_AUTO_SUBMIT=0): the form is filled, nothing clicked, status needs_review.
+APPLY_OUTCOMES = ("submitted", "staged", "needs_review", "blocked", "failed")
 _AUTH_ERRORS = ("authentication_failed",)
 _LIMIT_ERRORS = ("rate_limit", "billing_error")
 
@@ -156,6 +158,8 @@ def validate_result(stage: str, job_id: str, res: dict[str, Any]) -> list[str]:
     if stage == "apply":
         if not res.get("outcome"):
             probs.append("RESULT has no outcome")
+        elif res.get("outcome") not in APPLY_OUTCOMES:
+            probs.append(f"RESULT outcome {res.get('outcome')!r} not in {APPLY_OUTCOMES}")
         if res.get("status") not in APPLY_STATUSES:
             probs.append(f"RESULT status {res.get('status')!r} not in {APPLY_STATUSES}")
     return probs
