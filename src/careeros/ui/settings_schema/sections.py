@@ -11,6 +11,7 @@ from __future__ import annotations
 from typing import Any
 
 from careeros import retention
+from careeros.doctor import KNOWN_ATS
 from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
@@ -19,6 +20,8 @@ from careeros.ui import config as ui_cfg
 from careeros.ui.settings_schema.model import Field, Group, Policy, Section
 
 P, T, C, Q = "pipeline", "targets", "companies", "qa"
+# Shown, not editable: a key no step reads yet (tests/test_settings_schema.py fails when one gains a reader).
+UNUSED = {"readonly": True, "note": "Not used yet: no step reads this setting."}
 
 # Every safety check code (src/careeros/safety/scam.py, ghost.py); a test keeps this in step with the source.
 SAFETY_CODES = (
@@ -85,11 +88,17 @@ def _domains(v: dict[Any, Any]) -> str | None:
     return None
 
 
+def _file_path(v: Any) -> str | None:
+    return "Enter a file path, e.g. data/JobTracker.xlsx." if not str(v or "").strip() else None
+
+
 def _boards(v: list[dict[str, Any]]) -> str | None:
     for i, b in enumerate(v, 1):
         if not b.get("company") or not b.get("ats"):
             return f"Board {i} needs a company and an ATS."
         ats = str(b["ats"]).lower()
+        if ats not in KNOWN_ATS:
+            return f"Board {i} ({b['company']}): unknown ATS {b['ats']}. Use one of {', '.join(sorted(KNOWN_ATS))}."
         if ats in ATS_WITH_SLUG and not str(b.get("slug") or "").strip():
             return f"Board {i} ({b['company']}) needs a {ats} slug."
         if ats not in ATS_WITH_SLUG and not str(b.get("url") or "").strip():
@@ -181,6 +190,7 @@ SECTIONS: tuple[Section, ...] = (
     Section("general", "General", (
         Group("files", "Files", (
             Field(P, "paths.tracker_xlsx", "text", "Tracker spreadsheet", default="data/JobTracker.xlsx",
+                  check=_file_path,
                   help="Where JobTracker.xlsx is exported. Relative to the repo, or ~/… for anywhere."),
         )),
         Group("app", "App", (
@@ -207,7 +217,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("resume", "Résumé", (
             Field(P, "resume_build.engine", "select", "LaTeX engine", default="tectonic",
-                  options=("tectonic", "pdflatex")),
+                  options=("tectonic", "pdflatex"), **UNUSED),
             Policy("Résumé length", "One page", "A hard QA rule."),
         )),
     )),
@@ -216,8 +226,8 @@ SECTIONS: tuple[Section, ...] = (
             _personal(T, "candidate.level", "select", "Level", options=("new_grad", "early_career")),
             _personal(T, "candidate.graduation", "text", "Graduation", pattern=r"\d{4}-(0[1-9]|1[0-2])",
                       help="Year and month, e.g. 2026-05."),
-            _num(T, "candidate.current_base_usd", "Current base salary", None, unit="USD", nullable=True,
-                 personal=True),
+            _personal(T, "candidate.current_base_usd", "number", "Current base salary", unit="USD", nullable=True,
+                      min=0, integer=True, **UNUSED),
             _num(T, "candidate.min_base_usd", "Minimum base salary", None, unit="USD", personal=True,
                  help="Postings whose top of range is below this are skipped. Unknown salary is allowed."),
             _num(T, "candidate.salary_dropdown_floor_usd", "Salary dropdown floor", None, unit="USD", personal=True,
@@ -253,7 +263,8 @@ SECTIONS: tuple[Section, ...] = (
         Group("thresholds", "Fit thresholds", (
             _num(T, "thresholds.min_fit_to_prepare", "Minimum fit to prepare", 70, hi=100),
             _num(T, "thresholds.min_fit_nonpreferred_location", "Minimum fit outside preferred cities", 85, hi=100),
-            _num(T, "thresholds.boost_industry_bonus", "Boost for preferred industries", 5, hi=100, unit="points"),
+            Field(T, "thresholds.boost_industry_bonus", "number", "Boost for preferred industries", default=5,
+                  min=0, max=100, integer=True, unit="points", **UNUSED),
             _num(T, "thresholds.tier_a_min_fit", "Minimum fit for dream companies", 60, hi=100),
         )),
     )),
@@ -317,7 +328,7 @@ SECTIONS: tuple[Section, ...] = (
         Group("sources", "Sources", (
             _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby"],
                   options=("greenhouse", "lever", "ashby"), strict=True),
-            _tags(C, "searches.keywords", "Search phrases", None, personal=True),
+            _tags(C, "searches.keywords", "Search phrases", None, personal=True, **UNUSED),
         )),
         Group("filters", "Filters", (
             _switch(T, "scout.filters.blocklist", "Skip blocked companies", True),
@@ -354,11 +365,12 @@ SECTIONS: tuple[Section, ...] = (
     )),
     Section("notifications", "Notifications", (
         Group("notify", "Notify me", (
-            Field(P, "notify.on_interview", "select", "Interview invite", default="push", options=("push", "none")),
-            Field(P, "notify.on_offer", "select", "Offer", default="push", options=("push", "none")),
+            Field(P, "notify.on_interview", "select", "Interview invite", default="push", options=("push", "none"),
+                  **UNUSED),
+            Field(P, "notify.on_offer", "select", "Offer", default="push", options=("push", "none"), **UNUSED),
             Field(P, "notify.on_qa_fail", "select", "QA failure", default="action_item_only",
-                  options=("action_item_only", "push", "none")),
-            _switch(P, "notify.daily_digest", "Daily digest", True),
+                  options=("action_item_only", "push", "none"), **UNUSED),
+            _switch(P, "notify.daily_digest", "Daily digest", True, **UNUSED),
         )),
     )),
     Section("runs", "Runs & schedule", (
@@ -484,8 +496,10 @@ SECTIONS: tuple[Section, ...] = (
             _num(Q, "cover_letter.min_words", "Minimum length", 120, lo=1, unit="words"),
             _num(Q, "cover_letter.max_words", "Maximum length", 250, lo=1, unit="words"),
             _num(Q, "cover_letter.hard.company_facts_min", "Company facts at least", 2),
-            _num(Q, "cover_letter.soft.voice_match_min", "Voice match at least", 7, lo=1, hi=10),
-            _num(Q, "cover_letter.soft.specificity_min", "Specificity at least", 7, lo=1, hi=10),
+            Field(Q, "cover_letter.soft.voice_match_min", "number", "Voice match at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
+            Field(Q, "cover_letter.soft.specificity_min", "number", "Specificity at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
         )),
         Group("resume", "Résumé", (
             _num(Q, "resume.soft.keyword_coverage_min", "Keyword coverage at least", 0.6, hi=1, integer=False,
@@ -496,7 +510,8 @@ SECTIONS: tuple[Section, ...] = (
                    "tasked with"]),
         )),
         Group("answers", "Application answers", (
-            _num(Q, "answers.soft.voice_match_min", "Voice match at least", 7, lo=1, hi=10),
+            Field(Q, "answers.soft.voice_match_min", "number", "Voice match at least", default=7, min=1, max=10,
+                  integer=True, **UNUSED),
         )),
         Group("banned", "Banned phrases", (
             _tags(Q, "banned_phrases", "Never write", [

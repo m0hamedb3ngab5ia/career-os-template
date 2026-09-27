@@ -1,0 +1,113 @@
+/* Form inputs from the Settings artboards: 26 px compact fields in grouped rows, right-aligned numbers. */
+.input {
+  height: 26px;
+  padding: 0 8px;
+  border-radius: var(--r-segment);
+  border: 1px solid var(--sep);
+  background: var(--card);
+  color: var(--label);
+  font-size: var(--fs-caption);
+  min-width: 0;
+}
+.input:disabled,
+.input:read-only:not(select) {
+  background: var(--group);
+  color: var(--sec);
+}
+.input[aria-invalid="true"] {
+  border-color: var(--red);
+  box-shadow: 0 0 0 1px var(--red);
+}
+.number {
+  width: 72px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.text {
+  width: 220px;
+}
+.time {
+  width: 92px;
+  font-variant-numeric: tabular-nums;
+}
+.select {
+  appearance: none;
+  -webkit-appearance: none;
+  padding: 0 26px 0 10px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%23666469' stroke-width='1.7' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 9l6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 8px center;
+  cursor: pointer;
+  max-width: 100%;
+}
+.range {
+  width: 100%;
+  accent-color: var(--accent);
+  min-width: 0;
+}
+.withUnit {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+  white-space: nowrap;
+}
+
+/* Tag editor: removable chips and an add field */
+.tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px 2px 2px 8px;
+  border-radius: var(--r-chip);
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  line-height: 18px;
+  white-space: nowrap;
+  background: var(--blue-bg);
+  color: var(--blue);
+}
+.tag[data-tone="gray"] {
+  background: var(--gray-bg);
+  color: var(--gray);
+}
+.tagRemove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 9px;
+  padding: 0;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+.tagAdd {
+  width: 150px;
+}
+.tagEmpty {
+  color: var(--sec);
+  font-size: var(--fs-caption);
+}
+@media (pointer: coarse) {
+  .input {
+    min-height: var(--touch);
+  }
+  .tagRemove {
+    width: var(--touch);
+    height: var(--touch);
+    border-radius: 22px;
+  }
+}

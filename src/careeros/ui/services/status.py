@@ -48,7 +48,10 @@ def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
     open_items = ix.query(f"SELECT * FROM action_items WHERE done = 0 ORDER BY {_PRIO}, created")
     interviews = ix.query("SELECT * FROM jobs WHERE status = 'interview' ORDER BY updated_at DESC")
     window = [j for j in applied if _parse(j["applied_at"]) >= now - timedelta(days=RESPONSE_DAYS)]
-    responded = [j for j in window if j["status"] in RESPONDED]
+    marks = ",".join("?" * len(RESPONDED))
+    heard = {r["job_id"] for r in ix.query(f"SELECT DISTINCT job_id FROM status_history WHERE status IN ({marks})",
+                                           RESPONDED)}
+    responded = [j for j in window if j["status"] in RESPONDED or j["job_id"] in heard]   # even if withdrawn later
     return {
         "applied_week": {"value": len(this_week), "since": ws.isoformat(),
                          "daily_cap": daily_cap(settings.targets or {}, now.astimezone().date()),
@@ -62,7 +65,7 @@ def tiles(ix: Any, settings: Any, now: datetime) -> dict[str, Any]:
                        "rows": [_job_row(j, "interview", j["updated_at"]) for j in interviews[:ROWS]]},
         "response_rate": {"rate": (len(responded) / len(window)) if window else None, "responded": len(responded),
                           "applied": len(window), "days": RESPONSE_DAYS,
-                          "definition": f"applications in the last {RESPONSE_DAYS} days that reached "
+                          "definition": f"applications in the last {RESPONSE_DAYS} days that ever reached "
                                         f"{', '.join(RESPONDED[:-1])} or {RESPONDED[-1]}",
                           "rows": [_job_row(j, j["status"], j["applied_at"]) for j in responded[:ROWS]]},
     }

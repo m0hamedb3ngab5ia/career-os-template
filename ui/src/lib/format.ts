@@ -1,16 +1,27 @@
-// All dates, times and numbers go through Intl (docs/UI.md build checklist). Default locale: the browser's.
+// All dates, times and numbers go through Intl (docs/UI.md build checklist). Default locale: the browser's,
+// unless setAppLocale() picked one (tests pin en-US in src/test/setup.ts so output never depends on the machine).
+
+let appLocale: string | undefined;
+
+export function setAppLocale(locale: string | undefined): void {
+  appLocale = locale;
+}
+
+export function getAppLocale(): string | undefined {
+  return appLocale;
+}
 
 const rtfs = new Map<string, Intl.RelativeTimeFormat>();
 const nfs = new Map<string, Intl.NumberFormat>();
 
-function rtf(locale?: string): Intl.RelativeTimeFormat {
+function rtf(locale = appLocale): Intl.RelativeTimeFormat {
   const k = locale ?? "";
   let f = rtfs.get(k);
   if (!f) rtfs.set(k, (f = new Intl.RelativeTimeFormat(locale, { numeric: "auto" })));
   return f;
 }
 
-function nf(locale?: string): Intl.NumberFormat {
+function nf(locale = appLocale): Intl.NumberFormat {
   const k = locale ?? "";
   let f = nfs.get(k);
   if (!f) nfs.set(k, (f = new Intl.NumberFormat(locale)));
