@@ -1,0 +1,253 @@
+/* Button */
+.button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: var(--control-h);
+  padding: 0 14px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-body);
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.button[data-size="small"] {
+  height: 28px;
+}
+.button[data-variant="primary"] {
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: 0;
+}
+.button[data-variant="secondary"] {
+  background: var(--card);
+  color: var(--label);
+  border: 1px solid var(--sep);
+}
+.button[data-variant="destructive"] {
+  background: var(--card);
+  color: var(--destructive);
+  border: 1px solid var(--sep);
+}
+.button[data-variant="destructive-filled"] {
+  background: var(--destructive);
+  color: var(--destructive-fg);
+  border: 0;
+}
+.spinner {
+  animation: spin 0.9s linear infinite;
+}
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* Switch */
+.switchRow {
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+}
+.switch {
+  position: relative;
+  width: 42px;
+  height: 24px;
+  border-radius: 12px;
+  border: 0;
+  padding: 0;
+  flex-shrink: 0;
+  cursor: pointer;
+  background: var(--switch-off);
+  box-shadow: inset 0 0 0 1px var(--switch-off-edge);
+  transition: background-color 0.15s;
+}
+.switch[aria-checked="true"] {
+  background: var(--switch-on);
+  box-shadow: none;
+}
+.knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  background: #ffffff;
+  box-shadow: var(--shadow-knob);
+  transition: transform 0.15s;
+}
+.switch[aria-checked="true"] .knob {
+  transform: translateX(18px);
+}
+
+/* Segmented control */
+.segmented {
+  display: inline-flex;
+  align-self: flex-start;
+  width: fit-content;
+  gap: 2px;
+  padding: 2px;
+  border-radius: var(--r-control);
+  background: var(--fill);
+}
+.segment {
+  height: 26px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: var(--r-segment);
+  background: transparent;
+  color: var(--label);
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  cursor: pointer;
+}
+.segment[aria-checked="true"] {
+  background: var(--card);
+  box-shadow: var(--shadow-card);
+  font-weight: 600;
+}
+
+/* Popover */
+.popover {
+  position: absolute;
+  z-index: 20;
+  width: 380px;
+  max-width: calc(100vw - 32px);
+  padding: var(--space-4);
+  border-radius: var(--r-card);
+  background: var(--card);
+  color: var(--label);
+  border: 1px solid var(--sep);
+  box-shadow: var(--shadow-popover);
+}
+
+/* Confirm panel */
+.confirm {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--red-bg);
+  color: var(--label);
+}
+.confirmQuestion {
+  flex-grow: 1;
+}
+
+/* Mark done */
+.done {
+  display: flex;
+  width: 28px;
+  height: 28px;
+  padding: 4px;
+  border: 0;
+  border-radius: 14px;
+  background: transparent;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.doneRing {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 10px;
+  border: 1.5px solid var(--done-ring);
+  color: var(--accent-fg);
+}
+.done[aria-checked="true"] .doneRing {
+  border: 0;
+  background: var(--accent);
+}
+@media (pointer: coarse) {
+  /* 44 pt touch targets (HIG) */
+  .button,
+  .switchRow,
+  .segment,
+  .toastAction {
+    min-height: var(--touch);
+  }
+  .toastAction {
+    min-width: var(--touch);
+  }
+  .done {
+    width: var(--touch);
+    height: var(--touch);
+    padding: 12px;
+    border-radius: 22px;
+  }
+}
+
+/* External link */
+.external {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+
+/* Empty state */
+.empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--sec);
+}
+.emptyTitle {
+  margin: 0;
+  font-size: var(--fs-h2);
+  font-weight: 600;
+  color: var(--label);
+  text-wrap: balance;
+}
+.emptyBody {
+  margin: 0;
+  max-width: 44ch;
+}
+
+/* Toast */
+.toastRegion {
+  position: fixed;
+  left: 50%;
+  bottom: calc(24px + env(safe-area-inset-bottom));
+  transform: translateX(-50%);
+  z-index: 50;
+  width: min(460px, calc(100vw - 32px));
+  pointer-events: none;
+}
+.toast {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--toast-bg);
+  color: var(--toast-fg);
+  box-shadow: var(--shadow-tooltip);
+  pointer-events: auto;
+  animation: rise 0.18s ease-out;
+}
+.toastMessage {
+  flex-grow: 1;
+}
+.toastAction {
+  border: 0;
+  background: transparent;
+  color: var(--toast-link);
+  font-weight: 600;
+  padding: 0;
+  cursor: pointer;
+}
+@keyframes rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+}

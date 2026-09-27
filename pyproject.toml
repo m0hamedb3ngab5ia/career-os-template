@@ -11,7 +11,8 @@ dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl", "ruamel.yaml>=0
 
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]
-test = ["pytest", "pytest-cov", "jinja2", "pypdf"]
+test = ["pytest", "pytest-cov", "jinja2", "pypdf", "httpx"]
+ui = ["fastapi", "uvicorn", "watchfiles"]
 
 [project.scripts]
 careeros = "careeros.cli:main"
@@ -21,6 +22,10 @@ package-dir = {"" = "src"}
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.package-data]
+# The built web UI (ui/ -> npm run build); committed so `careeros ui` needs no Node.
+careeros = ["ui/static/**/*"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
