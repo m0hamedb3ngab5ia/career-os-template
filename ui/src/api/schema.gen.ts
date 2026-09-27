@@ -252,6 +252,31 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /** ActionCounts */
+    ActionCounts: {
+      /** Done */
+      done: number;
+      /** Open */
+      open: number;
+      /** Today */
+      today: number;
+    };
+    /** ActionGroup */
+    ActionGroup: {
+      /** Count */
+      count: number;
+      /** Items */
+      items: components["schemas"]["ActionItem"][];
+      /** Key */
+      key: string;
+    };
+    /** ActionHead */
+    ActionHead: {
+      /** Overdue */
+      overdue: number;
+      /** Soon */
+      soon: number;
+    };
     /** ActionHint */
     ActionHint: {
       /** Due */
@@ -331,6 +356,23 @@ export interface components {
       /** What */
       what: string | null;
     };
+    /** ActionsPage */
+    ActionsPage: {
+      counts: components["schemas"]["ActionCounts"];
+      /** Group */
+      group: string;
+      /** Groups */
+      groups: components["schemas"]["ActionGroup"][];
+      head: components["schemas"]["ActionHead"];
+      /** More Done */
+      more_done: number;
+      /** Now */
+      now: string;
+      /** Sort */
+      sort: string;
+      /** Tab */
+      tab: string;
+    };
     /** ActivityEntry */
     ActivityEntry: {
       /** At */
@@ -339,6 +381,36 @@ export interface components {
       component: string;
       /** Message */
       message: string;
+    };
+    /**
+     * Advice
+     * @description GET /api/advise: storage and run advice plus every recommendation (storage first).
+     */
+    Advice: {
+      /** Recommendations */
+      recommendations: components["schemas"]["Recommendation"][];
+      runs: components["schemas"]["RunsAdvice"];
+      storage: components["schemas"]["StorageAdvice"];
+    };
+    /** AdvisorConfig */
+    AdvisorConfig: {
+      advisor: components["schemas"]["AdvisorLimits"];
+      storage: components["schemas"]["StorageLimits"];
+    };
+    /** AdvisorLimits */
+    AdvisorLimits: {
+      /** Advise After Days */
+      advise_after_days: number;
+      /** Failure Rate Warn */
+      failure_rate_warn: number;
+      /** Min Runs */
+      min_runs: number;
+      /** Prune Idle Weeks */
+      prune_idle_weeks: number;
+      /** Usage Limit Stops */
+      usage_limit_stops: number;
+      /** Window Days */
+      window_days: number;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -350,6 +422,47 @@ export interface components {
       since: string;
       /** Value */
       value: number;
+    };
+    /** Attempt */
+    Attempt: {
+      /** Company */
+      company?: string | null;
+      /** Detail */
+      detail?: string;
+      /** Duration S */
+      duration_s?: number | null;
+      /** Ended At */
+      ended_at?: string | null;
+      /** Headless */
+      headless?: {
+        [key: string]: unknown;
+      };
+      /** Job Id */
+      job_id: string | null;
+      /** N */
+      n: number;
+      /** Outcome */
+      outcome: string;
+      /** Rank */
+      rank?: number | null;
+      /** Result */
+      result?: {
+        [key: string]: unknown;
+      } | null;
+      /** Run Id */
+      run_id?: string;
+      /** Session Id */
+      session_id?: string | null;
+      /** Stage */
+      stage?: string;
+      /** Started At */
+      started_at?: string | null;
+      /** Stream */
+      stream?: string;
+      /** Title */
+      title?: string | null;
+      /** Why */
+      why?: string | null;
     };
     /** Board */
     Board: {
@@ -405,6 +518,17 @@ export interface components {
       /** Updated At */
       updated_at: string | null;
     };
+    /** CatchUp */
+    CatchUp: {
+      /** Created At */
+      created_at: string;
+      /** Kinds */
+      kinds: {
+        [key: string]: components["schemas"]["CatchUpKind"];
+      };
+      /** Updated At */
+      updated_at?: string;
+    };
     /** CatchUpBody */
     CatchUpBody: {
       /**
@@ -412,6 +536,15 @@ export interface components {
        * @default false
        */
       dismiss?: boolean;
+    };
+    /** CatchUpKind */
+    CatchUpKind: {
+      /** First Missed */
+      first_missed: string | null;
+      /** Last Missed */
+      last_missed?: string | null;
+      /** Slots */
+      slots: number;
     };
     /** Changes */
     Changes: {
@@ -479,6 +612,59 @@ export interface components {
       /** Role */
       role: string;
     };
+    /** ContactRow */
+    ContactRow: {
+      /** Company */
+      company: string | null;
+      draft: components["schemas"]["InboxDraft"] | null;
+      /** Email */
+      email: string | null;
+      /** Email Confidence */
+      email_confidence: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Job Status */
+      job_status: string | null;
+      /** Job Title */
+      job_title: string | null;
+      /** Linkedin */
+      linkedin: string | null;
+      /** Linkedin Degree */
+      linkedin_degree: number | null;
+      /** Manual */
+      manual: boolean;
+      /** Manual Detail */
+      manual_detail: string | null;
+      /** Manual Reason */
+      manual_reason: string | null;
+      /** Mode */
+      mode: string;
+      /** Mutuals */
+      mutuals: number | null;
+      /** Name */
+      name: string;
+      /** Replied */
+      replied: string | null;
+      /** Sent */
+      sent: boolean;
+      /** Title */
+      title: string;
+    };
+    /** ContactsPage */
+    ContactsPage: {
+      /** Items */
+      items: components["schemas"]["ContactRow"][];
+      /** Linkedin Drafts */
+      linkedin_drafts: number;
+      policy: components["schemas"]["ContactsPolicy"];
+    };
+    /** ContactsPolicy */
+    ContactsPolicy: {
+      /** Manual If Connected */
+      manual_if_connected: boolean;
+      /** Manual If Mutuals */
+      manual_if_mutuals: boolean;
+    };
     /** Counts */
     Counts: {
       /** Action Items Open */
@@ -489,6 +675,67 @@ export interface components {
       inbox: number;
       /** Jobs */
       jobs: number;
+    };
+    /** CurrentRun */
+    CurrentRun: {
+      /** Attempts */
+      attempts: components["schemas"]["Attempt"][];
+      budget?: components["schemas"]["RunBudget"];
+      cap: components["schemas"]["RunCap"] | null;
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters?: {
+        [key: string]: number;
+      };
+      /** Current Job */
+      current_job: string | null;
+      /** Detail */
+      detail?: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s?: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Holder */
+      holder: {
+        [key: string]: unknown;
+      } | null;
+      /** Id */
+      id: string;
+      /** Jobs */
+      jobs: components["schemas"]["RunJobRow"][];
+      /** Kind */
+      kind: string;
+      /** Pid */
+      pid?: number | null;
+      /** Scheduled */
+      scheduled: boolean;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      used: components["schemas"]["RunUsed"];
+      /** Warnings */
+      warnings?: string[];
+    };
+    /** DiskUsage */
+    DiskUsage: {
+      /** Free */
+      free: number;
+      /** Free Pct */
+      free_pct: number;
+      /** Total */
+      total: number;
     };
     /** Due */
     Due: {
@@ -523,6 +770,49 @@ export interface components {
        */
       tier?: string[];
     };
+    /** FieldSchema */
+    FieldSchema: {
+      /** Control */
+      control: string;
+      /** Default */
+      default: unknown;
+      /** File */
+      file: string;
+      /** Help */
+      help: string;
+      /** Id */
+      id: string;
+      /** Integer */
+      integer: boolean;
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
+      /** Locked */
+      locked: boolean;
+      /** Max */
+      max: number | null;
+      /** Min */
+      min: number | null;
+      /** Note */
+      note: string;
+      /** Nullable */
+      nullable: boolean;
+      /** Options */
+      options: unknown[];
+      /** Personal */
+      personal: boolean;
+      /** Readonly */
+      readonly: boolean;
+      /** Recommended */
+      recommended: boolean;
+      /** Step */
+      step: number | null;
+      /** Strict Options */
+      strict_options: boolean;
+      /** Unit */
+      unit: string;
+    };
     /** FileEntry */
     FileEntry: {
       /** Modified */
@@ -556,15 +846,193 @@ export interface components {
        */
       reason?: string;
     };
+    /** GroupSchema */
+    GroupSchema: {
+      /** Help */
+      help: string;
+      /** Id */
+      id: string;
+      /** Items */
+      items: (components["schemas"]["PolicyItem"] | components["schemas"]["FieldSchema"])[];
+      /** Title */
+      title: string;
+    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
       detail?: components["schemas"]["ValidationError"][];
     };
+    /** HistoryPage */
+    HistoryPage: {
+      /** Next Cursor */
+      next_cursor: string | null;
+      /** Runs */
+      runs: components["schemas"]["RunRecord"][];
+    };
     /** Ids */
     Ids: {
       /** Ids */
       ids: string[];
+    };
+    /** InboxAvailability */
+    InboxAvailability: {
+      /** Available */
+      available: boolean;
+      /** Reason */
+      reason: string;
+    };
+    /** InboxDetail */
+    InboxDetail: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Days Since Applied */
+      days_since_applied: number | null;
+      /** Drafts */
+      drafts: components["schemas"]["InboxDraft"][];
+      /** Job Id */
+      job_id: string;
+      last_email: components["schemas"]["InboxEmail"] | null;
+      next: components["schemas"]["InboxNext"];
+      /** Placeholders */
+      placeholders: number;
+      /** Primary */
+      primary: number | null;
+      sending: components["schemas"]["InboxAvailability"];
+      /** Status */
+      status: string;
+      sync: components["schemas"]["InboxAvailability"];
+      /** Thread */
+      thread: components["schemas"]["InboxThreadEvent"][];
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /** InboxDraft */
+    InboxDraft: {
+      /** Body */
+      body: string;
+      /** Channel */
+      channel: string;
+      /** Contact */
+      contact: string;
+      /** Due */
+      due: string | null;
+      /** Followup */
+      followup: boolean;
+      /** Kind */
+      kind: string;
+      /** Linkedin Message */
+      linkedin_message: string | null;
+      /** Linkedin Note */
+      linkedin_note: string | null;
+      /** Manual Reason */
+      manual_reason: string | null;
+      /** Manual Tailor */
+      manual_tailor: boolean;
+      /** Mode */
+      mode: string;
+      /** Placeholders */
+      placeholders: string[];
+      /** Role */
+      role: string;
+      /** Sent */
+      sent: boolean;
+      /** Sent By */
+      sent_by: string | null;
+      /** Sent Date */
+      sent_date: string | null;
+      /** Subject */
+      subject: string | null;
+      /** To */
+      to: string | null;
+      /** Verified */
+      verified: boolean;
+      /** Words */
+      words: number;
+    };
+    /** InboxEmail */
+    InboxEmail: {
+      /** At */
+      at: string | null;
+      /** Class */
+      class: string;
+      /** From */
+      from: string;
+      /** Link */
+      link: string | null;
+      /** Status */
+      status: string;
+    };
+    /** InboxNext */
+    InboxNext: {
+      /** Due */
+      due: string | null;
+      /** Kind */
+      kind: string;
+      /** Mode */
+      mode: string;
+    };
+    /** InboxPage */
+    InboxPage: {
+      /** Items */
+      items: components["schemas"]["InboxRow"][];
+      /** Last Sync */
+      last_sync: string | null;
+      sending: components["schemas"]["InboxAvailability"];
+      sync: components["schemas"]["InboxAvailability"];
+    };
+    /** InboxRow */
+    InboxRow: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Days Since Applied */
+      days_since_applied: number | null;
+      /** Drafts */
+      drafts: number;
+      /** Job Id */
+      job_id: string;
+      last_email: components["schemas"]["InboxEmail"] | null;
+      next: components["schemas"]["InboxNext"];
+      /** Placeholders */
+      placeholders: number;
+      /** Status */
+      status: string;
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+    };
+    /** InboxThreadEvent */
+    InboxThreadEvent: {
+      /** At */
+      at: string;
+      /** Class */
+      class?: string;
+      /** Contact */
+      contact?: string;
+      /** From */
+      from?: string;
+      /** Kind */
+      kind?: string;
+      /** Link */
+      link?: string | null;
+      /** Note */
+      note?: string | null;
+      /** Sent By */
+      sent_by?: string | null;
+      /** Status */
+      status?: string | null;
+      /** Type */
+      type: string;
     };
     /** IndexState */
     IndexState: {
@@ -706,6 +1174,16 @@ export interface components {
       updated_at: string | null;
       /** Url */
       url: string | null;
+    };
+    /** JobStep */
+    JobStep: {
+      /** Name */
+      name: string;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "done" | "active" | "pending" | "skipped";
     };
     /** JobsPage */
     JobsPage: {
@@ -871,6 +1349,28 @@ export interface components {
       /** Columns */
       columns: components["schemas"]["PipelineColumnCount"][];
     };
+    /**
+     * PolicyItem
+     * @description A locked row: a rule the code enforces whatever the config says.
+     */
+    PolicyItem: {
+      /**
+       * Control
+       * @constant
+       */
+      control: "policy";
+      /** Label */
+      label: string;
+      /**
+       * Locked
+       * @constant
+       */
+      locked: true;
+      /** Value */
+      value: string;
+      /** Why */
+      why: string;
+    };
     /** PrepareQueue */
     PrepareQueue: {
       /** Error */
@@ -905,6 +1405,13 @@ export interface components {
         [key: string]: unknown;
       };
     };
+    /** Projection */
+    Projection: {
+      /** 30D */
+      "30d": number;
+      /** 90D */
+      "90d": number;
+    };
     /** PruneBody */
     PruneBody: {
       /**
@@ -920,6 +1427,38 @@ export interface components {
        * @constant
        */
       kind: "qa_failed";
+    };
+    /** QuietHours */
+    QuietHours: {
+      /** End */
+      end: string;
+      /** Start */
+      start: string;
+    };
+    /** Recommendation */
+    Recommendation: {
+      change: components["schemas"]["RecommendationChange"] | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Severity */
+      severity: string;
+      /** Title */
+      title: string;
+      /** Why */
+      why: string;
+    };
+    /** RecommendationChange */
+    RecommendationChange: {
+      /** File */
+      file: string;
+      /** From */
+      from: unknown;
+      /** Path */
+      path: string;
+      /** To */
+      to: unknown;
     };
     /** Registry */
     Registry: {
@@ -958,6 +1497,168 @@ export interface components {
       /** Rows */
       rows: components["schemas"]["TileRow"][];
     };
+    /** RunBudget */
+    RunBudget: {
+      /** Max Jobs */
+      max_jobs?: number | null;
+      /** Max Minutes */
+      max_minutes?: number | null;
+      /** Preset */
+      preset?: string | null;
+    };
+    /** RunCap */
+    RunCap: {
+      /** Applied */
+      applied: number;
+      /** Base */
+      base: number;
+      /** Cap */
+      cap: number;
+      /** Date */
+      date: string;
+      /** Multiplier */
+      multiplier: number;
+      /** Reached */
+      reached: boolean;
+      /** Remaining */
+      remaining: number;
+    };
+    /** RunDetail */
+    RunDetail: {
+      /** Attempts */
+      attempts: components["schemas"]["Attempt"][];
+      budget?: components["schemas"]["RunBudget"];
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters?: {
+        [key: string]: number;
+      };
+      /** Detail */
+      detail?: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s?: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Log */
+      log: string;
+      /** Pid */
+      pid?: number | null;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      /** Warnings */
+      warnings?: string[];
+    };
+    /** RunJobRow */
+    RunJobRow: {
+      /** Company */
+      company: string | null;
+      /** Detail */
+      detail: string;
+      /** Duration S */
+      duration_s: number | null;
+      /** Job Id */
+      job_id: string;
+      /** Outcome */
+      outcome: string | null;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "done" | "failed" | "active" | "queued";
+      /** Steps */
+      steps: components["schemas"]["JobStep"][];
+      /** Title */
+      title: string | null;
+    };
+    /** RunMetrics */
+    RunMetrics: {
+      /** Attempts */
+      attempts: number;
+      /** Avg Job S */
+      avg_job_s: number;
+      /** Budget Used */
+      budget_used: number;
+      /** Failed */
+      failed: number;
+      /** Failure Rate */
+      failure_rate: number;
+      /** P90 Job S */
+      p90_job_s: number;
+      /** Prepare Share */
+      prepare_share?: number | null;
+      /** Runs */
+      runs: number;
+      /** Stops */
+      stops: {
+        [key: string]: number;
+      };
+    };
+    /** RunPause */
+    RunPause: {
+      /** Paused At */
+      paused_at: string;
+      /** Reason */
+      reason: string;
+      /** Until */
+      until: string | null;
+    };
+    /** RunRecord */
+    RunRecord: {
+      /** Attempts */
+      attempts?: number[];
+      budget?: components["schemas"]["RunBudget"];
+      /** Cmd */
+      cmd?: string[];
+      /** Counters */
+      counters?: {
+        [key: string]: number;
+      };
+      /** Detail */
+      detail?: string;
+      /** Dry Run */
+      dry_run?: boolean;
+      /** Duration S */
+      duration_s?: number | null;
+      /** Ended At */
+      ended_at: string | null;
+      /** Id */
+      id: string;
+      /** Kind */
+      kind: string;
+      /** Pid */
+      pid?: number | null;
+      /** Started At */
+      started_at: string | null;
+      /** State */
+      state: string;
+      /** Status */
+      status: string;
+      /** Step */
+      step?: boolean;
+      /** Stop Reason */
+      stop_reason: string | null;
+      /** Trigger */
+      trigger: string;
+      /** Warnings */
+      warnings?: string[];
+    };
     /** RunRow */
     RunRow: {
       /** Attempted */
@@ -987,6 +1688,30 @@ export interface components {
       /** Trigger */
       trigger: string | null;
     };
+    /** RunUsed */
+    RunUsed: {
+      /** Jobs */
+      jobs: number;
+      /** Max Jobs */
+      max_jobs: number | null;
+      /** Max Minutes */
+      max_minutes: number | null;
+      /** Minutes */
+      minutes: number | null;
+    };
+    /** RunsAdvice */
+    RunsAdvice: {
+      /** Metrics */
+      metrics: {
+        [key: string]: components["schemas"]["RunMetrics"];
+      };
+      /** Min Runs */
+      min_runs: number;
+      /** Ready */
+      ready: boolean;
+      /** Recommendations */
+      recommendations: components["schemas"]["Recommendation"][];
+    };
     /** SafetyHint */
     SafetyHint: {
       /**
@@ -996,6 +1721,47 @@ export interface components {
       kind: "safety";
       /** Text */
       text: string;
+    };
+    /** Schedule */
+    Schedule: {
+      catch_up: components["schemas"]["CatchUp"] | null;
+      /** Inbox Ready */
+      inbox_ready: boolean;
+      /** Installed */
+      installed: boolean;
+      /** Jobs */
+      jobs: components["schemas"]["ScheduleJob"][];
+      /** Label */
+      label: string | null;
+      /** Last Tick */
+      last_tick: string | null;
+      /** Loaded */
+      loaded: boolean;
+      paused: components["schemas"]["RunPause"] | null;
+      quiet_hours: components["schemas"]["QuietHours"] | null;
+      /** Tick Minutes */
+      tick_minutes: number;
+    };
+    /** ScheduleJob */
+    ScheduleJob: {
+      /** At */
+      at: string[];
+      /** Claude */
+      claude: boolean;
+      /** Enabled */
+      enabled: boolean;
+      /** Every Minutes */
+      every_minutes: number | null;
+      /** Kind */
+      kind: string;
+      /** Last Run */
+      last_run: string | null;
+      /** Last Status */
+      last_status: string | null;
+      /** Next */
+      next: string | null;
+      /** Preset */
+      preset: string | null;
     };
     /** ScheduleState */
     ScheduleState: {
@@ -1007,6 +1773,57 @@ export interface components {
       next: {
         [key: string]: string | null;
       };
+    };
+    /** SectionData */
+    SectionData: {
+      /** Defaults */
+      defaults: {
+        [key: string]: unknown;
+      };
+      /** Files */
+      files: {
+        [key: string]: string;
+      };
+      section: components["schemas"]["SectionSchema"];
+      /** Values */
+      values: {
+        [key: string]: unknown;
+      };
+      /** Version */
+      version: string;
+      /** Warnings */
+      warnings: {
+        [key: string]: components["schemas"]["UnquotedWarning"];
+      };
+    };
+    /** SectionList */
+    SectionList: {
+      /** Sections */
+      sections: components["schemas"]["SectionSummary"][];
+    };
+    /** SectionSchema */
+    SectionSchema: {
+      /** Files */
+      files: string[];
+      /** Groups */
+      groups: components["schemas"]["GroupSchema"][];
+      /** Help */
+      help: string;
+      /** Id */
+      id: string;
+      /** Title */
+      title: string;
+    };
+    /** SectionSummary */
+    SectionSummary: {
+      /** Files */
+      files: string[];
+      /** Help */
+      help: string;
+      /** Id */
+      id: string;
+      /** Title */
+      title: string;
     };
     /** StartBody */
     StartBody: {
@@ -1050,6 +1867,68 @@ export interface components {
       note?: string | null;
       /** Status */
       status: string;
+    };
+    /** StorageAdvice */
+    StorageAdvice: {
+      /** Budget */
+      budget?: number;
+      /** Current */
+      current?: number;
+      /** Days */
+      days: number;
+      /** Need Days */
+      need_days: number;
+      projection?: components["schemas"]["Projection"];
+      /** Rate Per Day */
+      rate_per_day?: number;
+      /** Ready */
+      ready: boolean;
+      /** Recommendations */
+      recommendations: components["schemas"]["Recommendation"][];
+    };
+    /** StorageLimits */
+    StorageLimits: {
+      /** Budget Mb */
+      budget_mb: number;
+      /** Disk Free Warn Pct */
+      disk_free_warn_pct: number;
+      /** Warn At Pct */
+      warn_at_pct: number;
+    };
+    /**
+     * StorageSnapshot
+     * @description One line of the snapshots log (appended after each run / prune; older lines may lack keys).
+     */
+    StorageSnapshot: {
+      /** At */
+      at?: string;
+      /** Bytes */
+      bytes?: {
+        [key: string]: number;
+      };
+      disk?: components["schemas"]["DiskUsage"];
+      /** Pruned Bytes */
+      pruned_bytes?: number | null;
+      /** Total */
+      total: number;
+      /** Trigger */
+      trigger?: string;
+    };
+    /**
+     * StorageView
+     * @description GET /api/storage: bytes per category, the disk, the snapshot history and the advisor config.
+     */
+    StorageView: {
+      /** Bytes */
+      bytes: {
+        [key: string]: number;
+      };
+      config: components["schemas"]["AdvisorConfig"];
+      disk: components["schemas"]["DiskUsage"];
+      /** Snapshots */
+      snapshots: components["schemas"]["StorageSnapshot"][];
+      /** Total */
+      total: number;
     };
     /** TierAHint */
     TierAHint: {
@@ -1117,6 +1996,13 @@ export interface components {
         [key: string]: unknown;
       } | null;
     };
+    /** UnquotedWarning */
+    UnquotedWarning: {
+      /** Intended */
+      intended: unknown;
+      /** Message */
+      message: string;
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -1181,9 +2067,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["ActionsPage"];
         };
       };
       /** @description Validation Error */
@@ -1455,9 +2339,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Advice"];
         };
       };
     };
@@ -1492,9 +2374,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["ContactsPage"];
         };
       };
     };
@@ -1559,9 +2439,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["InboxPage"];
         };
       };
     };
@@ -1577,9 +2455,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["InboxDetail"];
         };
       };
       /** @description Validation Error */
@@ -2034,9 +2910,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["HistoryPage"];
         };
       };
       /** @description Validation Error */
@@ -2128,9 +3002,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          } | null;
+          "application/json": components["schemas"]["CurrentRun"] | null;
         };
       };
     };
@@ -2234,9 +3106,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["RunDetail"];
         };
       };
       /** @description Validation Error */
@@ -2279,9 +3149,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Schedule"];
         };
       };
     };
@@ -2316,9 +3184,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["SectionList"];
         };
       };
     };
@@ -2358,9 +3224,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["SectionData"];
         };
       };
       /** @description Validation Error */
@@ -2467,9 +3331,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["StorageView"];
         };
       };
     };

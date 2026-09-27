@@ -28,6 +28,57 @@ _HTTP = re.compile(r"^https?://[^\s]+$", re.I)
 MAX_WHAT = 500
 
 
+# Response shapes (GET /api/actions): FastAPI turns these into the OpenAPI schema behind ui/src/api/schema.gen.ts.
+class ActionItem(TypedDict):
+    """One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape)."""
+    id: str
+    created: str | None
+    job_id: str | None
+    company: str
+    role: str
+    type: str
+    what: str
+    link: str
+    priority: str
+    needs: str
+    done: bool
+    done_date: str | None
+    due: str | None
+    due_date_only: bool
+    due_reason: str | None
+    bucket: str
+    level: str
+    scam_actions: bool
+
+
+class ActionGroup(TypedDict):
+    key: str
+    count: int
+    items: list[ActionItem]
+
+
+class ActionCounts(TypedDict):
+    open: int
+    today: int
+    done: int
+
+
+class ActionHead(TypedDict):
+    overdue: int
+    soon: int
+
+
+class ActionsPage(TypedDict):
+    tab: str
+    group: str
+    sort: str
+    counts: ActionCounts
+    head: ActionHead
+    groups: list[ActionGroup]
+    more_done: int
+    now: str
+
+
 # --- time -------------------------------------------------------------------------------------------------------
 
 def resolve_tz(name: str | None) -> tzinfo:
@@ -86,28 +137,6 @@ def due_level(due: str | None, now: datetime, tz: tzinfo, soon_hours: int) -> st
 
 # --- the list ---------------------------------------------------------------------------------------------------
 
-class ActionItem(TypedDict):
-    """One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape)."""
-    id: str
-    created: str | None
-    job_id: str | None
-    company: str
-    role: str
-    type: str
-    what: str
-    link: str
-    priority: str
-    needs: str
-    done: bool
-    done_date: str | None
-    due: str | None
-    due_date_only: bool
-    due_reason: str | None
-    bucket: str
-    level: str
-    scam_actions: bool
-
-
 def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> ActionItem:
     at = due_at(r.get("due"), tz)
     return {
@@ -151,7 +180,7 @@ def _group_order(group: str, present: Iterable[str]) -> list[str]:
 
 
 def build_view(rows: list[dict[str, Any]], *, tab: str, group: str, sort: str, now: datetime, tz: tzinfo,
-               soon_hours: int, done_limit: int | None = None) -> dict[str, Any]:
+               soon_hours: int, done_limit: int | None = None) -> ActionsPage:
     if tab not in TABS:
         raise ValueError(f"tab must be one of {', '.join(TABS)}, got {tab!r}")
     if group not in GROUPS:
@@ -185,7 +214,7 @@ def build_view(rows: list[dict[str, Any]], *, tab: str, group: str, sort: str, n
 
 
 def list_actions(ix: Any, *, tab: str, group: str, sort: str, now: datetime, tz: tzinfo, soon_hours: int,
-                 done_limit: int) -> dict[str, Any]:
+                 done_limit: int) -> ActionsPage:
     rows = ix.query("SELECT * FROM action_items")
     return build_view(rows, tab=tab, group=group, sort=sort, now=now, tz=tz, soon_hours=soon_hours,
                       done_limit=done_limit)

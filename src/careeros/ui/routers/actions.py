@@ -55,7 +55,7 @@ def _run(fn, *args: Any) -> Any:  # noqa: ANN001
 
 @router.get("/actions")
 def list_actions(tab: str = "open", group: str = "due", sort: str = "soonest", tz: str | None = None,
-                 c=Depends(ctx)) -> dict[str, Any]:
+                 c=Depends(ctx)) -> svc.ActionsPage:
     from careeros.ui.config import load_ui_config
 
     ui = load_ui_config(c.settings)

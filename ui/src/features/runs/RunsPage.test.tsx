@@ -18,8 +18,11 @@ const routes = [
 ];
 
 function current(over: Partial<CurrentRun> = {}): CurrentRun {
-  return {
+  const base: CurrentRun = {
     id: "20260926-020000-prepare-ab12",
+    detail: "",
+    attempts: [],
+    holder: null,
     kind: "prepare",
     trigger: "manual",
     budget: { preset: "medium", max_jobs: 5, max_minutes: 90 },
@@ -33,7 +36,7 @@ function current(over: Partial<CurrentRun> = {}): CurrentRun {
     scheduled: false,
     current_job: "b2",
     used: { jobs: 1, max_jobs: 5, minutes: 21, max_minutes: 90 },
-    cap: { cap: 15, applied: 0, remaining: 15, reached: false },
+    cap: { date: "2026-09-25", cap: 15, base: 15, multiplier: 1, applied: 0, remaining: 15, reached: false },
     jobs: [
       {
         job_id: "a1",
@@ -71,24 +74,26 @@ function current(over: Partial<CurrentRun> = {}): CurrentRun {
         steps: ["Score", "Tailor", "Cover", "QA"].map((name) => ({ name, state: "pending" as const })),
       },
     ],
-    ...over,
   };
+  return Object.assign(base, over);
 }
 
 function run(over: Partial<RunRecord>): RunRecord {
-  return {
+  const base: RunRecord = {
     id: "20260925-010000-score-aaaa",
     kind: "score",
     trigger: "schedule",
+    budget: { preset: "small", max_jobs: 3, max_minutes: 30 },
     status: "done",
     state: "done",
     stop_reason: "completed",
+    detail: "",
     started_at: "2026-09-25T01:00:00Z",
     ended_at: "2026-09-25T01:07:00Z",
     duration_s: 420,
     counters: { attempted: 3, ok: 3 },
-    ...over,
   };
+  return Object.assign(base, over);
 }
 
 let restoreLayout: () => void;

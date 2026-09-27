@@ -71,7 +71,7 @@ class CatchUpBody(BaseModel):
 @router.get("/runs")
 def history(kind: str | None = None, cursor: str | None = None,
             limit: int | None = Query(default=None, ge=1, le=MAX_LIMIT), c=Depends(ctx),
-            rc: RunControl = Depends(run_control)) -> dict[str, Any]:
+            rc: RunControl = Depends(run_control)) -> view.HistoryPage:
     from careeros.ui.config import load_ui_config
 
     with refusals():
@@ -79,7 +79,7 @@ def history(kind: str | None = None, cursor: str | None = None,
 
 
 @router.get("/runs/current")
-def current(rc: RunControl = Depends(run_control)) -> dict[str, Any] | None:
+def current(rc: RunControl = Depends(run_control)) -> view.CurrentRun | None:
     return view.current_view(rc)
 
 
@@ -91,7 +91,7 @@ def queue(kind: str, limit: int = Query(default=QUEUE_LIMIT, ge=1, le=MAX_LIMIT)
 
 
 @router.get("/runs/{run_id}")
-def detail(run_id: str, rc: RunControl = Depends(run_control)) -> dict[str, Any]:
+def detail(run_id: str, rc: RunControl = Depends(run_control)) -> view.RunDetail:
     with refusals():
         d = view.detail_view(rc, run_id)
     if d is None:
@@ -202,7 +202,7 @@ def catch_up(body: CatchUpBody | None = None, rc: RunControl = Depends(run_contr
 # --- scheduler -------------------------------------------------------------------------------------------------
 
 @router.get("/schedule")
-def schedule(rc: RunControl = Depends(run_control)) -> dict[str, Any]:
+def schedule(rc: RunControl = Depends(run_control)) -> view.Schedule:
     return view.schedule_view(rc)
 
 

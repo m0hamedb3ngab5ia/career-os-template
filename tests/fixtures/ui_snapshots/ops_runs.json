@@ -1,0 +1,51 @@
+{
+  "next_cursor": null,
+  "runs": [
+    {
+      "attempts": [],
+      "budget": {
+        "max_jobs": 2,
+        "max_minutes": 30,
+        "preset": "small"
+      },
+      "counters": {
+        "attempted": 1,
+        "ok": 0
+      },
+      "detail": "",
+      "duration_s": 420,
+      "ended_at": "2026-09-24T12:07:00+00:00",
+      "id": "<id>",
+      "kind": "prepare",
+      "pid": "<pid>",
+      "started_at": "2026-09-24T12:00:00+00:00",
+      "state": "done",
+      "status": "done",
+      "stop_reason": "usage_limit",
+      "trigger": "schedule"
+    },
+    {
+      "attempts": [],
+      "budget": {
+        "max_jobs": 2,
+        "max_minutes": 30,
+        "preset": "small"
+      },
+      "counters": {
+        "attempted": 1,
+        "ok": 1
+      },
+      "detail": "",
+      "duration_s": 420,
+      "ended_at": "2026-09-24T10:07:00+00:00",
+      "id": "<id>",
+      "kind": "score",
+      "pid": "<pid>",
+      "started_at": "2026-09-24T10:00:00+00:00",
+      "state": "done",
+      "status": "done",
+      "stop_reason": "completed",
+      "trigger": "schedule"
+    }
+  ]
+}

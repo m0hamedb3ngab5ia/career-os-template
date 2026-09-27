@@ -15,7 +15,7 @@ import type { RunRecord } from "./types";
 export const HISTORY_KINDS = ["", "scout", "score", "prepare", "inbox_sync", "tracker", "prune"] as const;
 
 /** One line under the title: what the run did, then the fix when its stop reason needs you. */
-export function runSummary(run: RunRecord): string {
+export function runSummary(run: Omit<RunRecord, "attempts">): string {
   const c = run.counters ?? {};
   const parts: string[] = [];
   if (run.kind === "score" || run.kind === "prepare") {

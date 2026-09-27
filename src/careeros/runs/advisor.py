@@ -194,7 +194,7 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
                 for r in rs]
         m = {"runs": len(rs), "attempts": attempted, "failed": failed, "avg_job_s": round(sum(durs) / len(durs), 1) if durs else 0,
              "p90_job_s": _p90(durs), "failure_rate": round(failed / attempted, 2) if attempted else 0.0,
-             "budget_used": round(sum(used) / len(used), 2), "stops": dict(Counter(r.get("stop_reason") for r in rs))}
+             "budget_used": round(sum(used) / len(used), 2), "stops": dict(Counter(r.get("stop_reason") or "unknown" for r in rs))}
         if kind == "score":
             oks = [a for a in atts if a.get("outcome") == "ok"]
             m["prepare_share"] = round(sum(1 for a in oks if (a.get("result") or {}).get("decision") == "prepare")

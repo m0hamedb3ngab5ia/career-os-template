@@ -1,0 +1,94 @@
+{
+  "sections": [
+    {
+      "files": [
+        "pipeline"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "General"
+    },
+    {
+      "files": [
+        "targets"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Targets"
+    },
+    {
+      "files": [
+        "pipeline",
+        "targets"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Autonomy"
+    },
+    {
+      "files": [
+        "targets"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Safety"
+    },
+    {
+      "files": [
+        "companies",
+        "targets"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Scout"
+    },
+    {
+      "files": [
+        "companies"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Companies"
+    },
+    {
+      "files": [
+        "pipeline"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Outreach"
+    },
+    {
+      "files": [
+        "pipeline"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Notifications"
+    },
+    {
+      "files": [
+        "pipeline"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Runs & schedule"
+    },
+    {
+      "files": [
+        "pipeline"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Storage & efficiency"
+    },
+    {
+      "files": [
+        "qa"
+      ],
+      "help": "",
+      "id": "<id>",
+      "title": "Quality checks"
+    }
+  ]
+}

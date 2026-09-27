@@ -1,0 +1,144 @@
+{
+  "applied_at": "2026-09-12T15:00:00+00:00",
+  "company": "Stark Industries",
+  "days_since_applied": 12,
+  "drafts": [
+    {
+      "body": "Hi Pat,\n\nI applied to the Software Engineer role on your team.",
+      "channel": "linkedin",
+      "contact": "Pat Rivers",
+      "due": null,
+      "followup": false,
+      "kind": "cold_email",
+      "linkedin_message": "Hi Pat,\n\nI applied to the Software Engineer role on your team.",
+      "linkedin_note": "Hi Pat, good to see the team growing.",
+      "manual_reason": "LINKEDIN_CONNECTED",
+      "manual_tailor": true,
+      "mode": "manual",
+      "placeholders": [],
+      "role": "hiring_manager",
+      "sent": false,
+      "sent_by": null,
+      "sent_date": null,
+      "subject": null,
+      "to": "pat@example.com",
+      "verified": false,
+      "words": 12
+    },
+    {
+      "body": "Hi Sam,\n\nI applied to the Software Engineer role and would like to connect.",
+      "channel": "linkedin",
+      "contact": "Sam Lee",
+      "due": null,
+      "followup": false,
+      "kind": "cold_email",
+      "linkedin_message": "Hi Sam,\n\nI applied to the Software Engineer role and would like to connect.",
+      "linkedin_note": "Hi Sam, I applied to the Software Engineer role at Stark Industries.",
+      "manual_reason": null,
+      "manual_tailor": false,
+      "mode": "linkedin",
+      "placeholders": [],
+      "role": "recruiter",
+      "sent": false,
+      "sent_by": null,
+      "sent_date": null,
+      "subject": null,
+      "to": null,
+      "verified": false,
+      "words": 14
+    },
+    {
+      "body": "Hi Pat,\n\nThank you for [INTERVIEW DETAIL].",
+      "channel": "email",
+      "contact": "Pat Rivers",
+      "due": null,
+      "followup": true,
+      "kind": "post_interview_thanks",
+      "linkedin_message": null,
+      "linkedin_note": null,
+      "manual_reason": "LINKEDIN_CONNECTED",
+      "manual_tailor": true,
+      "mode": "always_manual",
+      "placeholders": [
+        "[INTERVIEW DETAIL]"
+      ],
+      "role": "",
+      "sent": false,
+      "sent_by": null,
+      "sent_date": null,
+      "subject": "Thank you",
+      "to": "pat@example.com",
+      "verified": false,
+      "words": 7
+    }
+  ],
+  "job_id": "<job_interview>",
+  "last_email": {
+    "at": "2026-09-22T15:00:00+00:00",
+    "class": "interview_invite",
+    "from": "recruiting@example.com",
+    "link": "https://mail.google.com/mail/u/0/#all/thread-stark-1",
+    "status": "interview"
+  },
+  "next": "<next>",
+  "placeholders": 1,
+  "primary": 2,
+  "sending": {
+    "available": false,
+    "reason": "Follow-up sending isn't built yet"
+  },
+  "status": "interview",
+  "sync": {
+    "available": false,
+    "reason": "Inbox sync isn't set up yet"
+  },
+  "thread": [
+    {
+      "at": "2026-09-22T15:00:00+00:00",
+      "class": "interview_invite",
+      "from": "recruiting@example.com",
+      "link": "https://mail.google.com/mail/u/0/#all/thread-stark-1",
+      "status": "interview",
+      "type": "email"
+    },
+    {
+      "at": "2026-09-18T15:00:00+00:00",
+      "note": null,
+      "status": "interview",
+      "type": "status"
+    },
+    {
+      "at": "2026-09-15T15:00:00+00:00",
+      "note": null,
+      "status": "screening",
+      "type": "status"
+    },
+    {
+      "at": "2026-09-12T15:00:00+00:00",
+      "note": null,
+      "status": "applied",
+      "type": "status"
+    },
+    {
+      "at": "2026-09-04T17:00:00+00:00",
+      "note": null,
+      "status": "queued",
+      "type": "status"
+    },
+    {
+      "at": "2026-09-04T16:00:00+00:00",
+      "note": null,
+      "status": "scored",
+      "type": "status"
+    },
+    {
+      "at": "2026-09-04T15:00:00+00:00",
+      "note": null,
+      "status": "found",
+      "type": "status"
+    }
+  ],
+  "tier": "A",
+  "title": "Software Engineer",
+  "updated_at": "2026-09-18T15:00:00+00:00"
+}
