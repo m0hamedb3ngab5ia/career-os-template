@@ -14,13 +14,17 @@ Every JSON write is atomic (temp file + rename). Run ids sort by start time: YYY
 from __future__ import annotations
 
 import json
+import logging
 import os
 import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
+from careeros.runs.atomic import write_json
 from careeros.store import _is_finder_copy
+
+log = logging.getLogger(__name__)
 
 RUN = "run.json"
 LOG = "run.log"
@@ -28,16 +32,20 @@ ATTEMPTS = "attempts"
 
 
 def _dump(path: Path, data: Any) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(data, indent=2, ensure_ascii=False, default=str), encoding="utf-8")
-    tmp.replace(path)
+    write_json(path, data, indent=2, ensure_ascii=False, default=str)
 
 
 def _load(path: Path) -> Any:
+    """The file's JSON, or None when it is missing. Writes are atomic, so unparsable JSON is real corruption:
+    it is logged (not raised, so one bad run cannot break a listing) and read as None."""
     try:
-        return json.loads(path.read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
+        text = path.read_text(encoding="utf-8")
+    except OSError:
+        return None
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError as e:
+        log.warning("unreadable JSON in %s: %s", path, e)
         return None
 
 
