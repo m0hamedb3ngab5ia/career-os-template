@@ -28,29 +28,58 @@ describe("keysForChange", () => {
   it("maps a changed payload to the query keys it makes stale", () => {
     expect(keysForChange({ jobs: ["a1", "b2"], runs: [], actions: false, config: false, status: false })).toEqual([
       ["jobs"],
+      ["jobs-tabs"],
       ["job", "a1"],
       ["job", "b2"],
       ["contacts"],
       ["inbox"],
       ["status"],
+      ["today"],
+      ["pipeline"],
     ]);
     expect(keysForChange({ jobs: [], runs: ["r1"], actions: true, config: false, status: false })).toEqual([
       ["runs"],
       ["run", "r1"],
+      ["storage"],
+      ["advise"],
       ["inbox"],
       ["status"],
+      ["today"],
       ["actions"],
+      ["pipeline"],
     ]);
     expect(keysForChange({ jobs: [], runs: [], actions: false, config: true, status: false })).toEqual([
       ["meta"],
+      ["runs"],
       ["settings"],
+      ["advise"],
+      ["storage"],
       ["inbox"],
       ["contacts"],
       ["status"],
+      ["pipeline"],
     ]);
     // data/sync_updates.json (pending inbox-sync updates) arrives as a bare status change: the Inbox refetches too
-    expect(keysForChange({ status: true })).toEqual([["status"], ["inbox"]]);
+    expect(keysForChange({ status: true })).toEqual([["status"], ["runs"], ["today"], ["inbox"]]);
     expect(keysForChange({})).toEqual([]);
+  });
+
+  it("refreshes Today on action, job, run and status changes, not on config", () => {
+    const today = (p: Parameters<typeof keysForChange>[0]) =>
+      keysForChange(p).filter((k) => JSON.stringify(k) === '["today"]').length;
+    expect(today({ actions: true })).toBe(1);
+    expect(today({ jobs: ["a1"] })).toBe(1);
+    expect(today({ runs: ["r1"] })).toBe(1);
+    expect(today({ status: true })).toBe(1);
+    expect(today({ jobs: ["a1"], runs: ["r1"], actions: true, status: true })).toBe(1);
+    expect(today({ config: true })).toBe(0);
+  });
+});
+
+describe("keysForChange: Jobs screen", () => {
+  it("a jobs change also refreshes the Jobs filter-tab counts", () => {
+    expect(keysForChange({ jobs: ["a1"] })).toContainEqual(["jobs-tabs"]);
+    expect(keysForChange({ runs: ["r1"] })).not.toContainEqual(["jobs-tabs"]);
   });
 });
 

@@ -15,7 +15,7 @@ from careeros.runs import locks
 from careeros.runs.store import RunStore
 from careeros.store import Store
 from careeros.ui.services import step as step_mod
-from careeros.ui.services.runs import Busy, NotSetUp, Paused, RunControl
+from careeros.ui.services.runs import Busy, NotSetUp, Paused, RunControl, classify_cmdline
 from careeros.ui.services.stream import parse_event
 
 pytestmark = pytest.mark.unit
@@ -49,6 +49,7 @@ def make_rc(settings, **kw) -> RunControl:
     kw.setdefault("pid_alive", lambda pid: True)
     kw.setdefault("cmdline", lambda pid: "/venv/bin/python -m careeros.cli --root /r run score --json")
     kw.setdefault("now", lambda: NOW)
+    kw.setdefault("started", lambda pid: None)
     return RunControl(settings, **kw)
 
 
@@ -80,10 +81,9 @@ def running_run(rs: RunStore, kind: str = "score", rid: str | None = None, **ext
 def test_start_spawns_a_detached_cli_run_with_the_preset(rc):
     out = rc.start("score", preset="small")
     call = FakePopen.calls[0]
-    assert call["cmd"] == ["/venv/bin/python", "-m", "careeros.cli", "--root", str(rc.settings.root), "run", "score",
-                           "--preset", "small", "--json"]
+    assert call["cmd"] == ["/venv/bin/python", "-m", "careeros.cli", "run", "score", "--preset", "small", "--json"]
     assert call["start_new_session"] is True and call["cwd"] == str(rc.settings.root)
-    assert call["env"] == {"PATH": "/bin"}
+    assert call["env"] == {"PATH": "/bin", "CAREEROS_ROOT": str(rc.settings.root)}  # root via env: no spaces in argv
     assert out["pid"] == 4242 and out["kind"] == "score" and out["started"] is True
     assert Path(out["output"]).parent == RunStore(rc.settings).dir / "ui"
 
@@ -139,8 +139,8 @@ def test_launch_outputs_are_trimmed(rc):
 
 def test_start_step_spawns_the_step_runner(rc):
     out = rc.start_step("scout")
-    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "--root",
-                                         str(rc.settings.root), "scout"]
+    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "scout"]
+    assert FakePopen.calls[0]["env"]["CAREEROS_ROOT"] == str(rc.settings.root)
     assert FakePopen.calls[0]["start_new_session"] is True and out["kind"] == "scout"
 
 
@@ -192,6 +192,26 @@ def test_step_run_records_cancel(settings):
 
     rec = step_mod.run_step(settings, "prune", actions={"prune": interrupted})
     assert rec["stop_reason"] == "cancelled"
+
+
+def test_step_output_streams_to_run_log_while_running(settings, rc):
+    """Scout prints progress; each line reaches run.log (and so the tail endpoint) before the step ends."""
+    import sys
+
+    seen: list[list[str]] = []
+
+    def scout():
+        print("scanning board 1")
+        print("half", end="")
+        print(" line done", file=sys.stderr)
+        rid = RunStore(settings).run_ids()[-1]
+        seen.append([e["text"] for e in rc.tail(rid, follow=False) if e["type"] == "log"])
+        return "ok", "fetched=1"
+
+    rec = step_mod.run_step(settings, "scout", actions={"scout": scout})
+    assert any(t.endswith("scanning board 1") for t in seen[0])
+    log = RunStore(settings).read_log(rec["id"])
+    assert "scanning board 1" in log and "half line done" in log
 
 
 def test_step_run_busy_when_locked(settings):
@@ -424,3 +444,338 @@ def test_stale_cancel_markers_are_cleared_on_the_next_start(rc):
     marker.write_text("x")
     rc.start("score")
     assert not marker.exists()
+
+
+# --- review round 1 ------------------------------------------------------------------------------------------
+
+@pytest.mark.parametrize("cmd,want", [
+    ("/v/bin/python -m careeros.cli --root /r run score --json", "run"),
+    ("/v/bin/python -m careeros.cli --root /r run prepare --preset small --json", "run"),
+    ("/v/bin/python -m careeros.cli --root /r run catch-up --json", "run"),
+    ("/v/bin/careeros run score", "run"),
+    ("/v/bin/python /v/bin/careeros --root /r run prepare", "run"),
+    ("/v/bin/python -m careeros.ui.services.step --root /r scout", "step"),
+    ("/v/bin/python -m careeros.ui.services.step --root /r inbox_sync", "step"),
+    ("/v/bin/python -m careeros.cli --root /r tick", "tick"),
+    ("/v/bin/python -m careeros.cli --root /r ui --port 8765", None),
+    ("/v/bin/python -m careeros.cli run status", None),
+    ("vim /repo/careeros/notes.txt", None),
+    ("/usr/bin/python3 -m http.server careeros run score", None),
+    ("/v/bin/python -m careeros.ui.services.step --root /r apply", None),
+    ("", None),
+])
+def test_classify_cmdline_matches_argv_tokens(cmd, want):
+    assert classify_cmdline(cmd) == want
+
+
+def _held_run(rc, pid=777):
+    rs = RunStore(rc.settings)
+    run = running_run(rs)
+    hold_runner(rs, run["id"], pid=pid)
+    return run
+
+
+def test_cancel_refuses_careeros_processes_that_are_not_a_run(rc):
+    _held_run(rc)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append(pid),
+                  cmdline=lambda pid: "/v/bin/python -m careeros.cli --root /r ui --port 8765")
+    assert rc2.cancel()["status"] == "refused" and sent == []
+
+
+def test_cancel_refuses_a_pid_that_started_after_the_lock(rc):
+    _held_run(rc)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append(pid),
+                  started=lambda pid: datetime.now(timezone.utc) + timedelta(minutes=5))
+    out = rc2.cancel()
+    assert out["status"] == "refused" and "reused" in out["detail"] and sent == []
+
+
+def test_cancel_allows_a_pid_that_started_before_the_lock(rc):
+    _held_run(rc)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append(pid),
+                  started=lambda pid: datetime.now(timezone.utc) - timedelta(minutes=5))
+    assert rc2.cancel()["status"] == "cancelling" and sent == [777]
+
+
+@pytest.mark.parametrize("exc,status", [(ProcessLookupError, "idle"), (PermissionError, "refused")])
+def test_cancel_kill_errors(rc, exc, status):
+    _held_run(rc)
+
+    def kill(pid, sig):
+        raise exc
+
+    out = make_rc(rc.settings, kill=kill).cancel()
+    assert out["status"] == status
+    assert not list((RunStore(rc.settings).dir / "ui").glob("cancel-*"))
+
+
+def test_run_state_rereads_a_run_that_finished_between_reads(rc):
+    rs = RunStore(rc.settings)
+    run = running_run(rs)
+    hold_runner(rs, run["id"], pid=777)
+
+    def finishes(pid):  # the run completes while the lock is being checked
+        done = {**run, "status": "done", "stop_reason": "completed"}
+        rs.save_run(done)
+        locks.release(rs.runner_lock_path, None, force=True)
+        return False
+
+    rc2 = make_rc(rc.settings, pid_alive=finishes)
+    got = rc2.history()["runs"][0]
+    assert got["state"] == "done" and got["stop_reason"] == "completed"
+
+
+def test_catch_up_cancel_leaves_unstarted_kinds_pending(settings):
+    import threading
+
+    from careeros.runs.tick import load_catch_up, run_catch_up
+
+    rs = RunStore(settings)
+    rs.dir.mkdir(parents=True, exist_ok=True)
+    (rs.dir / "catch_up.json").write_text(json.dumps({"kinds": {"score": {"slots": 1}, "prepare": {"slots": 1}}}))
+    cancel = threading.Event()
+    called = []
+
+    def score(trigger):
+        called.append("score")
+        cancel.set()
+        return "cancelled", "run x"
+
+    out = run_catch_up(settings, cancel=cancel, actions={"score": score, "prepare": lambda t: called.append("p")})
+    assert called == ["score"] and out["ran"] == ["score"] and out["left"] == ["prepare"]
+    assert list(load_catch_up(rs)["kinds"]) == ["prepare"]
+
+
+def test_default_actions_pass_cancel_to_batches_and_inbox(settings, monkeypatch):
+    import threading
+
+    from careeros.runs import service, tick
+
+    seen = {}
+    monkeypatch.setattr(service, "run_batch", lambda *a, **kw: seen.setdefault("batch", kw) and
+                        {"stop_reason": "completed", "id": "r"} or {"stop_reason": "completed", "id": "r"})
+    monkeypatch.setattr(service, "run_skill", lambda *a, **kw: seen.setdefault("skill", kw) and
+                        {"stop_reason": "completed", "id": "r"} or {"stop_reason": "completed", "id": "r"})
+    cancel = threading.Event()
+    acts = tick.default_actions(settings, cancel=cancel)
+    acts["score"]("catch_up")
+    acts["inbox_sync"]("catch_up")
+    assert seen["batch"]["cancel"] is cancel and seen["skill"]["cancel"] is cancel
+
+
+def test_schedule_install_writes_the_plist_and_loads_it(rc, tmp_path):
+    calls = []
+    agents = tmp_path / "LaunchAgents"
+    rc2 = make_rc(rc.settings, launchctl=lambda args: calls.append(args) or (0, "", ""), agents_dir=agents,
+                  which=lambda name: None)
+    out = rc2.schedule_install()
+    import plistlib
+
+    plist = plistlib.loads(Path(out["plist"]).read_bytes())
+    assert Path(out["plist"]).parent == agents
+    assert plist["ProgramArguments"][-3:] == ["--root", str(Path(rc.settings.root).absolute()), "tick"]
+    assert plist["ProgramArguments"][0] == "/venv/bin/python"
+    assert any(a[0] == "bootstrap" for a in calls) and "claude" in out["warning"]
+    rc3 = make_rc(rc.settings, launchctl=lambda args: (0, "", ""), agents_dir=agents, which=lambda n: "/bin/claude")
+    assert rc3.schedule_install()["warning"] is None
+
+
+def test_schedule_uninstall_boots_out_and_removes(rc, tmp_path):
+    calls = []
+    agents = tmp_path / "LaunchAgents"
+    rc2 = make_rc(rc.settings, launchctl=lambda args: calls.append(args) or (0, "", ""), agents_dir=agents,
+                  which=lambda n: "/bin/claude")
+    rc2.schedule_install()
+    calls.clear()
+    out = rc2.schedule_uninstall()
+    assert out["removed"] is True and calls[0][0] == "bootout" and calls[0][1].endswith(out["label"])
+    assert not Path(out["plist"]).exists()
+
+
+@pytest.fixture
+def inbox_on(rc):
+    rc.settings.pipeline["schedule"]["jobs"]["inbox_sync"]["enabled"] = True
+    return rc
+
+
+def test_inbox_sync_busy_when_the_runner_lock_is_held(inbox_on):
+    hold_runner(RunStore(inbox_on.settings), "20260926-110000-score-abcd")
+    with pytest.raises(Busy):
+        inbox_on.start_step("inbox_sync")
+
+
+def test_inbox_sync_paused(inbox_on):
+    RunStore(inbox_on.settings).set_pause(None, "", NOW - timedelta(hours=1))
+    with pytest.raises(Paused):
+        inbox_on.start_step("inbox_sync")
+
+
+def test_inbox_sync_spawns_the_step(inbox_on):
+    inbox_on.start_step("inbox_sync")
+    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "inbox_sync"]
+
+
+def test_step_main_exit_codes(temp_root, monkeypatch, capsys):
+    from careeros.config import Settings
+
+    rs = RunStore(Settings.load(temp_root))
+    lk = locks.acquire(step_mod.step_lock_path(rs, "scout"), owner="step:x", ttl_seconds=600, pid=os.getpid())
+    assert step_mod.main(["--root", str(temp_root), "scout"]) == 5
+    locks.release(step_mod.step_lock_path(rs, "scout"), lk.token)
+
+    def boom():
+        raise RuntimeError("board down")
+
+    monkeypatch.setattr(step_mod, "default_actions", lambda s: {"scout": boom})
+    assert step_mod.main(["--root", str(temp_root), "scout"]) == 1
+    monkeypatch.setattr(step_mod, "default_actions", lambda s: {"scout": lambda: ("ok", "fine")})
+    assert step_mod.main(["--root", str(temp_root), "scout"]) == 0
+
+
+def test_run_inbox_sync_turns_sigterm_into_cancel(settings, monkeypatch):
+    from careeros.runs import service
+
+    seen = {}
+    before = signal.getsignal(signal.SIGTERM)
+
+    def fake_run_skill(*a, cancel, **kw):
+        os.kill(os.getpid(), signal.SIGTERM)
+        seen["cancelled"] = cancel.wait(5)
+        return {"id": "r", "stop_reason": "cancelled"}
+
+    monkeypatch.setattr(service, "run_skill", fake_run_skill)
+    assert step_mod.run_inbox_sync(settings)["stop_reason"] == "cancelled" and seen["cancelled"] is True
+    assert signal.getsignal(signal.SIGTERM) == before
+
+
+def test_tail_holds_back_a_half_written_line(rc):
+    rs = RunStore(rc.settings)
+    run = running_run(rs)
+    hold_runner(rs, run["id"])
+    n, stream = rs.next_attempt(run["id"])
+    line = json.dumps({"type": "assistant", "message": {"content": [{"type": "text", "text": "whole"}]}})
+    stream.write_text(line[:20])
+    polls = {"n": 0}
+
+    def sleep(_):
+        polls["n"] += 1
+        if polls["n"] == 1:
+            with stream.open("a") as f:
+                f.write(line[20:] + "\n")
+        else:
+            locks.release(rs.runner_lock_path, None, force=True)
+            rs.save_run({**run, "status": "done", "stop_reason": "completed"})
+
+    events = list(make_rc(rc.settings, sleep=sleep).tail(run["id"], follow=True, poll_s=0))
+    assert [e for e in events if e["type"] == "assistant"] == [{"type": "assistant", "text": "whole", "attempt": 1}]
+
+
+def test_ps_cmdline_of_this_process_is_not_truncated():
+    from careeros.ui.services.runs import ps_cmdline
+
+    got = ps_cmdline(os.getpid())  # an exact argv on Linux, a joined line on macOS
+    assert "pytest" in (" ".join(got) if isinstance(got, list) else got)
+
+
+# --- review round 2 ------------------------------------------------------------------------------------------
+
+SPACED = "/Users/a/My Jobs/career-os"
+
+
+@pytest.mark.parametrize("cmd,root,want", [
+    ("/Users/a/My Jobs/career-os/.venv/bin/python -m careeros.cli run score --json", SPACED, "run"),
+    (f"/v/bin/python -m careeros.cli --root {SPACED} run prepare --json", SPACED, "run"),
+    (f"/v/bin/python -m careeros.ui.services.step --root {SPACED} scout", SPACED, "step"),
+    (f"/v/bin/python -m careeros.cli --root {SPACED} tick", SPACED, "tick"),
+    ("/Users/a/My Jobs/career-os/.venv/bin/careeros run catch-up", SPACED, "run"),
+    (["/v/bin/python", "-m", "careeros.cli", "--root", SPACED, "run", "score", "--json"], None, "run"),
+    (["/v/bin/python", "-m", "careeros.ui.services.step", "--root", SPACED, "prune"], None, "step"),
+    (["/v/bin/python", "-m", "careeros.cli", "--root", SPACED, "ui"], None, None),
+])
+def test_classify_with_a_root_that_has_spaces(cmd, root, want):
+    assert classify_cmdline(cmd, root=root) == want
+
+
+def test_tail_rereads_the_run_before_its_end_event(rc):
+    rs = RunStore(rc.settings)
+    run = running_run(rs)
+    hold_runner(rs, run["id"], pid=777)
+    calls = {"n": 0}
+
+    def alive(pid):  # the run finishes while tail checks the lock
+        calls["n"] += 1
+        rs.save_run({**run, "status": "done", "stop_reason": "completed"})
+        locks.release(rs.runner_lock_path, None, force=True)
+        return False
+
+    events = list(make_rc(rc.settings, pid_alive=alive).tail(run["id"], follow=True, poll_s=0))
+    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed"}
+
+
+def test_cancel_reaches_a_catch_up_between_batches(rc):
+    """A catch-up running scout or prune holds only tick.lock; Cancel must still reach it."""
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="catch-up", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/v/bin/python -m careeros.cli run catch-up --json")
+    out = rc2.cancel()
+    assert out["status"] == "cancelling" and sent == [(888, signal.SIGTERM)]
+
+
+def test_cancel_ignores_a_scheduled_tick_lock(rc):
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="tick", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    assert make_rc(rc.settings, kill=lambda *a: pytest.fail("no kill")).cancel()["status"] == "idle"
+
+
+def test_cancel_reaches_a_later_catch_up_after_an_earlier_one_was_cancelled(rc):
+    """The cancel marker belongs to one holder: a later catch-up (new pid) must not look 'already stopping'."""
+    rs = RunStore(rc.settings)
+    tick = rs.dir / "tick.lock"
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/v/bin/python -m careeros.cli run catch-up --json")
+    locks.acquire(tick, owner="catch-up", ttl_seconds=600, pid=888, pid_alive=lambda p: True)
+    assert rc2.cancel()["status"] == "cancelling"
+    assert rc2.cancel()["status"] == "already_stopping"
+    locks.release(tick, None, force=True)
+    locks.acquire(tick, owner="catch-up", ttl_seconds=600, pid=889, pid_alive=lambda p: True)
+    out = rc2.cancel()
+    assert out["status"] == "cancelling" and sent == [(888, signal.SIGTERM), (889, signal.SIGTERM)]
+
+
+# --- review round 2 ------------------------------------------------------------------------------------------
+
+def test_starting_a_step_keeps_the_live_catch_up_cancel_marker(rc):
+    rs = RunStore(rc.settings)
+    locks.acquire(rs.dir / "tick.lock", owner="catch-up", ttl_seconds=3600, pid=888, pid_alive=lambda p: True)
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append((pid, sig)),
+                  cmdline=lambda pid: "/venv/bin/python -m careeros.cli --root /r run catch-up --json")
+    assert rc2.cancel()["status"] == "cancelling"
+    rc2.start_step("scout")
+    out = rc2.cancel()
+    assert out["status"] == "already_stopping" and out["run_id"] == "catch-up" and sent == [(888, signal.SIGTERM)]
+
+
+def test_cancel_marker_removed_between_exists_and_read_is_no_marker(rc, monkeypatch):
+    _held_run(rc)
+    marker_dir = RunStore(rc.settings).dir / "ui"
+    marker_dir.mkdir(parents=True, exist_ok=True)
+    real = Path.read_text
+
+    def racing(self, *a, **kw):
+        if self.name.startswith("cancel-"):
+            self.unlink()
+            raise FileNotFoundError(self)
+        return real(self, *a, **kw)
+
+    sent = []
+    rc2 = make_rc(rc.settings, kill=lambda pid, sig: sent.append(pid))
+    (marker_dir / f"cancel-{rc2._holder_of(None)[0]}").write_text("1 old\n")
+    monkeypatch.setattr(Path, "read_text", racing)
+    assert rc2.cancel()["status"] == "cancelling" and sent == [777]

@@ -28,6 +28,8 @@ JOBS: dict[str, tuple[str, str, str, int | None, str | None, str | None, int, in
     "rejected":  ("Wayne Enterprises", "Data Engineer", "rejected", 77, "C", "pass", 30, 20),
     "skipped":   ("Vandelay Imports", "Sales Engineer", "skipped", 40, "C", "skip", 40, None),
 }
+# The smallest valid PNG (1x1, transparent): a screenshot stand-in.
+PNG_1PX = bytes.fromhex("89504e470d0a1a0a0000000d4948445200000001000000010806000000""1f15c4890000000d49444154789c6360000002000154a24f5d0000000049454e44ae426082")
 REVIEW_FLOW = ["found", "scored", "queued", "prepared", "needs_review"]
 
 
@@ -83,6 +85,23 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
                 "regenerate_suggestions": [], "regenerations": 0})
             (store.job_dir(jid) / "resume.pdf").write_bytes(b"%PDF-1.4 fixture\n")
             (store.job_dir(jid) / "cover_letter.md").write_text("Hi,\n\nFixture letter.\n", encoding="utf-8")
+    # Job detail's Safety flags, Apply session timeline and screenshot for the needs-review job.
+    rid = ids["review"]
+    store._write(rid, "safety.json", {
+        "job_id": rid, "checked_at": iso(now - timedelta(days=5)), "verdict": "review", "runs": [],
+        "flags": [{"code": "GHOST_OLD_POST", "level": "review", "detail": "Posted 45 days ago",
+                   "evidence": ["https://boards.example.com/review"], "at": iso(now - timedelta(days=5))}]})
+    shots = store.job_dir(rid) / "screenshots"
+    shots.mkdir(exist_ok=True)
+    (shots / "01_form.png").write_bytes(PNG_1PX)
+    store._write(rid, "apply_session.json", {
+        "job_id": rid, "ats": "greenhouse", "started": iso(now - timedelta(days=1)),
+        "finished": iso(now - timedelta(days=1, minutes=-6)), "tier": "A", "auto_submit": False,
+        "steps": [{"time": iso(now - timedelta(days=1)), "action": "open_form", "ok": True, "note": ""},
+                  {"time": iso(now - timedelta(days=1, minutes=-5)), "action": "finish", "ok": False,
+                   "note": "needs_review: Tier A: you submit"}],
+        "screenshots": [str(shots / "01_form.png")], "outcome": "needs_review", "reason": "Tier A: you submit",
+        "submit_clicked": False, "status": "needs_review", "n_steps": 2})
     contacts = {"contacts": [
         {"name": "Pat Rivers", "role": "Engineering Manager", "linkedin": "https://www.linkedin.com/in/example-pat",
          "email": "pat@example.com", "linkedin_degree": 1},
@@ -96,7 +115,8 @@ def build_ui_data(root: Path, now: datetime) -> dict[str, Any]:
     actions = {
         "high": tr.add_action_item("Review and submit", type="review", job_id=ids["review"], company="Umbrella Labs",
                                    role="Infrastructure Engineer", link="https://boards.example.com/review",
-                                   priority="H", needs="laptop"),
+                                   priority="H", needs="laptop", due=iso(now + timedelta(days=1)),
+                                   due_reason="posting closes"),
         "medium": tr.add_action_item("Answer the salary question", type="salary", job_id=ids["queued"],
                                      company="Initech", role="Platform Engineer", priority="M", needs="anytime"),
         "low": tr.add_action_item("Send the LinkedIn note", type="send_linkedin", job_id=ids["interview"],
@@ -175,3 +195,36 @@ def add_outreach_data(data: dict[str, Any]) -> dict[str, Any]:
         {"job_id": hooli, "company": "Hooli", "status": "screening", "note": "assessment invite",
          "source_thread": "thread-hooli-1", "date": invite_at.date().isoformat(), "applied": False}]), encoding="utf-8")
     return data
+
+
+def add_scam_case(data: dict[str, Any]) -> dict[str, Any]:
+    """A blocked posting at a made-up company, its flagged-registry entry and the open `scam_suspected` item the
+    safety gate writes (Action Items' Block company / Mark posting safe). Kept out of build_ui_data so the counts
+    other tests rely on stay put. Returns {"job_id", "action_id", "company"}."""
+    from careeros.safety import registry
+
+    s, now = data["settings"], data["now"]
+    store = Store(s)
+    company = "Obsidian Quant Partners"
+    found = now - timedelta(days=2)
+    p = Posting(company=company, title="Quant Developer", location="Remote", ats="custom", ats_job_id="scam-1",
+                url="https://obsidian-careers.example/jobs/1", fetched_at=iso(found),
+                description_text="Buy the equipment kit before your first day.")
+    jid = p.job_id
+    store._write(jid, "posting.json", p.model_dump())
+    hist = [{"status": st, "at": iso(found + timedelta(hours=i)), "note": None}
+            for i, st in enumerate(["found", "scored", "needs_review"])]
+    store._write(jid, "status.json", {"status": "needs_review", "updated_at": hist[-1]["at"], "history": hist})
+    store.save_score(Score(job_id=jid, category="swe_backend", fit=74, tier=None, reasons=["fixture"]))
+    store._write(jid, "safety.json", {"job_id": jid, "checked_at": iso(found), "verdict": "block", "runs": [],
+                                      "flags": [{"code": "SCAM_PAYMENT_REQUEST", "level": "block",
+                                                 "detail": "asks for payment", "evidence": []}]})
+    registry.add_or_bump(registry.default_path(s), company, domain="obsidian-careers.example",
+                         reason="SCAM_PAYMENT_REQUEST", job_id=jid)
+    aid = Tracker(settings=s).add_action_item(
+        "Posting asks for a paid equipment kit. Block the company or mark the posting safe", type="scam_suspected",
+        job_id=jid, company=company, role="Quant Developer", link="https://obsidian-careers.example/jobs/1",
+        priority="H", needs="phone")
+    data["jobs"]["scam"] = jid
+    data["actions"]["scam"] = aid
+    return {"job_id": jid, "action_id": aid, "company": company}

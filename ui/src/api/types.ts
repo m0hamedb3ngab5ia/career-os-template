@@ -16,8 +16,14 @@ export interface StatusSummary {
   };
 }
 
-/** GET /api/meta (src/careeros/ui/services/meta.py); only the fields the screens read so far. */
+/** GET /api/meta (src/careeros/ui/services/meta.py): every code the UI renders, plus the ui settings. */
 export interface Meta {
-  statuses?: string[];
-  ui?: { theme?: string; undo_seconds?: number; page_size?: number };
+  statuses: string[];
+  tiers: string[];
+  priorities: string[];
+  action_types: string[];
+  action_needs: string[];
+  safety_verdicts: string[];
+  pipeline: { columns: { name: string; statuses: string[] }[]; closed: string[]; card_limit: number };
+  ui: { theme: string; undo_seconds: number; page_size: number; due_soon_hours: number };
 }

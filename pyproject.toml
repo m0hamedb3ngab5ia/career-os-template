@@ -12,7 +12,7 @@ dependencies = ["pyyaml", "requests", "pydantic>=2", "openpyxl", "ruamel.yaml>=0
 [project.optional-dependencies]
 dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]
 test = ["pytest", "pytest-cov", "jinja2", "pypdf", "httpx"]
-ui = ["fastapi", "uvicorn", "watchfiles"]
+ui = ["fastapi", "uvicorn", "watchfiles", "anyio>=4.1"]  # anyio 4.1+: abandon_on_cancel
 
 [project.scripts]
 careeros = "careeros.cli:main"

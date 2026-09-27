@@ -1,6 +1,6 @@
 import { useId, useState, type FormEvent } from "react";
 import { ApiError } from "../../api/client";
-import { useUndoSeconds } from "../../api/queries";
+import { useUndoSeconds } from "../actions/useUndoSeconds";
 import { Button } from "../../kit/Button";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Sheet } from "../../kit/Sheet";

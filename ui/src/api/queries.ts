@@ -15,12 +15,7 @@ export function useMeta() {
   return useQuery({
     queryKey: ["meta"],
     queryFn: () => apiFetch<Meta>("/api/meta"),
-    staleTime: Infinity,
+    staleTime: Infinity, // changes only with config; the `changed` event invalidates it
     retry: false,
   });
-}
-
-/** `pipeline.yaml: ui.undo_seconds` (8 (Recommended) until /api/meta answers). */
-export function useUndoSeconds(): number {
-  return useMeta().data?.ui?.undo_seconds ?? 8;
 }

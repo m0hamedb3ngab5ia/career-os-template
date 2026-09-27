@@ -12,16 +12,19 @@ data/action_items.json). Every table is derived; the index never writes back. A 
 """
 from __future__ import annotations
 
+import hashlib
 import json
+import os
 import sqlite3
 import threading
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2   # 2: action_items.due, due_reason
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -34,7 +37,7 @@ CREATE TABLE status_history (job_id TEXT, seq INTEGER, status TEXT, at TEXT, not
 CREATE INDEX status_history_job ON status_history(job_id);
 CREATE TABLE action_items (
     id TEXT PRIMARY KEY, created TEXT, job_id TEXT, company TEXT, role TEXT, type TEXT, what TEXT, link TEXT,
-    priority TEXT, needs TEXT, done INTEGER, done_date TEXT);
+    priority TEXT, needs TEXT, done INTEGER, done_date TEXT, due TEXT, due_reason TEXT);
 CREATE TABLE contacts (
     job_id TEXT, seq INTEGER, name TEXT, title TEXT, company TEXT, linkedin TEXT, email TEXT,
     email_confidence TEXT, linkedin_degree INTEGER, mutuals INTEGER, sent INTEGER, replied TEXT);
@@ -68,31 +71,113 @@ def _obj(path: Path) -> dict[str, Any]:
 
 
 def _sig(paths: Iterable[Path]) -> str:
-    n = newest = size = 0
+    """Hash of sorted (name, mtime_ns, size) per file, so renames and same-size edits change it too.
+    Names are parent/name, enough to tell run.json from attempts/001.json."""
+    rows = []
     for p in paths:
         try:
             st = p.stat()
         except OSError:
             continue
-        n, newest, size = n + 1, max(newest, st.st_mtime_ns), size + st.st_size
-    return f"{n}:{newest}:{size}"
+        rows.append((f"{p.parent.name}/{p.name}", st.st_mtime_ns, st.st_size))
+    return hashlib.sha1(repr(sorted(rows)).encode("utf-8")).hexdigest()
 
 
 def _dir_sig(d: Path) -> str:
     try:
-        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name))
+        return _sig(f for f in d.iterdir() if f.is_file() and not _is_finder_copy(f.name)
+                    and not f.name.endswith(".tmp"))
     except OSError:
         return ""
 
 
+SQLITE_HEADER = b"SQLite format 3\x00"
+
+
 def default_path(settings: Any) -> Path:
+    """data/careeros.db, or `ui.index_path`. The index is deleted and rebuilt at will, so a path that is (or is
+    inside) something the candidate keeps is refused: a configured file, a folder, config/, profile/, or a path
+    inside the jobs or runs folder."""
+    from careeros.runs.store import runs_dir_for
     from careeros.ui.config import load_ui_config
 
     cfg = load_ui_config(settings)
-    if cfg.index_path:
-        p = Path(cfg.index_path).expanduser()
-        return p if p.is_absolute() else (Path(settings.root) / p).resolve()
-    return Path(settings.paths["jobs_dir"]).parent / "careeros.db"
+    if not cfg.index_path:
+        return Path(settings.paths["jobs_dir"]).parent / "careeros.db"
+    p = Path(cfg.index_path).expanduser()
+    p = p if p.is_absolute() else (Path(settings.root) / p).resolve()
+    root = Path(settings.root)
+    fold = lambda x: Path(os.path.realpath(x).casefold())  # noqa: E731 - macOS volumes are case-insensitive
+    real = fold(p)
+    kept = {fold(v) for v in settings.paths.values()}
+    guarded = [fold(root / d) for d in ("config", "profile")] + [fold(settings.paths["jobs_dir"]),
+                                                                 fold(runs_dir_for(settings))]
+    if real in kept or Path(os.path.realpath(p)).is_dir() or any(real.is_relative_to(g) for g in guarded):
+        raise ConfigError(f"config/pipeline.yaml: ui.index_path {cfg.index_path!r} points at your own files "
+                          "(a path under paths:, a folder, config/, profile/, the jobs or runs folder); use a new file such as "
+                          "data/careeros.db, or null")
+    return p
+
+
+def _classify(path: Path) -> str:
+    """What sits at the index path: "absent" (missing or empty), "ours" (SQLite with our meta.schema_version row),
+    "damaged" (SQLite header but unreadable, failing quick_check, or our meta table without its row), or
+    "foreign" (anything else)."""
+    if path.is_dir():
+        return "foreign"
+    if not path.exists() or not path.stat().st_size:
+        return "absent"
+    with path.open("rb") as f:
+        if f.read(len(SQLITE_HEADER)) != SQLITE_HEADER:
+            return "foreign"
+    try:
+        con = sqlite3.connect(f"file:{path}?mode=ro", uri=True)
+    except sqlite3.Error:
+        return "damaged"
+    try:
+        tables = {r[0] for r in con.execute("SELECT name FROM sqlite_master WHERE type = 'table'")}
+        if "meta" not in tables:
+            return "foreign"
+        row = con.execute("SELECT 1 FROM meta WHERE key = 'schema_version'").fetchone()
+        if not row:
+            return "damaged"
+        check = con.execute("PRAGMA quick_check(1)").fetchone()     # damage inside a data page
+        return "ours" if check and check[0] == "ok" else "damaged"
+    except sqlite3.Error:
+        return "damaged"
+    finally:
+        con.close()
+
+
+def _set_aside(path: Path) -> Path:
+    """Rename a damaged index (and its WAL side files) to <name>.corrupt-<stamp>; never delete it."""
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    aside = path.with_name(f"{path.name}.corrupt-{stamp}")
+    n = 1
+    while aside.exists():
+        aside, n = path.with_name(f"{path.name}.corrupt-{stamp}-{n}"), n + 1
+    path.rename(aside)
+    path.with_name(path.name + "-shm").unlink(missing_ok=True)   # shared-memory map: rebuilt by SQLite
+    for suffix in ("-wal", "-journal"):
+        side = path.with_name(path.name + suffix)
+        if side.exists() and side.stat().st_size:
+            side.rename(aside.with_name(aside.name + suffix))
+        else:
+            side.unlink(missing_ok=True)     # empty side file (e.g. made by the read-only probe)
+    return aside
+
+
+def _prepare(path: Path) -> None:
+    """Make `path` safe to open as the index: refuse a folder or another program's file (ConfigError, left
+    untouched); rename a damaged index aside so a fresh one is built."""
+    kind = _classify(path)
+    if path.is_dir():
+        raise ConfigError(f"UI index path {path} is a folder; set ui.index_path to a file (or null)")
+    if kind == "foreign":
+        raise ConfigError(f"UI index path {path} is not a careeros index (another file or database); refusing to "
+                          "replace it. Move it away or set ui.index_path (null = data/careeros.db)")
+    if kind == "damaged":
+        _set_aside(path)
 
 
 class Index:
@@ -106,12 +191,19 @@ class Index:
         self.path = Path(path) if path else default_path(settings)
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._lock = threading.RLock()
+        self.con: sqlite3.Connection | None = None
+        _prepare(self.path)
+        self._synced = False
         try:
             self._open()
-        except sqlite3.DatabaseError:        # not a database (or damaged): it is derived, so start over
+        except sqlite3.DatabaseError:        # damaged in a way the read-only probe missed: set aside, rebuild
+            self._recover()
+
+    def _recover(self) -> None:
+        if self.con is not None:
             self.con.close()
-            self.remove_files(self.path)
-            self._open()
+        _set_aside(self.path)
+        self._open()
 
     def _open(self) -> None:
         self.con = sqlite3.connect(self.path, check_same_thread=False, isolation_level=None)
@@ -121,7 +213,9 @@ class Index:
 
     @staticmethod
     def remove_files(path: Path) -> None:
-        """Delete the index and its WAL side files (`careeros ui --reindex`)."""
+        """Delete the index and its WAL side files (`careeros ui --reindex`). Refuses anything but an index; a
+        damaged one is renamed aside, never deleted."""
+        _prepare(path)
         for suffix in ("", "-wal", "-shm", "-journal"):
             path.with_name(path.name + suffix).unlink(missing_ok=True)
 
@@ -169,6 +263,20 @@ class Index:
             return self.sync()
 
     def sync(self) -> dict[str, Any]:
+        with self._lock:
+            if self._synced:
+                return self._sync()
+            try:
+                res = self._sync()
+            except sqlite3.OperationalError:
+                raise
+            except sqlite3.DatabaseError:    # first sync hit damage the probe missed: set aside, rebuild once
+                self._recover()
+                res = self._sync()
+            self._synced = True
+            return res
+
+    def _sync(self) -> dict[str, Any]:
         with self._lock:
             self._ensure_schema()
             on_disk = set(self._job_ids())
@@ -288,6 +396,8 @@ class Index:
                     continue
                 self._index_run(rid, _obj(d / "run.json"), att_files, sig)
                 changed.append(rid)
+            if changed:
+                self.set_meta("indexed_at", _now())
         return changed
 
     def _index_run(self, rid: str, run: dict[str, Any], att_files: list[Path], sig: str) -> None:
@@ -309,6 +419,19 @@ class Index:
 
     # --- tracker (action items) ----------------------------------------------------------------------------
 
+    def update_config(self) -> bool:
+        """Record the config folder's signature; True when it differs from the last one recorded. A UI write
+        records it first, so the watcher, seeing that same write, finds nothing new and stays quiet."""
+        root = Path(self.settings.root) / "config"
+        files = sorted(f for f in root.rglob("*") if f.is_file() and not f.name.startswith(".")
+                       and not f.name.endswith(".tmp")) if root.is_dir() else []
+        sig = _sig(files)
+        with self._lock:
+            if self.get_meta("config_sig") == sig:
+                return False
+            self.set_meta("config_sig", sig)
+            return True
+
     def update_tracker(self) -> bool:
         """Re-read the Action Items tab when the workbook changed. Read-only: never through Tracker, whose load
         creates a missing workbook and renames a damaged one. A missing tracker indexes as no items."""
@@ -324,12 +447,14 @@ class Index:
                     return False                 # and no signature, so the next change retries
             self.con.execute("DELETE FROM action_items")
             self.con.executemany(
-                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(str(it.get("ID")), _s(it.get("Created")), _s(it.get("JobID")), _s(it.get("Company")),
                   _s(it.get("Role")), _s(it.get("Type")), _s(it.get("What to do")), _s(it.get("Link")),
                   _s(it.get("Priority")), _s(it.get("Needs")), int(str(it.get("Done") or "N").upper() == "Y"),
-                  _s(it.get("DoneDate"))) for it in items if it.get("ID")])
+                  _s(it.get("DoneDate")), _due(it.get("Due")), _s(it.get("Due reason")))
+                 for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
+            self.set_meta("indexed_at", _now())
             return True
 
 
@@ -359,6 +484,13 @@ def read_action_items(path: Path) -> list[dict[str, Any]]:
         return [dict(zip(header, r)) for r in rows if r and r[0] not in (None, "")]
     finally:
         wb.close()
+
+
+def _due(v: Any) -> str | None:
+    """A typed Excel date comes back as a datetime at 00:00: keep only the date (due = the end of that day)."""
+    if isinstance(v, datetime) and v.time() == datetime.min.time() and v.tzinfo is None:
+        return v.date().isoformat()
+    return _s(v)
 
 
 def _s(v: Any) -> str | None:

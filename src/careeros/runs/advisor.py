@@ -192,7 +192,7 @@ def run_advice(runs: list[dict[str, Any]], pipeline: dict[str, Any], now: dateti
         failed = sum((r.get("counters") or {}).get("failed", 0) for r in rs)
         used = [(r.get("counters") or {}).get("attempted", 0) / max(1, (r.get("budget") or {}).get("max_jobs") or 1)
                 for r in rs]
-        m = {"runs": len(rs), "attempts": attempted, "avg_job_s": round(sum(durs) / len(durs), 1) if durs else 0,
+        m = {"runs": len(rs), "attempts": attempted, "failed": failed, "avg_job_s": round(sum(durs) / len(durs), 1) if durs else 0,
              "p90_job_s": _p90(durs), "failure_rate": round(failed / attempted, 2) if attempted else 0.0,
              "budget_used": round(sum(used) / len(used), 2), "stops": dict(Counter(r.get("stop_reason") for r in rs))}
         if kind == "score":

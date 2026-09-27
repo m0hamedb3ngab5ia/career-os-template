@@ -241,16 +241,20 @@ def invoke(cmd: list[str], cwd: str, env: dict[str, str], timeout_s: float, stre
     for t in threads:
         t.start()
     deadline = start + timeout_s
-    while proc.poll() is None:
-        if cancel is not None and cancel.is_set():
-            r.cancelled = True
-            _kill(proc)
-            break
-        if time.monotonic() >= deadline:
-            r.timed_out = True
-            _kill(proc)
-            break
-        time.sleep(0.1)
+    try:
+        while proc.poll() is None:
+            if cancel is not None and cancel.is_set():
+                r.cancelled = True
+                _kill(proc)
+                break
+            if time.monotonic() >= deadline:
+                r.timed_out = True
+                _kill(proc)
+                break
+            time.sleep(0.1)
+    except BaseException:  # an interrupt (e.g. a second Ctrl-C) must not orphan the claude process group
+        _kill(proc)
+        raise
     proc.wait()
     for t in threads:
         t.join(timeout=5)

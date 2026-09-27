@@ -1,7 +1,8 @@
 """Outreach gate: people the candidate already knows on LinkedIn get a hand-tailored message, never an automated one.
 
 `contacts.json` entries may carry `linkedin_degree` (1 = connected) and `mutuals` (count of mutual connections),
-recorded by the candidate with `careeros outreach mark`. `draft-outreach` calls `careeros outreach check` and, for a
+recorded by the candidate with `careeros outreach mark`. `pipeline.yaml: outreach.mutuals_threshold` (1 = any mutual)
+is how many mutual connections make a contact someone the candidate knows. `draft-outreach` calls `careeros outreach check` and, for a
 manual contact, marks the draft `manual_tailor: true` and opens ONE `send_linkedin` Action Item per job (text =
 `action_text`, naming every manual contact) instead of queueing it.
 Unknown degree/mutuals = no known relationship = the normal (draft-only / verified-email) rules apply.
@@ -15,23 +16,34 @@ from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 
-from careeros.config import Settings
+from careeros.config import ConfigError, Settings
 from careeros.models import Contact
 
 LINKEDIN_CONNECTED = "LINKEDIN_CONNECTED"
 LINKEDIN_MUTUALS = "LINKEDIN_MUTUALS"
+MUTUALS_THRESHOLD_RANGE = (1, 50)
 
 
 @dataclass(frozen=True)
 class OutreachPolicy:
     manual_if_connected: bool = True
     manual_if_mutuals: bool = True
+    mutuals_threshold: int = 1        # this many mutual connections or more = someone you know
 
     @classmethod
     def from_settings(cls, s: Settings) -> "OutreachPolicy":
+        """`pipeline.yaml: outreach`. ConfigError on a value that isn't what the key needs."""
         cfg = s.pipeline.get("outreach") or {}
-        return cls(manual_if_connected=bool(cfg.get("manual_if_connected", True)),
-                   manual_if_mutuals=bool(cfg.get("manual_if_mutuals", True)))
+        where = "config/pipeline.yaml: outreach"
+        for key in ("manual_if_connected", "manual_if_mutuals"):
+            if key in cfg and not isinstance(cfg[key], bool):
+                raise ConfigError(f"{where}.{key} must be true or false, got {cfg[key]!r}")
+        n = cfg.get("mutuals_threshold", 1)
+        lo, hi = MUTUALS_THRESHOLD_RANGE
+        if isinstance(n, bool) or not isinstance(n, int) or not lo <= n <= hi:
+            raise ConfigError(f"{where}.mutuals_threshold must be a whole number from {lo} to {hi}, got {n!r}")
+        return cls(manual_if_connected=cfg.get("manual_if_connected", True),
+                   manual_if_mutuals=cfg.get("manual_if_mutuals", True), mutuals_threshold=n)
 
 
 def _fields(contact: Mapping[str, Any] | Contact) -> tuple[int | None, int | None]:
@@ -45,7 +57,7 @@ def needs_manual_outreach(contact: Mapping[str, Any] | Contact, policy: Outreach
     degree, mutuals = _fields(contact)
     if policy.manual_if_connected and degree == 1:
         return True, LINKEDIN_CONNECTED
-    if policy.manual_if_mutuals and (mutuals or 0) > 0:
+    if policy.manual_if_mutuals and (mutuals or 0) >= policy.mutuals_threshold:
         return True, LINKEDIN_MUTUALS
     return False, None
 

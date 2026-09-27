@@ -24,31 +24,48 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   };
   if (p.jobs?.length) {
     add(["jobs"]);
+    add(["jobs-tabs"]); // Jobs screen filter-tab counts
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
     add(["inbox"]); // outreach.json, log.md (inbox-sync lines) and the status history too
     add(["status"]);
+    add(["today"]);
+    add(["pipeline"]);
   }
   if (p.runs?.length) {
     add(["runs"]);
     for (const id of p.runs) add(["run", id]);
+    add(["storage"]); // storage.jsonl and run history live under data/runs
+    add(["advise"]);
     add(["inbox"]); // "Last inbox sync" comes from inbox_sync runs
     add(["status"]);
+    add(["today"]); // recent runs, catch-up and the prepare queue
   }
   if (p.actions) {
     add(["status"]);
     add(["actions"]);
+    add(["today"]);
+    add(["pipeline"]); // card hints and overrides come from the tracker
   }
   if (p.config) {
     add(["meta"]);
+    add(["runs"]); // schedule, presets, inbox sync on/off
     add(["settings"]);
+    add(["advise"]); // advice depends on the config
+    add(["storage"]);
     add(["inbox"]); // follow-up due days (ui.followup_*_days)
     add(["contacts"]); // outreach.manual_if_connected / manual_if_mutuals
     add(["status"]);
+    add(["pipeline"]); // columns come from ui.pipeline
   }
   if (p.status) {
     add(["status"]);
-    add(["inbox"]); // data/sync_updates.json: pending inbox-sync updates in the Inbox thread
+    add(["runs"]); // pause, catch-up, queue, locks and the scheduler's state live in data/runs/
+    add(["today"]);    add(["inbox"]); // data/sync_updates.json: pending inbox-sync updates in the Inbox thread
+  }
+  if (p.status) {
+    add(["status"]);
+    add(["today"]);
   }
   return keys;
 }

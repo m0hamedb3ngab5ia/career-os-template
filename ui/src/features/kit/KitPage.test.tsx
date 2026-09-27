@@ -47,11 +47,11 @@ describe("KitPage", () => {
     const user = userEvent.setup();
     renderKit();
     const light = screen.getByRole("region", { name: "Light" });
-    expect(within(light).getByRole("button", { name: "Sync inbox" })).toHaveAccessibleDescription(
-      "Inbox sync isn't set up yet",
+    expect(within(light).getByRole("button", { name: "Sync" })).toHaveAccessibleDescription(
+      "This needs a backend that isn't built yet",
     );
     await user.click(within(light).getByRole("button", { name: "Open sheet" }));
-    expect(screen.getByRole("dialog", { name: "Mark connection" })).toBeInTheDocument();
+    expect(screen.getByRole("dialog", { name: "Add item" })).toBeInTheDocument();
     await user.keyboard("{Escape}");
     expect(within(light).getByRole("button", { name: "Open sheet" })).toHaveFocus();
   });

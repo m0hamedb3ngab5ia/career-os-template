@@ -220,7 +220,8 @@ prepare nightly at 02:00, prune weekly (all Recommended). Each job takes `every_
 (`at: ["01:00"]`). A nightly job waits for its time after you install the schedule; it does not run at once.
 `inbox_sync` (08:00 and 18:00) is in the file but `enabled: false` until the inbox-sync skill is finished; once you
 turn it on it needs the Gmail MCP logged in (step 2 above), or it stops with `auth_required`. Score, prepare and
-inbox sync never start inside quiet hours (09:00 to 18:00, Recommended); scout and prune ignore them. A slot held
+inbox sync never start inside quiet hours (09:00 to 18:00, Recommended); scout and prune ignore them
+(`schedule.scout_quiet_hours: true` makes scout wait too). A slot held
 back by quiet hours (or a busy runner) runs as soon as it may; it is not lost. It is a **LaunchAgent, not a daemon**: it runs as you, with your Claude
 Code login, only while you are logged in to your Mac. Nothing runs while the Mac sleeps, is off or you are logged out.
 
@@ -235,7 +236,9 @@ Code login, only while you are logged in to your Mac. Nothing runs while the Mac
 ```
 
 Pausing stops the current run before its next job, and ticks skip what falls due (it is not stored up). Missed
-slots never run on their own: they collapse into one pending catch-up that you start or dismiss.
+slots never run on their own: they collapse into one pending catch-up that you start or dismiss
+(`schedule.missed_runs: skip` drops them instead). With `runs.on_usage_limit: pause` a run that hits your Claude usage
+limit also pauses all runs until `careeros run resume` (the Recommended `stop` just waits for the next slot).
 
 **Where the logs are:** `data/runs/<run_id>/` (`run.json`, `run.log`, `attempts/` with each call's raw output),
 `data/runs/launchd.out.log` and `data/runs/launchd.err.log` (the scheduler's own output). `careeros prune` removes
@@ -252,6 +255,58 @@ git pull
 Your data is gitignored (or lives in your private repo), so a pull never conflicts with it. New settings
 show up in `examples/`; compare with your copy (`diff examples/config/targets.yaml config/targets.yaml`)
 and let `careeros doctor` tell you if a required key is missing.
+
+## Keeping a private copy in sync
+
+Step 9 keeps only your data private. Some people instead keep a whole **private copy** of this repo: the same
+code plus a committed `personal/` folder (profile, config, `CLAUDE.local.md`, linked with
+`careeros init --link personal`). The rule for such a copy: code, docs and skill changes land in the public
+template first, then get merged into the private copy; only personal values are committed privately.
+
+One-time setup in the private copy:
+
+```sh
+git remote add template https://github.com/<you>/career-os-template.git   # the public template
+.venv/bin/careeros sync install-hook      # pre-push guard: personal paths never go to a template URL
+```
+
+List the files your copy keeps different on purpose in a committed `.template-sync-keep` (one glob per line,
+with a reason), so they don't show up as drift:
+
+```text
+README.md        # my own README
+.gitattributes   # LFS rules for my data
+```
+
+Day to day:
+
+```sh
+.venv/bin/careeros sync status     # exit 0 in sync, 1 template commits not merged yet, 2 drift
+.venv/bin/careeros sync pull       # sync/<date> branch from main, merge the template (no fast-forward),
+                                   # run pytest (+ ui/ npm ci, test, build), print the push + `gh pr create` commands
+```
+
+- **Drift** = files that differ from the template outside personal paths and `.template-sync-keep`. They are
+  changes that belong in the template: branch from `template/main`, apply them there, open the PR, then
+  `careeros sync pull`.
+- `pull` refuses on uncommitted changes. On conflicts it stops (exit 3) with the files to resolve and the
+  commands to finish (`git add`, `git commit --no-edit`) or abort (`git merge --abort`). `--no-checks` skips the
+  local checks, `--branch` names the branch, `--remote` / `--template-branch` pick another remote or branch.
+- The checks run locally, so a private repo does not need its own CI minutes.
+
+Settings (git config in the private copy):
+
+| Key | Default | Meaning |
+|---|---|---|
+| `careeros.personalPaths` | `personal/ profile/ config/ CLAUDE.local.md data/` (Recommended) | paths that never go to the template and never count as drift (comma or space separated) |
+| `careeros.templateUrlPattern` | `*career-os-template*` (Recommended) | remote URLs the pre-push guard protects (shell glob) |
+
+`install-hook` is idempotent and will not replace a pre-push hook it did not write unless you pass `--force`
+(the old one is kept as `pre-push.bak`).
+The guard checks the tip tree and every commit the push sends. To know what the template already has, it asks
+the template itself (`git ls-remote <push URL>`), never local remote-tracking refs; if the template can't be
+reached, or a `url.*.insteadOf` rule would send that query to a different URL, it scans the whole pushed history
+instead (slower, never less safe).
 
 ## FAQ
 

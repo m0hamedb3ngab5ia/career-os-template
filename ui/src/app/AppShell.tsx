@@ -1,6 +1,7 @@
 import type { LucideIcon } from "lucide-react";
 import { Activity, Inbox, KanbanSquare, ListChecks, Search, Settings, Sun, Table2, Users, Zap } from "lucide-react";
-import { NavLink, Outlet } from "react-router";
+import { useEffect, useState, type FormEvent } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
 import { useStatus } from "../api/queries";
 import type { StatusSummary } from "../api/types";
@@ -66,6 +67,46 @@ function Freshness({ status, connection }: { status: StatusSummary | undefined; 
   );
 }
 
+/**
+ * Sidebar search: Enter opens Jobs filtered by the text (?q=). On the Jobs screen it shows the current q and keeps
+ * the rest of the view (tab, sort, columns) and follows the page's own search box.
+ */
+function SidebarSearch() {
+  const location = useLocation();
+  const navigate = useNavigate();
+  const onJobs = location.pathname === "/jobs";
+  const q = onJobs ? (new URLSearchParams(location.search).get("q") ?? "") : "";
+  const [text, setText] = useState(q);
+  useEffect(() => setText(q), [q]);
+
+  function onSubmit(e: FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    const value = text.trim();
+    const params = new URLSearchParams(onJobs ? location.search : "");
+    if (value) params.set("q", value);
+    else params.delete("q");
+    params.delete("sel");
+    const search = params.toString();
+    navigate({ pathname: "/jobs", search: search ? `?${search}` : "" });
+  }
+
+  return (
+    <form role="search" className={styles.search} onSubmit={onSubmit}>
+      <Search size={14} strokeWidth={1.7} aria-hidden="true" />
+      <input
+        type="search"
+        name="q"
+        autoComplete="off"
+        spellCheck={false}
+        value={text}
+        onChange={(e) => setText(e.target.value)}
+        placeholder="Search jobs and companies…"
+        aria-label="Search jobs and companies"
+      />
+    </form>
+  );
+}
+
 export function AppShell() {
   const connection = useLiveEvents();
   const { data: status } = useStatus();
@@ -82,18 +123,7 @@ export function AppShell() {
           </span>
           <span translate="no">career-os</span>
         </div>
-        <label className={styles.search}>
-          <Search size={14} strokeWidth={1.7} aria-hidden="true" />
-          <span className="sr-only">Search jobs and companies (coming soon)</span>
-          <input
-            type="search"
-            name="q"
-            autoComplete="off"
-            placeholder="Search jobs and companies…"
-            disabled
-            title="Search arrives with the Jobs screen"
-          />
-        </label>
+        <SidebarSearch />
         {NAV.map(({ group, items }) => (
           <div key={group}>
             <h2 className={styles.group}>{group}</h2>
