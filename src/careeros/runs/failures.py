@@ -7,10 +7,10 @@ A success clears the entry.
 from __future__ import annotations
 
 import json
-import os
 from datetime import datetime
 from typing import Any
 
+from careeros.runs.atomic import write_json
 from careeros.runs.store import RunStore, iso
 
 JOB_FAILURES = ("skill_error", "invalid_result", "error", "timeout")
@@ -28,10 +28,7 @@ class Failures:
         return data if isinstance(data, dict) else {}
 
     def _save(self, data: dict[str, Any]) -> None:
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = self.path.with_name(f"{self.path.name}.{os.getpid()}.tmp")
-        tmp.write_text(json.dumps(data, indent=1, sort_keys=True), encoding="utf-8")
-        tmp.replace(self.path)
+        write_json(self.path, data, indent=1, sort_keys=True)
 
     @staticmethod
     def key(kind: str, job_id: str) -> str:

@@ -83,6 +83,15 @@ def wait_for(fn, timeout: float = 60, every: float = 0.2):
     raise AssertionError("timed out waiting")
 
 
+def _summary(path: Path) -> dict | None:
+    """The detached child's JSON summary, or None while it is still being written (empty or partial)."""
+    try:
+        got = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return None
+    return got if isinstance(got, dict) else None
+
+
 def finished(rc: RunControl, kind: str):
     runs = rc.history(kind=kind)["runs"]
     return runs[0] if runs and runs[0]["state"] != "running" else None
@@ -102,7 +111,8 @@ def test_start_runs_a_batch_detached_and_history_shows_it(root, env):
     out = rc.start("score", preset="small")
     run = wait_for(lambda: finished(rc, "score"))
     assert run["stop_reason"] == "completed" and run["counters"]["ok"] == 2
-    assert Path(out["output"]).exists() and json.loads(Path(out["output"]).read_text())["id"] == run["id"]
+    # run.json turns "finished" before the child prints its summary and exits: wait for the whole summary
+    assert wait_for(lambda: _summary(Path(out["output"])), timeout=30)["id"] == run["id"]
     events = list(rc.tail(run["id"], follow=False))
     assert any(e["type"] == "system" for e in events) and any(e["type"] == "result" for e in events)
     assert any(e["type"] == "log" and "stop completed" in e["text"] for e in events)

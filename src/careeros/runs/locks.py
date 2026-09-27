@@ -21,6 +21,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator
 
+from careeros.runs.atomic import write_json
+
 try:
     import fcntl
 except ImportError:  # pragma: no cover - non-POSIX
@@ -125,9 +127,7 @@ def _write_new(path: Path, body: dict[str, Any]) -> bool:
 
 
 def _replace(path: Path, body: dict[str, Any]) -> None:
-    tmp = path.with_name(f"{path.name}.{os.getpid()}.tmp")
-    tmp.write_text(json.dumps(body, indent=1), encoding="utf-8")
-    tmp.replace(path)
+    write_json(path, body, indent=1)
 
 
 def acquire(path: Path, owner: str, ttl_seconds: float, *, token: str | None = None, pid: int | None = None,
