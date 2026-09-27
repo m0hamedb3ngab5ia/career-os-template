@@ -690,3 +690,31 @@ def add_action(settings: Settings, what: str, type: str, job_id: str = "", compa
     aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
                              role=role, link=link, priority=priority, needs=needs)
     return f"action item {aid} added ({type}/{priority}/{needs})"
+
+
+def sync_all(settings: Settings) -> dict[str, Any]:
+    """Every job folder -> one Jobs row (created or updated) plus the Config tab counters: `careeros tracker sync`
+    and the UI's Sync tracker. Returns {synced, path, pending} (pending = ops queued while Excel holds the file)."""
+    from careeros.models import TrackerRow
+    from careeros.store import Store
+
+    store = Store(settings)
+    tr = Tracker(settings=settings)
+    tr.init()
+    rows = []
+    for jid in store.iter_job_ids():
+        p = store.load_posting(jid)
+        if not p:
+            continue
+        row = TrackerRow.from_posting(p, store.load_score(jid), folder=str(store.job_dir(jid)))
+        st = store.get_status(jid)
+        if st:
+            row.status = st  # type: ignore[assignment]
+        rows.append(row)
+    counts = tr.upsert_jobs(rows)
+    jobs = store.list_jobs()
+    tr.set_config("last_sync", datetime.now().strftime("%Y-%m-%d %H:%M"))
+    tr.set_config("jobs_count", len(jobs))
+    tr.set_config("applied_count", sum(1 for j in jobs if j["status"] == "applied"))
+    return {"synced": counts.get("created", 0) + counts.get("updated", 0), "path": str(tr.path),
+            "pending": tr.pending_count()}
