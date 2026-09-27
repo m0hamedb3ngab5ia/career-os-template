@@ -74,7 +74,7 @@ describe("NextScheduled", () => {
   it("shows the schedule error instead of times", () => {
     mockApi(defaultRoutes());
     renderWithApp(
-      <NextScheduled schedule={{ next: {}, error: "schedule: bad time '25:00'" }} catchUp={null} now={NOW} />,
+      <NextScheduled schedule={{ last_tick: null, next: {}, error: "schedule: bad time '25:00'" }} catchUp={null} now={NOW} />,
     );
     expect(screen.getByText(/schedule: bad time/)).toBeInTheDocument();
   });

@@ -25,7 +25,7 @@ export function TodayPage() {
     open === null ? formatLongDate(now) : `${formatLongDate(now)} · ${formatCount(open)} ${open === 1 ? "item needs" : "items need"} you`;
 
   return (
-    <Page title="Today" subtitle={subtitle} actions={<HeaderActions queue={today.data?.prepare_queue ?? (today.data ? { total: null } : undefined)} paused={!!s?.paused} />}>
+    <Page title="Today" subtitle={subtitle} actions={<HeaderActions queue={today.data?.prepare_queue ?? (today.data ? { total: null, error: null } : undefined)} paused={!!s?.paused} />}>
       <div className={styles.stack}>
         {s?.paused ? <PausedBanner paused={s.paused} now={now} /> : null}
         {status.isPending ? (
@@ -48,7 +48,7 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : (
-          <StatTiles tiles={s?.tiles ?? {}} now={now} />
+          <StatTiles tiles={s?.tiles} now={now} />
         )}
         <div className={styles.columns}>
           <div className={styles.main}>

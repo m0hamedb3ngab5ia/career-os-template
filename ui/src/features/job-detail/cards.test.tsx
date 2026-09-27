@@ -57,7 +57,7 @@ describe("ContactsCard", () => {
     const { rerender } = renderWithProviders(
       <ContactsCard
         contacts={[{ name: "Sam Park", linkedin_degree: 1 }]}
-        policy={[{ name: "Sam Park", manual: true, reason: "LINKEDIN_CONNECTED" }]}
+        policy={[{ name: "Sam Park", role: "", manual: true, reason: "LINKEDIN_CONNECTED", detail: "" }]}
         outreach={null}
       />,
     );

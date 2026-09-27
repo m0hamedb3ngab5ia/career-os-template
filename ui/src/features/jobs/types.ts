@@ -1,44 +1,16 @@
-// Shapes of the Jobs endpoints (src/careeros/ui/services/jobs.py + the today-jobs API contract).
+// Jobs endpoint shapes, generated from the FastAPI OpenAPI schema (src/api/schema.gen.ts; services/jobs.py). The
+// tracker replies (routers/tracker.py) stay hand-written.
+import type { components } from "../../api/schema.gen";
 
-export interface JobListItem {
-  job_id: string;
-  company: string | null;
-  title: string | null;
-  location: string | null;
-  ats: string | null;
-  url: string | null;
-  category: string | null;
-  fit: number | null;
-  tier: string | null;
-  status: string | null;
-  safety: string | null;
-  qa_passed: boolean | number | null;
-  qa_score: number | null;
-  found_at: string | null;
-  applied_at: string | null;
-  updated_at: string | null;
-  closes_at: string | null;
-  /** The highest-priority open Action Item's "what" for this job. */
-  next_action?: string | null;
-}
+type Schemas = components["schemas"];
 
-export interface JobsPage {
-  items: JobListItem[];
-  total: number;
-  next_cursor: string | null;
-}
+/** An index row plus `next_action`: the highest-priority open Action Item's "what" for this job. */
+export type JobListItem = Schemas["JobListItem"];
+export type JobsPage = Schemas["JobsPage"];
+export type JobsTab = Schemas["JobsTab"];
+export type JobsTabs = Schemas["JobsTabs"];
 
 export type TabKey = "active" | "review" | "applied" | "tier_a" | "all";
-
-export interface JobsTab {
-  key: string;
-  label: string;
-  count: number;
-}
-
-export interface JobsTabs {
-  tabs: JobsTab[];
-}
 
 export interface TrackerSync {
   synced: number;

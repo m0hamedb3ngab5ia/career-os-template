@@ -34,7 +34,7 @@ def _closed(c: Any) -> list[str]:
 def list_jobs(status: list[str] = Query(default=[]), tier: list[str] = Query(default=[]),
               safety: list[str] = Query(default=[]), category: list[str] = Query(default=[]), q: str | None = None,
               sort: str = svc.DEFAULT_SORT, cursor: str | None = None, tab: str | None = None,
-              limit: int | None = Query(default=None, ge=1, le=svc.MAX_LIMIT), c=Depends(ctx)) -> dict[str, Any]:
+              limit: int | None = Query(default=None, ge=1, le=svc.MAX_LIMIT), c=Depends(ctx)) -> svc.JobsPage:
     from careeros.ui.config import load_ui_config
 
     return svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q, sort=sort,
@@ -43,7 +43,7 @@ def list_jobs(status: list[str] = Query(default=[]), tier: list[str] = Query(def
 
 
 @router.get("/jobs/tabs")
-def job_tabs(q: str | None = None, c=Depends(ctx)) -> dict[str, Any]:
+def job_tabs(q: str | None = None, c=Depends(ctx)) -> svc.JobsTabs:
     return {"tabs": svc.tabs(c.index, _closed(c), q=q)}
 
 
@@ -67,7 +67,7 @@ def export(body: Export, c=Depends(ctx)) -> Response:
 
 
 @router.get("/jobs/{job_id}")
-def job_detail(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+def job_detail(job_id: str, c=Depends(ctx)) -> svc.JobDetail:
     d = svc.job_detail(c.settings, c.index, job_id)
     if d is None:
         raise HTTPException(404, f"no job {job_id!r}")

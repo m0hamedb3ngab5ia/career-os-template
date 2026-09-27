@@ -252,6 +252,62 @@ export type webhooks = Record<string, never>;
 
 export interface components {
   schemas: {
+    /** ActionHint */
+    ActionHint: {
+      /** Due */
+      due: string | null;
+      /** Due Reason */
+      due_reason: string | null;
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "action";
+      /** Type */
+      type: string;
+    };
+    /**
+     * ActionItem
+     * @description One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape).
+     */
+    ActionItem: {
+      /** Bucket */
+      bucket: string;
+      /** Company */
+      company: string;
+      /** Created */
+      created: string | null;
+      /** Done */
+      done: boolean;
+      /** Done Date */
+      done_date: string | null;
+      /** Due */
+      due: string | null;
+      /** Due Date Only */
+      due_date_only: boolean;
+      /** Due Reason */
+      due_reason: string | null;
+      /** Id */
+      id: string;
+      /** Job Id */
+      job_id: string | null;
+      /** Level */
+      level: string;
+      /** Link */
+      link: string;
+      /** Needs */
+      needs: string;
+      /** Priority */
+      priority: string;
+      /** Role */
+      role: string;
+      /** Scam Actions */
+      scam_actions: boolean;
+      /** Type */
+      type: string;
+      /** What */
+      what: string;
+    };
     /** ActionRow */
     ActionRow: {
       /** Company */
@@ -275,6 +331,15 @@ export interface components {
       /** What */
       what: string | null;
     };
+    /** ActivityEntry */
+    ActivityEntry: {
+      /** At */
+      at: string;
+      /** Component */
+      component: string;
+      /** Message */
+      message: string;
+    };
     /** AppliedWeekTile */
     AppliedWeekTile: {
       /** Daily Cap */
@@ -286,10 +351,59 @@ export interface components {
       /** Value */
       value: number;
     };
+    /** Board */
+    Board: {
+      /** Card Limit */
+      card_limit: number;
+      closed: components["schemas"]["Closed"];
+      /** Columns */
+      columns: components["schemas"]["Column"][];
+      options: components["schemas"]["BoardOptions"];
+    };
+    /** BoardOptions */
+    BoardOptions: {
+      /** Categories */
+      categories: string[];
+      /** Locations */
+      locations: components["schemas"]["LocationOption"][];
+    };
     /** CancelBody */
     CancelBody: {
       /** Run Id */
       run_id?: string | null;
+    };
+    /** Card */
+    Card: {
+      /** Category */
+      category: string | null;
+      /** Company */
+      company: string | null;
+      /** Fit */
+      fit: number | null;
+      /** Found At */
+      found_at: string | null;
+      /** Hint */
+      hint: components["schemas"]["ActionHint"] | components["schemas"]["SafetyHint"] | components["schemas"]["NotScoredHint"] | components["schemas"]["TierAHint"] | components["schemas"]["QaFailedHint"] | null;
+      /** Job Id */
+      job_id: string;
+      /** Location */
+      location: string | null;
+      /** Override */
+      override: string | null;
+      /** Qa Passed */
+      qa_passed: boolean | null;
+      /** Qa Score */
+      qa_score: number | null;
+      /** Safety */
+      safety: string | null;
+      /** Status */
+      status: string;
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
     };
     /** CatchUpBody */
     CatchUpBody: {
@@ -316,6 +430,15 @@ export interface components {
        */
       note?: string;
     };
+    /** Closed */
+    Closed: {
+      /** By Status */
+      by_status: {
+        [key: string]: number;
+      };
+      /** Count */
+      count: number;
+    };
     /** ClosedCount */
     ClosedCount: {
       /** By Status */
@@ -325,12 +448,36 @@ export interface components {
       /** Count */
       count: number;
     };
+    /** Column */
+    Column: {
+      /** Cards */
+      cards: components["schemas"]["Card"][];
+      /** Count */
+      count: number;
+      /** Name */
+      name: string;
+      /** Statuses */
+      statuses: string[];
+    };
     /** ColumnConfig */
     ColumnConfig: {
       /** Name */
       name: string;
       /** Statuses */
       statuses: string[];
+    };
+    /** ContactPolicy */
+    ContactPolicy: {
+      /** Detail */
+      detail: string;
+      /** Manual */
+      manual: boolean;
+      /** Name */
+      name: string;
+      /** Reason */
+      reason: string | null;
+      /** Role */
+      role: string;
     };
     /** Counts */
     Counts: {
@@ -375,6 +522,15 @@ export interface components {
        * @default []
        */
       tier?: string[];
+    };
+    /** FileEntry */
+    FileEntry: {
+      /** Modified */
+      modified: number;
+      /** Name */
+      name: string;
+      /** Size */
+      size: number;
     };
     /** FlagBody */
     FlagBody: {
@@ -421,6 +577,165 @@ export interface components {
       rows: components["schemas"]["TileRow"][];
       /** Value */
       value: number;
+    };
+    /** JobDetail */
+    JobDetail: {
+      /** Activity */
+      activity: components["schemas"]["ActivityEntry"][];
+      /** Apply Session */
+      apply_session: {
+        [key: string]: unknown;
+      } | null;
+      /** Contacts */
+      contacts: {
+          [key: string]: unknown;
+        }[];
+      /** Contacts Policy */
+      contacts_policy: components["schemas"]["ContactPolicy"][];
+      /** Documents */
+      documents: components["schemas"]["FileEntry"][];
+      /** History */
+      history: {
+          [key: string]: unknown;
+        }[];
+      job: components["schemas"]["JobRow"] | null;
+      /** Log */
+      log: string;
+      /** Outreach */
+      outreach: {
+        [key: string]: unknown;
+      } | null;
+      /** Override */
+      override: string | null;
+      /** Posting */
+      posting: {
+        [key: string]: unknown;
+      };
+      /** Qa */
+      qa: {
+        [key: string]: unknown;
+      } | null;
+      registry: components["schemas"]["Registry"];
+      /** Safety */
+      safety: {
+        [key: string]: unknown;
+      } | null;
+      /** Score */
+      score: {
+        [key: string]: unknown;
+      } | null;
+      /** Screenshots */
+      screenshots: components["schemas"]["FileEntry"][];
+      /** Status */
+      status: string | null;
+      /** Submitted */
+      submitted: string[];
+    };
+    /** JobListItem */
+    JobListItem: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Ats */
+      ats: string | null;
+      /** Category */
+      category: string | null;
+      /** Closes At */
+      closes_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Fit */
+      fit: number | null;
+      /** Found At */
+      found_at: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Location */
+      location: string | null;
+      /** Next Action */
+      next_action: string | null;
+      /** Qa Passed */
+      qa_passed: number | null;
+      /** Qa Score */
+      qa_score: number | null;
+      /** Safety */
+      safety: string | null;
+      /** Status */
+      status: string | null;
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+      /** Url */
+      url: string | null;
+    };
+    /** JobRow */
+    JobRow: {
+      /** Applied At */
+      applied_at: string | null;
+      /** Ats */
+      ats: string | null;
+      /** Category */
+      category: string | null;
+      /** Closes At */
+      closes_at: string | null;
+      /** Company */
+      company: string | null;
+      /** Fit */
+      fit: number | null;
+      /** Found At */
+      found_at: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Location */
+      location: string | null;
+      /** Qa Passed */
+      qa_passed: number | null;
+      /** Qa Score */
+      qa_score: number | null;
+      /** Safety */
+      safety: string | null;
+      /** Status */
+      status: string | null;
+      /** Tier */
+      tier: string | null;
+      /** Title */
+      title: string | null;
+      /** Updated At */
+      updated_at: string | null;
+      /** Url */
+      url: string | null;
+    };
+    /** JobsPage */
+    JobsPage: {
+      /** Items */
+      items: components["schemas"]["JobListItem"][];
+      /** Next Cursor */
+      next_cursor: string | null;
+      /** Total */
+      total: number;
+    };
+    /** JobsTab */
+    JobsTab: {
+      /** Count */
+      count: number;
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
+    };
+    /** JobsTabs */
+    JobsTabs: {
+      /** Tabs */
+      tabs: components["schemas"]["JobsTab"][];
+    };
+    /** LocationOption */
+    LocationOption: {
+      /** Count */
+      count: number;
+      /** Value */
+      value: string;
     };
     /** MarkBody */
     MarkBody: {
@@ -504,6 +819,14 @@ export interface components {
       /** What */
       what: string;
     };
+    /** NotScoredHint */
+    NotScoredHint: {
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "not_scored";
+    };
     /** NoteBody */
     NoteBody: {
       /** Note */
@@ -548,6 +871,13 @@ export interface components {
       /** Columns */
       columns: components["schemas"]["PipelineColumnCount"][];
     };
+    /** PrepareQueue */
+    PrepareQueue: {
+      /** Error */
+      error: string | null;
+      /** Total */
+      total: number | null;
+    };
     /** Presets */
     Presets: {
       /** Current */
@@ -582,6 +912,25 @@ export interface components {
        * @default true
        */
       dry_run?: boolean;
+    };
+    /** QaFailedHint */
+    QaFailedHint: {
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "qa_failed";
+    };
+    /** Registry */
+    Registry: {
+      /** Flagged */
+      flagged: {
+        [key: string]: unknown;
+      } | null;
+      /** Verified */
+      verified: {
+        [key: string]: unknown;
+      } | null;
     };
     /** ResponseBreakdown */
     ResponseBreakdown: {
@@ -638,6 +987,16 @@ export interface components {
       /** Trigger */
       trigger: string | null;
     };
+    /** SafetyHint */
+    SafetyHint: {
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "safety";
+      /** Text */
+      text: string;
+    };
     /** ScheduleState */
     ScheduleState: {
       /** Error */
@@ -692,6 +1051,14 @@ export interface components {
       /** Status */
       status: string;
     };
+    /** TierAHint */
+    TierAHint: {
+      /**
+       * Kind
+       * @constant
+       */
+      kind: "tier_a";
+    };
     /** TileRow */
     TileRow: {
       /** Company */
@@ -711,6 +1078,12 @@ export interface components {
       interviews: components["schemas"]["InterviewsTile"];
       needs_you: components["schemas"]["NeedsYouTile"];
       response_rate: components["schemas"]["ResponseRateTile"];
+    };
+    /** Today */
+    Today: {
+      /** Actions */
+      actions: components["schemas"]["ActionItem"][];
+      prepare_queue: components["schemas"]["PrepareQueue"];
     };
     /** UiSettings */
     UiSettings: {
@@ -1236,9 +1609,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["JobsPage"];
         };
       };
       /** @description Validation Error */
@@ -1282,9 +1653,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["JobsTabs"];
         };
       };
       /** @description Validation Error */
@@ -1306,9 +1675,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["JobDetail"];
         };
       };
       /** @description Validation Error */
@@ -1619,9 +1986,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Board"];
         };
       };
       /** @description Validation Error */
@@ -2120,9 +2485,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
+          "application/json": components["schemas"]["Today"];
         };
       };
       /** @description Validation Error */

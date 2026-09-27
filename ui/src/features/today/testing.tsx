@@ -4,36 +4,49 @@ import type { ReactNode } from "react";
 import { createMemoryRouter, RouterProvider } from "react-router";
 import { vi } from "vitest";
 import { ToastProvider } from "../../kit/Toast";
+import { META } from "../../test/mockApi";
 import type { ActionItem, Meta, TodayData, TodayStatus } from "./types";
 
 // Test-only helpers: fictional fixtures shaped like the server's JSON and a fetch mock routed by method + path.
 
 export const NOW = new Date("2026-09-25T10:00:00Z"); // Friday
 
+/** An Action Item with every field the server sends; tests override what they care about. */
+export function actionItem(over: Partial<ActionItem> & Pick<ActionItem, "id" | "company" | "what">): ActionItem {
+  return {
+    created: null, job_id: null, role: "", type: "other", link: "", priority: "", needs: "", done: false,
+    done_date: null, due: null, due_date_only: false, due_reason: null, bucket: "nodate", level: "none",
+    scam_actions: false, ...over,
+  };
+}
+
 export const actions: ActionItem[] = [
-  { id: 11, job_id: "j-acme", company: "Acme Robotics", role: "Software Engineer, Platform",
+  actionItem({ id: "11", job_id: "j-acme", company: "Acme Robotics", role: "Software Engineer, Platform",
     what: "Tier A: review résumé, cover letter and answers, then submit yourself", type: "review", priority: "H",
     needs: "laptop", link: "https://jobs.example.com/acme/123", created: "2026-09-20T09:00:00Z",
-    due: "2026-10-03T12:00:00Z", due_reason: "posting closes" },
-  { id: 12, job_id: "j-globex", company: "Globex", role: "Backend Engineer",
+    due: "2026-10-03T12:00:00Z", due_reason: "posting closes", level: "later", bucket: "later" }),
+  actionItem({ id: "12", job_id: "j-globex", company: "Globex", role: "Backend Engineer",
     what: "Interview invite: pick a slot", type: "send_email", priority: "H", needs: "phone",
     link: "https://mail.example.org/thread/1", created: "2026-09-24T09:00:00Z",
-    due: "2026-09-26T15:00:00Z", due_reason: "reply within 48 hours" },
-  { id: 13, job_id: "j-initech", company: "Initech", role: "Data Engineer",
+    due: "2026-09-26T15:00:00Z", due_reason: "reply within 48 hours", level: "soon", bucket: "tomorrow" }),
+  actionItem({ id: "13", job_id: "j-initech", company: "Initech", role: "Data Engineer",
     what: "Add a number to the dashboard bullet", type: "profile_gap", priority: "L", needs: "anytime",
-    link: "profile/master.yaml", created: "2026-09-22T09:00:00Z", due: null, due_reason: null },
-  { id: 14, job_id: "j-hooli", company: "Hooli", role: "Software Engineer",
+    link: "profile/master.yaml", created: "2026-09-22T09:00:00Z", due: null, due_reason: null, level: "none", bucket: "nodate" }),
+  actionItem({ id: "14", job_id: "j-hooli", company: "Hooli", role: "Software Engineer",
     what: "Tailor the message yourself", type: "send_linkedin", priority: "M", needs: "phone",
-    link: "", created: "2026-09-21T09:00:00Z", due: "2026-09-24T09:00:00Z", due_reason: "note was due" },
+    link: "", created: "2026-09-21T09:00:00Z", due: "2026-09-24T09:00:00Z", due_reason: "note was due", level: "overdue", bucket: "overdue" }),
 ];
 
 export const today: TodayData = { actions, prepare_queue: { total: 3, error: null } };
 
 export const meta: Meta = {
+  ...META,
+  clean_stops: [],
+  stop_reasons: [],
   statuses: ["found", "queued", "needs_review", "applied", "screening", "interview", "offer", "rejected"],
-  presets: { names: ["small", "medium", "large"], recommended: "medium", current: "small" },
-  pipeline: { columns: [], closed: [] },
-  ui: { theme: "system", undo_seconds: 8, page_size: 50 },
+  presets: { names: ["small", "medium", "large"], recommended: "medium", current: "small", values: {} },
+  pipeline: { columns: [], closed: [], card_limit: 5 },
+  ui: { theme: "system", undo_seconds: 8, page_size: 50, due_soon_hours: 48, pause_until_tomorrow_at: "08:00" },
 };
 
 export const status: TodayStatus = {
@@ -54,7 +67,6 @@ export const status: TodayStatus = {
     response_rate: {
       rate: 7 / 41, responded: 7, applied: 41, days: 30,
       definition: "applications in the last 30 days that reached screening, interview, offer or rejected",
-      ghost_days: 30,
       breakdown: [
         { status: "interview", count: 2, companies: ["Globex", "Hooli"] },
         { status: "rejected", count: 5, companies: ["Initech"] },
@@ -72,13 +84,13 @@ export const status: TodayStatus = {
     ],
     closed: { count: 0, by_status: {} },
   },
-  counts: { jobs: 476, action_items_open: 4 },
+  counts: { jobs: 476, action_items_open: 4, inbox: 0, contacts: 0 },
   recent_runs: [
-    { id: "r1", kind: "scout", status: "ok", stop_reason: "completed", detail: "38 new of 412 scanned",
+    { trigger: null, ended_at: null, duration_s: null, attempted: null, ok: null, failed: null, id: "r1", kind: "scout", status: "ok", stop_reason: "completed", detail: "38 new of 412 scanned",
       started_at: "2026-09-25T08:02:00Z", interrupted: false },
-    { id: "r2", kind: "prepare", status: "running", stop_reason: null, detail: "", started_at: "2026-09-25T09:14:00Z",
+    { trigger: null, ended_at: null, duration_s: null, failed: null, id: "r2", kind: "prepare", status: "running", stop_reason: null, detail: "", started_at: "2026-09-25T09:14:00Z",
       attempted: 2, ok: 1, interrupted: true },
-    { id: "r3", kind: "score", status: "done", stop_reason: "mystery_reason", detail: "",
+    { trigger: null, ended_at: null, duration_s: null, attempted: null, ok: null, failed: null, id: "r3", kind: "score", status: "done", stop_reason: "mystery_reason", detail: "",
       started_at: "2026-09-21T16:40:00Z", interrupted: false },
   ],
   paused: null,

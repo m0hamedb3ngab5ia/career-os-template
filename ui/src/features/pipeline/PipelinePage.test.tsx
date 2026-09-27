@@ -11,7 +11,7 @@ import type { Board, Card } from "./types";
 function card(over: Partial<Card>): Card {
   return {
     job_id: "j1", company: "Acme Robotics", title: "Backend Engineer", location: "New York, NY", category: "swe_backend",
-    fit: null, tier: null, status: "found", safety: "pass", qa_passed: null, qa_score: null, override: null,
+    fit: null, tier: null, status: "found", safety: "pass", qa_passed: null, qa_score: null, found_at: null, updated_at: null, override: null,
     hint: { kind: "not_scored" }, ...over,
   };
 }

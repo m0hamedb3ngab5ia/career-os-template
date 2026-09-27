@@ -88,3 +88,18 @@ def test_response_matches_snapshot(env, name):
         snap.write_text(json.dumps(got, indent=2, sort_keys=True) + "\n")
     assert got == json.loads(snap.read_text())
     assert not re.search(r"/(private|tmp|var|Users)/", json.dumps(got)), "a machine path leaked into the snapshot"
+
+
+def test_job_detail_reads_malformed_job_files_as_empty(env):
+    """A job file holding the wrong JSON type (a list where an object belongs) reads as missing instead of failing
+    the typed response."""
+    client, data, _ = env
+    jid = data["jobs"]["review"]
+    d = Path(data["settings"].paths["jobs_dir"]) / jid
+    for name in ("score.json", "safety.json", "qa.json", "apply_session.json", "outreach.json"):
+        (d / name).write_text("[1, 2]", encoding="utf-8")
+    (d / "contacts.json").write_text(json.dumps({"contacts": ["not a contact", {"name": None}]}), encoding="utf-8")
+    body = client.get(f"/api/jobs/{jid}").json()
+    assert [body[k] for k in ("score", "safety", "qa", "apply_session", "outreach")] == [None] * 5
+    assert body["contacts"] == [{"name": None}]
+    assert body["contacts_policy"][0]["name"] == ""

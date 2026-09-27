@@ -1,0 +1,1 @@
+import{t as e}from"./index-C6Cq6z_t.js";function t(){return e().data?.ui.undo_seconds}export{t};

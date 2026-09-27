@@ -59,6 +59,8 @@ UI writes always go through the existing APIs (`Store.set_status`, `Tracker.set_
 The frontend's API types come from FastAPI's OpenAPI schema, not from hand-written copies. A route gets a shape by
 annotating its service function with a `TypedDict` (`NotRequired[...]` for keys the backend may leave out); routes
 that still return `dict[str, Any]` keep hand-written types in `ui/src/features/*/types.ts`, as do SSE payloads.
+Files returned as written (a job's `posting.json`, `score.json`, ..., the run store's pause / catch-up files) are open
+mappings in the schema; the feature `types.ts` describes their contents by hand on top of the generated envelope.
 After changing a response shape, regenerate and commit both files:
 
 ```bash

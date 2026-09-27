@@ -37,16 +37,16 @@ function capitalize(s: string): string {
   return s ? s[0]!.toUpperCase() + s.slice(1) : s;
 }
 
-function specs(t: Tiles, now: Date): TileSpec[] {
-  const applied = t.applied_week ?? { value: 0, rows: [] };
+function specs(t: Partial<Tiles>, now: Date): TileSpec[] {
+  const applied = t.applied_week ?? { value: 0, since: "", daily_cap: null, rows: [] };
   const needs = t.needs_you ?? { value: 0, high: 0, rows: [] };
   const interviews = t.interviews ?? { value: 0, rows: [] };
-  const rr = t.response_rate ?? { rate: null, responded: 0, applied: 0, days: 30, rows: [] };
+  const rr = t.response_rate ?? { rate: null, responded: 0, applied: 0, days: 30, definition: "", breakdown: [], rows: [] };
   const aRows = applied.rows ?? [];
   const nRows = needs.rows ?? [];
   const iRows = interviews.rows ?? [];
   const since = formatDay(applied.since, now);
-  const names = uniq(iRows.map((r) => r.company));
+  const names = uniq(iRows.flatMap((r) => (r.company ? [r.company] : [])));
   const cap = applied.daily_cap;
   return [
     {
@@ -58,8 +58,8 @@ function specs(t: Tiles, now: Date): TileSpec[] {
         sub: `${plural(applied.value, "application", "applications")}${since ? ` since ${since}` : " this week"}`,
         rows: aRows.map((r) => ({
           key: r.job_id,
-          company: r.company,
-          role: r.role,
+          company: r.company ?? "",
+          role: r.role ?? undefined,
           detail: describeCode(STATUSES, r.detail).label,
           when: formatDay(r.when, now),
         })),
@@ -79,9 +79,9 @@ function specs(t: Tiles, now: Date): TileSpec[] {
         sub: `${plural(needs.value, "item", "items")} · ${formatCount(needs.high ?? 0)} high priority`,
         rows: nRows.map((r) => ({
           key: String(r.id),
-          company: r.company,
+          company: r.company ?? "",
           role: r.role ?? undefined,
-          detail: r.what,
+          detail: r.what ?? undefined,
           when: r.priority ? describeCode(PRIORITIES, r.priority).label : null,
         })),
         more: Math.max(0, needs.value - nRows.length),
@@ -100,8 +100,8 @@ function specs(t: Tiles, now: Date): TileSpec[] {
         sub: `${formatCount(interviews.value)} active`,
         rows: iRows.map((r) => ({
           key: r.job_id,
-          company: r.company,
-          role: r.role,
+          company: r.company ?? "",
+          role: r.role ?? undefined,
           detail: describeCode(STATUSES, r.detail).label,
           when: formatDay(r.when, now),
         })),
@@ -132,11 +132,12 @@ function specs(t: Tiles, now: Date): TileSpec[] {
   ];
 }
 
-export function StatTiles({ tiles, now }: { tiles: Tiles; now: Date }) {
+/** `tiles` is missing only while /api/status has not answered with a full reply (then every tile reads zero). */
+export function StatTiles({ tiles, now }: { tiles: Tiles | undefined; now: Date }) {
   const [open, setOpen] = useState<TileKey | null>(null);
   const anchor = useRef<HTMLElement | null>(null);
   const popId = useId();
-  const list = specs(tiles, now);
+  const list = specs(tiles ?? {}, now);
   const current = list.find((s) => s.key === open);
 
   function close() {
