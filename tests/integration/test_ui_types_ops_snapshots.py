@@ -29,7 +29,7 @@ REPO = Path(__file__).resolve().parents[2]
 SNAPSHOTS = REPO / "tests" / "fixtures" / "ui_snapshots"
 NOW = datetime(2026, 9, 24, 15, 0, tzinfo=timezone.utc)
 # values that change per build (generated ids, wall-clock stamps, temp paths): blanked, their keys kept
-VOLATILE = {"id", "run_id", "created", "indexed_at", "pid", "log", "path", "root", "dir", "next", "version"}
+VOLATILE = {"id", "run_id", "created", "indexed_at", "pid", "log", "path", "root", "dir", "next", "version", "done_date"}
 SIZES = {"storage"}  # byte counts and free disk space vary per machine
 
 
