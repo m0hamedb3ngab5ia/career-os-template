@@ -63,3 +63,13 @@ def test_creds_path_override_inside_the_repo_warns(root: Path):
     assert (root / "secrets" / "credentials.yaml").is_file()
     out = _cli(root, "doctor").stdout
     assert "WARN  credentials" in out and "not gitignored" in out
+
+
+def test_creds_set_empty_stdin_stores_no_password_and_non_tty_needs_a_flag(root: Path):
+    r = _cli(root, "creds", "set", "lever", "--username", "u", "--password-stdin", stdin="\n")
+    assert r.returncode == 0, r.stderr
+    assert "password stored" not in r.stdout
+    r = _cli(root, "creds", "get", "lever", "--json")
+    assert json.loads(r.stdout)["has_password"] is False
+    r = _cli(root, "creds", "set", "lever", "--username", "u2", stdin="")
+    assert r.returncode != 0 and "--password-stdin" in r.stderr

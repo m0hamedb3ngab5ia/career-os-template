@@ -6,14 +6,17 @@ directory. Shape: `{site: {username, password | secret_ref, notes}}`. Site names
 Backends (`credentials.backend` in config/pipeline.yaml):
 - `file` (default): the password sits in the YAML file.
 - `keychain` (macOS): the password goes to the login keychain (`security`, service `careeros:<site>`); the file keeps
-  only `username`, `notes` and `secret_ref: keychain:careeros:<site>`. Note: `security add-generic-password -w` puts
-  the password on its argv for the moment the command runs.
+  only `username`, `notes` and `secret_ref: keychain:careeros:<site>`. One item per site (account = site); the
+  password reaches `security -i` hex-encoded on stdin, never on argv.
 
-`redactor(settings)` masks every stored file-backend password (4+ chars) in text: headless run logs pass through it.
+`redactor(settings)` masks every stored password (file and keychain, 4+ chars; also as JSON-escaped) in text:
+headless run logs pass through it. `set_credential` refuses passwords shorter than 8 chars.
 """
 from __future__ import annotations
 
+import json
 import os
+import re
 import subprocess
 import tempfile
 from pathlib import Path
@@ -25,12 +28,17 @@ DEFAULT_PATH = "~/.careeros/credentials.yaml"
 BACKENDS = ("file", "keychain")
 MASK = "********"
 MIN_REDACT_LEN = 4
+MIN_PASSWORD_LEN = 8
+SITE_RE = re.compile(r"[a-z0-9][a-z0-9._-]*")
 KEYCHAIN_PREFIX = "keychain:"
 Runner = Callable[..., subprocess.CompletedProcess]
 
 
 def _run(argv: list[str], input: str | None = None) -> subprocess.CompletedProcess:
-    return subprocess.run(argv, input=input, capture_output=True, text=True, timeout=30)
+    try:
+        return subprocess.run(argv, input=input, capture_output=True, text=True, timeout=30)
+    except (OSError, subprocess.SubprocessError) as e:
+        raise RuntimeError(f"keychain: could not run {argv[0]} ({e}); the keychain backend needs macOS") from e
 
 
 def credentials_path(s: Any) -> Path:
@@ -47,23 +55,27 @@ def backend_name(s: Any) -> str:
 
 def _site(site: str) -> str:
     k = str(site or "").strip().lower()
-    if not k or any(c.isspace() for c in k):
-        raise ValueError(f"site must be a non-empty name without spaces, got {site!r}")
+    if not SITE_RE.fullmatch(k):
+        raise ValueError(f"site must be a name of letters, digits, '.', '_' or '-', got {site!r}")
     return k
 
 
 def _load(p: Path) -> dict[str, dict[str, Any]]:
     if not p.is_file():
         return {}
-    data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    try:
+        data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
+    except yaml.YAMLError as e:
+        raise ValueError(f"{p}: not valid YAML ({e})") from e
     if not isinstance(data, dict):
         raise ValueError(f"{p}: must be a mapping of site -> {{username, password, notes}}")
     return {str(k).lower(): (v if isinstance(v, dict) else {}) for k, v in data.items()}
 
 
 def _save(p: Path, data: dict[str, dict[str, Any]]) -> None:
-    p.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-    os.chmod(p.parent, 0o700)
+    if not p.parent.is_dir():  # only a directory we create gets 0700; never chmod an existing one ($HOME, repo)
+        p.parent.mkdir(parents=True, mode=0o700)
+        os.chmod(p.parent, 0o700)
     fd, tmp = tempfile.mkstemp(dir=p.parent, prefix=".credentials.", suffix=".tmp")  # mkstemp creates it 0600
     try:
         with os.fdopen(fd, "w", encoding="utf-8") as fh:
@@ -90,9 +102,12 @@ def set_credential(s: Any, site: str, *, username: str | None = None, password: 
     if notes is not None:
         e["notes"] = notes
     if password is not None:
+        if len(password) < MIN_PASSWORD_LEN:
+            raise ValueError(f"password must be at least {MIN_PASSWORD_LEN} characters (shorter ones cannot be "
+                             "masked safely in run logs)")
         if backend == "keychain":
-            r = runner(["security", "add-generic-password", "-U", "-a", e.get("username") or key,
-                        "-s", _service(key), "-w", password])
+            r = runner(["security", "-i"], input=f"add-generic-password -U -a {key} -s {_service(key)} "
+                                                 f"-X {password.encode('utf-8').hex()}\n")
             if r.returncode != 0:
                 raise RuntimeError(f"keychain: could not store the password for {key}: {r.stderr.strip()}")
             e.pop("password", None)
@@ -114,7 +129,7 @@ def get_credential(s: Any, site: str, runner: Runner = _run) -> dict[str, Any]:
     pw = e.get("password")
     ref = str(e.get("secret_ref") or "")
     if pw is None and ref.startswith(KEYCHAIN_PREFIX):
-        r = runner(["security", "find-generic-password", "-s", ref[len(KEYCHAIN_PREFIX):], "-w"])
+        r = runner(["security", "find-generic-password", "-a", key, "-s", ref[len(KEYCHAIN_PREFIX):], "-w"])
         if r.returncode != 0:
             raise RuntimeError(f"keychain: no password for {key} ({ref})")
         pw = r.stdout.rstrip("\n")
@@ -137,19 +152,38 @@ def remove_credential(s: Any, site: str, runner: Runner = _run) -> bool:
         return False
     ref = str(e.get("secret_ref") or "")
     if ref.startswith(KEYCHAIN_PREFIX):
-        runner(["security", "delete-generic-password", "-s", ref[len(KEYCHAIN_PREFIX):]])
+        r = runner(["security", "delete-generic-password", "-a", key, "-s", ref[len(KEYCHAIN_PREFIX):]])
+        if r.returncode not in (0, 44):  # 44 = errSecItemNotFound: already gone
+            raise RuntimeError(f"keychain: could not delete the password for {key}: {r.stderr.strip()}")
     _save(p, data)
     return True
 
 
-def redactor(s: Any) -> Callable[[str], str]:
-    """A function masking every stored file-backend password (longest first) in a string."""
+def _stored_passwords(s: Any, runner: Runner) -> set[str]:
+    """Every stored password: file ones, plus keychain ones that resolve (a keychain error skips that site)."""
+    out: set[str] = set()
+    for k, e in _load(credentials_path(s)).items():
+        if e.get("password") is not None:
+            out.add(str(e["password"]))
+        elif str(e.get("secret_ref") or "").startswith(KEYCHAIN_PREFIX):
+            try:
+                pw = get_credential(s, k, runner=runner)["password"]
+            except (KeyError, RuntimeError, OSError, ValueError):
+                continue
+            if pw:
+                out.add(pw)
+    return out
+
+
+def redactor(s: Any, runner: Runner = _run) -> Callable[[str], str]:
+    """A function masking every stored password (longest first) in a string, raw and JSON-escaped. Secrets are read
+    once, when the redactor is built: a `creds set` after that is not masked by it."""
     try:
-        secrets = sorted({str(e["password"]) for e in _load(credentials_path(s)).values()
-                          if e.get("password") is not None and len(str(e["password"])) >= MIN_REDACT_LEN},
-                         key=len, reverse=True)
-    except (OSError, ValueError, yaml.YAMLError):
-        secrets = []
+        raw = {x for x in _stored_passwords(s, runner) if len(x) >= MIN_REDACT_LEN}
+    except (OSError, ValueError):
+        raw = set()
+    variants = raw | {json.dumps(x)[1:-1] for x in raw} | {json.dumps(x, ensure_ascii=False)[1:-1] for x in raw}
+    secrets = sorted(variants, key=len, reverse=True)
 
     def red(text: str) -> str:
         for x in secrets:

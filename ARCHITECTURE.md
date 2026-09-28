@@ -277,10 +277,11 @@ and treats the lessons as instructions ("Known hurdles"). The app reads and adds
 ATS/job-site logins for `/apply-job` live outside the repo and outside `profile/`: `paths.credentials` in
 `config/pipeline.yaml` (default `~/.careeros/credentials.yaml`), a `{site: {username, password | secret_ref, notes}}`
 mapping written atomically with mode 0600 in a 0700 directory. `credentials.backend: keychain` stores the password in
-the macOS login keychain (`security`, service `careeros:<site>`) and leaves only `secret_ref` in the file.
+the macOS login keychain (`security -i`, password hex-encoded on stdin, never argv; service `careeros:<site>`, account
+`<site>`) and leaves only `secret_ref` in the file. Passwords shorter than 8 characters are refused.
 `careeros creds set|get|list|rm` is the only interface; `get` masks the password unless `--reveal`, `list` never
 shows it. `runs/headless.invoke` passes every stream-json line and stderr through `credentials.redactor`, so stored
-file-backend passwords never reach a run log or result. `careeros doctor` WARNs when the file sits inside a git repo
+passwords (file and keychain, raw and JSON-escaped) never reach a run log or result. `careeros doctor` WARNs when the file sits inside a git repo
 (louder when not gitignored) or its mode is not 0600; `.gitignore` ignores `credentials.yaml`.
 
 ## Directories

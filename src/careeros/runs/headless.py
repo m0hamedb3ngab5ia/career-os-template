@@ -232,7 +232,9 @@ def invoke(cmd: list[str], cwd: str, env: dict[str, str], timeout_s: float, stre
     r = HeadlessResult()
     start = time.monotonic()
     stream_path.parent.mkdir(parents=True, exist_ok=True)
-    redact = redactor_for_root(Path(cwd))  # stored login passwords never reach the run log or the result
+    # stored login passwords (file + keychain) never reach the run log or the result; read once here, so a
+    # `creds set` during this run is not masked until the next run
+    redact = redactor_for_root(Path(cwd))
     try:
         proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                 start_new_session=True, bufsize=1)

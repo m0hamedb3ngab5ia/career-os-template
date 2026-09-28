@@ -703,8 +703,11 @@ def cmd_creds_set(args: argparse.Namespace) -> int:
 
     pw = None
     if args.password_stdin:
-        pw = sys.stdin.readline().rstrip("\r\n")
+        pw = sys.stdin.readline().rstrip("\r\n") or None
     elif not args.no_password:
+        if not sys.stdin.isatty():
+            print("creds set: stdin is not a terminal: pass --password-stdin or --no-password", file=sys.stderr)
+            return 1
         pw = getpass.getpass(f"password for {args.site} (hidden, empty = keep): ") or None
     try:
         set_credential(_settings(args), args.site, username=args.username, password=pw, notes=args.notes)
@@ -765,7 +768,7 @@ def cmd_creds_rm(args: argparse.Namespace) -> int:
 
     try:
         ok = remove_credential(_settings(args), args.site)
-    except ValueError as err:
+    except (ValueError, RuntimeError) as err:
         print(f"creds rm: {err}", file=sys.stderr)
         return 1
     print(f"removed {args.site}" if ok else f"no credentials for {args.site!r}", file=sys.stdout if ok else sys.stderr)

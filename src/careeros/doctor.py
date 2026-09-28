@@ -521,16 +521,20 @@ def check_credentials(p: Path) -> list[Check]:
     gitignored there) or its mode is not 0600."""
     if not p.is_file():
         return [Check(PASS, "credentials", f"{p} absent (created by `careeros creds set <site>`)")]
+    out: list[Check] = []
     top = _git_toplevel(p)
     if top is not None:
-        ignored = subprocess.run(["git", "-C", str(top), "check-ignore", "-q", str(p)],
-                                 capture_output=True).returncode == 0
+        try:
+            ignored = subprocess.run(["git", "-C", str(top), "check-ignore", "-q", str(p)],
+                                     capture_output=True).returncode == 0
+        except OSError:
+            ignored = False
         where = (f"{p} is inside the git repo {top}" + ("" if ignored else " and not gitignored: it could be committed"))
-        return [Check(WARN, "credentials", f"{where}; move it to ~/.careeros/credentials.yaml (paths.credentials)")]
+        out.append(Check(WARN, "credentials", f"{where}; move it to ~/.careeros/credentials.yaml (paths.credentials)"))
     mode = stat.S_IMODE(p.stat().st_mode)
     if mode != 0o600:
-        return [Check(WARN, "credentials", f"{p} has mode {mode:04o}, want 0600: chmod 600 {p}")]
-    return [Check(PASS, "credentials", f"{p}: outside git, mode 0600")]
+        out.append(Check(WARN, "credentials", f"{p} has mode {mode:04o}, want 0600: chmod 600 {p}"))
+    return out or [Check(PASS, "credentials", f"{p}: outside git, mode 0600")]
 
 
 def check_voice(root: Path) -> Check:
