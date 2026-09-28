@@ -221,6 +221,22 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
     need(not dup, f"profile/standard_answers.yaml: duplicate keys {dup}")
     missing = [k for k in STANDARD_KEYS if k not in keys]
     need(not missing, f"profile/standard_answers.yaml: answers missing keys {missing}")
+    ca = sa.get("company_answers")
+    if ca is not None and need(isinstance(ca, dict), "profile/standard_answers.yaml: company_answers must be a "
+                                                      "mapping {<Company>: [{key, match, answer}]}"):
+        for co, lst in ca.items():
+            if not need(isinstance(lst, list), f"profile/standard_answers.yaml: company_answers.{co} must be a list"):
+                continue
+            for i, a in enumerate(lst):
+                where = f"profile/standard_answers.yaml: company_answers.{co}[{i}]"
+                if not need(isinstance(a, dict) and a.get("key") and isinstance(a.get("match") or [], list)
+                            and "answer" in a, f"{where} needs key, match (list) and answer"):
+                    continue
+                for pat in a.get("match") or []:
+                    try:
+                        re.compile(str(pat), re.I)
+                    except re.error as e:
+                        out.append(f"{where}.match {pat!r} is not a valid regex ({e})")
     eeo = sa.get("eeo")
     if need(isinstance(eeo, dict), "profile/standard_answers.yaml: eeo missing"):
         for f in ("gender", "race_ethnicity", "veteran", "disability"):

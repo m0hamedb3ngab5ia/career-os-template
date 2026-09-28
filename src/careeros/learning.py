@@ -14,10 +14,17 @@ from __future__ import annotations
 import json
 import os
 import re
+import threading
 import uuid
+from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover (Windows)
+    fcntl = None  # type: ignore[assignment]
 
 from ruamel.yaml.comments import CommentedMap, CommentedSeq
 from ruamel.yaml.scalarstring import DoubleQuotedScalarString as DQ
@@ -40,7 +47,8 @@ def normalize(text: str) -> str:
 
 _PREFIX_RE = re.compile(r"^[a-z_]+(?: [a-z_ ]+)?:\s+", re.I)   # "legal question not in standard answers: "
 _LIMIT_RE = re.compile(r"\s*\(limit \d+\)\s*$", re.I)
-_QUOTED_RE = re.compile(r'"([^"]{3,})"')
+_QUOTED_RE = re.compile(r'^"([^"]{3,})"$')
+_URGENT_RE = re.compile(r"\s+\u2014\s+urgent:.*$", re.I)   # " — <gate action_note>" on urgent items
 
 
 def question_pattern(question: str) -> str:
@@ -52,12 +60,28 @@ def question_from_action(what: str) -> str:
     """The exact form question inside an Action Item's "What to do" text (the apply-job / answer-question
     contract: `<class>: <question> (limit n)`, `legal question not in standard answers: <question>`, or the
     question quoted)."""
-    t = normalize(what)
-    m = _QUOTED_RE.search(t)
-    if m:
-        return m.group(1).strip()
-    t = _LIMIT_RE.sub("", t)
-    return _PREFIX_RE.sub("", t, count=1).strip()
+    t = _LIMIT_RE.sub("", _URGENT_RE.sub("", normalize(what)))
+    t = _PREFIX_RE.sub("", t, count=1).strip()
+    m = _QUOTED_RE.match(t)   # only a wholly quoted payload; quotes inside the question stay
+    return m.group(1).strip() if m else t
+
+
+_THREAD_LOCK = threading.Lock()
+
+
+@contextmanager
+def _locked(real: Path) -> Iterator[None]:
+    """Serialize a whole read-modify-write of the learning files (threads and processes)."""
+    with _THREAD_LOCK:
+        if fcntl is None:  # pragma: no cover
+            yield
+            return
+        with real.parent.joinpath(".learning.lock").open("a") as fh:
+            fcntl.flock(fh, fcntl.LOCK_EX)
+            try:
+                yield
+            finally:
+                fcntl.flock(fh, fcntl.LOCK_UN)
 
 
 def _guard_path(p: Path) -> Path:
@@ -123,10 +147,14 @@ def _entry(question: str, answer: str, key: str | None, match: list[str] | None,
     return e
 
 
-def _all_keys(data: dict[str, Any]) -> set[str]:
+def _all_keys(data: dict[str, Any], company: str | None = None) -> set[str]:
+    """Keys a new entry must not reuse: general answers plus every company's (general scope) or plus only
+    `company`'s (company scope: the same generic question may be learned once per company)."""
     keys = {str(x.get("key")) for x in (data.get("answers") or []) if isinstance(x, dict)}
-    for lst in (data.get("company_answers") or {}).values():
-        keys |= {str(x.get("key")) for x in (lst or []) if isinstance(x, dict)}
+    ca = data.get("company_answers") if isinstance(data.get("company_answers"), dict) else {}
+    for co, lst in ca.items():
+        if company is None or str(co).strip().lower() == company.strip().lower():
+            keys |= {str(x.get("key")) for x in (lst if isinstance(lst, list) else []) if isinstance(x, dict)}
     return keys
 
 
@@ -195,8 +223,6 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
                  company: str | None = None, eeo: bool = False) -> dict[str, Any]:
     """Append one learned answer to profile/standard_answers.yaml and, with `job_id`, record it in that job's
     answers.json (needs_review false, source "learned"). Returns the entry as written plus `scope`/`company`."""
-    import yaml as pyyaml
-
     q, a = normalize(question), (answer or "").strip()
     if not q:
         raise ValueError("question is empty")
@@ -216,6 +242,17 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
     if job_id:
         _check_job_id(job_id)
     real = _guard_path(answers_path(settings))
+    real.parent.mkdir(parents=True, exist_ok=True)
+    with _locked(real):
+        return _learn_answer_locked(settings, real, q, a, job_id, key, match, scope, company, eeo)
+
+
+def _learn_answer_locked(settings: Settings, real: Path, q: str, a: str, job_id: str | None, key: str | None,
+                         match: list[str] | None, scope: str, company: str | None, eeo: bool) -> dict[str, Any]:
+    import yaml as pyyaml
+
+    if job_id:
+        _load_answers_json(_job_dir(settings, job_id) / "answers.json")  # refuse before writing anything
     text = real.read_text(encoding="utf-8") if real.exists() else ""
     try:
         data = pyyaml.safe_load(text) or {}
@@ -234,11 +271,12 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
         entry: dict[str, Any] = {"key": k, "answer": a, "note": note, "eeo": True}
     else:
         e = _entry(q, a, key, match, note)
-        if e["key"] in _all_keys(data):
+        co = company if scope == "company" else None
+        if e["key"] in _all_keys(data, co):
             raise ValueError(f"key {e['key']!r} already exists in {real.name}; pass --key for a new one")
         out = _insert_entry(text, e, company=company if scope == "company" else None)
         check = pyyaml.safe_load(out)
-        if not isinstance(check, dict) or e["key"] not in _all_keys(check):
+        if not isinstance(check, dict) or e["key"] not in _all_keys(check, co):
             raise ValueError(f"{real.name}: could not append the entry safely; add it by hand")
         _write_atomic(real, out)
         entry = {"key": e["key"], "match": list(e["match"]), "answer": a, "note": note}
@@ -251,18 +289,30 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
     return entry
 
 
+def _job_dir(settings: Settings, job_id: str) -> Path:
+    return Path(settings.paths.get("jobs_dir") or settings.root / "data" / "jobs") / _check_job_id(job_id)
+
+
+def _load_answers_json(p: Path) -> list[Any]:
+    """The job's answers.json list ([] when missing); ValueError (nothing written) when it is damaged."""
+    if not p.exists():
+        return []
+    try:
+        items = json.loads(p.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as e:
+        raise ValueError(f"{p.parent.name}/answers.json is not valid JSON ({e}); fix it by hand first") from None
+    if not isinstance(items, list):
+        raise ValueError(f"{p.parent.name}/answers.json must be a list; fix it by hand first")
+    return items
+
+
 def record_answer(settings: Settings, job_id: str, question: str, answer: str, key: str) -> bool:
     """Set the matching answers.json entry (or add one) to the learned answer. False when the job dir is missing."""
-    d = Path(settings.paths.get("jobs_dir") or settings.root / "data" / "jobs") / _check_job_id(job_id)
+    d = _job_dir(settings, job_id)
     if not d.is_dir():
         return False
     p = d / "answers.json"
-    try:
-        items = json.loads(p.read_text(encoding="utf-8")) if p.exists() else []
-    except json.JSONDecodeError:
-        items = []
-    if not isinstance(items, list):
-        items = []
+    items = _load_answers_json(p)
     want = normalize(question).lower()
     now = datetime.now().isoformat(timespec="seconds")
     hit = next((x for x in items if isinstance(x, dict) and normalize(str(x.get("question") or "")).lower() == want), None)
@@ -271,9 +321,7 @@ def record_answer(settings: Settings, job_id: str, question: str, answer: str, k
         items.append(hit)
     hit.update({"answer": answer, "type": "standard", "standard_key": key, "needs_review": False,
                 "action_item": None, "source": "learned", "answered_at": now})
-    tmp = p.with_suffix(".json.tmp")
-    tmp.write_text(json.dumps(items, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
-    os.replace(tmp, p)
+    _write_atomic(p, json.dumps(items, indent=2, ensure_ascii=False) + "\n")
     return True
 
 
@@ -318,6 +366,13 @@ def learn_lesson(settings: Settings, *, text: str, ats: str | None = None, compa
     if not t:
         raise ValueError("lesson text is empty")
     real = _guard_path(lessons_path(settings))
+    real.parent.mkdir(parents=True, exist_ok=True)
+    with _locked(real):
+        return _learn_lesson_locked(real, t, ats, company, job_id, tags)
+
+
+def _learn_lesson_locked(real: Path, t: str, ats: str | None, company: str | None, job_id: str | None,
+                         tags: tuple[str, ...] | list[str]) -> dict[str, Any]:
     y, data = _load_rt(real)
     lst = data.get("lessons")
     if not isinstance(lst, list):

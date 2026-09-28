@@ -974,7 +974,8 @@ class Checker:
                             continue
                     patterns.append((str(ent["key"]), rxs))
             posting_co = str(self.posting.get("company", "")).strip().lower() if isinstance(self.posting, dict) else ""
-            for co, lst in (sa.get("company_answers") or {}).items():  # this posting's company only, tried first
+            ca = sa.get("company_answers") if isinstance(sa.get("company_answers"), dict) else {}  # doctor reports bad shapes
+            for co, lst in ca.items():  # this posting's company only, tried first
                 if str(co).strip().lower() != posting_co:
                     continue
                 for ent in lst if isinstance(lst, list) else []:

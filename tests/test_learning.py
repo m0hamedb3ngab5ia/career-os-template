@@ -181,6 +181,8 @@ def test_doctor_validates_apply_lessons_shape(root: Path):
     ("essay: Why do you want to work at Acme? (limit 500)", "Why do you want to work at Acme?"),
     ('salary_freeform: "What are your salary expectations?"', "What are your salary expectations?"),
     ("Do you have a valid driver's license?", "Do you have a valid driver's license?"),
+    ('unknown: What does "ownership" mean to you? (limit 300)', 'What does "ownership" mean to you?'),
+    ("essay: Why Acme? (limit 500) \u2014 urgent: posting closes 2026-10-01; apply before then", "Why Acme?"),
 ])
 def test_question_from_action(what: str, want: str):
     assert question_from_action(what) == want
@@ -216,3 +218,66 @@ def test_learn_answer_rejects_bad_yaml_bad_eeo_keys_and_bad_job_ids(s: Settings,
     p.write_text("answers: [\n")
     with pytest.raises(ValueError, match="answers:"):
         learn_answer(s, question="Q?", answer="A")
+
+
+def test_same_question_learned_for_two_companies(s: Settings, root: Path):
+    q = "Why do you want to work here?"
+    learn_answer(s, question=q, answer="Acme reason", company="Acme")
+    learn_answer(s, question=q, answer="Globex reason", company="Globex")
+    doc = yaml.safe_load((root / "profile" / "standard_answers.yaml").read_text())
+    assert doc["company_answers"]["Globex"][0]["answer"] == "Globex reason"
+    with pytest.raises(ValueError, match="already exists"):
+        learn_answer(s, question=q, answer="again", company="Acme")
+
+
+@pytest.mark.parametrize("bad", ['{"question": "x"}', "not json ["])
+def test_malformed_answers_json_is_never_overwritten(s: Settings, root: Path, bad: str):
+    d = _job(root)
+    (d / "answers.json").write_text(bad)
+    sa = root / "profile" / "standard_answers.yaml"
+    before = sa.read_text()
+    with pytest.raises(ValueError, match="answers.json"):
+        learn_answer(s, question="Which office do you prefer?", answer="Springfield", job_id="acme-1")
+    assert (d / "answers.json").read_text() == bad and sa.read_text() == before
+
+
+def test_concurrent_learning_loses_nothing(s: Settings, root: Path):
+    import threading
+
+    n, go = 8, threading.Barrier(8)
+    errs: list[BaseException] = []
+
+    def work(i: int) -> None:
+        go.wait()
+        try:
+            learn_lesson(s, text=f"lesson {i}")
+            learn_answer(s, question=f"Concurrent question {i}?", answer="A")
+        except BaseException as e:  # noqa: BLE001
+            errs.append(e)
+
+    ts = [threading.Thread(target=work, args=(i,)) for i in range(n)]
+    [t.start() for t in ts]
+    [t.join() for t in ts]
+    assert errs == []
+    assert len(lessons_for(s)) == n
+    doc = yaml.safe_load((root / "profile" / "standard_answers.yaml").read_text())
+    assert sum(1 for e in doc["answers"] if e["key"].startswith("concurrent_question")) == n
+
+
+def test_malformed_company_answers_fails_doctor_not_qa(s: Settings, root: Path):
+    from careeros.doctor import schema_problems, _safe_yaml
+    from careeros.qa import Checker
+
+    sa = root / "profile" / "standard_answers.yaml"
+    for bad in ([], {"Acme": {"key": "x"}}, {"Acme": [{"key": "x", "match": ["("], "answer": "a"}]}):
+        doc = yaml.safe_load(sa.read_text())
+        doc["company_answers"] = bad
+        sa.write_text(yaml.safe_dump(doc, sort_keys=False))
+        prof = {n: _safe_yaml(root / "profile" / f"{n}.yaml") for n in ("master", "standard_answers", "confidential_terms")}
+        cfg = {n: _safe_yaml(root / "config" / f"{n}.yaml") for n in ("targets", "categories", "companies", "qa", "pipeline")}
+        assert any("company_answers" in p for p in schema_problems(cfg, prof)), bad
+        d = root / "data" / "jobs" / "acme-1"
+        if not d.exists():
+            _job(root)
+        q = Checker(d, root)
+        q.check_standard_answers()  # must not crash
