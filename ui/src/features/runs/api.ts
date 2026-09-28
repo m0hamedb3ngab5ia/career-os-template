@@ -131,10 +131,13 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
   const qc = useQueryClient();
   const [lines, setLines] = useState<StreamLine[]>([]);
   const [ended, setEnded] = useState(false);
+  // The `end` frame's stop reason (e.g. "completed", "usage_limit"); null until the run ends or if the frame had none.
+  const [stopReason, setStopReason] = useState<string | null>(null);
 
   useEffect(() => {
     setLines([]);
     setEnded(false);
+    setStopReason(null);
     if (!runId || !enabled || typeof EventSource === "undefined") return;
     const es = new EventSource(`/api/runs/${encodeURIComponent(runId)}/stream`);
     let key = 0;
@@ -155,8 +158,14 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
       const line: StreamLine = { key, type: ev.type ?? "log", text: ev.text, attempt: ev.attempt, error: ev.error };
       setLines((prev) => (prev.length >= MAX_LINES ? [...prev.slice(-MAX_LINES + 1), line] : [...prev, line]));
     });
-    es.addEventListener("end", () => {
+    es.addEventListener("end", (m) => {
       es.close();
+      try {
+        const end = JSON.parse((m as MessageEvent).data as string) as { stop_reason?: string | null };
+        setStopReason(end.stop_reason ?? null);
+      } catch {
+        setStopReason(null);
+      }
       setEnded(true);
       void qc.invalidateQueries({ queryKey: runKeys.all });
       void qc.invalidateQueries({ queryKey: runKeys.detail(runId) });
@@ -164,5 +173,5 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
     return () => es.close();
   }, [runId, enabled, qc]);
 
-  return { lines, ended };
+  return { lines, ended, stopReason };
 }

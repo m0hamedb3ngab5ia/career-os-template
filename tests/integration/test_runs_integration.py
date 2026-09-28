@@ -234,11 +234,32 @@ def test_run_apply_needs_job_and_uses_the_apply_skill(root, home, fake_bin, tmp_
     r = cli(root, env, "run", "apply", "--job", ids[0], "--json")
     assert r.returncode == 0, r.stderr
     rec = json.loads(r.stdout)
-    assert rec["kind"] == "apply" and rec["counters"]["ok"] == 1 and status_of(root, ids[0]) == "applied"
+    # auto_submit is off by default, so the run hands CAREEROS_AUTO_SUBMIT=0 and apply-job stages the form
+    assert rec["kind"] == "apply" and rec["counters"]["ok"] == 1 and status_of(root, ids[0]) == "needs_review"
     argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
     assert argv[-1][-1] == f"/apply-job data/jobs/{ids[0]}"
     assert "mcp__claude-in-chrome__*" in argv[-1][argv[-1].index("--allowedTools") + 1]
     assert "mcp__claude-in-chrome__*" not in argv[0][argv[0].index("--allowedTools") + 1]
+
+
+def test_run_apply_stages_a_tier_a_job_parked_in_needs_review(root, home, fake_bin, tmp_path):
+    """Tier A across the CLI -> headless process boundary: prepare-job leaves it in needs_review with QA passed;
+    `run apply --job` picks it, hands the skill CAREEROS_AUTO_SUBMIT=0 and accepts the staged outcome."""
+    jid = add_jobs(root, 1)[0]
+    jdir = root / "data" / "jobs" / jid
+    (jdir / "score.json").write_text(json.dumps({"job_id": jid, "decision": "prepare", "fit": 90,
+                                                 "category": "swe_backend", "tier": "A"}))
+    (jdir / "prepare.json").write_text(json.dumps({"job_id": jid, "status": "needs_review", "qa_pass": True}))
+    Store(Settings.load(root)).set_status(jid, "needs_review", "test: prepare-job parked Tier A")
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ENV=str(tmp_path / "env.jsonl"))
+    r = cli(root, env, "run", "apply", "--job", jid, "--json")
+    assert r.returncode == 0, r.stdout + r.stderr
+    rec = json.loads(r.stdout)
+    assert rec["kind"] == "apply" and rec["counters"]["ok"] == 1 and rec["counters"]["attempted"] == 1
+    seen = [json.loads(l) for l in (tmp_path / "env.jsonl").read_text().splitlines()]
+    assert len(seen) == 1 and seen[0]["CAREEROS_AUTO_SUBMIT"] == "0" and seen[0]["CAREEROS_AUTO_SUBMIT_REASON"]
+    assert seen[0]["CAREEROS_RUN_ID"] == rec["id"]
+    assert status_of(root, jid) == "needs_review"
 
 
 def test_run_force_without_job_exits_2_before_anything_runs(root, home, fake_bin, tmp_path):

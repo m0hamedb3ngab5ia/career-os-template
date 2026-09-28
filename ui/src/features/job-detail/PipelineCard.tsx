@@ -116,8 +116,12 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     setChaining(null);
     const was = startedKind.current;
     startedKind.current = null;
+    // Chain only after a clean finish: a failed or stopped run (usage_limit, error, ...) may still have left
+    // runnable files behind, and those stops need the user's attention, not the next stage.
+    const endReason = stream.ended ? stream.stopReason : startedRun.data?.stop_reason ?? null;
+    const completed = endReason === "completed";
     void pipeline.refetch().then((r) => {
-      if (stopAfter || !r.data || !r.data.next_action) return;
+      if (stopAfter || !completed || !r.data || !r.data.next_action) return;
       const next = was === "score" && chainsToPrepare(r.data) ? "prepare"
         : was === "prepare" && chainsToApply(r.data) ? "apply" : null;
       if (!next) return;

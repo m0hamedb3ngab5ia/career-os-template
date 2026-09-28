@@ -175,7 +175,7 @@ describe("PipelineCard", () => {
   });
 
   /** Continue on a scored job; the first POST prepares it, the stream end flips the server state to `after`. */
-  async function prepareThen(after: Partial<PipelineState>, stopAfter = false) {
+  async function prepareThen(after: Partial<PipelineState>, stopAfter = false, stopReason = "completed") {
     let current: PipelineState = { ...base, ...after, active_run_id: null, stage: "prepare", next_action: "continue",
                                    next_label: "Continue pipeline", next_kind: "prepare", note: null };
     let n = 0;
@@ -194,9 +194,16 @@ describe("PipelineCard", () => {
     await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
     expect(FakeEventSource.last.url).toBe("/api/runs/run-1-prepare/stream");
     current = { ...base, ...after, active_run_id: null };
-    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed" }));
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: stopReason }));
     return api;
   }
+
+  it("does not chain a failed prepare run into apply even if it left runnable files", async () => {
+    const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply", auto_submit: false },
+                                  false, "usage_limit");
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
 
   it("never chains past the review gate: Approve & continue stays with the human", async () => {
     const api = await prepareThen({ stage: "review", next_action: "approve_continue", next_kind: "apply",
