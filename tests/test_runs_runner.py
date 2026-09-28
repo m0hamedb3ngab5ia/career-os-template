@@ -174,6 +174,7 @@ def test_timeout_can_be_configured_to_continue(settings, store):
     a, b = add_job(store, 1, hours_old=60), add_job(store, 2, hours_old=70)
     rec = run(settings, FakeInvoke(settings, modes={a: "timeout"}), stop_on_timeout=False)
     assert rec["stop_reason"] == "completed" and rec["counters"]["failed"] == 1
+    assert "1 failed" in rec["detail"] and "done" not in rec["detail"]
 
 
 def test_consecutive_failures(settings, store):

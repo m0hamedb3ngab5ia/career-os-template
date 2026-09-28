@@ -244,7 +244,7 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
 
    | Stop reason | Chip | Means / fix |
    |---|---|---|
-   | `completed` | Done | nothing left in the queue |
+   | `completed` | Done | nothing left in the queue; the detail counts ok vs failed jobs |
    | `budget_reached` | Job budget used | the preset's job count is done; the rest wait for the next run |
    | `time_budget` | Time budget used | the preset's minutes are spent (the job in flight is cut at the budget too) |
    | `daily_cap` | Daily cap reached | prepared jobs fill today's apply cap |

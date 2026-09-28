@@ -151,6 +151,17 @@ def test_classify_permission_denied():
     assert out == "permission_denied" and "Bash" in detail
 
 
+def test_denial_behind_an_invalid_result_is_permission_denied():
+    """A denied Bash call made the skill stop with a malformed RESULT: the cause is the allowlist, a setup
+    error that must stop the run, not a job failure that burns a retry."""
+    cmd = ".venv/bin/careeros doctor --quiet; echo done"
+    ev = ok_events('RESULT: {"job_id": "j", "outcome": "failed", "status": "unchanged"}',
+                   permission_denials=[{"tool_name": "Bash", "tool_input": {"command": cmd}}])
+    out, detail = classify(res_of(ev), CFG, "apply", "j")
+    assert out == "permission_denied"
+    assert "Bash" in detail and "doctor --quiet; echo" in detail
+
+
 def test_denials_with_a_valid_result_are_ok_but_reported():
     ev = ok_events('RESULT: {"job_id": "j", "decision": "prepare"}', permission_denials=[{"tool_name": "WebFetch"}])
     r = res_of(ev)

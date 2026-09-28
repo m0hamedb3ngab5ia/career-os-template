@@ -14,6 +14,8 @@ each step's RESULT JSON in memory; you will summarize them at the end.
 Before starting, read `config/targets.yaml` (tiers, thresholds) and `config/qa.yaml` (`critic.max_regenerations`).
 Initialize `action_items = []`, `steps = {}`.
 
+Shell: one command per Bash call. Runs start this skill headless with `--permission-mode dontAsk` and an allowlist (`.venv/bin/careeros *`, `.venv/bin/python *`, `date *`); a chain (`;`, `&&`, `|`) or an `echo $?` has an unlisted part and the whole call is denied. Read the exit code from the tool result.
+
 ## Step 0: setup guard (fake-data guard)
 
 Run `.venv/bin/careeros doctor --quiet` first. If it exits nonzero, STOP: do not score, tailor or write

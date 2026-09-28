@@ -202,6 +202,8 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
         return "invalid_result", "no RESULT line in the skill output"
     probs = validate_result(stage, job_id, res)
     if probs:
+        if r.permission_denials:  # the denial made the skill stop early: a setup error, not the job's fault
+            return "permission_denied", _denied(r)
         return "invalid_result", "; ".join(probs)
     if "error" in res:
         if "mcp_unavailable" in str(res["error"]).lower():
@@ -212,8 +214,11 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
 
 def _denied(r: HeadlessResult) -> str:
     tools = sorted({str(d.get("tool_name")) for d in r.permission_denials})
-    return (f"tool(s) denied: {', '.join(tools)}; add them to pipeline.yaml llm.allowed_tools if the skill "
-            "needs them")
+    cmds = [str((d.get("tool_input") or {}).get("command"))[:160] for d in r.permission_denials
+            if isinstance(d.get("tool_input"), dict) and d["tool_input"].get("command")]
+    seen = f" (command: {cmds[0]})" if cmds else ""
+    return (f"tool(s) denied: {', '.join(tools)}{seen}; add them to pipeline.yaml llm.allowed_tools if the skill "
+            "needs them, or run one command per Bash call")
 
 
 # --------------------------------------------------------------------------------------------------------
