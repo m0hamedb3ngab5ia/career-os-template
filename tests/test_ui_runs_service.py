@@ -5,6 +5,8 @@ from __future__ import annotations
 import json
 import os
 import signal
+import subprocess
+import sys
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -677,8 +679,15 @@ def test_tail_holds_back_a_half_written_line(rc):
 def test_ps_cmdline_of_this_process_is_not_truncated():
     from careeros.ui.services.runs import ps_cmdline
 
-    got = ps_cmdline(os.getpid())  # an exact argv on Linux, a joined line on macOS
-    assert "pytest" in (" ".join(got) if isinstance(got, list) else got)
+    # A child with a known argv well past 80 columns; under pytest-xdist this process's own argv has no "pytest".
+    marker = "careeros-cmdline-probe-" + "x" * 120
+    child = subprocess.Popen([sys.executable, "-c", "import time; time.sleep(30)", marker])
+    try:
+        got = ps_cmdline(child.pid)  # an exact argv on Linux, a joined line on macOS
+    finally:
+        child.kill()
+        child.wait()
+    assert marker in (" ".join(got) if isinstance(got, list) else got)
 
 
 # --- review round 2 ------------------------------------------------------------------------------------------
