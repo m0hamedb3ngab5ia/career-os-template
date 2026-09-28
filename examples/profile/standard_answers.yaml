@@ -76,7 +76,7 @@ answers:
     match: ["previously applied", "applied .*before", "worked .*here before", "former employee"]
     answer: "No"                     # reusable default: fine to keep (the applier overrides to Yes from tracker history)
   - key: referral
-    match: ["referred", "referral", "how did you hear"]
+    match: ['\breferred', "referral", "how did you hear"]   # \b: "Preferred Name" is not a referral
     answer: "Company careers page"   # reusable default: fine to keep
     note: "If the Contacts tab has a referrer for this company → use their name."
   - key: non_compete

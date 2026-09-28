@@ -1,0 +1,792 @@
+{
+ "id": 8128744,
+ "title": "Software Engineer, New Grad",
+ "absolute_url": "https://ledgerline.com/jobs/search?gh_jid=8128744",
+ "compliance": [
+  {
+   "type": "eeoc",
+   "questions": [
+    {
+     "required": false,
+     "label": "VeteranStatus",
+     "fields": [
+      {
+       "name": "veteran_status",
+       "type": "multi_value_single_select",
+       "values": [
+        {
+         "label": "I don't wish to answer",
+         "value": "3"
+        },
+        {
+         "label": "I identify as one or more of the classifications of a protected veteran",
+         "value": "2"
+        },
+        {
+         "label": "I am not a protected veteran",
+         "value": "1"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "description": null
+  },
+  {
+   "type": "eeoc",
+   "questions": [
+    {
+     "required": false,
+     "label": "Race",
+     "fields": [
+      {
+       "name": "race",
+       "type": "multi_value_single_select",
+       "values": [
+        {
+         "label": "Decline To Self Identify",
+         "value": "8"
+        },
+        {
+         "label": "Two or More Races",
+         "value": "7"
+        },
+        {
+         "label": "Native Hawaiian or Other Pacific Islander",
+         "value": "6"
+        },
+        {
+         "label": "White",
+         "value": "5"
+        },
+        {
+         "label": "Hispanic or Latino",
+         "value": "4"
+        },
+        {
+         "label": "Black or African American",
+         "value": "3"
+        },
+        {
+         "label": "Asian",
+         "value": "2"
+        },
+        {
+         "label": "American Indian or Alaskan Native",
+         "value": "1"
+        }
+       ]
+      }
+     ]
+    },
+    {
+     "required": false,
+     "label": "Gender",
+     "fields": [
+      {
+       "name": "gender",
+       "type": "multi_value_single_select",
+       "values": [
+        {
+         "label": "Decline To Self Identify",
+         "value": "3"
+        },
+        {
+         "label": "Female",
+         "value": "2"
+        },
+        {
+         "label": "Male",
+         "value": "1"
+        }
+       ]
+      }
+     ]
+    }
+   ],
+   "description": null
+  }
+ ],
+ "questions": [
+  {
+   "description": null,
+   "label": "First Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "first_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Last Name",
+   "required": true,
+   "fields": [
+    {
+     "name": "last_name",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Email",
+   "required": true,
+   "fields": [
+    {
+     "name": "email",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Phone",
+   "required": true,
+   "fields": [
+    {
+     "name": "phone",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Resume/CV",
+   "required": true,
+   "fields": [
+    {
+     "name": "resume",
+     "type": "input_file",
+     "values": []
+    },
+    {
+     "name": "resume_text",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Cover Letter",
+   "required": false,
+   "fields": [
+    {
+     "name": "cover_letter",
+     "type": "input_file",
+     "values": []
+    },
+    {
+     "name": "cover_letter_text",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "We are always aiming to keep our school list inclusive of all institutions. If you did not see your University listed in the previous question, please let us know your school name here.",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68843614",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "As part of our commitment to understanding candidates' backgrounds, we invite you to share your SAT or ACT score if you feel comfortable. This information is optional and will help us in evaluating your application alongside your other qualifications.",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581526",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Similarly, we also invite you to provide your GPA, this can help us further understand your academic experience. ",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581527",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Please upload your academic record document (e.g. University Transcript, Transcript of Records, Marksheet, or Statement of Marks).",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68584709",
+     "type": "input_file",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Preferred Name",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581528",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Pronouns",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581529",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "LinkedIn Profile, Github, Personal Website, or Portfolio",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581530",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Do you have an active offer deadline or another recruiting-process deadline we should be aware of? If yes, please share the deadline date and any relevant context.\n",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581533",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "When are you available to start full-time?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581532[]",
+     "type": "multi_value_multi_select",
+     "values": [
+      {
+       "label": "Q4 2026 (October - December)",
+       "value": 748989780
+      },
+      {
+       "label": "Q1 2027 (January - March)",
+       "value": 748989781
+      },
+      {
+       "label": "Q2 2027 (April - June)",
+       "value": 748989782
+      },
+      {
+       "label": "Q3 2027 (July - September)",
+       "value": 748989783
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Are you currently eligible to work in the United States?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581540",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes, I am currently eligible to work in the country where this role is based.",
+       "value": 748175820
+      },
+      {
+       "label": "No, I am not currently eligible to work in the country where this role is based.",
+       "value": 748175821
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "As Ledgerline grows, we are always aiming to expand our recruitment presence at conferences and gatherings. Please let us know of any conferences you’re planning to attend this year or have previously attended to help inform our team about future recruitment opportunities. ",
+   "required": false,
+   "fields": [
+    {
+     "name": "question_68581534",
+     "type": "textarea",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "What is your first location preference?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581535",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "San Francisco, CA, United States",
+       "value": 748175798
+      },
+      {
+       "label": "Seattle, WA, United States",
+       "value": 748175799
+      },
+      {
+       "label": "New York, NY, United States",
+       "value": 749002743
+      },
+      {
+       "label": "I am open to working in any office",
+       "value": 748175800
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Second location preference",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581536",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "San Francisco, CA, United States",
+       "value": 748175801
+      },
+      {
+       "label": "Seattle, WA, United States",
+       "value": 748175802
+      },
+      {
+       "label": "New York, NY, United States",
+       "value": 749002744
+      },
+      {
+       "label": "I am open to working in any office",
+       "value": 748175803
+      },
+      {
+       "label": "I do not have flexibility to consider another office location",
+       "value": 748175804
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Third location preference",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68746466",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "San Francisco, CA, United States",
+       "value": 749002745
+      },
+      {
+       "label": "Seattle, WA, United States",
+       "value": 749002746
+      },
+      {
+       "label": "New York, NY, United States",
+       "value": 749002747
+      },
+      {
+       "label": "I am open to working in any office",
+       "value": 749002748
+      },
+      {
+       "label": "I do not have flexibility to consider another office location",
+       "value": 749002749
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Please select the top 3 engineer profile types below that are most relevant to your interests, skills and past experiences. First preference:",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581537",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Backend",
+       "value": 748175805
+      },
+      {
+       "label": "Frontend",
+       "value": 748175806
+      },
+      {
+       "label": "Full-stack",
+       "value": 748175807
+      },
+      {
+       "label": "Infrastructure / Systems Design",
+       "value": 748175808
+      },
+      {
+       "label": "Mobile (iOS or Android)",
+       "value": 748175809
+      },
+      {
+       "label": "Security Engineering",
+       "value": 748989784
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Second engineering preference:",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581538",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Backend",
+       "value": 748175810
+      },
+      {
+       "label": "Frontend",
+       "value": 748175811
+      },
+      {
+       "label": "Full-stack",
+       "value": 748175812
+      },
+      {
+       "label": "Infrastructure / Systems Design",
+       "value": 748175813
+      },
+      {
+       "label": "Mobile (iOS or Android)",
+       "value": 748175814
+      },
+      {
+       "label": "Security Engineering",
+       "value": 748989785
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Third engineering preference:",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581539",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Backend",
+       "value": 748175815
+      },
+      {
+       "label": "Frontend",
+       "value": 748175816
+      },
+      {
+       "label": "Full-stack",
+       "value": 748175817
+      },
+      {
+       "label": "Infrastructure / Systems Design",
+       "value": 748175818
+      },
+      {
+       "label": "Mobile (iOS or Android)",
+       "value": 748175819
+      },
+      {
+       "label": "Security Engineering",
+       "value": 748989786
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Do you require visa sponsorship, now or in the future, to continue working in the United States?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_68581541",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Yes, I will require visa sponsorship now or in the future to continue working in the country where this role is based.",
+       "value": 748175822
+      },
+      {
+       "label": "No, I do not require visa sponsorship now or in the future to continue working in the country where this role is based.",
+       "value": 748175823
+      }
+     ]
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Who is your current or previous employer?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_69458204",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "What is your current or previous job title?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_69458207",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "If located in the US, in what city and state do you reside?",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_69458352",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Please select the country where you currently reside.\n",
+   "required": true,
+   "fields": [
+    {
+     "name": "question_69459558",
+     "type": "multi_value_single_select",
+     "values": [
+      {
+       "label": "Australia",
+       "value": 753322355
+      },
+      {
+       "label": "Belgium",
+       "value": 753322358
+      },
+      {
+       "label": "Brazil",
+       "value": 753322361
+      },
+      {
+       "label": "Canada",
+       "value": 753322363
+      },
+      {
+       "label": "Egypt",
+       "value": 753322364
+      },
+      {
+       "label": "France",
+       "value": 753322367
+      },
+      {
+       "label": "Germany",
+       "value": 753322369
+      },
+      {
+       "label": "India",
+       "value": 753322372
+      },
+      {
+       "label": "Indonesia",
+       "value": 753322374
+      },
+      {
+       "label": "Ireland",
+       "value": 753322377
+      },
+      {
+       "label": "Israel",
+       "value": 753322383
+      },
+      {
+       "label": "Italy",
+       "value": 753322386
+      },
+      {
+       "label": "Japan",
+       "value": 753322389
+      },
+      {
+       "label": "Malaysia",
+       "value": 753322390
+      },
+      {
+       "label": "Mexico",
+       "value": 753322393
+      },
+      {
+       "label": "New Zealand",
+       "value": 753322395
+      },
+      {
+       "label": "Poland",
+       "value": 753322400
+      },
+      {
+       "label": "Portugal",
+       "value": 753322402
+      },
+      {
+       "label": "Romania",
+       "value": 753322406
+      },
+      {
+       "label": "Singapore",
+       "value": 753322408
+      },
+      {
+       "label": "South Korea",
+       "value": 753322413
+      },
+      {
+       "label": "Spain",
+       "value": 753322415
+      },
+      {
+       "label": "Sweden",
+       "value": 753322418
+      },
+      {
+       "label": "Switzerland",
+       "value": 753322422
+      },
+      {
+       "label": "Taiwan",
+       "value": 753322425
+      },
+      {
+       "label": "Thailand",
+       "value": 753322430
+      },
+      {
+       "label": "The Netherlands",
+       "value": 753322433
+      },
+      {
+       "label": "UAE",
+       "value": 753322436
+      },
+      {
+       "label": "UK",
+       "value": 753322441
+      },
+      {
+       "label": "US",
+       "value": 753322446
+      },
+      {
+       "label": "Other",
+       "value": 753322449
+      }
+     ]
+    }
+   ]
+  }
+ ],
+ "location_questions": [
+  {
+   "description": null,
+   "label": "Longitude",
+   "required": true,
+   "fields": [
+    {
+     "name": "longitude",
+     "type": "input_hidden",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Latitude",
+   "required": true,
+   "fields": [
+    {
+     "name": "latitude",
+     "type": "input_hidden",
+     "values": []
+    }
+   ]
+  },
+  {
+   "description": null,
+   "label": "Location",
+   "required": true,
+   "fields": [
+    {
+     "name": "location",
+     "type": "input_text",
+     "values": []
+    }
+   ]
+  }
+ ],
+ "demographic_questions": null
+}
