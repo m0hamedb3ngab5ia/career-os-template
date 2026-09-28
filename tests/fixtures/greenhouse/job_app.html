@@ -1,0 +1,46 @@
+<!doctype html>
+<!-- Minimal stand-in for a job-boards.greenhouse.io application form: text, file, checkbox group,
+     react-select-like comboboxes (role=option menu, Escape closes) and a field that appears only after
+     another answer (race after hispanic_ethnicity), as on the real form. -->
+<html><head><meta charset="utf-8"><title>Apply</title></head><body>
+<form id="application-form">
+  <label for="first_name">First Name</label><input id="first_name" type="text">
+  <label for="email">Email</label><input id="email" type="text">
+  <label for="question_1">Why us?</label><textarea id="question_1"></textarea>
+  <label for="resume">Resume</label><input id="resume" type="file">
+  <fieldset><legend>Which offices?</legend>
+    <input type="checkbox" id="question_2_1" name="question_2"><label for="question_2_1">Remote</label>
+    <input type="checkbox" id="question_2_2" name="question_2"><label for="question_2_2">New York</label>
+  </fieldset>
+  <div class="select" data-options="Yes|No|Decline To Self Identify"><label for="hispanic_ethnicity">Hispanic/Latino</label>
+    <div class="select__control"><div class="select__single-value"></div>
+      <input id="hispanic_ethnicity" role="combobox"></div></div>
+  <div class="select" data-options="Asian|White|Two or More Races" id="race-wrap" hidden><label for="race">Race</label>
+    <div class="select__control"><div class="select__single-value"></div><input id="race" role="combobox"></div></div>
+  <div class="select" data-options="Springfield, Illinois, United States|Springfield, Missouri, United States">
+    <label for="candidate-location">Location (City)</label>
+    <div class="select__control"><div class="select__single-value"></div>
+      <input id="candidate-location" role="combobox"></div></div>
+  <button type="submit" id="submit" onclick="document.title='SUBMITTED';return false">Submit application</button>
+</form>
+<script>
+document.querySelectorAll('.select').forEach(w => {
+  const inp = w.querySelector('input'), val = w.querySelector('.select__single-value');
+  const opts = w.dataset.options.split('|');
+  let menu = null;
+  const close = () => { if (menu) { menu.remove(); menu = null; } };
+  const open = () => {
+    close();
+    menu = document.createElement('div'); menu.setAttribute('role', 'listbox');
+    opts.filter(o => o.toLowerCase().includes(inp.value.toLowerCase())).forEach(o => {
+      const d = document.createElement('div'); d.setAttribute('role', 'option'); d.textContent = o;
+      d.onmousedown = e => { e.preventDefault(); val.textContent = o; inp.value = ''; close();
+        if (inp.id === 'hispanic_ethnicity') setTimeout(() => document.getElementById('race-wrap').hidden = false, 200); };
+      menu.appendChild(d);
+    });
+    w.appendChild(menu);
+  };
+  inp.addEventListener('focus', open); inp.addEventListener('input', open);
+  inp.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+});
+</script></body></html>
