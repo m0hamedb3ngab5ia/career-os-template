@@ -21,3 +21,6 @@ __pycache__/
 .pytest_cache/
 .coverage
 uv.lock
+
+# learning write lock (careeros.learning)
+.learning.lock
