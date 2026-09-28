@@ -66,7 +66,10 @@ def _load(p: Path) -> dict[str, dict[str, Any]]:
     try:
         data = yaml.safe_load(p.read_text(encoding="utf-8")) or {}
     except yaml.YAMLError as e:
-        raise ValueError(f"{p}: not valid YAML ({e})") from e
+        # Only the position: PyYAML's message quotes the offending source line, which may hold a password.
+        mark = getattr(e, "problem_mark", None)
+        where = f" at line {mark.line + 1}, column {mark.column + 1}" if mark else ""
+        raise ValueError(f"{p}: not valid YAML{where}") from None
     if not isinstance(data, dict):
         raise ValueError(f"{p}: must be a mapping of site -> {{username, password, notes}}")
     return {str(k).lower(): (v if isinstance(v, dict) else {}) for k, v in data.items()}

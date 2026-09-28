@@ -266,3 +266,19 @@ def test_doctor_reports_mode_and_repo_and_survives_missing_git(tmp_path, monkeyp
     got = check_credentials(p)
     assert [c.level for c in got] == [WARN, WARN]
     assert "git repo" in got[0].detail and "0600" in got[1].detail
+
+
+def test_malformed_yaml_error_never_echoes_a_secret(s):
+    p = s.paths["credentials"]
+    p.parent.mkdir(parents=True)
+    p.write_text("workday: {password: Tr0ub4dor-and-3, notes: [}\n")
+    with pytest.raises(ValueError) as ei:
+        cr.list_credentials(s)
+    assert "Tr0ub4dor" not in str(ei.value) and "line" in str(ei.value)
+
+
+def test_apply_job_runs_creds_via_the_allowlisted_path():
+    """Headless runs allow only `Bash(.venv/bin/careeros *)`: a bare `careeros creds` would be denied."""
+    text = (ROOT / ".claude/skills/apply-job/SKILL.md").read_text(encoding="utf-8")
+    assert "careeros creds" in text
+    assert "`careeros creds" not in text
