@@ -65,3 +65,38 @@ def test_apply_plan_fetch_failure_exits_1(temp_root: Path, tmp_path: Path, monke
     monkeypatch.setattr(gs, "fetch_questions", boom)
     assert cli_mod.main(["--root", str(temp_root), "apply", "plan", job_id]) == 1
     assert "u" in capsys.readouterr().err
+
+
+def _gh_job(root: Path, job_id: str = "x-1") -> Path:
+    jd = root / "data" / "jobs" / job_id
+    jd.mkdir(parents=True)
+    (jd / "posting.json").write_text(json.dumps({
+        "job_id": job_id, "company": "X", "title": "T", "ats": "greenhouse", "source_slug": "x",
+        "ats_job_id": "1", "url": "https://example.com/j"}))
+    return jd
+
+
+def test_apply_plan_sensitive_field_blocks(temp_root: Path, tmp_path: Path):
+    import careeros.cli as cli_mod
+
+    jd = _gh_job(temp_root)
+    schema = tmp_path / "q.json"
+    schema.write_text(json.dumps({"questions": [{"label": "Social Security Number", "required": True,
+                                                 "fields": [{"name": "question_1", "type": "input_text"}]}]}))
+    assert cli_mod.main(["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json", str(schema)]) == 3
+    plan = json.loads((jd / "fill_plan.json").read_text())
+    assert plan["blocked"] == ["Social Security Number"]
+
+
+def test_apply_plan_refuses_locked_job(temp_root: Path, monkeypatch):
+    import careeros.cli as cli_mod
+    from careeros.config import get_settings
+    from careeros.runs import locks
+    from careeros.runs.store import RunStore
+
+    monkeypatch.delenv("CAREEROS_LOCK_TOKEN", raising=False)
+    jd = _gh_job(temp_root)
+    locks.acquire(RunStore(get_settings(temp_root)).job_lock_path("x-1"), owner="run:other", ttl_seconds=600)
+    assert cli_mod.main(["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json",
+                         str(FIXTURES / "greenhouse" / "job_questions.json")]) == 6
+    assert not (jd / "fill_plan.json").exists()

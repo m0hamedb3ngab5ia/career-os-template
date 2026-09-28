@@ -51,11 +51,12 @@ def normalize(data: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def pick_option(options: list[str], answer: Any) -> str | None:
-    """Exact label (case-insensitive), else a whole-word prefix match; else None."""
+    """Exact label (case-insensitive), else the only whole-word prefix match; else None (ambiguous = review)."""
     if isinstance(answer, bool):
         answer = "Yes" if answer else "No"
     kinds = [(o, _label_matches(o, str(answer))) for o in options]
-    return next((o for o, k in kinds if k == "exact"), None) or next((o for o, k in kinds if k == "prefix"), None)
+    prefix = [o for o, k in kinds if k == "prefix"]
+    return next((o for o, k in kinds if k == "exact"), None) or (prefix[0] if len(prefix) == 1 else None)
 
 
 def _identity(profile: dict[str, Any]) -> dict[str, Any]:
@@ -71,14 +72,16 @@ def _extras(profile: dict[str, Any]) -> list[dict[str, Any]]:
     edu = (profile.get("education") or [{}])[0] or {}
     city = str(i.get("location") or "").split(",")[0].strip() or None
     start = str(edu.get("start") or "")[:4] or None
-    rows = [("country", "Country", "select", i.get("country")),
-            ("candidate-location", "Location (City)", "select_async", city),
-            ("school--0", "School", "select_async", edu.get("school")),
-            ("degree--0", "Degree", "select_async", edu.get("degree")),
-            ("discipline--0", "Discipline", "select_async", edu.get("discipline") or edu.get("major")),
-            ("start-year--0", "Start date year", "text", start)]
-    return [{"field_id": fid, "label": label, "type": t, "value": v, "source": "profile", "needs_review": False}
-            for fid, label, t, v in rows if v]
+    disc = edu.get("discipline") or edu.get("major")
+    combined = bool(edu.get("degree")) and not disc  # e.g. "BS Computer Science": never split it by guessing
+    rows = [("country", "Country", "select", i.get("country"), False),
+            ("candidate-location", "Location (City)", "select_async", city, False),
+            ("school--0", "School", "select_async", edu.get("school"), False),
+            ("degree--0", "Degree", "select_async", edu.get("degree"), combined),
+            ("discipline--0", "Discipline", "select_async", disc, combined),
+            ("start-year--0", "Start date year", "text", start, False)]
+    return [{"field_id": fid, "label": label, "type": t, "value": v, "source": "profile" if v else None,
+             "needs_review": rev} for fid, label, t, v, rev in rows if v or rev]
 
 
 def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers_path: Path, company: str,

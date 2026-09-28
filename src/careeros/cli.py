@@ -450,6 +450,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     if not posting:
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
+    if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
+        return locked
     if posting.get("ats") != "greenhouse" or not posting.get("source_slug") or not posting.get("ats_job_id"):
         print(f"job {args.job_id}: fill plans need a greenhouse posting with source_slug + ats_job_id", file=sys.stderr)
         return 2
@@ -467,7 +469,17 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
                       company=posting.get("company") or "", files=files)
     plan = {"job_id": args.job_id, "ats": "greenhouse", "board": board, "ats_job_id": ats_id,
             "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"), **plan}
+    blocked = [f["label"] for f in plan["fields"] if f["source"] == "pause:sensitive"]
+    if blocked:  # SSN/bank/passport...: hard stop like the form gate, never auto-filled
+        plan["blocked"] = blocked
     path = store._write(args.job_id, "fill_plan.json", plan)
+    if blocked:
+        what = "; ".join(blocked)[:300]
+        print(f"  BLOCK  sensitive_field {what}")
+        _add_action(s, f"scam gate (form): sensitive_field: {what}", "scam_suspected", job_id=args.job_id,
+                    priority="H", needs="phone", dedupe=True)
+        _set_status_both(s, args.job_id, "needs_review", f"safety block (form): sensitive_field: {what}"[:200])
+        return SAFETY_HARD_EXIT
     fields = plan["fields"]
     review = [f for f in fields if f["needs_review"]]
     paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")]
@@ -1692,6 +1704,8 @@ def build_parser() -> argparse.ArgumentParser:
     app.add_argument("job_id")
     app.add_argument("--json", action="store_true", help="print the plan")
     app.add_argument("--schema-json", help="read the questions JSON from this file instead of the boards API")
+    app.add_argument("--lock-token", help="re-enter a job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
+    app.add_argument("--force", action="store_true", help="ignore a held job lock")
     app.set_defaults(fn=cmd_apply_plan)
     sf = sub.add_parser("safety", help="scam + company + ghost-job gate (exit 3 = block, 4 = skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)

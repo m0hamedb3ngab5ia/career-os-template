@@ -118,3 +118,18 @@ def _paused(tmp_path, label):
 def test_plan_never_guesses_legal_salary_sensitive(tmp_path, label, kind):
     row = _paused(tmp_path, label)
     assert row["value"] is None and row["needs_review"] and row["source"] == f"pause:{kind}"
+
+
+def test_pick_option_ambiguous_prefix_is_none():
+    assert pick_option(["Yes, but I need sponsorship later", "Yes, I am a citizen"], "Yes") is None
+    assert pick_option(["Yes", "Yes, but later"], "Yes") == "Yes"  # exact still wins
+
+
+def test_plan_combined_degree_needs_review():
+    f = _by_id(_plan()["fields"])  # example profile: "Bachelor of Science, Computer Science", no discipline
+    assert f["degree--0"]["needs_review"] and f["discipline--0"]["needs_review"]
+    assert f["discipline--0"]["value"] is None
+    edu = {**PROFILE["education"][0], "degree": "BS", "discipline": "Computer Science"}
+    f2 = _by_id(build_plan([], profile={**PROFILE, "education": [edu]}, answers_path=ANSWERS, files={})["fields"])
+    assert f2["degree--0"]["value"] == "BS" and not f2["degree--0"]["needs_review"]
+    assert f2["discipline--0"]["value"] == "Computer Science" and not f2["discipline--0"]["needs_review"]
