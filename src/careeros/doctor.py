@@ -18,6 +18,7 @@ What it checks:
   an `estimate: true` bullet without a "~<number>" in its text (WARN: QA's estimate_marked cannot guard it).
 - `**bold**` markup (careeros.markup) in bullet text, variants and summary_variants: unbalanced, empty or nested
   markers FAIL (the résumé render would fail); `**` in narratives WARNs (narratives feed prose, which stays plain).
+- Login store (`paths.credentials`): WARN if inside a git repo (and louder if not gitignored) or mode is not 0600.
 
 The prepare-job and apply-job skills run `careeros doctor --quiet` first and stop on a nonzero exit,
 so the fictional example candidate never reaches a real application.
@@ -27,6 +28,8 @@ from __future__ import annotations
 import os
 import re
 import shutil
+import stat
+import subprocess
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -506,6 +509,30 @@ def check_apply_lessons(root: Path) -> list[Check]:
     return [Check(PASS, "apply_lessons", f"profile/apply_lessons.yaml: {len(data['lessons'])} lesson(s)")]
 
 
+def _git_toplevel(p: Path) -> Path | None:
+    for d in [p.parent, *p.parent.parents]:
+        if (d / ".git").exists():
+            return d
+    return None
+
+
+def check_credentials(p: Path) -> list[Check]:
+    """The login store (`paths.credentials`, careeros.credentials): WARN if it sits inside a git repo (worse: not
+    gitignored there) or its mode is not 0600."""
+    if not p.is_file():
+        return [Check(PASS, "credentials", f"{p} absent (created by `careeros creds set <site>`)")]
+    top = _git_toplevel(p)
+    if top is not None:
+        ignored = subprocess.run(["git", "-C", str(top), "check-ignore", "-q", str(p)],
+                                 capture_output=True).returncode == 0
+        where = (f"{p} is inside the git repo {top}" + ("" if ignored else " and not gitignored: it could be committed"))
+        return [Check(WARN, "credentials", f"{where}; move it to ~/.careeros/credentials.yaml (paths.credentials)")]
+    mode = stat.S_IMODE(p.stat().st_mode)
+    if mode != 0o600:
+        return [Check(WARN, "credentials", f"{p} has mode {mode:04o}, want 0600: chmod 600 {p}")]
+    return [Check(PASS, "credentials", f"{p}: outside git, mode 0600")]
+
+
 def check_voice(root: Path) -> Check:
     d = root / "profile" / "voice" / "samples"
     n = sum(1 for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.is_dir() else 0
@@ -573,6 +600,9 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     checks += check_runs(cfg["pipeline"])
     checks += check_ui_index(root)
     checks += check_apply_lessons(root)
+    cp = (cfg["pipeline"].get("paths") or {}).get("credentials") if isinstance(cfg["pipeline"].get("paths"), dict) else None
+    cp = Path(str(cp or "~/.careeros/credentials.yaml")).expanduser()
+    checks += check_credentials(cp if cp.is_absolute() else root / cp)
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)

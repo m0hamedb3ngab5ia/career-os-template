@@ -20,7 +20,13 @@ paths:
   standard_answers: profile/standard_answers.yaml
   voice_dir: profile/voice
   resume_template_dir: templates/resume
+  credentials: ~/.careeros/credentials.yaml  # (Recommended) ATS/job-site logins for /apply-job: outside the repo,
+                                           # mode 0600, never committed. `careeros creds set <site>` writes it
   output_dir_per_job: true                 # data/jobs/<id>/{posting.json,score.json,resume.pdf,cover_letter.md,answers.json,qa.json,log.md}
+
+credentials:                               # reusable default: fine to keep
+  backend: file                            # file (Recommended): passwords in paths.credentials (0600) | keychain:
+                                           # macOS login keychain (`security`), the file keeps only username/notes
 
 schedule:                                  # reusable default: fine to keep. `careeros schedule install` adds a macOS
                                            # LaunchAgent that runs `careeros tick` every tick_minutes; the tick runs
