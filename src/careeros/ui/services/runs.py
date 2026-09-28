@@ -215,7 +215,7 @@ class RunControl:
         score / prepare / apply run (`careeros run <kind> --job <id> [--force]`, run id chosen here and returned
         as `run_id`). A dry run ranks and returns the selection in-process: it never calls Claude and takes no
         lock, so there is nothing to detach. JobNotRunnable (the runner's own reasons) before anything is
-        spawned when the job is not a candidate; Tier A is never applied."""
+        spawned when the job is not a candidate; Tier A is never submitted (the run stages it for review)."""
         from careeros.runs.config import budget_for, load_runs_config
 
         kinds = JOB_KINDS if job_id else BATCH_KINDS
@@ -508,7 +508,7 @@ class RunControl:
             if state != "running":
                 run = self.rs.load_run(run_id) or run  # the final stop reason
                 yield from read_new()
-                yield {"type": "end", "state": state, "stop_reason": run.get("stop_reason")}
+                yield {"type": "end", "state": state, "stop_reason": run.get("stop_reason"), "counters": run.get("counters")}
                 return
             self.sleep(poll_s)
             yield from read_new()

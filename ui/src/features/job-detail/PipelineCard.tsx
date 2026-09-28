@@ -32,12 +32,34 @@ const KIND_HELP: Record<string, string> = {
   prepare: "Runs prepare-job headless: score, tailored resume, cover letter and QA.",
   apply: "Runs apply-job headless in Chrome: fills the form, then submits or stages it for you per auto_submit.",
 };
+/** apply help by the server's auto_submit switch (job_pipeline.auto_submit): off = every run stages for review. */
+function kindHelp(s: PipelineState): string {
+  if (s.next_kind === "apply") {
+    return s.note != null || !s.auto_submit
+      ? "Runs apply-job headless in Chrome: fills the form and stops before Submit; you review and send it (never auto-submitted)."
+      : "Runs apply-job headless in Chrome: fills the form and submits it (auto_submit is on).";
+  }
+  return KIND_HELP[s.next_kind ?? ""] ?? "";
+}
+const CHAIN_MSG: Record<string, string> = {
+  prepare: "Scored — continuing to prepare…",
+  apply: "Prepared — filling & staging for review…",
+};
 
 /** True when a state just reached after a score run started here should roll straight into prepare: the server
- * offers a plain (non-forced) continue into prepare and nothing blocks the job. Apply is never chained. */
+ * offers a plain (non-forced) continue into prepare and nothing blocks the job. */
 function chainsToPrepare(s: PipelineState): boolean {
   return s.next_action === "continue" && s.next_kind === "prepare" && !s.force && !s.blocked_reason &&
     s.active_run_id == null;
+}
+
+/** True when a state just reached after a prepare run started here should roll on into apply: only while
+ * auto_submit is off (the run fills and stages the form, never submits: the human reviews it in the browser),
+ * the server offers a plain continue into apply and nothing blocks the job. Never `approve_continue`: that is
+ * the review gate (Tier A doc review, review_required categories) and only a human click approves it. */
+function chainsToApply(s: PipelineState): boolean {
+  return !s.auto_submit && s.next_kind === "apply" && s.next_action === "continue" && !s.force &&
+    !s.blocked_reason && s.active_run_id == null;
 }
 
 // Polls of GET /runs/{id} (1s apart) that may 404 before a run the card started is given up on: `careeros run`
@@ -46,15 +68,17 @@ const MAX_MISSING_POLLS = 15;
 
 /** Stage stepper, the one next action (Start / Continue / Approve & continue), the review reasons and, while a
  * run works on this job, its live output with Cancel. The server decides what can run (job_pipeline.py).
- * A score run started here chains into prepare (score → prepare → QA in one click) and stops at the review gate
- * or a blocked state; "Stop after this stage" turns that off. */
+ * A score run started here chains into prepare (score → prepare → QA in one click); while auto_submit is off the
+ * prepare run chains on into apply (fill & stage the form for review, never submit), so one click takes a job to
+ * a staged form. Chaining stops at a blocked state or at the review gate (Approve & continue is always a human
+ * click); "Stop after this stage" turns it off. */
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
   const [started, setStarted] = useState<string | null>(null);
   const [stopAfter, setStopAfter] = useState(false);
-  // "Scored — continuing to prepare…": from the moment a chained prepare run is requested until it ends.
-  const [chaining, setChaining] = useState(false);
+  // The chained run's message (CHAIN_MSG): from the moment it is requested until it ends.
+  const [chaining, setChaining] = useState<string | null>(null);
   // The kind of the run this card started, so only our own score run chains (never a run from elsewhere).
   const startedKind = useRef<string | null>(null);
   // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
@@ -89,19 +113,28 @@ export function PipelineCard({ jobId }: { jobId: string }) {
                    : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
     }
     setStarted(null);
-    setChaining(false);
-    const wasScore = startedKind.current === "score";
+    setChaining(null);
+    const was = startedKind.current;
     startedKind.current = null;
+    // Chain only after a clean finish: a failed or stopped run (usage_limit, error, ...) may still have left
+    // runnable files behind, and those stops need the user's attention, not the next stage. A run whose job
+    // failed still ends "completed" (the runner only counts it), so the counters must show a clean success too.
+    const endReason = stream.ended ? stream.stopReason : startedRun.data?.stop_reason ?? null;
+    const counts = (stream.ended ? stream.counters : startedRun.data?.counters) ?? {};
+    const completed = endReason === "completed" && (counts.ok ?? 0) >= 1 && (counts.failed ?? 0) === 0;
     void pipeline.refetch().then((r) => {
-      if (!wasScore || stopAfter || !r.data || !chainsToPrepare(r.data)) return;
-      setChaining(true);
-      startedKind.current = "prepare";
+      if (stopAfter || !completed || !r.data || !r.data.next_action) return;
+      const next = was === "score" && chainsToPrepare(r.data) ? "prepare"
+        : was === "prepare" && chainsToApply(r.data) ? "apply" : null;
+      if (!next) return;
+      setChaining(CHAIN_MSG[next] ?? null);
+      startedKind.current = next;
       start.mutate(
-        { action: "continue" },
+        { action: r.data.next_action },
         {
           onSuccess: (res) => setStarted(res.run_id),
           onError: (e) => {
-            setChaining(false);
+            setChaining(null);
             toast.show({ message: errorText(e) });
           },
         },
@@ -179,7 +212,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         <>
           <div className={styles.buttons}>
             <span className={styles.sec}>
-              {chaining ? "Scored — continuing to prepare… " : ""}Running {state.next_kind ?? ""} · {runId}
+              {chaining ? `${chaining} ` : ""}Running {state.next_kind ?? ""} · {runId}
             </span>
             <Button
               variant="destructive"
@@ -199,7 +232,13 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button
             variant="primary"
             title={(() => {
-              const key = state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
+              // Tier A/B "stage the form" offers keep the stageReview tooltip even though next_action is
+              // approve_continue (label overridden to "Prepare & stage for review"); a plain Tier B/C
+              // "Approve & continue" must keep its own tooltip: it approves the docs, it does not stage/submit.
+              const key = state.next_action === "approve_continue" && state.next_label === "Approve & continue"
+                ? NEXT_ACTION_HELP_KEY.approve_continue
+                : state.note != null ? "stageReview"
+                : state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
               return key ? help(key).title : label;
             })()}
             disabled={busy}
@@ -208,7 +247,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             {started ? "Starting…" : label}
           </Button>
           <span className={styles.sec}>
-            {chaining ? "Scored — continuing to prepare…" : KIND_HELP[state.next_kind ?? ""] ?? ""}
+            {chaining ?? kindHelp(state)}
           </span>
         </div>
       ) : (
@@ -219,7 +258,9 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <span className={styles.sec}>{state.blocked_reason ?? "Nothing left to run for this job."}</span>
         </div>
       )}
-      {state.next_kind === "score" || chaining || startedKind.current === "score" ? (
+      {state.note ? <Muted>{state.note}</Muted> : null}
+      {state.next_kind === "score" || (state.next_kind === "prepare" && !state.auto_submit) || chaining !== null ||
+       startedKind.current === "score" || startedKind.current === "prepare" ? (
         <label
           className={styles.caption}
           style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}

@@ -1531,6 +1531,8 @@ export interface components {
     PipelineState: {
       /** Active Run Id */
       active_run_id: string | null;
+      /** Auto Submit */
+      auto_submit: boolean;
       /** Blocked Reason */
       blocked_reason: string | null;
       /** Force */
@@ -1541,6 +1543,8 @@ export interface components {
       next_kind: string | null;
       /** Next Label */
       next_label: string | null;
+      /** Note */
+      note: string | null;
       /** Queued In Run */
       queued_in_run: string | null;
       /** Review Reasons */

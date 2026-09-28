@@ -2,24 +2,27 @@
 Approve & continue), why nothing can run, and what a needs_review job is waiting on.
 
 The rules are the runner's (careeros.runs.runner.eligibility, policy.is_tier_a): this module reads the job files
-and names the button; `careeros run <kind> --job <id>` decides again before anything is called, so a Tier A job
-is refused twice and never applied by a run.
+and names the button; `careeros run <kind> --job <id>` decides again before anything is called. A Tier A job is
+never refused: its apply stage runs assisted (the runner passes CAREEROS_AUTO_SUBMIT=0), so the run fills and
+stages the form and the candidate reviews and submits; a run never submits Tier A.
 """
 from __future__ import annotations
 
 from typing import Any, Literal, TypedDict
 
 from careeros.runs.policy import is_tier_a
-from careeros.runs.runner import eligibility
+from careeros.runs.runner import HANDS_OFF_OUTCOMES, eligibility
 
 STAGES = ("score", "prepare", "qa", "review", "apply")
 Action = Literal["start", "continue", "approve_continue"]
+ACTIONS: tuple[Action, ...] = ("start", "continue", "approve_continue")
 LABELS: dict[str, str] = {"start": "Start pipeline", "continue": "Continue pipeline",
-                          "approve_continue": "Approve & continue"}
-TIER_A_BLOCKED = "Tier A: never auto-applied; apply manually"
+                          "approve_continue": "Approve & continue",
+                          "stage_review": "Prepare & stage for review"}  # Tier A apply (assisted)
+TIER_A_NOTE = "Tier A: the run fills and stages the form; you review and submit."
+STAGE_NOTE = "auto_submit is off: the run fills and stages the form; you review and submit."
 APPLY_STAGED = "Application staged in the browser: review and submit it manually (see Apply session)"
-# apply_session.json outcomes after which the browser holds the application: nothing runs again, a human finishes.
-HANDS_OFF_OUTCOMES = ("staged", "submitted", "blocked")
+# HANDS_OFF_OUTCOMES (runner): apply_session.json outcomes after which nothing runs again, a human finishes.
 APPROVE_NOTE = "Approved for apply from the UI"
 # Statuses after which the pipeline has nothing left to run (the job is done, dropped or in the human's hands).
 DONE_STATUSES = ("applied", "skipped", "withdrawn", "screening", "interview", "offer", "rejected", "ghosted")
@@ -33,6 +36,8 @@ class PipelineState(TypedDict):
     next_kind: str | None
     force: bool  # the next run needs `--force` (a stage that already finished is rerun)
     blocked_reason: str | None
+    note: str | None  # what the next action does differently for this job (Tier A: assisted apply)
+    auto_submit: bool  # runs.auto_submit.enabled: false -> every apply run only fills and stages the form
     review_reasons: list[str]
     active_run_id: str | None
     queued_in_run: str | None  # a batch run that will get to this job later (no Cancel: it would kill the batch)
@@ -92,18 +97,31 @@ def review_reasons(qa: dict[str, Any] | None, prepare: dict[str, Any] | None,
 def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dict[str, Any] | None,
                   qa: dict[str, Any] | None, open_actions: list[str] | None = None,
                   active_run_id: str | None = None, apply_session: dict[str, Any] | None = None,
-                  queued_in_run: str | None = None) -> PipelineState:
-    """Pure: the job's files in, the stage / next action / blocked reason out."""
+                  queued_in_run: str | None = None, auto_submit: bool = False) -> PipelineState:
+    """Pure: the job's files in, the stage / next action / blocked reason out. `auto_submit` is the config switch
+    (runs.auto_submit.enabled); while it is off every apply is labelled as staging for review (the run never submits)
+    and the UI chains prepare into a plain `continue` apply, never past the Approve gate."""
     status = status or "found"
     score, prepare, session = score or {}, prepare or {}, apply_session or {}
     has_score, qa_pass, tier_a = bool(score), bool(prepare.get("qa_pass")), is_tier_a(score.get("tier"))
     st: PipelineState = {"stage": STAGE_OF_STATUS.get(status, "apply"), "next_action": None, "next_label": None,
-                         "next_kind": None, "force": False, "blocked_reason": None,
+                         "next_kind": None, "force": False, "blocked_reason": None, "note": None,
+                         "auto_submit": auto_submit,
                          "review_reasons": review_reasons(qa, prepare, open_actions or [], session),
                          "active_run_id": active_run_id, "queued_in_run": queued_in_run}
 
     def offer(action: Action, kind: str, force: bool = False) -> PipelineState:
         st.update(next_action=action, next_label=LABELS[action], next_kind=kind, force=force)
+        if kind == "apply" and (tier_a or not auto_submit):  # the run stages the form, the candidate submits
+            st["note"] = TIER_A_NOTE if tier_a else STAGE_NOTE
+            if tier_a or action == "continue":  # the Approve gate keeps its label for B/C: the human approves docs
+                st["next_label"] = LABELS["stage_review"]
+        return st
+
+    def hands_off() -> PipelineState:  # the browser holds the form: running again would refill or re-submit it
+        st["blocked_reason"] = APPLY_STAGED if session.get("outcome") == "staged" else \
+            "submit already clicked in an earlier session: check the ATS by hand" if session.get("submit_clicked") \
+            else f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
         return st
 
     if active_run_id:
@@ -124,23 +142,15 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
         st["blocked_reason"] = f"Score decision: skip ({score.get('skip_reason') or 'see score.json'})" \
             if why.startswith("score decision") else why
         return st
+    if status in ("needs_review", "queued", "prepared") and \
+            (session.get("outcome") in HANDS_OFF_OUTCOMES or session.get("submit_clicked")):
+        return hands_off()
     if status == "needs_review":
-        if tier_a:
-            st["blocked_reason"] = TIER_A_BLOCKED
-            return st
-        if session.get("outcome") in HANDS_OFF_OUTCOMES:  # the browser holds the form: re-approving would refill it
-            st["blocked_reason"] = APPLY_STAGED if session["outcome"] == "staged" else \
-                f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
-            return st
         return offer("approve_continue", "apply") if qa_pass else offer("continue", "prepare", force=True)
     if status in ("queued", "prepared"):
-        why = eligibility("apply", status, has_score, score, qa_pass)
+        why = eligibility("apply", status, has_score, score, qa_pass, apply_session=session)
         if why is None:
             return offer("continue", "apply")
-        if tier_a:
-            st["stage"] = "apply"
-            st["blocked_reason"] = TIER_A_BLOCKED
-            return st
         st["stage"] = "qa"
         return offer("continue", "prepare", force=True)  # qa not passed: re-prepare
     return st
@@ -160,16 +170,19 @@ def open_action_items(settings: Any, job_id: str) -> list[str]:
 
 def pipeline_state(settings: Any, job_id: str, rc: Any) -> PipelineState:
     """GET /jobs/{id}/pipeline: compute_state over the job's files, the tracker's open items and the running run."""
+    from careeros.runs.config import load_runs_config
+    from careeros.runs.policy import AutoSubmitPolicy
     from careeros.store import Store
     from careeros.ui.services.job_actions import _job
 
     _job(settings, job_id)  # LookupError -> 404
     store = Store(settings)
+    auto_submit = AutoSubmitPolicy.from_config(load_runs_config(settings).raw).enabled
     return compute_state(store.get_status(job_id), store._read(job_id, "score.json"),
                          store._read(job_id, "prepare.json"), store._read(job_id, "qa.json"),
                          open_action_items(settings, job_id), rc.active_run_for(job_id),
                          apply_session=store._read(job_id, "apply_session.json"),
-                         queued_in_run=rc.queued_in_run(job_id))
+                         queued_in_run=rc.queued_in_run(job_id), auto_submit=auto_submit)
 
 
 def start_pipeline(settings: Any, job_id: str, action: str, rc: Any, force: bool = False) -> dict[str, Any]:
@@ -179,8 +192,8 @@ def start_pipeline(settings: Any, job_id: str, action: str, rc: Any, force: bool
     from careeros.store import Store
     from careeros.ui.services import job_actions
 
-    if action not in LABELS:
-        raise ValueError(f"action must be one of {', '.join(LABELS)}, got {action!r}")
+    if action not in ACTIONS:
+        raise ValueError(f"action must be one of {', '.join(ACTIONS)}, got {action!r}")
     rc._check_can_start()  # Busy / Paused before any status change
     st = pipeline_state(settings, job_id, rc)
     fits = st["next_action"] is not None and (action == st["next_action"]
