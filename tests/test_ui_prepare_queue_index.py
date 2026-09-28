@@ -73,3 +73,16 @@ def test_prepare_queue_reports_a_config_error(data, idx, monkeypatch):
 
     monkeypatch.setattr("careeros.runs.config.load_runs_config", boom)
     assert today_svc.prepare_queue(data["settings"], idx, NOW) == {"total": None, "error": "bad runs config"}
+
+
+@pytest.mark.parametrize("name,text", [("status.json", "{bad"), ("score.json", "{bad"), ("prepare.json", "[1]")])
+def test_prepare_queue_reports_a_job_file_the_runner_cannot_read(data, idx, name, text):
+    s = data["settings"]
+    jid = data["prep"]["p_hi"]
+    (Store(s).job_dir(jid) / name).write_text(text, encoding="utf-8")
+    with pytest.raises((ValueError, AttributeError)):   # the run itself fails on it during selection
+        runner.select_candidates(s, "prepare", load_runs_config(s), NOW)
+    idx.update_jobs([jid])
+    got = today_svc.prepare_queue(s, idx, NOW)
+    assert got["total"] is None
+    assert jid in got["error"] and name in got["error"]

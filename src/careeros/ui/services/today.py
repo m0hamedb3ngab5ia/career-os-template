@@ -46,6 +46,9 @@ def ranked_from_index(settings: Any, ix: Any, kind: str, cfg: Any, now: datetime
     from careeros.runs.runner import CandidateRecord, rank_records
 
     rows = ix.query("SELECT * FROM candidates ORDER BY job_id")
+    bad = next((r for r in rows if r["error"]), None)
+    if bad:   # select_candidates raises on the same file, so the next run would fail too
+        raise ValueError(f"job {bad['job_id']}: {bad['error']}")
     records = (CandidateRecord(job_id=r["job_id"], status=r["status"], score=json.loads(r["score"] or "{}"),
                                has_score=bool(r["has_score"]), prepared_ok=bool(r["prepared_ok"]),
                                posting=json.loads(r["posting"] or "{}")) for r in rows)
