@@ -101,3 +101,20 @@ def test_plan_greenhouse_extras_only_where_profile_has_data():
     prof = {**PROFILE, "identity": {**PROFILE["identity"], "country": "United States"}}
     f2 = _by_id(build_plan(normalize(DATA), profile=prof, answers_path=ANSWERS, company="x", files={})["fields"])
     assert f2["country"]["value"] == "United States"
+
+
+def _paused(tmp_path, label):
+    ans = tmp_path / "sa.yaml"
+    ans.write_text("answers:\n  - key: current_employer\n    match: ['current employer']\n    answer: Foo\n")
+    fields = [{"field_id": "q1", "label": label, "type": "text", "required": True, "options": []}]
+    return build_plan(fields, profile=PROFILE, answers_path=ans, files={})["fields"][0]
+
+
+@pytest.mark.parametrize("label,kind", [
+    ("Are you legally authorized to work in the United States?", "legal"),
+    ("What are your salary expectations?", "salary"),
+    ("Please enter your Social Security Number", "sensitive"),
+])
+def test_plan_never_guesses_legal_salary_sensitive(tmp_path, label, kind):
+    row = _paused(tmp_path, label)
+    assert row["value"] is None and row["needs_review"] and row["source"] == f"pause:{kind}"

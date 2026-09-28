@@ -439,7 +439,10 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     """Greenhouse question schema -> data/jobs/<id>/fill_plan.json (answers from profile + standard_answers)."""
     import yaml
 
+    import requests
+
     from careeros.apply.gh_schema import build_plan, fetch_questions, normalize
+    from careeros.scout.base import BoardNotFound, FetchError
 
     s = _settings(args)
     store = Store(s)
@@ -451,8 +454,12 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         print(f"job {args.job_id}: fill plans need a greenhouse posting with source_slug + ats_job_id", file=sys.stderr)
         return 2
     board, ats_id = posting["source_slug"], str(posting["ats_job_id"])
-    data = (json.loads(Path(args.schema_json).read_text(encoding="utf-8")) if args.schema_json
-            else fetch_questions(board, ats_id))
+    try:
+        data = (json.loads(Path(args.schema_json).read_text(encoding="utf-8")) if args.schema_json
+                else fetch_questions(board, ats_id))
+    except (BoardNotFound, FetchError, requests.RequestException) as e:
+        print(f"job {args.job_id}: could not fetch questions for {board}/{ats_id}: {e}", file=sys.stderr)
+        return 1
     jd = store.job_dir(args.job_id)
     files = {k: str(jd / f"{k}.pdf") if (jd / f"{k}.pdf").exists() else None for k in ("resume", "cover_letter")}
     profile = yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}
@@ -465,8 +472,9 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     review = [f for f in fields if f["needs_review"]]
     paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")]
     if paused:  # legal/salary/EEO with no stored answer: never guessed
-        _add_action(s, f"fill plan: answer {len(paused)} legal/salary/EEO question(s): " + "; ".join(paused)[:250],
-                    "question", job_id=args.job_id, company=posting.get("company") or "", dedupe=True)
+        print(f"paused for your answer ({len(paused)}): " + "; ".join(paused))  # Action Items have no detail column
+        _add_action(s, f"fill plan: {args.job_id}", "question", job_id=args.job_id,
+                    company=posting.get("company") or "", dedupe=True)
     if args.json:
         print(json.dumps(plan, indent=2))
     else:

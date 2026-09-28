@@ -108,7 +108,7 @@ def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers
         value, source = _fill(f, ident, eeo, Path(answers_path), company, files)
         if value is None and f["type"] not in ("hidden", "file"):
             kind = classify_question(f["label"]) if f["field_id"] not in _EEO else "eeo"
-            source = f"pause:{kind}" if kind in ("legal", "salary", "eeo") else "unanswered"
+            source = f"pause:{kind}" if kind in ("legal", "salary", "eeo", "sensitive") else "unanswered"
         needs = value is None and f["type"] != "hidden" and (f["type"] != "file" or f["required"])
         row = {"field_id": f["field_id"], "label": f["label"], "type": f["type"], "value": value, "source": source,
                "needs_review": needs}
