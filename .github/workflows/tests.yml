@@ -6,10 +6,36 @@ on:
     branches: [main]
 
 jobs:
+  changes:
+    # Which jobs this change needs. Jobs are skipped with `if` (not trigger-level `paths:`), so the required
+    # `pytest` check still reports: a skipped job counts as passed.
+    if: ${{ !github.event.repository.private }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      python: ${{ steps.filter.outputs.python }}
+      ui: ${{ steps.filter.outputs.ui }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dorny/paths-filter@v3
+        id: filter
+        with:
+          predicate-quantifier: every
+          filters: |
+            python:
+              - '**'
+              - '!**/*.md'
+              - '!docs/**'
+            ui:
+              - '{ui/**,src/careeros/ui/static/**,.nvmrc,.github/workflows/tests.yml}'
+
   pytest:
     # CI runs only in the public template: private copies have a small Actions quota, so their syncs are
-    # verified locally (`careeros sync pull`). Skipped jobs count as passed there.
-    if: ${{ !github.event.repository.private }}
+    # verified locally (`careeros sync pull`). Skipped jobs count as passed there. Docs-only changes skip it.
+    needs: changes
+    if: ${{ !github.event.repository.private && needs.changes.outputs.python == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,12 +50,14 @@ jobs:
         run: pip install -e ".[test,ui]"
       - name: Everything + coverage
         if: steps.has_pkg.outputs.present == 'yes'
-        run: pytest -q --cov=careeros --cov-report=term-missing
+        run: pytest -q -n auto --cov=careeros --cov-report=term-missing
 
   ui:
     # CI runs only in the public template: private copies have a small Actions quota, so their syncs are
-    # verified locally (`careeros sync pull`). Skipped jobs count as passed there.
-    if: ${{ !github.event.repository.private }}
+    # verified locally (`careeros sync pull`). Skipped jobs count as passed there. Runs only when ui/, the
+    # committed bundle, .nvmrc or this workflow change; API changes reach it via ui/openapi.json (pytest checks it).
+    needs: changes
+    if: ${{ !github.event.repository.private && needs.changes.outputs.ui == 'true' }}
     runs-on: ubuntu-latest
     defaults:
       run:

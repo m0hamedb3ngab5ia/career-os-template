@@ -12,8 +12,8 @@ dependencies = ["pyyaml", "requests", "pydantic>=2,<3", "openpyxl", "ruamel.yaml
                 "typing_extensions>=4.7"]
 
 [project.optional-dependencies]
-dev = ["pytest", "pytest-cov", "jinja2", "pypdf"]
-test = ["pytest", "pytest-cov", "jinja2", "pypdf", "httpx"]
+dev = ["pytest", "pytest-cov", "pytest-xdist", "jinja2", "pypdf"]
+test = ["pytest", "pytest-cov", "pytest-xdist", "jinja2", "pypdf", "httpx"]
 # fastapi pinned to one minor: ui/openapi.json is compared byte-for-byte, so a bump means regenerating it
 ui = ["fastapi>=0.141,<0.142", "uvicorn", "watchfiles", "anyio>=4.1"]  # anyio 4.1+: abandon_on_cancel
 
