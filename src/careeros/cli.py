@@ -695,6 +695,83 @@ def cmd_learn_list(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_creds_set(args: argparse.Namespace) -> int:
+    """Password from --password-stdin (first line) or a hidden prompt; never from argv, never echoed."""
+    import getpass
+
+    from careeros.credentials import set_credential
+
+    pw = None
+    if args.password_stdin:
+        pw = sys.stdin.readline().rstrip("\r\n")
+    elif not args.no_password:
+        pw = getpass.getpass(f"password for {args.site} (hidden, empty = keep): ") or None
+    try:
+        set_credential(_settings(args), args.site, username=args.username, password=pw, notes=args.notes)
+    except (ValueError, RuntimeError) as err:
+        print(f"creds set: {err}", file=sys.stderr)
+        return 1
+    print(f"saved {args.site.strip().lower()}" + (" (password stored)" if pw else ""))
+    return 0
+
+
+def cmd_creds_get(args: argparse.Namespace) -> int:
+    from careeros.credentials import get_credential
+
+    try:
+        c = get_credential(_settings(args), args.site)
+    except KeyError:
+        print(f"creds get: no credentials for {args.site!r} (careeros creds set {args.site})", file=sys.stderr)
+        return 1
+    except (ValueError, RuntimeError) as err:
+        print(f"creds get: {err}", file=sys.stderr)
+        return 1
+    if args.reveal:
+        if not c["password"]:
+            print(f"creds get: no password stored for {c['site']}", file=sys.stderr)
+            return 1
+        print(c["password"])
+        return 0
+    info = {"site": c["site"], "username": c["username"], "notes": c["notes"], "has_password": bool(c["password"])}
+    if args.json:
+        print(json.dumps(info, indent=2))
+    else:
+        print(f"site: {info['site']}\nusername: {info['username'] or ''}\nnotes: {info['notes'] or ''}\n"
+              f"password: {'******** (stored; --reveal prints it)' if info['has_password'] else '(none)'}")
+    return 0
+
+
+def cmd_creds_list(args: argparse.Namespace) -> int:
+    from careeros.credentials import credentials_path, list_credentials
+
+    s = _settings(args)
+    try:
+        items = list_credentials(s)
+    except ValueError as err:
+        print(f"creds list: {err}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(items, indent=2))
+    elif not items:
+        print(f"no credentials in {credentials_path(s)}")
+    for x in [] if args.json else items:
+        print(f"{x['site']:<20} {x['username'] or '':<32} {'secret' if x['has_secret'] else 'no secret':<9} "
+              f"{x['backend']:<8} {x['notes'] or ''}".rstrip())
+    return 0
+
+
+def cmd_creds_rm(args: argparse.Namespace) -> int:
+    from careeros.credentials import remove_credential
+
+    try:
+        ok = remove_credential(_settings(args), args.site)
+    except ValueError as err:
+        print(f"creds rm: {err}", file=sys.stderr)
+        return 1
+    print(f"removed {args.site}" if ok else f"no credentials for {args.site!r}", file=sys.stdout if ok else sys.stderr)
+    return 0 if ok else 1
+
+
 def cmd_prune(args: argparse.Namespace) -> int:
     """--yes holds the pipeline lock (never deletes beside a batch); exit 6 = busy. A dry run only reads."""
     from contextlib import nullcontext
@@ -1533,6 +1610,29 @@ def build_parser() -> argparse.ArgumentParser:
     lls.add_argument("--company")
     lls.add_argument("--json", action="store_true")
     lls.set_defaults(fn=cmd_learn_list)
+
+    cr = sub.add_parser("creds", help="ATS/job-site logins for /apply-job (paths.credentials, 0600, never in git)")
+    crs = cr.add_subparsers(dest="sub", required=True)
+    cst = crs.add_parser("set", help="create/update a site; password via --password-stdin or a hidden prompt")
+    cst.add_argument("site")
+    cst.add_argument("--username")
+    cst.add_argument("--notes")
+    pwg = cst.add_mutually_exclusive_group()
+    pwg.add_argument("--password-stdin", action="store_true", help="read the password from the first stdin line")
+    pwg.add_argument("--no-password", action="store_true", help="do not ask for a password (username/notes only)")
+    cst.set_defaults(fn=cmd_creds_set)
+    cgt_ = crs.add_parser("get", help="username/notes (password masked); --reveal prints only the password")
+    cgt_.add_argument("site")
+    cgm = cgt_.add_mutually_exclusive_group()
+    cgm.add_argument("--reveal", action="store_true")
+    cgm.add_argument("--json", action="store_true")
+    cgt_.set_defaults(fn=cmd_creds_get)
+    cls_ = crs.add_parser("list", help="stored sites, no secrets")
+    cls_.add_argument("--json", action="store_true")
+    cls_.set_defaults(fn=cmd_creds_list)
+    crm = crs.add_parser("rm", help="delete a site (and its keychain item)")
+    crm.add_argument("site")
+    crm.set_defaults(fn=cmd_creds_rm)
 
     sf = sub.add_parser("safety", help="scam + company + ghost-job gate (exit 3 = block, 4 = skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)
