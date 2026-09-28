@@ -719,6 +719,26 @@ def test_matched_question_wins_over_a_wrong_standard_key(tmp_path: Path) -> None
     assert c["ok"] is False and "work_authorization" in c["detail"], c["detail"]
 
 
+def test_standard_answers_checks_company_learned_answers(tmp_path: Path) -> None:
+    """The posting's company (Ledgerline, from example_posting.json) is threaded into the matcher so a
+    question that only a learned company_answers entry covers is actually reachable."""
+    import shutil
+
+    root = tmp_path / "root"
+    shutil.copytree(EXAMPLE_REPO, root)
+    sa = root / "profile" / "standard_answers.yaml"
+    sa.write_text(sa.read_text() + "\ncompany_answers:\n  Ledgerline:\n"
+                                   "    - key: parking\n      match: [\"need parking\"]\n      answer: \"Yes\"\n")
+    job = make_job(tmp_path / "a", answers=[{"question": "Do you need parking?", "answer": "Yes", "type": "standard",
+                                       "standard_key": "parking", "bullet_ids": []}])
+    c = by_name(run_deterministic(job, root=root), "standard_answers")
+    assert c["ok"], c["detail"]
+    job = make_job(tmp_path / "b", answers=[{"question": "Do you need parking?", "answer": "No", "type": "standard",
+                                       "standard_key": "parking", "bullet_ids": []}])
+    c = by_name(run_deterministic(job, root=root), "standard_answers")
+    assert not c["ok"], c["detail"]
+
+
 # --- close rotation (write-cover-letter close_variant) --------------------------------------------------
 
 def _letter_job(jobs: Path, jid: str, company: str, close: str | None) -> Path:

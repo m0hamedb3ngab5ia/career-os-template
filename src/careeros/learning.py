@@ -61,10 +61,28 @@ def question_from_action(what: str) -> str:
 
 
 def _guard_path(p: Path) -> Path:
+    from careeros.config import PKG_ROOT
+
     real = Path(os.path.realpath(p))
-    if "examples" in real.parts:
+    if real.is_relative_to(Path(os.path.realpath(PKG_ROOT / "examples"))):
         raise ValueError(f"refusing to write into examples/: {p} (run `careeros init` first)")
     return real
+
+
+_EEO_KEY_RE = re.compile(r"^[a-z0-9_]+$")
+_BAD_JOB_ID_RE = re.compile(r"^\s*$|[/\\\\]|\.\.|^\.")
+
+
+def _check_job_id(job_id: str) -> str:
+    """A job id names one folder under jobs_dir: no separators, `..` or leading dot."""
+    if _BAD_JOB_ID_RE.search(job_id):
+        raise ValueError(f"invalid job_id {job_id!r}")
+    return job_id
+
+
+def _yaml_key(company: str) -> str:
+    """`company` as a YAML mapping key: plain when safe, JSON/double-quoted otherwise (`Acme, #1`)."""
+    return company if re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9 ._'&()/-]*[A-Za-z0-9.)]", company) else json.dumps(company)
 
 
 def answers_path(settings: Settings) -> Path:
@@ -124,8 +142,6 @@ def _block_end(lines: list[str], start: int) -> int:
             break
         if lines[i].strip() and not lines[i].lstrip().startswith("#"):
             end = i + 1
-    else:
-        return end
     return end
 
 
@@ -157,12 +173,13 @@ def _insert_entry(text: str, e: CommentedMap, *, company: str | None) -> str:
         block = CommentedMap(); block[company] = CommentedSeq([e])
         return "".join(lines) + "\n" + _render(y, CommentedMap({"company_answers": block}))
     end = _block_end(lines, start)
-    key_rx = re.compile(r"^(\s+)" + re.escape(company) + r"\s*:")
+    forms = (company, json.dumps(company), "'" + company.replace("'", "''") + "'")  # plain, "quoted", 'quoted'
+    key_rx = re.compile(r"^(\s+)(?:" + "|".join(re.escape(f) for f in forms) + r")\s*:")
     ci = next((i for i in range(start + 1, end) if key_rx.match(lines[i])), None)
     indent = " " * (len(key_rx.match(lines[ci]).group(1)) if ci is not None else 2)
     item = "".join(indent + ln if ln.strip() else ln for ln in item.splitlines(keepends=True))
     if ci is None:
-        lines.insert(end, f"{indent}{company}:\n" + item)
+        lines.insert(end, f"{indent}{_yaml_key(company)}:\n" + item)
         return "".join(lines)
     cend = end
     for i in range(ci + 1, end):
@@ -196,16 +213,23 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
             re.compile(pat, re.I)
         except re.error as e:
             raise ValueError(f"match {pat!r} is not a valid regex ({e})") from None
+    if job_id:
+        _check_job_id(job_id)
     real = _guard_path(answers_path(settings))
     text = real.read_text(encoding="utf-8") if real.exists() else ""
-    data = pyyaml.safe_load(text) or {}
+    try:
+        data = pyyaml.safe_load(text) or {}
+    except pyyaml.YAMLError as e:
+        raise ValueError(f"{real.name}: not a single mapping ({e}); convert to answers:/eeo: shape") from None
     if not isinstance(data, dict):
-        raise ValueError(f"{real.name}: top level must be a mapping")
+        raise ValueError(f"{real.name}: not a single mapping; convert to answers:/eeo: shape")
     note = f"learned {date.today().isoformat()}" + (f" from job {job_id}" if job_id else "")
     if eeo:
         from careeros.runs.yamledit import set_path
 
         k = key or slug(q)
+        if not _EEO_KEY_RE.match(k):
+            raise ValueError(f"eeo key {k!r} must match a-z0-9_ (no dots)")
         set_path(real, f"eeo.{k}.answer", a)
         entry: dict[str, Any] = {"key": k, "answer": a, "note": note, "eeo": True}
     else:
@@ -229,7 +253,7 @@ def learn_answer(settings: Settings, *, question: str, answer: str, job_id: str 
 
 def record_answer(settings: Settings, job_id: str, question: str, answer: str, key: str) -> bool:
     """Set the matching answers.json entry (or add one) to the learned answer. False when the job dir is missing."""
-    d = Path(settings.paths.get("jobs_dir") or settings.root / "data" / "jobs") / job_id
+    d = Path(settings.paths.get("jobs_dir") or settings.root / "data" / "jobs") / _check_job_id(job_id)
     if not d.is_dir():
         return False
     p = d / "answers.json"

@@ -165,3 +165,35 @@ def test_doctor_validates_apply_lessons_shape(root: Path):
 ])
 def test_question_from_action(what: str, want: str):
     assert question_from_action(what) == want
+
+
+def test_company_insert_second_company_quoted_keys_and_odd_names(s: Settings, root: Path):
+    p = root / "profile" / "standard_answers.yaml"
+    learn_answer(s, question="Q1?", answer="A1", company="Acme")
+    learn_answer(s, question="Q2?", answer="A2", company="Big Co")
+    p.write_text(p.read_text().replace("  Acme:\n", '  "Acme":\n'))  # a hand-quoted key must not be duplicated
+    learn_answer(s, question="Q3?", answer="A3", company="Acme")
+    learn_answer(s, question="Q4?", answer="A4", company="Big Co")
+    learn_answer(s, question="Q5?", answer="A5", company="Acme, #1")  # needs quoting or `#` starts a comment
+    doc = yaml.safe_load(p.read_text())
+    assert [e["key"] for e in doc["company_answers"]["Acme"]] == ["q1", "q3"]
+    assert [e["key"] for e in doc["company_answers"]["Big Co"]] == ["q2", "q4"]
+    assert doc["company_answers"]["Acme, #1"][0]["key"] == "q5"
+    assert p.read_text().count('"Acme":') == 1 and "q1" in p.read_text()  # one key, not duplicated
+
+
+def test_learn_answer_rejects_bad_yaml_bad_eeo_keys_and_bad_job_ids(s: Settings, root: Path):
+    p = root / "profile" / "standard_answers.yaml"
+    with pytest.raises(ValueError, match="a-z0-9_"):
+        learn_answer(s, question="x", answer="y", eeo=True, key="a.b")
+    before = p.read_text()
+    for bad in ("../x", "a/b", ".hidden"):
+        with pytest.raises(ValueError, match="job_id"):
+            learn_answer(s, question="Q?", answer="A", job_id=bad)
+    assert p.read_text() == before  # nothing written before the refusal
+    p.write_text("- a\n- b\n")
+    with pytest.raises(ValueError, match="answers:"):
+        learn_answer(s, question="Q?", answer="A")
+    p.write_text("answers: [\n")
+    with pytest.raises(ValueError, match="answers:"):
+        learn_answer(s, question="Q?", answer="A")
