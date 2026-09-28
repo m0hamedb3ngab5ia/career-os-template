@@ -574,6 +574,8 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "paths.standard_answers"): "Profile files are edited outside the UI (free text, not settings).",
     (P, "paths.voice_dir"): "Profile files are edited outside the UI (free text, not settings).",
     (P, "paths.resume_template_dir"): "Templates are edited outside the UI (LaTeX, not settings).",
+    (P, "paths.credentials"): "Login store location; secrets stay out of the app, managed with `careeros creds`.",
+    (P, "credentials.backend"): "Where login passwords live (file or macOS keychain); managed with `careeros creds`.",
     (P, "paths.output_dir_per_job"): "Layout switch the code assumes is on; not a preference.",
     (P, "ui.index_path"): "Index location; rebuildable, change it only when data/ is on a slow or synced disk.",
     (P, "schedule.launchd_label"): "LaunchAgent id; change it only after `careeros schedule uninstall`.",
