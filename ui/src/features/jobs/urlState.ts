@@ -16,7 +16,22 @@ export const SORT_KEYS = ["fit", "company", "location", "status", "tier", "found
 export type SortKey = (typeof SORT_KEYS)[number];
 export const DEFAULT_SORT = "-fit";
 /** Columns the chooser can hide (the checkbox and Company always show). */
-export const HIDEABLE = ["role", "location", "tier", "fit", "status", "safety", "qa", "ats", "found", "applied", "next"] as const;
+export const HIDEABLE = [
+  "role",
+  "location",
+  "tier",
+  "fit",
+  "status",
+  "category",
+  "safety",
+  "qa",
+  "qa_passed",
+  "ats",
+  "found",
+  "applied",
+  "closes_at",
+  "next",
+] as const;
 
 /** Column filters (docs/UI.md "Jobs"): value lists, and min..max ranges on numbers and ISO dates. `param` is
  *  the API query key when it differs from the field (exact locations vs the `location` substring search). */

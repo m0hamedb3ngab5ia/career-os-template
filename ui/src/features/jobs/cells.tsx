@@ -88,6 +88,15 @@ export const COLUMNS: Column[] = [
     cell: (j) => (j.status ? <StatusChip status={j.status} /> : <Empty sr="No status" />),
   },
   {
+    key: "category",
+    label: "Category",
+    width: 92,
+    filter: "category",
+    exportField: "category",
+    className: styles.sec,
+    cell: (j) => (j.category ? humanize(j.category) : <Empty sr="No category" />),
+  },
+  {
     key: "safety",
     label: "Safety",
     width: 84,
@@ -103,6 +112,14 @@ export const COLUMNS: Column[] = [
     exportField: "qa_score",
     className: styles.num,
     cell: (j) => (typeof j.qa_score === "number" ? formatDecimal(j.qa_score) : <Empty sr="No QA score" />),
+  },
+  {
+    key: "qa_passed",
+    label: "QA passed",
+    width: 84,
+    filter: "qa_passed",
+    exportField: "qa_passed",
+    cell: (j) => (j.qa_passed === null || j.qa_passed === undefined ? <Empty sr="No QA verdict" /> : j.qa_passed ? "Passed" : "Failed"),
   },
   {
     key: "ats",
@@ -132,6 +149,15 @@ export const COLUMNS: Column[] = [
     exportField: "applied_at",
     className: styles.num,
     cell: (j) => formatDate(j.applied_at) ?? <Empty sr="Not applied" />,
+  },
+  {
+    key: "closes_at",
+    label: "Closes",
+    width: 72,
+    filter: "closes_at",
+    exportField: "closes_at",
+    className: styles.num,
+    cell: (j) => formatDate(j.closes_at) ?? <Empty sr="No closing date" />,
   },
   {
     key: "next",
