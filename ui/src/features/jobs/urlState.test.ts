@@ -14,8 +14,8 @@ describe("Jobs URL state", () => {
     });
   });
 
-  it("reads and writes column filters: value lists (URI-encoded values) and min..max ranges", () => {
-    const v = readView(new URLSearchParams("f.status=queued,applied&f.company=Acme%252C%20Inc.&f.fit=80..&f.found_at=..2026-02-01&f.bogus=1&f.tier=&f.qa_score=5"));
+  it("reads and writes column filters: value lists (backslash-escaped commas) and min..max ranges", () => {
+    const v = readView(new URLSearchParams("f.status=queued,applied&f.company=Acme%5C%2C%20Inc.&f.fit=80..&f.found_at=..2026-02-01&f.bogus=1&f.tier=&f.qa_score=5"));
     expect(v.filters).toEqual({
       status: { kind: "values", values: ["queued", "applied"] },
       company: { kind: "values", values: ["Acme, Inc."] },
@@ -24,7 +24,10 @@ describe("Jobs URL state", () => {
     });
     const p = writeView(new URLSearchParams("f.fit=80..&sort=company"), { filters: v.filters });
     expect(p.get("f.status")).toBe("queued,applied");
-    expect(p.get("f.company")).toBe("Acme%2C%20Inc.");
+    expect(p.get("f.company")).toBe("Acme\\, Inc.");
+    // Only the literal comma is escaped once (as %5C%2C); it isn't run through encodeURIComponent
+    // first and then percent-encoded again by URLSearchParams.
+    expect(p.toString()).toContain("f.company=Acme%5C%2C");
     expect(p.get("f.fit")).toBe("80..");
     expect(p.get("f.found_at")).toBe("..2026-02-01");
     expect(p.get("sort")).toBe("company");

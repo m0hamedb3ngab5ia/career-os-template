@@ -5,7 +5,8 @@ import type { TabKey } from "./types";
 // Jobs view state lives in the query string (docs/UI.md "URL state"):
 //   ?tab=active|review|applied|tier_a|all  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
 //   &cols=<hidden column keys>  &sel=<selected job ids>
-//   &f.<field>=v1,v2 (column value filter; each value URI-encoded so commas survive)  &f.<field>=min..max (number
+//   &f.<field>=v1,v2 (column value filter; literal commas in a value are backslash-escaped so they survive the
+//   split; URLSearchParams itself percent-encodes the rest, so values aren't double-encoded)  &f.<field>=min..max (number
 //   or ISO date range, either side may be empty). Fields: see FILTERS.
 // Defaults are left out so /jobs stays clean.
 
@@ -54,7 +55,8 @@ export function isFilterField(f: string): f is FilterField {
 
 function readFilter(field: FilterField, raw: string): ColumnFilter | null {
   if (FILTERS[field].kind === "values") {
-    const values = raw.split(",").filter(Boolean).map(decodeURIComponent);
+    // Split on commas not preceded by a backslash, then unescape "\," back to ",".
+    const values = raw.split(/(?<!\\),/).filter(Boolean).map((v) => v.replace(/\\,/g, ","));
     return values.length ? { kind: "values", values } : null;
   }
   const at = raw.indexOf("..");
@@ -64,7 +66,7 @@ function readFilter(field: FilterField, raw: string): ColumnFilter | null {
 }
 
 function writeFilter(f: ColumnFilter): string {
-  return f.kind === "values" ? f.values.map(encodeURIComponent).join(",") : `${f.min}..${f.max}`;
+  return f.kind === "values" ? f.values.map((v) => v.replace(/,/g, "\\,")).join(",") : `${f.min}..${f.max}`;
 }
 
 function list(v: string | null): string[] {

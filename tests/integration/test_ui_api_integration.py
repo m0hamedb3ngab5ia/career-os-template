@@ -87,9 +87,17 @@ def test_jobs_column_filters_facets_tabs_and_export(client):
     assert client.get("/api/jobs", params={"found_from": "2026-09-19", "found_to": "2026-09-21", "tab": "all"}).json()["total"] == 3
     assert client.get("/api/jobs", params=[("location_in", "Remote"), ("location", "rem")]).json()["total"] == 1
     assert client.get("/api/jobs", params={"fit_min": "high"}).status_code == 422
-    assert client.get("/api/jobs", params={"found_from": "yesterday"}).status_code == 400
+    assert client.get("/api/jobs", params={"found_from": "yesterday"}).status_code == 422
+    assert client.get("/api/jobs", params={"qa_passed": "1", "tab": "all"}).json()["total"] == 4
+    assert client.get("/api/jobs", params={"closes_from": "2026-01-01", "closes_to": "2026-12-31",
+                                           "tab": "all"}).json()["total"] == 0
+    assert client.get("/api/jobs", params={"closes_from": "not-a-date"}).status_code == 422
     f = client.get("/api/jobs/facets", params={"field": "tier", "tab": "all", "tier": "A", "status": "applied"}).json()
     assert f == {"field": "tier", "values": [{"value": "B", "count": 1}]}
+    # location facet must drop only the values["location"] filter, not the `location` substring search, so a
+    # substring search still narrows the facet counts (regression: field-name kwarg pop used to eat `location`).
+    loc_facet = client.get("/api/jobs/facets", params={"field": "location", "tab": "all", "location": "rem"}).json()
+    assert loc_facet == {"field": "location", "values": [{"value": "Remote", "count": 1}]}
     assert client.get("/api/jobs/facets", params={"field": "url"}).status_code == 400
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"fit_min": 85}).json()["tabs"]}
     assert tabs["all"] == 3 and tabs["tier_a"] == 2

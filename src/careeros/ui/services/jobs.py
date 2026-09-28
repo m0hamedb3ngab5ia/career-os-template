@@ -267,7 +267,8 @@ def facets(ix: Any, field: str, *, closed: list[str], **filters: Any) -> JobFace
     if field not in VALUE_COLUMNS:
         raise ValueError(f"unknown facet field {field!r}; valid: {', '.join(VALUE_COLUMNS)}")
     filters = dict(filters)
-    filters.pop(field, None)
+    if field in ("status", "tier", "safety", "category"):
+        filters.pop(field, None)
     values = {k: v for k, v in (filters.pop("values", None) or {}).items() if k != field}
     clause, params = _where(closed=closed, values=values, **filters)
     clause = f"{clause} AND " if clause else " WHERE "

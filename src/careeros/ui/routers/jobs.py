@@ -45,12 +45,19 @@ def _column_filters(*, company: list[str], location_in: list[str], ats: list[str
                        "closes_at": (closes_from, closes_to)}}
 
 
+_ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
+
 def column_filters(company: list[str] = Query(default=[]), location_in: list[str] = Query(default=[]),
                    ats: list[str] = Query(default=[]), qa_passed: list[str] = Query(default=[]),
                    fit_min: float | None = None, fit_max: float | None = None, qa_score_min: float | None = None,
-                   qa_score_max: float | None = None, found_from: str | None = None, found_to: str | None = None,
-                   applied_from: str | None = None, applied_to: str | None = None, closes_from: str | None = None,
-                   closes_to: str | None = None) -> dict[str, Any]:
+                   qa_score_max: float | None = None,
+                   found_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   found_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   applied_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   applied_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   closes_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   closes_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN)) -> dict[str, Any]:
     return _column_filters(company=company, location_in=location_in, ats=ats, qa_passed=qa_passed, fit_min=fit_min,
                            fit_max=fit_max, qa_score_min=qa_score_min, qa_score_max=qa_score_max,
                            found_from=found_from, found_to=found_to, applied_from=applied_from,

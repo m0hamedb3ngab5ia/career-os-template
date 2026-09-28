@@ -48,12 +48,17 @@ export function HeaderFilterMenu({ col, filter, onChange, params, sort, onSortTo
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
   const [min, setMin] = useState("");
   const [max, setMax] = useState("");
+  const filterRef = useRef(filter);
+  filterRef.current = filter;
   useEffect(() => {
     if (!open) return;
-    setPicked(new Set(filter?.kind === "values" ? filter.values : []));
-    setMin(filter?.kind === "range" ? filter.min : "");
-    setMax(filter?.kind === "range" ? filter.max : "");
-  }, [open, filter]);
+    const f = filterRef.current;
+    setPicked(new Set(f?.kind === "values" ? f.values : []));
+    setMin(f?.kind === "range" ? f.min : "");
+    setMax(f?.kind === "range" ? f.max : "");
+    // Reset the draft only when the menu opens, not on every URL-driven `filter` change while it's open.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
 
   function apply() {
     if (kind === "values") onChange(field, picked.size ? { kind: "values", values: [...picked] } : null);
@@ -134,7 +139,7 @@ function ValuesList({ col, field, params, picked, setPicked }: ValuesListProps) 
   const facets = useJobFacets(field, params, true);
   const options = useMemo(() => {
     const seen = new Map<string, number>();
-    for (const v of facets.data?.values ?? []) if (v.value !== null) seen.set(String(v.value), v.count);
+    for (const v of facets.data?.values ?? []) if (v.value !== null && v.value !== "") seen.set(String(v.value), v.count);
     for (const v of picked) if (!seen.has(v)) seen.set(v, 0);
     const needle = search.trim().toLowerCase();
     return [...seen].filter(([v]) => !needle || facetLabel(field, v).toLowerCase().includes(needle));
