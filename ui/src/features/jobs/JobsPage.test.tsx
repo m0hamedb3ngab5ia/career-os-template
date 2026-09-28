@@ -109,13 +109,13 @@ describe("Jobs screen", () => {
     const table = await screen.findByRole("table");
     const fit = within(table).getByRole("columnheader", { name: /Fit/ });
     expect(fit).toHaveAttribute("aria-sort", "descending");
-    expect(within(table).getByRole("columnheader", { name: "Safety" })).not.toHaveAttribute("aria-sort");
+    expect(within(table).getByRole("columnheader", { name: /Safety/ })).not.toHaveAttribute("aria-sort");
     await user.click(within(table).getByRole("button", { name: "Company" }));
     expect(router.state.location.search).toBe("?sort=company");
     expect(within(table).getByRole("columnheader", { name: /Company/ })).toHaveAttribute("aria-sort", "ascending");
     expect(await screen.findByRole("table", { name: "Tracked jobs, sorted by company, A to Z" })).toBeInTheDocument();
     await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.get("sort")).toBe("company"));
-    await user.click(within(table).getByRole("button", { name: /Company/ }));
+    await user.click(within(table).getByRole("button", { name: /^Company/ }));
     expect(router.state.location.search).toBe("?sort=-company");
   });
 
@@ -282,6 +282,119 @@ describe("Jobs screen", () => {
     setup("/jobs?q=globex");
     const side = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
     expect(side).toHaveValue("globex");
+  });
+
+  describe("column header filters", () => {
+    const FACETS = {
+      "GET /api/jobs/facets": (call: Call) => ({
+        field: call.search.get("field"),
+        values: call.search.get("field") === "status"
+          ? [{ value: "queued", count: 5 }, { value: "applied", count: 3 }, { value: "needs_review", count: 1 }]
+          : [],
+      }),
+    };
+
+    it("opens from the header, lists values with counts, applies to the URL, the list and the tabs", async () => {
+      const { api, router } = setup("/jobs", FACETS);
+      const user = userEvent.setup();
+      const table = await screen.findByRole("table");
+      const trigger = within(table).getByRole("button", { name: "Filter Status" });
+      expect(trigger).toHaveAttribute("aria-expanded", "false");
+      await user.click(trigger);
+      const menu = await screen.findByRole("dialog", { name: "Filter Status" });
+      expect(await within(menu).findByRole("checkbox", { name: "Queued (5)" })).not.toBeChecked();
+      expect(within(menu).getByRole("checkbox", { name: "Needs review (1)" })).toBeInTheDocument();
+      const facetReq = api.callsTo("GET /api/jobs/facets")[0]!;
+      expect(facetReq.search.get("field")).toBe("status");
+      expect(facetReq.search.get("tab")).toBe("active");
+      expect(within(menu).getByRole("button", { name: "Sort A to Z" })).toBeInTheDocument();
+      await user.type(within(menu).getByRole("searchbox", { name: "Search Status values" }), "ap");
+      expect(within(menu).queryByRole("checkbox", { name: "Queued (5)" })).not.toBeInTheDocument();
+      await user.clear(within(menu).getByRole("searchbox", { name: "Search Status values" }));
+      await user.click(within(menu).getByRole("checkbox", { name: "Queued (5)" }));
+      await user.click(within(menu).getByRole("checkbox", { name: "Applied (3)" }));
+      await user.click(within(menu).getByRole("button", { name: "Apply" }));
+      expect(screen.queryByRole("dialog", { name: "Filter Status" })).not.toBeInTheDocument();
+      expect(trigger).toHaveFocus();
+      expect(new URLSearchParams(router.state.location.search).get("f.status")).toBe("queued,applied");
+      await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.getAll("status")).toEqual(["queued", "applied"]));
+      await waitFor(() => expect(api.callsTo("GET /api/jobs/tabs").at(-1)!.search.getAll("status")).toEqual(["queued", "applied"]));
+      expect(trigger).toHaveAttribute("data-active", "true");
+      // The chip row names the filter; × removes it.
+      const chips = screen.getByLabelText("Active filters");
+      expect(chips).toHaveTextContent("Status: Queued, Applied");
+      await user.click(within(chips).getByRole("button", { name: "Remove filter Status" }));
+      expect(router.state.location.search).toBe("");
+      expect(screen.queryByLabelText("Active filters")).not.toBeInTheDocument();
+    });
+
+    it("facets are fetched under the other filters but not the column's own", async () => {
+      const { api } = setup("/jobs?f.status=queued&f.fit=80..&f.location=Remote", FACETS);
+      const user = userEvent.setup();
+      const table = await screen.findByRole("table");
+      const first = api.callsTo("GET /api/jobs")[0]!;
+      expect(first.search.getAll("status")).toEqual(["queued"]);
+      expect(first.search.get("fit_min")).toBe("80");
+      expect(first.search.has("fit_max")).toBe(false);
+      expect(first.search.getAll("location_in")).toEqual(["Remote"]);
+      await user.click(within(table).getByRole("button", { name: "Filter Status" }));
+      await screen.findByRole("dialog", { name: "Filter Status" });
+      await waitFor(() => expect(api.callsTo("GET /api/jobs/facets").length).toBe(1));
+      const req = api.callsTo("GET /api/jobs/facets")[0]!;
+      expect(req.search.has("status")).toBe(false);
+      expect(req.search.get("fit_min")).toBe("80");
+      expect(req.search.getAll("location_in")).toEqual(["Remote"]);
+    });
+
+    it("a range filter applies min..max, Escape closes and returns focus, Clear all empties the URL", async () => {
+      const { api, router } = setup("/jobs", FACETS);
+      const user = userEvent.setup();
+      const table = await screen.findByRole("table");
+      const trigger = within(table).getByRole("button", { name: "Filter Fit" });
+      await user.click(trigger);
+      const menu = await screen.findByRole("dialog", { name: "Filter Fit" });
+      await user.type(within(menu).getByLabelText("Min"), "80");
+      await user.click(within(menu).getByRole("button", { name: "Apply" }));
+      expect(new URLSearchParams(router.state.location.search).get("f.fit")).toBe("80..");
+      await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.get("fit_min")).toBe("80"));
+      expect(screen.getByLabelText("Active filters")).toHaveTextContent("Fit: ≥ 80");
+      await user.click(within(table).getByRole("button", { name: "Filter Found" }));
+      const found = await screen.findByRole("dialog", { name: "Filter Found" });
+      expect(within(found).getByLabelText("From")).toHaveAttribute("type", "date");
+      await user.keyboard("{Escape}");
+      expect(screen.queryByRole("dialog", { name: "Filter Found" })).not.toBeInTheDocument();
+      expect(within(table).getByRole("button", { name: "Filter Found" })).toHaveFocus();
+      await user.click(screen.getByRole("button", { name: "Clear all" }));
+      expect(router.state.location.search).toBe("");
+    });
+
+    it("the export body carries the column filters", async () => {
+      const { api } = setup("/jobs?f.status=queued,applied&f.fit=80..90&f.found_at=2026-01-01..", {
+        ...FACETS,
+        "POST /api/jobs/export": () => new Response("x", { status: 200, headers: { "content-type": "application/octet-stream" } }),
+      });
+      const user = userEvent.setup();
+      vi.stubGlobal("URL", Object.assign(URL, { createObjectURL: vi.fn(() => "blob:x"), revokeObjectURL: vi.fn() }));
+      await screen.findByRole("table");
+      await user.click(screen.getByRole("button", { name: "Export xlsx" }));
+      await waitFor(() => expect(api.callsTo("POST /api/jobs/export").length).toBe(1));
+      const body = api.callsTo("POST /api/jobs/export")[0]!.body as Record<string, unknown>;
+      expect(body.status).toEqual(["queued", "applied"]);
+      expect(body.fit_min).toBe("80");
+      expect(body.fit_max).toBe("90");
+      expect(body.found_from).toBe("2026-01-01");
+      expect(body.found_to).toBeUndefined();
+    });
+
+    it("has no axe violations with a menu open", { timeout: 20_000 }, async () => {
+      const { container } = setup("/jobs?f.status=queued", FACETS);
+      const user = userEvent.setup();
+      const table = await screen.findByRole("table");
+      await user.click(within(table).getByRole("button", { name: "Filter Status" }));
+      await screen.findByRole("checkbox", { name: "Queued (5)" });
+      await act(async () => undefined);
+      expect(await axeViolations(container)).toEqual([]);
+    });
   });
 
   it("has no axe violations", { timeout: 20_000 }, async () => {

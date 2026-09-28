@@ -5,7 +5,7 @@ import { humanize } from "../../kit/labels";
 import { formatDate, formatDecimal } from "../../lib/format";
 import styles from "./JobsPage.module.css";
 import type { JobListItem } from "./types";
-import type { SortKey } from "./urlState";
+import type { FilterField, SortKey } from "./urlState";
 
 /** An empty cell: a dash for the eye, words for screen readers. */
 export function Empty({ sr }: { sr: string }) {
@@ -24,6 +24,8 @@ export interface Column {
   label: string;
   width?: number;
   sort?: SortKey;
+  /** Column filter (header menu); the field names the URL `f.<field>` key and the facet. */
+  filter?: FilterField;
   /** Field name sent to POST /api/jobs/export. */
   exportField: string;
   className?: string;
@@ -38,6 +40,7 @@ export const COLUMNS: Column[] = [
     label: "Company",
     width: 170,
     sort: "company",
+    filter: "company",
     exportField: "company",
     title: (j) => j.company ?? undefined,
     cell: (j) => (
@@ -58,17 +61,19 @@ export const COLUMNS: Column[] = [
     label: "Location",
     width: 130,
     sort: "location",
+    filter: "location",
     exportField: "location",
     className: styles.sec,
     title: (j) => j.location ?? undefined,
     cell: (j) => j.location || <Empty sr="No location" />,
   },
-  { key: "tier", label: "Tier", width: 48, sort: "tier", exportField: "tier", cell: (j) => <TierBadge tier={j.tier} /> },
+  { key: "tier", label: "Tier", width: 48, sort: "tier", filter: "tier", exportField: "tier", cell: (j) => <TierBadge tier={j.tier} /> },
   {
     key: "fit",
     label: "Fit",
     width: 56,
     sort: "fit",
+    filter: "fit",
     exportField: "fit",
     className: styles.fit,
     cell: (j) => (j.fit === null || j.fit === undefined ? <Empty sr="No fit score" /> : j.fit),
@@ -78,6 +83,7 @@ export const COLUMNS: Column[] = [
     label: "Status",
     width: 118,
     sort: "status",
+    filter: "status",
     exportField: "status",
     cell: (j) => (j.status ? <StatusChip status={j.status} /> : <Empty sr="No status" />),
   },
@@ -85,6 +91,7 @@ export const COLUMNS: Column[] = [
     key: "safety",
     label: "Safety",
     width: 84,
+    filter: "safety",
     exportField: "safety",
     cell: (j) => (j.safety ? <SafetyChip verdict={j.safety} /> : <Empty sr="Not checked" />),
   },
@@ -92,6 +99,7 @@ export const COLUMNS: Column[] = [
     key: "qa",
     label: "QA",
     width: 44,
+    filter: "qa_score",
     exportField: "qa_score",
     className: styles.num,
     cell: (j) => (typeof j.qa_score === "number" ? formatDecimal(j.qa_score) : <Empty sr="No QA score" />),
@@ -100,6 +108,7 @@ export const COLUMNS: Column[] = [
     key: "ats",
     label: "ATS",
     width: 92,
+    filter: "ats",
     exportField: "ats",
     className: styles.sec,
     cell: (j) => (j.ats ? humanize(j.ats) : <Empty sr="Unknown ATS" />),
@@ -109,6 +118,7 @@ export const COLUMNS: Column[] = [
     label: "Found",
     width: 72,
     sort: "found_at",
+    filter: "found_at",
     exportField: "found_at",
     className: styles.num,
     cell: (j) => formatDate(j.found_at) ?? <Empty sr="Unknown" />,
@@ -118,6 +128,7 @@ export const COLUMNS: Column[] = [
     label: "Applied",
     width: 76,
     sort: "applied_at",
+    filter: "applied_at",
     exportField: "applied_at",
     className: styles.num,
     cell: (j) => formatDate(j.applied_at) ?? <Empty sr="Not applied" />,

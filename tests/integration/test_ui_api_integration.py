@@ -80,6 +80,27 @@ def test_jobs_list_filters_and_paging(client):
     assert client.get("/api/jobs", params={"limit": 0}).status_code == 422
 
 
+def test_jobs_column_filters_facets_tabs_and_export(client):
+    r = client.get("/api/jobs", params=[("company", "Hooli"), ("company", "Initech"), ("tab", "all")]).json()
+    assert {j["company"] for j in r["items"]} == {"Hooli", "Initech"}
+    assert client.get("/api/jobs", params={"fit_min": 85, "fit_max": 90, "tab": "all"}).json()["total"] == 2
+    assert client.get("/api/jobs", params={"found_from": "2026-09-19", "found_to": "2026-09-21", "tab": "all"}).json()["total"] == 3
+    assert client.get("/api/jobs", params=[("location_in", "Remote"), ("location", "rem")]).json()["total"] == 1
+    assert client.get("/api/jobs", params={"fit_min": "high"}).status_code == 422
+    assert client.get("/api/jobs", params={"found_from": "yesterday"}).status_code == 400
+    f = client.get("/api/jobs/facets", params={"field": "tier", "tab": "all", "tier": "A", "status": "applied"}).json()
+    assert f == {"field": "tier", "values": [{"value": "B", "count": 1}]}
+    assert client.get("/api/jobs/facets", params={"field": "url"}).status_code == 400
+    tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"fit_min": 85}).json()["tabs"]}
+    assert tabs["all"] == 3 and tabs["tier_a"] == 2
+    xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
+                       json={"tab": "all", "company": ["Hooli"], "fit_min": 80, "columns": ["company"]})
+    assert xlsx.status_code == 200
+    from openpyxl import load_workbook
+    import io
+    assert load_workbook(io.BytesIO(xlsx.content))["Jobs"].max_row == 2
+
+
 def test_job_detail(client, data):
     jid = data["jobs"]["review"]
     d = client.get(f"/api/jobs/{jid}").json()

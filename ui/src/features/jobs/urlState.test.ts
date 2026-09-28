@@ -10,7 +10,26 @@ describe("Jobs URL state", () => {
       sort: DEFAULT_SORT,
       hidden: [],
       selected: [],
+      filters: {},
     });
+  });
+
+  it("reads and writes column filters: value lists (URI-encoded values) and min..max ranges", () => {
+    const v = readView(new URLSearchParams("f.status=queued,applied&f.company=Acme%252C%20Inc.&f.fit=80..&f.found_at=..2026-02-01&f.bogus=1&f.tier=&f.qa_score=5"));
+    expect(v.filters).toEqual({
+      status: { kind: "values", values: ["queued", "applied"] },
+      company: { kind: "values", values: ["Acme, Inc."] },
+      fit: { kind: "range", min: "80", max: "" },
+      found_at: { kind: "range", min: "", max: "2026-02-01" },
+    });
+    const p = writeView(new URLSearchParams("f.fit=80..&sort=company"), { filters: v.filters });
+    expect(p.get("f.status")).toBe("queued,applied");
+    expect(p.get("f.company")).toBe("Acme%2C%20Inc.");
+    expect(p.get("f.fit")).toBe("80..");
+    expect(p.get("f.found_at")).toBe("..2026-02-01");
+    expect(p.get("sort")).toBe("company");
+    const cleared = writeView(p, { filters: {} });
+    expect([...cleared.keys()]).toEqual(["sort"]);
   });
 
   it("reads tab, q, sort, hidden columns and selection; ignores junk", () => {
@@ -22,6 +41,7 @@ describe("Jobs URL state", () => {
       sort: "company",
       hidden: ["ats", "qa"],
       selected: ["a1", "b2"],
+      filters: {},
     });
     expect(readView(new URLSearchParams("sort=-location")).sort).toBe("-location");
     expect(readView(new URLSearchParams("tab=nope&sort=drop_table")).tab).toBe("active");

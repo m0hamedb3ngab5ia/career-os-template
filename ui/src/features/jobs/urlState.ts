@@ -5,6 +5,8 @@ import type { TabKey } from "./types";
 // Jobs view state lives in the query string (docs/UI.md "URL state"):
 //   ?tab=active|review|applied|tier_a|all  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
 //   &cols=<hidden column keys>  &sel=<selected job ids>
+//   &f.<field>=v1,v2 (column value filter; each value URI-encoded so commas survive)  &f.<field>=min..max (number
+//   or ISO date range, either side may be empty). Fields: see FILTERS.
 // Defaults are left out so /jobs stays clean.
 
 export const TABS: TabKey[] = ["active", "review", "applied", "tier_a", "all"];
@@ -15,6 +17,27 @@ export const DEFAULT_SORT = "-fit";
 /** Columns the chooser can hide (the checkbox and Company always show). */
 export const HIDEABLE = ["role", "location", "tier", "fit", "status", "safety", "qa", "ats", "found", "applied", "next"] as const;
 
+/** Column filters (docs/UI.md "Jobs"): value lists, and min..max ranges on numbers and ISO dates. `param` is
+ *  the API query key when it differs from the field (exact locations vs the `location` substring search). */
+export const FILTERS = {
+  company: { kind: "values" },
+  location: { kind: "values", param: "location_in" },
+  status: { kind: "values" },
+  tier: { kind: "values" },
+  category: { kind: "values" },
+  safety: { kind: "values" },
+  ats: { kind: "values" },
+  qa_passed: { kind: "values" },
+  fit: { kind: "range" },
+  qa_score: { kind: "range" },
+  found_at: { kind: "date" },
+  applied_at: { kind: "date" },
+  closes_at: { kind: "date" },
+} as const satisfies Record<string, { kind: "values" | "range" | "date"; param?: string }>;
+export type FilterField = keyof typeof FILTERS;
+export type ColumnFilter = { kind: "values"; values: string[] } | { kind: "range"; min: string; max: string };
+export type Filters = Partial<Record<FilterField, ColumnFilter>>;
+
 export interface JobsView {
   tab: TabKey;
   q: string;
@@ -22,6 +45,26 @@ export interface JobsView {
   sort: string;
   hidden: string[];
   selected: string[];
+  filters: Filters;
+}
+
+export function isFilterField(f: string): f is FilterField {
+  return Object.hasOwn(FILTERS, f);
+}
+
+function readFilter(field: FilterField, raw: string): ColumnFilter | null {
+  if (FILTERS[field].kind === "values") {
+    const values = raw.split(",").filter(Boolean).map(decodeURIComponent);
+    return values.length ? { kind: "values", values } : null;
+  }
+  const at = raw.indexOf("..");
+  if (at < 0) return null;
+  const [min, max] = [raw.slice(0, at).trim(), raw.slice(at + 2).trim()];
+  return min || max ? { kind: "range", min, max } : null;
+}
+
+function writeFilter(f: ColumnFilter): string {
+  return f.kind === "values" ? f.values.map(encodeURIComponent).join(",") : `${f.min}..${f.max}`;
 }
 
 function list(v: string | null): string[] {
@@ -42,7 +85,20 @@ export function readView(p: URLSearchParams): JobsView {
     sort: validSort(p.get("sort")),
     hidden: list(p.get("cols")).filter((c) => (HIDEABLE as readonly string[]).includes(c)),
     selected: list(p.get("sel")),
+    filters: readFilters(p),
   };
+}
+
+function readFilters(p: URLSearchParams): Filters {
+  const out: Filters = {};
+  for (const [k, v] of p) {
+    if (!k.startsWith("f.")) continue;
+    const field = k.slice(2);
+    if (!isFilterField(field)) continue;
+    const f = readFilter(field, v);
+    if (f) out[field] = f;
+  }
+  return out;
 }
 
 export function writeView(p: URLSearchParams, patch: Partial<JobsView>): URLSearchParams {
@@ -54,6 +110,10 @@ export function writeView(p: URLSearchParams, patch: Partial<JobsView>): URLSear
   if (patch.sort !== undefined) set("sort", patch.sort, DEFAULT_SORT);
   if (patch.hidden !== undefined) set("cols", patch.hidden.join(","));
   if (patch.selected !== undefined) set("sel", patch.selected.join(","));
+  if (patch.filters !== undefined) {
+    for (const k of [...next.keys()]) if (k.startsWith("f.")) next.delete(k);
+    for (const [field, f] of Object.entries(patch.filters)) if (f) next.set(`f.${field}`, writeFilter(f));
+  }
   return next;
 }
 

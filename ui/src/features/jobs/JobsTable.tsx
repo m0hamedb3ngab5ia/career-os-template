@@ -1,10 +1,12 @@
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
+import type { FilterParams } from "./api";
 import type { Column } from "./cells";
+import { HeaderFilterMenu } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
 import type { JobListItem } from "./types";
-import { sortCaption, sortDirection, type SortKey } from "./urlState";
+import { sortCaption, sortDirection, type ColumnFilter, type FilterField, type Filters, type SortKey } from "./urlState";
 
 const ROW_H = 44;
 
@@ -19,13 +21,46 @@ interface JobsTableProps {
   /** All rows the filter matches (loaded or not), for aria-rowcount. */
   total: number;
   captionId: string;
+  /** Column filters (header menus); `filterParams` carries the other active filters for the value counts. */
+  filters: Filters;
+  onFilter: (field: FilterField, f: ColumnFilter | null) => void;
+  filterParams: FilterParams;
+  onSortTo: (sort: string) => void;
 }
 
-function SortHeader({ col, sort, onSort }: { col: Column; sort: string; onSort: (k: SortKey) => void }) {
-  const key = col.sort!;
-  const active = sort.replace(/^-/, "") === key;
+interface HeaderProps {
+  col: Column;
+  sort: string;
+  onSort: (k: SortKey) => void;
+  onSortTo: (sort: string) => void;
+  filters: Filters;
+  onFilter: (field: FilterField, f: ColumnFilter | null) => void;
+  filterParams: FilterParams;
+}
+
+function Header({ col, sort, onSort, onSortTo, filters, onFilter, filterParams }: HeaderProps) {
+  const key = col.sort;
+  const active = !!key && sort.replace(/^-/, "") === key;
   const desc = sort.startsWith("-");
   const Icon = desc ? ArrowDown : ArrowUp;
+  const menu = col.filter ? (
+    <HeaderFilterMenu
+      col={col}
+      filter={filters[col.filter]}
+      onChange={onFilter}
+      params={filterParams}
+      sort={sort}
+      onSortTo={onSortTo}
+    />
+  ) : null;
+  if (!key) {
+    return (
+      <th scope="col" className={styles.th}>
+        {col.label}
+        {menu}
+      </th>
+    );
+  }
   return (
     <th scope="col" aria-sort={active ? (desc ? "descending" : "ascending") : "none"} className={styles.th}>
       <button type="button" className={styles.sortButton} data-active={active} onClick={() => onSort(key)}>
@@ -33,6 +68,7 @@ function SortHeader({ col, sort, onSort }: { col: Column; sort: string; onSort: 
         {active ? <Icon size={10} strokeWidth={2.4} aria-hidden="true" /> : null}
         {active ? <span className="sr-only">, sorted {sortDirection(sort)}</span> : null}
       </button>
+      {menu}
     </th>
   );
 }
@@ -81,7 +117,12 @@ const Row = memo(function Row({
  * Virtual against the page scroll, so thousands of rows cost only what is on screen. Spacer rows keep the
  * scroll height; aria-rowcount / aria-rowindex tell assistive tech where each row sits.
  */
-export function JobsTable({ rows, columns, sort, onSort, selected, onToggle, onToggleAll, total, captionId }: JobsTableProps) {
+export function JobsTable({ rows, columns, sort, onSort, selected, onToggle, onToggleAll, total, captionId,
+  filters,
+  onFilter,
+  filterParams,
+  onSortTo,
+}: JobsTableProps) {
   const bodyRef = useRef<HTMLTableSectionElement>(null);
   const [margin, setMargin] = useState(0);
   useLayoutEffect(() => {
@@ -130,15 +171,18 @@ export function JobsTable({ rows, columns, sort, onSort, selected, onToggle, onT
               <span className="sr-only">Select all shown jobs</span>
             </label>
           </th>
-          {columns.map((c) =>
-            c.sort ? (
-              <SortHeader key={c.key} col={c} sort={sort} onSort={onSort} />
-            ) : (
-              <th key={c.key} scope="col" className={styles.th}>
-                {c.label}
-              </th>
-            ),
-          )}
+          {columns.map((c) => (
+            <Header
+              key={c.key}
+              col={c}
+              sort={sort}
+              onSort={onSort}
+              onSortTo={onSortTo}
+              filters={filters}
+              onFilter={onFilter}
+              filterParams={filterParams}
+            />
+          ))}
         </tr>
       </thead>
       <tbody ref={bodyRef}>

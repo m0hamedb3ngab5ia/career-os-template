@@ -20,6 +20,12 @@ SECTION_FILES = {"posting.json", "status.json", "score.json", "safety.json", "qa
                  "apply_session.json", "log.md"}
 # The documents Job detail shows prominently, in this order; every other file in the folder is under "All files".
 KEY_DOCUMENTS = ("resume.pdf", "cover_letter.pdf", "cover_letter.md", "resume.txt", "cover_letter.txt")
+# Excel-style column filters (docs/UI.md "Jobs"): value lists per column, min..max ranges, inclusive ISO date ranges.
+# GET /api/jobs/facets counts a column's values under every other active filter.
+VALUE_COLUMNS = ("company", "location", "status", "tier", "category", "safety", "ats", "qa_passed")
+NUMBER_COLUMNS = ("fit", "qa_score")
+DATE_COLUMNS = ("found_at", "applied_at", "closes_at")
+_ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
                "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at")
 
@@ -55,6 +61,16 @@ class JobsPage(TypedDict):
     items: list[JobListItem]
     total: int
     next_cursor: str | None
+
+
+class FacetValue(TypedDict):
+    value: str | int | float | None
+    count: int
+
+
+class JobFacets(TypedDict):
+    field: str
+    values: list[FacetValue]
 
 
 class JobsTab(TypedDict):
@@ -161,12 +177,41 @@ def _tab_clause(tab: str | None, closed: list[str] | None) -> tuple[str | None, 
 def _where(*, status: list[str] | None = None, tier: list[str] | None = None, safety: list[str] | None = None,
            category: list[str] | None = None, q: str | None = None, location: str | None = None,
            tab: str | None = None, closed: list[str] | None = None,
-           job_ids: list[str] | None = None) -> tuple[str, list[Any]]:
+           job_ids: list[str] | None = None, values: dict[str, list[str]] | None = None,
+           ranges: dict[str, tuple[Any, Any]] | None = None) -> tuple[str, list[Any]]:
+    """`values` = {column: [exact values]} for VALUE_COLUMNS; `ranges` = {column: (lo, hi)} for NUMBER_COLUMNS
+    (numbers, either side None) and DATE_COLUMNS (ISO dates, inclusive on both sides)."""
     where, params = [], []
+    merged: dict[str, list[str]] = {k: list(v) for k, v in (values or {}).items() if v}
     for col, vals in (("status", status), ("tier", tier), ("safety", safety), ("category", category)):
         if vals:
-            where.append(f"{col} IN ({','.join('?' * len(vals))})")
-            params.extend(vals)
+            merged.setdefault(col, []).extend(vals)
+    for col, vals in merged.items():
+        if col not in VALUE_COLUMNS:
+            raise ValueError(f"unknown filter column {col!r}; valid: {', '.join(VALUE_COLUMNS)}")
+        where.append(f"{col} IN ({','.join('?' * len(vals))})")
+        params.extend(vals)
+    for col, (lo, hi) in (ranges or {}).items():
+        if col in NUMBER_COLUMNS:
+            for side, v, op in (("min", lo, ">="), ("max", hi, "<=")):
+                if v is None or v == "":
+                    continue
+                try:
+                    num = float(v)
+                except (TypeError, ValueError):
+                    raise ValueError(f"{col}_{side} must be a number, got {v!r}") from None
+                where.append(f"{col} {op} ?")
+                params.append(num)
+        elif col in DATE_COLUMNS:
+            for side, v, op in (("from", lo, ">= ?"), ("to", hi, "< date(?, '+1 day')")):
+                if v is None or v == "":
+                    continue
+                if not isinstance(v, str) or not _ISO_DATE.match(v):
+                    raise ValueError(f"{col[:-3]}_{side} must be an ISO date (YYYY-MM-DD), got {v!r}")
+                where.append(f"{col} {op}")
+                params.append(v)
+        else:
+            raise ValueError(f"unknown range column {col!r}; valid: {', '.join(NUMBER_COLUMNS + DATE_COLUMNS)}")
     if q and q.strip():
         where.append("(LOWER(company) LIKE ? ESCAPE '\\' OR LOWER(title) LIKE ? ESCAPE '\\' "
                      "OR LOWER(location) LIKE ? ESCAPE '\\')")
@@ -190,9 +235,10 @@ def _where(*, status: list[str] | None = None, tier: list[str] | None = None, sa
 def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | None = None,
               safety: list[str] | None = None, category: list[str] | None = None, q: str | None = None,
               location: str | None = None, sort: str = DEFAULT_SORT, cursor: str | None = None, limit: int = 100,
-              tab: str | None = None, closed: list[str] | None = None) -> JobsPage:
+              tab: str | None = None, closed: list[str] | None = None, values: dict[str, list[str]] | None = None,
+              ranges: dict[str, tuple[Any, Any]] | None = None) -> JobsPage:
     clause, params = _where(status=status, tier=tier, safety=safety, category=category, q=q, location=location,
-                            tab=tab, closed=closed)
+                            tab=tab, closed=closed, values=values, ranges=ranges)
     try:
         offset = int(cursor) if cursor else 0
     except ValueError:
@@ -207,12 +253,27 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
 
 
-def tabs(ix: Any, closed: list[str], q: str | None = None, location: str | None = None) -> list[JobsTab]:
+def tabs(ix: Any, closed: list[str], q: str | None = None, location: str | None = None, **filters: Any) -> list[JobsTab]:
     out: list[JobsTab] = []
     for key, label in TABS:
-        clause, params = _where(q=q, location=location, tab=key, closed=closed)
+        clause, params = _where(q=q, location=location, tab=key, closed=closed, **filters)
         out.append({"key": key, "label": label, "count": ix.query(f"SELECT COUNT(*) AS n FROM jobs{clause}", params)[0]["n"]})
     return out
+
+
+def facets(ix: Any, field: str, *, closed: list[str], **filters: Any) -> JobFacets:
+    """Distinct values of one column with counts, under every filter except the one on that column (so the
+    checklist still shows what else could be picked, as Excel does). NULLs are left out."""
+    if field not in VALUE_COLUMNS:
+        raise ValueError(f"unknown facet field {field!r}; valid: {', '.join(VALUE_COLUMNS)}")
+    filters = dict(filters)
+    filters.pop(field, None)
+    values = {k: v for k, v in (filters.pop("values", None) or {}).items() if k != field}
+    clause, params = _where(closed=closed, values=values, **filters)
+    clause = f"{clause} AND " if clause else " WHERE "
+    rows = ix.query(f"SELECT {field} AS value, COUNT(*) AS count FROM jobs{clause}{field} IS NOT NULL "
+                    f"GROUP BY {field} ORDER BY count DESC, value ASC", params)
+    return {"field": field, "values": [{"value": r["value"], "count": r["count"]} for r in rows]}
 
 
 def _cell(v: Any) -> Any:
