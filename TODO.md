@@ -45,6 +45,7 @@ belong in each candidate's own private repo, not here.
 - [ ] Action Items redesign: group by `Type` + `Needs` column = `laptop` (Chrome/Handshake/Workday session, candidate present) | `phone` (approve/send from anywhere) | `anytime`; sort by Priority then NextActionDate; separate "Today" view. Tier A submits, Handshake, Workday review pages = `laptop`. LinkedIn sends, email approvals, cover-letter reviews = `phone`.
 - [ ] Handshake apply sessions: candidate logged in + present; system drives Chrome, candidate debugs live. Assisted mode only.
 - [ ] Web UI dashboard (jobs pipeline, action items, contacts, stats). Design spec: `docs/UI.md`. Action Items section: every item shows its `Link` as a clickable hyperlink (e.g. "review & submit" opens the prepared application form) — reads tracker/data; likely local FastAPI + simple frontend, or Artifact page fed from tracker.
+- [ ] Action Items tab: answer box on question/salary items that calls `POST /actions/{id}/answer` (learns the answer, closes the item); lessons list/add UI on top of `GET|POST /learning/lessons`. Backend shipped with `careeros learn`.
 - [ ] Phone access: approve/reject drafts, mark actions done, get interview alerts. Candidates: Google Sheet mirror of tracker, push notifications (already planned), Claude Code remote sessions, or the web UI made mobile-first.
 
 ## Ghost jobs

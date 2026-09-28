@@ -72,8 +72,8 @@ _EEO_SPLIT_RE = re.compile(r"^eeo:\s*(#.*)?$", re.M)
 
 
 @lru_cache(maxsize=8)
-def _load_answers(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
-    """Accepts three shapes:
+def _load_answers(path: str) -> tuple[list[dict[str, Any]], dict[str, Any], dict[str, list[dict[str, Any]]]]:
+    """(answers, eeo, company_answers). Accepts three shapes:
     1. dict: {answers: [...], eeo: {...}}
     2. list: [{key,...}, ...]  (no eeo block)
     3. list followed by a top-level `eeo:` mapping (the shipped profile/standard_answers.yaml). That is
@@ -94,10 +94,21 @@ def _load_answers(path: str) -> tuple[list[dict[str, Any]], dict[str, Any]]:
         if not isinstance(items, list):
             items = next((v for v in data.values() if isinstance(v, list)), [])
         eeo = data.get("eeo") or {}
+        ca = data.get("company_answers") if isinstance(data.get("company_answers"), dict) else {}
     else:
         items = [x for x in (data or []) if isinstance(x, dict) and "key" in x]
-        eeo = {}
-    return [x for x in items if isinstance(x, dict) and "key" in x], eeo
+        eeo, ca = {}, {}
+    company = {str(k).lower(): [x for x in (v or []) if isinstance(x, dict) and "key" in x]
+               for k, v in ca.items() if isinstance(v, list)}
+    return [x for x in items if isinstance(x, dict) and "key" in x], eeo, company
+
+
+def load_company_answers(path: str | Path, company: str | None) -> list[dict[str, Any]]:
+    """Entries learned for one company (`company_answers: {<Company>: [...]}`, matched case-insensitively);
+    they are tried before the general list."""
+    if not company:
+        return []
+    return _load_answers(str(path))[2].get(company.strip().lower(), [])
 
 
 def load_standard_answers(path: str | Path) -> list[dict[str, Any]]:
@@ -132,8 +143,10 @@ def classify_question(text: str, standard_answers_yaml: str | Path | None = None
     return "unknown"
 
 
-def match_standard_answer(question_text: str, standard_answers_yaml: str | Path) -> tuple[str, Any] | None:
-    """Return (key, answer) for the first standard entry (in file order) whose `match` regex hits.
+def match_standard_answer(question_text: str, standard_answers_yaml: str | Path,
+                          company: str | None = None) -> tuple[str, Any] | None:
+    """Return (key, answer) for the first standard entry (in file order) whose `match` regex hits. With
+    `company`, that company's learned `company_answers` are tried first.
 
     File order is the priority order: put specific entries (`years_experience_fulltime`) above general
     ones (`years_experience`). EEO questions never match. Salary matches return (key, None) because
@@ -145,7 +158,7 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path)
     # A legal or salary question may only be answered by an entry whose pattern hit the legal/salary
     # wording itself: "convicted of a crime in any city" must not borrow the `address` answer.
     guard_spans = [m.span() for rx in (_SALARY_RE, _LEGAL_RE) for m in rx.finditer(t)]
-    for entry in load_standard_answers(standard_answers_yaml):
+    for entry in load_company_answers(standard_answers_yaml, company) + load_standard_answers(standard_answers_yaml):
         for pat in entry.get("match") or []:
             try:
                 m = re.search(pat, t, re.I)
@@ -168,7 +181,8 @@ def _is_sensitive(text: str) -> bool:
     return bool(check_form_fields([text]))
 
 
-def answer_for(label: str, standard_answers_yaml: str | Path, required: bool = False) -> tuple[str, Any] | None:
+def answer_for(label: str, standard_answers_yaml: str | Path, required: bool = False,
+               company: str | None = None) -> tuple[str, Any] | None:
     """`match_standard_answer` plus data minimization. A street-address field is left blank (None) unless
     the form marks it required; then the first standard hit is used, with an `address` entry's `full`
     value preferred over its city form. Sensitive fields are never answered."""
@@ -180,10 +194,10 @@ def answer_for(label: str, standard_answers_yaml: str | Path, required: bool = F
             return None
         for entry in load_standard_answers(standard_answers_yaml):
             if entry.get("key") == "address" and entry.get("full"):
-                hit = match_standard_answer(t, standard_answers_yaml)
+                hit = match_standard_answer(t, standard_answers_yaml, company)
                 if hit and hit[0] == "address":
                     return "address", entry["full"]
-    return match_standard_answer(t, standard_answers_yaml)
+    return match_standard_answer(t, standard_answers_yaml, company)
 
 
 # --- EEO ---------------------------------------------------------------------------------------------

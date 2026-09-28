@@ -564,6 +564,35 @@
         "title": "AdvisorLimits",
         "type": "object"
       },
+      "Answer": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "scope": {
+            "default": "general",
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "Answer",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -3730,6 +3759,92 @@
         "title": "JobsTabs",
         "type": "object"
       },
+      "Lesson": {
+        "properties": {
+          "added": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added"
+          },
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Lesson",
+        "type": "object"
+      },
+      "Lessons": {
+        "properties": {
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/Lesson"
+            },
+            "title": "Lessons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lessons"
+        ],
+        "title": "Lessons",
+        "type": "object"
+      },
       "LocationOption": {
         "properties": {
           "count": {
@@ -3957,6 +4072,60 @@
           "what"
         ],
         "title": "NewItem",
+        "type": "object"
+      },
+      "NewLesson": {
+        "properties": {
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "NewLesson",
         "type": "object"
       },
       "NotScoredHint": {
@@ -6678,6 +6847,61 @@
         ]
       }
     },
+    "/api/actions/{aid}/answer": {
+      "post": {
+        "description": "Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then\nmark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.",
+        "operationId": "answer_api_actions__aid__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Answer Api Actions  Aid  Answer Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
     "/api/actions/{aid}/block-company": {
       "post": {
         "operationId": "block_company_api_actions__aid__block_company_post",
@@ -9069,6 +9293,110 @@
         "summary": "Withdraw",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/learning/lessons": {
+      "get": {
+        "operationId": "list_lessons_api_learning_lessons_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ats",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ats"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lessons"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Lessons",
+        "tags": [
+          "learning"
+        ]
+      },
+      "post": {
+        "operationId": "add_lesson_api_learning_lessons_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewLesson"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lesson"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Lesson",
+        "tags": [
+          "learning"
         ]
       }
     },
