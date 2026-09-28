@@ -1,4 +1,4 @@
-import { Download, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
+import { Download, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
@@ -8,11 +8,12 @@ import { Menu } from "../../kit/Menu";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useExportJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker } from "./api";
+import { useExportJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsTable } from "./JobsTable";
+import { filterSummary } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
-import { TABS, toggleSort, useJobsView, type SortKey } from "./urlState";
+import { TABS, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
 import type { TabKey } from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
@@ -132,11 +133,12 @@ function FilterField({ value: q, onCommit, name, label, placeholder, icon }: Fil
 export function JobsPage() {
   const toast = useToast();
   const [view, update] = useJobsView();
-  const { tab, q, location, sort } = view;
+  const { tab, q, location, sort, filters } = view;
   const meta = useMeta();
   const pageSize = meta.data?.ui?.page_size ?? DEFAULT_PAGE_SIZE;
-  const list = useJobsList({ tab, q, location, sort, limit: pageSize }, !meta.isPending);
-  const tabs = useJobsTabs(q, location);
+  const filterParams = useMemo(() => ({ tab, q, location, filters }), [tab, q, location, filters]);
+  const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
+  const tabs = useJobsTabs(filterParams);
   const exporter = useExportJobs();
   const captionId = useId();
   const panelId = useId();
@@ -168,6 +170,17 @@ export function JobsPage() {
     setSelected(next);
   };
   const onSort = useCallback((key: SortKey) => update({ sort: toggleSort(sort, key) }), [update, sort]);
+  const onSortTo = useCallback((s: string) => update({ sort: s }), [update]);
+  const onFilter = useCallback(
+    (field: FilterField, f: ColumnFilter | null) => {
+      const next = { ...filters };
+      if (f) next[field] = f;
+      else delete next[field];
+      update({ filters: next });
+    },
+    [update, filters],
+  );
+  const activeFilters = (Object.entries(filters) as [FilterField, ColumnFilter][]).filter(([, f]) => f);
   const onSearch = useCallback((text: string) => update({ q: text }, true), [update]);
   const onLocation = useCallback((text: string) => update({ location: text }, true), [update]);
 
@@ -179,7 +192,7 @@ export function JobsPage() {
     const body =
       nSel > 0
         ? { job_ids: [...selected], columns: cols }
-        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols };
+        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols, ...exportFilters(filters) };
     exporter.mutate(body, {
       onSuccess: (name) => toast.show({ message: `Downloaded ${name}` }),
       onError: (e) => toast.show({ message: errorText(e) }),
@@ -224,6 +237,10 @@ export function JobsPage() {
   } else {
     body = (
       <JobsTable
+        filters={filters}
+        onFilter={onFilter}
+        filterParams={filterParams}
+        onSortTo={onSortTo}
         rows={rows}
         columns={columns}
         sort={sort}
@@ -307,6 +324,26 @@ export function JobsPage() {
             {nSel > 0 ? `Export ${formatCount(nSel)} to xlsx` : "Export xlsx"}
           </Button>
         </div>
+        {activeFilters.length > 0 ? (
+          <div className={styles.chips} aria-label="Active filters">
+            {activeFilters.map(([field, f]) => {
+              const label = COLUMNS.find((c) => c.filter === field)?.label ?? field;
+              return (
+                <span key={field} className={styles.chip}>
+                  <span>
+                    {label}: {filterSummary(field, f)}
+                  </span>
+                  <button type="button" className={styles.chipRemove} aria-label={`Remove filter ${label}`} onClick={() => onFilter(field, null)}>
+                    <X size={12} strokeWidth={2} aria-hidden="true" />
+                  </button>
+                </span>
+              );
+            })}
+            <button type="button" className={styles.linkButton} onClick={() => update({ filters: {} })}>
+              Clear all
+            </button>
+          </div>
+        ) : null}
         <section
           id={panelId}
           role="tabpanel"

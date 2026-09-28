@@ -19,6 +19,14 @@ export interface paths {
     /** Bulk Reopen */
     post: operations["bulk_reopen_api_actions_bulk_reopen_post"];
   };
+  "/api/actions/{aid}/answer": {
+    /**
+     * Answer
+     * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
+     * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
+     */
+    post: operations["answer_api_actions__aid__answer_post"];
+  };
   "/api/actions/{aid}/block-company": {
     /** Block Company */
     post: operations["block_company_api_actions__aid__block_company_post"];
@@ -87,6 +95,13 @@ export interface paths {
     /** Export */
     post: operations["export_api_jobs_export_post"];
   };
+  "/api/jobs/facets": {
+    /**
+     * Job Facets
+     * @description Distinct values of one column with counts under every other active filter (the header filter menu).
+     */
+    get: operations["job_facets_api_jobs_facets_get"];
+  };
   "/api/jobs/tabs": {
     /** Job Tabs */
     get: operations["job_tabs_api_jobs_tabs_get"];
@@ -148,6 +163,12 @@ export interface paths {
   "/api/jobs/{job_id}/withdraw": {
     /** Withdraw */
     post: operations["withdraw_api_jobs__job_id__withdraw_post"];
+  };
+  "/api/learning/lessons": {
+    /** List Lessons */
+    get: operations["list_lessons_api_learning_lessons_get"];
+    /** Add Lesson */
+    post: operations["add_lesson_api_learning_lessons_post"];
   };
   "/api/meta": {
     /** Meta */
@@ -427,6 +448,18 @@ export interface components {
       usage_limit_stops: number;
       /** Window Days */
       window_days: number;
+    };
+    /** Answer */
+    Answer: {
+      /** Answer */
+      answer: string;
+      /** Company */
+      company?: string | null;
+      /**
+       * Scope
+       * @default general
+       */
+      scope?: string;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -762,14 +795,64 @@ export interface components {
     };
     /** Export */
     Export: {
+      /** Applied From */
+      applied_from?: string | null;
+      /** Applied To */
+      applied_to?: string | null;
+      /**
+       * Ats
+       * @default []
+       */
+      ats?: string[];
+      /**
+       * Category
+       * @default []
+       */
+      category?: string[];
+      /** Closes From */
+      closes_from?: string | null;
+      /** Closes To */
+      closes_to?: string | null;
       /** Columns */
       columns?: string[] | null;
+      /**
+       * Company
+       * @default []
+       */
+      company?: string[];
+      /** Fit Max */
+      fit_max?: number | null;
+      /** Fit Min */
+      fit_min?: number | null;
+      /** Found From */
+      found_from?: string | null;
+      /** Found To */
+      found_to?: string | null;
       /** Job Ids */
       job_ids?: string[] | null;
       /** Location */
       location?: string | null;
+      /**
+       * Location In
+       * @default []
+       */
+      location_in?: string[];
       /** Q */
       q?: string | null;
+      /**
+       * Qa Passed
+       * @default []
+       */
+      qa_passed?: string[];
+      /** Qa Score Max */
+      qa_score_max?: number | null;
+      /** Qa Score Min */
+      qa_score_min?: number | null;
+      /**
+       * Safety
+       * @default []
+       */
+      safety?: string[];
       /**
        * Sort
        * @default -fit
@@ -787,6 +870,13 @@ export interface components {
        * @default []
        */
       tier?: string[];
+    };
+    /** FacetValue */
+    FacetValue: {
+      /** Count */
+      count: number;
+      /** Value */
+      value: string | number | null;
     };
     /** FieldSchema */
     FieldSchema: {
@@ -1119,6 +1209,13 @@ export interface components {
       /** Submitted */
       submitted: string[];
     };
+    /** JobFacets */
+    JobFacets: {
+      /** Field */
+      field: string;
+      /** Values */
+      values: components["schemas"]["FacetValue"][];
+    };
     /** JobListItem */
     JobListItem: {
       /** Applied At */
@@ -1228,6 +1325,31 @@ export interface components {
       /** Tabs */
       tabs: components["schemas"]["JobsTab"][];
     };
+    /** Lesson */
+    Lesson: {
+      /** Added */
+      added?: string | null;
+      /** Ats */
+      ats?: string | null;
+      /** Company */
+      company?: string | null;
+      /** Id */
+      id: string;
+      /** Job Id */
+      job_id?: string | null;
+      /**
+       * Tags
+       * @default []
+       */
+      tags?: string[];
+      /** Text */
+      text: string;
+    };
+    /** Lessons */
+    Lessons: {
+      /** Lessons */
+      lessons: components["schemas"]["Lesson"][];
+    };
     /** LocationOption */
     LocationOption: {
       /** Count */
@@ -1316,6 +1438,22 @@ export interface components {
       type?: string;
       /** What */
       what: string;
+    };
+    /** NewLesson */
+    NewLesson: {
+      /** Ats */
+      ats?: string | null;
+      /** Company */
+      company?: string | null;
+      /** Job Id */
+      job_id?: string | null;
+      /**
+       * Tags
+       * @default []
+       */
+      tags?: string[];
+      /** Text */
+      text: string;
     };
     /** NotScoredHint */
     NotScoredHint: {
@@ -2215,6 +2353,39 @@ export interface operations {
       };
     };
   };
+  /**
+   * Answer
+   * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
+   * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
+   */
+  answer_api_actions__aid__answer_post: {
+    parameters: {
+      path: {
+        aid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Answer"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Block Company */
   block_company_api_actions__aid__block_company_post: {
     parameters: {
@@ -2545,6 +2716,20 @@ export interface operations {
         cursor?: string | null;
         tab?: string | null;
         limit?: number | null;
+        company?: string[];
+        location_in?: string[];
+        ats?: string[];
+        qa_passed?: string[];
+        fit_min?: number | null;
+        fit_max?: number | null;
+        qa_score_min?: number | null;
+        qa_score_max?: number | null;
+        found_from?: string | null;
+        found_to?: string | null;
+        applied_from?: string | null;
+        applied_to?: string | null;
+        closes_from?: string | null;
+        closes_to?: string | null;
       };
     };
     responses: {
@@ -2584,12 +2769,76 @@ export interface operations {
       };
     };
   };
+  /**
+   * Job Facets
+   * @description Distinct values of one column with counts under every other active filter (the header filter menu).
+   */
+  job_facets_api_jobs_facets_get: {
+    parameters: {
+      query: {
+        field: string;
+        status?: string[];
+        tier?: string[];
+        safety?: string[];
+        category?: string[];
+        q?: string | null;
+        location?: string | null;
+        tab?: string | null;
+        company?: string[];
+        location_in?: string[];
+        ats?: string[];
+        qa_passed?: string[];
+        fit_min?: number | null;
+        fit_max?: number | null;
+        qa_score_min?: number | null;
+        qa_score_max?: number | null;
+        found_from?: string | null;
+        found_to?: string | null;
+        applied_from?: string | null;
+        applied_to?: string | null;
+        closes_from?: string | null;
+        closes_to?: string | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["JobFacets"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Job Tabs */
   job_tabs_api_jobs_tabs_get: {
     parameters: {
       query?: {
+        status?: string[];
+        tier?: string[];
+        safety?: string[];
+        category?: string[];
         q?: string | null;
         location?: string | null;
+        company?: string[];
+        location_in?: string[];
+        ats?: string[];
+        qa_passed?: string[];
+        fit_min?: number | null;
+        fit_max?: number | null;
+        qa_score_min?: number | null;
+        qa_score_max?: number | null;
+        found_from?: string | null;
+        found_to?: string | null;
+        applied_from?: string | null;
+        applied_to?: string | null;
+        closes_from?: string | null;
+        closes_to?: string | null;
       };
     };
     responses: {
@@ -2950,6 +3199,51 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Lessons */
+  list_lessons_api_learning_lessons_get: {
+    parameters: {
+      query?: {
+        ats?: string | null;
+        company?: string | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Lessons"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Add Lesson */
+  add_lesson_api_learning_lessons_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["NewLesson"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Lesson"];
         };
       };
       /** @description Validation Error */

@@ -25,6 +25,10 @@ function renderTable(props: Partial<Parameters<typeof JobsTable>[0]> = {}) {
         onToggleAll={onToggleAll}
         total={1200}
         captionId="cap"
+        filters={{}}
+        onFilter={vi.fn()}
+        filterParams={{ tab: "active", q: "", location: "", filters: {} }}
+        onSortTo={vi.fn()}
         {...props}
       />
     </MemoryRouter>,

@@ -27,6 +27,7 @@ Personal context (who the candidate is, where their private files live) lives in
 ## Commands
 - `.venv/bin/careeros scout --sync` — pull boards, prefilter, store, sync tracker
 - `.venv/bin/careeros jobs list [--status queued]`, `job show <id>`, `job status <id> <status> [--note]` (status.json + tracker), `stats`, `action list`, `action add "<what>" --type <t> --needs laptop|phone|anytime`
+- `.venv/bin/careeros learn answer "<question>" "<answer>" [--job <id>] [--key k] [--match re ...] [--company X] [--eeo]`, `learn lesson "<text>" [--ats workday|greenhouse|lever|ashby|custom] [--company X] [--job <id>] [--tag t]`, `learn list [--ats] [--company] [--json]` — answers land in `profile/standard_answers.yaml`, hurdles in `profile/apply_lessons.yaml`; `action done <id> --answer "<text>"` learns a question/salary item's answer, then closes it
 - `.venv/bin/careeros tracker applied-count [<company>] [--days N]`, `tracker upsert <job_id> --field Header=value ...`, `tracker sync|flush|init`
 - `.venv/bin/careeros run score|prepare [--preset small|medium|large|max|custom] [--max-jobs N] [--max-minutes M] [--dry-run] [--json]` — budgeted batches, one headless skill call per job, never applies; `--job <id> [--force]` runs one job (exit 2 with the reason if it is not a candidate)
 - `.venv/bin/careeros run apply --job <id> [--json]` — `/apply-job` one prepared job headless (Chrome MCP tools allowed); `--job` required, Tier A staged for review, never submitted, never scheduled

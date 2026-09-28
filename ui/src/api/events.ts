@@ -25,6 +25,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
   if (p.jobs?.length) {
     add(["jobs"]);
     add(["jobs-tabs"]); // Jobs screen filter-tab counts
+    add(["jobs-facets"]); // Jobs screen header filter checklists/counts
     for (const id of p.jobs) add(["job", id]);
     add(["contacts"]); // contacts.json lives in the job folder
     add(["inbox"]); // outreach.json, log.md (inbox-sync lines) and the status history too

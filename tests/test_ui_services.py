@@ -179,6 +179,53 @@ def test_jobs_list_filters(idx, kw, expect):
     assert {j["company"] for j in jobs_svc.list_jobs(idx, **kw)["items"]} == expect
 
 
+@pytest.mark.parametrize("kw,expect", [
+    ({"values": {"company": ["Hooli", "Initech"]}}, {"Hooli", "Initech"}),
+    ({"values": {"location": ["Remote"]}}, {"Globex"}),
+    ({"values": {"ats": ["greenhouse"]}, "status": ["queued"]}, {"Initech"}),
+    ({"ranges": {"fit": (85, None)}}, {"Umbrella Labs", "Initech", "Stark Industries"}),
+    ({"ranges": {"fit": (None, 72)}}, {"Globex", "Vandelay Imports"}),
+    ({"ranges": {"fit": (84, 86)}}, {"Hooli", "Stark Industries"}),
+    ({"ranges": {"found_at": ("2026-09-19", "2026-09-21")}}, {"Globex", "Initech", "Umbrella Labs"}),   # inclusive dates
+    ({"ranges": {"applied_at": (None, "2026-09-12")}}, {"Stark Industries", "Wayne Enterprises"}),
+    ({"ranges": {"applied_at": ("2026-09-22", None)}}, {"Hooli"}),
+])
+def test_jobs_list_column_filters(idx, kw, expect):
+    assert {j["company"] for j in jobs_svc.list_jobs(idx, **kw)["items"]} == expect
+
+
+def test_column_filters_are_validated(idx):
+    with pytest.raises(ValueError, match="fit_min"):
+        jobs_svc.list_jobs(idx, ranges={"fit": ("high", None)})
+    with pytest.raises(ValueError, match="ISO date"):
+        jobs_svc.list_jobs(idx, ranges={"found_at": ("yesterday", None)})
+    with pytest.raises(ValueError, match="unknown"):
+        jobs_svc.list_jobs(idx, values={"url": ["x"]})
+    with pytest.raises(ValueError, match="unknown"):
+        jobs_svc.facets(idx, "url", closed=[])
+
+
+def test_facets_count_under_the_other_filters(idx):
+    tiers = jobs_svc.facets(idx, "tier", closed=[], tab="all")
+    assert tiers["field"] == "tier"
+    assert tiers["values"] == [{"value": "C", "count": 3}, {"value": "A", "count": 2}, {"value": "B", "count": 2}]
+    # Excel semantics: a filter on the requested field is ignored, the others apply.
+    under = jobs_svc.facets(idx, "tier", closed=[], tab="all", tier=["A"], status=["applied", "interview"])
+    assert under["values"] == [{"value": "A", "count": 1}, {"value": "B", "count": 1}]
+    st = jobs_svc.facets(idx, "status", closed=[], tab="all", values={"company": ["Hooli"]}, ranges={"fit": (85, None)})
+    assert st["values"] == []
+    assert jobs_svc.facets(idx, "qa_passed", closed=[], tab="all")["values"][0]["count"] >= 1
+
+
+def test_tabs_and_export_honour_column_filters(idx):
+    t = {x["key"]: x["count"] for x in jobs_svc.tabs(idx, [], values={"company": ["Hooli", "Globex"]})}
+    assert t["all"] == 2 and t["applied"] == 1
+    from openpyxl import load_workbook
+    import io
+    wb = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, tab="all", ranges={"fit": (85, None)})))
+    assert wb["Jobs"].max_row == 4
+
+
 def test_jobs_list_sorts(idx):
     by_company = jobs_svc.list_jobs(idx, sort="company")["items"]
     assert [j["company"] for j in by_company][:2] == ["Acme Robotics", "Globex"]

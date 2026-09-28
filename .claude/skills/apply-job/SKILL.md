@@ -103,6 +103,13 @@ path below, including errors. Set status with
 `status.json` and the tracker row together; every "status needs_review" / "status applied" below means
 this command).
 
+### 1c. Known hurdles (before opening the form)
+
+Run `.venv/bin/careeros learn list --ats <ats> --company "<company>" --json` and read every lesson's `text`
+as an instruction for this session (general lessons + this ATS + this company; `profile/apply_lessons.yaml`).
+They record what an earlier session had to work around (an upload that must finish before Next, a hidden EEO
+toggle, a page that needs a portfolio link). Follow them; they never override a hard rule below.
+
 ## 2. Open and detect
 
 1. `tabs_create_mcp` then `navigate` to `apply_url`. Wait for load. Screenshot → `s.shot(s.next_screenshot_path(job_dir, "landing"))`.
@@ -123,8 +130,10 @@ Follow the ATS flow in `adapters.md` exactly. Sources for values:
 
 ```python
 from careeros.apply.questions import answer_for, classify_question
-hit = answer_for(label, "profile/standard_answers.yaml", required=<field is marked required>)
+hit = answer_for(label, "profile/standard_answers.yaml", required=<field is marked required>, company=<posting company>)
 ```
+
+  `company=` tries the answers learned for this company (`company_answers` block) before the general list.
 
   `answer_for` minimizes personal data: an optional street-address field stays blank; only a required
   one gets the street. Phone and email are the only other contact data given. A `sensitive` label never
@@ -138,6 +147,8 @@ hit = answer_for(label, "profile/standard_answers.yaml", required=<field is mark
   - no hit: `classify_question(label)`:
     - `eeo` → section 4.
     - `legal` → STOP, Action Item type `question` ("legal question not in standard answers: <label>"). Never guess.
+      Every `question` / `salary` Action Item's text must contain the exact form question verbatim (`<class>:
+      <question>` or `... : <label>`): `careeros action done <id> --answer "<text>"` learns the answer from it.
     - `essay` / `unknown` / `standard` → look up the `answers.json` entry (a JSON list) whose `question`,
       whitespace-collapsed and lower-cased, equals the label normalized the same way. Missing → run
       `/answer-question <job_dir> "<label>" --limit <maxlength>` per
@@ -226,7 +237,12 @@ value the helper did not return.
    (review/submit items need the laptop; use `phone` only for items answerable by text).
 3. Run the status command from section 1 with the final outcome: `applied` on submitted, else `needs_review`.
 4. Close the tab only on `submitted` or `failed`; keep it open for `needs_review` / `blocked`.
-5. Print exactly one final line: `s.result_line()` → `RESULT: {"job_id":..., "outcome":..., "status":..., ...}`.
+5. Learn from the session. For each hurdle this run hit and worked around (a control that needed a wait, a
+   step adapters.md does not describe, a field that needed a non-obvious source), record it once:
+   `.venv/bin/careeros learn lesson "<one factual line, no personal data>" --ats <ats> [--company "<company>"] --job <job_id>`.
+   Only genuine, reusable hurdles (not "filled the form"); skip anything already in the Known hurdles list.
+   Add the same lines to the RESULT as `learned: [...]` (empty list when nothing was learned).
+6. Print exactly one final line: `s.result_line()` → `RESULT: {"job_id":..., "outcome":..., "status":..., "learned": [...], ...}`.
 
 ## Hard rules
 

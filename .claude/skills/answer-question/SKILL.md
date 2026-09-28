@@ -12,9 +12,13 @@ absent); `--options` lists dropdown choices when the field is a select.
 
 ## 1. Standard answer lookup (always first)
 
-Read `profile/standard_answers.yaml` (a list of `{key, match[], answer, note?}` plus an `eeo` block).
-For each entry in order, test every `match` pattern as a case-insensitive regex (`re.search`) against
-`QUESTION`. First hit wins.
+Read `profile/standard_answers.yaml` (a list of `{key, match[], answer, note?}` plus an `eeo` block, and an
+optional `company_answers: {<Company>: [entries]}` block of answers learned for one company). Check
+`company_answers[<company>]` first when the job's `posting.json: company` matches a key (case-insensitive),
+then `answers`. For each entry in order, test every `match` pattern as a case-insensitive regex (`re.search`)
+against `QUESTION`. First hit wins. (`careeros.apply.questions.match_standard_answer(question, path, company)`
+does exactly this.) Entries whose `note` starts with `learned` were answered once by the candidate
+(`careeros learn answer` / `action done --answer`): use them like any other standard answer.
 
 - Hit with non-null `answer`: use it VERBATIM. `type: standard`, `needs_review: false`.
   - If `--options` were given, choose the option that equals the answer case-insensitively, else the
@@ -91,4 +95,7 @@ Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [answer-question] "<first 60 char
 `RESULT: {"skill":"answer-question","job_id":"...","type":"standard","class":"standard","answer_present":true,"needs_review":false,"char_count":3,"action_item":null}`
 
 When `action_item` is set, RESULT must include `"ACTION_ITEM":"<class>: <question> (limit <n>)"` so the
-caller adds it with `careeros action add "<text>" --type question --job <job_id> --priority H`.
+caller adds it with `careeros action add "<text>" --type question --job <job_id> --priority H`. The text
+must contain the exact question verbatim (after `<class>: `): the candidate closes the item with
+`careeros action done <id> --answer "<text>"` (or the Answer button in the app), which learns the answer
+into `profile/standard_answers.yaml` from that text, so the question is never asked again.

@@ -564,6 +564,35 @@
         "title": "AdvisorLimits",
         "type": "object"
       },
+      "Answer": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "scope": {
+            "default": "general",
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "Answer",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -1757,6 +1786,66 @@
       },
       "Export": {
         "properties": {
+          "applied_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied From"
+          },
+          "applied_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied To"
+          },
+          "ats": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Ats",
+            "type": "array"
+          },
+          "category": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Category",
+            "type": "array"
+          },
+          "closes_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes From"
+          },
+          "closes_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Closes To"
+          },
           "columns": {
             "anyOf": [
               {
@@ -1770,6 +1859,58 @@
               }
             ],
             "title": "Columns"
+          },
+          "company": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Company",
+            "type": "array"
+          },
+          "fit_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Max"
+          },
+          "fit_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit Min"
+          },
+          "found_from": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found From"
+          },
+          "found_to": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Found To"
           },
           "job_ids": {
             "anyOf": [
@@ -1797,6 +1938,14 @@
             ],
             "title": "Location"
           },
+          "location_in": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Location In",
+            "type": "array"
+          },
           "q": {
             "anyOf": [
               {
@@ -1807,6 +1956,44 @@
               }
             ],
             "title": "Q"
+          },
+          "qa_passed": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Qa Passed",
+            "type": "array"
+          },
+          "qa_score_max": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Score Max"
+          },
+          "qa_score_min": {
+            "anyOf": [
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Qa Score Min"
+          },
+          "safety": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Safety",
+            "type": "array"
           },
           "sort": {
             "default": "-fit",
@@ -1842,6 +2029,37 @@
           }
         },
         "title": "Export",
+        "type": "object"
+      },
+      "FacetValue": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "value": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "integer"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Value"
+          }
+        },
+        "required": [
+          "value",
+          "count"
+        ],
+        "title": "FacetValue",
         "type": "object"
       },
       "FieldSchema": {
@@ -3002,6 +3220,27 @@
         "title": "JobDetail",
         "type": "object"
       },
+      "JobFacets": {
+        "properties": {
+          "field": {
+            "title": "Field",
+            "type": "string"
+          },
+          "values": {
+            "items": {
+              "$ref": "#/components/schemas/FacetValue"
+            },
+            "title": "Values",
+            "type": "array"
+          }
+        },
+        "required": [
+          "field",
+          "values"
+        ],
+        "title": "JobFacets",
+        "type": "object"
+      },
       "JobListItem": {
         "properties": {
           "applied_at": {
@@ -3520,6 +3759,92 @@
         "title": "JobsTabs",
         "type": "object"
       },
+      "Lesson": {
+        "properties": {
+          "added": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Added"
+          },
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "text"
+        ],
+        "title": "Lesson",
+        "type": "object"
+      },
+      "Lessons": {
+        "properties": {
+          "lessons": {
+            "items": {
+              "$ref": "#/components/schemas/Lesson"
+            },
+            "title": "Lessons",
+            "type": "array"
+          }
+        },
+        "required": [
+          "lessons"
+        ],
+        "title": "Lessons",
+        "type": "object"
+      },
       "LocationOption": {
         "properties": {
           "count": {
@@ -3747,6 +4072,60 @@
           "what"
         ],
         "title": "NewItem",
+        "type": "object"
+      },
+      "NewLesson": {
+        "properties": {
+          "ats": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Ats"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "job_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Job Id"
+          },
+          "tags": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Tags",
+            "type": "array"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "NewLesson",
         "type": "object"
       },
       "NotScoredHint": {
@@ -6485,6 +6864,61 @@
         ]
       }
     },
+    "/api/actions/{aid}/answer": {
+      "post": {
+        "description": "Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then\nmark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.",
+        "operationId": "answer_api_actions__aid__answer_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Answer"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Answer Api Actions  Aid  Answer Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Answer",
+        "tags": [
+          "actions"
+        ]
+      }
+    },
     "/api/actions/{aid}/block-company": {
       "post": {
         "operationId": "block_company_api_actions__aid__block_company_post",
@@ -7224,6 +7658,224 @@
               ],
               "title": "Limit"
             }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Company",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_in",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Location In",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ats",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Ats",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_passed",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Qa Passed",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes To"
+            }
           }
         ],
         "responses": {
@@ -7293,10 +7945,72 @@
         ]
       }
     },
-    "/api/jobs/tabs": {
+    "/api/jobs/facets": {
       "get": {
-        "operationId": "job_tabs_api_jobs_tabs_get",
+        "description": "Distinct values of one column with counts under every other active filter (the header filter menu).",
+        "operationId": "job_facets_api_jobs_facets_get",
         "parameters": [
+          {
+            "in": "query",
+            "name": "field",
+            "required": true,
+            "schema": {
+              "title": "Field",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Status",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Tier",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "safety",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Safety",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Category",
+              "type": "array"
+            }
+          },
           {
             "in": "query",
             "name": "q",
@@ -7327,6 +8041,575 @@
                 }
               ],
               "title": "Location"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tab",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Tab"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Company",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_in",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Location In",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ats",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Ats",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_passed",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Qa Passed",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes To"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/JobFacets"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Facets",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/tabs": {
+      "get": {
+        "operationId": "job_tabs_api_jobs_tabs_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "status",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Status",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "tier",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Tier",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "safety",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Safety",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "category",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Category",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "q",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Q"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Location"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Company",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "location_in",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Location In",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "ats",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Ats",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_passed",
+            "required": false,
+            "schema": {
+              "default": [],
+              "items": {
+                "type": "string"
+              },
+              "title": "Qa Passed",
+              "type": "array"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "fit_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Fit Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_min",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Min"
+            }
+          },
+          {
+            "in": "query",
+            "name": "qa_score_max",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Qa Score Max"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "found_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Found To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "applied_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Applied To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_from",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes From"
+            }
+          },
+          {
+            "in": "query",
+            "name": "closes_to",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Closes To"
             }
           }
         ],
@@ -8027,6 +9310,110 @@
         "summary": "Withdraw",
         "tags": [
           "jobs"
+        ]
+      }
+    },
+    "/api/learning/lessons": {
+      "get": {
+        "operationId": "list_lessons_api_learning_lessons_get",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "ats",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Ats"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lessons"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "List Lessons",
+        "tags": [
+          "learning"
+        ]
+      },
+      "post": {
+        "operationId": "add_lesson_api_learning_lessons_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/NewLesson"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Lesson"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Add Lesson",
+        "tags": [
+          "learning"
         ]
       }
     },

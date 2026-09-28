@@ -221,6 +221,22 @@ def schema_problems(cfg: dict[str, Any], prof: dict[str, Any]) -> list[str]:
     need(not dup, f"profile/standard_answers.yaml: duplicate keys {dup}")
     missing = [k for k in STANDARD_KEYS if k not in keys]
     need(not missing, f"profile/standard_answers.yaml: answers missing keys {missing}")
+    ca = sa.get("company_answers")
+    if ca is not None and need(isinstance(ca, dict), "profile/standard_answers.yaml: company_answers must be a "
+                                                      "mapping {<Company>: [{key, match, answer}]}"):
+        for co, lst in ca.items():
+            if not need(isinstance(lst, list), f"profile/standard_answers.yaml: company_answers.{co} must be a list"):
+                continue
+            for i, a in enumerate(lst):
+                where = f"profile/standard_answers.yaml: company_answers.{co}[{i}]"
+                if not need(isinstance(a, dict) and a.get("key") and isinstance(a.get("match") or [], list)
+                            and "answer" in a, f"{where} needs key, match (list) and answer"):
+                    continue
+                for pat in a.get("match") or []:
+                    try:
+                        re.compile(str(pat), re.I)
+                    except re.error as e:
+                        out.append(f"{where}.match {pat!r} is not a valid regex ({e})")
     eeo = sa.get("eeo")
     if need(isinstance(eeo, dict), "profile/standard_answers.yaml: eeo missing"):
         for f in ("gender", "race_ethnicity", "veteran", "disability"):
@@ -472,6 +488,24 @@ def check_ui_index(root: Path) -> list[Check]:
     return []
 
 
+def check_apply_lessons(root: Path) -> list[Check]:
+    """profile/apply_lessons.yaml (optional, written by `careeros learn lesson`): a mapping with `lessons:`, a list
+    of mappings each carrying a non-empty `text`."""
+    p = root / "profile" / "apply_lessons.yaml"
+    if not p.is_file():
+        return [Check(PASS, "apply_lessons", "profile/apply_lessons.yaml absent (created by `careeros learn lesson`)")]
+    try:
+        data = _safe_yaml(p)
+    except yaml.YAMLError as e:
+        return [Check(FAIL, "apply_lessons", f"profile/apply_lessons.yaml does not parse: {' '.join(str(e).split())[:160]}")]
+    if not isinstance(data, dict) or not isinstance(data.get("lessons"), list):
+        return [Check(FAIL, "apply_lessons", "profile/apply_lessons.yaml must be a mapping with a `lessons:` list")]
+    bad = [i for i, x in enumerate(data["lessons"]) if not isinstance(x, dict) or not str(x.get("text") or "").strip()]
+    if bad:
+        return [Check(FAIL, "apply_lessons", f"profile/apply_lessons.yaml: lessons {bad} need a non-empty `text`")]
+    return [Check(PASS, "apply_lessons", f"profile/apply_lessons.yaml: {len(data['lessons'])} lesson(s)")]
+
+
 def check_voice(root: Path) -> Check:
     d = root / "profile" / "voice" / "samples"
     n = sum(1 for p in d.iterdir() if p.is_file() and not p.name.startswith(".")) if d.is_dir() else 0
@@ -538,6 +572,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
     checks += check_bullet_priority(cfg["categories"], master)
     checks += check_runs(cfg["pipeline"])
     checks += check_ui_index(root)
+    checks += check_apply_lessons(root)
     if not probs:
         checks += check_metric_questions(master)
         checks += check_estimates(master)

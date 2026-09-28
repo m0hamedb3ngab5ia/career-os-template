@@ -9,6 +9,7 @@ export type JobListItem = Schemas["JobListItem"];
 export type JobsPage = Schemas["JobsPage"];
 export type JobsTab = Schemas["JobsTab"];
 export type JobsTabs = Schemas["JobsTabs"];
+export type JobFacets = Schemas["JobFacets"];
 
 export type TabKey = "active" | "review" | "applied" | "tier_a" | "all";
 

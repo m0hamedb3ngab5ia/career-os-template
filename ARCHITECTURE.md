@@ -251,6 +251,31 @@ a concrete YAML change or advice only. `careeros advise apply <id>` applies that
 `config/pipeline.yaml` only when called: ruamel.yaml round trip (comments and order kept), validate, roll back
 on failure. Nothing is ever applied automatically.
 
+## Learning from applications (`src/careeros/learning.py`)
+
+The system gets smarter with every application: a question the candidate answers once is never asked again, and
+a hurdle hit on an ATS or at a company is consulted before the next session there.
+
+Unknown question → `answer-question` returns `needs_review` → apply-job opens an Action Item (type `question` /
+`salary`) whose text contains the exact question → the candidate answers it once, in the app (Answer on the
+item: `POST /api/actions/{id}/answer`) or on the CLI (`careeros action done <id> --answer "<text>"`, or
+`careeros learn answer "<question>" "<answer>" [--job <id>] [--company X] [--eeo]`) → `learn_answer` appends an
+entry `{key, match, answer, note: "learned <date> from job <id>"}` to `profile/standard_answers.yaml` (general
+`answers:`, a per-company `company_answers: {<Company>: [...]}` block, or an `eeo:` value), rewriting only the
+new lines so comments and `# INSERT` markers survive, and sets that job's `answers.json` entry to the answer
+(`needs_review: false`, `source: learned`) → the item is marked done → the next apply-job fills it through
+`answer_for(label, path, company=...)` (company answers first) without asking. `qa.check_standard_answers` and
+`careeros doctor` keep validating the file; `learn_answer` refuses empty answers, duplicate keys and any path
+under `examples/`.
+
+Hurdles → apply-job ends a session with `careeros learn lesson "<one factual line>" --ats <ats> [--company X]
+--job <id>` for each workaround it needed (and lists them in its RESULT `learned[]`) → `learn_lesson` appends
+`{id, text, ats, company, job_id, added, tags}` to `profile/apply_lessons.yaml` (created on first use;
+`examples/profile/apply_lessons.yaml` ships two fictional ones) → the next apply-job session starts with
+`careeros learn list --ats <ats> --company <company> --json` (`lessons_for`: general + this ATS + this company)
+and treats the lessons as instructions ("Known hurdles"). The app reads and adds lessons through
+`GET/POST /api/learning/lessons`; `careeros doctor` checks the file's shape when it exists.
+
 ## Directories
 
 ```
@@ -258,10 +283,10 @@ career-os/
   ARCHITECTURE.md  README.md  TODO.md  CLAUDE.md  (CLAUDE.local.md: gitignored, personal)
   examples/  config/ + profile/ for the fictional candidate "Alex Example" (copied by `careeros init`)
   config/    targets.yaml  categories.yaml  companies.yaml  qa.yaml  pipeline.yaml        (gitignored)
-  profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  voice/        (gitignored)
+  profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  apply_lessons.yaml  voice/  (gitignored)
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
   src/careeros/  bootstrap.py  scout/  apply/ (incl. snapshot.py)  safety/  tracker.py  qa.py  qa_ext/  store.py
-                 company_policy.py  outreach.py  retention.py  doctor.py  cli.py
+                 company_policy.py  outreach.py  retention.py  doctor.py  learning.py  cli.py
                  runs/ (config  ranking  runner  headless  service  policy  locks  failures  store  schedule  tick  launchd)
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)

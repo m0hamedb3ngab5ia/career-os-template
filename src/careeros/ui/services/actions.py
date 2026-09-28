@@ -276,6 +276,18 @@ def mark_done(settings: Any, ids: list[str]) -> dict[str, Any]:
     return _outcome(results)
 
 
+def answer_item(settings: Any, ix: Any, aid: str, answer: str, scope: str = "general",
+                company: str | None = None) -> dict[str, Any]:
+    from careeros.learning import learn_from_action
+
+    it = get_item(ix, aid)
+    learned = learn_from_action(settings, None, aid, answer, scope=scope, company=company, item=it)
+    learned["job_id"] = it.get("job_id") or None
+    out = mark_done(settings, [aid])
+    out["learned"] = learned
+    return out
+
+
 def reopen(settings: Any, ids: list[str]) -> dict[str, Any]:
     tr = _tracker(settings)
     return _outcome({i: tr.reopen_action(i) for i in dict.fromkeys(ids)})

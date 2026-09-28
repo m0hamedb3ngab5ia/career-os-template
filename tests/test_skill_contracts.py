@@ -469,3 +469,19 @@ def test_tailor_resume_pins_bullets_and_renders_title_display():
     assert "only short-swap" in fit_rule or "short-swap" in fit_rule
     rules = (ROOT / ".claude" / "skills" / "_shared" / "resume_writing_rules.md").read_text()
     assert "resume_pin" in rules
+
+
+def test_answer_question_checks_company_answers_first():
+    text = (ROOT / ".claude" / "skills" / "answer-question" / "SKILL.md").read_text()
+    assert "company_answers" in text and text.index("company_answers[<company>]") < text.index("First hit wins")
+    assert "action done <id> --answer" in text and "exact question verbatim" in text
+
+
+def test_apply_job_reads_lessons_first_and_records_them_last():
+    text = (ROOT / ".claude" / "skills" / "apply-job" / "SKILL.md").read_text()
+    assert "careeros learn list --ats <ats> --company" in text and "Known hurdles" in text
+    assert text.index("careeros learn list") < text.index("## 2. Open and detect")
+    assert "careeros learn lesson" in text and text.index("careeros learn lesson") > text.index("## 7. Always, last")
+    assert '"learned": [...]' in text
+    assert "company=<posting company>" in text
+    assert "exact form question verbatim" in text and "action done <id> --answer" in text
