@@ -435,6 +435,31 @@ def cmd_safety_fields(args: argparse.Namespace) -> int:
     return SAFETY_HARD_EXIT
 
 
+def cmd_apply_fill(args: argparse.Namespace) -> int:
+    """Stage data/jobs/<id>/fill_plan.json in the browser (Playwright); never submits."""
+    from careeros.apply import gh_fill
+
+    s = _settings(args)
+    store = Store(s)
+    plan = store._read(args.job_id, "fill_plan.json")
+    if not plan:
+        print(f"job {args.job_id}: no fill_plan.json; run `careeros apply plan {args.job_id}` first", file=sys.stderr)
+        return 1
+    if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
+        return locked
+    if problems := gh_fill.plan_problems(plan):
+        print(f"job {args.job_id}: refusing to fill: " + "; ".join(problems), file=sys.stderr)
+        return SAFETY_HARD_EXIT if plan.get("blocked") else 2
+    profile_dir = s.paths.get("browser_profile") or Path.home() / ".careeros" / "chrome-apply"
+    try:
+        summary = gh_fill.run(plan, store.job_dir(args.job_id), cdp=args.cdp, profile_dir=profile_dir, url=args.url)
+    except gh_fill.MissingPlaywright as e:
+        print(e, file=sys.stderr)
+        return 2
+    print(json.dumps(summary, indent=2))
+    return 1 if summary["failed"] else 0
+
+
 def cmd_apply_plan(args: argparse.Namespace) -> int:
     """Greenhouse question schema -> data/jobs/<id>/fill_plan.json (answers from profile + standard_answers)."""
     import yaml
@@ -1722,6 +1747,15 @@ def build_parser() -> argparse.ArgumentParser:
     app.add_argument("--lock-token", help="re-enter a job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
     app.add_argument("--force", action="store_true", help="ignore a held job lock")
     app.set_defaults(fn=cmd_apply_plan)
+    apf = apls.add_parser("fill", help="stage fill_plan.json in the browser via Playwright ([fast-apply] extra); "
+                                       "never submits")
+    apf.add_argument("job_id")
+    apf.add_argument("--cdp", help="attach to a running Chrome, e.g. http://localhost:9222 (default: launch a "
+                                   "visible browser on paths.browser_profile)")
+    apf.add_argument("--url", help="form page to open (default: the job-boards.greenhouse.io embed form)")
+    apf.add_argument("--lock-token", help="re-enter a job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
+    apf.add_argument("--force", action="store_true", help="ignore a held job lock")
+    apf.set_defaults(fn=cmd_apply_fill)
     sf = sub.add_parser("safety", help="scam + company + ghost-job gate (exit 3 = block, 4 = skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)
     sck = sfs.add_parser("check", help="posting checks -> safety.json verdict pass|review|skip|block")

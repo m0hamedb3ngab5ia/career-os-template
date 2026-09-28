@@ -38,6 +38,8 @@ jobs:
     needs: changes
     if: ${{ !cancelled() && !github.event.repository.private && (needs.changes.result != 'success' || needs.changes.outputs.python == 'true') }}
     runs-on: ubuntu-latest
+    env:
+      PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers  # tests swap HOME; keep browsers findable
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -48,7 +50,7 @@ jobs:
         run: echo "present=$([ -f pyproject.toml ] && echo yes || echo no)" >> "$GITHUB_OUTPUT"
       - name: Install
         if: steps.has_pkg.outputs.present == 'yes'
-        run: pip install -e ".[test,ui]"
+        run: pip install -e ".[test,ui,fast-apply]" && python -m playwright install chromium-headless-shell
       - name: Everything + coverage
         if: steps.has_pkg.outputs.present == 'yes'
         run: pytest -q -n auto --cov=careeros --cov-report=term-missing
