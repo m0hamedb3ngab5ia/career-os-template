@@ -37,4 +37,5 @@ addopts = "--strict-markers"
 markers = [
     "unit: pure functions/classes; fakes for IO; no subprocess, no network",
     "integration: crosses a boundary (CLI subprocess, filesystem layout, workbook, recorded HTTP, PDF render, real YAML)",
+    "live: calls the real `claude` CLI; skipped unless CAREEROS_LIVE_SMOKE=1",
 ]

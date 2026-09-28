@@ -36,7 +36,8 @@ def add_job(store: Store, n: int, hours_old: float = 10, company: str = "Acme", 
 
 def events(job_id: str, result: dict | None = None, **res_extra) -> list[str]:
     text = "RESULT: " + json.dumps(result) if result is not None else "no result"
-    return [json.dumps({"type": "system", "subtype": "init", "session_id": f"s-{job_id}", "mcp_servers": []}),
+    return [json.dumps({"type": "system", "subtype": "init", "session_id": f"s-{job_id}",
+                        "mcp_servers": [{"name": "claude-in-chrome", "status": "connected"}]}),
             json.dumps({"type": "result", "subtype": "success", "is_error": False, "session_id": f"s-{job_id}",
                         "result": text, "num_turns": 2, **res_extra})]
 

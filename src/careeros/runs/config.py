@@ -46,6 +46,8 @@ DEFAULT_ALLOWED_TOOLS: list[str] = [
 ]
 # Extra tools per run kind, on top of llm.allowed_tools: apply-job drives Chrome through the MCP server.
 KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"]}
+# Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
+KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}
 DEFAULT_USAGE_LIMIT_PATTERNS = [r"usage limit", r"hit your limit", r"limit reached", r"rate.?limit",
                                 r"out of (extra )?usage", r"quota"]
 DEFAULT_AUTH_PATTERNS = [r"/login", r"not logged in", r"invalid api key", r"oauth token", r"authenticat",

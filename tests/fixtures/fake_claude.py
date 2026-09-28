@@ -45,7 +45,9 @@ def main() -> int:
         mode = (job_dir / ".fake_mode").read_text().strip()
     sid = argv[argv.index("--session-id") + 1] if "--session-id" in argv else str(uuid.uuid4())
     emit({"type": "system", "subtype": "init", "session_id": sid, "tools": ["Read", "Bash"],
-          "mcp_servers": [], "model": "fake"})
+          # Like the real CLI: claude-in-chrome loads only with --chrome.
+          "mcp_servers": [{"name": "claude-in-chrome", "status": "connected"}] if "--chrome" in argv else [],
+          "model": "fake"})
     if mode == "hang":
         time.sleep(600)
         return 0

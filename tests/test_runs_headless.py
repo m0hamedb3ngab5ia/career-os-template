@@ -28,8 +28,11 @@ def lines(*events) -> list[str]:
     return [json.dumps(e) for e in events]
 
 
-def ok_events(result_text: str, **extra):
-    return lines({"type": "system", "subtype": "init", "session_id": "sid-1", "mcp_servers": []},
+CHROME_OK = [{"name": "claude-in-chrome", "status": "connected"}]
+
+
+def ok_events(result_text: str, mcp_servers=(), **extra):
+    return lines({"type": "system", "subtype": "init", "session_id": "sid-1", "mcp_servers": list(mcp_servers)},
                  {"type": "assistant", "session_id": "sid-1", "message": {"content": [{"type": "text", "text": "hi"}]}},
                  {"type": "result", "subtype": "success", "is_error": False, "session_id": "sid-1",
                   "result": result_text, "num_turns": 3, "total_cost_usd": 0.01, **extra})
@@ -156,7 +159,8 @@ def test_denial_behind_an_invalid_result_is_permission_denied():
     error that must stop the run, not a job failure that burns a retry."""
     cmd = ".venv/bin/careeros doctor --quiet; echo done"
     ev = ok_events('RESULT: {"job_id": "j", "outcome": "failed", "status": "unchanged"}',
-                   permission_denials=[{"tool_name": "Bash", "tool_input": {"command": cmd}}])
+                   permission_denials=[{"tool_name": "Bash", "tool_input": {"command": cmd}}],
+                   mcp_servers=CHROME_OK)
     out, detail = classify(res_of(ev), CFG, "apply", "j")
     assert out == "permission_denied"
     assert "Bash" in detail and "doctor --quiet; echo" in detail
@@ -205,3 +209,41 @@ def test_apply_result_needs_outcome_and_a_known_status():
                                                                         "status": "applied"}))
     assert validate_result("apply", "j1", {"job_id": "j1", "status": "applied"}) == ["RESULT has no outcome"]
     assert any("status" in p for p in validate_result("apply", "j1", {"job_id": "j1", "outcome": "x", "status": "found"}))
+
+
+def test_apply_kind_launches_claude_with_chrome_and_other_kinds_do_not():
+    """Headless `claude -p` loads the claude-in-chrome MCP only with --chrome; without it apply-job has no browser."""
+    assert "--chrome" in build_command(CFG, "/x", session_id="u", kind="apply")
+    assert "--chrome" not in build_command(CFG, "/x", session_id="u", kind="score")
+    assert build_command(CFG, "/x", session_id="u", kind="apply")[-1] == "/x"
+
+
+def test_apply_result_outcome_failed_is_not_ok():
+    ev = ok_events('RESULT: {"job_id": "j", "outcome": "failed", "status": "queued", "reason": "status applied"}',
+                   mcp_servers=CHROME_OK)
+    out, detail = classify(res_of(ev), CFG, "apply", "j")
+    assert out == "skill_error" and "status applied" in detail
+
+
+def test_apply_failed_for_missing_chrome_is_a_setup_error():
+    ev = ok_events('RESULT: {"job_id": "j", "outcome": "failed", "status": "queued", '
+                   '"reason": "chrome tools unavailable: claude-in-chrome MCP not loaded"}', mcp_servers=CHROME_OK)
+    out, detail = classify(res_of(ev), CFG, "apply", "j")
+    assert out == "auth_required" and "Chrome" in detail
+
+
+
+def test_apply_without_chrome_at_startup_is_a_setup_error_whatever_the_result_says():
+    ev = ok_events('RESULT: {"job_id": "j", "outcome": "staged", "status": "needs_review"}')
+    out, detail = classify(res_of(ev), CFG, "apply", "j")
+    assert out == "auth_required" and "Chrome not connected" in detail
+
+
+def test_apply_with_chrome_connected_at_startup_passes_the_check():
+    ev = ok_events('RESULT: {"job_id": "j", "outcome": "staged", "status": "needs_review"}', mcp_servers=CHROME_OK)
+    assert classify(res_of(ev), CFG, "apply", "j")[0] == "ok"
+
+
+def test_chrome_check_applies_only_to_apply_runs():
+    ev = ok_events('RESULT: {"job_id": "j", "decision": "prepare"}')
+    assert classify(res_of(ev), CFG, "score", "j")[0] == "ok"
