@@ -110,6 +110,14 @@ export interface paths {
     /** Job Detail */
     get: operations["job_detail_api_jobs__job_id__get"];
   };
+  "/api/jobs/{job_id}/failures/reset": {
+    /**
+     * Reset Job Failures
+     * @description Clear the job's run failure count (`careeros run reset-failures`): a job out of retries runs again. Its
+     * out-of-retries Action Items are marked done.
+     */
+    post: operations["reset_job_failures_api_jobs__job_id__failures_reset_post"];
+  };
   "/api/jobs/{job_id}/files/{name}": {
     /** Job File */
     get: operations["job_file_api_jobs__job_id__files__name__get"];
@@ -878,6 +886,23 @@ export interface components {
       /** Value */
       value: string | number | null;
     };
+    /** FailureInfo */
+    FailureInfo: {
+      /** Count */
+      count: number;
+      /** Excluded */
+      excluded: boolean;
+      /** Kind */
+      kind: string;
+      /** Last Detail */
+      last_detail: string | null;
+      /** Last Outcome */
+      last_outcome: string | null;
+      /** Last Run */
+      last_run: string | null;
+      /** Max Attempts */
+      max_attempts: number;
+    };
     /** FieldSchema */
     FieldSchema: {
       /** Control */
@@ -1535,6 +1560,7 @@ export interface components {
       auto_submit: boolean;
       /** Blocked Reason */
       blocked_reason: string | null;
+      failures: components["schemas"]["FailureInfo"] | null;
       /** Force */
       force: boolean;
       /** Next Action */
@@ -1673,6 +1699,11 @@ export interface components {
       verified: {
         [key: string]: unknown;
       } | null;
+    };
+    /** ResetFailuresBody */
+    ResetFailuresBody: {
+      /** Kind */
+      kind?: ("score" | "prepare" | "apply") | null;
     };
     /** ResponseBreakdown */
     ResponseBreakdown: {
@@ -2868,6 +2899,39 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["JobDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Reset Job Failures
+   * @description Clear the job's run failure count (`careeros run reset-failures`): a job out of retries runs again. Its
+   * out-of-retries Action Items are marked done.
+   */
+  reset_job_failures_api_jobs__job_id__failures_reset_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["ResetFailuresBody"] | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */

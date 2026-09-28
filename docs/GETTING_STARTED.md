@@ -276,6 +276,7 @@ Code login, only while you are logged in to your Mac. Nothing runs while the Mac
 ```sh
 .venv/bin/careeros run pause --until +2h --reason "interview prep"   # or an ISO time; no --until = until resume
 .venv/bin/careeros run resume
+.venv/bin/careeros run reset-failures <job_id> --kind apply   # a job out of retries (runs.retry) runs again
 .venv/bin/careeros run catch-up --dry-run   # slots missed while the Mac slept or was off
 .venv/bin/careeros run catch-up             # run them now (once each)
 .venv/bin/careeros run catch-up --dismiss   # or drop them

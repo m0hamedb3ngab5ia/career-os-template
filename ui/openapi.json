@@ -2062,6 +2062,70 @@
         "title": "FacetValue",
         "type": "object"
       },
+      "FailureInfo": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "excluded": {
+            "title": "Excluded",
+            "type": "boolean"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "last_detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Detail"
+          },
+          "last_outcome": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Outcome"
+          },
+          "last_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Last Run"
+          },
+          "max_attempts": {
+            "title": "Max Attempts",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "kind",
+          "count",
+          "max_attempts",
+          "last_outcome",
+          "last_detail",
+          "last_run",
+          "excluded"
+        ],
+        "title": "FailureInfo",
+        "type": "object"
+      },
       "FieldSchema": {
         "properties": {
           "control": {
@@ -4340,6 +4404,16 @@
             ],
             "title": "Blocked Reason"
           },
+          "failures": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/FailureInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "force": {
             "title": "Force",
             "type": "boolean"
@@ -4427,7 +4501,8 @@
           "auto_submit",
           "review_reasons",
           "active_run_id",
-          "queued_in_run"
+          "queued_in_run",
+          "failures"
         ],
         "title": "PipelineState",
         "type": "object"
@@ -4716,6 +4791,28 @@
           "flagged"
         ],
         "title": "Registry",
+        "type": "object"
+      },
+      "ResetFailuresBody": {
+        "properties": {
+          "kind": {
+            "anyOf": [
+              {
+                "enum": [
+                  "score",
+                  "prepare",
+                  "apply"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kind"
+          }
+        },
+        "title": "ResetFailuresBody",
         "type": "object"
       },
       "ResponseBreakdown": {
@@ -8678,6 +8775,68 @@
           }
         },
         "summary": "Job Detail",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/failures/reset": {
+      "post": {
+        "description": "Clear the job's run failure count (`careeros run reset-failures`): a job out of retries runs again. Its\nout-of-retries Action Items are marked done.",
+        "operationId": "reset_job_failures_api_jobs__job_id__failures_reset_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/ResetFailuresBody"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Body"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Reset Job Failures Api Jobs  Job Id  Failures Reset Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Reset Job Failures",
         "tags": [
           "jobs"
         ]

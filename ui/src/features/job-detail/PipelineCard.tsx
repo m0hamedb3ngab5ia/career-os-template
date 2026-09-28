@@ -8,7 +8,7 @@ import { runKeys, useCancelRun, useRunStream } from "../runs/api";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
 import { type ActionKey, help } from "./actionHelp";
-import { errorText, usePipeline, useStartPipeline } from "./api";
+import { errorText, usePipeline, useResetFailures, useStartPipeline } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import type { PipelineState } from "./types";
@@ -88,6 +88,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   // Stream the run we started even before the pipeline reports it (it may end before the first 1s poll).
   const runId = state?.active_run_id ?? started;
   const start = useStartPipeline(jobId);
+  const reset = useResetFailures(jobId);
   const cancel = useCancelRun();
   const stream = useRunStream(runId, runId !== null);
   // The started run's record: 404 until run.json exists, then its status. A finished record means the run ended
@@ -100,7 +101,11 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     refetchInterval: 1000,
   });
   const startedEnded = started !== null && startedRun.data != null && startedRun.data.state !== "running";
-  const startedMissing = started !== null && startedRun.data == null && startedRun.errorUpdateCount >= MAX_MISSING_POLLS;
+  // The server reads the refusal the spawned run printed ("Run <id> did not start: <reason>"): no need to wait.
+  const startRefusal = started !== null && startedRun.error ? errorText(startedRun.error) : "";
+  const refused = startRefusal.includes("did not start");
+  const startedMissing = started !== null && startedRun.data == null &&
+    (refused || startedRun.errorUpdateCount >= MAX_MISSING_POLLS);
 
   useEffect(() => {
     if (state?.active_run_id && started && state.active_run_id !== started) setStarted(null); // another run took the job
@@ -110,6 +115,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     if (started && !stream.ended) {
       const d = startedRun.data;
       setLastEnd(d ? `Run ${d.id} ended: ${d.stop_reason ?? d.status}${d.detail ? ` — ${d.detail}` : ""}`
+                   : refused ? startRefusal
                    : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
     }
     setStarted(null);
@@ -227,7 +233,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           </div>
           <LogPane label="Live run output" lines={lines} empty="Waiting for output…" live />
         </>
-      ) : state.next_action ? (
+      ) : state.next_action && !state.failures?.excluded ? (
         <div className={styles.buttons}>
           <Button
             variant="primary"
@@ -256,6 +262,20 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             {label}
           </Button>
           <span className={styles.sec}>{state.blocked_reason ?? "Nothing left to run for this job."}</span>
+          {state.failures?.excluded ? (
+            <Button
+              title="Clear this job's failure count so runs pick it up again (careeros run reset-failures)"
+              disabled={reset.isPending}
+              onClick={() =>
+                reset.mutate(state.failures?.kind, {
+                  onSuccess: () => { setLastEnd(null); toast.show({ message: "Failures reset" }); },
+                  onError: (e) => toast.show({ message: errorText(e) }),
+                })
+              }
+            >
+              Reset failures
+            </Button>
+          ) : null}
         </div>
       )}
       {state.note ? <Muted>{state.note}</Muted> : null}

@@ -1219,6 +1219,21 @@ def cmd_run_resume(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_run_reset_failures(args: argparse.Namespace) -> int:
+    """Clear a job's failure count so runs pick it up again; resolve its out-of-retries Action Item."""
+    from careeros.runs.service import reset_failures
+
+    out = reset_failures(_settings(args), args.kind, args.job_id)
+    if args.json:
+        print(json.dumps(out, indent=2))
+    elif out["cleared"]:
+        print(f"{args.job_id}: {args.kind} failures reset" +
+              (f"; resolved Action Item(s) {', '.join(out['resolved'])}" if out["resolved"] else ""))
+    else:
+        print(f"{args.job_id}: no {args.kind} failures recorded")
+    return 0
+
+
 def cmd_run_catch_up(args: argparse.Namespace) -> int:
     """Start the pending catch-up (missed scheduled slots, collapsed into one record), or --dismiss it."""
     from careeros.runs.tick import load_catch_up, run_catch_up
@@ -1796,6 +1811,11 @@ def build_parser() -> argparse.ArgumentParser:
     rpz.add_argument("--reason")
     rpz.set_defaults(fn=cmd_run_pause)
     rns.add_parser("resume", help="lift `run pause`").set_defaults(fn=cmd_run_resume)
+    rrf = rns.add_parser("reset-failures", help="clear a job's failure count (a job out of retries runs again)")
+    rrf.add_argument("job_id")
+    rrf.add_argument("--kind", choices=("score", "prepare", "apply"), default="apply")
+    rrf.add_argument("--json", action="store_true")
+    rrf.set_defaults(fn=cmd_run_reset_failures)
     rcu = rns.add_parser("catch-up", help="run the missed scheduled slots (one pending record) now, or --dismiss")
     rcu.add_argument("--dismiss", action="store_true", help="drop the pending catch-up without running it")
     rcu.add_argument("--dry-run", action="store_true", help="show what is pending")
