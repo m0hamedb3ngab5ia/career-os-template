@@ -176,3 +176,136 @@
     min-width: 900px;
   }
 }
+
+/* Column header filter menus (Excel-style) and the active-filter chips row */
+.filterWrap {
+  position: relative;
+  display: inline-flex;
+  margin-left: 4px;
+  vertical-align: middle;
+}
+.filterButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--sec);
+  cursor: pointer;
+  opacity: 0.55;
+}
+.filterButton:hover,
+.filterButton:focus-visible,
+.filterButton[data-active="true"] {
+  opacity: 1;
+}
+.filterButton[data-active="true"] {
+  color: var(--accent, var(--label));
+}
+.filterMenu {
+  top: 24px;
+  left: 0;
+  width: 260px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  font-weight: 400;
+  white-space: normal;
+}
+.filterSort {
+  display: flex;
+  gap: var(--space-2);
+}
+.filterLinks {
+  display: flex;
+  gap: var(--space-3);
+}
+.linkButton {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  font-size: var(--fs-caption);
+  color: var(--accent, var(--label));
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filterList {
+  max-height: 220px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  overflow-y: auto;
+}
+.filterOption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 3px 0;
+  cursor: pointer;
+}
+.filterOptionText {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.filterCount {
+  color: var(--sec);
+  font-size: var(--fs-caption);
+}
+.filterEmpty {
+  color: var(--sec);
+  font-size: var(--fs-caption);
+}
+.filterRange {
+  display: flex;
+  gap: var(--space-2);
+}
+.filterRange label {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.filterActions {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-caption);
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 6px 2px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--sep);
+  background: var(--card);
+}
+.chipRemove {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sec);
+  cursor: pointer;
+}
+.chipRemove:hover {
+  color: var(--label);
+}

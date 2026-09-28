@@ -187,7 +187,15 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    tier A/B/C, safety dot (pass / review / block / skip), QA state, override. Filters: tier, category, safety,
    location. Dragging a card sets status (both `status.json` and the tracker).
 3. **Jobs**: the tracker's Jobs tab as a live table, same columns, inline Status / Override / Notes editing, saved
-   views, search, Export xlsx, Open folder.
+   views, search, Export xlsx, Open folder. **Column filters** (Excel-style): the filter button on a column header
+   opens a menu with sort, a searchable checklist of the column's distinct values with counts (company, location,
+   status, tier, category, safety, ATS, QA passed) or a min..max range (fit, QA score; found, applied, closes dates,
+   inclusive), Apply and Clear. Active filters show as removable chips above the table with Clear all. They live in
+   the URL as `f.<field>=v1,v2` (values URI-encoded) or `f.<field>=min..max` (either side may be empty), and apply
+   to the list, the tab counts and the xlsx export alike. `GET /api/jobs/facets?field=<column>` returns the
+   column's values with counts under every other active filter, so the checklist still shows what else can be
+   picked; the list, tabs and export take the same filters as repeated `<column>` params (`location_in` for exact
+   locations, `location` stays the substring search), `<field>_min` / `_max` and `<date>_from` / `_to`.
 4. **Job detail**: header with status stepper; segments **Safety** (verdict, flags with code, level, detail,
    evidence links; Verify / Flag / Clear), **Score**, **Documents** (résumé PDF, cover letter, answers, QA critic
    scores), **Apply session** (step timeline with screenshots, outcome), **Contacts & outreach** (drafts, relationship

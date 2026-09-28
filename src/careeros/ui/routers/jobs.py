@@ -32,22 +32,68 @@ def _closed(c: Any) -> list[str]:
     return load_ui_config(c.settings).closed
 
 
+def _column_filters(*, company: list[str], location_in: list[str], ats: list[str], qa_passed: list[str],
+                    fit_min: float | None, fit_max: float | None, qa_score_min: float | None,
+                    qa_score_max: float | None, found_from: str | None, found_to: str | None,
+                    applied_from: str | None, applied_to: str | None, closes_from: str | None,
+                    closes_to: str | None) -> dict[str, Any]:
+    """The Excel-style column filters as the service's `values` / `ranges` (status, tier, safety, category keep
+    their own params). `location_in` is exact values; `location` stays the substring search."""
+    return {"values": {"company": company, "location": location_in, "ats": ats, "qa_passed": qa_passed},
+            "ranges": {"fit": (fit_min, fit_max), "qa_score": (qa_score_min, qa_score_max),
+                       "found_at": (found_from, found_to), "applied_at": (applied_from, applied_to),
+                       "closes_at": (closes_from, closes_to)}}
+
+
+_ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
+
+
+def column_filters(company: list[str] = Query(default=[]), location_in: list[str] = Query(default=[]),
+                   ats: list[str] = Query(default=[]), qa_passed: list[str] = Query(default=[]),
+                   fit_min: float | None = None, fit_max: float | None = None, qa_score_min: float | None = None,
+                   qa_score_max: float | None = None,
+                   found_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   found_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   applied_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   applied_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   closes_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   closes_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN)) -> dict[str, Any]:
+    return _column_filters(company=company, location_in=location_in, ats=ats, qa_passed=qa_passed, fit_min=fit_min,
+                           fit_max=fit_max, qa_score_min=qa_score_min, qa_score_max=qa_score_max,
+                           found_from=found_from, found_to=found_to, applied_from=applied_from,
+                           applied_to=applied_to, closes_from=closes_from, closes_to=closes_to)
+
+
 @router.get("/jobs")
 def list_jobs(status: list[str] = Query(default=[]), tier: list[str] = Query(default=[]),
               safety: list[str] = Query(default=[]), category: list[str] = Query(default=[]), q: str | None = None,
               location: str | None = None, sort: str = svc.DEFAULT_SORT, cursor: str | None = None,
               tab: str | None = None,
-              limit: int | None = Query(default=None, ge=1, le=svc.MAX_LIMIT), c=Depends(ctx)) -> svc.JobsPage:
+              limit: int | None = Query(default=None, ge=1, le=svc.MAX_LIMIT), c=Depends(ctx),
+              cols: dict[str, Any] = Depends(column_filters)) -> svc.JobsPage:
     from careeros.ui.config import load_ui_config
 
     return svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q,
                          location=location, sort=sort, cursor=cursor, limit=limit or load_ui_config(c.settings).page_size, tab=tab,
-                         closed=_closed(c))
+                         closed=_closed(c), **cols)
 
 
 @router.get("/jobs/tabs")
-def job_tabs(q: str | None = None, location: str | None = None, c=Depends(ctx)) -> svc.JobsTabs:
-    return {"tabs": svc.tabs(c.index, _closed(c), q=q, location=location)}
+def job_tabs(status: list[str] = Query(default=[]), tier: list[str] = Query(default=[]),
+             safety: list[str] = Query(default=[]), category: list[str] = Query(default=[]), q: str | None = None,
+             location: str | None = None, c=Depends(ctx), cols: dict[str, Any] = Depends(column_filters)) -> svc.JobsTabs:
+    return {"tabs": svc.tabs(c.index, _closed(c), q=q, location=location, status=status, tier=tier, safety=safety,
+                             category=category, **cols)}
+
+
+@router.get("/jobs/facets")
+def job_facets(field: str, status: list[str] = Query(default=[]), tier: list[str] = Query(default=[]),
+               safety: list[str] = Query(default=[]), category: list[str] = Query(default=[]), q: str | None = None,
+               location: str | None = None, tab: str | None = None, c=Depends(ctx),
+               cols: dict[str, Any] = Depends(column_filters)) -> svc.JobFacets:
+    """Distinct values of one column with counts under every other active filter (the header filter menu)."""
+    return svc.facets(c.index, field, closed=_closed(c), q=q, location=location, tab=tab, status=status, tier=tier,
+                      safety=safety, category=category, **cols)
 
 
 class Export(BaseModel):
@@ -57,16 +103,36 @@ class Export(BaseModel):
     location: str | None = None
     status: list[str] = []
     tier: list[str] = []
+    safety: list[str] = []
+    category: list[str] = []
+    company: list[str] = []
+    location_in: list[str] = []
+    ats: list[str] = []
+    qa_passed: list[str] = []
+    fit_min: float | None = None
+    fit_max: float | None = None
+    qa_score_min: float | None = None
+    qa_score_max: float | None = None
+    found_from: str | None = None
+    found_to: str | None = None
+    applied_from: str | None = None
+    applied_to: str | None = None
+    closes_from: str | None = None
+    closes_to: str | None = None
     sort: str = svc.DEFAULT_SORT
     columns: list[str] | None = None
 
 
 @router.post("/jobs/export")
 def export(body: Export, c=Depends(ctx)) -> Response:
+    b = body.model_dump()
+    cols = _column_filters(**{k: b[k] for k in ("company", "location_in", "ats", "qa_passed", "fit_min", "fit_max",
+                                                "qa_score_min", "qa_score_max", "found_from", "found_to",
+                                                "applied_from", "applied_to", "closes_from", "closes_to")})
     raw = svc.export_xlsx(c.index, job_ids=body.job_ids, columns=body.columns, sort=body.sort, closed=_closed(c),
                           **({} if body.job_ids is not None else
                              {"tab": body.tab, "q": body.q, "location": body.location, "status": body.status,
-                              "tier": body.tier}))
+                              "tier": body.tier, "safety": body.safety, "category": body.category, **cols}))
     name = f"careeros-jobs-{datetime.now().strftime('%Y%m%d')}.xlsx"
     return Response(raw, media_type=XLSX, headers={"Content-Disposition": f'attachment; filename="{name}"'})
 

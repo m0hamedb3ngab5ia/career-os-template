@@ -22,12 +22,6 @@ jobs:
       - name: Install
         if: steps.has_pkg.outputs.present == 'yes'
         run: pip install -e ".[test,ui]"
-      - name: Unit tests
-        if: steps.has_pkg.outputs.present == 'yes'
-        run: pytest -q -m unit
-      - name: Integration tests
-        if: steps.has_pkg.outputs.present == 'yes'
-        run: pytest -q -m integration
       - name: Everything + coverage
         if: steps.has_pkg.outputs.present == 'yes'
         run: pytest -q --cov=careeros --cov-report=term-missing
