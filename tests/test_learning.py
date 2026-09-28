@@ -75,6 +75,25 @@ def test_learn_answer_result_passes_doctor_schema_and_qa(s: Settings, root: Path
     assert [c for c in q.checks if c["check"] == "standard_answers"][0]["ok"], q.checks
 
 
+def test_qa_standard_answers_uses_the_posting_companys_learned_answer(s: Settings, root: Path):
+    from careeros.qa import Checker
+
+    q_text = "Which office would you join?"
+    learn_answer(s, question=q_text, answer="Springfield", key="office", scope="company", company="Acme")
+    sa = root / "profile" / "standard_answers.yaml"  # hand-edited: another company, listed first, reuses the key
+    doc = yaml.safe_load(sa.read_text())
+    doc["company_answers"] = {"Globex": [{"key": "office", "match": ["office"], "answer": "Shelbyville"},
+                             *doc["company_answers"]["Acme"]][:1], **doc["company_answers"]}
+    sa.write_text(yaml.safe_dump(doc, sort_keys=False))
+    d = _job(root)  # company Acme
+    for ans, ok in (("Springfield", True), ("Shelbyville", False)):
+        (d / "answers.json").write_text(json.dumps([{"question": q_text, "answer": ans, "type": "standard",
+                                                     "standard_key": "office"}]))
+        q = Checker(d, root)
+        q.check_standard_answers()
+        assert [c for c in q.checks if c["check"] == "standard_answers"][0]["ok"] is ok, (ans, q.checks)
+
+
 def test_learn_answer_records_into_answers_json(s: Settings, root: Path):
     d = _job(root)
     (d / "answers.json").write_text(json.dumps([{"question": "Which office do you prefer?", "answer": None,

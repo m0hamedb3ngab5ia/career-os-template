@@ -973,10 +973,13 @@ class Checker:
                         except re.error:
                             continue
                     patterns.append((str(ent["key"]), rxs))
-            for lst in (sa.get("company_answers") or {}).values():  # learned per-company answers: key lookup only
+            posting_co = str(self.posting.get("company", "")).strip().lower() if isinstance(self.posting, dict) else ""
+            for co, lst in (sa.get("company_answers") or {}).items():  # this posting's company only, tried first
+                if str(co).strip().lower() != posting_co:
+                    continue
                 for ent in lst if isinstance(lst, list) else []:
                     if isinstance(ent, dict) and ent.get("key"):
-                        table.setdefault(str(ent["key"]), ent.get("answer"))
+                        table[str(ent["key"])] = ent.get("answer")
             for k, ent in (sa.get("eeo") or {}).items():
                 if isinstance(ent, dict):
                     table[f"eeo.{k}"] = ent.get("answer")
