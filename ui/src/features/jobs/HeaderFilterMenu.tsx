@@ -42,7 +42,10 @@ export function HeaderFilterMenu({ col, filter, onChange, params, sort, onSortTo
   const [open, setOpen] = useState(false);
   const anchor = useRef<HTMLButtonElement>(null);
   const id = useId();
-  const close = useCallback(() => setOpen(false), []);
+  const close = useCallback(() => {
+    setOpen(false);
+    anchor.current?.focus();
+  }, []);
 
   // Draft state, reset from the applied filter each time the menu opens.
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
@@ -63,13 +66,11 @@ export function HeaderFilterMenu({ col, filter, onChange, params, sort, onSortTo
   function apply() {
     if (kind === "values") onChange(field, picked.size ? { kind: "values", values: [...picked] } : null);
     else onChange(field, min.trim() || max.trim() ? { kind: "range", min: min.trim(), max: max.trim() } : null);
-    setOpen(false);
-    anchor.current?.focus();
+    close();
   }
   function clear() {
     onChange(field, null);
-    setOpen(false);
-    anchor.current?.focus();
+    close();
   }
   const active = !!filter;
   const inputType = kind === "date" ? "date" : "number";

@@ -35,6 +35,13 @@ describe("Jobs URL state", () => {
     expect([...cleared.keys()]).toEqual(["sort"]);
   });
 
+  it("round-trips values with a literal trailing backslash", () => {
+    const filters = { company: { kind: "values" as const, values: ["Acme\\", "Globex"] } };
+    const p = writeView(new URLSearchParams(), { filters });
+    const v = readView(p);
+    expect(v.filters).toEqual(filters);
+  });
+
   it("reads tab, q, sort, hidden columns and selection; ignores junk", () => {
     const v = readView(new URLSearchParams("tab=tier_a&q=data&loc=remote&sort=company&cols=ats,qa,bogus&sel=a1,b2"));
     expect(v).toEqual({

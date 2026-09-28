@@ -53,10 +53,29 @@ export function isFilterField(f: string): f is FilterField {
   return Object.hasOwn(FILTERS, f);
 }
 
+/** Splits on unescaped commas and unescapes "\," and "\\", scanning left to right so a literal trailing
+ *  backslash in one value can never make the following comma look escaped. */
+function splitEscaped(raw: string): string[] {
+  const out: string[] = [];
+  let cur = "";
+  for (let i = 0; i < raw.length; i++) {
+    const c = raw[i];
+    if (c === "\\" && i + 1 < raw.length) {
+      cur += raw[++i];
+    } else if (c === ",") {
+      out.push(cur);
+      cur = "";
+    } else {
+      cur += c;
+    }
+  }
+  out.push(cur);
+  return out;
+}
+
 function readFilter(field: FilterField, raw: string): ColumnFilter | null {
   if (FILTERS[field].kind === "values") {
-    // Split on commas not preceded by a backslash, then unescape "\," back to ",".
-    const values = raw.split(/(?<!\\),/).filter(Boolean).map((v) => v.replace(/\\,/g, ","));
+    const values = splitEscaped(raw).filter(Boolean);
     return values.length ? { kind: "values", values } : null;
   }
   const at = raw.indexOf("..");
@@ -66,7 +85,7 @@ function readFilter(field: FilterField, raw: string): ColumnFilter | null {
 }
 
 function writeFilter(f: ColumnFilter): string {
-  return f.kind === "values" ? f.values.map((v) => v.replace(/,/g, "\\,")).join(",") : `${f.min}..${f.max}`;
+  return f.kind === "values" ? f.values.map((v) => v.replace(/\\/g, "\\\\").replace(/,/g, "\\,")).join(",") : `${f.min}..${f.max}`;
 }
 
 function list(v: string | null): string[] {
