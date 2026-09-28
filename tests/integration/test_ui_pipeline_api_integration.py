@@ -102,6 +102,17 @@ def test_get_pipeline_per_job_state(client, data):
     assert client.get("/api/jobs/nope/pipeline").status_code == 404
 
 
+def test_auto_submit_on_in_config_is_reported_and_drops_the_stage_label(client, data):
+    jid = prepared(data, "queued", tier="B")
+    off = client.get(f"/api/jobs/{jid}/pipeline").json()
+    assert off["auto_submit"] is False and off["next_label"] == "Prepare & stage for review"
+    s = data["settings"]
+    s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}),
+                                         "auto_submit": {"enabled": True, "allow": ["tier_b"], "manual": ["tier_a"]}}}
+    on = client.get(f"/api/jobs/{jid}/pipeline").json()
+    assert on["auto_submit"] is True and on["next_label"] == "Continue pipeline" and on["note"] is None
+
+
 def test_approve_continue_flips_status_logs_and_starts_the_apply_run(client, data, fakes):
     jid = prepared(data, "review", tier="B")
     assert client.get(f"/api/jobs/{jid}/pipeline").json()["next_action"] == "approve_continue"

@@ -11,7 +11,7 @@ from __future__ import annotations
 from typing import Any, Literal, TypedDict
 
 from careeros.runs.policy import is_tier_a
-from careeros.runs.runner import eligibility
+from careeros.runs.runner import HANDS_OFF_OUTCOMES, eligibility
 
 STAGES = ("score", "prepare", "qa", "review", "apply")
 Action = Literal["start", "continue", "approve_continue"]
@@ -20,9 +20,9 @@ LABELS: dict[str, str] = {"start": "Start pipeline", "continue": "Continue pipel
                           "approve_continue": "Approve & continue",
                           "stage_review": "Prepare & stage for review"}  # Tier A apply (assisted)
 TIER_A_NOTE = "Tier A: the run fills and stages the form; you review and submit."
+STAGE_NOTE = "auto_submit is off: the run fills and stages the form; you review and submit."
 APPLY_STAGED = "Application staged in the browser: review and submit it manually (see Apply session)"
-# apply_session.json outcomes after which the browser holds the application: nothing runs again, a human finishes.
-HANDS_OFF_OUTCOMES = ("staged", "submitted", "blocked")
+# HANDS_OFF_OUTCOMES (runner): apply_session.json outcomes after which nothing runs again, a human finishes.
 APPROVE_NOTE = "Approved for apply from the UI"
 # Statuses after which the pipeline has nothing left to run (the job is done, dropped or in the human's hands).
 DONE_STATUSES = ("applied", "skipped", "withdrawn", "screening", "interview", "offer", "rejected", "ghosted")
@@ -99,7 +99,8 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
                   active_run_id: str | None = None, apply_session: dict[str, Any] | None = None,
                   queued_in_run: str | None = None, auto_submit: bool = False) -> PipelineState:
     """Pure: the job's files in, the stage / next action / blocked reason out. `auto_submit` is the config switch
-    (runs.auto_submit.enabled); the UI chains prepare into apply only while it is off (the run never submits)."""
+    (runs.auto_submit.enabled); while it is off every apply is labelled as staging for review (the run never submits)
+    and the UI chains prepare into a plain `continue` apply, never past the Approve gate."""
     status = status or "found"
     score, prepare, session = score or {}, prepare or {}, apply_session or {}
     has_score, qa_pass, tier_a = bool(score), bool(prepare.get("qa_pass")), is_tier_a(score.get("tier"))
@@ -111,8 +112,15 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
 
     def offer(action: Action, kind: str, force: bool = False) -> PipelineState:
         st.update(next_action=action, next_label=LABELS[action], next_kind=kind, force=force)
-        if kind == "apply" and tier_a:  # assisted apply: the run stages the form, the candidate submits
-            st.update(next_label=LABELS["stage_review"], note=TIER_A_NOTE)
+        if kind == "apply" and (tier_a or not auto_submit):  # the run stages the form, the candidate submits
+            st["note"] = TIER_A_NOTE if tier_a else STAGE_NOTE
+            if tier_a or action == "continue":  # the Approve gate keeps its label for B/C: the human approves docs
+                st["next_label"] = LABELS["stage_review"]
+        return st
+
+    def hands_off() -> PipelineState:  # the browser holds the form: running again would refill or re-submit it
+        st["blocked_reason"] = APPLY_STAGED if session["outcome"] == "staged" else \
+            f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
         return st
 
     if active_run_id:
@@ -133,14 +141,12 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
         st["blocked_reason"] = f"Score decision: skip ({score.get('skip_reason') or 'see score.json'})" \
             if why.startswith("score decision") else why
         return st
+    if status in ("needs_review", "queued", "prepared") and session.get("outcome") in HANDS_OFF_OUTCOMES:
+        return hands_off()
     if status == "needs_review":
-        if session.get("outcome") in HANDS_OFF_OUTCOMES:  # the browser holds the form: re-approving would refill it
-            st["blocked_reason"] = APPLY_STAGED if session["outcome"] == "staged" else \
-                f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
-            return st
         return offer("approve_continue", "apply") if qa_pass else offer("continue", "prepare", force=True)
     if status in ("queued", "prepared"):
-        why = eligibility("apply", status, has_score, score, qa_pass)
+        why = eligibility("apply", status, has_score, score, qa_pass, apply_session=session)
         if why is None:
             return offer("continue", "apply")
         st["stage"] = "qa"

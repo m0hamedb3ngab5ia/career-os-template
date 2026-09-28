@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from careeros.ui.services.job_pipeline import APPLY_STAGED, TIER_A_NOTE, compute_state, review_reasons
+from careeros.ui.services.job_pipeline import APPLY_STAGED, STAGE_NOTE, TIER_A_NOTE, compute_state, review_reasons
 
 pytestmark = pytest.mark.unit
 
@@ -47,10 +47,28 @@ def test_tier_a_offers_an_assisted_apply_in_review_and_when_queued():
         st = compute_state(status, SCORE_A, PREPARED, {"pass": True})
         assert (st["next_action"], st["next_kind"], st["blocked_reason"]) == (action, "apply", None), status
         assert st["next_label"] == "Prepare & stage for review" and st["note"] == TIER_A_NOTE, status
-    b = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    b = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
     assert b["note"] is None and b["next_label"] == "Continue pipeline"
     staged = compute_state("needs_review", SCORE_A, PREPARED, {"pass": True}, apply_session={"outcome": "staged"})
     assert staged["next_action"] is None and staged["blocked_reason"] == APPLY_STAGED and staged["note"] is None
+
+
+def test_apply_is_labelled_stage_for_review_for_every_tier_while_auto_submit_is_off():
+    off = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    assert (off["next_label"], off["note"]) == ("Prepare & stage for review", STAGE_NOTE)
+    on = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
+    assert (on["next_label"], on["note"]) == ("Continue pipeline", None)
+    gate = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True})  # the Approve gate keeps its label
+    assert (gate["next_label"], gate["note"]) == ("Approve & continue", STAGE_NOTE)
+    tier_a = compute_state("queued", SCORE_A, PREPARED, {"pass": True}, auto_submit=True)  # never submitted
+    assert (tier_a["next_label"], tier_a["note"]) == ("Prepare & stage for review", TIER_A_NOTE)
+
+
+def test_a_staged_session_blocks_a_queued_job_too():
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, apply_session={"outcome": "staged"})
+    assert (st["next_action"], st["blocked_reason"]) == (None, APPLY_STAGED)
+    st = compute_state("prepared", SCORE_B, PREPARED, {"pass": True}, apply_session={"outcome": "submitted"})
+    assert st["next_action"] is None and st["blocked_reason"].startswith("Application submitted in the browser")
 
 
 def test_auto_submit_switch_is_reported_so_the_ui_only_chains_into_apply_while_it_is_off():
@@ -60,7 +78,7 @@ def test_auto_submit_switch_is_reported_so_the_ui_only_chains_into_apply_while_i
 
 
 def test_queued_with_qa_pass_offers_continue_apply_and_without_it_a_re_prepare():
-    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
     assert act(st) == ("apply", "continue", "apply", False, None) and st["next_label"] == "Continue pipeline"
     assert act(compute_state("queued", SCORE_B, None, None)) == ("qa", "continue", "prepare", True, None)
 

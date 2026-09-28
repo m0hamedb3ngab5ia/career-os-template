@@ -38,7 +38,7 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | Check | Source | On fail |
 |---|---|---|
 | no earlier submit: `ApplySession.already_submitted(job_dir)` is False | `apply_session.json` | outcome failed, reason "submit already clicked in an earlier session; check the ATS by hand"; Action Item type `review`; no browser |
-| status is `queued` (or `prepared`); `needs_review` only when the effective tier (row below) is A (then `auto_submit` is forced off: staging for the candidate) or `prepare.json: qa_pass` is true | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
+| status is `queued` (or `prepared`); `needs_review` only when the effective tier (row below) is A and `prepare.json: qa_pass` is true (then `auto_submit` is forced off: staging for the candidate); a Tier B/C `needs_review` job waits for the human's Approve (status `queued`) | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
 | `qa.json` top-level `pass` is `true` and `deterministic.pass` is `true` (the qa-review schema) | `qa.json` | outcome failed, reason "qa not passed"; no browser |
 | `resume.pdf` exists | job dir | if only `resume.tex`: Action Item type `other` "no PDF; install LaTeX engine (`brew install tectonic`) then rerun /prepare-job"; outcome failed |
 | `cover_letter.txt` exists when tier `cover_letter: always`, or posting requires one | job dir, targets.yaml | outcome failed, reason "cover letter missing" |

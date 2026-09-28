@@ -186,11 +186,19 @@ describe("PipelineCard", () => {
     return api;
   }
 
-  it("chains a prepared Tier A job into the assisted apply while auto_submit is off", async () => {
+  it("never chains past the review gate: Approve & continue stays with the human", async () => {
     const api = await prepareThen({ stage: "review", next_action: "approve_continue", next_kind: "apply",
+                                    next_label: "Prepare & stage for review", auto_submit: false,
+                                    review_reasons: ["tier_a_review: review resume + cover letter"] });
+    expect(await screen.findByRole("button", { name: "Prepare & stage for review" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("chains a prepared job into the staged apply while auto_submit is off", async () => {
+    const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply",
                                     next_label: "Prepare & stage for review", auto_submit: false });
     await waitFor(() => expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(2));
-    expect(api.callsTo("POST /api/jobs/j1/pipeline")[1]?.body).toEqual({ action: "approve_continue" });
+    expect(api.callsTo("POST /api/jobs/j1/pipeline")[1]?.body).toEqual({ action: "continue" });
     expect(await screen.findByText(/Prepared — filling & staging for review…/)).toBeInTheDocument();
     await waitFor(() => expect(FakeEventSource.instances.length).toBe(2));
     expect(FakeEventSource.last.url).toBe("/api/runs/run-2-apply/stream");

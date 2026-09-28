@@ -13,9 +13,6 @@ import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import type { PipelineState } from "./types";
 
-/** The server's label for an assisted (Tier A) apply: fill & stage, the human submits (job_pipeline.LABELS). */
-const STAGE_REVIEW_LABEL = "Prepare & stage for review";
-
 const NEXT_ACTION_HELP_KEY: Record<string, ActionKey> = {
   start: "startPipeline",
   continue: "continuePipeline",
@@ -35,6 +32,15 @@ const KIND_HELP: Record<string, string> = {
   prepare: "Runs prepare-job headless: score, tailored resume, cover letter and QA.",
   apply: "Runs apply-job headless in Chrome: fills the form, then submits or stages it for you per auto_submit.",
 };
+/** apply help by the server's auto_submit switch (job_pipeline.auto_submit): off = every run stages for review. */
+function kindHelp(s: PipelineState): string {
+  if (s.next_kind === "apply") {
+    return s.note != null || !s.auto_submit
+      ? "Runs apply-job headless in Chrome: fills the form and stops before Submit; you review and send it (never auto-submitted)."
+      : "Runs apply-job headless in Chrome: fills the form and submits it (auto_submit is on).";
+  }
+  return KIND_HELP[s.next_kind ?? ""] ?? "";
+}
 const CHAIN_MSG: Record<string, string> = {
   prepare: "Scored — continuing to prepare…",
   apply: "Prepared — filling & staging for review…",
@@ -49,10 +55,11 @@ function chainsToPrepare(s: PipelineState): boolean {
 
 /** True when a state just reached after a prepare run started here should roll on into apply: only while
  * auto_submit is off (the run fills and stages the form, never submits: the human reviews it in the browser),
- * the server offers apply (continue, or approve & continue at the review gate) and nothing blocks the job. */
+ * the server offers a plain continue into apply and nothing blocks the job. Never `approve_continue`: that is
+ * the review gate (Tier A doc review, review_required categories) and only a human click approves it. */
 function chainsToApply(s: PipelineState): boolean {
-  return !s.auto_submit && s.next_kind === "apply" && !s.force && !s.blocked_reason && s.active_run_id == null &&
-    (s.next_action === "continue" || s.next_action === "approve_continue");
+  return !s.auto_submit && s.next_kind === "apply" && s.next_action === "continue" && !s.force &&
+    !s.blocked_reason && s.active_run_id == null;
 }
 
 // Polls of GET /runs/{id} (1s apart) that may 404 before a run the card started is given up on: `careeros run`
@@ -63,7 +70,8 @@ const MAX_MISSING_POLLS = 15;
  * run works on this job, its live output with Cancel. The server decides what can run (job_pipeline.py).
  * A score run started here chains into prepare (score → prepare → QA in one click); while auto_submit is off the
  * prepare run chains on into apply (fill & stage the form for review, never submit), so one click takes a job to
- * a staged form. Chaining stops at a blocked state; "Stop after this stage" turns it off. */
+ * a staged form. Chaining stops at a blocked state or at the review gate (Approve & continue is always a human
+ * click); "Stop after this stage" turns it off. */
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
@@ -218,7 +226,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button
             variant="primary"
             title={(() => {
-              const key = label === STAGE_REVIEW_LABEL ? "stageReview"
+              const key = state.note != null ? "stageReview"
                 : state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
               return key ? help(key).title : label;
             })()}
@@ -228,7 +236,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             {started ? "Starting…" : label}
           </Button>
           <span className={styles.sec}>
-            {chaining ?? KIND_HELP[state.next_kind ?? ""] ?? ""}
+            {chaining ?? kindHelp(state)}
           </span>
         </div>
       ) : (

@@ -415,6 +415,11 @@ def _prepared(store: Store, jid: str, qa_pass: bool = True, status: str = "queue
                                                                  "qa_pass": qa_pass}))
 
 
+def _session(store: Store, jid: str, outcome: str, submit_clicked: bool = False) -> None:
+    (store.job_dir(jid) / "apply_session.json").write_text(json.dumps({"job_id": jid, "outcome": outcome,
+                                                                       "submit_clicked": submit_clicked}))
+
+
 def test_job_ids_selects_only_those_jobs_and_keeps_the_ranking(settings, store):
     ids = [add_job(store, i, hours_old=50 + i * 10) for i in range(1, 4)]
     cfg = cfg_of(settings)
@@ -451,6 +456,17 @@ def test_force_reruns_a_scored_or_prepared_job_but_never_the_wrong_status(settin
     assert eligibility("prepare", "applied", True, prep, True, force=True) == "status applied"
     assert eligibility("prepare", "scored", True, {"decision": "skip"}, False, force=True).startswith("score decision")
     assert eligibility("apply", "applied", True, prep, True, force=True) == "status applied"
+    # needs_review is only a Tier A apply candidate (assisted); B/C wait for the human's Approve (status queued)
+    assert eligibility("apply", "needs_review", True, {"tier": "A"}, True) is None
+    assert eligibility("apply", "needs_review", True, {"tier": "B"}, True) == "status needs_review"
+    assert eligibility("apply", "needs_review", True, {"tier": "B"}, True, force=True) == "status needs_review"
+    # the browser holds the form (apply_session.json): never refill or re-submit, whatever the status
+    for outcome in ("staged", "submitted", "blocked"):
+        assert eligibility("apply", "queued", True, prep, True,
+                           apply_session={"outcome": outcome}) == f"application {outcome} in the browser"
+    assert eligibility("apply", "queued", True, prep, True,
+                       apply_session={"outcome": "failed", "submit_clicked": True}) == "submit already clicked"
+    assert eligibility("apply", "queued", True, prep, True, apply_session={"outcome": "failed"}) is None
 
 
 def test_force_selects_an_already_scored_job(settings, store):
@@ -468,10 +484,17 @@ def test_force_selects_an_already_scored_job(settings, store):
     (lambda s, j: _prepared(s, j, qa_pass=False), "qa not passed"),
     (lambda s, j: _scored(s, j), "status scored"),
     (lambda s, j: _prepared(s, j, status="applied"), "status applied"),
-    (lambda s, j: _prepared(s, j, status="needs_review"), None),  # human-approved / Tier A after prepare-job
+    (lambda s, j: _prepared(s, j, status="needs_review"), "status needs_review"),  # Tier C: waits for Approve
     (lambda s, j: _prepared(s, j, status="needs_review", qa_pass=False), "status needs_review"),
     (lambda s, j: _prepared(s, j, tier="A"), None),  # Tier A is staged for review, never refused
     (lambda s, j: _prepared(s, j, tier="a", status="needs_review"), None),
+    (lambda s, j: _prepared(s, j, tier="B", status="needs_review"), "status needs_review"),  # waits for Approve
+    (lambda s, j: (_prepared(s, j, tier="A", status="needs_review"), _session(s, j, "staged")),
+     "application staged in the browser"),
+    (lambda s, j: (_prepared(s, j), _session(s, j, "submitted")), "application submitted in the browser"),
+    (lambda s, j: (_prepared(s, j), _session(s, j, "blocked")), "application blocked in the browser"),
+    (lambda s, j: (_prepared(s, j), _session(s, j, "failed", submit_clicked=True)), "submit already clicked"),
+    (lambda s, j: (_prepared(s, j), _session(s, j, "failed")), None),  # a failed attempt may be retried
 ])
 def test_apply_eligibility(settings, store, setup, reason):
     jid = add_job(store, 1)
@@ -481,6 +504,21 @@ def test_apply_eligibility(settings, store, setup, reason):
         assert [r["job_id"] for r in ranked] == [jid]
     else:
         assert ranked == [] and excluded == [{"job_id": jid, "reason": reason}]
+
+
+def test_batch_apply_skips_tier_b_needs_review_and_staged_jobs_even_with_auto_submit_on(settings, store):
+    """A scheduled `run apply` (no --job) never picks a Tier B/C job prepare-job parked in needs_review (only the
+    human's Approve moves it to queued) nor a job whose form is already staged in the browser."""
+    parked = add_job(store, 1)
+    _prepared(store, parked, tier="B", status="needs_review")
+    staged = add_job(store, 2)
+    _prepared(store, staged, tier="A", status="needs_review")
+    _session(store, staged, "staged")
+    ready = add_job(store, 3)
+    _prepared(store, ready, tier="B")
+    cfg = cfg_of(settings, auto_submit={"enabled": True, "allow": ["tier_b", "tier_c"], "manual": ["tier_a"]})
+    ranked, _ = select_candidates(settings, "apply", cfg, NOW)
+    assert [r["job_id"] for r in ranked] == [ready]
 
 
 @pytest.mark.parametrize("status", ["queued", "needs_review"])
