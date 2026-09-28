@@ -41,6 +41,17 @@ class PipelineState(TypedDict):
     review_reasons: list[str]
     active_run_id: str | None
     queued_in_run: str | None  # a batch run that will get to this job later (no Cancel: it would kill the batch)
+    failures: FailureInfo | None  # the next kind's failure count (runs/failures.py); excluded -> blocked until reset
+
+
+class FailureInfo(TypedDict):
+    kind: str
+    count: int
+    max_attempts: int
+    last_outcome: str | None
+    last_detail: str | None
+    last_run: str | None
+    excluded: bool
 
 
 class NotRunnable(RuntimeError):
@@ -97,7 +108,8 @@ def review_reasons(qa: dict[str, Any] | None, prepare: dict[str, Any] | None,
 def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dict[str, Any] | None,
                   qa: dict[str, Any] | None, open_actions: list[str] | None = None,
                   active_run_id: str | None = None, apply_session: dict[str, Any] | None = None,
-                  queued_in_run: str | None = None, auto_submit: bool = False) -> PipelineState:
+                  queued_in_run: str | None = None, auto_submit: bool = False,
+                  failures: FailureInfo | None = None) -> PipelineState:
     """Pure: the job's files in, the stage / next action / blocked reason out. `auto_submit` is the config switch
     (runs.auto_submit.enabled); while it is off every apply is labelled as staging for review (the run never submits)
     and the UI chains prepare into a plain `continue` apply, never past the Approve gate."""
@@ -108,10 +120,15 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
                          "next_kind": None, "force": False, "blocked_reason": None, "note": None,
                          "auto_submit": auto_submit,
                          "review_reasons": review_reasons(qa, prepare, open_actions or [], session),
-                         "active_run_id": active_run_id, "queued_in_run": queued_in_run}
+                         "active_run_id": active_run_id, "queued_in_run": queued_in_run, "failures": None}
 
     def offer(action: Action, kind: str, force: bool = False) -> PipelineState:
         st.update(next_action=action, next_label=LABELS[action], next_kind=kind, force=force)
+        if failures and failures.get("kind") == kind:
+            st["failures"] = failures
+            if failures.get("excluded"):  # the runner skips it (runs/service.py): Reset failures runs it again
+                st["blocked_reason"] = (f"Failed {failures['count']} times (last: {failures.get('last_outcome')}): "
+                                        "runs skip this job until you reset its failures")
         if kind == "apply" and (tier_a or not auto_submit):  # the run stages the form, the candidate submits
             st["note"] = TIER_A_NOTE if tier_a else STAGE_NOTE
             if tier_a or action == "continue":  # the Approve gate keeps its label for B/C: the human approves docs
@@ -173,16 +190,36 @@ def pipeline_state(settings: Any, job_id: str, rc: Any) -> PipelineState:
     from careeros.runs.config import load_runs_config
     from careeros.runs.policy import AutoSubmitPolicy
     from careeros.store import Store
+    from careeros.runs.failures import Failures
+    from careeros.runs.policy import load_retry_config
+    from careeros.runs.store import RunStore
     from careeros.ui.services.job_actions import _job
 
     _job(settings, job_id)  # LookupError -> 404
     store = Store(settings)
-    auto_submit = AutoSubmitPolicy.from_config(load_runs_config(settings).raw).enabled
-    return compute_state(store.get_status(job_id), store._read(job_id, "score.json"),
-                         store._read(job_id, "prepare.json"), store._read(job_id, "qa.json"),
-                         open_action_items(settings, job_id), rc.active_run_for(job_id),
-                         apply_session=store._read(job_id, "apply_session.json"),
-                         queued_in_run=rc.queued_in_run(job_id), auto_submit=auto_submit)
+    raw = load_runs_config(settings).raw
+    auto_submit = AutoSubmitPolicy.from_config(raw).enabled
+    args = (store.get_status(job_id), store._read(job_id, "score.json"), store._read(job_id, "prepare.json"),
+            store._read(job_id, "qa.json"), open_action_items(settings, job_id), rc.active_run_for(job_id))
+    kw = dict(apply_session=store._read(job_id, "apply_session.json"), queued_in_run=rc.queued_in_run(job_id),
+              auto_submit=auto_submit)
+    st = compute_state(*args, **kw)
+    fails = Failures(RunStore(settings)).status(st["next_kind"], job_id, load_retry_config(raw)["max_attempts"]) \
+        if st["next_kind"] else None
+    return compute_state(*args, **kw, failures=fails) if fails else st
+
+
+def reset_failures(settings: Any, job_id: str, kind: str | None = None) -> dict[str, Any]:
+    """POST /jobs/{id}/failures/reset: clear the job's failure count (default: every run kind) and resolve its
+    out-of-retries Action Items (runs/service.reset_failures). {job_id, cleared: [kinds], resolved: [ids]}."""
+    from careeros.runs.runner import SKILLS
+    from careeros.runs.service import reset_failures as reset
+    from careeros.ui.services.job_actions import _job
+
+    _job(settings, job_id)  # LookupError -> 404
+    outs = [reset(settings, k, job_id) for k in ([kind] if kind else list(SKILLS))]
+    return {"job_id": job_id, "cleared": [o["kind"] for o in outs if o["cleared"]],
+            "resolved": [i for o in outs for i in o["resolved"]]}
 
 
 def start_pipeline(settings: Any, job_id: str, action: str, rc: Any, force: bool = False) -> dict[str, Any]:
@@ -198,7 +235,7 @@ def start_pipeline(settings: Any, job_id: str, action: str, rc: Any, force: bool
     st = pipeline_state(settings, job_id, rc)
     fits = st["next_action"] is not None and (action == st["next_action"]
                                               or {action, st["next_action"]} <= {"start", "continue"})
-    if not fits:
+    if not fits or (st["failures"] or {}).get("excluded"):
         raise NotRunnable(st["blocked_reason"] or "Nothing to run for a job with status "
                                                   f"{Store(settings).get_status(job_id) or 'found'}")
     if action == "approve_continue":

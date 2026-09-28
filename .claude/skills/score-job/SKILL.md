@@ -11,6 +11,8 @@ You are a deterministic-as-possible classifier. Do not browse the web. Do not in
 profile does not have. Every number you write must follow the rubric below so that two runs on the
 same posting give the same score (+/- 3).
 
+Shell: one command per Bash call. Runs start this skill headless with `--permission-mode dontAsk` and an allowlist (`.venv/bin/careeros *`, `.venv/bin/python *`, `date *`); a chain (`;`, `&&`, `|`) or an `echo $?` has an unlisted part and the whole call is denied. Read the exit code from the tool result.
+
 ## 1. Read inputs
 
 1. `JOB/posting.json` (fields: job_id, company, title, location, url, apply_url, ats,

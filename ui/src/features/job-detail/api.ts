@@ -82,6 +82,20 @@ export function usePipeline(id: string, poll = false) {
   });
 }
 
+/** POST /jobs/{id}/failures/reset: clear the job's run failure count (a job out of retries runs again) and resolve
+ * its out-of-retries Action Items. */
+export function useResetFailures(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (kind?: string | null) =>
+      apiSend<{ job_id: string; cleared: string[]; resolved: string[] }>("POST", `${jobPath(id)}/failures/reset`,
+        kind ? { kind } : {}),
+    onSettled: () => {
+      for (const queryKey of [pipelineKey(id), ["job", id], ["actions"], ["status"]]) void qc.invalidateQueries({ queryKey });
+    },
+  });
+}
+
 export function useStartPipeline(id: string) {
   const qc = useQueryClient();
   return useMutation({

@@ -21,3 +21,13 @@ Resolve by deleting the bundle and rebuilding, never by hand-merging: `git rm -r
 rm -rf src/careeros/ui/static && (cd ui && npx -p node@22 -- npm run build)`; then
 `CAREEROS_UPDATE_SNAPSHOTS=1 pytest tests/integration/test_ui_types_*` and inspect the snapshot diff.
 Merge UI PRs one at a time and re-merge `main` into the next before its CI run.
+
+## 2026-09-28 — Headless run denied a chained Bash call
+Context: `careeros run apply` launches skills with `claude -p --permission-mode dontAsk --allowedTools ...`.
+What happened: the apply-job agent ran `careeros doctor --quiet; echo "doctor=$?"; ...`; `echo` is not allowlisted, so the whole call was denied, the skill stopped with RESULT status `unchanged`, and the run showed "completed, 1 job(s) done" with nothing applied.
+Root cause: skills didn't forbid chaining; classify ranked invalid_result over the denial; completed detail hid failures.
+Prevention: skills say "one command per Bash call" (contract test); a denial behind an invalid RESULT is `permission_denied`.
+Scope: repo
+Occurrences: 1
+Confidence: high
+Status: active

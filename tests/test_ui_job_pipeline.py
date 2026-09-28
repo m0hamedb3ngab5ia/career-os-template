@@ -145,3 +145,14 @@ def test_a_job_queued_in_a_batch_is_blocked_without_an_active_run():
     assert st["next_action"] is None and st["active_run_id"] is None
     assert st["queued_in_run"] == "20260927-100000-prepare-ab12"
     assert st["blocked_reason"] == "Queued in batch run 20260927-100000-prepare-ab12"
+
+
+def test_a_job_out_of_retries_is_blocked_with_the_failures_and_a_reset_hint():
+    fails = {"kind": "apply", "count": 2, "max_attempts": 2, "last_outcome": "invalid_result",
+             "last_detail": "bad", "last_run": "r2", "excluded": True}
+    st = compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None, failures=fails)
+    assert st["failures"] == fails and st["next_kind"] == "apply"
+    assert st["blocked_reason"] == "Failed 2 times (last: invalid_result): runs skip this job until you reset its failures"
+    st = compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None, failures={**fails, "count": 1, "excluded": False})
+    assert st["blocked_reason"] is None and st["failures"]["count"] == 1
+    assert compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None)["failures"] is None

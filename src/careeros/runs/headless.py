@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from careeros.runs.config import RunsConfig, allowed_tools_for
+from careeros.runs.config import KIND_FLAGS, RunsConfig, allowed_tools_for
 
 OUTCOMES = ("ok", "usage_limit", "auth_required", "permission_denied", "timeout", "cancelled", "skill_error",
             "invalid_result", "error", "time_budget")  # time_budget: the runner cut the job at the run's budget
@@ -50,6 +50,7 @@ class HeadlessResult:
     cancelled: bool = False
     session_id: str | None = None
     saw_result: bool = False
+    saw_init: bool = False
     result_text: str = ""
     is_error: bool = False
     subtype: str | None = None
@@ -78,6 +79,7 @@ def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, k
     tools = allowed_tools_for(cfg, kind)
     if tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
         cmd += ["--allowedTools", ",".join(tools)]
+    cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
     if cfg.model and "--model" not in cmd:
         cmd += ["--model", cfg.model]
     if session_id and "--session-id" not in cmd:
@@ -102,6 +104,7 @@ def feed(r: HeadlessResult, line: str) -> None:
     r.session_id = ev.get("session_id") or r.session_id
     kind = ev.get("type")
     if kind == "system" and ev.get("subtype") == "init":
+        r.saw_init = True
         for s in ev.get("mcp_servers") or []:
             if isinstance(s, dict) and s.get("name"):
                 r.mcp_status[str(s["name"])] = str(s.get("status") or "")
@@ -169,6 +172,11 @@ def _matches(patterns: list[str], text: str) -> bool:
     return any(re.search(p, text, re.I) for p in patterns)
 
 
+def chrome_connected(r: HeadlessResult) -> bool:
+    """True when the init event listed the claude-in-chrome MCP server as connected."""
+    return any("chrome" in name.lower() and st == "connected" for name, st in r.mcp_status.items())
+
+
 def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tuple[str, str]:
     """(outcome, detail). `detail` is for humans; it never carries a reset time parsed from text."""
     if r.cancelled:
@@ -184,6 +192,9 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
                         for name, st in r.mcp_status.items())]
     if need_auth:
         return "auth_required", f"MCP server(s) {', '.join(need_auth)} need auth: run `claude` and /mcp once"
+    if stage == "apply" and r.saw_init and not chrome_connected(r):
+        return "auth_required", ("Chrome not connected (claude-in-chrome MCP missing at startup): open Chrome, "
+                                 "check the Claude extension is on and signed in, then rerun")
     res = parse_result_line(r.result_text) if r.saw_result else None
     failed = r.is_error or (r.exit_code not in (0, None)) or not r.saw_result
     if failed and res is None:
@@ -202,18 +213,29 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
         return "invalid_result", "no RESULT line in the skill output"
     probs = validate_result(stage, job_id, res)
     if probs:
+        if r.permission_denials:  # the denial made the skill stop early: a setup error, not the job's fault
+            return "permission_denied", _denied(r)
         return "invalid_result", "; ".join(probs)
     if "error" in res:
         if "mcp_unavailable" in str(res["error"]).lower():
             return "auth_required", f"the skill could not use its MCP server ({res['error']}): run `claude`, /mcp"
         return "skill_error", str(res["error"])[:200]
+    if stage == "apply" and res.get("outcome") == "failed":
+        reason = str(res.get("reason") or "")
+        if re.search(r"chrome|mcp", reason, re.I):
+            return "auth_required", (f"Chrome not connected ({reason[:120]}): open Chrome, check the Claude "
+                                     "extension is on and signed in, then rerun")
+        return "skill_error", reason[:200] or "apply-job failed"
     return "ok", ""
 
 
 def _denied(r: HeadlessResult) -> str:
     tools = sorted({str(d.get("tool_name")) for d in r.permission_denials})
-    return (f"tool(s) denied: {', '.join(tools)}; add them to pipeline.yaml llm.allowed_tools if the skill "
-            "needs them")
+    cmds = [str((d.get("tool_input") or {}).get("command"))[:160] for d in r.permission_denials
+            if isinstance(d.get("tool_input"), dict) and d["tool_input"].get("command")]
+    seen = f" (command: {cmds[0]})" if cmds else ""
+    return (f"tool(s) denied: {', '.join(tools)}{seen}; add them to pipeline.yaml llm.allowed_tools if the skill "
+            "needs them, or run one command per Bash call")
 
 
 # --------------------------------------------------------------------------------------------------------

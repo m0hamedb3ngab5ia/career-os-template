@@ -230,6 +230,20 @@ def test_fake_data_guard_runs_doctor_first(skill: str):
     assert "nonzero" in body[guard - 400: guard + 600].lower() or "non-zero" in body[guard - 400: guard + 600].lower()
 
 
+@pytest.mark.parametrize("skill", ["score-job", "prepare-job", "apply-job"])
+def test_headless_skills_run_one_command_per_bash_call(skill: str):
+    """Runs call these skills with `--permission-mode dontAsk` and an allowlist; a chain like
+    `careeros doctor; echo $?` has an unlisted part, so the whole call is denied."""
+    text = (ROOT / ".claude" / "skills" / skill / "SKILL.md").read_text(encoding="utf-8")
+    assert "one command per Bash call" in text
+
+
+def test_apply_job_early_stop_result_keeps_the_real_status():
+    text = (ROOT / ".claude" / "skills" / "apply-job" / "SKILL.md").read_text(encoding="utf-8")
+    guard = text.split("## Setup guard", 1)[1].split("## 0.", 1)[0]
+    assert "status.json" in guard and "never `unchanged`" in guard
+
+
 def test_user_docs_exist_and_link():
     readme = (ROOT / "README.md").read_text(encoding="utf-8")
     assert (ROOT / "docs" / "GETTING_STARTED.md").is_file()

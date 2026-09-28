@@ -45,10 +45,23 @@ class Failures:
         self._save(data)
         return e["count"]
 
-    def clear(self, kind: str, job_id: str) -> None:
+    def status(self, kind: str, job_id: str, max_attempts: int) -> dict[str, Any] | None:
+        """The job's failures for `kind` ({kind, count, max_attempts, last_*, excluded}), None when it has none.
+        `excluded`: out of attempts, runs skip it until `careeros run reset-failures`."""
+        e = self.get(kind, job_id)
+        if not e or not e.get("count"):
+            return None
+        return {"kind": kind, "count": e["count"], "max_attempts": max_attempts,
+                "last_outcome": e.get("last_outcome"), "last_detail": e.get("last_detail"),
+                "last_run": e.get("last_run"), "excluded": e["count"] >= max_attempts}
+
+    def clear(self, kind: str, job_id: str) -> bool:
+        """Drop the job's entry; True when there was one."""
         data = self._load()
         if data.pop(self.key(kind, job_id), None) is not None:
             self._save(data)
+            return True
+        return False
 
     def retry_ids(self, kind: str, max_attempts: int) -> set[str]:
         """Jobs that failed before but have attempts left: they get the ranking's retry bonus."""

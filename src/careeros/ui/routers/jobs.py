@@ -254,6 +254,20 @@ def start_job_pipeline(job_id: str, body: PipelineBody, request: Request, c=Depe
     return PipelineStarted(**out)
 
 
+class ResetFailuresBody(BaseModel):
+    kind: Literal["score", "prepare", "apply"] | None = None
+
+
+@router.post("/jobs/{job_id}/failures/reset")
+def reset_job_failures(job_id: str, body: ResetFailuresBody | None = None, c=Depends(ctx)) -> dict[str, Any]:
+    """Clear the job's run failure count (`careeros run reset-failures`): a job out of retries runs again. Its
+    out-of-retries Action Items are marked done."""
+    with refusals():
+        out = pipe.reset_failures(c.settings, job_id, body.kind if body else None)
+    after_write(c, jobs=[job_id], tracker=True)
+    return out
+
+
 @router.post("/jobs/{job_id}/qa")
 def rerun_qa(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():

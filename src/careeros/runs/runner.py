@@ -374,7 +374,8 @@ class _Loop:
             if outcome != "ok" and streak >= self.cfg.max_consecutive_failures:
                 return "consecutive_failures", f"{streak} failures in a row (last: {outcome}: {att['detail']})"
             locks.refresh(self.rs.runner_lock_path, self.lock_token, self.lock_ttl, now=self.now())
-        return "completed", f"{self.c['attempted']} job(s) done, nothing left in the queue"
+        return "completed", (f"{self.c['attempted']} job(s) tried ({self.c['ok']} ok, {self.c['failed']} failed), "
+                             "nothing left in the queue")
 
 
 def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig | None = None,

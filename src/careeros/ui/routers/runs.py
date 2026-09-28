@@ -95,7 +95,8 @@ def detail(run_id: str, rc: RunControl = Depends(run_control)) -> view.RunDetail
     with refusals():
         d = view.detail_view(rc, run_id)
     if d is None:
-        raise HTTPException(404, f"no run {run_id!r}")
+        err = rc.start_error(run_id)  # a job run started here that refused before writing run.json
+        raise HTTPException(404, f"Run {run_id} did not start: {err}" if err else f"no run {run_id!r}")
     return d
 
 

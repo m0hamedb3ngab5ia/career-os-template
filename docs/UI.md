@@ -238,13 +238,17 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
      skip due slots (not stored up).
    - **History**: past runs from `data/runs/<id>/run.json`: kind, trigger, ok/attempted, duration, and a
      stop-reason chip; a row opens the attempts (job, outcome, duration, session id, detail) and `run.log`.
+   Job detail > Pipeline: a job that failed `runs.retry.max_attempts` times is skipped by runs; its button is
+   disabled with the count and last outcome, and **Reset failures** (`POST /api/jobs/{id}/failures/reset`, same as
+   `careeros run reset-failures <job_id>`) clears the count and marks its out-of-retries Action Item done. A run
+   that refuses before writing its record shows its own reason (`GET /api/runs/{id}` 404 detail).
 
    Stop-reason chips (label, then meaning). Neutral chips mean the run did its job; orange chips mean it needs you,
    and the chip carries the fix:
 
    | Stop reason | Chip | Means / fix |
    |---|---|---|
-   | `completed` | Done | nothing left in the queue |
+   | `completed` | Done | nothing left in the queue; the detail counts ok vs failed jobs |
    | `budget_reached` | Job budget used | the preset's job count is done; the rest wait for the next run |
    | `time_budget` | Time budget used | the preset's minutes are spent (the job in flight is cut at the budget too) |
    | `daily_cap` | Daily cap reached | prepared jobs fill today's apply cap |

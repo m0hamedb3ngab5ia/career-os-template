@@ -11,11 +11,14 @@ Never type anything that is not in the profile, standard answers, answers.json, 
 
 Argument: `data/jobs/<job_id>` (absolute or repo-relative). Everything below refers to files in it.
 
+Shell: one command per Bash call. Runs start this skill headless with `--permission-mode dontAsk` and an allowlist (`.venv/bin/careeros *`, `.venv/bin/python *`, `date *`); a chain (`;`, `&&`, `|`) or an `echo $?` has an unlisted part and the whole call is denied. Read the exit code from the tool result.
+
 ## Setup guard (before anything else)
 
 Run `.venv/bin/careeros doctor --quiet` first. If it exits nonzero, STOP before opening a browser:
 print its FAIL lines and a `RESULT` with `outcome: failed`, reason `setup: careeros doctor failed`.
 Never submit with the example candidate's data (Alex Example) or a half-configured profile.
+Every early-stop `RESULT` in this section and in section 1 carries `status`: the job's current status from `status.json`, as is (never `unchanged` or any value not in `applied | needs_review | queued | prepared | skipped`).
 
 Job lock (next): `.venv/bin/careeros job lock <job_id> --owner apply-job --json`. Exit 6 means a run or another
 session is working on this job: STOP before opening a browser, change nothing, print a `RESULT` with

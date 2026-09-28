@@ -12,6 +12,7 @@ signalled: Pause all stops it before its next job.
 """
 from __future__ import annotations
 
+import json
 import os
 import re
 import signal
@@ -235,7 +236,13 @@ class RunControl:
         if job_id:
             from careeros.runs.runner import JobNotRunnable, new_run_id, select_candidates
 
-            ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force)
+            from careeros.runs.failures import Failures
+            from careeros.runs.policy import load_retry_config
+
+            # the runner leaves a job out of retries to its Action Item: refuse it here, not in the detached child
+            skip = Failures(self.rs).exhausted(kind, load_retry_config(cfg.raw)["max_attempts"])
+            ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force,
+                                                 skip_ids=skip)
             if not ranked:
                 raise JobNotRunnable(kind, {e["job_id"]: e["reason"] for e in excluded})
             run_id = new_run_id(kind, self.now())
@@ -249,8 +256,22 @@ class RunControl:
             argv += ["--max-minutes", f"{max_minutes:g}"]
         if job_id:
             argv += ["--job", job_id, *(["--force"] if force else []), "--run-id", run_id]
-        out = {"kind": kind, **self._spawn(kind, [*argv, "--json"])}
+        out = {"kind": kind, **self._spawn(run_id or kind, [*argv, "--json"])}
         return {**out, "run_id": run_id} if job_id else out
+
+    def start_error(self, run_id: str) -> str | None:
+        """The refusal a job run started here printed before writing any run record (`careeros run --json` prints
+        {"error": ...} to its .out file), else None."""
+        if not re.fullmatch(r"\w[\w.-]*", run_id or ""):  # a run id, never a path or a glob
+            return None
+        for f in sorted((self.rs.dir / "ui").glob(f"*-{run_id}.out"), reverse=True):
+            try:
+                data = json.loads(f.read_text(encoding="utf-8", errors="replace"))
+            except (OSError, ValueError):
+                continue
+            if isinstance(data, dict) and data.get("error"):
+                return str(data["error"])
+        return None
 
     def active_run_for(self, job_id: str) -> str | None:
         """The id of the running batch whose job in flight (its job lock) is this job, else None. A job that is

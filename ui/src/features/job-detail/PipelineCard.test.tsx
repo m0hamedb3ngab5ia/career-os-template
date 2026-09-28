@@ -20,6 +20,7 @@ const base: PipelineState = {
   review_reasons: [],
   active_run_id: null,
   queued_in_run: null,
+  failures: null,
 };
 
 let restore: () => void;
@@ -307,5 +308,28 @@ describe("PipelineCard", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
     expect(await screen.findByText("Another run is already running (prepare, pid 4).")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+  });
+
+  it("disables the button for a job out of retries and resets its failures", async () => {
+    const failures = { kind: "apply", count: 2, max_attempts: 2, last_outcome: "invalid_result", last_detail: "bad",
+      last_run: "r2", excluded: true };
+    const reason = "Failed 2 times (last: invalid_result): runs skip this job until you reset its failures";
+    const api = setup({ next_kind: "apply", blocked_reason: reason, failures }, {
+      "POST /api/jobs/j1/failures/reset": { job_id: "j1", cleared: ["apply"], resolved: ["A1"] },
+    });
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeDisabled();
+    expect(screen.getByText(reason)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Reset failures" }));
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/j1/failures/reset").length).toBe(1));
+  });
+
+  it("shows the run's own refusal when it never wrote a run record", async () => {
+    setup({ next_action: "continue", next_kind: "apply" }, {
+      "POST /api/jobs/j1/pipeline": { run_id: "20260927-100000-apply-ab12", kind: "apply" },
+      "GET /api/runs/20260927-100000-apply-ab12": { status: 404, body: {
+        detail: "Run 20260927-100000-apply-ab12 did not start: run apply: j1: status skipped" } },
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    expect(await screen.findByText(/did not start: run apply: j1: status skipped/)).toBeInTheDocument();
   });
 });

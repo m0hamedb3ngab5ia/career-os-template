@@ -102,6 +102,27 @@ def pause_after_usage_limit(settings: Settings, cfg: RunsConfig, run: dict[str, 
     return True
 
 
+def reset_failures(settings: Settings, kind: str, job_id: str) -> dict[str, Any]:
+    """`careeros run reset-failures`: clear the job's failure count for `kind` (runs pick it up again) and mark
+    done the open out-of-retries Action Items this module added for it. {kind, job_id, cleared, resolved: [ids]}."""
+    from careeros.tracker import Tracker
+
+    if kind not in SKILLS:
+        raise ValueError(f"unknown run kind {kind!r}; use {', '.join(SKILLS)}")
+    cleared = Failures(RunStore(settings)).clear(kind, job_id)
+    prefix = f"careeros run: /{SKILLS[kind]} failed "
+    resolved: list[str] = []
+    try:
+        tr = Tracker(settings=settings)
+        for item in tr.list_action_items(open_only=True):
+            if str(item.get("JobID") or "") == job_id and str(item.get("What to do") or "").startswith(prefix) \
+                    and tr.mark_action_done(str(item["ID"])) is not False:
+                resolved.append(str(item["ID"]))
+    except Exception:  # noqa: BLE001 - a locked or missing tracker must not undo the reset
+        pass
+    return {"kind": kind, "job_id": job_id, "cleared": cleared, "resolved": resolved}
+
+
 def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig | None = None,
               trigger: str = "manual", dry_run: bool = False, invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, clock: Callable[[], float] = time.monotonic, cancel=None,

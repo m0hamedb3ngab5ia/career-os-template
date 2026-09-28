@@ -873,3 +873,34 @@ def test_active_run_for_is_only_the_job_in_flight_and_queued_jobs_are_reported_a
     assert rc.active_run_for(jid) == run["id"] and rc.queued_in_run(jid) is None
     assert rc.active_run_for(other) is None and rc.queued_in_run(other) == run["id"]
     assert rc.active_run_for("nope") is None and rc.queued_in_run("nope") is None
+
+
+def _exhaust(settings, kind, jid, n=2):
+    from careeros.runs.failures import Failures
+    from careeros.runs.store import RunStore
+
+    for _ in range(n):
+        Failures(RunStore(settings)).record(kind, jid, "invalid_result", "bad json", "r1", NOW)
+
+
+def test_start_one_job_refuses_a_job_out_of_retries_before_spawning(rc, settings):
+    from careeros.runs.runner import JobNotRunnable
+
+    (jid,) = add_jobs(settings, 1)
+    _exhaust(settings, "score", jid)
+    with pytest.raises(JobNotRunnable) as e:
+        rc.start("score", job_id=jid)
+    assert e.value.reasons == {jid: "failed 2 times (last: invalid_result); see Action Items"}
+    assert FakePopen.calls == []
+
+
+def test_start_error_reads_the_refusal_the_spawned_run_wrote(rc, settings):
+    (jid,) = add_jobs(settings, 1)
+    out = rc.start("score", job_id=jid)
+    assert out["run_id"] in Path(out["output"]).name
+    assert rc.start_error(out["run_id"]) is None  # nothing written yet
+    Path(out["output"]).write_text('{"error": "run score: x: status skipped", "kind": "score"}\n')
+    assert rc.start_error(out["run_id"]) == "run score: x: status skipped"
+    Path(out["output"]).write_text("Traceback ...\n")
+    assert rc.start_error(out["run_id"]) is None
+    assert rc.start_error("../etc") is None and rc.start_error("nope") is None
