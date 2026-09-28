@@ -38,7 +38,7 @@ Read `posting.json`, `score.json`, `status.json`, `qa.json`, `config/targets.yam
 | Check | Source | On fail |
 |---|---|---|
 | no earlier submit: `ApplySession.already_submitted(job_dir)` is False | `apply_session.json` | outcome failed, reason "submit already clicked in an earlier session; check the ATS by hand"; Action Item type `review`; no browser |
-| status is `queued` (or `prepared`); `needs_review` only when the effective tier (row below) is A, and then `auto_submit` is forced off (staging for the candidate) | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
+| status is `queued` (or `prepared`); `needs_review` only when the effective tier (row below) is A (then `auto_submit` is forced off: staging for the candidate) or `prepare.json: qa_pass` is true | `status.json` | print `RESULT` with `outcome: failed`, reason "status <x>"; no browser |
 | `qa.json` top-level `pass` is `true` and `deterministic.pass` is `true` (the qa-review schema) | `qa.json` | outcome failed, reason "qa not passed"; no browser |
 | `resume.pdf` exists | job dir | if only `resume.tex`: Action Item type `other` "no PDF; install LaTeX engine (`brew install tectonic`) then rerun /prepare-job"; outcome failed |
 | `cover_letter.txt` exists when tier `cover_letter: always`, or posting requires one | job dir, targets.yaml | outcome failed, reason "cover letter missing" |
@@ -141,8 +141,13 @@ hit = answer_for(label, "profile/standard_answers.yaml", required=<field is mark
     - `essay` / `unknown` / `standard` → look up the `answers.json` entry (a JSON list) whose `question`,
       whitespace-collapsed and lower-cased, equals the label normalized the same way. Missing → run
       `/answer-question <job_dir> "<label>" --limit <maxlength>` per
-      `.claude/skills/answer-question/SKILL.md`. If it returns `needs_review` → STOP, screenshot,
-      Action Item type `question`, status needs_review.
+      `.claude/skills/answer-question/SKILL.md`. If it returns `needs_review` with a non-null `answer`
+      (class `standard` / `essay`, e.g. tier A flags every answer) and `auto_submit` is false (assisted mode,
+      `CAREEROS_AUTO_SUBMIT=0`): fill that best-effort answer, keep `needs_review: true` on its `answers.json`
+      entry and list the question in the "Review & submit" Action Item text (section 5) so the candidate checks
+      it before submitting. Otherwise (`answer` null: class `sensitive`, `salary_freeform` or `unknown` with
+      nothing to fill; or `auto_submit` true) → STOP, leave the field blank, screenshot, Action Item type
+      `question`, status needs_review.
   - Respect `maxlength`; an over-limit answer is a STOP (type `question`).
 - After filling any field, record what went in: `s.record_field(label, value, source)` with `source` one of
   `profile`, `standard`, `eeo`, `essay`, `salary`, `upload` (for uploads the value is the file name). These
@@ -183,7 +188,8 @@ value the helper did not return.
    Any failure → fix once if trivial (retype a value); else STOP, Action Item type `review`.
 3. If `not s.can_click_submit()` (tier A, `CAREEROS_AUTO_SUBMIT=0`, assisted ATS, or already clicked): status `needs_review`,
    Action Item type `review`, priority H for tier A, `what`: "Review & submit <company> <role>. Form is
-   filled in the open tab. Screenshot: <prefill_review path>", `link`: apply_url. Leave the tab open.
+   filled in the open tab. Screenshot: <prefill_review path>" plus, when any `answers.json` entry has
+   `needs_review: true`, "Check answers: <question labels>", `link`: apply_url. Leave the tab open.
    `s.finish("staged", reason="assisted: review & submit")` (outcome `staged` = filled, nothing clicked;
    its `status` is `needs_review`). Go to 7. When the user submits and
    runs `careeros job status <job_id> applied --lock-token <token>`, the snapshot is frozen then (reason `assisted_stop`, with

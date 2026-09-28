@@ -15,6 +15,8 @@ const base: PipelineState = {
   next_kind: "prepare",
   force: false,
   blocked_reason: null,
+  note: null,
+  auto_submit: false,
   review_reasons: [],
   active_run_id: null,
   queued_in_run: null,
@@ -74,13 +76,22 @@ describe("PipelineCard", () => {
     expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "upcoming"]);
   });
 
-  it("disables the button with the blocked reason as its title (Tier A)", async () => {
+  it("offers the assisted apply for a Tier A job with its note under the button", async () => {
+    setup({ stage: "review", next_action: "approve_continue", next_label: "Prepare & stage for review",
+            next_kind: "apply", note: "Tier A: the run fills and stages the form; you review and submit." });
+    const btn = await screen.findByRole("button", { name: "Prepare & stage for review" });
+    expect(btn).toBeEnabled();
+    expect(btn.getAttribute("title")).toContain("stops before Submit");
+    expect(screen.getByText("Tier A: the run fills and stages the form; you review and submit.")).toBeInTheDocument();
+  });
+
+  it("disables the button with the blocked reason as its title", async () => {
     setup({ stage: "apply", next_action: null, next_label: null, next_kind: null,
-            blocked_reason: "Tier A: never auto-applied; apply manually" });
+            blocked_reason: "A run is working on this job" });
     const btn = await screen.findByRole("button", { name: "Continue pipeline" });
     expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute("title", "Tier A: never auto-applied; apply manually");
-    expect(screen.getByText("Tier A: never auto-applied; apply manually")).toBeInTheDocument();
+    expect(btn).toHaveAttribute("title", "A run is working on this job");
+    expect(screen.getByText("A run is working on this job")).toBeInTheDocument();
   });
 
   it("says there is nothing to run for an applied job", async () => {
@@ -145,8 +156,54 @@ describe("PipelineCard", () => {
     expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(2);
   });
 
-  it("never chains into apply", async () => {
+  it("does not chain a score run into apply", async () => {
     const api = await scoreThen({ stage: "apply", next_action: "continue", next_kind: "apply", force: false });
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  /** Continue on a scored job; the first POST prepares it, the stream end flips the server state to `after`. */
+  async function prepareThen(after: Partial<PipelineState>, stopAfter = false) {
+    let current: PipelineState = { ...base, ...after, active_run_id: null, stage: "prepare", next_action: "continue",
+                                   next_label: "Continue pipeline", next_kind: "prepare", note: null };
+    let n = 0;
+    const api = mockApi({
+      "GET /api/jobs/j1/pipeline": () => current,
+      "POST /api/jobs/j1/pipeline": () => {
+        n += 1;
+        const kind = n === 1 ? "prepare" : "apply";
+        current = { ...current, active_run_id: `run-${n}-${kind}` };
+        return { run_id: `run-${n}-${kind}`, kind };
+      },
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    if (stopAfter) await userEvent.click(await screen.findByRole("checkbox", { name: "Stop after this stage" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
+    expect(FakeEventSource.last.url).toBe("/api/runs/run-1-prepare/stream");
+    current = { ...base, ...after, active_run_id: null };
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed" }));
+    return api;
+  }
+
+  it("chains a prepared Tier A job into the assisted apply while auto_submit is off", async () => {
+    const api = await prepareThen({ stage: "review", next_action: "approve_continue", next_kind: "apply",
+                                    next_label: "Prepare & stage for review", auto_submit: false });
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(2));
+    expect(api.callsTo("POST /api/jobs/j1/pipeline")[1]?.body).toEqual({ action: "approve_continue" });
+    expect(await screen.findByText(/Prepared — filling & staging for review…/)).toBeInTheDocument();
+    await waitFor(() => expect(FakeEventSource.instances.length).toBe(2));
+    expect(FakeEventSource.last.url).toBe("/api/runs/run-2-apply/stream");
+  });
+
+  it("never chains into apply while auto_submit is on", async () => {
+    const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply", auto_submit: true });
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("does not chain prepare into apply when Stop after this stage is on", async () => {
+    const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply", auto_submit: false }, true);
     expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
     expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
   });

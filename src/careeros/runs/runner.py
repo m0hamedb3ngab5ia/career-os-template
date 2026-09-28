@@ -125,19 +125,17 @@ def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], 
     """Why a job is not a candidate for this kind of run (None = it is). Only job-state rules; the scout
     filters and the pruned check run separately. `force` (an explicit `--job` rerun) only lets a job the stage
     already finished (scored / prepared) through again; a status that makes the stage meaningless (applied,
-    skipped, ...) is never forced, and `apply` is never forced at all."""
+    skipped, ...) is never forced, and `apply` is never forced at all. Tier A is a candidate for `apply`: the run
+    passes CAREEROS_AUTO_SUBMIT=0 (policy.auto_submit_decision) so apply-job fills and stages the form for the
+    candidate to review and submit; `needs_review` (where prepare-job leaves Tier A) is allowed when QA passed."""
     if kind == "score":
         if status != "found" and not (force and status == "scored"):
             return f"status {status}"
         return "already scored" if has_score and not force else None
     if kind == "apply":
-        from careeros.runs.policy import is_tier_a
-
-        if status not in ("queued", "prepared"):
+        if status not in ("queued", "prepared") and not (status == "needs_review" and prepared_ok):
             return f"status {status}"
-        if not prepared_ok:
-            return "qa not passed"
-        return "tier A (never applied by a run)" if is_tier_a(score.get("tier")) else None
+        return None if prepared_ok else "qa not passed"
     from careeros.company_policy import DEFERRED_REASONS
 
     if status not in ("found", "scored") and not (force and status in ("queued", "needs_review", "prepared")):

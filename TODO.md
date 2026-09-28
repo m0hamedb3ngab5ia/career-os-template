@@ -10,6 +10,7 @@ belong in each candidate's own private repo, not here.
 - [x] P2.5 QA `confidential_terms` hard check (`profile/confidential_terms.yaml`)
 - [ ] P3 applier: Chrome adapters greenhouse → lever → ashby; bot-detection heuristics; screenshot on every submit
 - [ ] P4 inbox-sync (Gmail MCP) + push notify + follow-up drafts
+- [ ] Gmail label for job mail: inbox-sync applies a `Career OS` label (config `inbox.label`) and archives application confirmations/rejections after updating the tracker, so the inbox is not spammed; a Gmail filter suggestion in docs/GETTING_STARTED.md
 - [ ] P5 find-contacts + draft-outreach (LinkedIn URL, email guess w/ verification, message)
 - [x] Outreach relationship gate: connected (1st degree) or mutuals → never automated, `send_linkedin` "tailor manually" (`careeros outreach check|mark`, `pipeline.yaml: outreach`)
 - [ ] P6 custom scrapers for `ats: custom` boards (company career pages without a public ATS API)

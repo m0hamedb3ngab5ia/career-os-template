@@ -818,20 +818,17 @@ def test_start_one_job_refuses_a_job_that_is_not_a_candidate_before_spawning(rc,
     assert e.value.reasons == {"nope": "not found"}
 
 
-def test_apply_needs_a_job_and_never_runs_tier_a(rc, settings):
-    from careeros.runs.runner import JobNotRunnable
-
+def test_apply_needs_a_job_and_runs_tier_a_and_b(rc, settings):
     with pytest.raises(ValueError):
         rc.start("apply")
     jid, other = add_jobs(settings, 2)
     _prepared(settings, jid, tier="A")
-    with pytest.raises(JobNotRunnable) as e:
-        rc.start("apply", job_id=jid, force=True)
-    assert "tier A" in e.value.reasons[jid] and FakePopen.calls == []
-    _prepared(settings, other, tier="B")
-    out = rc.start("apply", job_id=other)
+    out = rc.start("apply", job_id=jid)
     cmd = FakePopen.calls[0]["cmd"]
-    assert cmd[3:5] == ["run", "apply"] and cmd[cmd.index("--job") + 1] == other and out["kind"] == "apply"
+    assert cmd[3:5] == ["run", "apply"] and cmd[cmd.index("--job") + 1] == jid and out["kind"] == "apply"
+    _prepared(settings, other, tier="B")
+    rc.start("apply", job_id=other)
+    assert FakePopen.calls[-1]["cmd"][FakePopen.calls[-1]["cmd"].index("--job") + 1] == other
 
 
 def test_force_is_passed_through_for_a_rerun(rc, settings):

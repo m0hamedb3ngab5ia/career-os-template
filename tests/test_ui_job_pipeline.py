@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from careeros.ui.services.job_pipeline import APPLY_STAGED, TIER_A_BLOCKED, compute_state, review_reasons
+from careeros.ui.services.job_pipeline import APPLY_STAGED, TIER_A_NOTE, compute_state, review_reasons
 
 pytestmark = pytest.mark.unit
 
@@ -40,10 +40,23 @@ def test_needs_review_without_qa_pass_offers_a_forced_re_prepare():
         ("review", "continue", "prepare", True, None)
 
 
-def test_tier_a_is_blocked_in_review_and_when_queued():
-    for status in ("needs_review", "queued", "prepared"):
+def test_tier_a_offers_an_assisted_apply_in_review_and_when_queued():
+    """Tier A is not refused: the apply stage is offered as fill & stage for review, with a note; the runner passes
+    CAREEROS_AUTO_SUBMIT=0 so the run never submits it."""
+    for status, action in (("needs_review", "approve_continue"), ("queued", "continue"), ("prepared", "continue")):
         st = compute_state(status, SCORE_A, PREPARED, {"pass": True})
-        assert st["next_action"] is None and st["blocked_reason"] == TIER_A_BLOCKED, status
+        assert (st["next_action"], st["next_kind"], st["blocked_reason"]) == (action, "apply", None), status
+        assert st["next_label"] == "Prepare & stage for review" and st["note"] == TIER_A_NOTE, status
+    b = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    assert b["note"] is None and b["next_label"] == "Continue pipeline"
+    staged = compute_state("needs_review", SCORE_A, PREPARED, {"pass": True}, apply_session={"outcome": "staged"})
+    assert staged["next_action"] is None and staged["blocked_reason"] == APPLY_STAGED and staged["note"] is None
+
+
+def test_auto_submit_switch_is_reported_so_the_ui_only_chains_into_apply_while_it_is_off():
+    assert compute_state("queued", SCORE_B, PREPARED, {"pass": True})["auto_submit"] is False
+    assert compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)["auto_submit"] is True
+    assert compute_state("found", None, None, None)["auto_submit"] is False
 
 
 def test_queued_with_qa_pass_offers_continue_apply_and_without_it_a_re_prepare():

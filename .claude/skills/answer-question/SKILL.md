@@ -64,7 +64,9 @@ Rules:
   "Challenge" answers: pick a bullet with a measurable outcome; describe the problem, what the candidate
   did, the result number from the bullet; do not invent obstacles not implied by the bullet text.
 - `needs_review`: true if tier A (from score.json), if `voice_verified` would be false and the answer
-  is > 400 chars, or if you had to use a project older than 2024 as the main evidence.
+  is > 400 chars, or if you had to use a project older than 2024 as the main evidence. The flag does not
+  block filling: in assisted mode apply-job fills the answer and lists the question for the candidate to check
+  before submitting; only a null `answer` (sensitive / salary_freeform / unknown) is never filled.
 
 ## 4. Append to `JOB/answers.json`
 

@@ -468,9 +468,10 @@ def test_force_selects_an_already_scored_job(settings, store):
     (lambda s, j: _prepared(s, j, qa_pass=False), "qa not passed"),
     (lambda s, j: _scored(s, j), "status scored"),
     (lambda s, j: _prepared(s, j, status="applied"), "status applied"),
-    (lambda s, j: _prepared(s, j, status="needs_review"), "status needs_review"),
-    (lambda s, j: _prepared(s, j, tier="A"), "tier A (never applied by a run)"),
-    (lambda s, j: _prepared(s, j, tier="a"), "tier A (never applied by a run)"),
+    (lambda s, j: _prepared(s, j, status="needs_review"), None),  # human-approved / Tier A after prepare-job
+    (lambda s, j: _prepared(s, j, status="needs_review", qa_pass=False), "status needs_review"),
+    (lambda s, j: _prepared(s, j, tier="A"), None),  # Tier A is staged for review, never refused
+    (lambda s, j: _prepared(s, j, tier="a", status="needs_review"), None),
 ])
 def test_apply_eligibility(settings, store, setup, reason):
     jid = add_job(store, 1)
@@ -482,18 +483,21 @@ def test_apply_eligibility(settings, store, setup, reason):
         assert ranked == [] and excluded == [{"job_id": jid, "reason": reason}]
 
 
-def test_apply_run_refuses_tier_a_before_spawning_and_names_the_reason(settings, store):
-    from careeros.runs.runner import JobNotRunnable
-
+@pytest.mark.parametrize("status", ["queued", "needs_review"])
+def test_apply_run_stages_tier_a_with_auto_submit_0_even_when_config_allows(settings, store, status):
+    """Tier A is never refused and never auto-submitted: the attempt runs assisted (CAREEROS_AUTO_SUBMIT=0,
+    reason names tier_a) and a staged result with status needs_review is accepted."""
     jid = add_job(store, 1)
-    _prepared(store, jid, tier="A")
-    inv = FakeInvoke(settings)
-    cfg = cfg_of(settings, preflight_doctor=False)
-    with pytest.raises(JobNotRunnable) as ei:
-        execute_run(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg, invoke=inv,
-                    now=lambda: NOW, clock=Clock(), job_ids=[jid])
-    assert ei.value.reasons == {jid: "tier A (never applied by a run)"} and inv.calls == []
-    assert not any((settings.paths["jobs_dir"].parent / "runs").glob("2*"))
+    _prepared(store, jid, tier="A", status=status)
+    _safety(store, jid)
+    calls: list = []
+    rec = _apply_run(settings, _apply_invoke(store, jid, calls, outcome="staged", status="needs_review"), jid,
+                     auto_submit={"enabled": True})
+    assert rec["counters"]["ok"] == 1 and len(calls) == 1
+    assert calls[0]["CAREEROS_AUTO_SUBMIT"] == "0" and "tier_a" in calls[0]["CAREEROS_AUTO_SUBMIT_REASON"]
+    att = RunStore(settings).load_attempts(rec["id"])[0]
+    assert att["auto_submit"]["allowed"] is False and att["result"]["outcome"] == "staged"
+    assert store.get_status(jid) == "needs_review"
 
 
 def test_apply_run_calls_apply_job_with_chrome_tools_and_checks_the_status(settings, store):

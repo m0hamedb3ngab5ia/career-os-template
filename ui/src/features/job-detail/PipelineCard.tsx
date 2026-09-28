@@ -13,6 +13,9 @@ import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import type { PipelineState } from "./types";
 
+/** The server's label for an assisted (Tier A) apply: fill & stage, the human submits (job_pipeline.LABELS). */
+const STAGE_REVIEW_LABEL = "Prepare & stage for review";
+
 const NEXT_ACTION_HELP_KEY: Record<string, ActionKey> = {
   start: "startPipeline",
   continue: "continuePipeline",
@@ -32,12 +35,24 @@ const KIND_HELP: Record<string, string> = {
   prepare: "Runs prepare-job headless: score, tailored resume, cover letter and QA.",
   apply: "Runs apply-job headless in Chrome: fills the form, then submits or stages it for you per auto_submit.",
 };
+const CHAIN_MSG: Record<string, string> = {
+  prepare: "Scored — continuing to prepare…",
+  apply: "Prepared — filling & staging for review…",
+};
 
 /** True when a state just reached after a score run started here should roll straight into prepare: the server
- * offers a plain (non-forced) continue into prepare and nothing blocks the job. Apply is never chained. */
+ * offers a plain (non-forced) continue into prepare and nothing blocks the job. */
 function chainsToPrepare(s: PipelineState): boolean {
   return s.next_action === "continue" && s.next_kind === "prepare" && !s.force && !s.blocked_reason &&
     s.active_run_id == null;
+}
+
+/** True when a state just reached after a prepare run started here should roll on into apply: only while
+ * auto_submit is off (the run fills and stages the form, never submits: the human reviews it in the browser),
+ * the server offers apply (continue, or approve & continue at the review gate) and nothing blocks the job. */
+function chainsToApply(s: PipelineState): boolean {
+  return !s.auto_submit && s.next_kind === "apply" && !s.force && !s.blocked_reason && s.active_run_id == null &&
+    (s.next_action === "continue" || s.next_action === "approve_continue");
 }
 
 // Polls of GET /runs/{id} (1s apart) that may 404 before a run the card started is given up on: `careeros run`
@@ -46,15 +61,16 @@ const MAX_MISSING_POLLS = 15;
 
 /** Stage stepper, the one next action (Start / Continue / Approve & continue), the review reasons and, while a
  * run works on this job, its live output with Cancel. The server decides what can run (job_pipeline.py).
- * A score run started here chains into prepare (score → prepare → QA in one click) and stops at the review gate
- * or a blocked state; "Stop after this stage" turns that off. */
+ * A score run started here chains into prepare (score → prepare → QA in one click); while auto_submit is off the
+ * prepare run chains on into apply (fill & stage the form for review, never submit), so one click takes a job to
+ * a staged form. Chaining stops at a blocked state; "Stop after this stage" turns it off. */
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
   const [started, setStarted] = useState<string | null>(null);
   const [stopAfter, setStopAfter] = useState(false);
-  // "Scored — continuing to prepare…": from the moment a chained prepare run is requested until it ends.
-  const [chaining, setChaining] = useState(false);
+  // The chained run's message (CHAIN_MSG): from the moment it is requested until it ends.
+  const [chaining, setChaining] = useState<string | null>(null);
   // The kind of the run this card started, so only our own score run chains (never a run from elsewhere).
   const startedKind = useRef<string | null>(null);
   // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
@@ -89,19 +105,22 @@ export function PipelineCard({ jobId }: { jobId: string }) {
                    : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
     }
     setStarted(null);
-    setChaining(false);
-    const wasScore = startedKind.current === "score";
+    setChaining(null);
+    const was = startedKind.current;
     startedKind.current = null;
     void pipeline.refetch().then((r) => {
-      if (!wasScore || stopAfter || !r.data || !chainsToPrepare(r.data)) return;
-      setChaining(true);
-      startedKind.current = "prepare";
+      if (stopAfter || !r.data || !r.data.next_action) return;
+      const next = was === "score" && chainsToPrepare(r.data) ? "prepare"
+        : was === "prepare" && chainsToApply(r.data) ? "apply" : null;
+      if (!next) return;
+      setChaining(CHAIN_MSG[next] ?? null);
+      startedKind.current = next;
       start.mutate(
-        { action: "continue" },
+        { action: r.data.next_action },
         {
           onSuccess: (res) => setStarted(res.run_id),
           onError: (e) => {
-            setChaining(false);
+            setChaining(null);
             toast.show({ message: errorText(e) });
           },
         },
@@ -179,7 +198,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         <>
           <div className={styles.buttons}>
             <span className={styles.sec}>
-              {chaining ? "Scored — continuing to prepare… " : ""}Running {state.next_kind ?? ""} · {runId}
+              {chaining ? `${chaining} ` : ""}Running {state.next_kind ?? ""} · {runId}
             </span>
             <Button
               variant="destructive"
@@ -199,7 +218,8 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button
             variant="primary"
             title={(() => {
-              const key = state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
+              const key = label === STAGE_REVIEW_LABEL ? "stageReview"
+                : state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
               return key ? help(key).title : label;
             })()}
             disabled={busy}
@@ -208,7 +228,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             {started ? "Starting…" : label}
           </Button>
           <span className={styles.sec}>
-            {chaining ? "Scored — continuing to prepare…" : KIND_HELP[state.next_kind ?? ""] ?? ""}
+            {chaining ?? KIND_HELP[state.next_kind ?? ""] ?? ""}
           </span>
         </div>
       ) : (
@@ -219,7 +239,9 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <span className={styles.sec}>{state.blocked_reason ?? "Nothing left to run for this job."}</span>
         </div>
       )}
-      {state.next_kind === "score" || chaining || startedKind.current === "score" ? (
+      {state.note ? <Muted>{state.note}</Muted> : null}
+      {state.next_kind === "score" || (state.next_kind === "prepare" && !state.auto_submit) || chaining !== null ||
+       startedKind.current === "score" || startedKind.current === "prepare" ? (
         <label
           className={styles.caption}
           style={{ display: "flex", alignItems: "center", gap: "var(--space-1)" }}

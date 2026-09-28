@@ -51,7 +51,7 @@ scout ──► data/jobs/<job_id>/posting.json
         qa-review ──► qa.json   pass → queue; fail → regenerate once → Action Items
             │
             ▼
-         applier  ──► submits (if tier allows auto) OR Action Item with screenshot
+         applier  ──► submits (auto_submit allows, never Tier A) OR stages for review (assisted) + Action Item with screenshot
             │         └► submitted/<stamp>/  frozen copy of what went out + form values (manifest.json)
             │
             ▼
@@ -203,10 +203,14 @@ competes again later); any other block (`closed`, `not_similar`, `already_applie
 reached). Prepare runs stop with `daily_cap` once the jobs ready to submit fill what is left of today's cap
 (`runs.prepare.stop_at_daily_cap`, true, Recommended): preparing more than can be sent today is wasted work.
 
-**Auto-submit is config only.** `runs.auto_submit` (`enabled: false` (Recommended), `allow`, `manual`) is parsed and
-validated, and `auto_submit_decision` is the pure rule a future apply path will call (Tier A and a non-pass safety
-verdict are always manual, whatever the config says; `manual: [tier_a, fit_gte_85]` (Recommended) keeps your best
-matches manual, and the fit threshold is yours to change). Runs never apply in this version.
+**Apply stage: auto-submit vs assisted.** `runs.auto_submit` (`enabled: false` (Recommended), `allow`, `manual`) is
+parsed and validated, and `auto_submit_decision` is the rule `careeros run apply --job <id>` applies per attempt and
+hands to apply-job as `CAREEROS_AUTO_SUBMIT`: `1` = the skill may click submit (its own gates still apply), `0` =
+assisted mode: it fills everything, uploads the documents, stages the form, never clicks submit, and hands off with
+status `needs_review` plus a "review & submit" Action Item, so the candidate only reviews and presses Submit. Tier A
+and a non-pass safety verdict are always assisted, whatever the config says (`manual: [tier_a, fit_gte_85]`
+(Recommended) keeps your best matches assisted too, and the fit threshold is yours to change). A run never submits
+Tier A; a Tier A job is never refused at the apply stage.
 
 **Scheduler.** `careeros schedule install` writes a LaunchAgent (`~/Library/LaunchAgents/<schedule.launchd_label>.plist`,
 absolute paths, a PATH with the `claude` it found, logs to `data/runs/launchd.out.log` / `launchd.err.log`) that

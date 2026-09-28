@@ -3946,6 +3946,10 @@
             ],
             "title": "Active Run Id"
           },
+          "auto_submit": {
+            "title": "Auto Submit",
+            "type": "boolean"
+          },
           "blocked_reason": {
             "anyOf": [
               {
@@ -3999,6 +4003,17 @@
             ],
             "title": "Next Label"
           },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
           "queued_in_run": {
             "anyOf": [
               {
@@ -4029,6 +4044,8 @@
           "next_kind",
           "force",
           "blocked_reason",
+          "note",
+          "auto_submit",
           "review_reasons",
           "active_run_id",
           "queued_in_run"

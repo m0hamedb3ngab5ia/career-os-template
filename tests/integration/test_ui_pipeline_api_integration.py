@@ -81,8 +81,10 @@ def test_get_pipeline_per_job_state(client, data):
     assert (found["stage"], found["next_action"], found["next_kind"]) == ("score", "start", "score")
     review = prepared(data, "review", tier="A")
     got = client.get(f"/api/jobs/{review}/pipeline").json()
-    assert got["stage"] == "review" and got["next_action"] is None
-    assert got["blocked_reason"] == "Tier A: never auto-applied; apply manually"
+    assert got["stage"] == "review" and got["next_action"] == "approve_continue" and got["next_kind"] == "apply"
+    assert got["blocked_reason"] is None and got["next_label"] == "Prepare & stage for review"
+    assert got["note"] == "Tier A: the run fills and stages the form; you review and submit."
+    assert got["auto_submit"] is False  # examples/config: runs.auto_submit off -> the UI may chain prepare into apply
     assert got["review_reasons"] == ["cover_letter_facts: add 2 facts", "Apply session needs_review: Tier A: you submit",
                                      "Open action item: Review and submit"]
     # Tier B with the form staged in the browser (auto_submit off): nothing runnable, the human submits.
@@ -125,15 +127,20 @@ def test_start_and_continue_run_the_next_stage(client, data, fakes):
     assert [c[4] for c in fakes.spawned] == ["score", "apply"]
 
 
-def test_tier_a_is_never_applied_even_when_asked(client, data, fakes):
+def test_tier_a_apply_is_started_assisted_and_other_misfits_are_409(client, data, fakes):
+    """Tier A is no longer refused: continue starts `run apply --job` (the runner passes CAREEROS_AUTO_SUBMIT=0
+    and the skill stages the form); a status that does not fit the action is still 409."""
     jid = prepared(data, "queued", tier="A")
-    r = client.post(f"/api/jobs/{jid}/pipeline", json={"action": "continue", "force": True}, headers=W)
-    assert r.status_code == 409 and "Tier A" in r.json()["detail"]
+    got = client.get(f"/api/jobs/{jid}/pipeline").json()
+    assert got["next_action"] == "continue" and got["next_label"] == "Prepare & stage for review"
+    r = client.post(f"/api/jobs/{jid}/pipeline", json={"action": "continue"}, headers=W)
+    assert r.status_code == 200 and r.json()["kind"] == "apply"
+    assert len(fakes.spawned) == 1 and fakes.spawned[0][4] == "apply"
     r = client.post(f"/api/jobs/{data['jobs']['applied']}/pipeline", json={"action": "start"}, headers=W)
     assert r.status_code == 409 and "status applied" in r.json()["detail"]
     r = client.post(f"/api/jobs/{data['jobs']['found']}/pipeline", json={"action": "approve_continue"}, headers=W)
     assert r.status_code == 409 and Store(data["settings"]).get_status(data["jobs"]["found"]) == "found"
-    assert fakes.spawned == []
+    assert len(fakes.spawned) == 1
 
 
 def test_409_while_a_run_is_active_and_the_active_run_is_reported(client, data, fakes):

@@ -330,6 +330,20 @@ def test_score_job_uses_three_verdicts_and_reason_codes():
     assert "--risk low" in text and "--risk medium" in text and "--risk high" in text
 
 
+def test_apply_job_fills_flagged_answers_in_assisted_mode_and_stops_only_without_an_answer():
+    """Assisted mode (Tier A / CAREEROS_AUTO_SUBMIT=0): a needs_review answer is filled and flagged for the
+    candidate, not a STOP; sensitive / salary_freeform / unknown with no answer still stop with the field blank."""
+    fill = _skill("apply-job").split("## 3. Fill", 1)[1].split("\n## 4.", 1)[0]
+    assert "CAREEROS_AUTO_SUBMIT=0" in fill and "`needs_review: true`" in fill and "Review & submit" in fill
+    stop = fill.split("Otherwise (`answer` null", 1)[1]
+    for cls in ("sensitive", "salary_freeform", "unknown"):
+        assert cls in stop, cls
+    assert "STOP, leave the field blank" in stop
+    assert "Check answers:" in _skill("apply-job").split("## 5.", 1)[1]
+    aq = _skill("answer-question")
+    assert "block filling" in aq and "null `answer`" in aq
+
+
 def test_apply_job_follows_safety_verdict():
     text = _skill("apply-job")
     assert "verdict" in text and "block" in text and "review" in text
