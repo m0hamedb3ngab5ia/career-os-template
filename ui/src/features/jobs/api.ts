@@ -1,19 +1,52 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
-import type { JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
+import type { JobFacets, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
+import { FILTERS, type FilterField, type Filters } from "./urlState";
 
-export interface ListParams {
+export interface FilterParams {
   tab: TabKey;
   q: string;
   location: string;
+  filters: Filters;
+}
+
+export interface ListParams extends FilterParams {
   sort: string;
   limit: number;
 }
 
-function listUrl({ tab, q, location, sort, limit }: ListParams, cursor?: string): string {
-  const p = new URLSearchParams({ tab, sort, limit: String(limit) });
+/** Column filters as query pairs: repeated `<param>` for values, `<field>_min/_max` for numbers, `<base>_from/_to`
+ *  for dates (found_at -> found_from). Also the shape of the export body's filter keys. */
+export function filterPairs(filters: Filters): [string, string][] {
+  const out: [string, string][] = [];
+  for (const [field, f] of Object.entries(filters) as [FilterField, Filters[FilterField]][]) {
+    if (!f) continue;
+    const spec = FILTERS[field];
+    if (f.kind === "values") {
+      const key = "param" in spec ? spec.param : field;
+      for (const v of f.values) out.push([key, v]);
+    } else {
+      const [lo, hi] = spec.kind === "date" ? ["from", "to"] : ["min", "max"];
+      const base = spec.kind === "date" ? field.replace(/_at$/, "") : field;
+      if (f.min) out.push([`${base}_${lo}`, f.min]);
+      if (f.max) out.push([`${base}_${hi}`, f.max]);
+    }
+  }
+  return out;
+}
+
+function baseParams({ tab, q, location, filters }: FilterParams): URLSearchParams {
+  const p = new URLSearchParams({ tab });
   if (q) p.set("q", q);
   if (location) p.set("location", location);
+  for (const [k, v] of filterPairs(filters)) p.append(k, v);
+  return p;
+}
+
+function listUrl(params: ListParams, cursor?: string): string {
+  const p = baseParams(params);
+  p.set("sort", params.sort);
+  p.set("limit", String(params.limit));
   if (cursor) p.set("cursor", cursor);
   return `/api/jobs?${p}`;
 }
@@ -30,16 +63,40 @@ export function useJobsList(params: ListParams, enabled = true) {
   });
 }
 
-export function useJobsTabs(q: string, location = "") {
-  const p = new URLSearchParams();
-  if (q) p.set("q", q);
-  if (location) p.set("location", location);
+export function useJobsTabs(params: FilterParams) {
+  const p = baseParams(params);
+  p.delete("tab");
   const qs = p.toString();
   return useQuery({
-    queryKey: ["jobs-tabs", q, location],
+    queryKey: ["jobs-tabs", qs],
     queryFn: () => apiFetch<JobsTabs>(`/api/jobs/tabs${qs ? `?${qs}` : ""}`),
     placeholderData: keepPreviousData,
   });
+}
+
+/** Distinct values of one column with counts under every other active filter (the header filter menu). */
+export function useJobFacets(field: FilterField, params: FilterParams, enabled: boolean) {
+  const { [field]: _own, ...others } = params.filters;
+  const p = baseParams({ ...params, filters: others });
+  p.set("field", field);
+  const qs = p.toString();
+  return useQuery({
+    queryKey: ["jobs-facets", qs],
+    queryFn: () => apiFetch<JobFacets>(`/api/jobs/facets?${qs}`),
+    enabled,
+    placeholderData: keepPreviousData,
+  });
+}
+
+/** The column filters as export body keys (same names as the query params; lists for value filters). */
+export function exportFilters(filters: Filters): Record<string, string | string[]> {
+  const out: Record<string, string | string[]> = {};
+  for (const [k, v] of filterPairs(filters)) {
+    const cur = out[k];
+    if (cur === undefined) out[k] = FILTERS[k as FilterField]?.kind === "values" || k === "location_in" ? [v] : v;
+    else if (Array.isArray(cur)) cur.push(v);
+  }
+  return out;
 }
 
 export function useSyncTracker() {
@@ -52,7 +109,7 @@ export function useOpenTracker() {
 
 export type ExportRequest =
   | { job_ids: string[]; columns: string[] }
-  | { tab: TabKey; q?: string; location?: string; sort: string; columns: string[] };
+  | ({ tab: TabKey; q?: string; location?: string; sort: string; columns: string[] } & Record<string, unknown>);
 
 function filenameFrom(disposition: string | null): string {
   const m = disposition?.match(/filename\*?=(?:UTF-8'')?"?([^";]+)"?/i);

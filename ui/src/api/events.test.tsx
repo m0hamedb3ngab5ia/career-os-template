@@ -29,6 +29,7 @@ describe("keysForChange", () => {
     expect(keysForChange({ jobs: ["a1", "b2"], runs: [], actions: false, config: false, status: false })).toEqual([
       ["jobs"],
       ["jobs-tabs"],
+      ["jobs-facets"],
       ["job", "a1"],
       ["job", "b2"],
       ["contacts"],
