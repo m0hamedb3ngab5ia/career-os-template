@@ -152,7 +152,7 @@ describe("PipelineCard", () => {
     await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
     expect(FakeEventSource.last.url).toBe("/api/runs/run-1-score/stream");
     current = { ...base, ...after, active_run_id: null };
-    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed" }));
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: "completed", counters: { ok: 1, failed: 0 } }));
     return api;
   }
 
@@ -175,7 +175,8 @@ describe("PipelineCard", () => {
   });
 
   /** Continue on a scored job; the first POST prepares it, the stream end flips the server state to `after`. */
-  async function prepareThen(after: Partial<PipelineState>, stopAfter = false, stopReason = "completed") {
+  async function prepareThen(after: Partial<PipelineState>, stopAfter = false, stopReason = "completed",
+                             counters: Record<string, number> = { ok: 1, failed: 0 }) {
     let current: PipelineState = { ...base, ...after, active_run_id: null, stage: "prepare", next_action: "continue",
                                    next_label: "Continue pipeline", next_kind: "prepare", note: null };
     let n = 0;
@@ -194,13 +195,20 @@ describe("PipelineCard", () => {
     await waitFor(() => expect(FakeEventSource.instances.length).toBe(1));
     expect(FakeEventSource.last.url).toBe("/api/runs/run-1-prepare/stream");
     current = { ...base, ...after, active_run_id: null };
-    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: stopReason }));
+    act(() => FakeEventSource.last.dispatch("end", { state: "finished", stop_reason: stopReason, counters }));
     return api;
   }
 
   it("does not chain a failed prepare run into apply even if it left runnable files", async () => {
     const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply", auto_submit: false },
                                   false, "usage_limit");
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+    expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
+  });
+
+  it("does not chain a completed prepare run into apply when its job failed", async () => {
+    const api = await prepareThen({ stage: "apply", next_action: "continue", next_kind: "apply", auto_submit: false },
+                                  false, "completed", { attempted: 1, ok: 0, failed: 1 });
     expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
     expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
   });

@@ -133,11 +133,14 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
   const [ended, setEnded] = useState(false);
   // The `end` frame's stop reason (e.g. "completed", "usage_limit"); null until the run ends or if the frame had none.
   const [stopReason, setStopReason] = useState<string | null>(null);
+  // The `end` frame's run counters (ok, failed, ...); null until the run ends or if the frame had none.
+  const [counters, setCounters] = useState<Record<string, number> | null>(null);
 
   useEffect(() => {
     setLines([]);
     setEnded(false);
     setStopReason(null);
+    setCounters(null);
     if (!runId || !enabled || typeof EventSource === "undefined") return;
     const es = new EventSource(`/api/runs/${encodeURIComponent(runId)}/stream`);
     let key = 0;
@@ -161,10 +164,15 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
     es.addEventListener("end", (m) => {
       es.close();
       try {
-        const end = JSON.parse((m as MessageEvent).data as string) as { stop_reason?: string | null };
+        const end = JSON.parse((m as MessageEvent).data as string) as {
+          stop_reason?: string | null;
+          counters?: Record<string, number> | null;
+        };
         setStopReason(end.stop_reason ?? null);
+        setCounters(end.counters ?? null);
       } catch {
         setStopReason(null);
+        setCounters(null);
       }
       setEnded(true);
       void qc.invalidateQueries({ queryKey: runKeys.all });
@@ -173,5 +181,5 @@ export function useRunStream(runId: string | null | undefined, enabled = true) {
     return () => es.close();
   }, [runId, enabled, qc]);
 
-  return { lines, ended, stopReason };
+  return { lines, ended, stopReason, counters };
 }

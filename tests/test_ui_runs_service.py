@@ -406,13 +406,14 @@ def test_tail_follows_until_the_run_ends(rc):
             rs.log(run["id"], "late line")
         else:
             locks.release(rs.runner_lock_path, None, force=True)
-            run.update(status="done", stop_reason="completed")
+            run.update(status="done", stop_reason="completed", counters={"attempted": 1, "ok": 0, "failed": 1})
             rs.save_run(run)
 
     rc2 = make_rc(rc.settings, sleep=sleep)
     events = list(rc2.tail(run["id"], follow=True, poll_s=0))
-    assert any("late line" in e.get("text", "") for e in events) and events[-1] == {"type": "end", "state": "done",
-                                                                                   "stop_reason": "completed"}
+    # the counters ride on the end frame: a "completed" run whose only job failed must not chain to the next stage
+    assert any("late line" in e.get("text", "") for e in events) and events[-1] == {
+        "type": "end", "state": "done", "stop_reason": "completed", "counters": {"attempted": 1, "ok": 0, "failed": 1}}
 
 
 # --- schedule, storage, advice -------------------------------------------------------------------------------
@@ -712,7 +713,7 @@ def test_tail_rereads_the_run_before_its_end_event(rc):
         return False
 
     events = list(make_rc(rc.settings, pid_alive=alive).tail(run["id"], follow=True, poll_s=0))
-    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed"}
+    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed", "counters": run.get("counters")}
 
 
 def test_cancel_reaches_a_catch_up_between_batches(rc):

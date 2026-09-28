@@ -508,7 +508,7 @@ class RunControl:
             if state != "running":
                 run = self.rs.load_run(run_id) or run  # the final stop reason
                 yield from read_new()
-                yield {"type": "end", "state": state, "stop_reason": run.get("stop_reason")}
+                yield {"type": "end", "state": state, "stop_reason": run.get("stop_reason"), "counters": run.get("counters")}
                 return
             self.sleep(poll_s)
             yield from read_new()

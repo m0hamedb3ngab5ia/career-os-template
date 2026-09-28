@@ -117,9 +117,11 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     const was = startedKind.current;
     startedKind.current = null;
     // Chain only after a clean finish: a failed or stopped run (usage_limit, error, ...) may still have left
-    // runnable files behind, and those stops need the user's attention, not the next stage.
+    // runnable files behind, and those stops need the user's attention, not the next stage. A run whose job
+    // failed still ends "completed" (the runner only counts it), so the counters must show a clean success too.
     const endReason = stream.ended ? stream.stopReason : startedRun.data?.stop_reason ?? null;
-    const completed = endReason === "completed";
+    const counts = (stream.ended ? stream.counters : startedRun.data?.counters) ?? {};
+    const completed = endReason === "completed" && (counts.ok ?? 0) >= 1 && (counts.failed ?? 0) === 0;
     void pipeline.refetch().then((r) => {
       if (stopAfter || !completed || !r.data || !r.data.next_action) return;
       const next = was === "score" && chainsToPrepare(r.data) ? "prepare"

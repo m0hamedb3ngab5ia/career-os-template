@@ -262,6 +262,28 @@ def test_run_apply_stages_a_tier_a_job_parked_in_needs_review(root, home, fake_b
     assert status_of(root, jid) == "needs_review"
 
 
+def test_run_apply_auto_submits_when_an_allow_rule_matches(root, home, fake_bin, tmp_path):
+    """auto_submit on + a matching allow rule (tier_c, safety pass): the run hands CAREEROS_AUTO_SUBMIT=1 across the
+    process boundary and apply-job submits (outcome submitted, status applied)."""
+    jid = add_jobs(root, 1)[0]
+    jdir = root / "data" / "jobs" / jid
+    (jdir / "score.json").write_text(json.dumps({"job_id": jid, "decision": "prepare", "fit": 70,
+                                                 "category": "swe_backend", "tier": "C"}))
+    (jdir / "prepare.json").write_text(json.dumps({"job_id": jid, "status": "prepared", "qa_pass": True}))
+    (jdir / "safety.json").write_text(json.dumps({"job_id": jid, "verdict": "pass"}))
+    Store(Settings.load(root)).set_status(jid, "prepared", "test: prepared Tier C")
+    set_runs(root, auto_submit={"enabled": True, "allow": ["tier_c"], "manual": ["tier_a"]})
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ENV=str(tmp_path / "env.jsonl"))
+    r = cli(root, env, "run", "apply", "--job", jid, "--json")
+    assert r.returncode == 0, r.stdout + r.stderr
+    rec = json.loads(r.stdout)
+    assert rec["kind"] == "apply" and rec["counters"]["ok"] == 1 and rec["counters"]["failed"] == 0
+    seen = [json.loads(l) for l in (tmp_path / "env.jsonl").read_text().splitlines()]
+    assert len(seen) == 1 and seen[0]["CAREEROS_AUTO_SUBMIT"] == "1"
+    assert seen[0]["CAREEROS_AUTO_SUBMIT_REASON"] == "allowed: tier_c"
+    assert status_of(root, jid) == "applied"
+
+
 def test_run_force_without_job_exits_2_before_anything_runs(root, home, fake_bin, tmp_path):
     add_jobs(root, 1)
     env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
