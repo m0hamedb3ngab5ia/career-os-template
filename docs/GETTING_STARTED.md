@@ -196,6 +196,18 @@ Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
 It checks `careeros doctor`, the QA result, daily and per-company caps, and a scam gate before touching
 the form. See the FAQ for what submits on its own.
 
+If an ATS needs a login, store it once (outside the repo, mode 0600, never committed):
+
+```
+careeros creds set workday --username you@example.com      # prompts for the password (hidden)
+careeros creds list                                         # sites and usernames, no secrets
+```
+
+The file is `~/.careeros/credentials.yaml` (`paths.credentials` in `config/pipeline.yaml`); set
+`credentials.backend: keychain` there to keep passwords in the macOS keychain instead. `careeros doctor` warns if the
+file is inside a git repo or readable by others. `/apply-job` reads it with `careeros creds get` and never writes a
+password into job data or logs.
+
 Every application teaches the next one. A form question nothing in `profile/standard_answers.yaml` answers
 becomes an Action Item with the question in its text; answer it once with
 `careeros action done <id> --answer "<your answer>"` (or the Answer button in the app) and the answer is added to

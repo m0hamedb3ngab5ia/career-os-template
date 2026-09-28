@@ -227,9 +227,14 @@ def invoke(cmd: list[str], cwd: str, env: dict[str, str], timeout_s: float, stre
            cancel: threading.Event | None = None) -> HeadlessResult:
     """Run `cmd`, tee stdout (stream-json) to `stream_path`, fold events into a HeadlessResult. Kills the whole
     process group on timeout or cancel."""
+    from careeros.credentials import redactor_for_root
+
     r = HeadlessResult()
     start = time.monotonic()
     stream_path.parent.mkdir(parents=True, exist_ok=True)
+    # stored login passwords (file + keychain) never reach the run log or the result; read once here, so a
+    # `creds set` during this run is not masked until the next run
+    redact = redactor_for_root(Path(cwd))
     try:
         proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                 start_new_session=True, bufsize=1)
@@ -241,13 +246,14 @@ def invoke(cmd: list[str], cwd: str, env: dict[str, str], timeout_s: float, stre
     def pump_out() -> None:
         with stream_path.open("a", encoding="utf-8") as f:
             for line in proc.stdout:  # type: ignore[union-attr]
+                line = redact(line)
                 f.write(line)
                 f.flush()
                 feed(r, line)
 
     def pump_err() -> None:
         for line in proc.stderr:  # type: ignore[union-attr]
-            err_chunks.append(line)
+            err_chunks.append(redact(line))
             del err_chunks[:-50]
 
     threads = [threading.Thread(target=pump_out, daemon=True), threading.Thread(target=pump_err, daemon=True)]

@@ -276,6 +276,18 @@ Hurdles → apply-job ends a session with `careeros learn lesson "<one factual l
 and treats the lessons as instructions ("Known hurdles"). The app reads and adds lessons through
 `GET/POST /api/learning/lessons`; `careeros doctor` checks the file's shape when it exists.
 
+## Login credentials (`src/careeros/credentials.py`)
+
+ATS/job-site logins for `/apply-job` live outside the repo and outside `profile/`: `paths.credentials` in
+`config/pipeline.yaml` (default `~/.careeros/credentials.yaml`), a `{site: {username, password | secret_ref, notes}}`
+mapping written atomically with mode 0600 in a 0700 directory. `credentials.backend: keychain` stores the password in
+the macOS login keychain (`security -i`, password hex-encoded on stdin, never argv; service `careeros:<site>`, account
+`<site>`) and leaves only `secret_ref` in the file. Passwords shorter than 8 characters are refused.
+`careeros creds set|get|list|rm` is the only interface; `get` masks the password unless `--reveal`, `list` never
+shows it. `runs/headless.invoke` passes every stream-json line and stderr through `credentials.redactor`, so stored
+passwords (file and keychain, raw and JSON-escaped) never reach a run log or result. `careeros doctor` WARNs when the file sits inside a git repo
+(louder when not gitignored) or its mode is not 0600; `.gitignore` ignores `credentials.yaml`.
+
 ## Directories
 
 ```
@@ -286,7 +298,7 @@ career-os/
   profile/   master.yaml  standard_answers.yaml  confidential_terms.yaml  apply_lessons.yaml  voice/  (gitignored)
   templates/ resume/ (LaTeX)  cover_letter/  outreach/  followup_email/
   src/careeros/  bootstrap.py  scout/  apply/ (incl. snapshot.py)  safety/  tracker.py  qa.py  qa_ext/  store.py
-                 company_policy.py  outreach.py  retention.py  doctor.py  learning.py  cli.py
+                 company_policy.py  outreach.py  retention.py  doctor.py  learning.py  credentials.py  cli.py
                  runs/ (config  ranking  runner  headless  service  policy  locks  failures  store  schedule  tick  launchd)
   .claude/skills/  score-job  tailor-resume  write-cover-letter  answer-question  qa-review  inbox-sync  find-contacts  draft-outreach  apply-job  prepare-job  learn-voice
   data/      jobs/<job_id>/  seen.json  JobTracker.xlsx                                  (gitignored)

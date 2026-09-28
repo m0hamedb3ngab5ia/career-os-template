@@ -24,3 +24,6 @@ uv.lock
 
 # learning write lock (careeros.learning)
 .learning.lock
+
+# ATS/job-site logins (careeros creds): belong in ~/.careeros/, never in git
+credentials.yaml

@@ -39,6 +39,12 @@ def settings(tmp_path: Path) -> Settings:
     return s
 
 
+@pytest.fixture(autouse=True)
+def _temp_home(tmp_path_factory, monkeypatch):
+    """Tests never read the developer's $HOME (e.g. the default `~/.careeros/credentials.yaml`)."""
+    monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
+
+
 def make_temp_root(dest: Path) -> Path:
     """A temp repo root: examples/{config,profile} copied to config/ + profile/, tracker and data paths
     kept inside the root, recorded-fixture boards, and templates/ when the checkout has them."""

@@ -117,6 +117,20 @@ toggle, a page that needs a portfolio link). Follow them; they never override a 
    `posting.ats`, use the detected one and recompute `auto_submit`.
 3. Run the bot-detection scan (adapters.md). Positive → section 6.
 
+## 2a. Login (when the ATS asks to sign in)
+
+Logins come only from the credentials store (`.venv/bin/careeros creds get`, file `paths.credentials`, default
+`~/.careeros/credentials.yaml`, outside the repo). Site key = the ATS (`workday`, `greenhouse`, `lever`, `ashby`) or
+a per-tenant key the candidate chose (`.venv/bin/careeros creds list` shows them, no secrets).
+
+1. `.venv/bin/careeros creds get <site> --json` → `username`, `notes`, `has_password`. Unknown site or `has_password: false`
+   → STOP, Action Item type `laptop_required` ("add a login: `.venv/bin/careeros creds set <site> --username ...`"), needs laptop.
+2. Type the username. For the password field only: `.venv/bin/careeros creds get <site> --reveal` and type its output
+   straight into the field. Never print, echo, quote or summarise it; never put it in `record_field`,
+   `--answers-json`, `s.step`, `log.md`, `posting.json`, `status.json`, screenshots taken with it visible
+   (mask the field first) or the RESULT line. Credentials are never copied into `data/jobs/` or `profile/`.
+3. Login rejected, MFA or a one-time code → STOP (section 6 rules), Action Item; never retry more than once.
+
 ## 3. Fill
 
 Follow the ATS flow in `adapters.md` exactly. Sources for values:
@@ -251,4 +265,5 @@ value the helper did not return.
 - Never invent text. Anything missing is an Action Item, not a guess.
 - Never use "Apply with LinkedIn" or any LinkedIn automation.
 - Never create accounts with invented passwords; Workday account creation is an Action Item unless `WORKDAY_PASSWORD` is set.
+- Logins come only from `.venv/bin/careeros creds get` (section 2a); never print a password or store it in job data.
 - One job per invocation. One tab per job.
