@@ -226,7 +226,12 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button
             variant="primary"
             title={(() => {
-              const key = state.note != null ? "stageReview"
+              // Tier A/B "stage the form" offers keep the stageReview tooltip even though next_action is
+              // approve_continue (label overridden to "Prepare & stage for review"); a plain Tier B/C
+              // "Approve & continue" must keep its own tooltip: it approves the docs, it does not stage/submit.
+              const key = state.next_action === "approve_continue" && state.next_label === "Approve & continue"
+                ? NEXT_ACTION_HELP_KEY.approve_continue
+                : state.note != null ? "stageReview"
                 : state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
               return key ? help(key).title : label;
             })()}

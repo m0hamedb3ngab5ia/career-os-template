@@ -130,6 +130,16 @@ def test_a_failed_apply_session_allows_a_retry_with_the_reason_shown():
     assert "Apply session failed: daily cap" in st["review_reasons"]
 
 
+def test_a_submit_already_clicked_apply_session_stays_hands_off_even_when_outcome_is_failed():
+    # submit_clicked=True means the browser click happened even if the recorded outcome is "failed":
+    # re-preparing would risk a second submit, so this must stay blocked, not offer "continue prepare (force)".
+    session = {"outcome": "failed", "status": "queued", "reason": "network drop", "action_item": None,
+               "submit_clicked": True}
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, apply_session=session)
+    assert st["next_action"] is None and st["stage"] != "qa"
+    assert st["blocked_reason"] == "submit already clicked in an earlier session: check the ATS by hand"
+
+
 def test_a_job_queued_in_a_batch_is_blocked_without_an_active_run():
     st = compute_state("scored", SCORE_B, None, None, queued_in_run="20260927-100000-prepare-ab12")
     assert st["next_action"] is None and st["active_run_id"] is None

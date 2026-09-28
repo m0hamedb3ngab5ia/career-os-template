@@ -76,6 +76,18 @@ describe("PipelineCard", () => {
     expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "upcoming"]);
   });
 
+  it("keeps the Approve & continue tooltip for a Tier B job even though auto_submit is off (STAGE_NOTE set)", async () => {
+    // Regression: a Tier B/C needs_review job with qa_pass keeps its "Approve & continue" label (it approves the
+    // docs, it does not stage/submit a form) even though STAGE_NOTE is shown under the button; the tooltip must
+    // not fall back to the stageReview wording just because `note` is set.
+    setup({ stage: "review", next_action: "approve_continue", next_label: "Approve & continue", next_kind: "apply",
+            note: "auto_submit is off: the run fills and stages the form; you review and submit." });
+    const btn = await screen.findByRole("button", { name: "Approve & continue" });
+    expect(btn.getAttribute("title")).toBe(
+      "Approves the current documents and lets the pipeline continue to the next step.",
+    );
+  });
+
   it("offers the assisted apply for a Tier A job with its note under the button", async () => {
     setup({ stage: "review", next_action: "approve_continue", next_label: "Prepare & stage for review",
             next_kind: "apply", note: "Tier A: the run fills and stages the form; you review and submit." });

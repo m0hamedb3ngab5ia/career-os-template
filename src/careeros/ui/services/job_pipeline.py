@@ -119,8 +119,9 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
         return st
 
     def hands_off() -> PipelineState:  # the browser holds the form: running again would refill or re-submit it
-        st["blocked_reason"] = APPLY_STAGED if session["outcome"] == "staged" else \
-            f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
+        st["blocked_reason"] = APPLY_STAGED if session.get("outcome") == "staged" else \
+            "submit already clicked in an earlier session: check the ATS by hand" if session.get("submit_clicked") \
+            else f"Application {session['outcome']} in the browser: finish it manually (see Apply session)"
         return st
 
     if active_run_id:
@@ -141,7 +142,8 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
         st["blocked_reason"] = f"Score decision: skip ({score.get('skip_reason') or 'see score.json'})" \
             if why.startswith("score decision") else why
         return st
-    if status in ("needs_review", "queued", "prepared") and session.get("outcome") in HANDS_OFF_OUTCOMES:
+    if status in ("needs_review", "queued", "prepared") and \
+            (session.get("outcome") in HANDS_OFF_OUTCOMES or session.get("submit_clicked")):
         return hands_off()
     if status == "needs_review":
         return offer("approve_continue", "apply") if qa_pass else offer("continue", "prepare", force=True)
