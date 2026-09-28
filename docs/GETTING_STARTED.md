@@ -196,6 +196,14 @@ Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
 It checks `careeros doctor`, the QA result, daily and per-company caps, and a scam gate before touching
 the form. See the FAQ for what submits on its own.
 
+Every application teaches the next one. A form question nothing in `profile/standard_answers.yaml` answers
+becomes an Action Item with the question in its text; answer it once with
+`careeros action done <id> --answer "<your answer>"` (or the Answer button in the app) and the answer is added to
+`profile/standard_answers.yaml`, so no later application asks it again (`careeros learn answer` adds one by hand;
+`--company X` keeps it to one company). Hurdles the applier had to work around on an ATS or at a company are
+written to `profile/apply_lessons.yaml` (`careeros learn lesson`, `careeros learn list`) and read before the
+next session there.
+
 ## 12. Unattended runs (optional, macOS)
 
 Once single jobs look right, the system can score and prepare in batches on a schedule. Python ranks the jobs and

@@ -16,6 +16,7 @@ import difflib
 import io
 import os
 import re
+import uuid
 from pathlib import Path
 from typing import Any, Callable
 
@@ -63,7 +64,7 @@ def get_path(data: Any, dotted: str) -> Any:
 
 
 def _write_atomic(real: Path, text: str) -> None:
-    tmp = real.with_name(f".{real.name}.{os.getpid()}.tmp")
+    tmp = real.with_name(f".{real.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")  # unique per call (threads)
     try:
         tmp.write_text(text, encoding="utf-8")
         try:    # keep the target's permissions (a 0600 private config must not become 0644)

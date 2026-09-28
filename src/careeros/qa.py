@@ -233,14 +233,15 @@ def bullet_shape_issues(text: str, weak_openers: Iterable[str], max_words: int,
     return issues
 
 
-def _standard_hit(question: str, path: Path, patterns: list[tuple[str, list[re.Pattern[str]]]]) -> str | None:
+def _standard_hit(question: str, path: Path, patterns: list[tuple[str, list[re.Pattern[str]]]],
+                  company: str | None = None) -> str | None:
     """Key of the standard answer this question maps to. Uses the applier's matcher (EEO excluded,
     legal/salary wording guarded) so QA and the form filler agree; plain first-hit fallback otherwise."""
     try:
         from careeros.apply.questions import match_standard_answer
     except ImportError:  # pragma: no cover - applier not installed
         return next((k for k, rxs in patterns if any(rx.search(question) for rx in rxs)), None)
-    hit = match_standard_answer(question, path)
+    hit = match_standard_answer(question, path, company)
     return hit[0] if hit else None
 
 
@@ -972,19 +973,28 @@ class Checker:
                         except re.error:
                             continue
                     patterns.append((str(ent["key"]), rxs))
+            posting_co = str(self.posting.get("company", "")).strip().lower() if isinstance(self.posting, dict) else ""
+            ca = sa.get("company_answers") if isinstance(sa.get("company_answers"), dict) else {}  # doctor reports bad shapes
+            for co, lst in ca.items():  # this posting's company only, tried first
+                if str(co).strip().lower() != posting_co:
+                    continue
+                for ent in lst if isinstance(lst, list) else []:
+                    if isinstance(ent, dict) and ent.get("key"):
+                        table[str(ent["key"])] = ent.get("answer")
             for k, ent in (sa.get("eeo") or {}).items():
                 if isinstance(ent, dict):
                     table[f"eeo.{k}"] = ent.get("answer")
         def same(ans: Any, want: Any) -> bool:
             return ans in (None, "") if want is None else (ans is not None and str(ans).strip() == str(want).strip())
 
+        company = str(self.posting.get("company", "")).strip() if isinstance(self.posting, dict) else ""
         problems = []
         for i, a in enumerate(self.answers):
             if not isinstance(a, dict):
                 continue
             ans = a.get("answer")
             question = str(a.get("question") or "")
-            hit = _standard_hit(question, self.standard_answers_path, patterns) if sa is not None else None
+            hit = _standard_hit(question, self.standard_answers_path, patterns, company or None) if sa is not None else None
             if hit is not None:
                 # the question's own pattern match decides the key, whatever type/standard_key the record says
                 if not same(ans, table[hit]):

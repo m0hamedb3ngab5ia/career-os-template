@@ -629,13 +629,70 @@ def cmd_action_list(args: argparse.Namespace) -> int:
 
 
 def cmd_action_done(args: argparse.Namespace) -> int:
-    tr = Tracker(settings=_settings(args))
+    s = _settings(args)
+    tr = Tracker(settings=s)
+    if getattr(args, "answer", None) is not None:
+        from careeros.learning import learn_from_action
+
+        try:
+            learned = learn_from_action(s, tr, args.id, args.answer, scope=args.scope, company=args.company)
+        except (LookupError, ValueError) as e:
+            print(f"action item {args.id}: {e}", file=sys.stderr)
+            return 1
+        print(f"learned {learned['scope']} answer {learned['key']!r}" + (f" for {learned['company']}" if learned["company"] else ""))
     ok = tr.mark_action_done(args.id)
     if ok is None:
         print(f"action item {args.id}: queued (tracker locked); run `careeros tracker flush`")
         return 0
     print("done" if ok else f"action item {args.id} not found")
     return 0 if ok else 1
+
+
+def cmd_learn_answer(args: argparse.Namespace) -> int:
+    from careeros.learning import learn_answer
+
+    try:
+        e = learn_answer(_settings(args), question=args.question, answer=args.answer, job_id=args.job, key=args.key,
+                         match=args.match, scope=args.scope, company=args.company, eeo=args.eeo)
+    except ValueError as err:
+        print(f"learn answer: {err}", file=sys.stderr)
+        return 1
+    if args.json:
+        print(json.dumps(e, indent=2))
+    else:
+        where = "eeo" if e["scope"] == "eeo" else ("company_answers." + e["company"] if e["company"] else "answers")
+        print(f"learned {e['key']!r} -> profile/standard_answers.yaml: {where}"
+              + (" (+ answers.json)" if e.get("answers_json") else ""))
+    return 0
+
+
+def cmd_learn_lesson(args: argparse.Namespace) -> int:
+    from careeros.learning import learn_lesson
+
+    try:
+        e = learn_lesson(_settings(args), text=args.text, ats=args.ats, company=args.company, job_id=args.job,
+                         tags=tuple(args.tag))
+    except ValueError as err:
+        print(f"learn lesson: {err}", file=sys.stderr)
+        return 1
+    print(json.dumps(e, indent=2) if args.json else f"lesson {e['id']} added to profile/apply_lessons.yaml")
+    return 0
+
+
+def cmd_learn_list(args: argparse.Namespace) -> int:
+    from careeros.learning import lessons_for
+
+    items = lessons_for(_settings(args), ats=args.ats, company=args.company)
+    if args.json:
+        print(json.dumps(items, indent=2))
+        return 0
+    if not items:
+        print("no lessons")
+        return 0
+    for x in items:
+        scope = "/".join(v for v in (x["ats"], x["company"]) if v) or "general"
+        print(f"[{x['id']}] {scope:<22} {x['text']}")
+    return 0
 
 
 def cmd_prune(args: argparse.Namespace) -> int:
@@ -1444,7 +1501,38 @@ def build_parser() -> argparse.ArgumentParser:
     al.set_defaults(fn=cmd_action_list)
     ad = acs.add_parser("done")
     ad.add_argument("id")
+    ad.add_argument("--answer", help="for a question/salary item: learn this answer (standard_answers.yaml + the "
+                                     "job's answers.json) before closing it")
+    ad.add_argument("--scope", choices=("general", "company"), default="general", help="with --answer: where it applies")
+    ad.add_argument("--company", help="with --answer: learn for this company only (default: the item's company when --scope company)")
     ad.set_defaults(fn=cmd_action_done)
+
+    lrn = sub.add_parser("learn", help="remember answers and hurdles so the next application asks less")
+    lrs = lrn.add_subparsers(dest="learn_cmd", required=True)
+    la = lrs.add_parser("answer", help="add one answer to profile/standard_answers.yaml (and the job's answers.json)")
+    la.add_argument("question")
+    la.add_argument("answer")
+    la.add_argument("--job", help="job id it was asked on (goes in the note and answers.json)")
+    la.add_argument("--key", help="entry key (default: a slug of the question)")
+    la.add_argument("--match", action="append", help="regex the question must match (repeatable; default: the question itself)")
+    la.add_argument("--company", help="only for this company (company_answers block)")
+    la.add_argument("--scope", choices=("general", "company"), default="general")
+    la.add_argument("--eeo", action="store_true", help="write the eeo block value --key (or the slug) instead")
+    la.add_argument("--json", action="store_true")
+    la.set_defaults(fn=cmd_learn_answer)
+    ll = lrs.add_parser("lesson", help="record a hurdle hit on an ATS / at a company (profile/apply_lessons.yaml)")
+    ll.add_argument("text")
+    ll.add_argument("--ats", choices=("workday", "greenhouse", "lever", "ashby", "custom"))
+    ll.add_argument("--company")
+    ll.add_argument("--job")
+    ll.add_argument("--tag", action="append", default=[])
+    ll.add_argument("--json", action="store_true")
+    ll.set_defaults(fn=cmd_learn_lesson)
+    lls = lrs.add_parser("list", help="lessons that apply: general + this ATS + this company")
+    lls.add_argument("--ats")
+    lls.add_argument("--company")
+    lls.add_argument("--json", action="store_true")
+    lls.set_defaults(fn=cmd_learn_list)
 
     sf = sub.add_parser("safety", help="scam + company + ghost-job gate (exit 3 = block, 4 = skip)")
     sfs = sf.add_subparsers(dest="safety_cmd", required=True)
