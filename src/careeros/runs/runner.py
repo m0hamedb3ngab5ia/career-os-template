@@ -120,12 +120,22 @@ def _prefilter(settings: Settings):
     return Prefilter(settings, flagged=flagged, filters=scout_config(settings)["filters"])
 
 
+# apply_session.json outcomes after which the browser holds the application: no run touches the job again (it
+# would refill or re-submit the open form); a human finishes it (the UI blocks on the same outcomes).
+HANDS_OFF_OUTCOMES = ("staged", "submitted", "blocked")
+
+
 def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], prepared_ok: bool,
-                force: bool = False) -> str | None:
+                force: bool = False, apply_session: dict[str, Any] | None = None) -> str | None:
     """Why a job is not a candidate for this kind of run (None = it is). Only job-state rules; the scout
     filters and the pruned check run separately. `force` (an explicit `--job` rerun) only lets a job the stage
     already finished (scored / prepared) through again; a status that makes the stage meaningless (applied,
-    skipped, ...) is never forced, and `apply` is never forced at all."""
+    skipped, ...) is never forced, and `apply` is never forced at all. Tier A is a candidate for `apply`: the run
+    passes CAREEROS_AUTO_SUBMIT=0 (policy.auto_submit_decision) so apply-job fills and stages the form for the
+    candidate to review and submit; `needs_review` (where prepare-job leaves Tier A) is allowed only for Tier A when
+    QA passed: a Tier B/C job parked there waits for the human's Approve (status queued), so a batch run with
+    auto_submit on never submits past the review gate. `apply_session` (apply_session.json) rules out a job whose
+    form the browser already holds (HANDS_OFF_OUTCOMES) or that ever clicked submit."""
     if kind == "score":
         if status != "found" and not (force and status == "scored"):
             return f"status {status}"
@@ -133,11 +143,15 @@ def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], 
     if kind == "apply":
         from careeros.runs.policy import is_tier_a
 
-        if status not in ("queued", "prepared"):
+        if status not in ("queued", "prepared") and not (status == "needs_review" and prepared_ok
+                                                          and is_tier_a(score.get("tier"))):
             return f"status {status}"
-        if not prepared_ok:
-            return "qa not passed"
-        return "tier A (never applied by a run)" if is_tier_a(score.get("tier")) else None
+        session = apply_session or {}
+        if session.get("submit_clicked"):
+            return "submit already clicked"
+        if session.get("outcome") in HANDS_OFF_OUTCOMES:
+            return f"application {session['outcome']} in the browser"
+        return None if prepared_ok else "qa not passed"
     from careeros.company_policy import DEFERRED_REASONS
 
     if status not in ("found", "scored") and not (force and status in ("queued", "needs_review", "prepared")):
@@ -178,8 +192,9 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
         status = store.get_status(jid) or "found"
         score = store._read(jid, "score.json") or {}
         prep = store._read(jid, "prepare.json") or {}
+        session = (store._read(jid, "apply_session.json") or {}) if kind == "apply" else None
         why = eligibility(kind, status, bool(score) or (store.job_dir(jid) / "score.json").exists(), score,
-                          bool(prep.get("qa_pass")), force=force)
+                          bool(prep.get("qa_pass")), force=force, apply_session=session)
         if why:
             if explicit:
                 excluded.append({"job_id": jid, "reason": why})

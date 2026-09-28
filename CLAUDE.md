@@ -31,7 +31,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros tracker applied-count [<company>] [--days N]`, `tracker upsert <job_id> --field Header=value ...`, `tracker sync|flush|init`
 - `.venv/bin/careeros run score|prepare [--preset small|medium|large|max|custom] [--max-jobs N] [--max-minutes M] [--dry-run] [--json]` — budgeted batches, one headless skill call per job, never applies; `--job <id> [--force]` runs one job (exit 2 with the reason if it is not a candidate)
 - `.venv/bin/careeros creds set <site> [--username U] [--notes N] [--password-stdin|--no-password]`, `creds get <site> [--json|--reveal]`, `creds list [--json]` (no secrets), `creds rm <site>` — ATS/job-site logins for `/apply-job` in `paths.credentials` (default `~/.careeros/credentials.yaml`, 0600, outside git; `credentials.backend: file|keychain`); run logs mask stored passwords
-- `.venv/bin/careeros run apply --job <id> [--json]` — `/apply-job` one prepared job headless (Chrome MCP tools allowed); `--job` required, Tier A refused, never scheduled
+- `.venv/bin/careeros run apply --job <id> [--json]` — `/apply-job` one prepared job headless (Chrome MCP tools allowed); `--job` required, Tier A staged for review, never submitted, never scheduled
 - `.venv/bin/careeros run list|show <id> [--json|--log]|status|cap [--check]|pause [--until +2h|ISO] [--reason]|resume|catch-up [--dry-run|--dismiss]`
 - `.venv/bin/careeros job lock|unlock|check <id>` (exit 6 = held), `tick [--dry-run]`, `schedule install|uninstall|status` (LaunchAgent → `careeros tick`)
 - `.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]` — local web app on 127.0.0.1 (needs `pip install -e ".[ui]"`); SQLite index `data/careeros.db` is disposable

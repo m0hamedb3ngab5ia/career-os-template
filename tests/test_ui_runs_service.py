@@ -406,13 +406,14 @@ def test_tail_follows_until_the_run_ends(rc):
             rs.log(run["id"], "late line")
         else:
             locks.release(rs.runner_lock_path, None, force=True)
-            run.update(status="done", stop_reason="completed")
+            run.update(status="done", stop_reason="completed", counters={"attempted": 1, "ok": 0, "failed": 1})
             rs.save_run(run)
 
     rc2 = make_rc(rc.settings, sleep=sleep)
     events = list(rc2.tail(run["id"], follow=True, poll_s=0))
-    assert any("late line" in e.get("text", "") for e in events) and events[-1] == {"type": "end", "state": "done",
-                                                                                   "stop_reason": "completed"}
+    # the counters ride on the end frame: a "completed" run whose only job failed must not chain to the next stage
+    assert any("late line" in e.get("text", "") for e in events) and events[-1] == {
+        "type": "end", "state": "done", "stop_reason": "completed", "counters": {"attempted": 1, "ok": 0, "failed": 1}}
 
 
 # --- schedule, storage, advice -------------------------------------------------------------------------------
@@ -712,7 +713,7 @@ def test_tail_rereads_the_run_before_its_end_event(rc):
         return False
 
     events = list(make_rc(rc.settings, pid_alive=alive).tail(run["id"], follow=True, poll_s=0))
-    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed"}
+    assert events[-1] == {"type": "end", "state": "done", "stop_reason": "completed", "counters": run.get("counters")}
 
 
 def test_cancel_reaches_a_catch_up_between_batches(rc):
@@ -818,20 +819,17 @@ def test_start_one_job_refuses_a_job_that_is_not_a_candidate_before_spawning(rc,
     assert e.value.reasons == {"nope": "not found"}
 
 
-def test_apply_needs_a_job_and_never_runs_tier_a(rc, settings):
-    from careeros.runs.runner import JobNotRunnable
-
+def test_apply_needs_a_job_and_runs_tier_a_and_b(rc, settings):
     with pytest.raises(ValueError):
         rc.start("apply")
     jid, other = add_jobs(settings, 2)
     _prepared(settings, jid, tier="A")
-    with pytest.raises(JobNotRunnable) as e:
-        rc.start("apply", job_id=jid, force=True)
-    assert "tier A" in e.value.reasons[jid] and FakePopen.calls == []
-    _prepared(settings, other, tier="B")
-    out = rc.start("apply", job_id=other)
+    out = rc.start("apply", job_id=jid)
     cmd = FakePopen.calls[0]["cmd"]
-    assert cmd[3:5] == ["run", "apply"] and cmd[cmd.index("--job") + 1] == other and out["kind"] == "apply"
+    assert cmd[3:5] == ["run", "apply"] and cmd[cmd.index("--job") + 1] == jid and out["kind"] == "apply"
+    _prepared(settings, other, tier="B")
+    rc.start("apply", job_id=other)
+    assert FakePopen.calls[-1]["cmd"][FakePopen.calls[-1]["cmd"].index("--job") + 1] == other
 
 
 def test_force_is_passed_through_for_a_rerun(rc, settings):

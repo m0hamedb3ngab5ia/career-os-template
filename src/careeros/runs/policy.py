@@ -4,9 +4,10 @@ Daily cap = `targets.yaml: volume.max_applications_per_day` x `volume.season_mul
 counted per calendar day from DateApplied (tracker) or the first `applied` in status history. apply-job checks it
 with `careeros run cap --check`; any future apply path must call `cap_status` before submitting.
 
-Auto-submit (`pipeline.yaml: runs.auto_submit`) is configuration only in this version: runs never apply.
-`auto_submit_decision` is the pure rule a future apply path will call. Tier A is never auto-submitted, whatever
-the config says, and a safety verdict other than pass always means manual.
+Auto-submit (`pipeline.yaml: runs.auto_submit`): `auto_submit_decision` is the pure rule `careeros run apply`
+applies per attempt and hands to apply-job as CAREEROS_AUTO_SUBMIT (0 = assisted: fill, upload and stage the form,
+never click submit). Tier A is never auto-submitted, whatever the config says (runs stage it for review), and a
+safety verdict other than pass always means manual.
 """
 from __future__ import annotations
 
@@ -131,7 +132,7 @@ def _matches(token: str, job: dict[str, Any]) -> bool:
 
 
 def is_tier_a(tier: Any) -> bool:
-    """Tier A = the dream/manual tier: never auto-submitted, never applied by a run."""
+    """Tier A = the dream/manual tier: never auto-submitted; runs stage it for review, the candidate submits."""
     return str(tier or "").upper() == "A"
 
 

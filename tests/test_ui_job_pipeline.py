@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import pytest
 
-from careeros.ui.services.job_pipeline import APPLY_STAGED, TIER_A_BLOCKED, compute_state, review_reasons
+from careeros.ui.services.job_pipeline import APPLY_STAGED, STAGE_NOTE, TIER_A_NOTE, compute_state, review_reasons
 
 pytestmark = pytest.mark.unit
 
@@ -40,14 +40,45 @@ def test_needs_review_without_qa_pass_offers_a_forced_re_prepare():
         ("review", "continue", "prepare", True, None)
 
 
-def test_tier_a_is_blocked_in_review_and_when_queued():
-    for status in ("needs_review", "queued", "prepared"):
+def test_tier_a_offers_an_assisted_apply_in_review_and_when_queued():
+    """Tier A is not refused: the apply stage is offered as fill & stage for review, with a note; the runner passes
+    CAREEROS_AUTO_SUBMIT=0 so the run never submits it."""
+    for status, action in (("needs_review", "approve_continue"), ("queued", "continue"), ("prepared", "continue")):
         st = compute_state(status, SCORE_A, PREPARED, {"pass": True})
-        assert st["next_action"] is None and st["blocked_reason"] == TIER_A_BLOCKED, status
+        assert (st["next_action"], st["next_kind"], st["blocked_reason"]) == (action, "apply", None), status
+        assert st["next_label"] == "Prepare & stage for review" and st["note"] == TIER_A_NOTE, status
+    b = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
+    assert b["note"] is None and b["next_label"] == "Continue pipeline"
+    staged = compute_state("needs_review", SCORE_A, PREPARED, {"pass": True}, apply_session={"outcome": "staged"})
+    assert staged["next_action"] is None and staged["blocked_reason"] == APPLY_STAGED and staged["note"] is None
+
+
+def test_apply_is_labelled_stage_for_review_for_every_tier_while_auto_submit_is_off():
+    off = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    assert (off["next_label"], off["note"]) == ("Prepare & stage for review", STAGE_NOTE)
+    on = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
+    assert (on["next_label"], on["note"]) == ("Continue pipeline", None)
+    gate = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True})  # the Approve gate keeps its label
+    assert (gate["next_label"], gate["note"]) == ("Approve & continue", STAGE_NOTE)
+    tier_a = compute_state("queued", SCORE_A, PREPARED, {"pass": True}, auto_submit=True)  # never submitted
+    assert (tier_a["next_label"], tier_a["note"]) == ("Prepare & stage for review", TIER_A_NOTE)
+
+
+def test_a_staged_session_blocks_a_queued_job_too():
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, apply_session={"outcome": "staged"})
+    assert (st["next_action"], st["blocked_reason"]) == (None, APPLY_STAGED)
+    st = compute_state("prepared", SCORE_B, PREPARED, {"pass": True}, apply_session={"outcome": "submitted"})
+    assert st["next_action"] is None and st["blocked_reason"].startswith("Application submitted in the browser")
+
+
+def test_auto_submit_switch_is_reported_so_the_ui_only_chains_into_apply_while_it_is_off():
+    assert compute_state("queued", SCORE_B, PREPARED, {"pass": True})["auto_submit"] is False
+    assert compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)["auto_submit"] is True
+    assert compute_state("found", None, None, None)["auto_submit"] is False
 
 
 def test_queued_with_qa_pass_offers_continue_apply_and_without_it_a_re_prepare():
-    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True})
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, auto_submit=True)
     assert act(st) == ("apply", "continue", "apply", False, None) and st["next_label"] == "Continue pipeline"
     assert act(compute_state("queued", SCORE_B, None, None)) == ("qa", "continue", "prepare", True, None)
 
@@ -97,6 +128,16 @@ def test_a_failed_apply_session_allows_a_retry_with_the_reason_shown():
     st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session=failed)
     assert act(st) == ("review", "approve_continue", "apply", False, None)
     assert "Apply session failed: daily cap" in st["review_reasons"]
+
+
+def test_a_submit_already_clicked_apply_session_stays_hands_off_even_when_outcome_is_failed():
+    # submit_clicked=True means the browser click happened even if the recorded outcome is "failed":
+    # re-preparing would risk a second submit, so this must stay blocked, not offer "continue prepare (force)".
+    session = {"outcome": "failed", "status": "queued", "reason": "network drop", "action_item": None,
+               "submit_clicked": True}
+    st = compute_state("queued", SCORE_B, PREPARED, {"pass": True}, apply_session=session)
+    assert st["next_action"] is None and st["stage"] != "qa"
+    assert st["blocked_reason"] == "submit already clicked in an earlier session: check the ATS by hand"
 
 
 def test_a_job_queued_in_a_batch_is_blocked_without_an_active_run():

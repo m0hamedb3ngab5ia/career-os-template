@@ -101,7 +101,7 @@ the UI has to stand on its own as an application, without a Claude Code session 
   - `qa.yaml`: critic pass threshold, max regenerations, banned phrases.
 - Profile, voice and templates are edited outside the UI for now (they are free text, not settings).
 - Locked rows show policy that the system enforces and a form can't turn off: LinkedIn is draft-only; thank-you
-  notes after interviews are always written by hand; Tier A is never auto-submitted; runs never apply; ghost-job
+  notes after interviews are always written by hand; Tier A is never auto-submitted (a run fills and stages it, you submit); runs submit only when `auto_submit` allows; ghost-job
   checks only flag a dream company, never skip it (Safety › Ghost jobs); manual commands share the per-job lock with
   runs (Runs › Before each run).
 - Every row the Settings mockup shows is backed by a config key that code reads, or is one of those locked rows.

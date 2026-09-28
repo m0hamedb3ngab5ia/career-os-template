@@ -1016,7 +1016,8 @@ def cmd_run_prepare(args: argparse.Namespace) -> int:
 
 
 def cmd_run_apply(args: argparse.Namespace) -> int:
-    """/apply-job one prepared job (--job required; Tier A refused; the skill itself submits or stages)."""
+    """/apply-job one prepared job (--job required; Tier A staged for review, never submitted; the skill itself
+    submits or stages)."""
     return _run_kind(args, "apply")
 
 
@@ -1704,7 +1705,7 @@ def build_parser() -> argparse.ArgumentParser:
     _run_budget_args(rpp)
     rpp.set_defaults(fn=cmd_run_prepare)
     rap = rns.add_parser("apply", help="/apply-job one prepared job: --job <id> required (never a batch); Tier A "
-                                       "is refused; the skill submits or stages for review per auto_submit")
+                                       "is staged for review, never submitted; the skill submits or stages per auto_submit")
     _run_budget_args(rap)
     rap.set_defaults(fn=cmd_run_apply)
     rcp = rns.add_parser("cap", help="today's daily apply cap; --check exits 3 when it is reached")

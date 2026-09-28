@@ -7,6 +7,9 @@ file level, and prints stream-json events: `system/init`, one `assistant`, then 
 Behaviour per job: FAKE_CLAUDE_MODE (env) or data/jobs/<id>/.fake_mode (file, wins) is one of
   ok (default) | skip | usage_limit | rate_event | auth | deny | garbage | error_result | hang | exit1
 FAKE_CLAUDE_ARGV=<path> appends the argv (JSON) to that file, so tests can check the command line.
+FAKE_CLAUDE_ENV=<path> appends the CAREEROS_* environment (JSON) to that file, so tests can check what the runner
+handed down. `/apply-job` honours CAREEROS_AUTO_SUBMIT=0 like the real skill: it stages the form (outcome staged,
+status needs_review, no submit click) instead of submitting.
 """
 from __future__ import annotations
 
@@ -29,6 +32,10 @@ def main() -> int:
     if log:
         with open(log, "a", encoding="utf-8") as f:
             f.write(json.dumps(argv) + "\n")
+    env_log = os.environ.get("FAKE_CLAUDE_ENV")
+    if env_log:
+        with open(env_log, "a", encoding="utf-8") as f:
+            f.write(json.dumps({k: v for k, v in os.environ.items() if k.startswith("CAREEROS_")}) + "\n")
     prompt = argv[-1] if argv else ""
     skill, _, job_rel = prompt.partition(" ")
     job_dir = Path.cwd() / job_rel.strip()
@@ -90,12 +97,14 @@ def main() -> int:
         res = {"skill": "prepare-job", "job_id": job_id, "status": "queued", "tier": "C", "fit": 80,
                "decision": "prepare", "skip_reason": None, "qa_pass": True, "ACTION_ITEMS": []}
     elif skill == "/apply-job":
+        staged = os.environ.get("CAREEROS_AUTO_SUBMIT") == "0"
+        status, outcome = ("needs_review", "staged") if staged else ("applied", "submitted")
         st = json.loads((job_dir / "status.json").read_text()) if (job_dir / "status.json").exists() else {}
-        st["status"] = "applied"
-        st.setdefault("history", []).append({"status": "applied", "at": "2026-01-01T00:00:00+00:00", "note": "fake"})
+        st["status"] = status
+        st.setdefault("history", []).append({"status": status, "at": "2026-01-01T00:00:00+00:00", "note": "fake"})
         (job_dir / "status.json").write_text(json.dumps(st))
-        res = {"job_id": job_id, "ats": "greenhouse", "outcome": "submitted", "status": "applied", "reason": None,
-               "submit_clicked": True, "screenshots": [], "action_item": None, "resume_version": None}
+        res = {"job_id": job_id, "ats": "greenhouse", "outcome": outcome, "status": status, "reason": None,
+               "submit_clicked": not staged, "screenshots": [], "action_item": None, "resume_version": None}
     else:
         emit({"type": "result", "subtype": "success", "is_error": False, "session_id": sid,
               "result": f"unknown skill {skill}", "num_turns": 1, "duration_ms": 10})
