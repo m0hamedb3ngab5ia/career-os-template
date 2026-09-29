@@ -1,0 +1,1 @@
+import{t as e}from"./index-B13L5Gb1.js";function t(){return e().data?.ui.undo_seconds}export{t};
