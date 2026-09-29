@@ -28,9 +28,10 @@ function message(e: unknown) {
 export function BatchBuilderPage() {
   const [view, update] = useJobsView();
   const [params] = useSearchParams();
-  const ids = (params.get("ids") ?? "").split(",").filter(Boolean);
+  const ids = [...new Set((params.get("ids") ?? "").split(",").map((s) => s.trim()).filter(Boolean))];
   const fromFilters = ids.length === 0;
-  const [name, setName] = useState(() => `Batch — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`);
+  const [defaultName] = useState(() => `Batch — ${new Date().toLocaleDateString("en-US", { month: "short", day: "numeric" })}`);
+  const [name, setName] = useState(defaultName);
   const [qty, setQty] = useState("25");
   const [custom, setCustom] = useState<number | null>(100);
   const [stop, setStop] = useState<StopAt>("prepare");
@@ -38,7 +39,9 @@ export function BatchBuilderPage() {
   const [confirming, setConfirming] = useState(false);
   const reasonId = useId();
 
-  const autoSubmit = useSection("runs").data?.values["runs.auto_submit.enabled"] === true;
+  const runs = useSection("runs");
+  const autoSubmit = runs.data?.values["runs.auto_submit.enabled"] === true;
+  const autoOff = runs.data !== undefined && !autoSubmit; // only say "off" once settings have loaded
   const limit = qty === "custom" ? Math.min(Math.max(Math.round(custom ?? 1), 1), MAX_JOBS) : Number(qty);
   const jobs = useJobsList({ tab: view.tab, q: view.q, location: view.location, filters: view.filters, sort: view.sort, limit }, fromFilters);
   const first = jobs.data?.pages[0];
@@ -47,6 +50,8 @@ export function BatchBuilderPage() {
   const selected = preview.data?.selected ?? [];
   const chosen = selected.filter((j) => !off.has(j.job_id)).map((j) => j.job_id);
   const start = useStartBatch();
+  // keepPreviousData: while refetching, the list and count are from the old stop/filters, so starting waits.
+  const stale = preview.isPlaceholderData || preview.isFetching || jobs.isFetching;
 
   const summary = filterSummary(view);
   const source = fromFilters ? (summary ? `filters: ${summary}` : "") : "from your Jobs selection";
@@ -89,17 +94,17 @@ export function BatchBuilderPage() {
           <SegmentedControl label="Stop after" value={stop} onValueChange={pickStop}>
             {STOP_POINTS.map((s) => (
               <SegmentedControl.Option key={s.value} value={s.value} disabled={s.value === "submit" && !autoSubmit}
-                describedBy={s.value === "submit" && !autoSubmit ? reasonId : undefined}>
+                describedBy={s.value === "submit" && autoOff ? reasonId : undefined}>
                 {s.label}
               </SegmentedControl.Option>
             ))}
           </SegmentedControl>
-          {autoSubmit ? null : (
+          {autoOff ? (
             <p id={reasonId} className={styles.note}>
               Auto-submit is off in Settings, so a batch can fill applications but not submit them.{" "}
               <Link to="/settings/runs">Change in Settings</Link>
             </p>
-          )}
+          ) : null}
           <ul className={styles.rules}>
             {HARD_RULES.map((r) => <li key={r}>{r}</li>)}
           </ul>
@@ -165,10 +170,19 @@ export function BatchBuilderPage() {
         {confirming ? (
           <section aria-label="Confirm batch" className={styles.confirm}>
             <p>{confirmSentence(chosen.length, stop, source)}</p>
-            {start.error ? <p role="alert">{message(start.error)}</p> : null}
+            {start.error ? (
+              <p role="alert">
+                {start.savedId ? (
+                  <>
+                    Batch saved but not started: {message(start.error)}{" "}
+                    <Link to={`/pipeline/batch/${encodeURIComponent(start.savedId)}`}>Open saved batch</Link>
+                  </>
+                ) : message(start.error)}
+              </p>
+            ) : null}
             <div className={styles.row}>
-              <Button variant="primary" pending={start.isPending} pendingLabel="Starting…"
-                onClick={() => start.mutate({ jobIds: chosen, stopAt: stop, name })}>
+              <Button variant="primary" pending={start.isPending} pendingLabel="Starting…" disabled={stale && !start.savedId}
+                onClick={() => start.mutate({ jobIds: chosen, stopAt: stop, name: name.trim() || defaultName })}>
                 Start batch
               </Button>
               <Button onClick={() => setConfirming(false)}>Back</Button>
@@ -176,7 +190,7 @@ export function BatchBuilderPage() {
           </section>
         ) : (
           <div className={styles.row}>
-            <Button variant="primary" disabled={chosen.length === 0} onClick={() => setConfirming(true)}>
+            <Button variant="primary" disabled={chosen.length === 0 || stale} onClick={() => setConfirming(true)}>
               Review and start
             </Button>
           </div>
