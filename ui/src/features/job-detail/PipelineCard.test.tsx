@@ -74,9 +74,13 @@ describe("PipelineCard", () => {
       "title",
       "Approves the current documents and lets the pipeline continue to the next step.",
     );
-    expect(screen.getByText("Waiting on you")).toBeInTheDocument();
-    expect(screen.getByText("Review and submit the application")).toBeInTheDocument();
-    expect(screen.queryByText("long letter")).not.toBeInTheDocument(); // detail waits for the Details redesign
+    expect(screen.getByText("Needs your review: 2 things need attention.")).toBeInTheDocument();
+    const needs = screen.getByRole("list", { name: "Needs you" });
+    expect(within(needs).getByText("Review and submit the application")).toBeInTheDocument();
+    expect(within(needs).queryByText(/long letter/)).not.toBeInTheDocument(); // codes/details only in Details
+    const details = screen.getByText("Details").closest("details")!;
+    expect(details).not.toHaveAttribute("open");
+    expect(within(details).getByText(/long letter/)).toBeInTheDocument();
     const steps = within(screen.getByRole("list", { name: "Pipeline stages" })).getAllByRole("listitem");
     expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "upcoming"]);
   });

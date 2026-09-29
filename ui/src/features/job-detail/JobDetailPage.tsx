@@ -75,7 +75,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
   const subtitle = (
     <span className={styles.subtitle}>
       <Breadcrumb company={company} />
-      {[tier ? `Tier ${tier}` : null, statusLabel].filter(Boolean).map((t) => (
+      {[detail.posting.title, detail.posting.location, tier ? `Tier ${tier}` : null, statusLabel].filter(Boolean).map((t) => (
         <span key={t}>· {t}</span>
       ))}
     </span>
@@ -108,37 +108,20 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
           />
         ) : null}
         <PipelineCard jobId={jobId} />
+        {/* Supporting sections, in the design doc's order; apply-session screenshots sit under Documents. */}
+        <DocumentsCard
+          jobId={jobId}
+          documents={detail.documents}
+          otherFiles={detail.other_files}
+          submitted={detail.submitted}
+          qa={detail.qa}
+        />
+        <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} />
+        <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
+        <ScoreCard score={detail.score} />
         <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
-        <div className={styles.grid}>
-          <div className={styles.column}>
-            <SafetyCard
-              jobId={jobId}
-              company={company}
-              tier={tier}
-              safety={detail.safety}
-              registry={detail.registry}
-            />
-            <ScoreCard score={detail.score} />
-          </div>
-          <div className={styles.column}>
-            <DocumentsCard
-              jobId={jobId}
-              documents={detail.documents}
-              otherFiles={detail.other_files}
-              submitted={detail.submitted}
-              qa={detail.qa}
-            />
-            <ContactsCard
-              contacts={detail.contacts}
-              policy={detail.contacts_policy ?? []}
-              outreach={detail.outreach}
-            />
-          </div>
-          <div className={styles.column}>
-            <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} />
-            <ActivityCard activity={detail.activity ?? []} history={detail.history} />
-          </div>
-        </div>
+        <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
+        <ActivityCard activity={detail.activity ?? []} history={detail.history} />
       </div>
     </Page>
   );

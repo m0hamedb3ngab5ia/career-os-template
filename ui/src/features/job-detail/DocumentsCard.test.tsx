@@ -71,6 +71,8 @@ describe("DocumentsCard", () => {
     renderCard();
     expect(screen.getByText("Passed")).toHaveAttribute("data-tone", "green");
     expect(screen.getByText(`${formatDecimal(8.6)} of ${formatDecimal(7.5)} needed · next: queue`)).toBeInTheDocument();
+    // scores and counts sit in a collapsed Details; the verdict stays in view
+    expect(screen.getByText(`${formatDecimal(8.6)} of ${formatDecimal(7.5)} needed · next: queue`).closest("details")).not.toHaveAttribute("open");
     expect(screen.getByText("Specificity")).toBeInTheDocument();
     expect(screen.getByText("Truthfulness")).toBeInTheDocument();
     expect(screen.getByText(formatDecimal(9.5))).toBeInTheDocument();

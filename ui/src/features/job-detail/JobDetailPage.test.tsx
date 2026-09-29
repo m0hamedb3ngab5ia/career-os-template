@@ -50,6 +50,23 @@ describe("Job detail screen", () => {
     expect(document.title).toBe("Northwind Labs · career-os");
   });
 
+  it("leads with role, location and the Next step block, then the supporting sections in order", async () => {
+    setup({ "GET /api/jobs/nw01/pipeline": { stage: "review", next_action: "approve_continue", next_label: "Approve & continue",
+      next_kind: "apply", force: false, blocked_reason: null, note: null, auto_submit: false, active_run_id: null,
+      queued_in_run: null, failures: null,
+      review_reasons: [{ code: "qa_warning", text: "A document check left a warning", detail: "long letter" }] } });
+    expect(await screen.findByText("· Software Engineer, Infrastructure", {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("· Springfield")).toBeInTheDocument();
+    const next = screen.getByRole("region", { name: "Next step" });
+    expect(await within(next).findByText("Needs your review: 1 thing needs attention.")).toBeInTheDocument();
+    expect(within(next).getByRole("button", { name: "Approve & continue" })).toBeEnabled();
+    const order = ["Next step", "Documents", "Apply session", "Safety", "Score", "Posting", "Contacts & outreach", "Activity"]
+      .map((name) => screen.getByRole("region", { name }));
+    for (let i = 1; i < order.length; i++) {
+      expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    }
+  });
+
   it("header actions carry one-sentence help as their title", async () => {
     setup();
     expect(await screen.findByRole("button", { name: "Set status" })).toHaveAttribute("title", ACTION_HELP.setStatus);

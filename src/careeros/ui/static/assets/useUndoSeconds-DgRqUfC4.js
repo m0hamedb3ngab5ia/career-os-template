@@ -1,0 +1,1 @@
+import{t as e}from"./index-zxeMpR_l.js";function t(){return e().data?.ui.undo_seconds}export{t};
