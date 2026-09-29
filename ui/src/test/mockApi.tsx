@@ -31,7 +31,7 @@ export function mockApi(handlers: Record<string, Handler | unknown>): Call[] {
       const key = `${method} ${url.split("?")[0]}`;
       if (!(key in handlers)) return new Response(JSON.stringify({ detail: `no mock for ${key}` }), { status: 404 });
       const h = handlers[key];
-      const out = typeof h === "function" ? (h as Handler)(call) : h;
+      const out = typeof h === "function" ? await (h as Handler)(call) : h;
       if (out instanceof Response) return out;
       return new Response(JSON.stringify(out ?? {}), { headers: { "content-type": "application/json" } });
     }),

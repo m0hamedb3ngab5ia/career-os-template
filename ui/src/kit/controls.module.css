@@ -338,3 +338,8 @@
 .confirm[data-variant="primary"] {
   background: var(--blue-bg);
 }
+
+.segment:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
