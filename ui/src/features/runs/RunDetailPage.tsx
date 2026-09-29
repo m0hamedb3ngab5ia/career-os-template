@@ -20,7 +20,7 @@ export function RunDetailPage() {
   const live = run?.state === "running";
   const stream = useRunStream(runId, live);
   const back = (
-    <Link to="/runs" className={styles.back}>
+    <Link to="/automation" className={styles.back}>
       <ChevronLeft size={14} strokeWidth={1.7} aria-hidden="true" />
       All runs
     </Link>

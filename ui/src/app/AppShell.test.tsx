@@ -47,30 +47,38 @@ describe("AppShell", () => {
     const links = within(nav).getAllByRole("link").map((a) => a.textContent?.replace(/\d[\d,]*$/, "").trim());
     expect(links).toEqual([
       "Today",
-      "Pipeline",
       "Jobs",
-      "Action Items",
-      "Inbox & Follow-ups",
+      "Pipeline",
+      "Inbox",
+      "Automation",
       "Contacts",
-      "Runs",
       "Settings",
     ]);
-    for (const g of ["Overview", "Work", "System"]) expect(within(nav).getByText(g)).toBeInTheDocument();
+    for (const g of ["Job search", "More"]) expect(within(nav).getByText(g)).toBeInTheDocument();
+  });
+
+  it.each([
+    ["/runs", "/automation"],
+    ["/runs?kind=score", "/automation?kind=score"],
+    ["/runs/r1", "/automation/runs/r1"],
+  ])("redirects the old path %s to %s", async (from, to) => {
+    const { router } = renderAt(from);
+    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(to));
   });
 
   it("marks the current section and shows its page heading", async () => {
-    renderAt("/runs");
-    expect(await screen.findByRole("link", { name: "Runs" })).toHaveAttribute("aria-current", "page");
+    renderAt("/automation");
+    expect(await screen.findByRole("link", { name: "Automation" })).toHaveAttribute("aria-current", "page");
     // the screen is a lazy route: allow for its chunk to load
-    expect(await screen.findByRole("heading", { level: 1, name: "Runs" }, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Automation" }, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it("shows live counts from /api/status; zero when there is no data yet", async () => {
     renderAt("/", { counts: { jobs: 736, action_items_open: 7, inbox: 0 } });
     const nav = screen.getByRole("navigation", { name: "Sections" });
-    expect(await within(nav).findByText("736")).toBeInTheDocument();
-    expect(within(nav).getByText("7")).toBeInTheDocument();
-    expect(within(nav).getByText("0")).toBeInTheDocument();
+    expect(await within(nav).findByRole("link", { name: /^Today\s*7$/ })).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: /^Inbox\s*0$/ })).toBeInTheDocument();
+    expect(within(nav).queryByText("736")).toBeNull(); // Jobs total is not actionable
   });
 
   it("has a skip link to the main content", () => {
@@ -130,8 +138,8 @@ describe("AppShell", () => {
     });
 
     it("elsewhere the box starts empty", async () => {
-      renderAt("/runs?q=globex");
-      // the Runs route is lazy-loaded, so the shell appears once it resolves
+      renderAt("/automation?q=globex");
+      // the Automation route is lazy-loaded, so the shell appears once it resolves
       const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
       expect(box).toHaveValue("");
     });
@@ -170,43 +178,43 @@ describe("AppShell route changes", () => {
     const user = userEvent.setup();
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: "Sections" });
-    await user.click(within(nav).getByRole("link", { name: /^Runs/ }));
-    const h1 = await screen.findByRole("heading", { level: 1, name: "Runs" });
+    await user.click(within(nav).getByRole("link", { name: /^Automation/ }));
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Automation" });
     const main = screen.getByRole("main");
     await waitFor(() => expect(main).toHaveFocus());
     expect(main.contains(h1)).toBe(true);
-    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Runs");
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Automation");
   });
 
   it("does not announce or move focus on the first load", async () => {
-    renderAt("/runs");
-    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    renderAt("/automation");
+    await screen.findByRole("heading", { level: 1, name: "Automation" });
     expect(screen.getByRole("main")).not.toHaveFocus();
     expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
   });
 
   it("leaves focus alone when only the query string changes (e.g. ?sel=)", async () => {
-    const { router } = renderAt("/runs");
-    await screen.findByRole("heading", { level: 1, name: "Runs" });
+    const { router } = renderAt("/automation");
+    await screen.findByRole("heading", { level: 1, name: "Automation" });
     const search = screen.getByRole("searchbox", { name: "Search jobs and companies" });
     search.focus();
-    await act(() => router.navigate("/runs?sel=abc"));
+    await act(() => router.navigate("/automation?sel=abc"));
     expect(search).toHaveFocus();
     expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
   });
 
   it("waits for a loading page's real title before announcing it (not the placeholder)", async () => {
-    const { router } = renderAt("/runs");
-    await screen.findByRole("heading", { level: 1, name: "Runs" });
-    await act(() => router.navigate("/runs/abc"));
-    const h1 = await screen.findByRole("heading", { level: 1, name: (n) => n !== "Run" && n !== "Runs" });
+    const { router } = renderAt("/automation");
+    await screen.findByRole("heading", { level: 1, name: "Automation" });
+    await act(() => router.navigate("/automation/abc"));
+    const h1 = await screen.findByRole("heading", { level: 1, name: (n) => n !== "Run" && n !== "Automation" });
     await waitFor(() => expect(screen.getByTestId("route-announcer")).toHaveTextContent(h1.textContent!));
     expect(screen.getByTestId("route-announcer").textContent).not.toBe("Run");
   });
 
   it("Ctrl+K focuses the sidebar search off a Mac (Cmd+K does not)", async () => {
     const user = userEvent.setup();
-    renderAt("/runs");
+    renderAt("/automation");
     const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
     await user.keyboard("{Meta>}k{/Meta}");
     expect(search).not.toHaveFocus();
@@ -219,7 +227,7 @@ describe("AppShell route changes", () => {
     vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
     try {
       const user = userEvent.setup();
-      renderAt("/runs");
+      renderAt("/automation");
       const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
       expect(search).toHaveAttribute("aria-keyshortcuts", "Meta+K");
       const area = document.body.appendChild(document.createElement("textarea"));
@@ -235,7 +243,7 @@ describe("AppShell route changes", () => {
   });
 
   it("does not pull focus out of an open modal", async () => {
-    renderAt("/runs");
+    renderAt("/automation");
     await screen.findByRole("searchbox", { name: "Search jobs and companies" });
     const modal = document.body.appendChild(document.createElement("div"));
     modal.setAttribute("aria-modal", "true");

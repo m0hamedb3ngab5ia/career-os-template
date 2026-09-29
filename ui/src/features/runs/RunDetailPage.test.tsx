@@ -10,8 +10,8 @@ import type { RunDetail } from "./types";
 vi.setConfig({ testTimeout: 20_000 });
 
 const routes = [
-  { path: "/runs", element: <p>All runs</p> },
-  { path: "/runs/:runId", element: <RunDetailPage /> },
+  { path: "/automation", element: <p>All runs</p> },
+  { path: "/automation/runs/:runId", element: <RunDetailPage /> },
 ];
 
 function detail(over: Partial<RunDetail> = {}): RunDetail {
@@ -50,7 +50,7 @@ afterEach(() => {
 describe("RunDetailPage (live run)", () => {
   it("streams output into a log that is summarised for screen readers, with no axe violations", async () => {
     mockApi({ detail: { r1: detail() } });
-    const { container } = renderRoute(routes, "/runs/r1");
+    const { container } = renderRoute(routes, "/automation/runs/r1");
     expect(await screen.findByRole("heading", { level: 1, name: "Score run" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 2, name: "Live output" })).toBeInTheDocument();
     const es = FakeEventSource.last;
@@ -72,7 +72,7 @@ describe("RunDetailPage (live run)", () => {
         r2: detail({ id: "r2", status: "done", state: "done", stop_reason: "completed", log: "- start\n- stop\n" }),
       },
     });
-    renderRoute(routes, "/runs/r2");
+    renderRoute(routes, "/automation/runs/r2");
     const log = await screen.findByRole("log", { name: "Run log" });
     expect(within(log).getByText("- stop")).toBeInTheDocument();
     expect(screen.getByTestId("log-announcer")).toHaveTextContent("");

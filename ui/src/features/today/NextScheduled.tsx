@@ -21,7 +21,7 @@ export function NextScheduled({ schedule, catchUp, now }: { schedule: Schedule; 
         <h2 id="next-scheduled-title" className={styles.h2}>
           Next scheduled
         </h2>
-        <Link to="/runs" className={styles.headLink}>
+        <Link to="/automation" className={styles.headLink}>
           Run schedule
         </Link>
       </div>

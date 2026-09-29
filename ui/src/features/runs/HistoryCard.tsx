@@ -35,7 +35,7 @@ export function runSummary(run: Omit<RunRecord, "attempts">): string {
 function HistoryRow({ run, now }: { run: RunRecord; now: Date }) {
   const trig = triggerLabel(run.trigger);
   return (
-    <Link to={`/runs/${encodeURIComponent(run.id)}`} className={styles.historyRow}>
+    <Link to={`/automation/runs/${encodeURIComponent(run.id)}`} className={styles.historyRow}>
       <span className={styles.dot} data-tone={runTone(run)} aria-hidden="true" />
       <div className={styles.grow}>
         <div className={styles.strong}>

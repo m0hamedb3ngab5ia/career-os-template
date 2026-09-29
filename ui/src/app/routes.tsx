@@ -1,4 +1,4 @@
-import type { RouteObject } from "react-router";
+import { redirect, type RouteObject } from "react-router";
 import { NotFoundPage } from "../features/placeholder/PlaceholderPage";
 import { TodayPage } from "../features/today/TodayPage";
 import { AppShell } from "./AppShell";
@@ -17,8 +17,11 @@ export const routes: RouteObject[] = [
       { path: "inbox", lazy: () => import("../features/inbox/InboxPage").then((m) => ({ Component: m.InboxPage })) },
       { path: "inbox/:jobId", lazy: () => import("../features/inbox/InboxPage").then((m) => ({ Component: m.InboxPage })) },
       { path: "contacts", lazy: () => import("../features/contacts/ContactsPage").then((m) => ({ Component: m.ContactsPage })) },
-      { path: "runs", lazy: () => import("../features/runs/RunsPage").then((m) => ({ Component: m.RunsPage })) },
-      { path: "runs/:runId", lazy: () => import("../features/runs/RunDetailPage").then((m) => ({ Component: m.RunDetailPage })) },
+      { path: "automation", lazy: () => import("../features/runs/RunsPage").then((m) => ({ Component: m.RunsPage })) },
+      { path: "automation/runs/:runId", lazy: () => import("../features/runs/RunDetailPage").then((m) => ({ Component: m.RunDetailPage })) },
+      // Old Runs paths (design doc 2.1): kept as redirects so bookmarks and links still land.
+      { path: "runs", loader: ({ request }) => redirect(`/automation${new URL(request.url).search}`) },
+      { path: "runs/:runId", loader: ({ request, params }) => redirect(`/automation/runs/${encodeURIComponent(params.runId!)}${new URL(request.url).search}`) },
       { path: "settings/:section?", lazy: () => import("../features/settings/SettingsPage").then((m) => ({ Component: m.SettingsPage })) },
       { path: "kit", lazy: () => import("../features/kit/KitPage").then((m) => ({ Component: m.KitPage })) },
       { path: "*", element: <NotFoundPage /> },
