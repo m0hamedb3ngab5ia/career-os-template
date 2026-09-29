@@ -15,6 +15,7 @@ from typing import Any, Callable
 DEFAULT_CDP = "http://127.0.0.1:9223"   # dedicated port: not the 9222 a user's own debug Chrome may use
 RECORD = "application.json"
 FILL_EXIT = "careeros-fill-exit: "  # the UI's detached fill appends this + its exit code to application.log
+STAGED = "staged, not submitted"  # gh_fill's line once the form is filled and the tab kept open
 
 
 def _get(url: str) -> Any:
@@ -72,6 +73,8 @@ def fill_failure(job_dir: str | Path) -> dict[str, str] | None:
         if run[i].startswith(FILL_EXIT):
             run = run[i + 1:]
             break
+    if any(ln.startswith(STAGED) for ln in run):
+        return None  # form staged; exit 1 only means some fields were left for the user (fill_summary.json)
     return {"error": run[-1] if run else f"the fill exited with code {lines[-1][len(FILL_EXIT):]}",
             "log": "\n".join(run[-20:])}
 

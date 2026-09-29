@@ -138,6 +138,6 @@ def run(plan: dict[str, Any], job_dir: str | Path, *, cdp: str | None, profile_d
         tab_id = ctx.new_cdp_session(page).send("Target.getTargetInfo")["targetInfo"]["targetId"]
         browser.save_record(job_dir, tab_id=tab_id, url=page.url, cdp=cdp)
         page.bring_to_front()
-        print(f"staged, not submitted ({summary['filled']} filled, {len(summary['failed'])} failed; "
+        print(f"{browser.STAGED} ({summary['filled']} filled, {len(summary['failed'])} failed; "
               "fill_summary.json): review + submit in the open tab", file=sys.stderr)
         return summary  # leaving the block only disconnects: the browser and the tab stay open
