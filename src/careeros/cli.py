@@ -709,7 +709,8 @@ def cmd_action_list(args: argparse.Namespace) -> int:
         print("no open action items")
         return 0
     for it in items:
-        print(f"[{it['ID']}] {it['Priority']} {it['Type']:<15} {(it.get('Needs') or 'anytime'):<8} {it['Company'] or '':<18} {it['What to do']}")
+        print(f"[{it['ID']}] {it['Priority']} {it['Type']:<15} {(it.get('Needs') or 'anytime'):<8} {it['Company'] or '':<18} {it['What to do']}"
+              + (f" — {it['Detail']}" if it.get('Detail') else ""))
     return 0
 
 

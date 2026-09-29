@@ -166,3 +166,17 @@ def test_tracker_show_prints_one_row_as_json(cli, settings, capsys):
     assert cli(["tracker", "show", "o1", "--json"]) == 0
     row = _json.loads(capsys.readouterr().out)
     assert row["JobID"] == "o1" and row["Override"] == "A"
+
+
+def test_action_list_prints_the_detail(settings, monkeypatch, capsys):
+    import argparse
+
+    from careeros import cli
+    from careeros.tracker import add_action
+
+    monkeypatch.setattr(cli, "_settings", lambda _a: settings)
+    add_action(settings, "Retry it by hand", "other", detail="see `careeros run show r1`")
+    add_action(settings, "Plain item", "other")
+    assert cli.cmd_action_list(argparse.Namespace(all=False)) == 0
+    out = capsys.readouterr().out.splitlines()
+    assert out[0].endswith("Retry it by hand — see `careeros run show r1`") and out[1].endswith("Plain item")

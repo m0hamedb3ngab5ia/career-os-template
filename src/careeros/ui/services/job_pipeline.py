@@ -141,7 +141,8 @@ def review_reasons(qa: dict[str, Any] | None, prepare: dict[str, Any] | None,
     out.extend(session_notes(apply_session))
     for a in open_actions:
         t = str(a.get("type") or "other")
-        out.append(_reason(f"action_{t}", ACTION_TEXT.get(t, "A task for this job needs you"), a.get("what")))
+        out.append(_reason(f"action_{t}", ACTION_TEXT.get(t, "A task for this job needs you"),
+                            a.get("detail") or a.get("what")))
     return list({(r["code"], r["detail"]): r for r in out}.values())
 
 
@@ -214,14 +215,15 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
 
 
 def open_action_items(settings: Any, job_id: str) -> list[dict[str, Any]]:
-    """The open Action Items for the job as {type, what}; [] when the tracker cannot be read."""
+    """The open Action Items for the job as {type, what, detail}; [] when the tracker cannot be read."""
     from careeros.tracker import Tracker
 
     try:
         items = Tracker(settings=settings).list_action_items(open_only=True)
     except Exception:  # noqa: BLE001 - a locked or broken workbook must not break Job detail
         return []
-    return [{"type": i.get("Type"), "what": str(i.get("What to do") or "").strip()} for i in items
+    return [{"type": i.get("Type"), "what": str(i.get("What to do") or "").strip(),
+             "detail": str(i.get("Detail") or "").strip() or None} for i in items
             if str(i.get("JobID") or "") == job_id and str(i.get("What to do") or "").strip()]
 
 

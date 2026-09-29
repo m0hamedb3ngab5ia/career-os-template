@@ -169,3 +169,17 @@ def test_a_job_out_of_retries_is_blocked_with_the_failures_and_a_reset_hint():
     st = compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None, failures={**fails, "count": 1, "excluded": False})
     assert st["blocked_reason"] is None and st["failures"]["count"] == 1
     assert compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None)["failures"] is None
+
+
+def test_open_action_items_carry_detail_and_failed_run_items_stay_distinct(settings):
+    from careeros.tracker import add_action
+    from careeros.ui.services.job_pipeline import open_action_items
+
+    what = "Automation couldn't score for this job: retry or finish it by hand"
+    add_action(settings, what, "other", job_id="j1", detail="careeros run: /score-job failed on job j1 (see `careeros run show r1`)")
+    add_action(settings, what, "other", job_id="j1", detail="careeros run: /score-job failed 2 times on job j1 (timeout)")
+    add_action(settings, "Old item", "other", job_id="j1")  # written before the Detail column: falls back to what
+    opened = open_action_items(settings, "j1")
+    assert [o["detail"] for o in opened][2:] == [None]
+    got = review_reasons(None, None, opened)
+    assert [r["detail"] for r in got] == [opened[0]["detail"], opened[1]["detail"], "Old item"]

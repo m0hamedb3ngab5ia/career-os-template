@@ -492,3 +492,11 @@ def test_set_aside_twice_in_the_same_second_gets_a_counter(data, monkeypatch):
     assert first.name == "careeros.db.corrupt-20260924-150000"
     assert second.name == "careeros.db.corrupt-20260924-150000-1"
     assert (first.read_bytes(), second.read_bytes()) == (b"one", b"two")
+
+
+def test_a_pre_detail_tracker_item_is_indexed_with_detail_none(idx, data, monkeypatch):
+    legacy = {"ID": "old1", "Type": "other", "What to do": "careeros run: /score-job failed", "Done": "N"}
+    monkeypatch.setattr(index_mod, "read_action_items", lambda _p: [legacy])
+    monkeypatch.setattr(idx, "get_meta", lambda k: None if k == "tracker_sig" else "x")
+    idx.sync()
+    assert [(r["id"], r["detail"]) for r in idx.query("SELECT id, detail FROM action_items")] == [("old1", None)]

@@ -163,14 +163,14 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
             detail = (f"careeros run: /{SKILLS[kind]} failed on job {jid} ({outcome}: "
                       f"{(att.get('detail') or '')[:120]}) and left it where no run picks it up again "
                       f"(see `careeros run show {att['run_id']}`)")
-            add_action(settings, FAILED_WHAT[kind], "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
+            add_action(settings, FAILED_WHAT.get(kind, "Automation couldn't finish this job: retry or finish it by hand"), "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
                        detail=detail)
             echo(f"    {jid}: not selectable after the failure -> Action Item")
             return
         if n >= max_attempts and retry["action_item"]:
             detail = (f"careeros run: /{SKILLS[kind]} failed {n} times on job {jid} ({outcome}: "
                       f"{(att.get('detail') or '')[:120]}); see `careeros run show {att['run_id']}`")
-            add_action(settings, FAILED_WHAT[kind], "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
+            add_action(settings, FAILED_WHAT.get(kind, "Automation couldn't finish this job: retry or finish it by hand"), "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
                        detail=detail)
             echo(f"    {jid}: out of retries -> Action Item")
 
