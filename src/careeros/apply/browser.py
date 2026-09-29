@@ -22,6 +22,11 @@ def _get(url: str) -> Any:
         return json.loads(r.read() or b"null")
 
 
+def _put(url: str) -> Any:
+    with urllib.request.urlopen(urllib.request.Request(url, method="PUT"), timeout=5) as r:  # noqa: S310 (local CDP)
+        return json.loads(r.read() or b"null")
+
+
 def cdp_url(settings: Any) -> str:
     return str((getattr(settings, "paths", None) or {}).get("apply_cdp") or DEFAULT_CDP)
 
@@ -102,9 +107,14 @@ def activate(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = N
 
 
 def ensure(cdp: str, profile_dir: str | Path, executable: str, get: Callable[[str], Any] | None = None,
-           popen: Callable[..., Any] = subprocess.Popen, wait_s: float = 15.0) -> None:
+           popen: Callable[..., Any] = subprocess.Popen, wait_s: float = 15.0,
+           put: Callable[[str], Any] | None = None) -> None:
     """Start the apply browser detached (own session: survives the app and its rebuilds) unless one answers."""
-    if tabs(cdp, get) is not None:
+    open_tabs = tabs(cdp, get)
+    if open_tabs == []:
+        # macOS keeps Chromium alive after its last tab closes; CDP attach fails without a window, so open one.
+        (put or _put)(f"{cdp}/json/new?about:blank")
+    if open_tabs is not None:
         return
     port = cdp.rsplit(":", 1)[-1].strip("/")
     popen([executable, f"--remote-debugging-port={port}", f"--user-data-dir={profile_dir}", "--no-first-run",
