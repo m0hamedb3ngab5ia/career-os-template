@@ -59,8 +59,12 @@ def test_record_round_trip(tmp_path):
 
 def test_ensure_launches_detached_only_when_nothing_answers(tmp_path):
     launched: list[dict] = []
-    browser.ensure(CDP, tmp_path, "chrome", get=fake([]), popen=lambda *a, **k: launched.append(k))
-    assert launched == []
+    opened: list[str] = []
+    browser.ensure(CDP, tmp_path, "chrome", get=fake([]), popen=lambda *a, **k: launched.append(k), put=opened.append)
+    assert launched == [] and opened == [f"{CDP}/json/new?about:blank"]  # alive, no window (last tab closed)
+    browser.ensure(CDP, tmp_path, "chrome", get=fake([{"id": "T", "type": "page"}]), popen=launched.append,
+                   put=opened.append)
+    assert launched == [] and len(opened) == 1
     state = {"up": False}
 
     def get(url):
