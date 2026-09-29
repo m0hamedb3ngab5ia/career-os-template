@@ -64,6 +64,24 @@ describe("JobsTable", () => {
     expect(onToggleAll).toHaveBeenCalled();
   });
 
+  it("select all on the page is checked, mixed or off from the shown rows", () => {
+    const rows = MANY.slice(0, 3);
+    const all = () => screen.getByRole("checkbox", { name: "Select all shown jobs" }) as HTMLInputElement;
+    const { rerender } = renderTable({ rows, total: 3, selected: new Set(["j0", "j1", "j2", "elsewhere"]) });
+    expect(all()).toBeChecked();
+    expect(all().indeterminate).toBe(false);
+    const props = { columns: COLUMNS, sort: "-fit", onSort: vi.fn(), onToggle: vi.fn(), onToggleAll: vi.fn(), total: 3,
+      captionId: "cap", filters: {}, onFilter: vi.fn(), filterParams: { tab: "active" as const, q: "", location: "", filters: {} },
+      onSortTo: vi.fn() };
+    rerender(<MemoryRouter><JobsTable {...props} rows={rows} selected={new Set(["j1"])} /></MemoryRouter>);
+    expect(all()).not.toBeChecked();
+    expect(all().indeterminate).toBe(true);
+    rerender(<MemoryRouter><JobsTable {...props} rows={rows} selected={new Set()} /></MemoryRouter>);
+    expect(all().indeterminate).toBe(false);
+    rerender(<MemoryRouter><JobsTable {...props} rows={[]} total={0} selected={new Set()} /></MemoryRouter>);
+    expect(all()).toBeDisabled();
+  });
+
   it("has no axe violations", async () => {
     const { container } = renderTable({ rows: MANY.slice(0, 5), total: 5 });
     expect(await axeViolations(container)).toEqual([]);
