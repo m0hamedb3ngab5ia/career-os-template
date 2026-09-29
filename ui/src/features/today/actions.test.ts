@@ -1,9 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { filterActions, linkInfo, parseFilter, parseSort, sortActions } from "./actions";
+import { groupByJob, jobCta, linkInfo } from "./actions";
 import { actionItem } from "./testing";
 import type { ActionItem } from "./types";
-
-const now = new Date("2026-09-25T10:00:00Z");
 
 // Fictional companies only.
 const items: ActionItem[] = [
@@ -17,56 +15,43 @@ const items: ActionItem[] = [
 ];
 const ids = (xs: ActionItem[]) => xs.map((x) => x.id);
 
-describe("sortActions", () => {
-  it("priority: H→L, then soonest due, undated last", () => {
-    expect(ids(sortActions(items, "priority"))).toEqual(["4", "2", "3", "1"]);
+describe("groupByJob", () => {
+  const g = (over: Partial<ActionItem> & Pick<ActionItem, "id">) => actionItem({ company: "Acme Robotics", what: "x", ...over });
+  const groups = groupByJob([
+    g({ id: "1", job_id: "j-a", priority: "L", type: "review" }),
+    g({ id: "2", job_id: null, company: "", priority: "H" }),
+    g({ id: "3", job_id: "j-b", company: "Globex", priority: "H", type: "send_email", due: "2026-09-26T09:00:00Z" }),
+    g({ id: "4", job_id: "j-a", priority: "M", type: "captcha" }),
+    g({ id: "5", job_id: "j-b", company: "Globex", priority: "H", type: "send_email", due: "2026-09-25T12:00:00Z" }),
+  ]);
+
+  it("one group per job; tasks without a job are a final 'Other tasks' group", () => {
+    expect(groups.map((x) => x.jobId)).toEqual(["j-a", "j-b", null]);
+    expect(groups.map((x) => ids(x.items))).toEqual([["4", "1"], ["5", "3"], ["2"]]);
+    expect(groups[1]).toMatchObject({ company: "Globex" });
   });
-  it("due: soonest first, undated last, ties by priority", () => {
-    expect(ids(sortActions(items, "due"))).toEqual(["3", "4", "2", "1"]);
+
+  it("orders blocked first, then priority, then due (groups by their top task)", () => {
+    // j-a leads: its captcha blocks the application even though j-b has higher priority.
+    expect(ids(groups[0]!.items)).toEqual(["4", "1"]);
+    expect(ids(groups[1]!.items)).toEqual(["5", "3"]);
   });
-  it("A–Z by company", () => {
-    expect(ids(sortActions(items, "az"))).toEqual(["2", "1", "4", "3"]);
-  });
-  it("A–Z puts an item with no company last instead of crashing", () => {
-    const noCompany = { ...items[0]!, id: "5", company: undefined as unknown as string };
-    const zz = { ...items[0]!, id: "6", company: "Zzyzx" };
-    expect(ids(sortActions([noCompany, ...items], "az"))).toEqual(["2", "1", "4", "3", "5"]);
-    expect(ids(sortActions([...items, noCompany, zz], "az"))).toEqual(["2", "1", "4", "3", "6", "5"]);
-    expect(ids(sortActions([zz, noCompany], "az"))).toEqual(["6", "5"]);
-    expect(ids(sortActions([noCompany, zz], "az"))).toEqual(["6", "5"]);
-  });
-  it("newest by created", () => {
-    expect(ids(sortActions(items, "newest"))).toEqual(["2", "4", "3", "1"]);
-  });
+
   it("does not mutate its input", () => {
-    const copy = [...items];
-    sortActions(items, "az");
-    expect(items).toEqual(copy);
+    const input = [...items];
+    groupByJob(input);
+    expect(ids(input)).toEqual(ids(items));
   });
 });
 
-describe("filterActions", () => {
-  it.each([
-    ["all", ["1", "2", "3", "4"]],
-    ["overdue", ["3"]],
-    ["soon", ["3", "4"]],
-    ["high", ["2", "4"]],
-    ["phone", ["1", "3", "4"]],
-    ["laptop", ["2"]],
-    ["nodate", ["1"]],
-  ] as const)("%s", (f, want) => {
-    expect(ids(filterActions(items, f, now))).toEqual(want);
-  });
-});
-
-describe("URL values", () => {
-  it("fall back to the defaults for missing or unknown values", () => {
-    expect(parseSort(null)).toBe("priority");
-    expect(parseSort("due")).toBe("due");
-    expect(parseSort("bogus")).toBe("priority");
-    expect(parseFilter(null)).toBe("all");
-    expect(parseFilter("high")).toBe("high");
-    expect(parseFilter("nope")).toBe("all");
+describe("jobCta", () => {
+  it("names the one next step from the job's tasks", () => {
+    const cta = (...types: string[]) => jobCta(types.map((type, i) => actionItem({ id: String(i), company: "A", what: "x", type })));
+    expect(cta("send_email", "question")).toBe("Answer questions");
+    expect(cta("salary")).toBe("Answer questions");
+    expect(cta("qa_fail")).toBe("Review documents");
+    expect(cta("review")).toBe("Review documents");
+    expect(cta("captcha")).toBe("Continue application");
   });
 });
 

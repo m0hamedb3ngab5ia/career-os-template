@@ -1,76 +1,47 @@
-import { SOON_MS, parseTime } from "../../lib/dates";
+import { parseTime } from "../../lib/dates";
 import type { ActionItem } from "./types";
 
-// Sorting, filtering and link handling for the "Needs you" list. Pure, so the screen and the tests share them.
+// Grouping, order and link handling for the "Needs you" list. Pure, so the screen and the tests share them.
 
-export const SORTS = [
-  { value: "priority", label: "Priority" },
-  { value: "due", label: "Due date" },
-  { value: "az", label: "A–Z" },
-  { value: "newest", label: "Newest" },
-] as const;
-export type SortKey = (typeof SORTS)[number]["value"];
-
-export const FILTERS = [
-  { value: "all", label: "All" },
-  { value: "overdue", label: "Overdue" },
-  { value: "soon", label: "Due in 48 h" },
-  { value: "high", label: "High priority" },
-  { value: "phone", label: "Phone OK" },
-  { value: "laptop", label: "Needs laptop" },
-  { value: "nodate", label: "No date" },
-] as const;
-export type FilterKey = (typeof FILTERS)[number]["value"];
-
-export const DEFAULT_SORT: SortKey = "priority";
-export const DEFAULT_FILTER: FilterKey = "all";
-
-export function parseSort(v: string | null): SortKey {
-  return SORTS.some((s) => s.value === v) ? (v as SortKey) : DEFAULT_SORT;
-}
-export function parseFilter(v: string | null): FilterKey {
-  return FILTERS.some((f) => f.value === v) ? (v as FilterKey) : DEFAULT_FILTER;
-}
-
+// Task types that stop an application until you act (design doc 3 "Today": blocked first).
+const BLOCKING = new Set(["captcha", "bot_detection", "question", "salary", "profile_gap", "qa_fail", "laptop_required", "scam_suspected"]);
 const PRIO: Record<string, number> = { H: 0, M: 1, L: 2 };
+const blocked = (a: ActionItem) => (BLOCKING.has(a.type) ? 0 : 1);
 const prio = (a: ActionItem) => PRIO[a.priority ?? ""] ?? 3;
 const due = (a: ActionItem) => parseTime(a.due)?.getTime() ?? Number.POSITIVE_INFINITY;
-const created = (a: ActionItem) => parseTime(a.created)?.getTime() ?? Number.NEGATIVE_INFINITY;
 const byDue = (a: ActionItem, b: ActionItem) => {
   const x = due(a);
   const y = due(b);
   return x === y ? 0 : x < y ? -1 : 1;
 };
+const byOrder = (a: ActionItem, b: ActionItem) => blocked(a) - blocked(b) || prio(a) - prio(b) || byDue(a, b);
 
-const byCompany = (a: ActionItem, b: ActionItem) => {
-  const x = a.company ?? "";
-  const y = b.company ?? "";
-  return x === y ? 0 : !x ? 1 : !y ? -1 : x.localeCompare(y); // an item with no company sorts last
-};
-
-const SORTERS: Record<SortKey, (a: ActionItem, b: ActionItem) => number> = {
-  priority: (a, b) => prio(a) - prio(b) || byDue(a, b),
-  due: (a, b) => byDue(a, b) || prio(a) - prio(b),
-  az: (a, b) => byCompany(a, b) || prio(a) - prio(b),
-  newest: (a, b) => created(b) - created(a) || prio(a) - prio(b),
-};
-
-export function sortActions(items: readonly ActionItem[], sort: SortKey): ActionItem[] {
-  return items.toSorted(SORTERS[sort]);
+export interface JobGroup {
+  /** null = the final "Other tasks" group (tasks with no job). */
+  jobId: string | null;
+  company: string;
+  role: string;
+  items: ActionItem[];
 }
 
-export function filterActions(items: readonly ActionItem[], filter: FilterKey, now: Date): ActionItem[] {
-  const t = now.getTime();
-  const test: Record<FilterKey, (a: ActionItem) => boolean> = {
-    all: () => true,
-    overdue: (a) => due(a) < t,
-    soon: (a) => due(a) - t <= SOON_MS,
-    high: (a) => a.priority === "H",
-    phone: (a) => a.needs === "phone" || a.needs === "anytime",
-    laptop: (a) => a.needs === "laptop",
-    nodate: (a) => parseTime(a.due) === null,
-  };
-  return items.filter(test[filter]);
+/** One group per job, tasks and groups ordered blocked → priority → due; job-less tasks last. */
+export function groupByJob(items: readonly ActionItem[]): JobGroup[] {
+  const groups = new Map<string | null, JobGroup>();
+  for (const item of items.toSorted(byOrder)) {
+    const jobId = item.job_id || null;
+    let g = groups.get(jobId);
+    if (!g) groups.set(jobId, (g = { jobId, company: item.company, role: item.role, items: [] }));
+    g.items.push(item);
+  }
+  return [...groups.values()].sort((a, b) => (a.jobId === null ? 1 : 0) - (b.jobId === null ? 1 : 0));
+}
+
+/** The job's single next step, from its open tasks (no job status on /api/today). */
+export function jobCta(items: readonly ActionItem[]): string {
+  const types = new Set(items.map((a) => a.type));
+  if (types.has("question") || types.has("salary")) return "Answer questions";
+  if (types.has("qa_fail") || types.has("review")) return "Review documents";
+  return "Continue application";
 }
 
 export type LinkInfo = { kind: "web"; href: string; label: string } | { kind: "text"; text: string };

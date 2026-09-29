@@ -1,40 +1,26 @@
 import { useEffect, useRef, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link } from "react-router";
 import { Button } from "../../kit/Button";
 import { ActionTypeLabel, NeedsLabel, PriorityChip } from "../../kit/chips";
+import { Details } from "../../kit/Details";
 import { EmptyState } from "../../kit/EmptyState";
 import { ExternalLink } from "../../kit/ExternalLink";
 import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
-import { PillGroup } from "../../kit/PillGroup";
-import { SegmentedControl } from "../../kit/SegmentedControl";
 import { useToast } from "../../kit/Toast";
 import { dueInfo, type DueLevel } from "../../lib/dates";
 import { formatDue } from "../../lib/format";
 import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
-import {
-  DEFAULT_FILTER,
-  DEFAULT_SORT,
-  FILTERS,
-  SORTS,
-  filterActions,
-  linkInfo,
-  parseFilter,
-  parseSort,
-  sortActions,
-} from "./actions";
+import { groupByJob, jobCta, linkInfo, type JobGroup } from "./actions";
 import { errorText, useMarkDone, useMeta, useReopen, useToday } from "./api";
 import type { ActionItem } from "./types";
 import styles from "./Today.module.css";
 
-/** The "Needs you" list: every open Action Item, sortable and filterable (both kept in the query string). */
+/** The "Needs you" list: every open Action Item, grouped by job with one next step each (design doc 3 "Today"). */
 export function NeedsYou() {
   const today = useToday();
   const meta = useMeta();
   const now = useNow(60_000);
-  const [params, setParams] = useSearchParams();
-  const sort = parseSort(params.get("sort"));
-  const filter = parseFilter(params.get("filter"));
   const toast = useToast();
   const markDone = useMarkDone();
   const reopen = useReopen();
@@ -43,18 +29,6 @@ export function NeedsYou() {
   const listRef = useRef<HTMLUListElement>(null);
   /** After Mark done: the row that left and the row whose control takes focus (null = the heading). */
   const [refocus, setRefocus] = useState<{ done: string; next: string | null } | null>(null);
-
-  function setParam(key: "sort" | "filter", value: string, fallback: string) {
-    setParams(
-      (p) => {
-        const next = new URLSearchParams(p);
-        if (value === fallback) next.delete(key);
-        else next.set(key, value);
-        return next;
-      },
-      { replace: true },
-    );
-  }
 
   function onDone(item: ActionItem) {
     const i = shown.findIndex((a) => a.id === item.id);
@@ -78,7 +52,8 @@ export function NeedsYou() {
   }
 
   const all = today.data?.actions ?? [];
-  const shown = sortActions(filterActions(all, filter, now), sort);
+  const groups = groupByJob(all);
+  const shown = groups.flatMap((g) => g.items);
   useEffect(() => {
     if (!refocus || shown.some((a) => String(a.id) === refocus.done)) return;
     setRefocus(null);
@@ -88,23 +63,22 @@ export function NeedsYou() {
         : listRef.current?.querySelector<HTMLElement>(`[data-action-id="${CSS.escape(refocus.next)}"] [role="checkbox"]`);
     (target ?? headingRef.current)?.focus();
   });
-  const countLabel = shown.length === all.length ? formatCount(all.length) : `${formatCount(shown.length)} of ${formatCount(all.length)}`;
 
   return (
     <section className={styles.list} aria-labelledby="needs-you-title" aria-busy={today.isPending || undefined}>
       <div className={styles.listHead}>
         <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className={styles.h2}>
-          Needs you {today.data ? <span className={`${styles.count} tabular`}>{countLabel}</span> : null}
+          Needs you {today.data ? <span className={`${styles.count} tabular`}>{formatCount(all.length)}</span> : null}
         </h2>
         <Link to="/actions" className={styles.headLink}>
-          All action items
+          View all tasks
         </Link>
       </div>
       {today.isPending ? (
-        <div className={styles.skeletonBlock} aria-label="Loading action items" role="img" />
+        <div className={styles.skeletonBlock} aria-label="Loading tasks" role="img" />
       ) : today.isError ? (
         <EmptyState
-          title="Couldn’t load action items"
+          title="Couldn’t load tasks"
           headingLevel={3}
           action={
             <Button size="small" onClick={() => void today.refetch()}>
@@ -116,47 +90,53 @@ export function NeedsYou() {
         </EmptyState>
       ) : all.length === 0 ? (
         <EmptyState title="Nothing needs you" headingLevel={3}>
-          New action items appear here when a run needs a decision from you.
+          New tasks appear here when a run needs a decision from you.
         </EmptyState>
       ) : (
-        <>
-          <div className={styles.controls}>
-            <SegmentedControl label="Sort" value={sort} onValueChange={(v) => setParam("sort", v, DEFAULT_SORT)}>
-              {SORTS.map((s) => (
-                <SegmentedControl.Option key={s.value} value={s.value}>
-                  {s.label}
-                </SegmentedControl.Option>
-              ))}
-            </SegmentedControl>
-            <PillGroup label="Filter" value={filter} onValueChange={(v) => setParam("filter", v, DEFAULT_FILTER)}>
-              {FILTERS.map((f) => (
-                <PillGroup.Pill key={f.value} value={f.value}>
-                  {f.label}
-                </PillGroup.Pill>
-              ))}
-            </PillGroup>
-          </div>
-          {shown.length === 0 ? (
-            <p className={styles.emptyLine}>
-              Nothing matches this filter.{" "}
-              <button type="button" className={styles.textButton} onClick={() => setParam("filter", DEFAULT_FILTER, DEFAULT_FILTER)}>
-                Clear filter
-              </button>
-            </p>
-          ) : (
-            <ul ref={listRef} className={styles.rows}>
-              {shown.map((item) => (
-                <ActionRow key={item.id} item={item} now={now} onDone={onDone} />
-              ))}
-            </ul>
-          )}
-        </>
+        <ul ref={listRef} className={styles.groups}>
+          {groups.map((g) => (
+            <JobTasks key={g.jobId ?? ""} group={g} now={now} onDone={onDone} />
+          ))}
+        </ul>
       )}
     </section>
   );
 }
 
-function ActionRow({ item, now, onDone }: { item: ActionItem; now: Date; onDone: (item: ActionItem) => void }) {
+function JobTasks({ group, now, onDone }: { group: JobGroup; now: Date; onDone: (item: ActionItem) => void }) {
+  const n = group.items.length;
+  return (
+    <li className={styles.group}>
+      <div className={styles.groupHead}>
+        <div className={styles.rowMain}>
+          {group.jobId ? (
+            <h3 className={styles.rowTitle}>
+              <span className={styles.strong} data-company translate="no">
+                {group.company}
+              </span>
+              {group.role ? <span className={styles.rowRole}>{group.role}</span> : null}
+            </h3>
+          ) : (
+            <h3 className={`${styles.rowTitle} ${styles.strong}`}>Other tasks</h3>
+          )}
+          <div className={styles.rowWhat}>{n === 1 ? "1 thing needs attention" : `${formatCount(n)} things need attention`}</div>
+        </div>
+        {group.jobId ? (
+          <Link to={`/jobs/${encodeURIComponent(group.jobId)}`} className={styles.headLink}>
+            {jobCta(group.items)}
+          </Link>
+        ) : null}
+      </div>
+      <ul className={styles.rows}>
+        {group.items.map((item) => (
+          <ActionRow key={item.id} item={item} now={now} onDone={onDone} showCompany={!group.jobId} />
+        ))}
+      </ul>
+    </li>
+  );
+}
+
+function ActionRow({ item, now, onDone, showCompany }: { item: ActionItem; now: Date; onDone: (item: ActionItem) => void; showCompany: boolean }) {
   const info = dueInfo(item.due, now);
   // Same fields as /api/actions: a date-only deadline has no time of day; the server's level wins when present.
   const due = info && {
@@ -167,16 +147,18 @@ function ActionRow({ item, now, onDone }: { item: ActionItem; now: Date; onDone:
   return (
     <li className={styles.row} data-action-id={String(item.id)}>
       <span className={styles.rowDone}>
-        <MarkDoneCircle done={false} onDoneChange={() => onDone(item)} itemName={`${item.company}: ${item.what}`} />
+        <MarkDoneCircle done={false} onDoneChange={() => onDone(item)} itemName={item.company ? `${item.company}: ${item.what}` : item.what} />
       </span>
       <div className={styles.rowMain}>
-        <div className={styles.rowTitle}>
-          <span className={styles.strong} data-company translate="no">
-            {item.company}
-          </span>
-          {item.role ? <span className={styles.rowRole}>{item.role}</span> : null}
-        </div>
+        {showCompany && item.company ? (
+          <div className={styles.rowTitle}>
+            <span className={styles.strong} translate="no">
+              {item.company}
+            </span>
+          </div>
+        ) : null}
         <div className={styles.rowWhat}>{item.what}</div>
+        {item.detail ? <Details summary="Details">{item.detail}</Details> : null}
         {due ? (
           <div className={styles.due} data-level={due.level}>
             {item.due_reason ? `${due.text} · ${item.due_reason}` : due.text}

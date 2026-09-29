@@ -23,14 +23,14 @@ describe("TodayPage", () => {
   it("has the large title, the local date and how many items need you", async () => {
     setup();
     expect(screen.getByRole("heading", { level: 1, name: "Today" })).toBeInTheDocument();
-    expect(await screen.findByText("Friday, September 25 · 4 items need you")).toBeInTheDocument();
+    expect(await screen.findByText("Friday, September 25 · 4 jobs need you")).toBeInTheDocument();
     expect(document.title).toBe("Today · career-os");
   });
 
   it("renders every section from the API", async () => {
     setup();
-    expect(await screen.findByRole("button", { name: /Applied this week/ })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: /Needs you 4/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Applied this week/ })).not.toBeInTheDocument(); // stat tiles are gone
     expect(screen.getByRole("heading", { name: "Recent runs" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Next scheduled" })).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "Pipeline" })).toBeInTheDocument();
@@ -38,8 +38,7 @@ describe("TodayPage", () => {
 
   it("shows loading placeholders before data arrives", () => {
     setup({ "GET /api/status": () => new Promise<Response>(() => {}), "GET /api/today": () => new Promise<Response>(() => {}) });
-    expect(screen.getByRole("img", { name: "Loading today’s numbers" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Loading action items" })).toBeInTheDocument();
+    expect(screen.getByRole("img", { name: "Loading tasks" })).toBeInTheDocument();
   });
 
   it("shows the server's error with Retry when status can't load", async () => {
@@ -58,7 +57,7 @@ describe("TodayPage", () => {
             release = () => res(json({ kind: "scout", started: true, pid: 42 }));
           }),
       });
-      await screen.findByText(/items need you/);
+      await screen.findByText(/jobs need you/);
       await user.click(screen.getByRole("button", { name: "Run scout" }));
       expect(await screen.findByRole("button", { name: "Starting…" })).toBeDisabled();
       release();
@@ -69,7 +68,7 @@ describe("TodayPage", () => {
     it("a refused run shows the server's detail in a toast", async () => {
       const user = userEvent.setup();
       setup({ "POST /api/runs/steps/scout": { $status: 409, body: { detail: "scout is already running" } } });
-      await screen.findByText(/items need you/);
+      await screen.findByText(/jobs need you/);
       await user.click(screen.getByRole("button", { name: "Run scout" }));
       const msg = await screen.findByText(/scout is already running/);
       expect(msg.closest("[aria-live]")).not.toBeNull();
@@ -123,11 +122,10 @@ describe("TodayPage", () => {
 
   it("renders with an empty API (a fresh install) without inventing data", async () => {
     setup({ "GET /api/status": {}, "GET /api/today": {}, "GET /api/meta": {} });
-    expect(await screen.findByText("Friday, September 25 · 0 items need you")).toBeInTheDocument();
+    expect(await screen.findByText("Friday, September 25 · nothing needs you")).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Nothing needs you" })).toBeInTheDocument();
     expect(screen.getByText("No runs yet")).toBeInTheDocument();
     expect(screen.getByText("No jobs yet")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Response rate/ })).toHaveTextContent("—");
   });
 
   it("has no axe violations", async () => {

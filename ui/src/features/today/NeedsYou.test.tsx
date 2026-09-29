@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { NeedsYou } from "./NeedsYou";
-import { defaultRoutes, json, mockApi, NOW, renderWithApp, today, type Routes } from "./testing";
+import { actionItem, defaultRoutes, json, mockApi, NOW, renderWithApp, today, type Routes } from "./testing";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -56,50 +56,35 @@ describe("NeedsYou", () => {
     const initech = within((await screen.findByText("Initech")).closest("li")!);
     expect(initech.getByText("profile/master.yaml").closest("a")).toBeNull();
     const hooli = within(screen.getByText("Hooli").closest("li")!);
-    expect(hooli.queryByRole("link")).not.toBeInTheDocument();
+    expect(hooli.queryByRole("link", { name: /^Open/ })).not.toBeInTheDocument();
   });
 
-  it("sorts by priority by default and keeps sort and filter in the URL", async () => {
-    const user = userEvent.setup();
-    const { router } = setup();
-    await screen.findByText("Acme Robotics");
-    expect(rowNames()).toEqual(["Globex", "Acme Robotics", "Hooli", "Initech"]);
-    await user.click(screen.getByRole("radio", { name: "Due date" }));
-    expect(router.state.location.search).toBe("?sort=due");
-    expect(rowNames()).toEqual(["Hooli", "Globex", "Acme Robotics", "Initech"]);
-    await user.click(screen.getByRole("radio", { name: "High priority" }));
-    expect(new URLSearchParams(router.state.location.search).get("filter")).toBe("high");
-    expect(rowNames()).toEqual(["Globex", "Acme Robotics"]);
-    expect(screen.getByRole("heading", { name: "Needs you 2 of 4" })).toBeInTheDocument();
-  });
-
-  it("reads sort and filter from the URL", async () => {
-    setup("/?sort=az&filter=phone");
-    await screen.findByText("Globex");
-    expect(screen.getByRole("radio", { name: "A–Z" })).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByRole("radio", { name: "Phone OK" })).toHaveAttribute("aria-checked", "true");
-    expect(rowNames()).toEqual(["Globex", "Hooli", "Initech"]);
-  });
-
-  it("arrow keys move through the sort control", async () => {
-    const user = userEvent.setup();
-    const { router } = setup();
-    await screen.findByText("Globex");
-    screen.getByRole("radio", { name: "Priority" }).focus();
-    await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("radio", { name: "Due date" })).toHaveFocus();
-    expect(router.state.location.search).toBe("?sort=due");
-  });
-
-  it("an empty filter result offers Clear filter", async () => {
-    const user = userEvent.setup();
-    const { router } = setup("/?filter=laptop", {
-      "GET /api/today": { ...today, actions: today.actions!.filter((a) => a.needs !== "laptop") },
+  it("groups tasks by job, blocked first, with one CTA per job to the job page", async () => {
+    setup("/", {
+      "GET /api/today": {
+        ...today,
+        actions: [
+          ...today.actions!,
+          actionItem({ id: "15", job_id: "j-acme", company: "Acme Robotics", role: "Software Engineer, Platform",
+            what: "Answer 2 application questions", type: "question", priority: "M",
+            detail: "careeros run: /apply-job stopped at question 4" }),
+          actionItem({ id: "16", company: "", what: "Update your LinkedIn headline", priority: "L" }),
+        ],
+      },
     });
-    expect(await screen.findByText(/Nothing matches this filter/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Clear filter" }));
-    expect(router.state.location.search).toBe("");
-    expect(screen.getByText("Globex")).toBeInTheDocument();
+    const acme = within((await screen.findByText("Acme Robotics")).closest("li")!);
+    expect(acme.getByText("2 things need attention")).toBeInTheDocument();
+    expect(acme.getByRole("link", { name: "Answer questions" })).toHaveAttribute("href", "/jobs/j-acme");
+    // The blocking question comes before the High-priority review; its raw detail sits behind Details.
+    const tasks = acme.getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"));
+    expect(tasks[0]).toMatch(/Answer 2 application questions/);
+    expect(acme.getByText("careeros run: /apply-job stopped at question 4").closest("details")).not.toBeNull();
+    expect(rowNames()[0]).toBe("Acme Robotics");
+    const other = within(screen.getByRole("heading", { name: "Other tasks" }).closest("li")!);
+    expect(other.getByText("Update your LinkedIn headline")).toBeInTheDocument();
+    expect(other.queryByRole("link", { name: /Continue|Review|Answer/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "View all tasks" })).toHaveAttribute("href", "/actions");
+    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
   });
 
   it("has its own empty state when nothing is open", async () => {
