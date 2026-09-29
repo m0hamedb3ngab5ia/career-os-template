@@ -359,6 +359,26 @@ describe("PipelineCard", () => {
     expect(api.callsTo("POST /api/jobs/j1/application/open")).toHaveLength(1);
   });
 
+  it("shows Connect Chrome + Retry when your Chrome is not connected, and retries the same request", async () => {
+    const api = setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
+      "GET /api/jobs/j1/application": { tab: "needs_refill", submitted: false, can_fill: true },
+      "POST /api/jobs/j1/application/open": { status: 409, body: { detail: "Chrome not connected on http://127.0.0.1:9222: open Chrome, then retry" } },
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Refill application" }));
+    expect(await screen.findByText("Connect Chrome extension, then retry")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(api.callsTo("POST /api/jobs/j1/application/open")).toHaveLength(2);
+  });
+
+  it("says Connect Chrome instead of the raw error when the fill could not attach to the browser", async () => {
+    setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
+      "GET /api/jobs/j1/application": { tab: "none", submitted: false, can_fill: true,
+        fill_error: "playwright._impl._errors.Error: BrowserType.connect_over_cdp: connect ECONNREFUSED 127.0.0.1:9222" },
+    });
+    expect(await screen.findByText("Connect Chrome extension, then retry")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Retry fill" })).toBeEnabled();
+  });
+
   it("offers Open application with a Tab open chip for a live filled tab", async () => {
     setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
       "GET /api/jobs/j1/application": { tab: "open", submitted: false, can_fill: true },

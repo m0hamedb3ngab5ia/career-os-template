@@ -477,3 +477,35 @@ def test_application_status_open_and_confirmation(client, data, monkeypatch):
     live[0]["url"] = "https://job-boards.example/acme/jobs/1/confirmation"
     assert client.get(f"/api/jobs/{jid}/application").json()["marked_applied"] is True
     assert Store(data["settings"]).get_status(jid) == "applied"
+
+
+def test_application_open_refuses_when_own_chrome_not_connected(client, data, monkeypatch):
+    """paths.apply_cdp (your own Chrome) not answering: a plain 409 to connect and retry, no fill spawned, and the
+    recorded tab is kept so the retry focuses it once Chrome is back."""
+    from careeros.apply import browser, gh_fill
+    from careeros.ui.services import job_actions
+
+    jid = data["jobs"]["review"]
+    jdir = Store(data["settings"]).job_dir(jid)
+    cdp = "http://127.0.0.1:9222"
+    monkeypatch.setitem(data["settings"].paths, "apply_cdp", cdp)
+    browser.save_record(jdir, tab_id="T1", url="https://job-boards.example/embed", cdp=cdp)
+    live: list[dict] = []
+
+    def get(url):
+        if "/json/activate/" in url:
+            raise ValueError("Target activated")
+        if not live:
+            raise OSError("refused")
+        return live
+
+    monkeypatch.setattr(browser, "_get", get)
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
+    spawned: list = []
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv))
+    h = {"x-careeros": "1"}
+    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
+    assert r.status_code == 409 and r.json()["detail"].startswith("Chrome not connected") and not spawned
+    assert browser.record(jdir)["tab_id"] == "T1"
+    live.append({"id": "T1", "type": "page", "url": "https://job-boards.example/embed"})
+    assert client.post(f"/api/jobs/{jid}/application/open", headers=h).json() == {"action": "focused"}

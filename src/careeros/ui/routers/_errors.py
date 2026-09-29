@@ -11,6 +11,7 @@ from fastapi import HTTPException
 
 @contextmanager
 def refusals() -> Iterator[None]:
+    from careeros.apply.browser import NotConnected
     from careeros.apply.gh_fill import MissingPlaywright
     from careeros.ui.services.desktop import Unsupported
     from careeros.runs.runner import JobNotRunnable
@@ -23,5 +24,6 @@ def refusals() -> Iterator[None]:
         raise HTTPException(404, str(e).strip("'\"")) from None
     except JobNotRunnable as e:  # before ValueError (its base): the runner's reasons, not a 400
         raise HTTPException(409, "; ".join(f"{j}: {r}" for j, r in e.reasons.items()) or str(e)) from None
-    except (Busy, Paused, NotSetUp, NotRunnable, Unsupported, MissingPlaywright) as e:
+    except (Busy, Paused, NotSetUp, NotRunnable, Unsupported, MissingPlaywright,
+            NotConnected) as e:
         raise HTTPException(409, str(e)) from None
