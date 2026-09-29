@@ -60,7 +60,7 @@ function HeaderActions() {
             onSuccess: (r) =>
               toast.show({
                 message: r.pending
-                  ? `Synced ${formatCount(r.synced)} jobs. Excel has the tracker open, so they're saved to a queue; they're written on the next change, or run \`careeros tracker flush\` after closing Excel.`
+                  ? `Synced ${formatCount(r.synced)} jobs. Excel has the tracker open, so they're saved to a queue; they're written on the next change, or close Excel and they save then.`
                   : `Synced ${formatCount(r.synced)} jobs`,
               }),
             onError: (e) => toast.show({ message: errorText(e) }),

@@ -33,8 +33,8 @@ export type StartKind = "scout" | "score" | "prepare" | "inbox" | "tracker";
 
 export const START_KINDS: { value: StartKind; label: string; note: string }[] = [
   { value: "scout", label: "Scout", note: "Checks every board. Free: no Claude usage." },
-  { value: "score", label: "Score", note: "Ranks Found jobs, then scores the top ones with /score-job." },
-  { value: "prepare", label: "Prepare", note: "Runs /prepare-job on the best scored jobs: tailor, cover letter, QA." },
+  { value: "score", label: "Score", note: "Ranks Found jobs, then scores the top ones." },
+  { value: "prepare", label: "Prepare", note: "Prepares the best scored jobs: tailor, cover letter, QA." },
   { value: "inbox", label: "Inbox", note: "Reads Gmail for replies and interview invites." },
   { value: "tracker", label: "Tracker", note: "Rebuilds and exports JobTracker.xlsx." },
 ];
@@ -54,11 +54,11 @@ export const STOP_FIX: Record<string, string> = {
   cancelled: "Stopped by you.",
   usage_limit: "Subscription limit reached; it retries at the next slot.",
   auth_required: "Run claude and /login (or /mcp for a required MCP server).",
-  permission_denied: "A skill needed a tool missing from llm.allowed_tools.",
+  permission_denied: "A needed tool isn't allowed in Settings.",
   timeout: "One skill call ran past its timeout; often a login or prompt wait.",
   consecutive_failures: "3 jobs failed in a row; open the attempts.",
-  doctor_failed: "careeros doctor has FAIL lines.",
-  error: "The run failed; open the attempt and run.log.",
+  doctor_failed: "The setup check found problems; open Settings to fix them.",
+  error: "The run failed; open the attempt and the log.",
   interrupted: "The run's process stopped without recording why.",
 };
 

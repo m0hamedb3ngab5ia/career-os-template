@@ -28,7 +28,7 @@ describe("stateSentence", () => {
   it("names the one state, most urgent first", () => {
     expect(stateSentence({ ...base, active_run_id: "r1", review_reasons: reasons })).toMatch(/^Working on it/);
     expect(stateSentence({ ...base, blocked_reason: "Tier C is skipped" })).toBe("Tier C is skipped");
-    expect(stateSentence({ ...base, review_reasons: reasons }, 1)).toBe("Needs your review: 3 things need attention.");
+    expect(stateSentence({ ...base, review_reasons: reasons }, 3)).toBe("Needs your review: 3 things need attention.");
     expect(stateSentence({ ...base, review_reasons: reasons.slice(0, 1) })).toBe("Needs your review: 1 thing needs attention.");
     expect(stateSentence({ ...base, next_action: null })).toBe("Nothing left to run for this job.");
     expect(stateSentence(base)).toBe("Ready for the next step: Continue pipeline.");
@@ -47,6 +47,13 @@ describe("NextStepSummary", () => {
     ]);
     expect(screen.queryByText(/qa_warning/)).not.toBeInTheDocument();
     expect(screen.queryByText(/long letter/)).not.toBeInTheDocument();
+  });
+
+  it("lists an item once when a review reason and a task say the same thing", () => {
+    const dup = { ...task, what: "Review and submit the application" } as ActionItem;
+    render(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[dup]} />);
+    const items = within(screen.getByRole("list", { name: "Needs you" })).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual(["A document check left a warning", "Review and submit the application"]);
   });
 
   it("shows no list when nothing needs you", () => {

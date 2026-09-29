@@ -130,7 +130,7 @@ export function ContactsPage() {
                 mutuals rules off.
               </>
             )}{" "}
-            Degree and mutuals come from what you mark here (or <code translate="no">careeros outreach mark</code>).
+            Degree and mutuals come from what you mark here.
           </p>
           <Link to="/settings/outreach" className={styles.bannerLink}>
             Outreach settings
@@ -139,7 +139,7 @@ export function ContactsPage() {
 
         {isError ? (
           <div role="alert" className={styles.card}>
-            <EmptyState title="Couldn't load contacts">{error instanceof Error ? `${error.message}. ` : ""}Check that careeros ui is still running, then reload.</EmptyState>
+            <EmptyState title="Couldn't load contacts">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
           </div>
         ) : isPending ? (
           <div className={styles.card} aria-busy="true">

@@ -30,16 +30,16 @@ export const STAGES: { id: PipelineState["stage"]; label: string }[] = [
 ];
 
 const KIND_HELP: Record<string, string> = {
-  score: "Runs score-job headless: score.json, tier and the prepare/skip decision.",
-  prepare: "Runs prepare-job headless: score, tailored resume, cover letter and QA.",
-  apply: "Runs apply-job headless in Chrome: fills the form, then submits or stages it for you per auto_submit.",
+  score: "Scores the job against your targets and decides whether to prepare it.",
+  prepare: "Scores the job, tailors your resume and cover letter, and checks them.",
+  apply: "Fills the application in Chrome, then submits it or stops for your review, per your Automation settings.",
 };
 /** apply help by the server's auto_submit switch (job_pipeline.auto_submit): off = every run stages for review. */
 function kindHelp(s: PipelineState): string {
   if (s.next_kind === "apply") {
     return s.note != null || !s.auto_submit
-      ? "Runs apply-job headless in Chrome: fills the form and stops before Submit; you review and send it (never auto-submitted)."
-      : "Runs apply-job headless in Chrome: fills the form and submits it (auto_submit is on).";
+      ? "Fills the application in Chrome and stops before Submit; you review and send it."
+      : "Fills the application in Chrome and submits it (auto-submit is on).";
   }
   return KIND_HELP[s.next_kind ?? ""] ?? "";
 }
@@ -170,6 +170,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const current = STAGES.findIndex((s) => s.id === state.stage);
   const busy = start.isPending || started !== null || runId !== null;
   const label = state.next_label ?? "Continue pipeline";
+  const stageHelp = kindHelp(state);
   const lines: LogLine[] = stream.lines.map((l) => ({
     key: l.key,
     text: l.text,
@@ -257,7 +258,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           </Button>
           {state.failures?.excluded ? (
             <Button
-              title="Clear this job's failure count so runs pick it up again (careeros run reset-failures)"
+              title="Clear this job's failure count so runs pick it up again"
               disabled={reset.isPending}
               onClick={() =>
                 reset.mutate(state.failures?.kind, {
@@ -284,7 +285,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         </label>
       ) : null}
       <Details summary="Details">
-        {kindHelp(state) ? <p className={styles.caption}>{kindHelp(state)}</p> : null}
+        {stageHelp ? <p className={styles.caption}>{stageHelp}</p> : null}
         {runId ? <p className={styles.caption}>Run {runId}</p> : null}
         <ReasonDetails reasons={state.review_reasons} />
       </Details>

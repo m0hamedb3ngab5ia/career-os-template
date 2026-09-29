@@ -75,8 +75,8 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
   const subtitle = (
     <span className={styles.subtitle}>
       <Breadcrumb company={company} />
-      {[detail.posting.title, detail.posting.location, tier ? `Tier ${tier}` : null, statusLabel].filter(Boolean).map((t) => (
-        <span key={t}>· {t}</span>
+      {[detail.posting.title, detail.posting.location, tier ? `Tier ${tier}` : null, statusLabel].filter(Boolean).map((t, i) => (
+        <span key={`${i}:${t}`}>· {t}</span>
       ))}
     </span>
   );
@@ -108,20 +108,22 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
           />
         ) : null}
         <PipelineCard jobId={jobId} />
-        {/* Supporting sections, in the design doc's order; apply-session screenshots sit under Documents. */}
-        <DocumentsCard
-          jobId={jobId}
-          documents={detail.documents}
-          otherFiles={detail.other_files}
-          submitted={detail.submitted}
-          qa={detail.qa}
-        />
-        <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} />
-        <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
-        <ScoreCard score={detail.score} />
-        <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
-        <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
-        <ActivityCard activity={detail.activity ?? []} history={detail.history} />
+        {/* Supporting sections, in the design doc's order, as dividers not cards; screenshots sit under Documents. */}
+        <div className={styles.supporting}>
+          <DocumentsCard
+            jobId={jobId}
+            documents={detail.documents}
+            otherFiles={detail.other_files}
+            submitted={detail.submitted}
+            qa={detail.qa}
+          />
+          <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} />
+          <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
+          <ScoreCard score={detail.score} />
+          <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
+          <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
+          <ActivityCard activity={detail.activity ?? []} history={detail.history} />
+        </div>
       </div>
     </Page>
   );

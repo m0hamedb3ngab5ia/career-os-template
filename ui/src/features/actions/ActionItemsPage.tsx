@@ -57,7 +57,7 @@ function groupHeading(group: GroupBy, key: string): { label: string; tone?: "red
 }
 
 function problem(e: unknown): string {
-  return e instanceof ApiError ? e.message : "Couldn't reach careeros ui. Is it still running?";
+  return e instanceof ApiError ? e.message : "Couldn't reach Career OS. Is it still running?";
 }
 
 function queuedNote(r: WriteResult): string {

@@ -15,7 +15,7 @@ automation handle**. System machinery (skills, CLI, files, run ids, check codes)
 | Route | Page | Does today | Data (API) |
 |---|---|---|---|
 | `/` | Today | stat tiles, "Needs you" (all open Action Items, sort/filter), pipeline chart, recent runs, next scheduled, paused banner | `/today`, `/status`, `/runs`, `/schedule` |
-| `/pipeline` | Pipeline | Kanban, one column per `pipeline.yaml: ui.pipeline.columns`, `card_limit` cards/column, drag = status change, filters tier/category/safety/location | `/pipeline`, `POST /jobs/{id}/status` |
+| `/pipeline` | Pipeline | Kanban, fixed board columns, drag = status change, filters tier/category/safety/location | `/pipeline`, `POST /jobs/{id}/status` |
 | `/jobs` | Jobs | tracker-shaped table, tabs, Excel-style column filters in URL, search, export xlsx, open folder, inline edit | `/jobs`, `/jobs/tabs`, `/jobs/facets`, `/jobs/export` |
 | `/jobs/:id` | Job detail | stepper + PipelineCard, Posting, Safety, Score, Documents, Contacts, Apply session, Activity (all equal-weight cards) | `/jobs/{id}`, `/jobs/{id}/pipeline` |
 | `/actions` | Action Items | same open items as Today, grouped by heading, due, bulk done/reopen, add item, scam controls | `/actions*` |
@@ -86,9 +86,8 @@ continue", "Scout", "Catch up". Nav label "Inbox & Follow-ups", "Action Items".
 
 ### 1.7 Pipeline and mass-apply behaviour today
 
-- Pipeline = Kanban of configurable columns (default Found · Queued · Needs review · Applied · Screening·Interview ·
-  Offer + Closed line). Server caps cards (`services/pipeline.py:217`, `card_limit` 10) and sorts by fit; drag sets
-  status. With ~700 found jobs the Found column is a count plus 10 cards — unusable for selection.
+- Pipeline = Kanban of fixed columns (Found · Queued · Needs review · Applied · Screening·Interview · Offer + Closed
+  line). Server caps cards per column and sorts by fit; drag sets status. With ~700 found jobs the Found column is a count plus 10 cards — unusable for selection.
 - "Mass apply" does not exist. Batches exist only for **score** and **prepare** (`POST /runs`, budget presets,
   dry-run preview of the ranked selection, no per-job deselect). **Apply is per job only**
   (`service.py:115` raises without `job_ids`; `POST /jobs/{id}/pipeline`), never scheduled, Tier A staged.
@@ -314,6 +313,7 @@ more.
 | G5 | Salary, visa/sponsorship, experience level not indexed as filter columns | only if score/posting data has them; otherwise omit from v1 |
 | G6 | Run-failure Action Items and review reasons are prose with CLI text | structured `{code, text, detail}` (see 2.4) |
 | G7 | LinkedIn detection per job for exclusion | ATS/host field from posting (check `apply` module) → exclusion reason |
+| G8 | "Scam suspected → pause batch" (4.2 Exceptions) is not mapped: no structured scam signal from an apply run | add a structured `scam_suspected` outcome (apply_session or run stop reason) and map it to *pause batch* |
 
 ---
 
