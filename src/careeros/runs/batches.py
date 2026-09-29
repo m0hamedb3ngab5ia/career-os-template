@@ -23,7 +23,7 @@ from typing import Any
 from careeros.config import Settings
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
-from careeros.runs.failures import JOB_FAILURES
+from careeros.runs.failures import JOB_FAILURES, Failures
 from careeros.runs.runner import JobNotRunnable, RunBusy, auto_submit_verdict, new_run_id, select_candidates
 from careeros.runs.store import RunStore, _dump, _load, iso, runs_dir_for
 from careeros.store import Store
@@ -250,6 +250,9 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
                           echo=echo, job_ids=[jid])
             except JobNotRunnable as e:
                 action, why = not_runnable(e.reasons.get(jid, str(e)))
+                if action == "next" and (f := Failures(RunStore(settings)).get(kind, jid)):
+                    # the last call failed yet left its files (ok clears the record): not a finished stage
+                    action, why = "failed", f"failed {kind} ({f.get('last_outcome')}) but left its files; see Action Items"
             except RunBusy as e:  # another run (or a JobBusy job lock): wait for it, not counted as a try
                 if paused():
                     r["state"], r["reason"] = "pending", "paused by you"
@@ -286,23 +289,30 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
 
 
 def drive(settings: Settings, batch_id: str, *, invoke=None, now=_utcnow, cancel=None,
-          echo=lambda s: None, sleep=time.sleep, poll_s: float = 10.0, run=None) -> dict[str, Any]:
+          echo=lambda s: None, sleep=time.sleep, poll_s: float = 10.0, run=None,
+          since: datetime | None = None) -> dict[str, Any]:
     """Work the batch's queue, one job at a time, each stage its own per-job run (`run_batch`, which takes the
     global runner lock). Pause (a request, `careeros run pause`, or a usage/auth/permission stop) takes effect
-    after the current job; cancel after the current step. BatchBusy when a driver already holds the batch."""
+    after the current job; cancel after the current step. BatchBusy when a driver already holds the batch.
+    `since`: when the start was asked for (default now); a pause set after it is honoured, not resumed."""
     from careeros.runs.service import run_batch
 
     run = run or run_batch
     if load(settings, batch_id) is None:
         raise ValueError(f"batch {batch_id} not found")
+    t0, since = time.time(), since or now()
     try:
         lk = locks.acquire(_lock_path(settings, batch_id), owner=f"batch:{batch_id}", ttl_seconds=LOCK_TTL_S,
                            pid=os.getpid(), note="batch driver")
     except locks.LockBusy as e:
         raise BatchBusy(f"batch {batch_id} is already running (pid {e.holder.get('pid')})") from None
-    # load under the lock (a control / retry may have written it meanwhile); a request left from an earlier
-    # driver or control is stale now: only requests made while this driver runs count
-    _req_path(settings, batch_id).unlink(missing_ok=True)
+    # load under the lock (a control / retry may have written it meanwhile); a request older than this driver
+    # is stale (left from an earlier one): drop it, never one made since
+    try:
+        if _req_path(settings, batch_id).stat().st_mtime < t0:
+            _req_path(settings, batch_id).unlink()
+    except OSError:
+        pass
     b = load(settings, batch_id)
     if b is None:
         locks.release(_lock_path(settings, batch_id), lk.token)
@@ -323,8 +333,9 @@ def drive(settings: Settings, batch_id: str, *, invoke=None, now=_utcnow, cancel
         _dump(path, b)
 
     try:
-        if b["status"] in ("done", "cancelled"):
-            return b
+        if b["status"] in ("done", "cancelled") or (
+                b["status"] == "paused" and datetime.fromisoformat(b["updated_at"]) > since):
+            return b  # paused after the start was asked for: stays paused
         cfg = load_runs_config(settings)
         b["status"], b["reason"] = "running", None
         save()
