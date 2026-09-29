@@ -19,9 +19,12 @@ const SegmentedContext = createContext<Ctx | null>(null);
 interface OptionProps {
   value: string;
   children: ReactNode;
+  /** Shown but not selectable (say why next to the control, linked with `describedBy`). */
+  disabled?: boolean;
+  describedBy?: string;
 }
 
-function Option({ value, children }: OptionProps) {
+function Option({ value, children, disabled, describedBy }: OptionProps) {
   const ctx = use(SegmentedContext);
   if (!ctx) throw new Error("SegmentedControl.Option must be inside SegmentedControl");
   const on = ctx.value === value;
@@ -32,6 +35,8 @@ function Option({ value, children }: OptionProps) {
       aria-checked={on}
       tabIndex={on ? 0 : -1}
       data-value={value}
+      disabled={disabled}
+      aria-describedby={describedBy}
       className={styles.segment}
       onClick={() => ctx.select(value)}
     >
@@ -51,7 +56,7 @@ interface SegmentedControlProps {
 function SegmentedControlRoot({ label, value, onValueChange, children }: SegmentedControlProps) {
   const ref = useRef<HTMLDivElement>(null);
   const values = Children.toArray(children)
-    .filter((c): c is ReactElement<OptionProps> => isValidElement(c))
+    .filter((c): c is ReactElement<OptionProps> => isValidElement(c) && !(c.props as OptionProps).disabled)
     .map((c) => c.props.value);
 
   function onKeyDown(e: KeyboardEvent<HTMLDivElement>) {

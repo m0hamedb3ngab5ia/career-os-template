@@ -153,7 +153,7 @@ export function PipelinePage() {
   }
 
   return (
-    <Page title="Pipeline" subtitle="How jobs move from discovery to an offer">
+    <Page title="Pipeline" subtitle="How jobs move from discovery to an offer" actions={<Link to="/pipeline/batch/new">New batch</Link>}>
       {error ? (
         <EmptyState title="Couldn't load the pipeline">{problem(error)}</EmptyState>
       ) : isPending || !board ? null : (
