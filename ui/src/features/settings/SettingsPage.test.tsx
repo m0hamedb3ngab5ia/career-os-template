@@ -44,12 +44,12 @@ describe("Advanced groups", () => {
   it("puts advanced groups and where the settings are saved inside a collapsed Advanced section", async () => {
     mockApi(...sectionRoutes(runsData()));
     renderSettings("/settings/runs");
-    const ranking = await screen.findByRole("heading", { name: "Ranking" }, { timeout: 5000 });
+    const ranking = await screen.findByRole("heading", { name: /^Ranking/, hidden: true }, { timeout: 5000 });
     const adv = ranking.closest("details") as HTMLElement;
     expect(adv).not.toHaveAttribute("open");
     expect(within(adv).getByText("Advanced")).toBeInTheDocument();
     expect(within(adv).getByText("config/pipeline.yaml")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Budget" }).closest("details")).toBeNull();
+    expect(screen.getByRole("heading", { name: /^(Budget|How much)/ }).closest("details")).toBeNull();
     expect(screen.getByRole("status").textContent).not.toContain("config/");
   });
 

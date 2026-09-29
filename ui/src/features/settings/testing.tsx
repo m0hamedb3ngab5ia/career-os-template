@@ -42,7 +42,7 @@ function tier(letter: string, auto: boolean) {
   return {
     id: `tier_${letter.toLowerCase()}`,
     title: `Tier ${letter}`,
-    help: "",
+    help: "", advanced: false,
     items: [
       field({ file: "targets", key: `tiers.${letter}.description`, control: "text", label: "Description", default: `tier ${letter}` }),
       field({
@@ -96,7 +96,7 @@ export function autonomyData(): SectionData {
     section: {
       id: "autonomy",
       title: "Autonomy",
-      help: "",
+      help: "", advanced: false,
       files: ["pipeline", "targets"],
       groups: [
         tier("A", false),
