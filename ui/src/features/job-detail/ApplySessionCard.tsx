@@ -3,10 +3,9 @@ import { useState, type KeyboardEvent } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { Dialog } from "../../kit/Dialog";
-import { useToast } from "../../kit/Toast";
 import { describeCode, type CodeTable } from "../../kit/labels";
 import { formatDateTime } from "../../lib/format";
-import { errorText, fileUrl, useApplicationTab, useOpenApplication } from "./api";
+import { fileUrl } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import type { ApplySession, FileEntry } from "./types";
@@ -102,19 +101,6 @@ export function ApplySessionCard({
   const steps = session?.steps ?? [];
   const outcome = session ? (session.outcome ? describeCode(OUTCOMES, session.outcome) : { label: "In progress", tone: "blue" as const }) : null;
   const started = formatDateTime(session?.started);
-  const tab = useApplicationTab(jobId).data;
-  const openApp = useOpenApplication(jobId);
-  const toast = useToast();
-  const live = tab?.tab === "open";
-  function onOpen() {
-    openApp.mutate(undefined, {
-      onSuccess: (r) =>
-        toast.show({
-          message: r.action === "focused" ? "Switched to the filled tab" : "Filling the form in a new browser tab; it stops before submit",
-        }),
-      onError: (e) => toast.show({ message: errorText(e) }),
-    });
-  }
 
   return (
     <Card
@@ -128,19 +114,6 @@ export function ApplySessionCard({
         ) : undefined
       }
     >
-      <div className={styles.buttons}>
-        {tab && tab.tab !== "none" ? (
-          <Chip tone={live ? "green" : "orange"}>{live ? "Tab open" : "Needs refill"}</Chip>
-        ) : null}
-        <Button
-          variant={session?.outcome === "staged" || live ? "primary" : undefined}
-          disabled={openApp.isPending}
-          title={live ? "Focus the tab with the filled form" : "Open a visible tab and fill the form from your saved answers (stops before submit)"}
-          onClick={onOpen}
-        >
-          {live ? "Open application" : tab?.tab === "needs_refill" ? "Refill application" : "Fill application"}
-        </Button>
-      </div>
       {!session ? <Muted>No apply session yet. Apply runs stop before submit for you to check.</Muted> : null}
       {steps.length ? (
         <ol className={styles.steps}>

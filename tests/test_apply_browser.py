@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+import sys
 
 import pytest
 
@@ -85,3 +86,37 @@ def test_cdp_url_default_and_override():
         paths = {"apply_cdp": "http://127.0.0.1:9333"}
     assert browser.cdp_url(S()) == "http://127.0.0.1:9333"
     assert browser.cdp_url(object()) == browser.DEFAULT_CDP
+
+
+def test_fill_failure_from_log(tmp_path):
+    from careeros.apply import browser
+
+    assert browser.fill_failure(tmp_path) is None  # never ran
+    log = tmp_path / "application.log"
+    log.write_text("filling...\n")
+    assert browser.fill_failure(tmp_path) is None  # still running
+    log.write_text(f"ok\n{browser.FILL_EXIT}0\n")
+    assert browser.fill_failure(tmp_path) is None  # succeeded
+    log.write_text(f"Traceback...\nplaywright is not installed: pip install x\n{browser.FILL_EXIT}1\n")
+    f = browser.fill_failure(tmp_path)
+    assert f["error"] == "playwright is not installed: pip install x" and "Traceback" in f["log"]
+    assert browser.status(tmp_path, browser.DEFAULT_CDP)["fill_error"] == f["error"]
+
+
+def test_preflight_missing_playwright_and_chromium(monkeypatch, tmp_path):
+    from careeros.apply import gh_fill
+
+    monkeypatch.setitem(sys.modules, "playwright.sync_api", None)
+    with pytest.raises(gh_fill.MissingPlaywright, match="fast-apply"):
+        gh_fill.preflight()
+
+    class P:
+        def __enter__(self):
+            return type("pw", (), {"chromium": type("c", (), {"executable_path": str(tmp_path / "nope")})})
+
+        def __exit__(self, *a):
+            return False
+
+    monkeypatch.setattr(gh_fill, "sync_playwright", lambda: P())
+    with pytest.raises(gh_fill.MissingPlaywright, match="playwright install chromium"):
+        gh_fill.preflight()

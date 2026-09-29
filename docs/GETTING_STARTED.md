@@ -105,6 +105,7 @@ To change what scout keeps:
 
 ```sh
 .venv/bin/pip install -e ".[ui]"
+.venv/bin/playwright install chromium  # the browser "Fill application" stages forms in
 .venv/bin/careeros ui  # --port 8765 (default) --reindex --no-open
 ```
 

@@ -341,4 +341,29 @@ describe("PipelineCard", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
     expect(await screen.findByText(/did not start: run apply: j1: status skipped/)).toBeInTheDocument();
   });
+
+  it("puts Fill application beside the next-step button; a failed fill shows the error and Retry", async () => {
+    const api = setup({ stage: "review", next_action: "continue", next_label: "Continue pipeline", next_kind: "apply" }, {
+      "GET /api/jobs/j1/application": { tab: "none", submitted: false, can_fill: true,
+        fill_error: "playwright is not installed", fill_log: "Traceback\nplaywright is not installed" },
+      "POST /api/jobs/j1/application/open": { status: 409, body: { detail: "Playwright's Chromium is missing" } },
+    });
+    const next = await screen.findByRole("button", { name: "Continue pipeline" });
+    const retry = await screen.findByRole("button", { name: "Retry fill" });
+    expect(retry.parentElement).toBe(next.parentElement);
+    expect(screen.getByText("Fill failed")).toHaveAttribute("data-tone", "red");
+    expect(screen.getByText(/Filling the application failed: playwright is not installed/)).toBeInTheDocument();
+    expect(screen.getByText("Fill output")).toBeInTheDocument();
+    await userEvent.click(retry);
+    expect(await screen.findByText("Playwright's Chromium is missing")).toBeInTheDocument();
+    expect(api.callsTo("POST /api/jobs/j1/application/open")).toHaveLength(1);
+  });
+
+  it("offers Open application with a Tab open chip for a live filled tab", async () => {
+    setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
+      "GET /api/jobs/j1/application": { tab: "open", submitted: false, can_fill: true },
+    });
+    expect(await screen.findByRole("button", { name: "Open application" })).toBeEnabled();
+    expect(screen.getByText("Tab open")).toHaveAttribute("data-tone", "green");
+  });
 });

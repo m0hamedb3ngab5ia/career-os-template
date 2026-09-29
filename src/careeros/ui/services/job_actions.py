@@ -232,14 +232,16 @@ def application_status(settings: Any, job_id: str) -> dict[str, Any]:
 def open_application(settings: Any, job_id: str, popen: Any = None) -> dict[str, Any]:
     """Focus the live filled tab; otherwise fill the form again in a visible tab from the saved answers (plan
     first when there is none), detached from this server so a rebuild never kills it. Never submits."""
-    from careeros.apply import browser
+    from careeros.apply import browser, gh_fill
 
     d = _job(settings, job_id)
     if browser.activate(d, browser.cdp_url(settings)):
         return {"action": "focused"}
     ensure_unlocked(settings, job_id)
+    gh_fill.preflight()
     steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
     cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
+    cmd = f"{cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
     root = str(settings.root)
     with (d / "application.log").open("ab") as fh:
         (popen or subprocess.Popen)(["/bin/sh", "-c", cmd], cwd=root, env={**os.environ, "CAREEROS_ROOT": root}, stdin=subprocess.DEVNULL,
