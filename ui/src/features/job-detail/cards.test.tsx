@@ -78,10 +78,12 @@ describe("ActivityCard", () => {
     const { container } = renderWithProviders(<ActivityCard activity={d.activity!} history={d.history} />);
     const card = screen.getByRole("region", { name: "Activity" });
     const recent = within(card).getByRole("list", { name: "Recent activity" });
-    const rows = within(recent).getAllByRole("listitem");
+    const rows = within(recent).getAllByRole("listitem") as [HTMLElement, ...HTMLElement[]];
     expect(rows).toHaveLength(ACTIVITY_PREVIEW);
     expect(rows[0]).toHaveTextContent("Status changed to needs review: prepare-job: Tier A");
-    expect(rows[0]).toHaveAttribute("title", "[store] status -> needs_review: prepare-job: Tier A");
+    expect(within(rows[0]).getByText("[store] status -> needs_review: prepare-job: Tier A")).not.toBeVisible();
+    await userEvent.setup().click(within(rows[0]).getByText(/Status changed to needs review/));
+    expect(within(rows[0]).getByText("[store] status -> needs_review: prepare-job: Tier A")).toBeVisible();
     expect(within(card).getByText("Found by scout on greenhouse")).not.toBeVisible();
     expect(within(card).getAllByText(formatDateTime("2026-09-24T18:04:00")!).length).toBeGreaterThan(0);
     expect(within(card).getByRole("heading", { name: "Status history" })).toBeInTheDocument();

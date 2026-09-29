@@ -27,19 +27,16 @@ function DocRow({ jobId, file }: { jobId: string; file: FileEntry }) {
   const { title, open } = describe(file);
   const when = formatDate(file.modified);
   return (
-    <li className={styles.docRow}>
-      <FileText size={18} strokeWidth={1.6} aria-hidden="true" className={styles.sec} />
-      <div className={styles.grow}>
-        <div className={styles.strong}>{title}</div>
+    <li>
+      <Details summary={title}>
         <div className={styles.caption}>
           <span translate="no">{file.name}</span> · {formatBytes(file.size)}
           {when ? ` · ${when}` : ""}
         </div>
-      </div>
-      <a className={styles.buttonLink} href={fileUrl(jobId, file.name)} target="_blank" rel="noopener noreferrer">
-        {open}{" "}
-        <span className="sr-only">({file.name}, opens in a new tab)</span>
-      </a>
+        <a className={styles.buttonLink} href={fileUrl(jobId, file.name)} target="_blank" rel="noopener noreferrer">
+          {open} <span className="sr-only">({file.name}, opens in a new tab)</span>
+        </a>
+      </Details>
     </li>
   );
 }
