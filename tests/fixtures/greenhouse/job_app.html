@@ -1,13 +1,13 @@
 <!doctype html>
 <!-- Minimal stand-in for a job-boards.greenhouse.io application form: text, file, checkbox group,
      react-select-like comboboxes (role=option menu, Escape closes) and a field that appears only after
-     another answer (race after hispanic_ethnicity), as on the real form. -->
+     another answer (race only after hispanic_ethnicity = No) and a file input that becomes a filename chip, as on the real form. -->
 <html><head><meta charset="utf-8"><title>Apply</title></head><body>
 <form id="application-form">
   <label for="first_name">First Name</label><input id="first_name" type="text">
   <label for="email">Email</label><input id="email" type="text">
   <label for="question_1">Why us?</label><textarea id="question_1"></textarea>
-  <label for="resume">Resume</label><input id="resume" type="file">
+  <div id="resume-wrap"><label for="resume">Resume</label><input id="resume" type="file"></div>
   <fieldset><legend>Which offices?</legend>
     <input type="checkbox" id="question_2_1" name="question_2"><label for="question_2_1">Remote</label>
     <input type="checkbox" id="question_2_2" name="question_2"><label for="question_2_2">New York</label>
@@ -35,12 +35,16 @@ document.querySelectorAll('.select').forEach(w => {
     opts.filter(o => o.toLowerCase().includes(inp.value.toLowerCase())).forEach(o => {
       const d = document.createElement('div'); d.setAttribute('role', 'option'); d.textContent = o;
       d.onmousedown = e => { e.preventDefault(); val.textContent = o; inp.value = ''; close();
-        if (inp.id === 'hispanic_ethnicity') setTimeout(() => document.getElementById('race-wrap').hidden = false, 200); };
+        if (inp.id === 'hispanic_ethnicity' && o === 'No') setTimeout(() => document.getElementById('race-wrap').hidden = false, 200); };
       menu.appendChild(d);
     });
     w.appendChild(menu);
   };
   inp.addEventListener('focus', open); inp.addEventListener('input', open);
   inp.addEventListener('keydown', e => { if (e.key === 'Escape') close(); });
+});
+// like job-boards: a picked file replaces the input with a filename chip
+document.getElementById('resume').addEventListener('change', e => {
+  document.getElementById('resume-wrap').innerHTML = `<span>${e.target.files[0].name}</span><button type="button">Remove</button>`;
 });
 </script></body></html>

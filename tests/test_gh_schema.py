@@ -33,7 +33,16 @@ def test_normalize_types_and_sources():
     assert f["question_68581532[]"]["type"] == "checkbox_group" and len(f["question_68581532[]"]["options"]) == 4
     assert f["question_68581540"]["type"] == "select" and f["question_68581540"]["options"]
     assert {"veteran_status", "race", "gender"} <= f.keys()  # compliance
-    assert f["latitude"]["type"] == "hidden" and f["location"]["type"] == "text"  # location_questions
+    assert f["latitude"]["type"] == "hidden"  # location_questions
+    assert "location" not in f  # job-boards renders it as the candidate-location autocomplete (plan extras)
+
+
+def test_normalize_adds_hispanic_before_race():
+    """The API folds Hispanic/Latino into race; job-boards asks it first and shows race only after "No"."""
+    ids = [x["field_id"] for x in normalize(DATA)]
+    assert ids.index("hispanic_ethnicity") == ids.index("race") - 1
+    h = _by_id(normalize(DATA))["hispanic_ethnicity"]
+    assert h["type"] == "select" and h["options"] == ["Yes", "No", "Decline To Self Identify"]
 
 
 def test_normalize_keeps_api_order():

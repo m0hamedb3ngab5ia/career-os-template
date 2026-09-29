@@ -25,6 +25,8 @@ _TYPES = {"input_text": "text", "textarea": "textarea", "input_file": "file", "i
 _EEO = {"gender": "gender", "hispanic_ethnicity": "hispanic_latino", "race": "race_ethnicity",
         "veteran_status": "veteran", "disability_status": "disability"}
 _SELECTS = ("select", "multiselect", "checkbox_group")
+_HISPANIC = {"field_id": "hispanic_ethnicity", "label": "Are you Hispanic/Latino?", "type": "select", "required": False,
+             "options": ["Yes", "No", "Decline To Self Identify"]}
 
 
 def fetch_questions(board: str, job_id: str) -> dict[str, Any]:
@@ -41,6 +43,10 @@ def normalize(data: dict[str, Any]) -> list[dict[str, Any]]:
         if any(f.get("type") == "input_file" for f in fields):  # drop the "paste text instead" alternative
             fields = [f for f in fields if f.get("type") == "input_file"]
         for f in fields:
+            if f["name"] == "location" and q in (data.get("location_questions") or []):
+                continue  # job-boards renders it as the candidate-location autocomplete (_extras)
+            if f["name"] == "race" and not any(x["field_id"] == "hispanic_ethnicity" for x in out):
+                out.append(dict(_HISPANIC))  # the API folds it into race; job-boards asks it first
             t = _TYPES.get(f.get("type"), "text")
             if t == "multiselect" and f["name"].endswith("[]"):
                 t = "checkbox_group"

@@ -60,12 +60,11 @@ def server():
     httpd.shutdown()
 
 
-@pytest.mark.parametrize("page_name", ["job_app.html", "host.html"])  # direct form, and embedded in an iframe
-def test_fill_fixture_form(server: str, tmp_path: Path, page_name: str):
+def _run(server: str, tmp_path: Path, page_name: str, fields: list[dict]) -> tuple[dict, str]:
     sync_api = pytest.importorskip("playwright.sync_api")
     from careeros.apply import gh_fill
 
-    plan = {"job_id": "j-1", "board": "b", "ats_job_id": "1", "fields": _fields(tmp_path)}
+    plan = {"job_id": "j-1", "board": "b", "ats_job_id": "1", "fields": fields}
     with sync_api.sync_playwright() as p:
         try:
             browser = p.chromium.launch(headless=True)
@@ -75,7 +74,20 @@ def test_fill_fixture_form(server: str, tmp_path: Path, page_name: str):
         summary = gh_fill.fill(plan, page, tmp_path, url=f"{server}/{page_name}")
         title = page.title()
         browser.close()
+    return summary, title
+
+
+@pytest.mark.parametrize("page_name", ["job_app.html", "host.html"])  # direct form, and embedded in an iframe
+def test_fill_fixture_form(server: str, tmp_path: Path, page_name: str):
+    summary, title = _run(server, tmp_path, page_name, _fields(tmp_path))
     assert summary["failed"] == [] and summary["filled"] == 8, summary
     assert summary["fill_s"] >= 0 and title != "SUBMITTED"  # staged only, never submitted
     assert json.loads((tmp_path / "fill_summary.json").read_text()) == summary
     assert (tmp_path / "screenshots" / "fill.png").exists()
+
+
+def test_fill_skips_race_unless_not_hispanic(server: str, tmp_path: Path):
+    fields = [f for f in _fields(tmp_path) if f["field_id"] in ("hispanic_ethnicity", "race")]
+    fields[0]["value"] = "Decline To Self Identify"  # race stays hidden: skip it, don't time out on it
+    summary, _ = _run(server, tmp_path, "job_app.html", fields)
+    assert summary["filled"] == 1 and summary["failed"] == [] and summary["skipped"] == ["race"], summary
