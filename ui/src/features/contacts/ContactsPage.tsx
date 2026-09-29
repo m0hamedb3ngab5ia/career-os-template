@@ -2,6 +2,7 @@ import { Lock, Search, Users } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
+import { Pager, usePaged } from "../../kit/Pager";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { EmptyState } from "../../kit/EmptyState";
@@ -84,6 +85,7 @@ export function ContactsPage() {
   const [open, setOpen] = useState<Selected | null>(null);
   const items = data?.items ?? [];
   const linkedin = items.filter((c) => c.mode === "linkedin_draft" && c.draft);
+  const paged = usePaged(items);
   const policy = data?.policy;
   const gateOn = !policy || policy.manual_if_connected || policy.manual_if_mutuals;
   const current = open ? open.drafts[open.index] : undefined;
@@ -180,7 +182,7 @@ export function ContactsPage() {
                   </tr>
                 </thead>
                 <tbody>
-                  {items.map((c) => (
+                  {paged.pageItems.map((c) => (
                     <ContactRowView
                       key={`${c.job_id}/${c.name}`}
                       c={c}
@@ -191,6 +193,7 @@ export function ContactsPage() {
                 </tbody>
               </table>
             </div>
+            <Pager paged={paged} label="Contacts" />
           </section>
         )}
       </div>

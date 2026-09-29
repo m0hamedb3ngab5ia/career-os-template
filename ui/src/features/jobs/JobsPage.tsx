@@ -6,6 +6,7 @@ import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { Menu } from "../../kit/Menu";
+import { Pager, usePaged } from "../../kit/Pager";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
@@ -146,6 +147,14 @@ export function JobsPage() {
 
   const rows = useMemo(() => list.data?.pages.flatMap((p) => p.items ?? []) ?? [], [list.data]);
   const total = list.data?.pages[0]?.total ?? rows.length;
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
+  const paged = usePaged(rows, {
+    total,
+    resetKey: JSON.stringify([filterParams, sort]),
+    onNeedMore: useCallback(() => {
+      if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]),
+  });
   const hidden = useMemo(() => new Set(view.hidden), [view.hidden]);
   const columns = useMemo(() => COLUMNS.filter((c) => !hidden.has(c.key)), [hidden]);
   const selectedKey = view.selected.join(",");
@@ -163,8 +172,9 @@ export function JobsPage() {
   );
   const onToggleAll = () => {
     const next = new Set(selected);
-    const allOn = rows.length > 0 && rows.every((r) => next.has(r.job_id));
-    for (const r of rows) {
+    const shown = paged.pageItems;
+    const allOn = shown.length > 0 && shown.every((r) => next.has(r.job_id));
+    for (const r of shown) {
       if (allOn) next.delete(r.job_id);
       else next.add(r.job_id);
     }
@@ -242,7 +252,7 @@ export function JobsPage() {
         onFilter={onFilter}
         filterParams={filterParams}
         onSortTo={onSortTo}
-        rows={rows}
+        rows={paged.pageItems}
         columns={columns}
         sort={sort}
         onSort={onSort}
@@ -360,22 +370,10 @@ export function JobsPage() {
           {rows.length > 0 ? (
             <div className={styles.footer}>
               <span className="tabular">
-                Showing {formatCount(rows.length)} of {formatCount(total)} {TAB_NOUNS[tab] ?? "jobs"} · live from
-                data/careeros.db
+                {formatCount(total)} {TAB_NOUNS[tab] ?? "jobs"} · live from data/careeros.db
               </span>
               <span>Open a job to change its status or add notes</span>
-              {list.hasNextPage ? (
-                <Button
-                  size="small"
-                  pending={list.isFetchingNextPage}
-                  pendingLabel="Loading…"
-                  onClick={() => void list.fetchNextPage()}
-                >
-                  Show more
-                </Button>
-              ) : (
-                <span />
-              )}
+              <Pager paged={paged} label="Jobs" />
             </div>
           ) : null}
         </section>

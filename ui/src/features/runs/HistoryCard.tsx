@@ -1,9 +1,9 @@
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { useRef } from "react";
+import { useCallback, useRef } from "react";
 import { Link, useSearchParams } from "react-router";
-import { Button } from "../../kit/Button";
 import { StopReasonChip } from "../../kit/chips";
 import { EmptyState } from "../../kit/EmptyState";
+import { Pager, usePaged } from "../../kit/Pager";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { formatDuration, formatNumber, formatWhen } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
@@ -11,7 +11,6 @@ import { useRunHistory } from "./api";
 import { STOP_FIX, kindLabel, needsYou, runChipCode, runTone, triggerLabel } from "./labels";
 import styles from "./Runs.module.css";
 import type { RunRecord } from "./types";
-import { help } from "../job-detail/actionHelp";
 
 export const HISTORY_KINDS = ["", "scout", "score", "prepare", "inbox_sync", "tracker", "prune"] as const;
 
@@ -57,7 +56,16 @@ export function HistoryCard() {
   const kind = (HISTORY_KINDS as readonly string[]).includes(raw) ? raw : "";
   const q = useRunHistory(kind);
   const now = useNow(60_000);
-  const runs = q.data?.pages.flatMap((p) => p.runs) ?? [];
+  const all = q.data?.pages.flatMap((p) => p.runs) ?? [];
+  const { hasNextPage, isFetchingNextPage, fetchNextPage } = q;
+  const paged = usePaged(all, {
+    more: hasNextPage,
+    resetKey: kind,
+    onNeedMore: useCallback(() => {
+      if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
+    }, [hasNextPage, isFetchingNextPage, fetchNextPage]),
+  });
+  const runs = paged.pageItems;
   const ref = useRef<HTMLDivElement>(null);
   const v = useVirtualizer({
     count: runs.length,
@@ -120,17 +128,7 @@ export function HistoryCard() {
           </div>
         </div>
       )}
-      {q.hasNextPage ? (
-        <Button
-          size="small"
-          {...help("loadOlderRuns")}
-          onClick={() => void q.fetchNextPage()}
-          pending={q.isFetchingNextPage}
-          pendingLabel="Loading…"
-        >
-          Load older runs
-        </Button>
-      ) : null}
+      <Pager paged={paged} label="Runs" />
     </section>
   );
 }

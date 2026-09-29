@@ -46,7 +46,7 @@ describe("Jobs screen", () => {
     expect(screen.getByRole("tab", { name: "All (736)" })).toBeInTheDocument();
     const req = api.callsTo("GET /api/jobs")[0]!;
     expect(Object.fromEntries(req.search)).toEqual({ tab: "active", sort: "-fit", limit: "2" });
-    expect(screen.getByText(/Showing 2 of 3 active jobs/)).toBeInTheDocument();
+    expect(await screen.findByText(/3 active jobs · live from/)).toBeInTheDocument();
   });
 
   it("renders every mockup column with chips, dates and spoken dashes for empty cells", async () => {
@@ -73,20 +73,18 @@ describe("Jobs screen", () => {
 
   it("unknown status and safety codes fall back to gray chips", async () => {
     setup();
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Show more" }));
     const row = (await screen.findByRole("rowheader", { name: "Initech" })).closest("tr")!;
     expect(within(row).getByText("On hold")).toHaveAttribute("data-tone", "gray");
     expect(within(row).getByText("Mystery")).toHaveAttribute("data-tone", "gray");
     expect(within(row).getByText("No tier")).toBeInTheDocument();
   });
 
-  it("Show more loads the next page by cursor and hides once everything is loaded", async () => {
+  it("fills a 10-row page by fetching the next cursor page; no pager while it all fits", async () => {
     const { api } = setup();
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Show more" }));
-    expect(await screen.findByText(/Showing 3 of 3 active jobs/)).toBeInTheDocument();
+    expect(await screen.findByRole("rowheader", { name: "Initech" })).toBeInTheDocument();
+    expect(screen.getByText(/3 active jobs · live from/)).toBeInTheDocument();
     expect(api.callsTo("GET /api/jobs")[1]!.search.get("cursor")).toBe("2");
-    expect(screen.queryByRole("button", { name: "Show more" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("navigation", { name: "Jobs pages" })).not.toBeInTheDocument();
   });
 
   it("tabs are a roving tablist: arrow keys switch the filter and the URL", async () => {
@@ -182,12 +180,13 @@ describe("Jobs screen", () => {
     expect(live).toHaveAttribute("aria-live", "polite");
     expect(router.state.location.search).toBe("?sel=nw01");
     expect(screen.getByRole("button", { name: "Export 1 to xlsx" })).toBeInTheDocument();
+    await screen.findByRole("rowheader", { name: "Initech" });
     const all = screen.getByRole("checkbox", { name: "Select all shown jobs" });
     expect((all as HTMLInputElement).indeterminate).toBe(true);
     await user.click(all);
-    expect(screen.getByText("2 selected")).toBeInTheDocument();
+    expect(screen.getByText("3 selected")).toBeInTheDocument();
     expect(all).toBeChecked();
-    const add = screen.getByRole("link", { name: "Add 2 to batch" });
+    const add = screen.getByRole("link", { name: "Add 3 to batch" });
     expect(new URL(add.getAttribute("href")!, "http://x").searchParams.get("ids")!.split(",").sort()).toEqual(
       [...new URLSearchParams(router.state.location.search).get("sel")!.split(",")].sort(),
     );

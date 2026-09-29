@@ -7,6 +7,7 @@ import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { Listbox } from "../../kit/Listbox";
+import { Pager, usePaged } from "../../kit/Pager";
 import { NEEDS, PRIORITIES, describeCode } from "../../kit/labels";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { useToast } from "../../kit/Toast";
@@ -18,7 +19,7 @@ import { AddItemSheet } from "./AddItemSheet";
 import { useActions, useMarkDone, useReopen } from "./api";
 import { DueSheet } from "./DueSheet";
 import { QUEUED_NOTE } from "./queued";
-import type { ActionGroup, ActionItem, GroupBy, SortBy, Tab, WriteResult } from "./types";
+import type { ActionItem, GroupBy, SortBy, Tab, WriteResult } from "./types";
 import { useUndoSeconds } from "./useUndoSeconds";
 
 const TABS: { value: Tab; label: string }[] = [
@@ -104,6 +105,8 @@ export function ActionItemsPage() {
     );
   }
 
+  const paged = usePaged(data?.groups.flatMap((g) => g.items) ?? [], { resetKey: `${tab}|${group}|${sort}` });
+  const onPage = new Set(paged.pageItems.map((i) => i.id));
   const openIds = new Set(data?.groups.flatMap((g) => g.items.filter((i) => !i.done).map((i) => i.id)) ?? []);
   const selectedOpen = [...selected].filter((id) => openIds.has(id));
 
@@ -201,9 +204,9 @@ export function ActionItemsPage() {
         {error ? (
           <EmptyState title="Couldn't load Action Items">{problem(error)}</EmptyState>
         ) : isPending ? null : tab === "done" ? (
-          <DoneList groups={data?.groups ?? []} more={data?.more_done ?? 0} onReopen={reopenOne} />
+          <DoneList items={paged.pageItems} more={data?.more_done ?? 0} onReopen={reopenOne} />
         ) : data && data.groups.length ? (
-          data.groups.map((g) => {
+          data.groups.filter((g) => g.items.some((i) => onPage.has(i.id))).map((g) => {
             const h = groupHeading(group, g.key);
             const id = `grp-${g.key}`;
             return (
@@ -213,7 +216,7 @@ export function ActionItemsPage() {
                   <span className={styles.groupCount}>{formatCount(g.count)}</span>
                 </h2>
                 <ul className={styles.rows}>
-                  {g.items.map((item) => (
+                  {g.items.filter((i) => onPage.has(i.id)).map((item) => (
                     <ActionRow
                       key={item.id}
                       item={item}
@@ -232,6 +235,7 @@ export function ActionItemsPage() {
         ) : (
           <div className={styles.empty}>Nothing needs you right now. New items appear after the next run.</div>
         )}
+        {error ? null : <Pager paged={paged} label="Action items" />}
       </div>
       {dateFor ? <DueSheet item={dateFor} onClose={() => setDateFor(null)} onSaved={setRefocusRow} /> : null}
       {adding ? <AddItemSheet onClose={() => setAdding(false)} /> : null}
@@ -239,8 +243,7 @@ export function ActionItemsPage() {
   );
 }
 
-function DoneList({ groups, more, onReopen }: { groups: ActionGroup[]; more: number; onReopen: (i: ActionItem) => void }) {
-  const items = groups.flatMap((g) => g.items);
+function DoneList({ items, more, onReopen }: { items: ActionItem[]; more: number; onReopen: (i: ActionItem) => void }) {
   if (!items.length) return <div className={styles.empty}>Nothing done yet.</div>;
   return (
     <section aria-labelledby="grp-done" className={styles.group}>
