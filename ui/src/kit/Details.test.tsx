@@ -11,7 +11,8 @@ describe("Details", () => {
         <p>run-123</p>
       </Details>,
     );
-    const toggle = screen.getByText("Advanced");
+    const toggle = screen.getByRole("group").querySelector("summary")!;
+    expect(toggle).toHaveTextContent("Advanced");
     expect(container.querySelector("details")).not.toHaveAttribute("open");
     await userEvent.click(toggle);
     expect(container.querySelector("details")).toHaveAttribute("open");

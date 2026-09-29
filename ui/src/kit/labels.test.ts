@@ -8,7 +8,10 @@ import {
   STATUSES,
   STOP_REASONS,
   describeCode,
+  TIERS,
   humanize,
+  keywordCoverageLabel,
+  questionsLabel,
 } from "./labels";
 
 // Codes copied from src/careeros/models.py and src/careeros/runs/runner.py. If the backend adds a code the
@@ -62,6 +65,26 @@ describe("label tables", () => {
     expect(HUMAN.status.queued).toBe("Ready to prepare");
     expect(HUMAN.tier.A).toBe("Top choice");
     expect(HUMAN.term["dry run"]).toBe("Preview");
-    for (const g of [HUMAN.status, HUMAN.tier, HUMAN.safety, HUMAN.action, HUMAN.stop]) for (const v of Object.values(g)) expect(v[0]).toBe(v[0]!.toUpperCase());
+    expect(Object.keys(HUMAN.tier).sort()).toEqual(Object.keys(TIERS).sort());
+    expect(HUMAN.status).toEqual({
+      found: "New", scored: "Scored", queued: "Ready to prepare", prepared: "Ready to apply",
+      needs_review: "Needs your review", skipped: "Not a fit",
+    });
+    expect(HUMAN.safety).toEqual({ pass: "Company verified", review: "Check company", block: "Blocked" });
+    expect(HUMAN.stop).toEqual({ auth_required: "Sign-in needed", usage_limit: "Claude usage limit reached" });
+    expect(HUMAN.action).toEqual({
+      captcha: "Solve a verification check", bot_detection: "Solve a verification check",
+      question: "Answer application questions", salary: "Decide a salary answer",
+      profile_gap: "Add missing experience to your profile", laptop_required: "Finish on your laptop",
+      qa_fail: "Review tailored resume", scam_suspected: "Check this company is real",
+      ghost_job: "Posting may be stale",
+      other: "Automation couldn't finish this job — retry or finish by hand",
+    });
+    expect(HUMAN.preset).toEqual({ small: "10 jobs", medium: "25 jobs", large: "50 jobs", max: "All jobs" });
+    expect(Object.keys(HUMAN.qa).sort()).toEqual(["confidential_terms", "employer_title_consistent", "keyword_coverage", "numbers_consistent"]);
+    expect(HUMAN.term["tier a"]).toBe("Top choice (always submitted by you)");
+    expect(questionsLabel(3)).toBe("Answer 3 application questions");
+    expect(keywordCoverageLabel(1)).toBe("Resume misses 1 key skill from this role");
+    for (const g of [HUMAN.status, HUMAN.preset, HUMAN.qa, HUMAN.term, HUMAN.tier, HUMAN.safety, HUMAN.action, HUMAN.stop]) for (const [k, v] of Object.entries(g)) if (k !== "action item") expect(v[0]).toBe(v[0]!.toUpperCase());
   });
 });

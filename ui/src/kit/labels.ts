@@ -100,16 +100,29 @@ export const HUMAN = {
     profile_gap: "Add missing experience to your profile", laptop_required: "Finish on your laptop",
     qa_fail: "Review tailored resume", scam_suspected: "Check this company is real",
     ghost_job: "Posting may be stale",
+    other: "Automation couldn't finish this job — retry or finish by hand",
+  },
+  preset: { small: "10 jobs", medium: "25 jobs", large: "50 jobs", max: "All jobs" },
+  qa: {
+    keyword_coverage: "Resume misses key skills from this role",
+    numbers_consistent: "Resume and cover letter disagree on a detail",
+    employer_title_consistent: "Resume and cover letter disagree on a detail",
+    confidential_terms: "A private term appeared in a document",
   },
   stop: { auth_required: "Sign-in needed", usage_limit: "Claude usage limit reached" },
   // Terms with no code table.
   term: {
     "score run": "Score jobs", "prepare run": "Prepare documents", "apply run": "Fill application",
-    "dry run": "Preview", Runs: "Automation", "Action Item": "task", Scout: "Job discovery",
+    "dry run": "Preview", runs: "Automation", "action item": "task", scout: "Job discovery",
     tick: "Automation schedule", schedule: "Automation schedule", "catch-up": "Missed runs",
     "qa-review fail": "Documents need review",
+    "tier a": "Top choice (always submitted by you)",
   },
 } as const;
+
+// Count-aware wording for `question` ("Answer N application questions") and QA `keyword_coverage`.
+export const questionsLabel = (n: number) => `Answer ${n} application question${n === 1 ? "" : "s"}`;
+export const keywordCoverageLabel = (n: number) => `Resume misses ${n} key skill${n === 1 ? "" : "s"} from this role`;
 
 export function humanize(code: string): string {
   const words = code.replace(/[_-]+/g, " ").trim().toLowerCase();
