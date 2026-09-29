@@ -1,1 +1,0 @@
-import{t as e}from"./index-DOd7I5EJ.js";function t(){return e().data?.ui.undo_seconds}export{t};
