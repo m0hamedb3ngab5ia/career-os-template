@@ -32,13 +32,14 @@ class Roots:
 class Plan:
     jobs: set[str] = field(default_factory=set)
     runs: set[str] = field(default_factory=set)
+    batches: set[str] = field(default_factory=set)   # batch ids whose file changed (runs/batches/<id>.json)
     tracker: bool = False
     config: bool = False
     status: bool = False        # pause, catch-up, queue, schedule state, locks: the Today/Runs panels
 
     @property
     def any(self) -> bool:
-        return bool(self.jobs or self.runs or self.tracker or self.config or self.status)
+        return bool(self.jobs or self.runs or self.batches or self.tracker or self.config or self.status)
 
 
 def _real(p: Path | str) -> Path:
@@ -80,6 +81,10 @@ def plan_changes(paths: Iterable[Path | str], roots: Roots) -> Plan:
                 plan.jobs.add(parts[0])
             continue
         if (parts := _under(p, roots.runs)) is not None:
+            if parts and parts[0] == "batches":
+                if len(parts) == 2 and parts[1].endswith(".json"):
+                    plan.batches.add(parts[1][:-5])
+                continue
             if len(parts) == 1 and not _is_run_state(parts[0]) and not _is_finder_copy(parts[0]):
                 if not p.is_file():
                     plan.runs.add(parts[0])          # a run folder created, moved in or moved away
@@ -158,9 +163,11 @@ class Watcher:
         config = plan.config and self.index.update_config()   # False when a UI write already took this change
         if config and self.on_config:
             self.on_config()
-        if not (jobs or runs or actions or config or plan.status):
+        batches = sorted(plan.batches)
+        if not (jobs or runs or batches or actions or config or plan.status):
             return None
-        payload = {"jobs": jobs, "runs": runs, "actions": actions, "config": config, "status": plan.status}
+        payload = {"jobs": jobs, "runs": runs, "batches": batches, "actions": actions, "config": config,
+                   "status": plan.status}
         self.broker.publish("changed", payload)
         return payload
 

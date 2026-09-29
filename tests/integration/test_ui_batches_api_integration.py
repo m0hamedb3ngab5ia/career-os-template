@@ -93,3 +93,49 @@ def test_cli_create_and_show(data, tmp_path):
     shown = cli("show", bid)
     assert shown.returncode == 0 and data["jobs"]["found"] in shown.stdout
     assert cli("show", "missing").returncode == 1
+
+
+def test_drive_end_to_end_then_controls(client, data, monkeypatch):
+    """Slice 8: the driver works a saved batch with a fake headless invoke; the API reads the progress back and
+    pause / cancel / retry / start answer by the batch lock (single writer)."""
+    import sys
+    from pathlib import Path
+
+    from careeros.runs import locks
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from test_runs_runner import FakeInvoke
+
+    s = data["settings"]
+    s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}), "preflight_doctor": False}}
+    b = client.post("/api/batches", json={"job_ids": [data["jobs"]["found"]], "stop_at": "score"}, headers=W).json()
+    inv = FakeInvoke(s)
+    batches.drive(s, b["id"], invoke=inv, now=lambda: NOW)
+    g = client.get(f"/api/batches/{b['id']}").json()
+    assert g["status"] == "done" and g["selected"][0]["state"] == "done" and g["selected"][0]["result"] == "scored"
+    assert len(inv.calls) == 1 and inv.calls[0]["job_id"] == data["jobs"]["found"]
+    assert client.post(f"/api/batches/{b['id']}/start", headers=W).status_code == 422  # done
+    assert client.post(f"/api/batches/{b['id']}/retry", json={}, headers=W).json()["status"] == "done"
+
+    b2 = client.post("/api/batches", json={"job_ids": [data["jobs"]["found"]], "stop_at": "prepare"},
+                     headers=W).json()
+    lk = locks.acquire(batches._lock_path(s, b2["id"]), owner="driver", ttl_seconds=60, pid=None)
+    r = client.post(f"/api/batches/{b2['id']}/pause", headers=W).json()
+    assert r["requested"] == "pause" and r["status"] == "queued"  # a request: the driver writes the status
+    assert client.post(f"/api/batches/{b2['id']}/retry", json={}, headers=W).status_code == 409
+    assert client.post(f"/api/batches/{b2['id']}/start", headers=W).status_code == 409
+    locks.release(lk.path, lk.token)
+    assert client.post(f"/api/batches/{b2['id']}/cancel", headers=W).json()["status"] == "cancelled"
+    assert client.post("/api/batches/missing/pause", headers=W).status_code == 404
+
+
+def test_cli_batch_cancel_and_run(data, tmp_path):
+    b = batches.create(data["settings"], [data["jobs"]["found"]], "score", now=NOW)
+    root, env = str(data["settings"].root), subprocess_env(data["settings"].root, tmp_path / "home")
+    out = subprocess.run([PY, "-m", "careeros.cli", "--root", root, "batch", "cancel", b["id"], "--json"],
+                         capture_output=True, text=True, env=env, timeout=60, cwd=root)
+    assert out.returncode == 0, out.stderr
+    assert json.loads(out.stdout)["status"] == "cancelled"
+    out = subprocess.run([PY, "-m", "careeros.cli", "--root", root, "batch", "run", b["id"], "--json"],
+                         capture_output=True, text=True, env=env, timeout=60, cwd=root)
+    assert out.returncode == 0 and json.loads(out.stdout)["status"] == "cancelled"  # nothing left to run

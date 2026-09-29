@@ -71,6 +71,25 @@ export interface paths {
     /** Detail */
     get: operations["detail_api_batches__batch_id__get"];
   };
+  "/api/batches/{batch_id}/cancel": {
+    /** Cancel */
+    post: operations["cancel_api_batches__batch_id__cancel_post"];
+  };
+  "/api/batches/{batch_id}/pause": {
+    /** Pause */
+    post: operations["pause_api_batches__batch_id__pause_post"];
+  };
+  "/api/batches/{batch_id}/retry": {
+    /** Retry */
+    post: operations["retry_api_batches__batch_id__retry_post"];
+  };
+  "/api/batches/{batch_id}/start": {
+    /**
+     * Start
+     * @description Start (or resume) the driver as a detached process; the batch file then shows its progress.
+     */
+    post: operations["start_api_batches__batch_id__start_post"];
+  };
   "/api/contacts": {
     /** List Contacts */
     get: operations["list_contacts_api_contacts_get"];
@@ -545,12 +564,18 @@ export interface components {
       kind: string;
       /** Name */
       name?: string | null;
+      /** Reason */
+      reason?: string | null;
+      /** Requested */
+      requested?: string | null;
       /** Selected */
       selected: components["schemas"]["BatchJob"][];
       /** Status */
       status?: string | null;
       /** Stop At */
       stop_at: string;
+      /** Updated At */
+      updated_at?: string | null;
     };
     /** BatchJob */
     BatchJob: {
@@ -564,6 +589,10 @@ export interface components {
       job_id: string;
       /** Rank */
       rank: number;
+      /** Reason */
+      reason?: string | null;
+      /** Result */
+      result?: string | null;
       /** Score */
       score: number;
       /** Stage */
@@ -1825,6 +1854,11 @@ export interface components {
       /** Rows */
       rows: components["schemas"]["TileRow"][];
     };
+    /** RetryBody */
+    RetryBody: {
+      /** Job Ids */
+      job_ids?: string[] | null;
+    };
     /** RunBudget */
     RunBudget: {
       /** Max Jobs */
@@ -2760,6 +2794,102 @@ export interface operations {
   };
   /** Detail */
   detail_api_batches__batch_id__get: {
+    parameters: {
+      path: {
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Cancel */
+  cancel_api_batches__batch_id__cancel_post: {
+    parameters: {
+      path: {
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Pause */
+  pause_api_batches__batch_id__pause_post: {
+    parameters: {
+      path: {
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Retry */
+  retry_api_batches__batch_id__retry_post: {
+    parameters: {
+      path: {
+        batch_id: string;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["RetryBody"] | null;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Start
+   * @description Start (or resume) the driver as a detached process; the batch file then shows its progress.
+   */
+  start_api_batches__batch_id__start_post: {
     parameters: {
       path: {
         batch_id: string;
