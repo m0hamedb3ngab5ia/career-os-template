@@ -28,6 +28,10 @@ def _put(url: str) -> Any:
         return json.loads(r.read() or b"null")
 
 
+class NotConnected(RuntimeError):
+    """Your own Chrome (paths.apply_cdp) doesn't answer: connect it, then retry. The recorded tab is kept."""
+
+
 def cdp_url(settings: Any) -> str:
     return str((getattr(settings, "paths", None) or {}).get("apply_cdp") or DEFAULT_CDP)
 

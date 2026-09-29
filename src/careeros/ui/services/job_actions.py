@@ -239,6 +239,10 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
         return {"action": "focused"}
     ensure_unlocked(settings, job_id)
     gh_fill.preflight()
+    cdp = browser.cdp_url(settings)
+    if cdp != browser.DEFAULT_CDP and browser.tabs(cdp) is None:  # the default browser starts itself; yours can't
+        raise browser.NotConnected(f"Chrome not connected on {cdp}: open Chrome with its extension/remote debugging "
+                                   "on, then retry")
     steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
     cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
     cmd = f"{cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
