@@ -351,6 +351,15 @@ class RunControl:
     def cancel(self, run_id: str | None = None) -> dict[str, Any]:
         """SIGTERM the careeros process running `run_id` (default: the running batch). Never signals anything else."""
         rid, held = self._holder_of(run_id)
+        if not held and run_id and not self.rs.load_run(run_id) \
+                and re.fullmatch(r"\w[\w.-]*", run_id) and any((self.rs.dir / "ui").glob(f"*-{run_id}.out")):
+            # a step spawned here that has not taken its lock yet: leave a marker it checks once locked, then
+            # look again, so a step that locked meanwhile is signalled instead
+            marker = self.rs.dir / "ui" / f"cancel-{run_id}"
+            write_text(marker, f"pending\n{self.now().isoformat()}\n")
+            rid, held = self._holder_of(run_id)
+            if not held:
+                return {"status": "cancelling", "run_id": run_id, "pid": None}
         if not held:
             return {"status": "idle", "detail": "nothing is running"}
         pid = held.get("pid")

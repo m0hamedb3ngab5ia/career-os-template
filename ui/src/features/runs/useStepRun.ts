@@ -29,9 +29,9 @@ export function useStepRun(kind: StepRunKind, jobId?: string, onDone?: (run: Run
     if (finished && detail) {
       clear();
       onDone?.(detail);
-    } else if (startError) clear();
+    } else if (startError || (runId && run.isError)) clear(); // isError: retries used up, the run is gone
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [finished, startError]);
+  }, [finished, startError, run.isError]);
   const start = useMutation({
     mutationFn: () =>
       apiSend<{ run_id: string }>("POST", `/api/runs/steps/${kind}${jobId ? `?job_id=${encodeURIComponent(jobId)}` : ""}`),
