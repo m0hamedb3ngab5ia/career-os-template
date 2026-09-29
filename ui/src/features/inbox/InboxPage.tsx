@@ -6,6 +6,7 @@ import { Button } from "../../kit/Button";
 import { Chip, StatusChip } from "../../kit/chips";
 import { EmptyState } from "../../kit/EmptyState";
 import { ExternalLink } from "../../kit/ExternalLink";
+import { Pager, usePaged } from "../../kit/Pager";
 import { UnavailableButton } from "../../kit/UnavailableButton";
 import { formatDate, formatDateTime, formatRelative } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
@@ -40,6 +41,7 @@ export function InboxPage() {
   const now = useNow(60_000);
   const { data, isPending, isError, error } = useInbox();
   const items = data?.items ?? [];
+  const paged = usePaged(items);
   const selectedId = jobId ?? items[0]?.job_id;
   const syncReason = data?.sync.reason ?? "Inbox sync isn't set up yet";
   const lastSync = data?.last_sync ? formatDateTime(data.last_sync) : null;
@@ -94,7 +96,7 @@ export function InboxPage() {
               </span>
             </div>
             <ul className={styles.rows}>
-              {items.map((r) => (
+              {paged.pageItems.map((r) => (
                 <li key={r.job_id}>
                   <Link
                     to={`/inbox/${encodeURIComponent(r.job_id)}`}
@@ -114,6 +116,7 @@ export function InboxPage() {
                 </li>
               ))}
             </ul>
+            <Pager paged={paged} label="Follow-ups" />
           </section>
           <div className={styles.pane}>
             {jobId ? (

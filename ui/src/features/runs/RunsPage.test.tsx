@@ -386,7 +386,7 @@ describe("Runs page", () => {
     expect(rows[1]).toHaveTextContent("Interrupted");
     expect(rows[2]).toHaveTextContent("Done");
     expect(rows[2]).toHaveAttribute("href", "/automation/runs/20260925-010000-score-aaaa");
-    expect(screen.getByRole("button", { name: "Load older runs" })).toBeInTheDocument();
+    expect(screen.getByRole("navigation", { name: "Runs pages" })).toHaveTextContent(/of \d+\+/);
     await user.click(within(screen.getByRole("radiogroup", { name: "Run kind" })).getByRole("radio", { name: "Score" }));
     expect(router.state.location.search).toContain("history=score");
     await waitFor(() => expect(api.calls.some((c) => c.url === "/api/runs?kind=score")).toBe(true));

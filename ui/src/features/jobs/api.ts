@@ -51,7 +51,7 @@ function listUrl(params: ListParams, cursor?: string): string {
   return `/api/jobs?${p}`;
 }
 
-/** Pages of the live table; "Show more" fetches the next page by `next_cursor`. */
+/** Pages of the live table; the pager fetches the next page by `next_cursor` when it runs past the loaded rows. */
 export function useJobsList(params: ListParams, enabled = true) {
   return useInfiniteQuery({
     queryKey: ["jobs", "list", params],
