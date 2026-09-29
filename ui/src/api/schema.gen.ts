@@ -867,12 +867,18 @@ export interface components {
       } | null;
       /** Id */
       id: string;
+      /** Job Id */
+      job_id?: string;
       /** Jobs */
       jobs: components["schemas"]["RunJobRow"][];
       /** Kind */
       kind: string;
       /** Pid */
       pid?: number | null;
+      /** Result */
+      result?: {
+        [key: string]: unknown;
+      } | null;
       /** Scheduled */
       scheduled: boolean;
       /** Started At */
@@ -1916,12 +1922,18 @@ export interface components {
       ended_at: string | null;
       /** Id */
       id: string;
+      /** Job Id */
+      job_id?: string;
       /** Kind */
       kind: string;
       /** Log */
       log: string;
       /** Pid */
       pid?: number | null;
+      /** Result */
+      result?: {
+        [key: string]: unknown;
+      } | null;
       /** Started At */
       started_at: string | null;
       /** State */
@@ -2012,10 +2024,16 @@ export interface components {
       ended_at: string | null;
       /** Id */
       id: string;
+      /** Job Id */
+      job_id?: string;
       /** Kind */
       kind: string;
       /** Pid */
       pid?: number | null;
+      /** Result */
+      result?: {
+        [key: string]: unknown;
+      } | null;
       /** Started At */
       started_at: string | null;
       /** State */
@@ -3892,6 +3910,9 @@ export interface operations {
   /** Start Step */
   start_step_api_runs_steps__kind__post: {
     parameters: {
+      query?: {
+        job_id?: string | null;
+      };
       path: {
         kind: string;
       };

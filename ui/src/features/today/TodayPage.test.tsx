@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { TodayPage } from "./TodayPage";
-import { defaultRoutes, json, mockApi, NOW, renderWithApp, status, today, type Routes } from "./testing";
+import { defaultRoutes, mockApi, NOW, renderWithApp, status, today, type Routes } from "./testing";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -48,21 +48,26 @@ describe("TodayPage", () => {
   });
 
   describe("header actions", () => {
-    it("Run scout posts, reads Starting… while pending, then confirms", async () => {
+    it("Run scout shows live progress; Back keeps it running, Cancel stops and discards", async () => {
       const user = userEvent.setup();
-      let release!: () => void;
       const { calls } = setup({
-        "POST /api/runs/steps/scout": () =>
-          new Promise<Response>((res) => {
-            release = () => res(json({ kind: "scout", started: true, pid: 42 }));
-          }),
+        "POST /api/runs/steps/scout": { kind: "scout", started: true, pid: 42, run_id: "r-scout-1" },
+        "GET /api/runs/r-scout-1": {
+          id: "r-scout-1", kind: "scout", trigger: "manual", status: "running", state: "running", stop_reason: null,
+          started_at: new Date().toISOString(), ended_at: null, attempts: [],
+          log: "- t [run] start scout\n- t [run] [scout] Acme greenhouse fetched=9 new=3 stored=2 (title-1)\n",
+        },
+        "POST /api/runs/cancel": { status: "cancelling", run_id: "r-scout-1" },
       });
       await screen.findByText(/jobs need you/);
       await user.click(screen.getByRole("button", { name: "Run scout" }));
-      expect(await screen.findByRole("button", { name: "Starting…" })).toBeDisabled();
-      release();
-      expect(await screen.findByText("Scout started.")).toBeInTheDocument();
-      expect(calls.find((c) => c.path === "/api/runs/steps/scout")?.headers.get("X-CareerOS")).toBe("1");
+      expect(await screen.findByText(/2 found so far/)).toBeInTheDocument();
+      expect(screen.getByText(/Acme greenhouse/)).toBeInTheDocument();
+      await user.click(screen.getByRole("button", { name: "Back" }));
+      await user.click(screen.getByRole("button", { name: "View scout progress" }));
+      await user.click(await screen.findByRole("button", { name: "Cancel" }));
+      expect(await screen.findByRole("button", { name: "Run scout" })).toBeEnabled();
+      expect(calls.find((c) => c.path === "/api/runs/cancel")?.headers.get("X-CareerOS")).toBe("1");
     });
 
     it("a refused run shows the server's detail in a toast", async () => {
