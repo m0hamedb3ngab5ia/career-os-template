@@ -94,6 +94,33 @@ describe("SegmentedControl", () => {
     expect(radios[0]).toHaveAttribute("aria-checked", "true");
   });
 
+  it("skips disabled options with arrow keys and links the reason", async () => {
+    const user = userEvent.setup();
+    function D() {
+      const [v, setV] = useState("a");
+      return (
+        <>
+          <SegmentedControl label="Stop" value={v} onValueChange={setV}>
+            <SegmentedControl.Option value="a">A</SegmentedControl.Option>
+            <SegmentedControl.Option value="b" disabled describedBy="why">B</SegmentedControl.Option>
+            <SegmentedControl.Option value="c">C</SegmentedControl.Option>
+          </SegmentedControl>
+          <p id="why">B is off in Settings</p>
+        </>
+      );
+    }
+    render(<D />);
+    const [a, b, c] = screen.getAllByRole("radio");
+    expect(b).toBeDisabled();
+    expect(b).toHaveAccessibleDescription("B is off in Settings");
+    a!.focus();
+    await user.keyboard("{ArrowRight}");
+    expect(c).toHaveFocus();
+    expect(c).toHaveAttribute("aria-checked", "true");
+    await user.keyboard("{ArrowLeft}");
+    expect(a).toHaveFocus();
+  });
+
   it("has no axe violations", async () => {
     const { container } = render(<Demo />);
     expect(await axeViolations(container)).toEqual([]);
