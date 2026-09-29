@@ -2,6 +2,7 @@ import { FileText, FolderOpen } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
+import { Details } from "../../kit/Details";
 import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatBytes, formatCount, formatDate, formatDecimal } from "../../lib/format";
@@ -83,27 +84,29 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
     <div className={styles.qa}>
       <div className={styles.qaHead}>
         <h3 className={styles.h3}>QA</h3>
-        <span className={styles.qaVerdict}>
-          {verdict}
-          {meanText ? <span className={styles.caption}>{meanText}</span> : null}
-        </span>
+        <span className={styles.qaVerdict}>{verdict}</span>
       </div>
-      {rubric.length ? (
-        <dl className={styles.rubric}>
-          {rubric.map(([k, v]) => (
-            <div key={k} className={styles.tile} title={v.why}>
-              <dt>{RUBRIC_LABELS[k] ?? humanize(k)}</dt>
-              <dd>{formatDecimal(v.score)}</dd>
-            </div>
-          ))}
-        </dl>
-      ) : null}
       {qa?.fail_reasons?.length ? (
         <ul className={styles.bullets}>
           {qa.fail_reasons.map((r) => (
             <li key={r}>{r}</li>
           ))}
         </ul>
+      ) : null}
+      {meanText || rubric.length ? (
+        <Details summary="QA scores">
+          {meanText ? <p className={styles.caption}>{meanText}</p> : null}
+          {rubric.length ? (
+            <dl className={styles.rubric}>
+              {rubric.map(([k, v]) => (
+                <div key={k} className={styles.tile} title={v.why}>
+                  <dt>{RUBRIC_LABELS[k] ?? humanize(k)}</dt>
+                  <dd>{formatDecimal(v.score)}</dd>
+                </div>
+              ))}
+            </dl>
+          ) : null}
+        </Details>
       ) : null}
       <div className={styles.buttons}>
         <Button
@@ -195,8 +198,7 @@ export function DocumentsCard({
         </li>
       </ul>
       {otherFiles.length ? (
-        <details className={styles.details}>
-          <summary>All files ({formatCount(otherFiles.length)})</summary>
+        <Details summary={`All files (${formatCount(otherFiles.length)})`}>
           <ul className={styles.list} aria-label="All files">
             {otherFiles.toSorted((a, b) => a.name.localeCompare(b.name)).map((f) => (
               <li key={f.name} className={styles.docRow}>
@@ -210,7 +212,7 @@ export function DocumentsCard({
               </li>
             ))}
           </ul>
-        </details>
+        </Details>
       ) : null}
       <QaSection jobId={jobId} qa={qa} />
     </Card>

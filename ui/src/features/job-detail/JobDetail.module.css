@@ -194,6 +194,9 @@
   white-space: nowrap;
   max-width: 100%;
 }
+/* Thin progress line (Next step block): bars only, the current stage named. */
+.progressLine { margin: var(--space-1) 0 0; gap: 3px; }
+.progressLine .stepBar { height: 3px; }
 .stepper li[data-state="upcoming"] .stepLabel {
   color: var(--ter);
 }

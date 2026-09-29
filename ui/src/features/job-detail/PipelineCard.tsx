@@ -3,6 +3,7 @@ import { Workflow } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
+import { Details } from "../../kit/Details";
 import { useToast } from "../../kit/Toast";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
 import { LogPane, type LogLine } from "../runs/LogPane";
@@ -11,6 +12,7 @@ import { type ActionKey, help } from "./actionHelp";
 import { errorText, usePipeline, useResetFailures, useStartPipeline } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
+import { NextStepSummary, ReasonDetails, useJobTasks } from "./NextStep";
 import type { PipelineState } from "./types";
 
 const NEXT_ACTION_HELP_KEY: Record<string, ActionKey> = {
@@ -84,6 +86,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
   const [lastEnd, setLastEnd] = useState<string | null>(null);
   const pipeline = usePipeline(jobId, started !== null);
+  const tasks = useJobTasks(jobId);
   const state = pipeline.data;
   // Stream the run we started even before the pipeline reports it (it may end before the first 1s poll).
   const runId = state?.active_run_id ?? started;
@@ -151,14 +154,14 @@ export function PipelineCard({ jobId }: { jobId: string }) {
 
   if (pipeline.error) {
     return (
-      <Card title="Pipeline" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
+      <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
         <p className={styles.alert}>{errorText(pipeline.error)}</p>
       </Card>
     );
   }
   if (!state) {
     return (
-      <Card title="Pipeline" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
+      <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
         <Muted>Loading…</Muted>
       </Card>
     );
@@ -191,34 +194,25 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   }
 
   return (
-    <Card title="Pipeline" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
-      <ol className={styles.stepper} aria-label="Pipeline stages" style={{ marginTop: 0 }}>
+    <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
+      <NextStepSummary state={state} tasks={tasks} />
+      <ol className={`${styles.stepper} ${styles.progressLine}`} aria-label="Pipeline stages">
         {STAGES.map((s, i) => {
           const st = i < current ? "done" : i === current ? "current" : "upcoming";
           return (
             <li key={s.id} data-state={st} aria-current={st === "current" ? "step" : undefined}>
               <span className={styles.stepBar} />
-              <span className={styles.stepLabel}>{s.label}</span>
+              <span className={st === "current" ? styles.stepLabel : "sr-only"}>{s.label}</span>
             </li>
           );
         })}
       </ol>
-      {state.review_reasons.length > 0 ? (
-        <div className={styles.reviewReasons}>
-          <p className={styles.caption}>{state.stage === "review" ? "Waiting on you" : "Notes from the pipeline"}</p>
-          <ul className={styles.bullets}>
-            {state.review_reasons.map((r) => (
-              <li key={`${r.code}:${r.detail ?? ""}`}>{r.text}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
       {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
       {runId ? (
         <>
           <div className={styles.buttons}>
             <span className={styles.sec}>
-              {chaining ? `${chaining} ` : ""}Running {state.next_kind ?? ""} · {runId}
+              {chaining ? `${chaining} ` : ""}Running {state.next_kind ?? ""}…
             </span>
             <Button
               variant="destructive"
@@ -253,7 +247,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
             {started ? "Starting…" : label}
           </Button>
           <span className={styles.sec}>
-            {chaining ?? kindHelp(state)}
+            {chaining}
           </span>
         </div>
       ) : (
@@ -261,7 +255,6 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button variant="primary" title={state.blocked_reason ?? label} disabled>
             {label}
           </Button>
-          <span className={styles.sec}>{state.blocked_reason ?? "Nothing left to run for this job."}</span>
           {state.failures?.excluded ? (
             <Button
               title="Clear this job's failure count so runs pick it up again (careeros run reset-failures)"
@@ -290,6 +283,11 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           Stop after this stage
         </label>
       ) : null}
+      <Details summary="Details">
+        {kindHelp(state) ? <p className={styles.caption}>{kindHelp(state)}</p> : null}
+        {runId ? <p className={styles.caption}>Run {runId}</p> : null}
+        <ReasonDetails reasons={state.review_reasons} />
+      </Details>
     </Card>
   );
 }
