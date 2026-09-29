@@ -41,6 +41,15 @@ describe("DocumentsCard", () => {
     expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
   });
 
+  it("shows each document as a closed title that expands to its details", async () => {
+    renderCard();
+    const title = screen.getByText("Résumé");
+    expect(title.closest("details")).not.toHaveAttribute("open");
+    expect(screen.getAllByText("resume.pdf")[0]!).not.toBeVisible();
+    await userEvent.setup().click(title);
+    expect(screen.getAllByText("resume.pdf")[0]!).toBeVisible();
+  });
+
   it("folds every other file under a closed All files (N) toggle, sorted by name", async () => {
     renderCard();
     const toggle = screen.getByText("All files (3)");

@@ -1,4 +1,5 @@
 import { StatusChip } from "../../kit/chips";
+import { Details } from "../../kit/Details";
 import { formatCount, formatDateTime } from "../../lib/format";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -8,15 +9,15 @@ import type { ActivityEntry, HistoryEntry } from "./types";
 export const ACTIVITY_PREVIEW = 3;
 
 function ActivityRow({ entry }: { entry: ActivityEntry }) {
-  // The raw log line stays reachable on hover (and on expand for touch); the label is the plain-English version.
-  const raw = `[${entry.component}] ${entry.message}`;
+  // Title only; the time, component and raw log line sit behind the click.
   return (
-    <li className={styles.logRow} title={raw}>
-      <span className={styles.logTime}>{formatDateTime(entry.at) ?? entry.at}</span>
-      <span className={styles.grow}>{entry.label || entry.message}</span>
-      <span translate="no" className={styles.component}>
-        {entry.component}
-      </span>
+    <li>
+      <Details summary={entry.label || entry.message}>
+        <p className={styles.caption}>
+          {formatDateTime(entry.at) ?? entry.at} · <span translate="no">{entry.component}</span>
+        </p>
+        <p className={styles.caption} translate="no">{`[${entry.component}] ${entry.message}`}</p>
+      </Details>
     </li>
   );
 }
