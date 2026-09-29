@@ -138,12 +138,11 @@ def test_index_path_resolution(tmp_path, monkeypatch):
 
 
 @pytest.mark.parametrize("names", [["Queued", "Queued"], ["Queued", " queued "], ["Applied", "APPLIED"]])
-def test_duplicate_column_names_fail_closed(names):
-    from careeros.config import ConfigError
-
+def test_legacy_pipeline_columns_load_and_warn(names, caplog):
     cols = [{"name": names[0], "statuses": ["queued"]}, {"name": names[1], "statuses": ["applied"]}]
-    with pytest.raises(ConfigError, match="already"):
-        load_ui_config(S({"ui": {"pipeline": {"columns": cols}}}))
+    cfg = load_ui_config(S({"ui": {"pipeline": {"columns": cols, "card_limit": 5}}}))
+    assert cfg.columns == UiConfig().columns
+    assert "ui.pipeline is no longer used" in caplog.text
 
 
 def test_every_ui_key_is_documented_in_ui_md():

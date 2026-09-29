@@ -171,7 +171,7 @@ def test_pipeline_board(env, data):
     only_a = c.get("/api/pipeline", params=[("tier", "A")]).json()
     assert [card["status"] for card in only_a["applications"]] == ["interview"]
     m = c.get("/api/meta").json()
-    assert m["pipeline"]["card_limit"] == 10 and m["ui"]["due_soon_hours"] == 48
+    assert "card_limit" not in m.get("pipeline", {}) and m["ui"]["due_soon_hours"] == 48
 
 
 def test_set_status_moves_the_card(env, data):

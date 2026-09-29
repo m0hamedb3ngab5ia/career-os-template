@@ -115,11 +115,13 @@
     "pipeline": "config/pipeline.yaml"
   },
   "section": {
+    "advanced": false,
     "files": [
       "pipeline"
     ],
     "groups": [
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -264,6 +266,7 @@
         "title": "Budget"
       },
       {
+        "advanced": true,
         "help": "",
         "id": "<id>",
         "items": [
@@ -428,6 +431,7 @@
         "title": "Timeouts and failures"
       },
       {
+        "advanced": true,
         "help": "Which jobs go first. No Claude involved.",
         "id": "<id>",
         "items": [
@@ -611,6 +615,7 @@
         "title": "Ranking"
       },
       {
+        "advanced": true,
         "help": "",
         "id": "<id>",
         "items": [
@@ -662,6 +667,7 @@
         "title": "Retry"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -691,6 +697,7 @@
         "title": "Prepare"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -784,6 +791,7 @@
         "title": "Auto-submit"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -908,6 +916,7 @@
         "title": "Before each run"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -948,6 +957,7 @@
         "title": "Allowed tools"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
@@ -1135,6 +1145,7 @@
         "title": "Schedule"
       },
       {
+        "advanced": false,
         "help": "",
         "id": "<id>",
         "items": [
