@@ -47,3 +47,30 @@ def test_read_back_matches():
     assert gh_fill.matches("select_async", "Springfield", "Springfield, Illinois, United States")
     assert gh_fill.matches("select", "United States", "+1", field_id="country")  # phone widget shows dial code
     assert gh_fill.matches("multiselect", ["A", "B"], "AB")
+
+
+def test_degree_key():
+    assert gh_fill.degree_key("Bachelor of Engineering, Mechanical") == "bachelor"
+    assert gh_fill.degree_key("Master of Science") == "master"
+    assert gh_fill.degree_key("PhD, Physics") == gh_fill.degree_key("Ph.D.") == "philosophy"
+    assert gh_fill.degree_key("Doctor of Philosophy") == "philosophy"
+    assert gh_fill.degree_key("Associate of Arts") == "associate"
+    assert gh_fill.degree_key("High School Diploma") == "high school"
+    assert gh_fill.degree_key("BS Computer Science") is None
+
+
+def test_degree_read_back_by_keyword():
+    assert gh_fill.matches("select_async", "Bachelor of Engineering, X", "Bachelor's Degree", field_id="degree--0")
+    assert not gh_fill.matches("select_async", "Bachelor of Engineering, X", "Master's Degree", field_id="degree--0")
+    assert not gh_fill.matches("select_async", "Bachelor of Engineering, X", "Bachelor's Degree", field_id="school--0")
+
+
+def test_run_closes_its_tab_when_fill_raises(monkeypatch, tmp_path):
+    from unittest.mock import MagicMock
+    p = MagicMock()
+    page = p.chromium.connect_over_cdp.return_value.contexts[0].new_page.return_value
+    monkeypatch.setattr(gh_fill, "sync_playwright", lambda: MagicMock(__enter__=lambda s: p))
+    monkeypatch.setattr(gh_fill, "fill", MagicMock(side_effect=RuntimeError("boom")))
+    with pytest.raises(RuntimeError, match="boom"):
+        gh_fill.run(_plan(), tmp_path, cdp="http://127.0.0.1:1", profile_dir=tmp_path)
+    page.close.assert_called_once()

@@ -50,8 +50,20 @@ def job_url(plan: dict[str, Any]) -> str:
     return EMBED.format(board=plan["board"], token=plan["ats_job_id"])
 
 
+# GH degree options are fixed labels ("Bachelor's Degree", "Doctor of Philosophy (Ph.D.)"): profile prefix -> label text
+DEGREE_KEYS = {"bachelor": "bachelor", "master": "master", "phd": "philosophy", "doctor": "philosophy",
+               "associate": "associate", "high school": "high school"}
+
+
+def degree_key(value: str) -> str | None:
+    v = value.strip().lower().replace(".", "")
+    return next((key for prefix, key in DEGREE_KEYS.items() if v.startswith(prefix)), None)
+
+
 def matches(t: str, value: Any, shown: str, field_id: str = "") -> bool:
     shown = shown.strip().lower()
+    if field_id.startswith("degree") and (key := degree_key(str(value))) and key in shown:
+        return True
     if field_id == "country":  # ponytail: phone-country widget shows the dial code ("+1"), so only check non-empty
         return bool(shown)
     if isinstance(value, list):
@@ -92,7 +104,12 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
     if t in ("select", "multiselect", "select_async"):
         try:
             for one in v if isinstance(v, list) else [v]:
-                _pick(root, loc, str(one), exact=t != "select_async")
+                try:
+                    _pick(root, loc, str(one), exact=t != "select_async")
+                except LookupError:  # "Bachelor of Engineering, X" has no option: pick the fixed label by keyword
+                    if not (fid.startswith("degree") and (key := degree_key(str(one)))):
+                        raise
+                    _pick(root, loc, key, exact=False)
         finally:
             loc.press("Escape")  # an open menu (also after a failed pick) blocks the next field
         shown = loc.locator("xpath=ancestor::div[contains(@class, 'select__control')][1]").inner_text()
@@ -144,7 +161,11 @@ def run(plan: dict[str, Any], job_dir: str | Path, *, cdp: str | None, profile_d
         b = p.chromium.connect_over_cdp(cdp)
         ctx = b.contexts[0] if b.contexts else b.new_context()
         page = ctx.new_page()
-        summary = fill(plan, page, job_dir, url)
+        try:
+            summary = fill(plan, page, job_dir, url)
+        except Exception:
+            page.close()  # our own fresh tab, no record saved yet: don't leave an orphan behind
+            raise
         tab_id = ctx.new_cdp_session(page).send("Target.getTargetInfo")["targetInfo"]["targetId"]
         browser.save_record(job_dir, tab_id=tab_id, url=page.url, cdp=cdp)
         page.bring_to_front()
