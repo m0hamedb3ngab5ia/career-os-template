@@ -22,7 +22,7 @@ const MODEL_ACTION_TYPES = [
 ];
 const RUNNER_STOPS = [
   "completed", "budget_reached", "time_budget", "usage_limit", "auth_required", "permission_denied",
-  "timeout", "consecutive_failures", "daily_cap", "paused", "cancelled", "doctor_failed", "error",
+  "timeout", "consecutive_failures", "daily_cap", "paused", "cancelled", "doctor_failed", "error", "busy",
 ];
 
 describe("label tables", () => {
@@ -41,6 +41,7 @@ describe("label tables", () => {
     expect(ACTION_TYPES.scam_suspected?.label).toBe("Possible scam");
     expect(STOP_REASONS.auth_required).toMatchObject({ label: "Login needed", tone: "orange" });
     expect(STOP_REASONS.budget_reached?.label).toBe("Job budget used");
+    expect(STOP_REASONS.busy).toMatchObject({ label: "Busy", tone: "orange" });
     for (const t of [STATUSES, ACTION_TYPES, STOP_REASONS]) {
       for (const { label } of Object.values(t)) expect(label[0]).toBe(label[0]!.toUpperCase());
     }

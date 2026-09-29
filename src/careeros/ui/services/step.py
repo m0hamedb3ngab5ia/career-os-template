@@ -6,6 +6,8 @@ so Runs › History shows it. The work itself is the scheduler's (`tick.default_
 (`tracker.sync_all`); nothing is reimplemented. One step of a kind at a time: data/runs/step-<kind>.lock.
 Scout and prune also hold the pipeline lock (data/runs/runner.lock, owner step:<id>, `locks.pipeline_lock`), so
 they never overlap a batch (losing that race records a failed run, stop reason `busy`); the tracker sync writes atomically per op and may run beside one.
+The scout step's own tracker sync runs after the pipeline lock is released (like the scheduler's scout), so a tracker
+file held open in Excel never keeps a batch or a tick waiting; a sync error still fails the step, as it does there.
 Inbox sync is a headless skill call; `service.run_skill` records its own run and holds the runner lock.
 The step's stdout/stderr lines go to its run.log, so the Runs log tail streams them.
 SIGTERM (the UI's Cancel) ends the step with stop reason `cancelled`.
@@ -20,7 +22,7 @@ import sys
 from contextlib import ExitStack, redirect_stderr, redirect_stdout
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Union
 
 from careeros.config import Settings
 from careeros.runs import locks
@@ -30,6 +32,9 @@ from careeros.ui.services.runs import Busy
 STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync")
 LOCK_TTL_S = 3 * 3600  # a dead pid frees it sooner
 PIPELINE_STEPS = ("scout", "prune")  # steps that also take the pipeline lock (never beside a batch)
+# (status, detail), or (status, detail, after): `after` runs once the pipeline lock is released (scout's tracker sync)
+StepResult = Union[tuple[str, str], tuple[str, str, Callable[[], Any]]]
+StepAction = Callable[[], StepResult]
 
 
 class StepBusy(Busy):
@@ -64,22 +69,31 @@ def step_lock_path(rs: RunStore, kind: str) -> Path:
     return rs.dir / f"step-{kind}.lock"
 
 
-def default_actions(settings: Settings) -> dict[str, Callable[[], tuple[str, str]]]:
+def default_actions(settings: Settings) -> dict[str, StepAction]:
     from careeros.runs import tick
     from careeros.tracker import sync_all
 
     sched = tick.default_actions(settings)
+
+    def scout() -> StepResult:
+        """The scheduler's scout split in two: run_scout under the step's pipeline lock, the sync after it."""
+        from careeros.scout import run_scout, sync_to_tracker
+        from careeros.store import Store
+
+        store = Store(settings)
+        summary = run_scout(settings, store)
+        return "ok", tick.scout_detail(summary), lambda: sync_to_tracker(settings, store, summary)
 
     def tracker() -> tuple[str, str]:
         out = sync_all(settings)
         return "ok", f"synced {out['synced']} jobs" + (f" ({out['pending']} ops queued, file locked)"
                                                        if out["pending"] else "")
 
-    return {"scout": lambda: sched["scout"]("manual"), "prune": lambda: sched["prune"]("manual"),
+    return {"scout": scout, "prune": lambda: sched["prune"]("manual"),
             "tracker": tracker}
 
 
-def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], tuple[str, str]]] | None = None,
+def run_step(settings: Settings, kind: str, *, actions: dict[str, StepAction] | None = None,
              now: Callable[[], datetime] = lambda: datetime.now(timezone.utc)) -> dict[str, Any]:
     """Run scout | tracker | prune once, recorded as a run. Raises StepBusy when one of that kind is running.
     A scout/prune that finds the pipeline lock held (a batch started after the UI's check) is recorded as a
@@ -97,9 +111,10 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
             raise StepBusy(e.holder) from None
         held.callback(locks.release, step_lock_path(rs, kind), lk.token)
         busy: locks.LockBusy | None = None
+        pipe = held.enter_context(ExitStack())  # closed early: the `after` part runs without the pipeline lock
         if kind in PIPELINE_STEPS:
             try:
-                held.enter_context(locks.pipeline_lock(settings, f"step:{rid}", note=kind, wait_s=0))
+                pipe.enter_context(locks.pipeline_lock(settings, f"step:{rid}", note=kind, wait_s=0))
             except locks.LockBusy as e:  # lost the race after the UI's pre-spawn check: record why nothing ran
                 busy = e
         run = rs.new_run(kind, "manual", {}, start, run_id=rid, step=True)
@@ -112,7 +127,10 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, Callable[[], t
             else:
                 actions = actions if actions is not None else default_actions(settings)
                 with redirect_stdout(out), redirect_stderr(out):
-                    result, detail = actions[kind]()
+                    result, detail, *after = actions[kind]()
+                    pipe.close()
+                    if result == "ok" and after:
+                        after[0]()
                 if result != "ok":
                     status, stop = "failed", "error"
         except KeyboardInterrupt:

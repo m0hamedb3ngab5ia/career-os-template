@@ -24,7 +24,7 @@ from typing import Any, Iterable
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 2   # 2: action_items.due, due_reason
+SCHEMA_VERSION = 4   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -33,6 +33,9 @@ CREATE TABLE jobs (
     category TEXT, fit INTEGER, tier TEXT, status TEXT, safety TEXT, qa_passed INTEGER, qa_score REAL,
     found_at TEXT, applied_at TEXT, updated_at TEXT, closes_at TEXT, pruned INTEGER, sig TEXT);
 CREATE INDEX jobs_status ON jobs(status);
+CREATE TABLE candidates (
+    job_id TEXT PRIMARY KEY, status TEXT, score TEXT, has_score INTEGER, prepared_ok INTEGER, posting TEXT,
+    error TEXT);
 CREATE TABLE status_history (job_id TEXT, seq INTEGER, status TEXT, at TEXT, note TEXT);
 CREATE INDEX status_history_job ON status_history(job_id);
 CREATE TABLE action_items (
@@ -51,7 +54,7 @@ CREATE TABLE attempts (
     started_at TEXT, ended_at TEXT, duration_s REAL);
 CREATE INDEX attempts_run ON attempts(run_id);
 """
-_TABLES = ("meta", "jobs", "status_history", "action_items", "contacts", "runs", "attempts")
+_TABLES = ("meta", "jobs", "candidates", "status_history", "action_items", "contacts", "runs", "attempts")
 
 
 def _now() -> str:
@@ -305,7 +308,7 @@ class Index:
                 and (d / "posting.json").exists()]
 
     def _delete_job(self, jid: str) -> None:
-        for t in ("jobs", "status_history", "contacts"):
+        for t in ("jobs", "candidates", "status_history", "contacts"):
             self.con.execute(f"DELETE FROM {t} WHERE job_id = ?", (jid,))
 
     def update_jobs(self, job_ids: Iterable[str]) -> list[str]:
@@ -351,6 +354,11 @@ class Index:
              fit if isinstance(fit, int) and not isinstance(fit, bool) else None, score.get("tier"),
              status.get("status") or "found", safety.get("verdict"), qa_passed, qa_score, found_at, applied_at,
              status.get("updated_at"), posting.get("closes_at"), int(bool(posting.get("pruned"))), sig))
+        self.con.execute("INSERT INTO candidates VALUES (?,?,?,?,?,?,?)",
+                         (jid, status.get("status") or "found", json.dumps(candidate_score(score)),
+                          int(bool(score) or (d / "score.json").exists()),
+                          int(bool(_obj(d / "prepare.json").get("qa_pass"))), json.dumps(candidate_posting(posting)),
+                          candidate_error(d)))
         self.con.executemany("INSERT INTO status_history VALUES (?,?,?,?,?)",
                              [(jid, i, h.get("status"), h.get("at"), h.get("note")) for i, h in enumerate(hist)])
         contacts = _obj(d / "contacts.json").get("contacts")
@@ -456,6 +464,50 @@ class Index:
             self.set_meta("tracker_sig", sig)
             self.set_meta("indexed_at", _now())
             return True
+
+
+SCORE_KEYS = ("decision", "skip_reason", "fit")  # what runner.eligibility and the ranking read of score.json
+POSTING_RAW_KEYS = ("country", "address")      # what the scout Prefilter reads of posting.raw
+
+
+def candidate_error(d: Path) -> str | None:
+    """Which ranking input select_candidates cannot read (it raises on it), so the index-based ranking fails
+    the same way instead of treating the file as empty."""
+    for name in ("status.json", "score.json", "prepare.json"):
+        p = d / name
+        if not p.exists():
+            continue
+        try:
+            got = json.loads(p.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            return f"{name}: unreadable JSON"
+        if got and not isinstance(got, dict):   # falsy (`null`, `[]`) reads as missing there
+            return f"{name}: not a JSON object"
+    return None
+
+
+def candidate_score(score: dict[str, Any]) -> dict[str, Any]:
+    """score.json trimmed to what select_candidates reads (whether one exists is `has_score`)."""
+    return {k: score[k] for k in SCORE_KEYS if k in score}
+
+
+def candidate_posting(posting: dict[str, Any]) -> dict[str, Any]:
+    """posting.json without the description text and most of `raw`, with the deadline already worked out
+    (company_policy.posting_closes_at also reads the description), so ranking needs no job folder."""
+    if not posting:
+        return {}
+    from careeros.company_policy import posting_closes_at
+    from careeros.models import Posting
+
+    out = {k: v for k, v in posting.items() if k not in ("description_text", "description_html", "raw")}
+    raw = posting.get("raw") if isinstance(posting.get("raw"), dict) else {}
+    out["raw"] = {k: raw[k] for k in POSTING_RAW_KEYS if k in raw}
+    try:
+        closes = posting_closes_at(Posting.model_validate(posting))
+    except ValueError:  # invalid posting: ranking raises on it too (same as select_candidates on disk)
+        return posting
+    out["closes_at"] = closes.isoformat() if closes else None
+    return out
 
 
 def qa_summary(qa: dict[str, Any]) -> tuple[int | None, float | None]:

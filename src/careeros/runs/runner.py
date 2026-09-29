@@ -22,11 +22,14 @@ import threading
 import time
 import uuid
 import warnings
+from dataclasses import dataclass
 from datetime import datetime, timezone
+from functools import partial
 from pathlib import Path
-from typing import Any, Callable
+from typing import Any, Callable, Iterable, Iterator
 
 from careeros.config import Settings
+from careeros.models import Posting
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
 from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line
@@ -177,33 +180,69 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
     candidates (pruned postings, scout filters that now fail, `skip_ids`), not every other status. With
     `job_ids` only those jobs are considered and every one left out is in `excluded` with its reason
     (`not found`, an eligibility reason, ...); `force` reruns a job that is already scored/prepared."""
+    store = Store(settings)
+
+    def records() -> Iterator[CandidateRecord]:
+        for jid in (dict.fromkeys(job_ids) if job_ids is not None else store.iter_job_ids()):
+            if job_ids is not None and not (store.job_dir(jid) / "posting.json").exists():
+                yield CandidateRecord(job_id=jid, status="", score={}, has_score=False, prepared_ok=False,
+                                      posting={}, exists=False)
+                continue
+            score = store._read(jid, "score.json") or {}
+            yield CandidateRecord(
+                job_id=jid, status=store.get_status(jid) or "found", score=score,
+                has_score=bool(score) or (store.job_dir(jid) / "score.json").exists(),
+                prepared_ok=bool((store._read(jid, "prepare.json") or {}).get("qa_pass")),
+                posting=partial(_posting_dict, store, jid),
+                apply_session=(store._read(jid, "apply_session.json") or {}) if kind == "apply" else None)
+    return rank_records(settings, kind, cfg, now, records(), retry_ids, skip_ids,
+                        explicit=job_ids is not None, force=force)
+
+
+def _posting_dict(store: Store, jid: str) -> dict[str, Any]:
+    return store._read(jid, "posting.json") or {}
+
+
+@dataclass
+class CandidateRecord:
+    """What select_candidates needs of one job. `posting` is the posting.json dict, or a callable returning it
+    (read only for jobs that pass the job-state rules). The UI builds these from its SQLite index."""
+    job_id: str
+    status: str
+    score: dict[str, Any]
+    has_score: bool
+    prepared_ok: bool
+    posting: dict[str, Any] | Callable[[], dict[str, Any]]
+    apply_session: dict[str, Any] | None = None
+    exists: bool = True
+
+
+def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, records: Iterable[CandidateRecord],
+                 retry_ids: set[str] | None = None, skip_ids: dict[str, str] | None = None,
+                 explicit: bool = False, force: bool = False,
+                 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    """select_candidates over any source of job records (in job_id order, for the same `excluded` order)."""
     from careeros.company_policy import posting_closes_at
 
-    store = Store(settings)
     pre = _prefilter(settings)
     retry_ids, skip_ids = retry_ids or set(), skip_ids or {}
     cands: list[Candidate] = []
     excluded: list[dict[str, Any]] = []
-    explicit = job_ids is not None
-    for jid in (dict.fromkeys(job_ids) if explicit else store.iter_job_ids()):
-        if explicit and not (store.job_dir(jid) / "posting.json").exists():
+    for r in records:
+        jid, status, score = r.job_id, r.status, r.score
+        if not r.exists:
             excluded.append({"job_id": jid, "reason": "not found"})
             continue
-        status = store.get_status(jid) or "found"
-        score = store._read(jid, "score.json") or {}
-        prep = store._read(jid, "prepare.json") or {}
-        session = (store._read(jid, "apply_session.json") or {}) if kind == "apply" else None
-        why = eligibility(kind, status, bool(score) or (store.job_dir(jid) / "score.json").exists(), score,
-                          bool(prep.get("qa_pass")), force=force, apply_session=session)
+        why = eligibility(kind, status, r.has_score, score, r.prepared_ok, force=force, apply_session=r.apply_session)
         if why:
             if explicit:
                 excluded.append({"job_id": jid, "reason": why})
             continue
-        raw = store._read(jid, "posting.json") or {}
+        raw = r.posting() if callable(r.posting) else r.posting
         if raw.get("pruned"):
             excluded.append({"job_id": jid, "reason": "pruned"})
             continue
-        p = store.load_posting(jid)
+        p = Posting.model_validate(raw) if raw else None
         if p is None:
             if explicit:
                 excluded.append({"job_id": jid, "reason": "posting.json unreadable"})

@@ -425,14 +425,17 @@ class RunControl:
         started = _parse_dt(run.get("started_at"))
         minutes = round((self.now() - started).total_seconds() / 60, 1) if started else None
         job = None
+        job_started_at = None
         ldir = self.rs.dir / "locks"
         if ldir.is_dir():
             for f in sorted(ldir.glob("*.lock")):
                 info = locks.read(f) or {}
                 if info.get("owner") == f"run:{rid}":
                     job = f.stem
+                    job_started_at = info.get("acquired_at")
                     break
         return {**self._with_state(run), "holder": held, "current_job": job,
+                "current_job_started_at": job_started_at,
                 "used": {"jobs": (run.get("counters") or {}).get("attempted", 0), "max_jobs": b.get("max_jobs"),
                          "minutes": minutes, "max_minutes": b.get("max_minutes")},
                 "attempts": self.rs.load_attempts(rid)}

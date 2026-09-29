@@ -3,6 +3,7 @@
 the schedule panel and the pause `until` parser."""
 from __future__ import annotations
 
+import os
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -96,6 +97,33 @@ def test_current_lists_done_active_and_queued_jobs_with_steps(rc):
         ("Score", "done"), ("Tailor", "done"), ("Cover", "active"), ("QA", "pending")]
     assert rows[c]["state"] == "queued" and {st["state"] for st in rows[c]["steps"]} == {"pending"}
     assert "cap" in cur  # prepare runs show today's apply cap
+
+
+def test_active_steps_ignore_stale_files_left_over_in_a_reused_job_folder(rc):
+    """A job folder reused across attempts (e.g. a retry after a earlier failure) can still hold files from
+    the previous attempt; only output written since this attempt's job lock was acquired counts as done."""
+    s = rc.settings
+    a, b = add_job(s, "a", "Acme Robotics"), add_job(s, "b", "Globex")
+    rs = RunStore(s)
+    run = rs.new_run("prepare", "manual", {"preset": "small", "max_jobs": 2, "max_minutes": 30},
+                     NOW - timedelta(minutes=6), counters={"attempted": 0, "ok": 0},
+                     queue=[{"job_id": j, "rank": i, "score": 1, "why": ""} for i, j in enumerate((a, b), 1)])
+    store = Store(s)
+    d = store.job_dir(a)
+    old = (NOW - timedelta(hours=1)).timestamp()
+    (d / "score.json").write_text("{}")  # prepare reuses score.json, never rewrites it: counts even though old
+    os.utime(d / "score.json", (old, old))
+    (d / "resume.json").write_text("{}")  # stale: from a previous attempt, before the job lock started
+    os.utime(d / "resume.json", (old, old))
+    locks.acquire(rs.runner_lock_path, owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, note="prepare",
+                  pid_alive=lambda p: True)
+    locks.acquire(rs.job_lock_path(a), owner=f"run:{run['id']}", ttl_seconds=3600, pid=999, pid_alive=lambda p: True,
+                  now=NOW)
+
+    cur = view.current_view(rc)
+    rows = {r["job_id"]: r for r in cur["jobs"]}
+    assert [(st["name"], st["state"]) for st in rows[a]["steps"]] == [
+        ("Score", "done"), ("Tailor", "active"), ("Cover", "pending"), ("QA", "pending")]
 
 
 def test_steps_mark_a_skipped_cover_letter_once_a_later_step_has_output(rc):

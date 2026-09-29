@@ -230,3 +230,43 @@ def add_scam_case(data: dict[str, Any]) -> dict[str, Any]:
     data["jobs"]["scam"] = jid
     data["actions"]["scam"] = aid
     return {"job_id": jid, "action_id": aid, "company": company}
+
+
+def add_prepare_candidates(settings: Settings, now: datetime) -> dict[str, str]:
+    """Scored jobs the next prepare run ranks: several companies and fits (fit-first within a company), a
+    deadline stated only in the description, a first_published date, and the ones select_candidates drops or
+    excludes (pruned, already prepared, a deferred requeue that counts, a title the scout filters reject)."""
+    from careeros.company_policy import DEFERRED_REASONS
+
+    store = Store(settings)
+    ids: dict[str, str] = {}
+    rows = [  # key, company, title, status, fit, decision, extra posting fields, extra files
+        ("p_hi", "Globex", "Software Engineer", "scored", 91, "prepare", {}, {}),
+        ("p_lo", "Globex", "Backend Engineer", "scored", 70, "prepare", {}, {}),
+        ("p_mid", "Hooli", "Software Engineer", "found", 80, "prepare",
+         {"description_text": "Applications close 2026-09-30."}, {}),
+        ("p_pub", "Pied Piper", "Software Engineer", "scored", 75, "prepare",
+         {"first_published": iso(now - timedelta(days=1))}, {}),
+        ("p_req", "Vandelay", "Software Engineer", "scored", 65, "skip", {}, {}),
+        ("p_pruned", "Soylent", "Software Engineer", "scored", 88, "prepare", {"pruned": True}, {}),
+        ("p_done", "Wonka", "Software Engineer", "scored", 90, "prepare", {}, {"prepare.json": {"qa_pass": True}}),
+        ("p_title", "Tyrell", "Office Manager", "scored", 85, "prepare", {}, {}),
+    ]
+    for i, (key, company, title, status, fit, decision, extra, files) in enumerate(rows):
+        found = now - timedelta(days=3 + i)
+        p = Posting(company=company, title=title, location="New York, NY", ats="greenhouse",
+                    ats_job_id=f"{key}-1", url=f"https://boards.example.com/{key}", fetched_at=iso(found),
+                    description_text=extra.pop("description_text", f"{title} at {company}."),
+                    first_published=extra.pop("first_published", None))
+        jid = p.job_id
+        ids[key] = jid
+        store._write(jid, "posting.json", {**p.model_dump(), **extra})
+        store._write(jid, "status.json", {"status": status, "updated_at": iso(found),
+                                          "history": [{"status": status, "at": iso(found)}]})
+        score = {"job_id": jid, "category": "swe_backend", "fit": fit, "decision": decision}
+        if key == "p_req":
+            score["skip_reason"] = next(iter(DEFERRED_REASONS))
+        store._write(jid, "score.json", score)
+        for name, body in files.items():
+            store._write(jid, name, body)
+    return ids
