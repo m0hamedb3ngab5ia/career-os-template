@@ -797,6 +797,177 @@
         "title": "Attempt",
         "type": "object"
       },
+      "Batch": {
+        "properties": {
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Created At"
+          },
+          "dry_run": {
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "excluded": {
+            "items": {
+              "$ref": "#/components/schemas/Excluded"
+            },
+            "title": "Excluded",
+            "type": "array"
+          },
+          "id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Id"
+          },
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "selected": {
+            "items": {
+              "$ref": "#/components/schemas/BatchJob"
+            },
+            "title": "Selected",
+            "type": "array"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Status"
+          },
+          "stop_at": {
+            "title": "Stop At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "dry_run",
+          "stop_at",
+          "kind",
+          "selected",
+          "excluded"
+        ],
+        "title": "Batch",
+        "type": "object"
+      },
+      "BatchJob": {
+        "properties": {
+          "auto_submit": {
+            "title": "Auto Submit",
+            "type": "boolean"
+          },
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "fit": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fit"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "rank": {
+            "title": "Rank",
+            "type": "integer"
+          },
+          "score": {
+            "title": "Score",
+            "type": "number"
+          },
+          "stage": {
+            "title": "Stage",
+            "type": "string"
+          },
+          "stages": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Stages",
+            "type": "array"
+          },
+          "state": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "State"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          },
+          "submit_reason": {
+            "title": "Submit Reason",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          },
+          "why": {
+            "title": "Why",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "status",
+          "score",
+          "why",
+          "rank",
+          "stage",
+          "stages",
+          "auto_submit",
+          "submit_reason"
+        ],
+        "title": "BatchJob",
+        "type": "object"
+      },
       "Board": {
         "properties": {
           "card_limit": {
@@ -1547,6 +1718,52 @@
         "title": "Counts",
         "type": "object"
       },
+      "CreateBody": {
+        "properties": {
+          "dry_run": {
+            "default": false,
+            "title": "Dry Run",
+            "type": "boolean"
+          },
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 500,
+            "minItems": 1,
+            "title": "Job Ids",
+            "type": "array"
+          },
+          "name": {
+            "anyOf": [
+              {
+                "maxLength": 120,
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "stop_at": {
+            "enum": [
+              "score",
+              "prepare",
+              "fill",
+              "submit"
+            ],
+            "title": "Stop At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_ids",
+          "stop_at"
+        ],
+        "title": "CreateBody",
+        "type": "object"
+      },
       "CurrentRun": {
         "properties": {
           "attempts": {
@@ -1794,6 +2011,24 @@
           }
         },
         "title": "Due",
+        "type": "object"
+      },
+      "Excluded": {
+        "properties": {
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "reason": {
+            "title": "Reason",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "reason"
+        ],
+        "title": "Excluded",
         "type": "object"
       },
       "Export": {
@@ -7459,6 +7694,89 @@
         "summary": "Advise Apply",
         "tags": [
           "storage"
+        ]
+      }
+    },
+    "/api/batches": {
+      "post": {
+        "operationId": "create_api_batches_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Create",
+        "tags": [
+          "batches"
+        ]
+      }
+    },
+    "/api/batches/{batch_id}": {
+      "get": {
+        "operationId": "detail_api_batches__batch_id__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "batch_id",
+            "required": true,
+            "schema": {
+              "title": "Batch Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Batch"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Detail",
+        "tags": [
+          "batches"
         ]
       }
     },

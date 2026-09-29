@@ -63,6 +63,14 @@ export interface paths {
     /** Advise Apply */
     post: operations["advise_apply_api_advise__rec_id__apply_post"];
   };
+  "/api/batches": {
+    /** Create */
+    post: operations["create_api_batches_post"];
+  };
+  "/api/batches/{batch_id}": {
+    /** Detail */
+    get: operations["detail_api_batches__batch_id__get"];
+  };
   "/api/contacts": {
     /** List Contacts */
     get: operations["list_contacts_api_contacts_get"];
@@ -523,6 +531,56 @@ export interface components {
       /** Why */
       why?: string | null;
     };
+    /** Batch */
+    Batch: {
+      /** Created At */
+      created_at?: string | null;
+      /** Dry Run */
+      dry_run: boolean;
+      /** Excluded */
+      excluded: components["schemas"]["Excluded"][];
+      /** Id */
+      id?: string | null;
+      /** Kind */
+      kind: string;
+      /** Name */
+      name?: string | null;
+      /** Selected */
+      selected: components["schemas"]["BatchJob"][];
+      /** Status */
+      status?: string | null;
+      /** Stop At */
+      stop_at: string;
+    };
+    /** BatchJob */
+    BatchJob: {
+      /** Auto Submit */
+      auto_submit: boolean;
+      /** Company */
+      company: string;
+      /** Fit */
+      fit?: number | null;
+      /** Job Id */
+      job_id: string;
+      /** Rank */
+      rank: number;
+      /** Score */
+      score: number;
+      /** Stage */
+      stage: string;
+      /** Stages */
+      stages: string[];
+      /** State */
+      state?: string | null;
+      /** Status */
+      status: string;
+      /** Submit Reason */
+      submit_reason: string;
+      /** Title */
+      title: string;
+      /** Why */
+      why: string;
+    };
     /** Board */
     Board: {
       /** Card Limit */
@@ -735,6 +793,23 @@ export interface components {
       /** Jobs */
       jobs: number;
     };
+    /** CreateBody */
+    CreateBody: {
+      /**
+       * Dry Run
+       * @default false
+       */
+      dry_run?: boolean;
+      /** Job Ids */
+      job_ids: string[];
+      /** Name */
+      name?: string | null;
+      /**
+       * Stop At
+       * @enum {string}
+       */
+      stop_at: "score" | "prepare" | "fill" | "submit";
+    };
     /** CurrentRun */
     CurrentRun: {
       /** Attempts */
@@ -802,6 +877,13 @@ export interface components {
       due?: string | null;
       /** Due Reason */
       due_reason?: string | null;
+    };
+    /** Excluded */
+    Excluded: {
+      /** Job Id */
+      job_id: string;
+      /** Reason */
+      reason: string;
     };
     /** Export */
     Export: {
@@ -2640,6 +2722,50 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Create */
+  create_api_batches_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CreateBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Detail */
+  detail_api_batches__batch_id__get: {
+    parameters: {
+      path: {
+        batch_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Batch"];
         };
       };
       /** @description Validation Error */

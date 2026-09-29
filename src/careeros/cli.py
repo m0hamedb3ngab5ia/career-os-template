@@ -1380,6 +1380,43 @@ def cmd_schedule_status(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_batch_create(args: argparse.Namespace) -> int:
+    """Preview (--dry-run) or save a batch: which jobs run from which stage up to the stop point, and why the
+    others are left out. Exit 2 when no job can run."""
+    from careeros.runs import batches
+
+    try:
+        b = batches.create(_settings(args), args.job_ids, args.stop_at, name=args.name, dry_run=args.dry_run)
+    except ValueError as e:
+        print(f"batch: {e}", file=sys.stderr)
+        return 2
+    return _print_batch(b, args.json)
+
+
+def cmd_batch_show(args: argparse.Namespace) -> int:
+    from careeros.runs import batches
+
+    b = batches.load(_settings(args), args.batch_id)
+    if b is None:
+        print(f"batch {args.batch_id} not found", file=sys.stderr)
+        return 1
+    return _print_batch(b, args.json)
+
+
+def _print_batch(b: dict, as_json: bool) -> int:
+    if as_json:
+        print(json.dumps(b, indent=2, default=str))
+        return 0
+    head = f"{b['id']}  {b['name']}  {b['status']}" if b.get("id") else "dry run"
+    print(f"{head}  stop at {b['stop_at']}  {len(b['selected'])} selected, {len(b['excluded'])} excluded")
+    for r in b["selected"]:
+        sub = "auto-submit" if r["auto_submit"] else "no submit"
+        print(f"  {r['rank']:>3}. {r['job_id']}  {'>'.join(r['stages'])}  {sub}  {r['why']}")
+    for e in b["excluded"]:
+        print(f"   -  {e['job_id']}  {e['reason']}")
+    return 0
+
+
 def cmd_storage(args: argparse.Namespace) -> int:
     """Disk use by category (postings, résumés/PDFs, screenshots, run logs, tracker, other) and free disk."""
     from careeros.retention import human_bytes
@@ -1860,6 +1897,19 @@ def build_parser() -> argparse.ArgumentParser:
     rst.add_argument("--json", action="store_true")
     rst.set_defaults(fn=cmd_run_status)
 
+    bat = sub.add_parser("batch", help="plan a batch: jobs taken up to a stop point, one job per run")
+    bats = bat.add_subparsers(dest="batch_cmd", required=True)
+    bc = bats.add_parser("create", help="preview (--dry-run) or save a batch (exit 2 = no job can run)")
+    bc.add_argument("job_ids", nargs="+")
+    bc.add_argument("--stop-at", required=True, choices=["score", "prepare", "fill", "submit"])
+    bc.add_argument("--name")
+    bc.add_argument("--dry-run", action="store_true")
+    bc.add_argument("--json", action="store_true")
+    bc.set_defaults(fn=cmd_batch_create)
+    bsh = bats.add_parser("show", help="a saved batch")
+    bsh.add_argument("batch_id")
+    bsh.add_argument("--json", action="store_true")
+    bsh.set_defaults(fn=cmd_batch_show)
     sto = sub.add_parser("storage", help="disk use by category + free disk; --snapshot records it for `advise`")
     sto.add_argument("--snapshot", action="store_true", help="append this measurement to data/runs/storage.jsonl")
     sto.add_argument("--json", action="store_true")
