@@ -17,7 +17,7 @@ import type { ActionItem } from "./types";
 import styles from "./Today.module.css";
 
 /** The "Needs you" list: every open Action Item, grouped by job with one next step each (design doc 3 "Today"). */
-export function NeedsYou() {
+export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
   const today = useToday();
   const meta = useMeta();
   const now = useNow(60_000);
@@ -51,7 +51,8 @@ export function NeedsYou() {
     });
   }
 
-  const all = today.data?.actions ?? [];
+  // `jobIds`: only these jobs' tasks (Today filtered by batch, docs/design/ui-redesign.md §4.2 Review queue).
+  const all = (today.data?.actions ?? []).filter((a) => !jobIds || jobIds.includes(a.job_id ?? ""));
   const groups = groupByJob(all);
   const shown = groups.flatMap((g) => g.items);
   useEffect(() => {

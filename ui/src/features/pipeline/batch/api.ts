@@ -50,7 +50,11 @@ export type BatchAction = "start" | "pause" | "cancel" | "retry";
 export function useBatchAction(id: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (action: BatchAction) => apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/${action}`),
+    mutationFn: async (action: BatchAction) => {
+      const post = (a: BatchAction) => apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/${a}`);
+      const b = await post(action);
+      return action === "retry" ? post("start") : b; // retry only re-queues; the driver must run again
+    },
     onSuccess: (b) => qc.setQueryData(["batch", id], b),
   });
 }

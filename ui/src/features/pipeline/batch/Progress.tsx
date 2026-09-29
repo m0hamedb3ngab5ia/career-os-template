@@ -70,7 +70,7 @@ export function BatchProgressPage() {
   const retryable = b.selected.filter((r) => RETRYABLE.has(r.state ?? "")).length;
   const pending = act.isPending;
   const run = (a: "start" | "pause" | "cancel") => act.mutate(a, { onSuccess: () => setConfirmCancel(false) });
-  const retry = () => act.mutate("retry", { onSuccess: () => act.mutate("start") });
+  const retry = () => act.mutate("retry");
   const requested = b.requested === "pause" ? "Pausing after the current job…" : b.requested === "cancel" ? "Cancelling after the current step…" : null;
 
   return (
