@@ -11,6 +11,7 @@ export interface ChangedPayload {
   actions?: boolean;
   config?: boolean;
   status?: boolean;
+  batches?: string[];
 }
 
 export type Connection = "connecting" | "open" | "reconnecting";
@@ -42,6 +43,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["status"]);
     add(["today"]); // recent runs, catch-up and the prepare queue
   }
+  for (const id of p.batches ?? []) add(["batch", id]);
   if (p.actions) {
     add(["status"]);
     add(["actions"]);
