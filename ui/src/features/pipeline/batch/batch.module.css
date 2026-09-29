@@ -61,3 +61,21 @@
   border: 1px solid var(--sep);
   border-radius: var(--r-card);
 }
+.tableWrap {
+  overflow-x: auto;
+}
+.table {
+  width: 100%;
+  border-collapse: collapse;
+}
+.table th {
+  padding: 6px var(--space-2) 6px 0;
+  font-size: var(--fs-caption);
+  font-weight: 500;
+  color: var(--sec);
+  text-align: left;
+}
+.table td {
+  padding: 9px var(--space-2) 9px 0;
+  border-top: 1px solid var(--sep);
+}

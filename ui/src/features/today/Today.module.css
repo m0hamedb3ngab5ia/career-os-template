@@ -389,3 +389,8 @@
     opacity: 0.55;
   }
 }
+.batchNote {
+  margin: 0 0 var(--space-2);
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}

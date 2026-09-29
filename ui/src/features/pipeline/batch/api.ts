@@ -1,6 +1,6 @@
-import { keepPreviousData, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
-import { apiSend } from "../../../api/client";
+import { apiFetch, apiSend } from "../../../api/client";
 import type { components } from "../../../api/schema.gen";
 
 // Batches (src/careeros/ui/routers/batches.py): POST /api/batches with dry_run previews eligibility per job and
@@ -34,4 +34,27 @@ export function useStartBatch() {
     },
   });
   return { ...m, savedId };
+}
+
+/** One saved batch; the SSE `changed` event (batches: [ids]) invalidates ["batch", id]. */
+export function useBatch(id: string | undefined) {
+  return useQuery({
+    queryKey: ["batch", id],
+    queryFn: () => apiFetch<Batch>(`/api/batches/${encodeURIComponent(id!)}`),
+    enabled: !!id,
+  });
+}
+
+export type BatchAction = "start" | "pause" | "cancel" | "retry";
+
+export function useBatchAction(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: async (action: BatchAction) => {
+      const post = (a: BatchAction) => apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/${a}`);
+      const b = await post(action);
+      return action === "retry" ? post("start") : b; // retry only re-queues; the driver must run again
+    },
+    onSuccess: (b) => qc.setQueryData(["batch", id], b),
+  });
 }
