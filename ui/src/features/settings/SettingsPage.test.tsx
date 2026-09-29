@@ -50,7 +50,7 @@ describe("Advanced groups", () => {
     expect(within(adv).getByText("Advanced")).toBeInTheDocument();
     expect(within(adv).getByText("config/pipeline.yaml")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: /^(Budget|How much)/ }).closest("details")).toBeNull();
-    expect(screen.getByRole("status").textContent).not.toContain("config/");
+    screen.getAllByRole("status").forEach((el) => expect(el.textContent).not.toContain("config/"));
   });
 
   it("/settings opens General", async () => {
