@@ -183,3 +183,8 @@ def test_open_action_items_carry_detail_and_failed_run_items_stay_distinct(setti
     assert [o["detail"] for o in opened][2:] == [None]
     got = review_reasons(None, None, opened)
     assert [r["detail"] for r in got] == [opened[0]["detail"], opened[1]["detail"], "Old item"]
+
+
+@pytest.mark.unit
+def test_apply_staged_is_short_plain_text():
+    assert "(" not in APPLY_STAGED and len(APPLY_STAGED) < 80

@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   ACTION_TYPES,
+  plainText,
+  taskText,
   HUMAN,
   NEEDS,
   PRIORITIES,
@@ -90,5 +92,16 @@ describe("label tables", () => {
     expect(keywordCoverageLabel(0)).toBe("Resume misses 0 key skills from this role");
     expect(keywordCoverageLabel(2)).toBe("Resume misses 2 key skills from this role");
     for (const g of [HUMAN.status, HUMAN.preset, HUMAN.qa, HUMAN.term, HUMAN.tier, HUMAN.safety, HUMAN.action, HUMAN.stop]) for (const [k, v] of Object.entries(g)) if (k !== "action item") expect(v[0]).toBe(v[0]!.toUpperCase());
+  });
+});
+
+describe("task text", () => {
+  it("maps dev codes and raw tool text to plain words", () => {
+    expect(taskText("tier_a_review", "tier_a_review: docs staged")).toBe("Review resume + cover letter");
+    expect(taskText("profile_gap", "profile_gap: Backend bullets are placeholders")).toBe("Add real Backend bullets to your profile");
+    expect(taskText("other", "Chrome MCP tools not available")).toBe("Connect Chrome: the browser extension wasn't reachable");
+    expect(taskText(null, "tier_a_review")).toBe("Review resume + cover letter");
+    expect(plainText("artifacts_present")).toBe("Artifacts present");
+    expect(plainText("See .claude/skills/apply/SKILL.md for steps")).toBe("See for steps");
   });
 });

@@ -133,3 +133,30 @@ export function describeCode(table: CodeTable, code: string | null | undefined):
   if (!code) return { label: "—", tone: "gray" };
   return table[code] ?? { label: humanize(code), tone: "gray" };
 }
+
+// The one source of task text for Pipeline, Apply session and Needs you: dev codes and raw tool text → plain words.
+const TASK_TEXT: Record<string, string> = {
+  ...HUMAN.action,
+  review: "Review and submit the application",
+  tier_a_review: "Review resume + cover letter",
+  send_linkedin: "Send a LinkedIn message",
+  send_email: "Send an email",
+};
+
+/** Raw tool/tracker text in plain words: known ids mapped, internal paths and codes dropped. */
+export function plainText(raw: string): string {
+  const t = raw.trim();
+  if (/chrome mcp|claude-in-chrome/i.test(t)) return "Connect Chrome: the browser extension wasn't reachable";
+  const gap = /(\w[\w ]*?) bullets? (?:are|is) placeholders?/i.exec(t);
+  if (gap) return `Add real ${gap[1]!.trim()} bullets to your profile`;
+  const code = /^([a-z]+_[a-z_]+)\b/.exec(t)?.[1];
+  if (code && TASK_TEXT[code]) return TASK_TEXT[code]!;
+  if (/^[a-z]+(_[a-z]+)+$/.test(t)) return humanize(t);
+  return t.replace(/\S*\.claude\/skills\/\S*/g, "").replace(/\s{2,}/g, " ").trim() || "A task needs you";
+}
+
+/** A task's text from its type (Action Item type or tier_a_review…) and its raw description. */
+export function taskText(type: string | null | undefined, what?: string | null): string {
+  if (what?.trim()) return plainText(what);
+  return (type && TASK_TEXT[type]) || TASK_TEXT.other!;
+}
