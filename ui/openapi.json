@@ -1899,6 +1899,10 @@
             "title": "Id",
             "type": "string"
           },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
           "jobs": {
             "items": {
               "$ref": "#/components/schemas/RunJobRow"
@@ -1920,6 +1924,18 @@
               }
             ],
             "title": "Pid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
           },
           "scheduled": {
             "title": "Scheduled",
@@ -5414,6 +5430,10 @@
             "title": "Id",
             "type": "string"
           },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -5432,6 +5452,18 @@
               }
             ],
             "title": "Pid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
           },
           "started_at": {
             "anyOf": [
@@ -5768,6 +5800,10 @@
             "title": "Id",
             "type": "string"
           },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
           "kind": {
             "title": "Kind",
             "type": "string"
@@ -5782,6 +5818,18 @@
               }
             ],
             "title": "Pid"
+          },
+          "result": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Result"
           },
           "started_at": {
             "anyOf": [
@@ -10859,6 +10907,22 @@
             "schema": {
               "title": "Kind",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "job_id",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Job Id"
             }
           }
         ],

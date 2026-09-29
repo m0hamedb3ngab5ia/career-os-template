@@ -93,14 +93,6 @@ export function useReopen() {
   });
 }
 
-export function useRunScout() {
-  const refresh = useRefreshToday();
-  return useMutation({
-    mutationFn: () => apiSend<RunStarted>("POST", "/api/runs/steps/scout"),
-    onSettled: refresh,
-  });
-}
-
 export function usePrepareQueued() {
   const refresh = useRefreshToday();
   return useMutation({

@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
-import type { JobDetail, PipelineStarted, PipelineState, QaRun, StatusReply } from "./types";
+import type { JobDetail, PipelineStarted, PipelineState, StatusReply } from "./types";
 
 export const jobPath = (id: string) => `/api/jobs/${encodeURIComponent(id)}`;
 export const fileUrl = (id: string, name: string) =>
@@ -55,7 +55,6 @@ export const useSetStatus = (id: string) => useJobWrite<{ status: string; note?:
 export const useSetOverride = (id: string) => useJobWrite<{ value: string }, { override: string; queued?: boolean }>(id, "override");
 export const useWithdraw = (id: string) => useJobWrite<{ note?: string }, StatusReply>(id, "withdraw");
 export const useMarkSubmitted = (id: string) => useJobWrite<{ note?: string }, StatusReply>(id, "submitted");
-export const useRerunQa = (id: string) => useJobWrite<undefined, QaRun>(id, "qa");
 export const useOpenFolder = (id: string) => useJobWrite<undefined, { opened: boolean }>(id, "open-folder");
 export const useVerifyCompany = (id: string) =>
   useJobWrite<{ risk: string; signals: string[]; evidence?: string[]; domain?: string }, unknown>(id, "safety/verify");

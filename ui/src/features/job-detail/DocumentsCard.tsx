@@ -7,7 +7,8 @@ import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatBytes, formatCount, formatDate, formatDecimal } from "../../lib/format";
 import { help } from "./actionHelp";
-import { errorText, fileUrl, useOpenFolder, useRerunQa } from "./api";
+import { useStepRun } from "../runs/useStepRun";
+import { errorText, fileUrl, useOpenFolder } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
 import { DOCUMENTS, RUBRIC_LABELS } from "./labels";
@@ -62,8 +63,11 @@ function QaSummary({ run }: { run: QaRun }) {
 
 function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
   const toast = useToast();
-  const rerun = useRerunQa(jobId);
   const [result, setResult] = useState<QaRun | null>(null);
+  const rerun = useStepRun("qa", jobId, (run) => {
+    if (run.stop_reason === "completed" && run.result) setResult(run.result as unknown as QaRun);
+    else if (run.stop_reason !== "cancelled") toast.show({ message: run.detail || "QA did not finish." });
+  });
   const rubric = Object.entries(qa?.rubric ?? {});
   const verdict = qa ? (qa.pass ? <Chip tone="green">Passed</Chip> : <Chip tone="red">Failed</Chip>) : <Chip tone="gray">Not reviewed</Chip>;
   const meanText = [
@@ -106,20 +110,27 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
         </Details>
       ) : null}
       <div className={styles.buttons}>
-        <Button
-          size="small"
-          {...help("rerunQa")}
-          pending={rerun.isPending}
-          pendingLabel="Running…"
-          onClick={() =>
-            rerun.mutate(undefined, {
-              onSuccess: (r) => setResult(r),
-              onError: (e) => toast.show({ message: errorText(e) }),
-            })
-          }
-        >
-          Re-run QA
-        </Button>
+        {rerun.running ? (
+          <>
+            <span className={styles.caption}>Running QA…</span>
+            <Button size="small" onClick={() => rerun.stop()}>
+              Stop
+            </Button>
+          </>
+        ) : (
+          <Button
+            size="small"
+            {...help("rerunQa")}
+            pending={rerun.start.isPending}
+            pendingLabel="Starting…"
+            onClick={() => {
+              setResult(null);
+              rerun.start.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) });
+            }}
+          >
+            Re-run QA
+          </Button>
+        )}
       </div>
       <div role="status" aria-live="polite">
         {result ? <QaSummary run={result} /> : null}

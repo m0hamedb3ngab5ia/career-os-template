@@ -87,25 +87,40 @@ describe("DocumentsCard", () => {
     expect(screen.getByText(formatDecimal(9.5))).toBeInTheDocument();
   });
 
-  it("Re-run QA posts, reads Running… and announces the pass/fail summary", async () => {
-    let resolve!: () => void;
-    const gate = new Promise<void>((r) => (resolve = r));
+  it("Re-run QA starts a QA run and announces its pass/fail summary", async () => {
     const { api } = renderCard({}, {
-      "POST /api/jobs/nw01/qa": async () => {
-        await gate;
-        return { pass: false, summary: { hard_fail: 1, soft_fail: 2 }, fail_reasons: ["Résumé over one page"] };
+      "POST /api/runs/steps/qa": { kind: "qa", started: true, run_id: "r-qa-1" },
+      "GET /api/runs/r-qa-1": {
+        id: "r-qa-1", kind: "qa", trigger: "manual", status: "done", state: "done", stop_reason: "completed",
+        started_at: null, ended_at: null, attempts: [], log: "",
+        result: { pass: false, summary: { hard_fail: 1, soft_fail: 2 }, fail_reasons: ["Résumé over one page"] },
       },
     });
     const user = userEvent.setup();
     await user.click(screen.getByRole("button", { name: "Re-run QA" }));
-    expect(await screen.findByRole("button", { name: "Running…" })).toBeDisabled();
-    resolve();
     const status = await screen.findByText("QA failed");
     expect(status.closest("[role=status]")).not.toBeNull();
     expect(screen.getByText(/1 hard fails, 2 soft fails/)).toBeInTheDocument();
-    expect(screen.getByText("Résumé over one page")).toBeInTheDocument();
-    expect(api.callsTo("POST /api/jobs/nw01/qa")[0]!.headers["x-careeros"]).toBe("1");
+    expect(api.callsTo("POST /api/runs/steps/qa")[0]!.headers["x-careeros"]).toBe("1");
   });
+
+  it("Stop cancels a running QA and returns to Re-run QA with no result", async () => {
+    const { api } = renderCard({}, {
+      "POST /api/runs/steps/qa": { kind: "qa", started: true, run_id: "r-qa-2" },
+      "GET /api/runs/r-qa-2": {
+        id: "r-qa-2", kind: "qa", trigger: "manual", status: "running", state: "running", stop_reason: null,
+        started_at: null, ended_at: null, attempts: [], log: "",
+      },
+      "POST /api/runs/cancel": { status: "cancelling", run_id: "r-qa-2" },
+    });
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "Re-run QA" }));
+    await user.click(await screen.findByRole("button", { name: "Stop" }));
+    expect(await screen.findByRole("button", { name: "Re-run QA" })).toBeEnabled();
+    expect(screen.queryByText(/QA failed|QA passed/)).toBeNull();
+    expect(api.callsTo("POST /api/runs/cancel")).toHaveLength(1);
+  });
+
 
   it("Open folder posts", async () => {
     const { api } = renderCard();
