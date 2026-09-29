@@ -1,12 +1,13 @@
-"""GET /api/pipeline: the board. One column per `pipeline.yaml: ui.pipeline.columns` entry with its count and its
-first `card_limit` cards (all of them for the columns named in `expand`), the Closed line (statuses in no column),
-and the filter options. Cards come from the index; the override comes from the tracker's Jobs tab (read-only) and
-the hint line from the job's open Action Item, else its safety flag, else its stage.
+"""GET /api/pipeline: the automation funnel (counts per stage, submitted in the last 7 days), the live applications
+(applied → offer, as cards, narrowed by the filters), the Closed line and the filter options. Cards come from the
+index; the override comes from the tracker's Jobs tab (read-only) and the hint line from the job's open Action Item,
+else its safety flag, else its stage.
 """
 from __future__ import annotations
 
 import json
 import threading
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Literal, Union
 
@@ -19,6 +20,8 @@ CARD_FIELDS = ("job_id", "company", "title", "location", "category", "fit", "tie
 FILTERS = ("tier", "category", "safety", "location")
 _PRIO = {"H": 0, "M": 1, "L": 2}
 PREPARE_STAGE = ("queued", "prepared", "needs_review")
+FUNNEL = ("found", "scored", "queued", "prepared", "needs_review")
+APPLICATIONS = ("applied", "screening", "interview", "offer")
 
 
 # Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable TEXT/INTEGER.
@@ -67,11 +70,14 @@ class Card(TypedDict):
     hint: Hint | None
 
 
-class Column(TypedDict):
-    name: str
-    statuses: list[str]
+class FunnelStage(TypedDict):
+    status: str
     count: int
-    cards: list[Card]
+
+
+class Submitted(TypedDict):
+    count: int
+    since: str  # ISO date: applied on or after it
 
 
 class Closed(TypedDict):
@@ -90,9 +96,10 @@ class BoardOptions(TypedDict):
 
 
 class Board(TypedDict):
-    columns: list[Column]
+    funnel: list[FunnelStage]
+    submitted: Submitted
+    applications: list[Card]
     closed: Closed
-    card_limit: int
     options: BoardOptions
 
 
@@ -200,43 +207,41 @@ def _open_actions(ix: Any, job_ids: list[str]) -> dict[str, dict[str, Any]]:
 
 # --- the board ----------------------------------------------------------------------------------------------------
 
+def funnel_counts(by_status: dict[str, int]) -> list[FunnelStage]:
+    return [{"status": st, "count": by_status.get(st, 0)} for st in FUNNEL]
+
+
 def board(settings: Any, ix: Any, *, tier: list[str] | None = None, category: list[str] | None = None,
-          safety: list[str] | None = None, location: list[str] | None = None,
-          expand: list[str] | None = None) -> Board:
+          safety: list[str] | None = None, location: list[str] | None = None, now: datetime | None = None) -> Board:
+    """The funnel counts every job; the filters narrow the applications and the Closed line."""
     ui = load_ui_config(settings)
     where, params = _where({"tier": tier, "category": category, "safety": safety, "location": location})
     clause = f" AND {where}" if where else ""
-    by = {r["status"]: r["n"] for r in ix.query(f"SELECT status, COUNT(*) AS n FROM jobs WHERE 1=1{clause} "
-                                                "GROUP BY status", params)}
-    expand_set = set(expand or [])
+    count_sql = "SELECT status, COUNT(*) AS n FROM jobs WHERE 1=1{} GROUP BY status"
+    everything = {r["status"]: r["n"] for r in ix.query(count_sql.format(""))}
+    by = {r["status"]: r["n"] for r in ix.query(count_sql.format(clause), params)}
+    since = ((now or datetime.now(timezone.utc)) - timedelta(days=7)).date().isoformat()
+    submitted = ix.query("SELECT COUNT(*) AS n FROM jobs WHERE applied_at >= ?", [since])[0]["n"]
+    rows = ix.query(f"SELECT {', '.join(CARD_FIELDS)} FROM jobs WHERE status IN ({','.join('?' * len(APPLICATIONS))})"
+                    f"{clause} ORDER BY (fit IS NULL), fit DESC, updated_at DESC, company ASC, job_id ASC",
+                    [*APPLICATIONS, *params])
     overrides = read_overrides(Path(settings.paths["tracker_xlsx"]))
     jobs_dir = Path(settings.paths["jobs_dir"])
-    columns = []
-    for c in ui.columns:
-        sts = c["statuses"]
-        limit = "" if c["name"] in expand_set else f" LIMIT {int(ui.card_limit)}"
-        rows = ix.query(f"SELECT {', '.join(CARD_FIELDS)} FROM jobs WHERE status IN ({','.join('?' * len(sts))})"
-                        f"{clause} ORDER BY (fit IS NULL), fit DESC, updated_at DESC, company ASC, job_id ASC{limit}",
-                        [*sts, *params])
-        columns.append({"name": c["name"], "statuses": list(sts), "count": sum(by.get(s, 0) for s in sts),
-                        "cards": rows})
-    acts = _open_actions(ix, [r["job_id"] for col in columns for r in col["cards"]])
-    for col in columns:
-        cards = []
-        for r in col["cards"]:
-            card = {**r, "qa_passed": None if r["qa_passed"] is None else bool(r["qa_passed"]),
-                    "override": overrides.get(r["job_id"]) or None}
-            action = acts.get(r["job_id"])
-            text = _safety_text(jobs_dir, r["job_id"]) if not action and r["safety"] in ("block", "review", "skip") \
-                else None
-            card["hint"] = card_hint(card, action, text)
-            cards.append(card)
-        col["cards"] = cards
+    acts = _open_actions(ix, [r["job_id"] for r in rows])
+    cards = []
+    for r in rows:
+        card = {**r, "qa_passed": None if r["qa_passed"] is None else bool(r["qa_passed"]),
+                "override": overrides.get(r["job_id"]) or None}
+        action = acts.get(r["job_id"])
+        text = _safety_text(jobs_dir, r["job_id"]) if not action and r["safety"] in ("block", "review", "skip") else None
+        card["hint"] = card_hint(card, action, text)
+        cards.append(card)
     closed = {s: by[s] for s in ui.closed if by.get(s)}
     return {
-        "columns": columns,
+        "funnel": funnel_counts(everything),
+        "submitted": {"count": submitted, "since": since},
+        "applications": cards,
         "closed": {"count": sum(closed.values()), "by_status": closed},
-        "card_limit": ui.card_limit,
         "options": {
             "categories": [r["category"] for r in ix.query(
                 "SELECT DISTINCT category FROM jobs WHERE category IS NOT NULL AND category != '' ORDER BY category")],

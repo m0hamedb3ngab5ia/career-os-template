@@ -583,12 +583,13 @@ export interface components {
     };
     /** Board */
     Board: {
-      /** Card Limit */
-      card_limit: number;
+      /** Applications */
+      applications: components["schemas"]["Card"][];
       closed: components["schemas"]["Closed"];
-      /** Columns */
-      columns: components["schemas"]["Column"][];
+      /** Funnel */
+      funnel: components["schemas"]["FunnelStage"][];
       options: components["schemas"]["BoardOptions"];
+      submitted: components["schemas"]["Submitted"];
     };
     /** BoardOptions */
     BoardOptions: {
@@ -697,17 +698,6 @@ export interface components {
       };
       /** Count */
       count: number;
-    };
-    /** Column */
-    Column: {
-      /** Cards */
-      cards: components["schemas"]["Card"][];
-      /** Count */
-      count: number;
-      /** Name */
-      name: string;
-      /** Statuses */
-      statuses: string[];
     };
     /** ColumnConfig */
     ColumnConfig: {
@@ -1062,6 +1052,13 @@ export interface components {
        * @default
        */
       reason?: string;
+    };
+    /** FunnelStage */
+    FunnelStage: {
+      /** Count */
+      count: number;
+      /** Status */
+      status: string;
     };
     /** GroupSchema */
     GroupSchema: {
@@ -2260,6 +2257,13 @@ export interface components {
       snapshots: components["schemas"]["StorageSnapshot"][];
       /** Total */
       total: number;
+    };
+    /** Submitted */
+    Submitted: {
+      /** Count */
+      count: number;
+      /** Since */
+      since: string;
     };
     /** TierAHint */
     TierAHint: {
@@ -3478,7 +3482,6 @@ export interface operations {
         category?: string[];
         safety?: string[];
         location?: string[];
-        expand?: string[];
       };
     };
     responses: {

@@ -1,5 +1,45 @@
 {
-  "card_limit": 10,
+  "applications": [
+    {
+      "category": "swe_backend",
+      "company": "Stark Industries",
+      "fit": 86,
+      "found_at": "2026-09-04T15:00:00+00:00",
+      "hint": {
+        "due": null,
+        "due_reason": null,
+        "kind": "action",
+        "type": "send_linkedin"
+      },
+      "job_id": "<job:interview>",
+      "location": "New York, NY",
+      "override": null,
+      "qa_passed": true,
+      "qa_score": 8.2,
+      "safety": "pass",
+      "status": "interview",
+      "tier": "A",
+      "title": "Software Engineer",
+      "updated_at": "2026-09-18T15:00:00+00:00"
+    },
+    {
+      "category": "swe_backend",
+      "company": "Hooli",
+      "fit": 84,
+      "found_at": "2026-09-16T15:00:00+00:00",
+      "hint": null,
+      "job_id": "<job:applied>",
+      "location": "New York, NY",
+      "override": null,
+      "qa_passed": true,
+      "qa_score": 8.2,
+      "safety": "pass",
+      "status": "applied",
+      "tier": "B",
+      "title": "New Grad Engineer",
+      "updated_at": "2026-09-22T15:00:00+00:00"
+    }
+  ],
   "closed": {
     "by_status": {
       "rejected": 1,
@@ -7,181 +47,26 @@
     },
     "count": 2
   },
-  "columns": [
+  "funnel": [
     {
-      "cards": [
-        {
-          "category": "swe_backend",
-          "company": "Globex",
-          "fit": 72,
-          "found_at": "2026-09-21T15:00:00+00:00",
-          "hint": null,
-          "job_id": "<job:scored>",
-          "location": "Remote",
-          "override": null,
-          "qa_passed": null,
-          "qa_score": null,
-          "safety": "pass",
-          "status": "scored",
-          "tier": "C",
-          "title": "Software Engineer I",
-          "updated_at": "2026-09-21T16:00:00+00:00"
-        },
-        {
-          "category": null,
-          "company": "Acme Robotics",
-          "fit": null,
-          "found_at": "2026-09-23T15:00:00+00:00",
-          "hint": {
-            "kind": "not_scored"
-          },
-          "job_id": "<job:found>",
-          "location": "New York, NY",
-          "override": null,
-          "qa_passed": null,
-          "qa_score": null,
-          "safety": null,
-          "status": "found",
-          "tier": null,
-          "title": "Backend Engineer",
-          "updated_at": "2026-09-23T15:00:00+00:00"
-        }
-      ],
-      "count": 2,
-      "name": "Found",
-      "statuses": [
-        "found",
-        "scored"
-      ]
-    },
-    {
-      "cards": [
-        {
-          "category": "swe_backend",
-          "company": "Initech",
-          "fit": 88,
-          "found_at": "2026-09-20T15:00:00+00:00",
-          "hint": {
-            "due": null,
-            "due_reason": null,
-            "kind": "action",
-            "type": "salary"
-          },
-          "job_id": "<job:queued>",
-          "location": "New York, NY",
-          "override": null,
-          "qa_passed": true,
-          "qa_score": 8.2,
-          "safety": "pass",
-          "status": "queued",
-          "tier": "B",
-          "title": "Platform Engineer",
-          "updated_at": "2026-09-20T17:00:00+00:00"
-        }
-      ],
       "count": 1,
-      "name": "Queued",
-      "statuses": [
-        "queued",
-        "prepared"
-      ]
+      "status": "found"
     },
     {
-      "cards": [
-        {
-          "category": "swe_backend",
-          "company": "Umbrella Labs",
-          "fit": 91,
-          "found_at": "2026-09-19T15:00:00+00:00",
-          "hint": {
-            "due": "2026-09-25T15:00:00+00:00",
-            "due_reason": "posting closes",
-            "kind": "action",
-            "type": "review"
-          },
-          "job_id": "<job:review>",
-          "location": "New York, NY",
-          "override": null,
-          "qa_passed": true,
-          "qa_score": 8.2,
-          "safety": "review",
-          "status": "needs_review",
-          "tier": "A",
-          "title": "Infrastructure Engineer",
-          "updated_at": "2026-09-19T19:00:00+00:00"
-        }
-      ],
       "count": 1,
-      "name": "Needs review",
-      "statuses": [
-        "needs_review"
-      ]
+      "status": "scored"
     },
     {
-      "cards": [
-        {
-          "category": "swe_backend",
-          "company": "Hooli",
-          "fit": 84,
-          "found_at": "2026-09-16T15:00:00+00:00",
-          "hint": null,
-          "job_id": "<job:applied>",
-          "location": "New York, NY",
-          "override": null,
-          "qa_passed": true,
-          "qa_score": 8.2,
-          "safety": "pass",
-          "status": "applied",
-          "tier": "B",
-          "title": "New Grad Engineer",
-          "updated_at": "2026-09-22T15:00:00+00:00"
-        }
-      ],
       "count": 1,
-      "name": "Applied",
-      "statuses": [
-        "applied"
-      ]
+      "status": "queued"
     },
     {
-      "cards": [
-        {
-          "category": "swe_backend",
-          "company": "Stark Industries",
-          "fit": 86,
-          "found_at": "2026-09-04T15:00:00+00:00",
-          "hint": {
-            "due": null,
-            "due_reason": null,
-            "kind": "action",
-            "type": "send_linkedin"
-          },
-          "job_id": "<job:interview>",
-          "location": "New York, NY",
-          "override": null,
-          "qa_passed": true,
-          "qa_score": 8.2,
-          "safety": "pass",
-          "status": "interview",
-          "tier": "A",
-          "title": "Software Engineer",
-          "updated_at": "2026-09-18T15:00:00+00:00"
-        }
-      ],
-      "count": 1,
-      "name": "Screening \u00b7 Interview",
-      "statuses": [
-        "screening",
-        "interview"
-      ]
-    },
-    {
-      "cards": [],
       "count": 0,
-      "name": "Offer",
-      "statuses": [
-        "offer"
-      ]
+      "status": "prepared"
+    },
+    {
+      "count": 1,
+      "status": "needs_review"
     }
   ],
   "options": {
@@ -198,5 +83,9 @@
         "value": "Remote"
       }
     ]
+  },
+  "submitted": {
+    "count": 1,
+    "since": "2026-09-17"
   }
 }

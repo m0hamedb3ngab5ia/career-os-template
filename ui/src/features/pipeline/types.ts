@@ -6,7 +6,6 @@ type Schemas = components["schemas"];
 
 export type Hint = NonNullable<Schemas["Card"]["hint"]>;
 export type Card = Schemas["Card"];
-export type Column = Schemas["Column"];
 export type Board = Schemas["Board"];
 
 export interface Filters {

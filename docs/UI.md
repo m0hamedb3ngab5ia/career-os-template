@@ -182,10 +182,11 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
    was missed ("score: 3 slots since Tue 8:00 PM") with **Catch up** (`careeros run catch-up`) and **Dismiss**
    (`careeros run catch-up --dismiss`). Missed runs never start on their own; the banner is the only way in besides
    the CLI. While runs are paused the stat row shows "Runs paused until …" with Resume.
-2. **Pipeline**: board with one column per stage: Found · Queued · Preparing · Needs review · Applied ·
-   Screening / Interview · Offer · Closed (rejected, withdrawn, ghosted, skipped). Cards show company, role, fit,
-   tier A/B/C, safety dot (pass / review / block / skip), QA state, override. Filters: tier, category, safety,
-   location. Dragging a card sets status (both `status.json` and the tracker).
+2. **Pipeline**: the automation funnel (counts: New · Scored · Ready to prepare · Ready to apply · Needs your
+   review · Submitted this week), each linking to Jobs filtered to that stage; then Applications as cards grouped
+   Applied · Screening · Interview · Offer, with Closed as a count link. Cards show company, role, fit, tier,
+   safety, QA state, override; "Move to…" sets status (both `status.json` and the tracker; no drag). Filters (tier,
+   category, safety, location) narrow Applications only.
 3. **Jobs**: the tracker's Jobs tab as a live table, same columns, inline Status / Override / Notes editing, saved
    views, search, Export xlsx, Open folder. **Column filters** (Excel-style): the filter button on a column header
    opens a menu with sort, a searchable checklist of the column's distinct values with counts (company, location,
@@ -306,8 +307,8 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
 - `pipeline.yaml: ui` (built): port, host, open_browser, theme, undo_seconds, page_size, watch_debounce_ms,
   index_path, `due_soon_hours` (Action Items' orange window), `pause_until_tomorrow_at` (Runs › Pause all ›
   "Until tomorrow"), `followup_after_apply_days` / `followup_no_response_days` (Inbox & follow-ups due windows) and
-  the Pipeline board's `pipeline.columns` and `pipeline.card_limit` (status -> column; statuses in no column form
-  the "Closed" line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier,
+  `pipeline.columns` and `pipeline.card_limit` (status groups; statuses in no column form the Pipeline "Closed"
+  line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier,
   action type and stop reason from the models, so the frontend renders codes it was never told about (grey
   fallback).
 - Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write
@@ -392,7 +393,7 @@ close; a skip-to-content link is the first thing in `AppShell`.
   "12 s ago", "1.8 MB / week") are placeholders. Render times on the client, or guard them against hydration mismatch.
 - **URL state:** sort, filters, tabs, grouping, the selected Inbox thread, the Runs kind and budget, the Settings
   section and "Show as table" are kept in the query string, so views can be deep-linked and survive a reload.
-- **Long lists:** virtualize Jobs (all), Pipeline › Found, the Runs history and the live run log.
+- **Long lists:** virtualize Jobs (all), the Runs history and the live run log.
 - **Keyboard:** roving tabindex with arrow keys for tab lists, radio groups and segmented controls. Escape closes
   menus and sheets and returns focus to where it came from. On Save, focus moves to the first invalid field.
 - **Forms:** controlled inputs have `onChange` (or use `defaultValue`). Unsaved Settings changes are guarded with

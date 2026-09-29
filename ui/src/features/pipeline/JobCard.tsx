@@ -1,5 +1,4 @@
 import { CircleAlert, CircleCheck, Clock3, ShieldAlert, UserRoundCheck } from "lucide-react";
-import type { DragEvent } from "react";
 import { Link } from "react-router";
 import { ActionTypeLabel, Chip, SafetyChip, TierBadge } from "../../kit/chips";
 import { Menu, type MenuItem } from "../../kit/Menu";
@@ -41,30 +40,19 @@ export function HintLine({ hint }: { hint: Hint | null }) {
 interface JobCardProps {
   card: Card;
   moveItems: MenuItem[];
-  dragging: boolean;
   pending: boolean;
-  onDragStart: (card: Card) => void;
-  onDragEnd: () => void;
 }
 
-/** A job on the board: tier, company, fit, role, safety, QA, override, "Move to…", and what's next. Draggable. */
-export function JobCard({ card, moveItems, dragging, pending, onDragStart, onDragEnd }: JobCardProps) {
+/** A job on the board: tier, company, fit, role, safety, QA, override, "Move to…", and what's next. */
+export function JobCard({ card, moveItems, pending }: JobCardProps) {
   const company = card.company || card.job_id;
   return (
     <div
       className={styles.card}
       data-job-id={card.job_id}
-      draggable
-      data-dragging={dragging || undefined}
       data-pending={pending || undefined}
-      onDragStart={(e: DragEvent) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", card.job_id);
-        onDragStart(card);
-      }}
-      onDragEnd={onDragEnd}
     >
-      <Link to={`/jobs/${encodeURIComponent(card.job_id)}`} className={styles.cardLink} draggable={false}>
+      <Link to={`/jobs/${encodeURIComponent(card.job_id)}`} className={styles.cardLink}>
         <span className={styles.cardTop}>
           <TierBadge tier={card.tier} />
           <span className={styles.company}>{company}</span>
