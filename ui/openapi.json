@@ -1094,6 +1094,17 @@
         "title": "BoardOptions",
         "type": "object"
       },
+      "Body_open_application_api_jobs__job_id__application_open_post": {
+        "properties": {
+          "refill": {
+            "default": false,
+            "title": "Refill",
+            "type": "boolean"
+          }
+        },
+        "title": "Body_open_application_api_jobs__job_id__application_open_post",
+        "type": "object"
+      },
       "CancelBody": {
         "properties": {
           "run_id": {
@@ -9538,6 +9549,15 @@
             }
           }
         ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_open_application_api_jobs__job_id__application_open_post"
+              }
+            }
+          }
+        },
         "responses": {
           "200": {
             "content": {
