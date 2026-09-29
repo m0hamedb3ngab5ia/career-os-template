@@ -11,8 +11,9 @@ file held open in Excel never keeps a batch or a tick waiting; a sync error stil
 Inbox sync is a headless skill call; `service.run_skill` records its own run and holds the runner lock.
 The step's stdout/stderr lines go to its run.log, so the Runs log tail streams them.
 SIGTERM (the UI's Cancel) ends the step with stop reason `cancelled` and discards its partial output: a cancelled
-scout removes the job folders it created and restores seen/history (its tracker sync runs only after run_scout);
-QA writes nothing until it finishes (its result lands on run.json `result`).
+scout removes the job folders it created and restores seen/history, also when cancelled during its tracker sync;
+QA writes nothing until it finishes (its result lands on run.json `result`). A Stop that lands before the step
+holds its lock leaves data/runs/ui/cancel-<id>; the step finds it once locked and records `cancelled` without running.
 """
 from __future__ import annotations
 
@@ -98,17 +99,21 @@ def default_actions(settings: Settings, job_id: str | None = None) -> dict[str, 
         store = Store(settings)
         before = {d.name for d in store.jobs_dir.iterdir()}
         restore = _snapshot([store.seen_file, store.history_file])
-        try:
-            summary = run_scout(settings, store)
-        except KeyboardInterrupt:  # Cancel: discard what this scout stored so far
-            import shutil
 
-            for d in store.jobs_dir.iterdir():
-                if d.name not in before and d.is_dir():
-                    shutil.rmtree(d, ignore_errors=True)
-            restore()
-            raise
-        return "ok", tick.scout_detail(summary), lambda: sync_to_tracker(settings, store, summary)
+        def discarding(fn: Callable[[], Any]) -> Any:
+            try:
+                return fn()
+            except KeyboardInterrupt:  # Cancel: discard what this scout stored so far
+                import shutil
+
+                for d in store.jobs_dir.iterdir():
+                    if d.name not in before and d.is_dir():
+                        shutil.rmtree(d, ignore_errors=True)
+                restore()
+                raise
+        summary = discarding(lambda: run_scout(settings, store))
+        return "ok", tick.scout_detail(summary), \
+            lambda: discarding(lambda: sync_to_tracker(settings, store, summary))
 
     def tracker() -> tuple[str, str]:
         out = sync_all(settings)
@@ -157,6 +162,8 @@ def run_step(settings: Settings, kind: str, *, actions: dict[str, StepAction] | 
         status, stop, detail = "done", "completed", ""
         out = _RunLogWriter(rs, rid)
         try:
+            if (rs.dir / "ui" / f"cancel-{rid}").exists():  # Stop pressed before this step held its lock
+                raise KeyboardInterrupt
             if busy is not None:
                 status, stop, detail = "failed", "busy", str(busy)[:500]
             else:

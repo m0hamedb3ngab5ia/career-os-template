@@ -241,6 +241,30 @@ def test_cancelled_scout_discards_what_it_stored(settings, monkeypatch):
     assert st.seen_file.read_text() == "old\n" and not st.history_file.exists()
 
 
+
+def test_cancel_during_the_scout_tracker_sync_discards_what_it_stored(settings, monkeypatch):
+    from careeros import scout
+    from careeros.runs import tick
+    from careeros.store import Store
+
+    st = Store(settings)
+    st.seen_file.write_text("old\n")
+
+    def stored(settings, store, *a, **k):
+        (store.jobs_dir / "new1").mkdir()
+        store.seen_file.write_text("old\nnew\n")
+        return {}
+
+    def sync(*a, **k):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(scout, "run_scout", stored)
+    monkeypatch.setattr(scout, "sync_to_tracker", sync)
+    monkeypatch.setattr(tick, "scout_detail", lambda s: "")
+    rec = step_mod.run_step(settings, "scout")
+    assert rec["stop_reason"] == "cancelled"
+    assert list(st.jobs_dir.iterdir()) == [] and st.seen_file.read_text() == "old\n"
+
 def test_step_output_streams_to_run_log_while_running(settings, rc):
     """Scout prints progress; each line reaches run.log (and so the tail endpoint) before the step ends."""
     import sys
@@ -325,6 +349,15 @@ def test_cancel_a_step_by_run_id(rc):
                   cmdline=lambda pid: "/venv/bin/python -m careeros.ui.services.step --root /r scout")
     assert rc2.cancel(run["id"])["status"] == "cancelling" and sent == [555]
 
+
+
+def test_cancel_before_the_step_holds_its_lock_stops_it_at_start(rc):
+    rid = rc.start_step("scout")["run_id"]
+    assert rc.cancel(rid)["status"] == "cancelling"
+    assert rc.cancel("never-started")["status"] == "idle"  # only a step this UI spawned
+    ran = []
+    rec = step_mod.run_step(rc.settings, "scout", run_id=rid, actions={"scout": lambda: ran.append(1) or ("ok", "")})
+    assert rec["stop_reason"] == "cancelled" and ran == []
 
 # --- pause, resume, catch-up ---------------------------------------------------------------------------------
 
