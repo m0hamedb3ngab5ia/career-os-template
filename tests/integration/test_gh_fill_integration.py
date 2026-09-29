@@ -91,3 +91,10 @@ def test_fill_skips_race_unless_not_hispanic(server: str, tmp_path: Path):
     fields[0]["value"] = "Decline To Self Identify"  # race stays hidden: skip it, don't time out on it
     summary, _ = _run(server, tmp_path, "job_app.html", fields)
     assert summary["filled"] == 1 and summary["failed"] == [] and summary["skipped"] == ["race"], summary
+
+
+def test_fill_maps_degree_to_fixed_label(server: str, tmp_path: Path):
+    fields = [{"field_id": "degree--0", "label": "Degree", "type": "select_async",
+               "value": "Bachelor of Engineering, Mechanical", "source": "profile"}]
+    summary, _ = _run(server, tmp_path, "job_app.html", fields)  # no exact option: falls back to "Bachelor's Degree"
+    assert summary["filled"] == 1 and summary["failed"] == [], summary
