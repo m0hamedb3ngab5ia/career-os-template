@@ -237,15 +237,20 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
     d = _job(settings, job_id)
     if not refill and browser.activate(d, browser.cdp_url(settings)):
         return {"action": "focused"}
+    if browser.fill_running(d):  # double click / refill mid-fill: one fill, one tab, one application.json
+        return {"action": "filling", "log": "application.log"}
     ensure_unlocked(settings, job_id)
     gh_fill.preflight()
     cdp = browser.cdp_url(settings)
     if cdp != browser.DEFAULT_CDP and browser.tabs(cdp) is None:  # the default browser starts itself; yours can't
         raise browser.NotConnected(f"Chrome not connected on {cdp}: open Chrome with its extension/remote debugging "
                                    "on, then retry")
+    if refill:
+        browser.close(d, cdp)
+    (d / "fill_summary.json").unlink(missing_ok=True)  # else status() shows the last fill's fields_left
     steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
     cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
-    cmd = f"{cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
+    cmd = f"echo {shlex.quote(browser.FILL_PID)}$$; {cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
     root = str(settings.root)
     with (d / "application.log").open("ab") as fh:
         (popen or subprocess.Popen)(["/bin/sh", "-c", cmd], cwd=root, env={**os.environ, "CAREEROS_ROOT": root}, stdin=subprocess.DEVNULL,
