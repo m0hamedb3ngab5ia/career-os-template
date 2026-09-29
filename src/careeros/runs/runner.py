@@ -238,7 +238,6 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
             if explicit:
                 excluded.append({"job_id": jid, "reason": why})
             continue
-            continue
         raw = r.posting() if callable(r.posting) else r.posting
         if raw.get("pruned"):
             excluded.append({"job_id": jid, "reason": "pruned"})
