@@ -12,6 +12,7 @@ export const routes: RouteObject[] = [
       { index: true, element: <TodayPage /> },
       { path: "pipeline", lazy: () => import("../features/pipeline/PipelinePage").then((m) => ({ Component: m.PipelinePage })) },
       { path: "pipeline/batch/new", lazy: () => import("../features/pipeline/batch/BatchBuilderPage").then((m) => ({ Component: m.BatchBuilderPage })) },
+      { path: "pipeline/batch/:id", lazy: () => import("../features/pipeline/batch/Progress").then((m) => ({ Component: m.BatchProgressPage })) },
       { path: "jobs", lazy: () => import("../features/jobs/JobsPage").then((m) => ({ Component: m.JobsPage })) },
       { path: "jobs/:jobId", lazy: () => import("../features/job-detail/JobDetailPage").then((m) => ({ Component: m.JobDetailPage })) },
       { path: "actions", lazy: () => import("../features/actions/ActionItemsPage").then((m) => ({ Component: m.ActionItemsPage })) },

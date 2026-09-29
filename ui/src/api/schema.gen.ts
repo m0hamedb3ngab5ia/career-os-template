@@ -568,6 +568,8 @@ export interface components {
       reason?: string | null;
       /** Requested */
       requested?: string | null;
+      /** Retried */
+      retried?: number | null;
       /** Selected */
       selected: components["schemas"]["BatchJob"][];
       /** Status */

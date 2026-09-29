@@ -58,6 +58,7 @@ class Batch(BaseModel):
     reason: str | None = None
     updated_at: str | None = None
     requested: str | None = None
+    retried: int | None = None  # POST retry only: jobs put back in the queue (0 = nothing to start)
 
 
 class RetryBody(BaseModel):

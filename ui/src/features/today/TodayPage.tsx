@@ -1,9 +1,12 @@
+import { Link, useSearchParams } from "react-router";
+import { ApiError } from "../../api/client";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { formatLongDate } from "../../lib/dates";
 import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
+import { useBatch } from "../pipeline/batch/api";
 import { errorText, useToday, useTodayStatus } from "./api";
 import { HeaderActions } from "./HeaderActions";
 import { groupByJob } from "./actions";
@@ -21,6 +24,11 @@ export function TodayPage() {
   const status = useTodayStatus();
   const today = useToday();
   const s = status.data;
+  const batchId = useSearchParams()[0].get("batch") ?? undefined;
+  const batch = useBatch(batchId);
+  // Unknown/failed batch: say so and show every task; still loading: show none (not a false "Nothing needs you").
+  const jobIds = batchId && !batch.isError ? batch.data?.selected.map((r) => r.job_id) : undefined;
+  const batchMissing = batch.error instanceof ApiError && batch.error.status === 404;
   const subtitle = today.data ? `${formatLongDate(now)} · ${headline(today.data.actions ?? [])}` : formatLongDate(now);
 
   return (
@@ -43,7 +51,16 @@ export function TodayPage() {
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
-            <NeedsYou />
+            {batchId ? (
+              <p className={styles.batchNote}>
+                Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}
+                <Link to="/">Show all</Link>
+                {batch.isError ? (
+                  <span role="status"> · {batchMissing ? "Batch not found" : `Couldn’t load the batch: ${errorText(batch.error)}`}, showing all tasks</span>
+                ) : null}
+              </p>
+            ) : null}
+            {batchId && batch.isPending ? null : <NeedsYou jobIds={jobIds} />}
           </div>
           {s ? (
             <aside className={styles.side} aria-label="Runs and pipeline">

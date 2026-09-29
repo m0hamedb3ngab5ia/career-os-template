@@ -25,6 +25,9 @@ afterEach(() => {
 });
 
 describe("keysForChange", () => {
+  it("marks a changed batch stale", () => {
+    expect(keysForChange({ batches: ["b-1"] })).toEqual([["batch", "b-1"]]);
+  });
   it("maps a changed payload to the query keys it makes stale", () => {
     expect(keysForChange({ jobs: ["a1", "b2"], runs: [], actions: false, config: false, status: false })).toEqual([
       ["jobs"],

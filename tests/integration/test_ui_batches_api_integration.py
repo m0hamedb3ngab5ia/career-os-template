@@ -115,7 +115,8 @@ def test_drive_end_to_end_then_controls(client, data, monkeypatch):
     assert g["status"] == "done" and g["selected"][0]["state"] == "done" and g["selected"][0]["result"] == "scored"
     assert len(inv.calls) == 1 and inv.calls[0]["job_id"] == data["jobs"]["found"]
     assert client.post(f"/api/batches/{b['id']}/start", headers=W).status_code == 422  # done
-    assert client.post(f"/api/batches/{b['id']}/retry", json={}, headers=W).json()["status"] == "done"
+    r = client.post(f"/api/batches/{b['id']}/retry", json={}, headers=W).json()
+    assert r["status"] == "done" and r["retried"] == 0  # nothing failed: the UI must not call /start
 
     b2 = client.post("/api/batches", json={"job_ids": [data["jobs"]["found"]], "stop_at": "prepare"},
                      headers=W).json()
