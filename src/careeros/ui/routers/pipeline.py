@@ -13,4 +13,5 @@ router = APIRouter(tags=["pipeline"])
 def board(tier: list[str] = Query(default=[]), category: list[str] = Query(default=[]),
           safety: list[str] = Query(default=[]), location: list[str] = Query(default=[]),
           c=Depends(ctx)) -> svc.Board:
-    return svc.board(c.settings, c.index, tier=tier, category=category, safety=safety, location=location)
+    return svc.board(c.settings, c.index, tier=tier, category=category, safety=safety, location=location,
+                     now=c.now())
