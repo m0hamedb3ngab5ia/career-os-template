@@ -83,13 +83,13 @@ describe("key/value and records", () => {
     const user = userEvent.setup();
     const f = field({
       file: "pipeline",
-      key: "ui.pipeline.columns",
+      key: "demo.stages",
       control: "records",
-      label: "Pipeline columns",
+      label: "Stages",
       default: [{ name: "Found", statuses: ["found", "scored"] }],
     });
     const { container } = render(<Harness f={f} initial={[{ name: "Found", statuses: ["found", "scored"] }]} />);
-    const table = screen.getByRole("table", { name: "Pipeline columns" });
+    const table = screen.getByRole("table", { name: "Stages" });
     const statuses = within(table).getByRole("textbox", { name: "Statuses, row 1" });
     await user.clear(statuses);
     await user.type(statuses, "found, queued");

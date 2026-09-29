@@ -45,7 +45,7 @@ export const meta: Meta = {
   stop_reasons: [],
   statuses: ["found", "queued", "needs_review", "applied", "screening", "interview", "offer", "rejected"],
   presets: { names: ["small", "medium", "large"], recommended: "medium", current: "small", values: {} },
-  pipeline: { columns: [], closed: [], card_limit: 5 },
+  pipeline: { columns: [], closed: [] },
   ui: { theme: "system", undo_seconds: 8, page_size: 50, due_soon_hours: 48, pause_until_tomorrow_at: "08:00" },
 };
 

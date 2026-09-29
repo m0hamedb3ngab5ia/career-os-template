@@ -154,15 +154,6 @@ ui:                                        # reusable default: fine to keep. `ca
                                            # days after you apply (0 = same day). Display only; nothing sends
   followup_no_response_days: 7             # 7 (Recommended: 7 to 14): a status follow-up is due this long after the
                                            # last reply (screening)
-  pipeline:
-    card_limit: 10                         # 10 (Recommended): cards per Pipeline column before "Show all" (1 to 500)
-    columns:                               # (Recommended) the six below. Each status sits in at most one column;
-      - {name: Found, statuses: [found, scored]}          # statuses in no column (skipped, rejected, withdrawn,
-      - {name: Queued, statuses: [queued, prepared]}      # ghosted) are counted in the "Closed" line
-      - {name: Needs review, statuses: [needs_review]}
-      - {name: Applied, statuses: [applied]}
-      - {name: Screening · Interview, statuses: [screening, interview]}
-      - {name: Offer, statuses: [offer]}
 
 notify:
   on_interview: push                       # push | none  (PushNotification tool from inbox-sync)

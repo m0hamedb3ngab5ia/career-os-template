@@ -52,12 +52,25 @@ def test_example_file_marks_recommended_defaults():
     assert ui.count("(Recommended)") >= 6
 
 
-def test_overrides_and_custom_columns():
-    cfg = load_ui_config(S({"ui": {"port": 9000, "theme": "dark", "pipeline": {"columns": [
-        {"name": "New", "statuses": ["found"]}, {"name": "Doing", "statuses": ["queued", "prepared"]}]}}}))
+def test_overrides():
+    cfg = load_ui_config(S({"ui": {"port": 9000, "theme": "dark"}}))
     assert cfg.port == 9000 and cfg.theme == "dark"
-    assert [c["name"] for c in cfg.columns] == ["New", "Doing"]
-    assert "scored" in cfg.closed and "found" not in cfg.closed
+
+
+@pytest.mark.parametrize("old", [
+    {"columns": [{"name": "New", "statuses": ["found"]}], "card_limit": 25},
+    {"columns": []},
+    {"card_limit": "10"},
+    {"nope": 1},
+    "junk",
+])
+def test_removed_pipeline_board_keys_still_load_and_warn(old, caplog):
+    """ui.pipeline.columns / card_limit were removed (fixed board); old configs keep loading, with a warning."""
+    with caplog.at_level("WARNING"):
+        cfg = load_ui_config(S({"ui": {"port": 9000, "pipeline": old}}))
+    assert cfg.port == 9000 and cfg.columns == DEFAULT_COLUMNS
+    assert "ui.pipeline" in caplog.text and "ignored" in caplog.text
+    assert not hasattr(cfg, "card_limit")
 
 
 @pytest.mark.parametrize("bad", [
@@ -75,14 +88,6 @@ def test_overrides_and_custom_columns():
     {"ui": {"followup_after_apply_days": -1}},
     {"ui": {"followup_no_response_days": 0}},
     {"ui": {"followup_no_response_days": "7"}},
-    {"ui": {"pipeline": {"columns": []}}},
-    {"ui": {"pipeline": {"columns": [{"name": "X", "statuses": ["nope"]}]}}},
-    {"ui": {"pipeline": {"columns": [{"name": "", "statuses": ["found"]}]}}},
-    {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"]}, {"name": "B", "statuses": ["found"]}]}}},
-    {"ui": {"pipeline": {"columns": [{"name": "A", "statuses": ["found"], "x": 1}]}}},
-    {"ui": {"pipeline": {"nope": 1}}},
-    {"ui": {"pipeline": {"card_limit": 0}}},
-    {"ui": {"pipeline": {"card_limit": "10"}}},
     {"ui": {"due_soon_hours": 0}},
     {"ui": {"due_soon_hours": 24 * 15}},
     {"ui": {"pause_until_tomorrow_at": "8:00"}},
@@ -94,12 +99,9 @@ def test_invalid_config_fails_closed(bad):
         load_ui_config(S(bad))
 
 
-def test_board_card_limit_and_due_soon_window():
-    cfg = load_ui_config(S({}))
-    assert cfg.card_limit == 10 and cfg.due_soon_hours == 48
-    cfg = load_ui_config(S({"ui": {"due_soon_hours": 24, "pipeline": {"card_limit": 25}}}))
-    assert cfg.card_limit == 25 and cfg.due_soon_hours == 24
-    assert [c["name"] for c in cfg.columns][0] == "Found"      # card_limit alone keeps the default columns
+def test_due_soon_window():
+    assert load_ui_config(S({})).due_soon_hours == 48
+    assert load_ui_config(S({"ui": {"due_soon_hours": 24}})).due_soon_hours == 24
 def test_pause_until_tomorrow_at_defaults_to_eight_and_takes_hh_mm():
     assert load_ui_config(S({})).pause_until_tomorrow_at == "08:00"
     assert load_ui_config(S({"ui": {"pause_until_tomorrow_at": "06:30"}})).pause_until_tomorrow_at == "06:30"

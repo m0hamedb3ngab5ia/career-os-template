@@ -52,14 +52,6 @@ def _schedule_check(kind: str):
     return check
 
 
-def _ui_columns(v: Any) -> str | None:
-    try:
-        ui_cfg._columns(v)
-    except ConfigError as e:
-        return str(e).split("ui.", 1)[-1].split(" (see ", 1)[0]
-    return None
-
-
 def _tier_rules(v: list[dict[str, Any]]) -> str | None:
     for i, r in enumerate(v, 1):
         if set(r) != {"if", "tier"}:
@@ -201,14 +193,8 @@ SECTIONS: tuple[Section, ...] = (
             Field(P, "paths.tracker_xlsx", "text", "Tracker spreadsheet", default="data/JobTracker.xlsx",
                   check=_file_path,
                   help="Where JobTracker.xlsx is exported. Relative to the repo, or ~/… for anywhere."),
-        )),
-        Group("app", "App", (
-            Field(P, "ui.port", "number", "Port", default=ui_cfg.UiConfig.port, min=1, max=65535, integer=True,
-                  help="`careeros ui --port N` overrides it. Takes effect the next time the app starts."),
-            Field(P, "ui.host", "text", "Address", default=ui_cfg.UiConfig.host, readonly=True,
-                  note="This Mac only for now; LAN mode with a token comes in a later version."),
-            Field(P, "ui.open_browser", "switch", "Open the app in your browser on start",
-                  default=ui_cfg.UiConfig.open_browser),
+        ), advanced=True),
+        Group("appearance", "Appearance", (
             Field(P, "ui.theme", "select", "Appearance", default=ui_cfg.UiConfig.theme, options=ui_cfg.THEMES),
             Field(P, "ui.undo_seconds", "number", "Undo stays on for", default=ui_cfg.UiConfig.undo_seconds,
                   min=1, max=60, integer=True, unit="s"),
@@ -217,28 +203,31 @@ SECTIONS: tuple[Section, ...] = (
             Field(P, "ui.pause_until_tomorrow_at", "time", "Pause until tomorrow ends at",
                   default=ui_cfg.UiConfig.pause_until_tomorrow_at,
                   help="Runs › Pause all › Until tomorrow lifts the pause at this local time tomorrow."),
-            Field(P, "ui.watch_debounce_ms", "number", "Refresh after files are quiet for",
-                  default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
             Field(P, "ui.followup_after_apply_days", "number", "After-applying note is due after",
                   default=ui_cfg.UiConfig.followup_after_apply_days, min=0, max=60, integer=True, unit="days",
                   help="Inbox & follow-ups shows the due date; nothing sends on its own."),
             Field(P, "ui.followup_no_response_days", "number", "Status follow-up is due after",
                   default=ui_cfg.UiConfig.followup_no_response_days, min=1, max=60, integer=True, unit="days",
                   help="Counted from the last reply (screening)."),
-            Field(P, "ui.pipeline.columns", "records", "Pipeline columns", default=ui_cfg.DEFAULT_COLUMNS,
-                  check=_ui_columns, help="One column per stage; statuses in no column count as Closed."),
-            Field(P, "ui.pipeline.card_limit", "number", "Cards per Pipeline column",
-                  default=ui_cfg.UiConfig.card_limit, min=1, max=500, integer=True,
-                  help="The rest of a column opens with Show all."),
             Field(P, "ui.due_soon_hours", "number", "Action Items are due soon within",
                   default=ui_cfg.UiConfig.due_soon_hours, min=1, max=24 * 14, integer=True, unit="h",
                   help="Due soon shows orange; overdue shows red."),
         )),
+        Group("app", "App", (
+            Field(P, "ui.port", "number", "Port", default=ui_cfg.UiConfig.port, min=1, max=65535, integer=True,
+                  help="`careeros ui --port N` overrides it. Takes effect the next time the app starts."),
+            Field(P, "ui.host", "text", "Address", default=ui_cfg.UiConfig.host, readonly=True,
+                  note="This Mac only for now; LAN mode with a token comes in a later version."),
+            Field(P, "ui.open_browser", "switch", "Open the app in your browser on start",
+                  default=ui_cfg.UiConfig.open_browser),
+            Field(P, "ui.watch_debounce_ms", "number", "Refresh after files are quiet for",
+                  default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
+        ), advanced=True),
         Group("claude", "Claude", (
             Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),
             Field(P, "llm.model_hint", "text", "Model", default=None, nullable=True,
                   help="Empty = Claude Code's default (Recommended). For example: sonnet."),
-        )),
+        ), advanced=True),
         Group("resume", "Résumé", (
             Field(P, "resume_build.engine", "select", "LaTeX engine", default="tectonic",
                   options=("tectonic", "pdflatex"), **UNUSED),
@@ -423,7 +412,7 @@ SECTIONS: tuple[Section, ...] = (
                   default=runs_cfg.RunsConfig.on_usage_limit, options=runs_cfg.ON_USAGE_LIMIT,
                   help="The run stops and says so. Stop: the next scheduled run tries again. "
                        "Pause: all runs stay paused until you resume them."),
-        )),
+        ), advanced=True),
         Group("ranking", "Ranking", (
             _num(P, "runs.ranking.freshness_weight", "Freshness", R["freshness_weight"], hi=100, control="slider",
                  unit="points"),
@@ -438,12 +427,12 @@ SECTIONS: tuple[Section, ...] = (
                  control="slider", step=0.1, unit="points per fit point"),
             _num(P, "runs.ranking.retry_bonus", "Retry bonus", R["retry_bonus"], hi=100, control="slider",
                  unit="points"),
-        ), help="Which jobs go first. No Claude involved."),
+        ), help="Which jobs go first. No Claude involved.", advanced=True),
         Group("retry", "Retry", (
             _num(P, "runs.retry.max_attempts", "Attempts per job", policy.DEFAULT_RETRY["max_attempts"], lo=1,
                  help="2 = retry once."),
             _switch(P, "runs.retry.action_item", "Then add an Action Item", policy.DEFAULT_RETRY["action_item"]),
-        )),
+        ), advanced=True),
         Group("prepare", "Prepare", (
             _switch(P, "runs.prepare.stop_at_daily_cap", "Stop preparing at today's apply cap", True),
         )),
@@ -527,7 +516,7 @@ SECTIONS: tuple[Section, ...] = (
             _num(P, "advisor.failure_rate_warn", "Warn when failures exceed", AD["failure_rate_warn"], hi=1,
                  integer=False, step=0.05, unit="share of jobs"),
         )),
-    )),
+    ), advanced=True),
     Section("qa", "Quality checks", (
         Group("critic", "Critic", (
             _num(Q, "critic.pass_threshold", "Pass mark", 7.5, lo=1, hi=10, integer=False, step=0.1,
@@ -563,7 +552,7 @@ SECTIONS: tuple[Section, ...] = (
                 "game-changer", "cutting-edge", "hit the ground running", "wear many hats",
                 "I believe I would be a great fit", "Dear Hiring Manager,"]),
         )),
-    ), checks=(_min_below_max,)),
+    ), checks=(_min_below_max,), advanced=True),
 )
 
 # Example config keys with no form control, and why. The coverage test fails on any key that is in neither.
