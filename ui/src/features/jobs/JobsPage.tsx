@@ -1,5 +1,6 @@
 import { Download, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
+import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
@@ -290,6 +291,9 @@ export function JobsPage() {
             {nSel > 0 ? (
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
+                <Link to={`/pipeline/batch/new?${new URLSearchParams({ ids: [...selected].join(",") })}`}>
+                  Add {formatCount(nSel)} to batch
+                </Link>
                 <Button size="small" onClick={() => setSelected([])}>
                   Clear selection
                 </Button>

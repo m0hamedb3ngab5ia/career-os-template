@@ -1,1 +1,0 @@
-import{t as e}from"./index-PDc0Un7s.js";function t(){return e().data?.ui.undo_seconds}export{t};
