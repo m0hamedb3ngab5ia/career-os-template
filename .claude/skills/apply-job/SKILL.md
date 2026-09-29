@@ -31,6 +31,10 @@ After the final `RESULT`, and on every stop after this point, release it with
 
 `ToolSearch` once: `select:mcp__claude-in-chrome__tabs_context_mcp,mcp__claude-in-chrome__tabs_create_mcp,mcp__claude-in-chrome__navigate,mcp__claude-in-chrome__read_page,mcp__claude-in-chrome__find,mcp__claude-in-chrome__form_input,mcp__claude-in-chrome__computer,mcp__claude-in-chrome__file_upload,mcp__claude-in-chrome__get_page_text,mcp__claude-in-chrome__javascript_tool,mcp__claude-in-chrome__read_network_requests,mcp__claude-in-chrome__tabs_close_mcp`
 
+If the `mcp__claude-in-chrome__*` tools don't load or `tabs_context_mcp` errors (extension off or not connected):
+stop with `RESULT` `outcome: failed`, reason `chrome not connected`. No Action Item (the runner reports it as
+"Connect Chrome" and the UI offers Retry) and close no tab: a tab already open for this job stays for the retry.
+
 Python runs with `.venv/bin/python` from the repo root.
 
 ## 1. Preconditions (all must hold, else stop with the reason)
