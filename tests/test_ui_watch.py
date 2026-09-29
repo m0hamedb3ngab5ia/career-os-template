@@ -374,3 +374,9 @@ def test_loop_logs_a_failing_batch_and_keeps_running(data, monkeypatch, caplog):
     assert handled == ["/b", "/c"]
     assert any("re-index after a file change failed" in r.getMessage() for r in caplog.records)
     ix.close()
+
+
+def test_batch_file_change_is_a_batch_event(roots):
+    plan = plan_changes([roots.runs / "batches" / "20260926-batch-ab12.json",
+                         roots.runs / "batches" / "20260926-batch-ab12.lock"], roots)
+    assert plan.batches == {"20260926-batch-ab12"} and not plan.runs and not plan.status

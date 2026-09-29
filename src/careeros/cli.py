@@ -1403,6 +1403,42 @@ def cmd_batch_show(args: argparse.Namespace) -> int:
     return _print_batch(b, args.json)
 
 
+def cmd_batch_run(args: argparse.Namespace) -> int:
+    """Work a saved batch's queue (the driver): one job at a time, one run per stage. exit 6 = already running."""
+    from careeros.runs import batches
+
+    try:
+        with _cancel_on_signals() as cancel:
+            b = batches.drive(_settings(args), args.batch_id, cancel=cancel,
+                              echo=(lambda line: None) if args.json else print)
+    except batches.BatchBusy as e:
+        print(f"batch: {e}", file=sys.stderr)
+        return RUN_BUSY_EXIT
+    except ValueError as e:
+        print(f"batch: {e}", file=sys.stderr)
+        return 2
+    return _print_batch(b, args.json)
+
+
+def cmd_batch_control(args: argparse.Namespace) -> int:
+    """pause | cancel | retry a batch (a request the running driver acts on, else applied at once)."""
+    from careeros.runs import batches
+
+    s = _settings(args)
+    try:
+        if args.batch_cmd == "retry":
+            b = batches.retry(s, args.batch_id, args.job or None)
+        else:
+            b = batches.control(s, args.batch_id, args.batch_cmd)
+    except batches.BatchBusy as e:
+        print(f"batch: {e}", file=sys.stderr)
+        return RUN_BUSY_EXIT
+    except ValueError as e:
+        print(f"batch: {e}", file=sys.stderr)
+        return 2
+    return _print_batch(b, args.json)
+
+
 def _print_batch(b: dict, as_json: bool) -> int:
     if as_json:
         print(json.dumps(b, indent=2, default=str))
@@ -1411,7 +1447,8 @@ def _print_batch(b: dict, as_json: bool) -> int:
     print(f"{head}  stop at {b['stop_at']}  {len(b['selected'])} selected, {len(b['excluded'])} excluded")
     for r in b["selected"]:
         sub = "auto-submit" if r["auto_submit"] else "no submit"
-        print(f"  {r['rank']:>3}. {r['job_id']}  {'>'.join(r['stages'])}  {sub}  {r['why']}")
+        state = f"  [{r['state']}: {r.get('reason') or ''}]" if r.get("state") not in (None, "pending") else ""
+        print(f"  {r['rank']:>3}. {r['job_id']}  {'>'.join(r['stages'])}  {sub}  {r['why']}{state}")
     for e in b["excluded"]:
         print(f"   -  {e['job_id']}  {e['reason']}")
     return 0
@@ -1897,7 +1934,7 @@ def build_parser() -> argparse.ArgumentParser:
     rst.add_argument("--json", action="store_true")
     rst.set_defaults(fn=cmd_run_status)
 
-    bat = sub.add_parser("batch", help="plan a batch: jobs taken up to a stop point, one job per run")
+    bat = sub.add_parser("batch", help="batches: jobs taken up to a stop point, one job per run")
     bats = bat.add_subparsers(dest="batch_cmd", required=True)
     bc = bats.add_parser("create", help="preview (--dry-run) or save a batch (exit 2 = no job can run)")
     bc.add_argument("job_ids", nargs="+")
@@ -1910,6 +1947,18 @@ def build_parser() -> argparse.ArgumentParser:
     bsh.add_argument("batch_id")
     bsh.add_argument("--json", action="store_true")
     bsh.set_defaults(fn=cmd_batch_show)
+    brn = bats.add_parser("run", help="work a saved batch: one job at a time, one run per stage (exit 6 = running)")
+    brn.add_argument("batch_id")
+    brn.add_argument("--json", action="store_true")
+    brn.set_defaults(fn=cmd_batch_run)
+    for name, hlp in (("pause", "pause after the current job"), ("cancel", "stop the queue after the current step"),
+                      ("retry", "requeue failed / cancelled jobs (never staged / submitted ones)")):
+        bp = bats.add_parser(name, help=hlp)
+        bp.add_argument("batch_id")
+        if name == "retry":
+            bp.add_argument("--job", action="append", help="only this job (repeatable)")
+        bp.add_argument("--json", action="store_true")
+        bp.set_defaults(fn=cmd_batch_control)
     sto = sub.add_parser("storage", help="disk use by category + free disk; --snapshot records it for `advise`")
     sto.add_argument("--snapshot", action="store_true", help="append this measurement to data/runs/storage.jsonl")
     sto.add_argument("--json", action="store_true")

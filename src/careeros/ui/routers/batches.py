@@ -1,5 +1,5 @@
-"""Batches: preview (dry run), create and read a batch (runs/batches.py). Nothing runs from here yet: the driver
-that works a batch's queue is the next slice. Bad input (unknown stop point, no runnable job) -> 422."""
+"""Batches: preview (dry run), create, read, start (spawns `careeros batch run <id>` detached), pause, cancel, retry
+(runs/batches.py). Bad input (unknown stop point, no runnable job) -> 422; a running driver -> 409."""
 from __future__ import annotations
 
 from typing import Literal
@@ -9,6 +9,8 @@ from pydantic import BaseModel, Field
 
 from careeros.runs import batches
 from careeros.ui.routers import ctx
+from careeros.ui.routers.runs import run_control
+from careeros.ui.services.runs import RunControl
 
 router = APIRouter(tags=["batches"])
 
@@ -34,6 +36,8 @@ class BatchJob(BaseModel):
     auto_submit: bool
     submit_reason: str
     state: str | None = None
+    reason: str | None = None
+    result: str | None = None
 
 
 class Excluded(BaseModel):
@@ -51,6 +55,13 @@ class Batch(BaseModel):
     kind: str
     selected: list[BatchJob]
     excluded: list[Excluded]
+    reason: str | None = None
+    updated_at: str | None = None
+    requested: str | None = None
+
+
+class RetryBody(BaseModel):
+    job_ids: list[str] | None = None
 
 
 @router.post("/batches")
@@ -68,3 +79,41 @@ def detail(batch_id: str, c=Depends(ctx)) -> Batch:
     if b is None:
         raise HTTPException(404, f"batch {batch_id} not found")
     return Batch.model_validate(b)
+
+
+def _do(fn, *a):
+    try:
+        return Batch.model_validate(fn(*a))
+    except batches.BatchBusy as e:
+        raise HTTPException(409, str(e)) from None
+    except ValueError as e:
+        raise HTTPException(404 if "not found" in str(e) else 422, str(e)) from None
+
+
+@router.post("/batches/{batch_id}/start")
+def start(batch_id: str, c=Depends(ctx), rc: RunControl = Depends(run_control)) -> Batch:
+    """Start (or resume) the driver as a detached process; the batch file then shows its progress."""
+    b = batches.load(c.settings, batch_id)
+    if b is None:
+        raise HTTPException(404, f"batch {batch_id} not found")
+    if b["status"] in ("done", "cancelled"):
+        raise HTTPException(422, f"batch {batch_id} is {b['status']}")
+    if batches.running(c.settings, batch_id):
+        raise HTTPException(409, f"batch {batch_id} is already running")
+    rc._spawn(f"batch-{batch_id}", ["careeros.cli", "batch", "run", batch_id, "--json"])
+    return Batch.model_validate(b)
+
+
+@router.post("/batches/{batch_id}/pause")
+def pause(batch_id: str, c=Depends(ctx)) -> Batch:
+    return _do(batches.control, c.settings, batch_id, "pause", c.now())
+
+
+@router.post("/batches/{batch_id}/cancel")
+def cancel(batch_id: str, c=Depends(ctx)) -> Batch:
+    return _do(batches.control, c.settings, batch_id, "cancel", c.now())
+
+
+@router.post("/batches/{batch_id}/retry")
+def retry(batch_id: str, body: RetryBody | None = None, c=Depends(ctx)) -> Batch:
+    return _do(batches.retry, c.settings, batch_id, (body or RetryBody()).job_ids, c.now())

@@ -362,6 +362,12 @@ def _locked(settings: Settings, batch_id: str):
         return b, None
 
 
+def running(settings: Settings, batch_id: str) -> bool:
+    """A live driver holds the batch lock (a stale lock, e.g. a crashed driver, does not count)."""
+    info = locks.read(_lock_path(settings, batch_id))
+    return bool(info) and not locks.is_stale(info, _utcnow())
+
+
 def control(settings: Settings, batch_id: str, action: str, now: datetime | None = None) -> dict[str, Any]:
     """pause | cancel. With a driver running: a request it acts on (pause after the current job, cancel after
     the current step). Without one: applied here, under the batch lock."""
