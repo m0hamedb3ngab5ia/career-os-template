@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router";
 import { Page } from "../../app/PageHeader";
+import { Details } from "../../kit/Details";
 import { EmptyState } from "../../kit/EmptyState";
 import { useSection, useSectionList } from "./api";
 import { BudgetGroup } from "./custom/BudgetGroup";
@@ -25,7 +26,7 @@ import { GroupCard } from "./GroupCard";
 import { SaveBar } from "./SaveBar";
 import styles from "./settings.module.css";
 import { StorageOverview } from "./storage/StorageOverview";
-import type { GroupSchema, SectionData } from "./types";
+import type { GroupSchema, SectionData, SectionSummary } from "./types";
 
 export const DEFAULT_SECTION = "general";
 
@@ -45,7 +46,7 @@ const ICONS: Record<string, LucideIcon> = {
 
 // Page subtitles from the mockup; sections without an artboard say what they hold.
 const SUBTITLES: Record<string, string> = {
-  general: "General · files, the app, Claude and résumé builds",
+  general: "General · appearance, reminders and résumé builds",
   targets: "Targets · who you are and which roles to look for",
   autonomy: "Autonomy and outreach · how much career-os does without asking",
   safety: "Safety · what stops an auto-submit",
@@ -58,13 +59,10 @@ const SUBTITLES: Record<string, string> = {
   qa: "Quality checks · what a résumé and cover letter must pass",
 };
 
-function SectionNav({ current }: { current: string }) {
-  const list = useSectionList();
-  const sections = list.data?.sections ?? [];
+function NavList({ sections, current }: { sections: SectionSummary[]; current: string }) {
   return (
-    <nav aria-label="Settings sections" className={styles.nav}>
-      <ul className={styles.navList}>
-        {sections.map((s) => {
+    <ul className={styles.navList}>
+      {sections.map((s) => {
           const Icon = ICONS[s.id] ?? SlidersHorizontal;
           return (
             <li key={s.id}>
@@ -81,7 +79,23 @@ function SectionNav({ current }: { current: string }) {
             </li>
           );
         })}
-      </ul>
+    </ul>
+  );
+}
+
+// Primary sections first; system pages (storage, quality checks) fold under Advanced (design doc 2.3, 3 Settings).
+function SectionNav({ current }: { current: string }) {
+  const list = useSectionList();
+  const sections = list.data?.sections ?? [];
+  const advanced = sections.filter((s) => s.advanced);
+  return (
+    <nav aria-label="Settings sections" className={styles.nav}>
+      <NavList sections={sections.filter((s) => !s.advanced)} current={current} />
+      {advanced.length ? (
+        <Details summary="Advanced" defaultOpen={advanced.some((s) => s.id === current)}>
+          <NavList sections={advanced} current={current} />
+        </Details>
+      ) : null}
     </nav>
   );
 }
@@ -95,10 +109,25 @@ function Groups({ data }: { data: SectionData }) {
     if (id === "runs" && g.id === "ranking") return <RankingGroup key={g.id} group={g} />;
     return <GroupCard key={g.id} group={g} />;
   };
+  const rest = groups.filter((g) => !tiers.includes(g));
+  const files = data.section.files.map((f) => data.files[f] ?? `config/${f}.yaml`);
   return (
     <>
       {tiers.length ? <TierCards groups={tiers} /> : null}
-      {groups.filter((g) => !tiers.includes(g)).map(render)}
+      {rest.filter((g) => !g.advanced).map(render)}
+      <Details summary="Advanced">
+        {rest.filter((g) => g.advanced).map(render)}
+        <p className={styles.hint}>
+          Where this is saved:{" "}
+          {files.map((f, i) => (
+            <span key={f}>
+              {i ? ", " : null}
+              <code translate="no">{f}</code>
+            </span>
+          ))}{" "}
+          (comments kept)
+        </p>
+      </Details>
     </>
   );
 }

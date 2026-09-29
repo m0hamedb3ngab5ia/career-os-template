@@ -31,11 +31,11 @@ export function field(p: Partial<FieldSchema> & Pick<FieldSchema, "file" | "key"
 }
 
 export const SECTIONS = [
-  { id: "general", title: "General", help: "", files: ["pipeline"] },
-  { id: "autonomy", title: "Autonomy", help: "", files: ["pipeline", "targets"] },
-  { id: "safety", title: "Safety", help: "", files: ["targets"] },
-  { id: "runs", title: "Runs & schedule", help: "", files: ["pipeline"] },
-  { id: "storage", title: "Storage & efficiency", help: "", files: ["pipeline"] },
+  { id: "general", title: "General", help: "", files: ["pipeline"], advanced: false },
+  { id: "autonomy", title: "Autonomy", help: "", files: ["pipeline", "targets"], advanced: false },
+  { id: "safety", title: "Safety", help: "", files: ["targets"], advanced: false },
+  { id: "runs", title: "Runs & schedule", help: "", files: ["pipeline"], advanced: false },
+  { id: "storage", title: "Storage & efficiency", help: "", files: ["pipeline"], advanced: true },
 ];
 
 function tier(letter: string, auto: boolean) {
@@ -102,11 +102,11 @@ export function autonomyData(): SectionData {
         tier("A", false),
         tier("B", true),
         tier("C", true),
-        { id: "volume", title: "Volume", help: "", items: [volume, cooldown] },
+        { id: "volume", title: "Volume", help: "", advanced: false, items: [volume, cooldown] },
         {
           id: "outreach",
           title: "Outreach",
-          help: "",
+          help: "", advanced: false,
           items: [
             { control: "policy", label: "LinkedIn messages", value: "Draft only", why: "You send every message.", locked: true },
             connected,
@@ -173,12 +173,12 @@ export function runsData(): SectionData {
       id: "runs",
       title: "Runs & schedule",
       help: "",
-      files: ["pipeline"],
+      files: ["pipeline"], advanced: false,
       groups: [
-        { id: "budget", title: "Budget", help: "", items: items.budget },
-        { id: "ranking", title: "Ranking", help: "", items: items.ranking },
-        { id: "auto_submit", title: "Auto-submit", help: "", items: items.auto },
-        { id: "schedule", title: "Schedule", help: "", items: items.schedule },
+        { id: "budget", title: "Budget", help: "", advanced: false, items: items.budget },
+        { id: "ranking", title: "Ranking", help: "", advanced: true, items: items.ranking },
+        { id: "auto_submit", title: "Auto-submit", help: "", advanced: false, items: items.auto },
+        { id: "schedule", title: "Schedule", help: "", advanced: false, items: items.schedule },
       ],
     },
     values,
@@ -211,10 +211,10 @@ export function safetyData(): SectionData {
       id: "safety",
       title: "Safety",
       help: "",
-      files: ["targets"],
+      files: ["targets"], advanced: false,
       groups: [
-        { id: "ats", title: "Where auto-submit is allowed", help: "", items: [ats] },
-        { id: "levels", title: "Check levels", help: "", items: [levels] },
+        { id: "ats", title: "Where auto-submit is allowed", help: "", advanced: false, items: [ats] },
+        { id: "levels", title: "Check levels", help: "", advanced: false, items: [levels] },
       ],
     },
     values: { [ats.id]: ["greenhouse", "lever"], [levels.id]: { GHOST_OLD_POST: "info" } },
