@@ -54,7 +54,7 @@ describe("NeedsYou", () => {
 
   it("shows plain task text and hides the empty 'Other' type", async () => {
     setup("/", {
-      "GET /api/today": { ...today, actions: [actionItem({ id: 9, company: "Umbrella", job_id: "u1", what: "tier_a_review", type: "other" })] },
+      "GET /api/today": { ...today, actions: [actionItem({ id: "9", company: "Umbrella", job_id: "u1", what: "tier_a_review", type: "other" })] },
     });
     const row = within((await screen.findByText("Umbrella")).closest("li")!);
     expect(row.getByText("Review resume + cover letter")).toBeInTheDocument();
