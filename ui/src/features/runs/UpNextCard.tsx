@@ -1,5 +1,6 @@
 import { Link, useSearchParams } from "react-router";
 import { EmptyState } from "../../kit/EmptyState";
+import { Pager, usePaged } from "../../kit/Pager";
 import { SegmentedControl } from "../../kit/SegmentedControl";
 import { formatCount, formatNumber } from "../../lib/format";
 import { useQueue } from "./api";
@@ -12,6 +13,7 @@ export function UpNextCard() {
   const [params, setParams] = useSearchParams();
   const kind: BatchKind = params.get("queue") === "prepare" ? "prepare" : "score";
   const { data, isPending, error } = useQueue(kind);
+  const paged = usePaged(data?.items ?? [], { resetKey: kind });
 
   function pick(v: string) {
     const next = new URLSearchParams(params);
@@ -67,7 +69,7 @@ export function UpNextCard() {
               </tr>
             </thead>
             <tbody>
-              {data.items.map((i) => (
+              {paged.pageItems.map((i) => (
                 <tr key={i.job_id}>
                   <td className={styles.numCol}>{i.rank}</td>
                   <td>
@@ -83,6 +85,7 @@ export function UpNextCard() {
               ))}
             </tbody>
           </table>
+          <Pager paged={paged} label="Up next" />
           {data.total > data.items.length ? (
             <p className={styles.caption}>
               Showing the top {formatCount(data.items.length)} of {formatCount(data.total)}.

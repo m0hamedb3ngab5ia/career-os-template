@@ -44,7 +44,7 @@ export function useSchedule() {
 export function useQueue(kind: BatchKind) {
   return useQuery({
     queryKey: runKeys.queue(kind),
-    queryFn: () => apiFetch<Queue>(`/api/runs/queue/${kind}`),
+    queryFn: () => apiFetch<Queue>(`/api/runs/queue/${kind}?limit=1000`),
   });
 }
 
