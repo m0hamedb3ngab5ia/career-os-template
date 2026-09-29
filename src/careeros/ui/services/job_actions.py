@@ -229,13 +229,13 @@ def application_status(settings: Any, job_id: str) -> dict[str, Any]:
     return st
 
 
-def open_application(settings: Any, job_id: str, popen: Any = None) -> dict[str, Any]:
-    """Focus the live filled tab; otherwise fill the form again in a visible tab from the saved answers (plan
+def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool = False) -> dict[str, Any]:
+    """Focus the live filled tab (unless `refill`); otherwise fill the form again in a visible tab from the saved answers (plan
     first when there is none), detached from this server so a rebuild never kills it. Never submits."""
     from careeros.apply import browser, gh_fill
 
     d = _job(settings, job_id)
-    if browser.activate(d, browser.cdp_url(settings)):
+    if not refill and browser.activate(d, browser.cdp_url(settings)):
         return {"action": "focused"}
     ensure_unlocked(settings, job_id)
     gh_fill.preflight()

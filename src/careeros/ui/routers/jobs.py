@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
 from pydantic import BaseModel, Field
 
@@ -290,9 +290,9 @@ def application_status(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
 
 
 @router.post("/jobs/{job_id}/application/open")
-def open_application(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+def open_application(job_id: str, refill: bool = Body(False, embed=True), c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
-        return acts.open_application(c.settings, job_id)
+        return acts.open_application(c.settings, job_id, refill=refill)
 
 
 @router.post("/jobs/{job_id}/safety/verify")
