@@ -101,6 +101,8 @@ def test_fill_failure_from_log(tmp_path):
     assert browser.fill_failure(tmp_path) is None  # still running
     log.write_text(f"ok\n{browser.FILL_EXIT}0\n")
     assert browser.fill_failure(tmp_path) is None  # succeeded
+    log.write_text(f"{browser.STAGED} (15 filled, 5 failed; x)\n{{\n}}\n{browser.FILL_EXIT}1\n")
+    assert browser.fill_failure(tmp_path) is None  # staged; some fields left for the user
     log.write_text(f"Traceback...\nplaywright is not installed: pip install x\n{browser.FILL_EXIT}1\n")
     f = browser.fill_failure(tmp_path)
     assert f["error"] == "playwright is not installed: pip install x" and "Traceback" in f["log"]
