@@ -118,7 +118,7 @@ describe("Job detail screen", () => {
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Status override: none" }));
     await user.click(screen.getByRole("menuitemradio", { name: /skip/i }));
-    expect(await screen.findByText(/saved to a queue; it's written on the next change, or run `careeros tracker flush` after closing Excel/)).toBeInTheDocument();
+    expect(await screen.findByText(/saved to a queue; it's written on the next change, or close Excel and it saves then/)).toBeInTheDocument();
   });
 
   it("Status override: reads the value and posts the choice", async () => {

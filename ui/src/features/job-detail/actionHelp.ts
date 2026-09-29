@@ -11,7 +11,7 @@ export const ACTION_HELP = {
   startPipeline: "Starts a run for this job only: score, tailor, cover letter and QA, then stops for your review.",
   continuePipeline: "Picks the pipeline up from the last completed step for this job.",
   approveContinue: "Approves the current documents and lets the pipeline continue to the next step.",
-  stageReview: "Fills the form and uploads the documents in Chrome, then stops before Submit so you review and send it yourself (Tier A, and every job while auto_submit is off, is never auto-submitted).",
+  stageReview: "Fills the form and uploads the documents in Chrome, then stops before Submit so you review and send it yourself (Tier A, and every job while auto-submit is off, is never auto-submitted).",
   cancelRun: "Stops the running batch before its next job; the job in progress finishes first.",
   pause: "Pauses all runs, scheduled and manual, until the time you choose.",
   resume: "Resumes runs; scheduled runs start again at their next slot.",

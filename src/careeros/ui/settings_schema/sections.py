@@ -158,7 +158,7 @@ OUTREACH_FIELDS = (
     _switch(P, "outreach.manual_if_connected", "Tailor by hand when you're already connected", True,
             "1st-degree LinkedIn connections never get an automated message; they become an Action Item."),
     _switch(P, "outreach.manual_if_mutuals", "Tailor by hand when you have mutual connections", True,
-            "Anyone with mutuals is handled by hand. Record what LinkedIn shows with `careeros outreach mark`."),
+            "Anyone with mutuals is handled by hand. Record what LinkedIn shows from the job's outreach."),
     _num(P, "outreach.mutuals_threshold", "Minimum mutual connections", outreach.OutreachPolicy.mutuals_threshold,
          lo=outreach.MUTUALS_THRESHOLD_RANGE[0], hi=outreach.MUTUALS_THRESHOLD_RANGE[1], unit="or more",
          help="Counts people with at least this many mutual connections."),
@@ -167,7 +167,7 @@ OUTREACH_FIELDS = (
 DREAM_FLAG_ONLY = Policy("Dream companies", "Flag only",
                          "Ghost-job checks only flag a dream company for review; they never skip it.")
 MANUAL_LOCK = Policy("Manual commands during a run", "Share the job lock",
-                     "/prepare-job, /apply-job and `careeros job status` take the same per-job lock as runs; on a job "
+                     "Manual prepare, apply and status commands take the same per-job lock as runs; on a job "
                      "a run is working on they stop and say so. Run them again once the run moves on.")
 
 
@@ -215,7 +215,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("app", "App", (
             Field(P, "ui.port", "number", "Port", default=ui_cfg.UiConfig.port, min=1, max=65535, integer=True,
-                  help="`careeros ui --port N` overrides it. Takes effect the next time the app starts."),
+                  help="A command-line port overrides it. Takes effect the next time the app starts."),
             Field(P, "ui.host", "text", "Address", default=ui_cfg.UiConfig.host, readonly=True,
                   note="This Mac only for now; LAN mode with a token comes in a later version."),
             Field(P, "ui.open_browser", "switch", "Open the app in your browser on start",
@@ -447,7 +447,7 @@ SECTIONS: tuple[Section, ...] = (
                   pattern=_AUTO_TOKEN, help="Wins over Allowed. fit_gte_85 keeps your best matches manual."),
         )),
         Group("checks", "Before each run", (
-            _switch(P, "runs.preflight_doctor", "Run `careeros doctor` first", True),
+            _switch(P, "runs.preflight_doctor", "Run the setup check first", True),
             _tags(P, "runs.required_mcp_servers", "Required MCP servers", [],
                   help="Servers every run needs logged in. Inbox sync carries its own gmail."),
             _num(P, "runs.job_lock_minutes", "Job lock expires after", 120, lo=1, unit="min"),
@@ -563,12 +563,12 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "paths.standard_answers"): "Profile files are edited outside the UI (free text, not settings).",
     (P, "paths.voice_dir"): "Profile files are edited outside the UI (free text, not settings).",
     (P, "paths.resume_template_dir"): "Templates are edited outside the UI (LaTeX, not settings).",
-    (P, "paths.credentials"): "Login store location; secrets stay out of the app, managed with `careeros creds`.",
-    (P, "paths.browser_profile"): "Dedicated Chrome profile for `careeros apply fill`; a machine path, set in the YAML.",
-    (P, "credentials.backend"): "Where login passwords live (file or macOS keychain); managed with `careeros creds`.",
+    (P, "paths.credentials"): "Login store location; secrets stay out of the app, managed from the command line.",
+    (P, "paths.browser_profile"): "Dedicated Chrome profile for applying; a machine path, set in the YAML.",
+    (P, "credentials.backend"): "Where login passwords live (file or macOS keychain); managed from the command line.",
     (P, "paths.output_dir_per_job"): "Layout switch the code assumes is on; not a preference.",
     (P, "ui.index_path"): "Index location; rebuildable, change it only when data/ is on a slow or synced disk.",
-    (P, "schedule.launchd_label"): "LaunchAgent id; change it only after `careeros schedule uninstall`.",
+    (P, "schedule.launchd_label"): "LaunchAgent id; change it only after uninstalling the schedule.",
     (P, "llm.runner"): "Shown as a locked row: runs use the Claude Code subscription; the API is not enabled.",
     (P, "llm.headless_cmd"): "The exact claude command line; a wrong flag breaks every run.",
     (P, "resume_build.fallback"): "Only one fallback exists (markdown_to_pdf); nothing to choose.",
@@ -583,7 +583,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (Q, "critic.model_rubric"): "The critic's rubric names are read by the qa-review skill; not a preference.",
     (Q, "style_rules"): "Mixed rule list read by the writing skills; edit qa.yaml if you need to.",
     (C, "already_applied"): "Past-application records; the tracker holds applications made here.",
-    (C, "hiring_signals"): "Written by `careeros safety signal`; a record, not a setting.",
+    (C, "hiring_signals"): "Written by the safety check; a record, not a setting.",
     (C, "searches.sources"): "Discovery sources carry URLs and notes; edit companies.yaml.",
     (C, "prestige_tiers"): "Company ranking tables; edit companies.yaml.",
     (C, "prestige_scoring"): "Company ranking bonuses; edit companies.yaml.",

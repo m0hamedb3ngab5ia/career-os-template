@@ -122,7 +122,7 @@ export function RunDetailPage() {
         </section>
         <section className={styles.card} aria-labelledby="log-h">
           <h2 id="log-h" className={styles.h2}>
-            {live ? "Live output" : "run.log"}
+            {live ? "Live output" : "Log"}
           </h2>
           <LogPane label={live ? "Live run output" : "Run log"} lines={logLines} empty="Nothing logged." live={live} />
         </section>

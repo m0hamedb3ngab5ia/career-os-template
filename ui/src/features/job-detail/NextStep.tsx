@@ -7,9 +7,8 @@ import type { PipelineState } from "./types";
 // The Job detail "Next step" block (design doc 3 "Job detail"): one state sentence, what needs you on this job
 // (pipeline review reasons + this job's open tasks), and the raw reasons for Details.
 
-/** One plain sentence for the job's pipeline state; `needs` counts review reasons + open tasks. */
-export function stateSentence(s: PipelineState, tasks = 0): string {
-  const n = s.review_reasons.length + tasks;
+/** One plain sentence for the job's pipeline state; `n` is the deduped count of what needs you (default: review reasons). */
+export function stateSentence(s: PipelineState, n = s.review_reasons.length): string {
   if (s.active_run_id) return "Working on it: a run is in progress for this job.";
   if (s.blocked_reason) return s.blocked_reason; // already a sentence from the server
   if (n > 0) return `Needs your review: ${n} ${n === 1 ? "thing needs" : "things need"} attention.`;
@@ -28,7 +27,7 @@ export function NextStepSummary({ state, tasks }: { state: PipelineState; tasks:
   const needs = [...new Set([...state.review_reasons.map((r) => r.text), ...tasks.map((t) => t.what)])];
   return (
     <div className={styles.reviewReasons}>
-      <p className={styles.strong}>{stateSentence(state, tasks.length)}</p>
+      <p className={styles.strong}>{stateSentence(state, needs.length)}</p>
       {needs.length ? (
         <ul className={styles.bullets} aria-label="Needs you">
           {needs.map((t, i) => (

@@ -803,7 +803,7 @@
             "id": "<id>",
             "integer": false,
             "key": "runs.preflight_doctor",
-            "label": "Run `careeros doctor` first",
+            "label": "Run the setup check first",
             "locked": false,
             "max": null,
             "min": null,
@@ -910,7 +910,7 @@
             "label": "Manual commands during a run",
             "locked": true,
             "value": "Share the job lock",
-            "why": "/prepare-job, /apply-job and `careeros job status` take the same per-job lock as runs; on a job a run is working on they stop and say so. Run them again once the run moves on."
+            "why": "Manual prepare, apply and status commands take the same per-job lock as runs; on a job a run is working on they stop and say so. Run them again once the run moves on."
           }
         ],
         "title": "Before each run"
