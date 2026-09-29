@@ -1410,10 +1410,11 @@ def cmd_batch_run(args: argparse.Namespace) -> int:
     try:
         with _cancel_on_signals() as cancel:
             b = batches.drive(_settings(args), args.batch_id, cancel=cancel,
-                              echo=(lambda line: None) if args.json else print)
+                              echo=(lambda line: None) if args.json else print,
+                              since=datetime.fromisoformat(args.since) if args.since else None)
     except batches.BatchBusy as e:
         print(f"batch: {e}", file=sys.stderr)
-        return RUN_BUSY_EXIT
+        return JOB_LOCKED_EXIT
     except ValueError as e:
         print(f"batch: {e}", file=sys.stderr)
         return 2
@@ -1950,6 +1951,7 @@ def build_parser() -> argparse.ArgumentParser:
     brn = bats.add_parser("run", help="work a saved batch: one job at a time, one run per stage (exit 6 = running)")
     brn.add_argument("batch_id")
     brn.add_argument("--json", action="store_true")
+    brn.add_argument("--since", help=argparse.SUPPRESS)  # UI start time: a pause set after it is honoured
     brn.set_defaults(fn=cmd_batch_run)
     for name, hlp in (("pause", "pause after the current job"), ("cancel", "stop the queue after the current step"),
                       ("retry", "requeue failed / cancelled jobs (never staged / submitted ones)")):
