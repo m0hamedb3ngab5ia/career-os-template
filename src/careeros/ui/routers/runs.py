@@ -159,10 +159,10 @@ def start(body: StartBody, rc: RunControl = Depends(run_control)) -> dict[str, A
 
 
 @router.post("/runs/steps/{kind}")
-def start_step(kind: str,
+def start_step(kind: str, job_id: str | None = None,
                rc: RunControl = Depends(run_control)) -> dict[str, Any]:
     with refusals():
-        return rc.start_step(kind)
+        return rc.start_step(kind, job_id)
 
 
 @router.post("/runs/cancel")

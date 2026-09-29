@@ -32,7 +32,7 @@ from careeros.ui.services.stream import parse_event
 
 BATCH_KINDS = ("score", "prepare")
 JOB_KINDS = ("score", "prepare", "apply")  # `--job <id>` runs: one explicit job, apply only this way
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa")
 KEEP_OUTPUTS = 50  # launch output files kept under data/runs/ui/
 
 
@@ -290,12 +290,17 @@ class RunControl:
             return run["id"]
         return None
 
-    def start_step(self, kind: str) -> dict[str, Any]:
-        """Start scout | tracker | prune (--yes) | inbox_sync as a recorded step run."""
+    def start_step(self, kind: str, job_id: str | None = None) -> dict[str, Any]:
+        """Start scout | tracker | prune (--yes) | inbox_sync | qa (`job_id` required) as a recorded step run.
+        Scout and qa get their run id here (returned as `run_id`), so the UI can watch and cancel exactly that run."""
         from careeros.ui.services.step import step_lock_path
 
         if kind not in STEP_KINDS:
             raise ValueError(f"unknown step {kind!r}; use one of {', '.join(STEP_KINDS)}")
+        if (kind == "qa") != bool(job_id):
+            raise ValueError("qa needs a job id" if kind == "qa" else f"{kind} takes no job id")
+        if job_id and not re.fullmatch(r"\w[\w.-]*", job_id):
+            raise ValueError(f"bad job id {job_id!r}")
         if kind == "inbox_sync":
             from careeros.runs.schedule import load_schedule
 
@@ -311,7 +316,11 @@ class RunControl:
                 raise Busy(held, f"a {kind} step is already running")
             if kind in PIPELINE_STEPS and (held := self._held(self.rs.runner_lock_path)):
                 raise Busy(held)  # scout / prune never run beside a batch (the shared pipeline lock)
-        return {"kind": kind, **self.spawn(kind, ["careeros.ui.services.step", kind])}
+        if kind not in ("scout", "qa"):
+            return {"kind": kind, **self.spawn(kind, ["careeros.ui.services.step", kind])}
+        rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
+        argv = ["careeros.ui.services.step", kind, *(["--job", job_id] if job_id else []), "--run-id", rid]
+        return {"kind": kind, **self.spawn(rid, argv), "run_id": rid}
 
     def prune_plan(self) -> dict[str, Any]:
         """What Prune would remove right now (`careeros prune --json` without --yes). Reads only."""

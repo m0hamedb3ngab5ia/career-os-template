@@ -141,7 +141,9 @@ def test_launch_outputs_are_trimmed(rc):
 
 def test_start_step_spawns_the_step_runner(rc):
     out = rc.start_step("scout")
-    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "scout"]
+    assert FakePopen.calls[0]["cmd"] == ["/venv/bin/python", "-m", "careeros.ui.services.step", "scout",
+                                         "--run-id", out["run_id"]]
+    assert "-scout-" in out["run_id"]
     assert FakePopen.calls[0]["env"]["CAREEROS_ROOT"] == str(rc.settings.root)
     assert FakePopen.calls[0]["start_new_session"] is True and out["kind"] == "scout"
 
@@ -150,6 +152,19 @@ def test_inbox_sync_is_not_set_up_while_disabled(rc):
     with pytest.raises(NotSetUp) as e:
         rc.start_step("inbox_sync")
     assert "inbox" in str(e.value).lower() and FakePopen.calls == []
+
+
+def test_start_qa_step_passes_the_job_and_a_run_id(rc):
+    out = rc.start_step("qa", "nw01")
+    assert FakePopen.calls[0]["cmd"][3:] == ["qa", "--job", "nw01", "--run-id", out["run_id"]]
+    assert "-qa-" in out["run_id"]
+
+
+@pytest.mark.parametrize("kind,job", [("qa", None), ("scout", "nw01"), ("qa", "../x")])
+def test_qa_step_needs_exactly_a_job_id(rc, kind, job):
+    with pytest.raises(ValueError):
+        rc.start_step(kind, job)
+    assert FakePopen.calls == []
 
 
 def test_unknown_step(rc):
@@ -194,6 +209,36 @@ def test_step_run_records_cancel(settings):
 
     rec = step_mod.run_step(settings, "prune", actions={"prune": interrupted})
     assert rec["stop_reason"] == "cancelled"
+
+
+def test_qa_step_records_its_job_and_result(settings):
+    res = {"pass": False, "summary": {"hard_fail": 1, "soft_fail": 0}}
+    rec = step_mod.run_step(settings, "qa", job_id="nw01", run_id="r-qa-1",
+                            actions={"qa": lambda: ("ok", "fail: 1 hard, 0 soft", lambda: res)})
+    run = RunStore(settings).load_run("r-qa-1")
+    assert rec["id"] == "r-qa-1" and run["job_id"] == "nw01" and run["result"] == res
+    assert run["stop_reason"] == "completed"
+
+
+def test_cancelled_scout_discards_what_it_stored(settings, monkeypatch):
+    from careeros import scout
+    from careeros.store import Store
+
+    st = Store(settings)
+    (st.jobs_dir / "old1").mkdir()
+    st.seen_file.write_text("old\n")
+
+    def partial(settings, store, *a, **k):
+        (store.jobs_dir / "new1").mkdir()
+        store.seen_file.write_text("old\nnew\n")
+        store.history_file.write_text("{}")
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr(scout, "run_scout", partial)
+    rec = step_mod.run_step(settings, "scout")
+    assert rec["stop_reason"] == "cancelled"
+    assert sorted(d.name for d in st.jobs_dir.iterdir()) == ["old1"]
+    assert st.seen_file.read_text() == "old\n" and not st.history_file.exists()
 
 
 def test_step_output_streams_to_run_log_while_running(settings, rc):
@@ -632,9 +677,9 @@ def test_step_main_exit_codes(temp_root, monkeypatch, capsys):
     def boom():
         raise RuntimeError("board down")
 
-    monkeypatch.setattr(step_mod, "default_actions", lambda s: {"scout": boom})
+    monkeypatch.setattr(step_mod, "default_actions", lambda s, j=None: {"scout": boom})
     assert step_mod.main(["--root", str(temp_root), "scout"]) == 1
-    monkeypatch.setattr(step_mod, "default_actions", lambda s: {"scout": lambda: ("ok", "fine")})
+    monkeypatch.setattr(step_mod, "default_actions", lambda s, j=None: {"scout": lambda: ("ok", "fine")})
     assert step_mod.main(["--root", str(temp_root), "scout"]) == 0
 
 

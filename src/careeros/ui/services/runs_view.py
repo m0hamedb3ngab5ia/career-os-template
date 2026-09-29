@@ -59,6 +59,8 @@ class RunBase(TypedDict):
     warnings: NotRequired[list[str]]
     dry_run: NotRequired[bool]
     step: NotRequired[bool]
+    job_id: NotRequired[str]  # a qa step's job
+    result: NotRequired[dict[str, Any] | None]  # a finished qa step's QA result
     cmd: NotRequired[list[str]]
 
 
