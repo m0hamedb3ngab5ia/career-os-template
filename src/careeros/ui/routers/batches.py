@@ -100,7 +100,7 @@ def start(batch_id: str, c=Depends(ctx), rc: RunControl = Depends(run_control)) 
         raise HTTPException(422, f"batch {batch_id} is {b['status']}")
     if batches.running(c.settings, batch_id):
         raise HTTPException(409, f"batch {batch_id} is already running")
-    rc._spawn(f"batch-{batch_id}", ["careeros.cli", "batch", "run", batch_id, "--json"])
+    rc.spawn(f"batch-{batch_id}", ["careeros.cli", "batch", "run", batch_id, "--json"])
     return Batch.model_validate(b)
 
 

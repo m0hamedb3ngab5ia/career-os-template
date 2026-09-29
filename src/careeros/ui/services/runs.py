@@ -183,7 +183,7 @@ class RunControl:
         if self.rs.pause_state(self.now()):
             raise Paused("runs are paused; resume them first")
 
-    def _spawn(self, name: str, argv: list[str]) -> dict[str, Any]:
+    def spawn(self, name: str, argv: list[str]) -> dict[str, Any]:
         out_dir = self.rs.dir / "ui"
         out_dir.mkdir(parents=True, exist_ok=True)
         old = sorted(out_dir.glob("*.out"))
@@ -256,7 +256,7 @@ class RunControl:
             argv += ["--max-minutes", f"{max_minutes:g}"]
         if job_id:
             argv += ["--job", job_id, *(["--force"] if force else []), "--run-id", run_id]
-        out = {"kind": kind, **self._spawn(run_id or kind, [*argv, "--json"])}
+        out = {"kind": kind, **self.spawn(run_id or kind, [*argv, "--json"])}
         return {**out, "run_id": run_id} if job_id else out
 
     def start_error(self, run_id: str) -> str | None:
@@ -311,7 +311,7 @@ class RunControl:
                 raise Busy(held, f"a {kind} step is already running")
             if kind in PIPELINE_STEPS and (held := self._held(self.rs.runner_lock_path)):
                 raise Busy(held)  # scout / prune never run beside a batch (the shared pipeline lock)
-        return {"kind": kind, **self._spawn(kind, ["careeros.ui.services.step", kind])}
+        return {"kind": kind, **self.spawn(kind, ["careeros.ui.services.step", kind])}
 
     def prune_plan(self) -> dict[str, Any]:
         """What Prune would remove right now (`careeros prune --json` without --yes). Reads only."""
@@ -370,7 +370,7 @@ class RunControl:
         except PermissionError:
             return {"status": "refused", "run_id": rid, "detail": f"not allowed to signal pid {pid}"}
         marker.parent.mkdir(parents=True, exist_ok=True)
-        # Write then rename, so _spawn never reads a half-written marker and prunes it.
+        # Write then rename, so spawn never reads a half-written marker and prunes it.
         write_text(marker, f"{holder}\n{self.now().isoformat()}\n")
         return {"status": "cancelling", "run_id": rid, "pid": pid}
 
@@ -392,7 +392,7 @@ class RunControl:
         if self.rs.pause_state(self.now()):
             raise Paused("runs are paused; resume them first")
         return {"pending": True, "kinds": list(rec["kinds"]),
-                **self._spawn("catch-up", ["careeros.cli", "run", "catch-up", "--json"])}
+                **self.spawn("catch-up", ["careeros.cli", "run", "catch-up", "--json"])}
 
     # --- reading -------------------------------------------------------------------------------------------
 

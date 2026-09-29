@@ -199,3 +199,70 @@ def test_waits_while_runner_lock_is_held(settings):
     slept = []
     out = batches.drive(settings, b["id"], run=run, sleep=lambda s: (slept.append(s), busy.__setitem__(0, False)))
     assert slept and states(out) == ["done"]
+
+
+def test_drive_loads_batch_after_taking_the_lock(settings, monkeypatch):
+    b = make(settings)
+    real = locks.acquire
+
+    def acquire(*a, **kw):  # a control that finished just before the driver got the lock
+        if kw.get("owner") == f"batch:{b['id']}":
+            batches.control(settings, b["id"], "cancel")
+        return real(*a, **kw)
+    monkeypatch.setattr(batches.locks, "acquire", acquire)
+    run = fake_run([])
+    out = batches.drive(settings, b["id"], run=run)
+    assert not run.calls and out["status"] == "cancelled"
+    assert batches.load(settings, b["id"])["status"] == "cancelled"
+
+
+def test_stale_request_is_dropped_when_driver_starts(settings):
+    b = make(settings)
+    batches._req_path(settings, b["id"]).write_text("cancel", encoding="utf-8")
+    out = batches.drive(settings, b["id"], run=fake_run([]))
+    assert out["status"] == "done" and states(out) == ["done", "done"]
+
+
+def test_apply_verdict_rerun_on_each_retry_pass(settings, monkeypatch):
+    allow_submit(settings)
+    s = Store(settings)
+    jid = put(s, add_job(s, 1), "prepared", tier="B", qa=True)
+    b = batches.create(settings, [jid], "submit", now=NOW)
+    seen = []
+    monkeypatch.setattr(batches, "auto_submit_verdict", lambda *a: (seen.append(1), (False, "no"))[1])
+    run = fake_run(["timeout", "ok"])
+    batches.drive(settings, b["id"], run=run)
+    assert len(run.calls) == 2 and len(seen) == 2
+
+
+def test_runner_busy_waits_do_not_count_against_the_cap(settings):
+    b = make(settings, 1)
+    busy = [60]
+
+    def run(settings_, kind, budget, **kw):
+        if busy[0]:
+            busy[0] -= 1
+            raise RunBusy({"owner": "run:x", "pid": 1})
+        return fake_run([])(settings_, kind, budget, **kw)
+
+    out = batches.drive(settings, b["id"], run=run, sleep=lambda s: None)
+    assert states(out) == ["done"]
+
+
+def test_pause_request_while_waiting_on_runner(settings):
+    b = make(settings, 1)
+
+    def run(settings_, kind, budget, **kw):
+        raise RunBusy({"owner": "run:x", "pid": 1})
+
+    out = batches.drive(settings, b["id"], run=run,
+                        sleep=lambda s: batches._req_path(settings, b["id"]).write_text("pause"))
+    assert out["status"] == "paused" and states(out) == ["pending"]
+
+
+def test_driver_renews_its_lock_per_job(settings, monkeypatch):
+    b = make(settings, 2)
+    refreshed = []
+    monkeypatch.setattr(batches.locks, "refresh", lambda *a, **kw: refreshed.append(a) or True)
+    batches.drive(settings, b["id"], run=fake_run([]))
+    assert len(refreshed) == 2

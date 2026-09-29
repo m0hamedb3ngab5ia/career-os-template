@@ -151,6 +151,8 @@ REVIEW = ("status needs_review", "qa not passed", "submit already clicked", "app
 FINISHED = ("already scored", "already prepared")
 RESULT = {"score": "scored", "prepare": "prepared"}
 OPEN = ("pending", "waiting", "working", None)
+LOCK_TTL_S = 24 * 3600  # renewed before each job
+MAX_TRIES = 50  # real runs per stage; retries are capped by Failures first
 
 
 class BatchBusy(RuntimeError):
@@ -222,36 +224,41 @@ def _take_request(settings: Settings, batch_id: str) -> str | None:
 
 
 def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: RunsConfig, run, *,
-                invoke, now, cancel, echo, sleep, poll_s, stop) -> str | None:
+                invoke, now, cancel, echo, sleep, poll_s, stop, paused=lambda: False) -> str | None:
     """Work one job's remaining stages; sets r["state"], r["reason"]. Returns "cancel", "pause: <why>" or None."""
     store, jid = Store(settings), r["job_id"]
     stages = r["stages"]
     for kind in stages[stages.index(r["stage"]):]:
         r["stage"] = kind
-        c = cfg
-        if kind == "apply":  # never trust the saved preview: re-check right before the run
-            if is_linkedin(store._read(jid, "posting.json") or {}):
-                r["state"], r["reason"] = "needs_you", "LinkedIn: apply yourself on LinkedIn"
-                return None
-            ok, why = (auto_submit_verdict(settings, store, cfg, r) if b["stop_at"] == "submit"
-                       else (False, f"stop point {b['stop_at']}: never submits"))
-            r["auto_submit"], r["submit_reason"] = ok, why
-            if not ok:
-                c = _no_submit(cfg)
         budget = Budget("batch", 1, 2 * float(cfg.job_timeout_minutes.get(kind, 20)))  # room for the one job
-        for _ in range(50):  # each pass is a run, a busy wait or a retry; retries are capped by Failures
+        tries = 0
+        while True:  # a run, a retry (capped by Failures, then MAX_TRIES) or a wait while the runner is busy
             if stop():
                 return "cancel"
+            c = cfg
+            if kind == "apply":  # never trust the saved preview (or an earlier pass): re-check right before the run
+                if is_linkedin(store._read(jid, "posting.json") or {}):
+                    r["state"], r["reason"] = "needs_you", "LinkedIn: apply yourself on LinkedIn"
+                    return None
+                ok, why = (auto_submit_verdict(settings, store, cfg, r) if b["stop_at"] == "submit"
+                           else (False, f"stop point {b['stop_at']}: never submits"))
+                r["auto_submit"], r["submit_reason"] = ok, why
+                if not ok:
+                    c = _no_submit(cfg)
             try:
                 rec = run(settings, kind, budget, cfg=c, trigger="batch", invoke=invoke, now=now, cancel=cancel,
                           echo=echo, job_ids=[jid])
             except JobNotRunnable as e:
                 action, why = not_runnable(e.reasons.get(jid, str(e)))
-            except RunBusy as e:  # another run (or a JobBusy job lock): wait for it
+            except RunBusy as e:  # another run (or a JobBusy job lock): wait for it, not counted as a try
+                if paused():
+                    r["state"], r["reason"] = "pending", "paused by you"
+                    return "pause: paused by you"
                 r["state"], r["reason"] = "waiting", str(e)[:200]
                 sleep(poll_s)
                 continue
             else:
+                tries += 1
                 atts = RunStore(settings).load_attempts(rec["id"]) if rec.get("id") else []
                 outcome = atts[-1]["outcome"] if atts else None
                 session = store._read(jid, "apply_session.json") if kind == "apply" else None
@@ -259,10 +266,10 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
                 r["run_ids"] = [*r.get("run_ids", []), rec.get("id")]
             r["state"], r["reason"] = "working", why
             if action == "failed" and not why.startswith("failed "):
-                continue  # attempts left: run it again (the runner refuses it once out of retries)
+                if tries < MAX_TRIES:
+                    continue  # attempts left: run it again (the runner refuses it once out of retries)
+                action, why = "failed", f"gave up after {MAX_TRIES} tries"
             break
-        else:
-            action, why = "failed", "gave up after 50 tries"
         if action == "next":
             r["result"] = RESULT.get(kind, why)
             continue
@@ -286,14 +293,20 @@ def drive(settings: Settings, batch_id: str, *, invoke=None, now=_utcnow, cancel
     from careeros.runs.service import run_batch
 
     run = run or run_batch
-    b = load(settings, batch_id)
-    if b is None:
+    if load(settings, batch_id) is None:
         raise ValueError(f"batch {batch_id} not found")
     try:
-        lk = locks.acquire(_lock_path(settings, batch_id), owner=f"batch:{batch_id}", ttl_seconds=24 * 3600,
+        lk = locks.acquire(_lock_path(settings, batch_id), owner=f"batch:{batch_id}", ttl_seconds=LOCK_TTL_S,
                            pid=os.getpid(), note="batch driver")
     except locks.LockBusy as e:
         raise BatchBusy(f"batch {batch_id} is already running (pid {e.holder.get('pid')})") from None
+    # load under the lock (a control / retry may have written it meanwhile); a request left from an earlier
+    # driver or control is stale now: only requests made while this driver runs count
+    _req_path(settings, batch_id).unlink(missing_ok=True)
+    b = load(settings, batch_id)
+    if b is None:
+        locks.release(_lock_path(settings, batch_id), lk.token)
+        raise ValueError(f"batch {batch_id} not found")
     rs, path, reqs = RunStore(settings), _dir(settings) / f"{batch_id}.json", []
 
     def stop() -> bool:
@@ -301,6 +314,9 @@ def drive(settings: Settings, batch_id: str, *, invoke=None, now=_utcnow, cancel
         if req:
             reqs.append(req)
         return (cancel is not None and cancel.is_set()) or "cancel" in reqs
+
+    def paused() -> bool:
+        return "pause" in reqs
 
     def save() -> None:
         b["updated_at"] = iso(now())
@@ -321,11 +337,12 @@ def drive(settings: Settings, batch_id: str, *, invoke=None, now=_utcnow, cancel
                 halt = "pause: " + ("paused by you" if "pause" in reqs else
                                     f"runs paused ({(pause or {}).get('reason') or 'careeros run pause'})")
             if not halt:
+                locks.refresh(_lock_path(settings, batch_id), lk.token, LOCK_TTL_S)
                 r["state"] = "working"
                 save()
                 echo(f"batch {batch_id}: {r['job_id']} {'>'.join(r['stages'])}")
                 halt = _job_stages(settings, b, r, cfg, run, invoke=invoke, now=now, cancel=cancel, echo=echo,
-                                   sleep=sleep, poll_s=poll_s, stop=stop)
+                                   sleep=sleep, poll_s=poll_s, stop=stop, paused=paused)
             if halt == "cancel":
                 _cancel_rest(b)
                 break
