@@ -206,7 +206,7 @@ describe("AppShell route changes", () => {
   it("waits for a loading page's real title before announcing it (not the placeholder)", async () => {
     const { router } = renderAt("/automation");
     await screen.findByRole("heading", { level: 1, name: "Automation" });
-    await act(() => router.navigate("/automation/abc"));
+    await act(() => router.navigate("/automation/runs/abc"));
     const h1 = await screen.findByRole("heading", { level: 1, name: (n) => n !== "Run" && n !== "Automation" });
     await waitFor(() => expect(screen.getByTestId("route-announcer")).toHaveTextContent(h1.textContent!));
     expect(screen.getByTestId("route-announcer").textContent).not.toBe("Run");
