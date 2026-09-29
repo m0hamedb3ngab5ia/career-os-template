@@ -53,7 +53,9 @@ export function useBatchAction(id: string) {
     mutationFn: async (action: BatchAction) => {
       const post = (a: BatchAction) => apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/${a}`);
       const b = await post(action);
-      return action === "retry" ? post("start") : b; // retry only re-queues; the driver must run again
+      // retry only re-queues; the driver must run again. It may re-queue nothing (hands-off jobs), and /start
+      // refuses a done/cancelled batch, so start only when something went back in the queue.
+      return action === "retry" && b.retried ? { ...(await post("start")), retried: b.retried } : b;
     },
     onSuccess: (b) => qc.setQueryData(["batch", id], b),
   });

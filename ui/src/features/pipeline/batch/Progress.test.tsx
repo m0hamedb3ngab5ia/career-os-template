@@ -25,7 +25,7 @@ function setup(b: Batch | (() => Batch), path = "/pipeline/batch/b-1", extra: Re
     "GET /api/batches/b-1": b,
     "POST /api/batches/b-1/pause": { ...(typeof b === "function" ? b() : b), requested: "pause" },
     "POST /api/batches/b-1/cancel": batch("cancelled", [job("j-acme", "Acme Robotics", "cancelled", "batch cancelled")]),
-    "POST /api/batches/b-1/retry": batch("paused", [job("j-acme", "Acme Robotics", "pending")]),
+    "POST /api/batches/b-1/retry": batch("paused", [job("j-acme", "Acme Robotics", "pending")], { retried: 1 }),
     "POST /api/batches/b-1/start": batch("running"),
     ...extra,
   });
@@ -83,6 +83,52 @@ describe("Batch progress", () => {
     await waitFor(() => expect(posts(calls)).toEqual(["/api/batches/b-1/retry", "/api/batches/b-1/start"]));
   });
 
+  it("retry that re-queues nothing does not start the driver and says why", async () => {
+    const { calls } = setup(batch("done", [job("j-acme", "Acme Robotics", "failed", "timeout")]), undefined, {
+      "POST /api/batches/b-1/retry": batch("done", [job("j-acme", "Acme Robotics", "failed", "not retried: application submitted")], { retried: 0 }),
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Retry 1 job" }, opts));
+    expect(await screen.findByText(/Nothing to retry/)).toBeInTheDocument();
+    expect(posts(calls)).toEqual(["/api/batches/b-1/retry"]);
+  });
+
+  it("an action error shows an alert", async () => {
+    setup(batch("running"), undefined, { "POST /api/batches/b-1/pause": () => new Response(JSON.stringify({ detail: "batch is busy" }), { status: 409 }) });
+    await userEvent.click(await screen.findByRole("button", { name: "Pause after this job" }, opts));
+    expect(await screen.findByRole("alert")).toHaveTextContent(/batch is busy/);
+  });
+
+  it("404: says the batch is not found and links to Pipeline, no Retry", async () => {
+    setup(batch("running"), "/pipeline/batch/nope");
+    expect(await screen.findByText("Batch not found", {}, opts)).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back to Pipeline" })).toHaveAttribute("href", "/pipeline");
+    expect(screen.queryByRole("button", { name: "Retry" })).toBeNull();
+  });
+
+  it("closes the cancel confirmation once the batch finishes", async () => {
+    let b = batch("running");
+    setup(() => b);
+    await userEvent.click(await screen.findByRole("button", { name: "Cancel batch" }, opts));
+    expect(screen.getByText("Cancel this batch?")).toBeInTheDocument();
+    b = batch("done", [job("j-acme", "Acme Robotics", "done", "submitted")]);
+    act(() => FakeEventSource.last.dispatch("changed", { batches: ["b-1"] }));
+    await waitFor(() => expect(screen.queryByText("Cancel this batch?")).toBeNull());
+  });
+
+  it("completed: summarises results and lists skipped and excluded reasons", async () => {
+    setup(batch("done", [
+      job("j-a", "Acme Robotics", "done", "submitted"),
+      job("j-b", "Hooli", "done", "submitted"),
+      job("j-c", "Globex", "needs_you", "staged: review and submit it yourself"),
+      job("j-d", "Initech", "done", "prepared"),
+      job("j-e", "Umbrella", "skipped", "LinkedIn: apply yourself"),
+    ], { excluded: [{ job_id: "j-f", reason: "already applied" }] }));
+    const summary = await screen.findByRole("region", { name: "Summary" }, opts);
+    expect(summary).toHaveTextContent("2 submitted · 1 staged · 1 prepared · 1 skipped");
+    expect(summary).toHaveTextContent("Umbrella · Backend Engineer: LinkedIn: apply yourself");
+    expect(summary).toHaveTextContent("j-f: already applied");
+  });
+
   it("needs review: links to Today filtered by the batch, which shows only its jobs", async () => {
     setup(batch("done", [job("j-acme", "Acme Robotics", "needs_you", "staged: review and submit it yourself")]), undefined,
       { "GET /api/today": today });
@@ -91,6 +137,20 @@ describe("Batch progress", () => {
     expect(await screen.findByText(/Only jobs in/, {}, opts)).toBeInTheDocument();
     expect(await screen.findByText("Acme Robotics", {}, opts)).toBeInTheDocument();
     expect(screen.queryByText("Globex")).toBeNull();
+  });
+
+  it("Today ?batch= while the batch loads: no false 'Nothing needs you'", async () => {
+    setup(batch("running"), "/?batch=b-1", { "GET /api/today": today, "GET /api/batches/b-1": () => new Promise(() => {}) });
+    expect(await screen.findByText(/Only jobs in/, {}, opts)).toBeInTheDocument();
+    expect(screen.queryByText("Nothing needs you")).toBeNull();
+    expect(screen.queryByText("Acme Robotics")).toBeNull();
+  });
+
+  it("Today ?batch= unknown: says so and shows all tasks", async () => {
+    setup(batch("running"), "/?batch=nope", { "GET /api/today": today });
+    expect(await screen.findByText(/Batch not found/, {}, opts)).toBeInTheDocument();
+    expect(await screen.findByText("Globex", {}, opts)).toBeInTheDocument();
+    expect(screen.queryByText("Nothing needs you")).toBeNull();
   });
 
   it("refetches when the SSE changed event names the batch", async () => {
