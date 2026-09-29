@@ -345,6 +345,8 @@ export interface components {
       company: string;
       /** Created */
       created: string | null;
+      /** Detail */
+      detail: string | null;
       /** Done */
       done: boolean;
       /** Done Date */
@@ -1574,7 +1576,7 @@ export interface components {
       /** Queued In Run */
       queued_in_run: string | null;
       /** Review Reasons */
-      review_reasons: string[];
+      review_reasons: components["schemas"]["Reason"][];
       /** Stage */
       stage: string;
     };
@@ -1663,6 +1665,19 @@ export interface components {
       end: string;
       /** Start */
       start: string;
+    };
+    /**
+     * Reason
+     * @description Why a job needs a human. `code`: stable id the UI may map; `text`: a human sentence (no commands, no internal
+     * ids); `detail`: the raw technical text behind it (file values, CLI hints), for a Details disclosure.
+     */
+    Reason: {
+      /** Code */
+      code: string;
+      /** Detail */
+      detail: string | null;
+      /** Text */
+      text: string;
     };
     /** Recommendation */
     Recommendation: {

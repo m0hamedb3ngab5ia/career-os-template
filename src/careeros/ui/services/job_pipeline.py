@@ -38,10 +38,46 @@ class PipelineState(TypedDict):
     blocked_reason: str | None
     note: str | None  # what the next action does differently for this job (Tier A: assisted apply)
     auto_submit: bool  # runs.auto_submit.enabled: false -> every apply run only fills and stages the form
-    review_reasons: list[str]
+    review_reasons: list[Reason]
     active_run_id: str | None
     queued_in_run: str | None  # a batch run that will get to this job later (no Cancel: it would kill the batch)
     failures: FailureInfo | None  # the next kind's failure count (runs/failures.py); excluded -> blocked until reset
+
+
+class Reason(TypedDict):
+    """Why a job needs a human. `code`: stable id the UI may map; `text`: a human sentence (no commands, no internal
+    ids); `detail`: the raw technical text behind it (file values, CLI hints), for a Details disclosure."""
+    code: str
+    text: str
+    detail: str | None
+
+
+# QA check ids -> what they mean for the human (docs/design/ui-redesign.md §2.4)
+QA_CHECK_TEXT = {
+    "keyword_coverage": "Resume misses key skills from this role",
+    "numbers_consistent": "Resume and cover letter disagree on a detail",
+    "employer_title_consistent": "Resume and cover letter disagree on a detail",
+    "confidential_terms": "A private term appeared in a document",
+}
+SESSION_TEXT = {
+    "staged": "The application is filled in: review it and submit",
+    "needs_review": "The application needs your review",
+    "failed": "The application couldn't be filled in",
+    "blocked": "The application was blocked before it was sent",
+    "submitted": "The application was submitted",
+}
+ACTION_TEXT = {  # open Action Item type -> the next step
+    "captcha": "Solve a verification check", "bot_detection": "Solve a verification check",
+    "question": "Answer the application questions", "salary": "Decide a salary answer",
+    "profile_gap": "Add missing experience to your profile", "laptop_required": "Finish on your laptop",
+    "qa_fail": "Review the tailored resume", "scam_suspected": "Check this company is real",
+    "ghost_job": "The posting may be stale", "review": "Review and submit the application",
+    "send_linkedin": "Send a LinkedIn message", "send_email": "Send an email",
+}
+
+
+def _reason(code: str, text: str, detail: Any = None) -> Reason:
+    return {"code": code, "text": text, "detail": str(detail).strip() if detail else None}
 
 
 class FailureInfo(TypedDict):
@@ -66,47 +102,52 @@ def _dicts(v: Any) -> list[dict[str, Any]]:
     return [x for x in v if isinstance(x, dict)] if isinstance(v, list) else []
 
 
-def session_notes(session: dict[str, Any] | None) -> list[str]:
+def session_notes(session: dict[str, Any] | None) -> list[Reason]:
     """What the last apply session (apply_session.json) left for the human: its outcome + reason, its action item."""
     session = session or {}
-    out: list[str] = []
-    if session.get("outcome"):
-        out.append(f"Apply session {session['outcome']}: {session.get('reason') or 'no reason given'}")
+    out: list[Reason] = []
+    if outcome := session.get("outcome"):
+        out.append(_reason(f"apply_{outcome}", SESSION_TEXT.get(outcome, "The last application attempt needs a look"),
+                           f"Apply session {outcome}: {session.get('reason') or 'no reason given'}"))
     item = session.get("action_item")
     if isinstance(item, dict) and str(item.get("what") or "").strip():
-        out.append(f"Action item: {str(item['what']).strip()}")
+        out.append(_reason("apply_action", "The application left a step for you", item["what"]))
     return out
 
 
 def review_reasons(qa: dict[str, Any] | None, prepare: dict[str, Any] | None,
-                   open_actions: list[str], apply_session: dict[str, Any] | None = None) -> list[str]:
+                   open_actions: list[dict[str, Any]], apply_session: dict[str, Any] | None = None) -> list[Reason]:
     """Why a job needs a human: QA fail reasons, failed (non-skipped) QA checks and warnings, prepare-job's
-    action items / flags / notes, the last apply session's notes, then the open Action Items for the job.
-    Deduplicated, in that order."""
-    out: list[str] = []
+    action items / flags / notes, the last apply session's notes, then the open Action Items ({type, what}) for the
+    job. Deduplicated, in that order."""
+    out: list[Reason] = []
     qa, prepare = qa or {}, prepare or {}
     det = qa.get("deterministic") if isinstance(qa.get("deterministic"), dict) else {}
     for r in _strs(qa.get("fail_reasons")):
-        out.append(f"QA: {r}")
+        out.append(_reason("qa_fail", "The documents need your review", r))
     for c in [*_dicts(qa.get("checks")), *_dicts(det.get("checks"))]:
         if c.get("ok") is False and not c.get("skipped"):
-            out.append(f"QA check {c.get('check') or '?'}: {c.get('detail') or 'failed'}")
+            check = str(c.get("check") or "unknown")
+            out.append(_reason(f"qa_{check}", QA_CHECK_TEXT.get(check, "A document check failed"),
+                               f"{check}: {c.get('detail') or 'failed'}"))
     for w in [*_strs(qa.get("warnings")), *_strs(det.get("warnings"))]:
-        out.append(f"QA warning: {w}")
+        out.append(_reason("qa_warning", "A document check left a warning", w))
     for a in _strs(prepare.get("action_items")):
-        out.append(a)
+        out.append(_reason("prepare_action", "Document preparation left a step for you", a))
     for f in _strs(prepare.get("flags")):
-        out.append(f"Flag: {f}")
+        out.append(_reason("prepare_flag", "Document preparation flagged something to check", f))
     if isinstance(prepare.get("notes"), str) and prepare["notes"].strip():
-        out.append(prepare["notes"].strip())
+        out.append(_reason("prepare_note", "Document preparation left a note", prepare["notes"]))
     out.extend(session_notes(apply_session))
     for a in open_actions:
-        out.append(f"Open action item: {a}")
-    return list(dict.fromkeys(s for s in out if s))
+        t = str(a.get("type") or "other")
+        out.append(_reason(f"action_{t}", ACTION_TEXT.get(t, "A task for this job needs you"),
+                            a.get("detail") or a.get("what")))
+    return list({(r["code"], r["detail"]): r for r in out}.values())
 
 
 def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dict[str, Any] | None,
-                  qa: dict[str, Any] | None, open_actions: list[str] | None = None,
+                  qa: dict[str, Any] | None, open_actions: list[dict[str, Any]] | None = None,
                   active_run_id: str | None = None, apply_session: dict[str, Any] | None = None,
                   queued_in_run: str | None = None, auto_submit: bool = False,
                   failures: FailureInfo | None = None) -> PipelineState:
@@ -173,16 +214,17 @@ def compute_state(status: str | None, score: dict[str, Any] | None, prepare: dic
     return st
 
 
-def open_action_items(settings: Any, job_id: str) -> list[str]:
-    """The open Action Items for the job ("What to do"); [] when the tracker cannot be read."""
+def open_action_items(settings: Any, job_id: str) -> list[dict[str, Any]]:
+    """The open Action Items for the job as {type, what, detail}; [] when the tracker cannot be read."""
     from careeros.tracker import Tracker
 
     try:
         items = Tracker(settings=settings).list_action_items(open_only=True)
     except Exception:  # noqa: BLE001 - a locked or broken workbook must not break Job detail
         return []
-    return [str(i.get("What to do") or "").strip() for i in items if str(i.get("JobID") or "") == job_id
-            and str(i.get("What to do") or "").strip()]
+    return [{"type": i.get("Type"), "what": str(i.get("What to do") or "").strip(),
+             "detail": str(i.get("Detail") or "").strip() or None} for i in items
+            if str(i.get("JobID") or "") == job_id and str(i.get("What to do") or "").strip()]
 
 
 def pipeline_state(settings: Any, job_id: str, rc: Any) -> PipelineState:

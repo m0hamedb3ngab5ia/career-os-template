@@ -157,7 +157,7 @@ def test_retry_once_then_action_item_across_runs(root, env):
     second = cli(root, env, "run", "score", "--json")
     assert json.loads(second.stdout)["counters"]["attempted"] == 1
     items = cli(root, env, "action", "list")
-    assert jid[:6] in items.stdout or "failed twice" in items.stdout
+    assert "Automation couldn't score for this job" in items.stdout
     third = json.loads(cli(root, env, "run", "score", "--json").stdout)
     assert third["counters"]["attempted"] == 0
     assert status_of(root, jid) == "found"

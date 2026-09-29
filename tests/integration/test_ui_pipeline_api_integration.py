@@ -85,8 +85,10 @@ def test_get_pipeline_per_job_state(client, data):
     assert got["blocked_reason"] is None and got["next_label"] == "Prepare & stage for review"
     assert got["note"] == "Tier A: the run fills and stages the form; you review and submit."
     assert got["auto_submit"] is False  # examples/config: runs.auto_submit off -> the UI may chain prepare into apply
-    assert got["review_reasons"] == ["cover_letter_facts: add 2 facts", "Apply session needs_review: Tier A: you submit",
-                                     "Open action item: Review and submit"]
+    assert [(r["code"], r["detail"]) for r in got["review_reasons"]] == [
+        ("prepare_action", "cover_letter_facts: add 2 facts"),
+        ("apply_needs_review", "Apply session needs_review: Tier A: you submit"), ("action_review", "Review and submit")]
+    assert all(r["text"] and "_" not in r["text"] for r in got["review_reasons"])
     # Tier B with the form staged in the browser (auto_submit off): nothing runnable, the human submits.
     Store(data["settings"])._write(review, "score.json", {**json.loads((Store(data["settings"]).job_dir(review) / "score.json").read_text()), "tier": "B"})
     Store(data["settings"])._write(review, "apply_session.json", {"outcome": "staged", "status": "needs_review",
@@ -94,7 +96,8 @@ def test_get_pipeline_per_job_state(client, data):
     staged = client.get(f"/api/jobs/{review}/pipeline").json()
     assert staged["stage"] == "review" and staged["next_action"] is None
     assert staged["blocked_reason"].startswith("Application staged in the browser")
-    assert "Apply session staged: assisted: review & submit" in staged["review_reasons"]
+    assert {"code": "apply_staged", "text": "The application is filled in: review it and submit",
+            "detail": "Apply session staged: assisted: review & submit"} in staged["review_reasons"]
     r = client.post(f"/api/jobs/{review}/pipeline", json={"action": "approve_continue"}, headers=W)
     assert r.status_code == 409 and "staged in the browser" in r.json()["detail"]
     applied = client.get(f"/api/jobs/{data['jobs']['applied']}/pipeline").json()

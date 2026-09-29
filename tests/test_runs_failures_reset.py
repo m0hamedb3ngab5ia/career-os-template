@@ -32,12 +32,14 @@ def test_reset_clears_the_count_and_resolves_only_the_matching_action_item(setti
     f.record("apply", "j1", "invalid_result", "bad", "r1", NOW)
     f.record("apply", "j1", "invalid_result", "bad", "r2", NOW)
     f.record("prepare", "j1", "timeout", "slow", "r3", NOW)
-    add_action(settings, "careeros run: /apply-job failed 2 times on job j1 (invalid_result: bad). Run it by hand",
-               "other", job_id="j1")
+    add_action(settings, "Automation couldn't fill the application for this job: retry or finish it by hand", "other",
+               job_id="j1", detail="careeros run: /apply-job failed 2 times on job j1 (invalid_result: bad)")
+    add_action(settings, "careeros run: /apply-job failed 2 times on job j1 (old item, prose only). Run it by hand",
+               "other", job_id="j1")  # items written before the Detail column
     add_action(settings, "careeros run: /apply-job failed 2 times on job j2 (x). Run it by hand", "other", job_id="j2")
     add_action(settings, "Follow up with the recruiter", "other", job_id="j1")
     out = reset_failures(settings, "apply", "j1")
-    assert out["cleared"] is True and len(out["resolved"]) == 1
+    assert out["cleared"] is True and len(out["resolved"]) == 2
     assert f.get("apply", "j1") is None and f.get("prepare", "j1") is not None
     left = {(i["JobID"], i["What to do"][:20]) for i in Tracker(settings=settings).list_action_items(open_only=True)}
     assert left == {("j2", "careeros run: /apply"), ("j1", "Follow up with the r")}

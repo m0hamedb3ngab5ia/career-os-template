@@ -65,14 +65,18 @@ describe("PipelineCard", () => {
       next_action: "approve_continue",
       next_label: "Approve & continue",
       next_kind: "apply",
-      review_reasons: ["QA warning: long letter", "Open action item: Review and submit"],
+      review_reasons: [
+        { code: "qa_warning", text: "A document check left a warning", detail: "long letter" },
+        { code: "action_review", text: "Review and submit the application", detail: "Review and submit" },
+      ],
     });
     expect(await screen.findByRole("button", { name: "Approve & continue" })).toHaveAttribute(
       "title",
       "Approves the current documents and lets the pipeline continue to the next step.",
     );
     expect(screen.getByText("Waiting on you")).toBeInTheDocument();
-    expect(screen.getByText("Open action item: Review and submit")).toBeInTheDocument();
+    expect(screen.getByText("Review and submit the application")).toBeInTheDocument();
+    expect(screen.queryByText("long letter")).not.toBeInTheDocument(); // detail waits for the Details redesign
     const steps = within(screen.getByRole("list", { name: "Pipeline stages" })).getAllByRole("listitem");
     expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "upcoming"]);
   });
@@ -217,7 +221,8 @@ describe("PipelineCard", () => {
   it("never chains past the review gate: Approve & continue stays with the human", async () => {
     const api = await prepareThen({ stage: "review", next_action: "approve_continue", next_kind: "apply",
                                     next_label: "Prepare & stage for review", auto_submit: false,
-                                    review_reasons: ["tier_a_review: review resume + cover letter"] });
+                                    review_reasons: [{ code: "prepare_action", text: "Document preparation left a step for you",
+                                                      detail: "tier_a_review: review resume + cover letter" }] });
     expect(await screen.findByRole("button", { name: "Prepare & stage for review" })).toBeEnabled();
     expect(api.callsTo("POST /api/jobs/j1/pipeline").length).toBe(1);
   });
@@ -263,7 +268,7 @@ describe("PipelineCard", () => {
       "GET /api/jobs/j1/pipeline": () => current,
       "POST /api/jobs/j1/pipeline": () => {
         // The run failed at once (doctor): status.json unchanged, active_run_id never set.
-        current = { ...current, review_reasons: ["Flag: doctor failed"] };
+        current = { ...current, review_reasons: [{ code: "prepare_flag", text: "Document preparation flagged something to check", detail: "doctor failed" }] };
         return { run_id: "run-fast", kind: "apply" };
       },
       "GET /api/runs/run-fast": () => ({
@@ -276,7 +281,7 @@ describe("PipelineCard", () => {
     await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
     expect(await screen.findByText(/Run run-fast ended: doctor — careeros doctor failed/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeEnabled();
-    expect(screen.getByText("Flag: doctor failed")).toBeInTheDocument();
+    expect(screen.getByText("Document preparation flagged something to check")).toBeInTheDocument();
     expect(api.callsTo("GET /api/runs/run-fast").length).toBeGreaterThan(0);
   });
 

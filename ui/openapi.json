@@ -133,6 +133,17 @@
             ],
             "title": "Created"
           },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
           "done": {
             "title": "Done",
             "type": "boolean"
@@ -230,6 +241,7 @@
           "role",
           "type",
           "what",
+          "detail",
           "link",
           "priority",
           "needs",
@@ -4480,7 +4492,7 @@
           },
           "review_reasons": {
             "items": {
-              "type": "string"
+              "$ref": "#/components/schemas/Reason"
             },
             "title": "Review Reasons",
             "type": "array"
@@ -4687,6 +4699,37 @@
           "end"
         ],
         "title": "QuietHours",
+        "type": "object"
+      },
+      "Reason": {
+        "description": "Why a job needs a human. `code`: stable id the UI may map; `text`: a human sentence (no commands, no internal\nids); `detail`: the raw technical text behind it (file values, CLI hints), for a Details disclosure.",
+        "properties": {
+          "code": {
+            "title": "Code",
+            "type": "string"
+          },
+          "detail": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detail"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code",
+          "text",
+          "detail"
+        ],
+        "title": "Reason",
         "type": "object"
       },
       "Recommendation": {

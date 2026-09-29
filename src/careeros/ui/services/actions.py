@@ -39,6 +39,7 @@ class ActionItem(TypedDict):
     role: str
     type: str
     what: str
+    detail: str | None  # technical text behind `what` (run ids, CLI hints): Details only
     link: str
     priority: str
     needs: str
@@ -143,8 +144,8 @@ def _item(r: dict[str, Any], now: datetime, tz: tzinfo, soon_hours: int) -> Acti
     return {
         "id": r["id"], "created": r.get("created"), "job_id": r.get("job_id") or None,
         "company": r.get("company") or "", "role": r.get("role") or "", "type": r.get("type") or "other",
-        "what": r.get("what") or "", "link": r.get("link") or "", "priority": r.get("priority") or "",
-        "needs": r.get("needs") or "", "done": bool(r.get("done")), "done_date": r.get("done_date"),
+        "what": r.get("what") or "", "detail": r.get("detail") or None,
+        "link": r.get("link") or "", "priority": r.get("priority") or "", "needs": r.get("needs") or "", "done": bool(r.get("done")), "done_date": r.get("done_date"),
         "due": at.isoformat() if at else None, "due_date_only": bool(at and is_date_only(r.get("due"))),
         "due_reason": r.get("due_reason") if at else None,
         "bucket": due_bucket(r.get("due"), now, tz), "level": due_level(r.get("due"), now, tz, soon_hours),

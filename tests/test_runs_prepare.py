@@ -203,6 +203,7 @@ def test_failure_that_leaves_the_job_unselectable_is_an_action_item_at_once(sett
     assert sel == []  # prepare.json says qa_pass: no run will ever pick it again
     items = Tracker(settings=settings).list_action_items()
     assert len(items) == 1 and items[0]["JobID"] == jid and "by hand" in items[0]["What to do"]
+    assert "careeros" not in items[0]["What to do"] and "`careeros run show " in items[0]["Detail"]
 
 
 def test_gate_non_deferral_skips_the_job_with_the_reason(settings, store):

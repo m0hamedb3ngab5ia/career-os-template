@@ -1,6 +1,8 @@
 """careeros.ui.services.job_pipeline.compute_state / review_reasons: pure, one case per job state."""
 from __future__ import annotations
 
+import re
+
 import pytest
 
 from careeros.ui.services.job_pipeline import APPLY_STAGED, STAGE_NOTE, TIER_A_NOTE, compute_state, review_reasons
@@ -95,15 +97,24 @@ def test_an_active_run_blocks_and_is_reported():
     assert st["blocked_reason"] == "A run is working on this job"
 
 
-def test_review_reasons_collect_qa_prepare_and_open_items_deduplicated():
+def test_review_reasons_are_structured_code_text_detail_deduplicated():
     qa = {"pass": False, "fail_reasons": ["fabricated metric in bullet x3"], "warnings": ["long letter"],
-          "deterministic": {"checks": [{"check": "estimate_marked", "ok": False, "detail": "~ missing"},
+          "deterministic": {"checks": [{"check": "keyword_coverage", "ok": False, "detail": "3 missing"},
                                        {"check": "pdf", "ok": True}, {"check": "tex", "ok": False, "skipped": True}]}}
-    prep = {"qa_pass": False, "action_items": ["tier_a_review: review resume", "long letter"], "notes": "  "}
-    got = review_reasons(qa, prep, ["tier_a_review: review resume", "Answer the salary question"])
-    assert got == ["QA: fabricated metric in bullet x3", "QA check estimate_marked: ~ missing", "QA warning: long letter",
-                   "tier_a_review: review resume", "long letter", "Open action item: tier_a_review: review resume",
-                   "Open action item: Answer the salary question"]
+    prep = {"qa_pass": False, "action_items": ["tier_a_review: review resume", "tier_a_review: review resume"],
+            "flags": ["doctor failed"], "notes": "  "}
+    opened = [{"type": "salary", "what": "Answer the salary question"},
+              {"type": "other", "what": "careeros run: /prepare-job failed (see `careeros run show r1`)"}]
+    got = review_reasons(qa, prep, opened)
+    assert [(r["code"], r["detail"]) for r in got] == [
+        ("qa_fail", "fabricated metric in bullet x3"), ("qa_keyword_coverage", "keyword_coverage: 3 missing"),
+        ("qa_warning", "long letter"), ("prepare_action", "tier_a_review: review resume"),
+        ("prepare_flag", "doctor failed"), ("action_salary", "Answer the salary question"),
+        ("action_other", "careeros run: /prepare-job failed (see `careeros run show r1`)")]
+    assert got[1]["text"] == "Resume misses key skills from this role"
+    for r in got:  # human text: no CLI commands, backticks or snake_case internal ids
+        assert r["text"] and "careeros" not in r["text"] and "`" not in r["text"], r
+        assert not re.search(r"[a-z]_[a-z]", r["text"]), r
     assert review_reasons(None, None, []) == [] and review_reasons({"checks": "junk"}, {"flags": 3}, []) == []
 
 
@@ -116,8 +127,9 @@ def test_a_staged_apply_session_is_reviewed_by_hand_and_never_re_approved():
     st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session=STAGED)
     assert st["stage"] == "review" and st["next_action"] is None and st["next_kind"] is None
     assert st["blocked_reason"] == APPLY_STAGED
-    assert "Apply session staged: assisted: review & submit" in st["review_reasons"]
-    assert "Action item: Review the staged form and click submit" in st["review_reasons"]
+    got = {r["code"]: r for r in st["review_reasons"]}
+    assert got["apply_staged"]["detail"] == "Apply session staged: assisted: review & submit"
+    assert got["apply_action"]["detail"] == "Review the staged form and click submit"
     for outcome in ("submitted", "blocked"):
         st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session={**STAGED, "outcome": outcome})
         assert st["next_action"] is None and st["blocked_reason"], outcome
@@ -127,7 +139,8 @@ def test_a_failed_apply_session_allows_a_retry_with_the_reason_shown():
     failed = {"outcome": "failed", "status": "needs_review", "reason": "daily cap", "action_item": None}
     st = compute_state("needs_review", SCORE_B, PREPARED, {"pass": True}, apply_session=failed)
     assert act(st) == ("review", "approve_continue", "apply", False, None)
-    assert "Apply session failed: daily cap" in st["review_reasons"]
+    assert {"code": "apply_failed", "text": "The application couldn't be filled in",
+            "detail": "Apply session failed: daily cap"} in st["review_reasons"]
 
 
 def test_a_submit_already_clicked_apply_session_stays_hands_off_even_when_outcome_is_failed():
@@ -156,3 +169,17 @@ def test_a_job_out_of_retries_is_blocked_with_the_failures_and_a_reset_hint():
     st = compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None, failures={**fails, "count": 1, "excluded": False})
     assert st["blocked_reason"] is None and st["failures"]["count"] == 1
     assert compute_state("queued", {"tier": "B"}, {"qa_pass": True}, None)["failures"] is None
+
+
+def test_open_action_items_carry_detail_and_failed_run_items_stay_distinct(settings):
+    from careeros.tracker import add_action
+    from careeros.ui.services.job_pipeline import open_action_items
+
+    what = "Automation couldn't score for this job: retry or finish it by hand"
+    add_action(settings, what, "other", job_id="j1", detail="careeros run: /score-job failed on job j1 (see `careeros run show r1`)")
+    add_action(settings, what, "other", job_id="j1", detail="careeros run: /score-job failed 2 times on job j1 (timeout)")
+    add_action(settings, "Old item", "other", job_id="j1")  # written before the Detail column: falls back to what
+    opened = open_action_items(settings, "j1")
+    assert [o["detail"] for o in opened][2:] == [None]
+    got = review_reasons(None, None, opened)
+    assert [r["detail"] for r in got] == [opened[0]["detail"], opened[1]["detail"], "Old item"]

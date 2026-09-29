@@ -92,6 +92,11 @@ def daily_cap_stop(settings: Settings) -> Callable[[], tuple[str, str] | None]:
     return check
 
 
+# The human `what` of the Action Item a failed run leaves; the run id and CLI hint go to its `detail`.
+FAILED_WHAT = {k: f"Automation couldn't {v} for this job: retry or finish it by hand" for k, v in
+               {"score": "score", "prepare": "prepare documents", "apply": "fill the application"}.items()}
+
+
 def pause_after_usage_limit(settings: Settings, cfg: RunsConfig, run: dict[str, Any], at: datetime) -> bool:
     """`runs.on_usage_limit: pause`: a run that stopped on the usage limit pauses every later run until resumed."""
     if cfg.on_usage_limit != "pause" or run.get("stop_reason") != "usage_limit" or run.get("dry_run"):
@@ -115,7 +120,9 @@ def reset_failures(settings: Settings, kind: str, job_id: str) -> dict[str, Any]
     try:
         tr = Tracker(settings=settings)
         for item in tr.list_action_items(open_only=True):
-            if str(item.get("JobID") or "") == job_id and str(item.get("What to do") or "").startswith(prefix) \
+            # the prose sits in Detail since `what` became human; older items carry it in "What to do"
+            if str(item.get("JobID") or "") == job_id \
+                    and any(str(item.get(k) or "").startswith(prefix) for k in ("Detail", "What to do")) \
                     and tr.mark_action_done(str(item["ID"])) is not False:
                 resolved.append(str(item["ID"]))
     except Exception:  # noqa: BLE001 - a locked or missing tracker must not undo the reset
@@ -153,16 +160,18 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         if retry["action_item"] and n < max_attempts and not _selectable(settings, kind, jid):
             # the failed call left files that make the job ineligible (e.g. a passing prepare.json with the
             # status never recorded): no run can retry it, so hand it over now
-            what = (f"careeros run: /{SKILLS[kind]} failed on job {jid} ({outcome}: "
-                    f"{(att.get('detail') or '')[:120]}) and left it where no run picks it up again; finish it by "
-                    f"hand (see `careeros run show {att['run_id']}`)")
-            add_action(settings, what, "other", job_id=jid, priority="M", needs="laptop", dedupe=True)
+            detail = (f"careeros run: /{SKILLS[kind]} failed on job {jid} ({outcome}: "
+                      f"{(att.get('detail') or '')[:120]}) and left it where no run picks it up again "
+                      f"(see `careeros run show {att['run_id']}`)")
+            add_action(settings, FAILED_WHAT.get(kind, "Automation couldn't finish this job: retry or finish it by hand"), "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
+                       detail=detail)
             echo(f"    {jid}: not selectable after the failure -> Action Item")
             return
         if n >= max_attempts and retry["action_item"]:
-            what = (f"careeros run: /{SKILLS[kind]} failed {n} times on job {jid} ({outcome}: "
-                    f"{(att.get('detail') or '')[:120]}). Run it by hand or see `careeros run show {att['run_id']}`")
-            add_action(settings, what, "other", job_id=jid, priority="M", needs="laptop", dedupe=True)
+            detail = (f"careeros run: /{SKILLS[kind]} failed {n} times on job {jid} ({outcome}: "
+                      f"{(att.get('detail') or '')[:120]}); see `careeros run show {att['run_id']}`")
+            add_action(settings, FAILED_WHAT.get(kind, "Automation couldn't finish this job: retry or finish it by hand"), "other", job_id=jid, priority="M", needs="laptop", dedupe=True,
+                       detail=detail)
             echo(f"    {jid}: out of retries -> Action Item")
 
     extra_stop = None
