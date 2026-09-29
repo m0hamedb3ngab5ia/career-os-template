@@ -12,6 +12,7 @@ import { type ActionKey, help } from "./actionHelp";
 import { errorText, usePipeline, useResetFailures, useStartPipeline } from "./api";
 import { Card, Muted } from "./Card";
 import styles from "./JobDetail.module.css";
+import { FillApplicationButton, FillApplicationError } from "./FillApplication";
 import { NextStepSummary, ReasonDetails, useJobTasks } from "./NextStep";
 import type { PipelineState } from "./types";
 
@@ -209,6 +210,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         })}
       </ol>
       {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
+      {!runId ? <FillApplicationError jobId={jobId} stage={state.stage} /> : null}
       {runId ? (
         <>
           <div className={styles.buttons}>
@@ -247,6 +249,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           >
             {started ? "Starting…" : label}
           </Button>
+          <FillApplicationButton jobId={jobId} stage={state.stage} />
           <span className={styles.sec}>
             {chaining}
           </span>
@@ -256,6 +259,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button variant="primary" title={state.blocked_reason ?? label} disabled>
             {label}
           </Button>
+          <FillApplicationButton jobId={jobId} stage={state.stage} />
           {state.failures?.excluded ? (
             <Button
               title="Clear this job's failure count so runs pick it up again"

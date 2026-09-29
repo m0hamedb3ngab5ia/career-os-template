@@ -14,6 +14,7 @@ from typing import Any, Callable
 
 DEFAULT_CDP = "http://127.0.0.1:9223"   # dedicated port: not the 9222 a user's own debug Chrome may use
 RECORD = "application.json"
+FILL_EXIT = "careeros-fill-exit: "  # the UI's detached fill appends this + its exit code to application.log
 
 
 def _get(url: str) -> Any:
@@ -51,11 +52,33 @@ def is_confirmation(url: str) -> bool:
     return "/confirmation" in url.split("?")[0]
 
 
+def fill_failure(job_dir: str | Path) -> dict[str, str] | None:
+    """The last detached fill's error (its last output line) + log tail when it exited non-zero; None while it
+    runs, after success, or when it never ran."""
+    try:
+        text = (Path(job_dir) / "application.log").read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    lines = [ln for ln in text.splitlines() if ln.strip()]
+    if not lines or not lines[-1].startswith(FILL_EXIT) or lines[-1][len(FILL_EXIT):].strip() == "0":
+        return None
+    run = lines[:-1]
+    for i in range(len(run) - 1, -1, -1):  # this run only: output after the previous run's exit line
+        if run[i].startswith(FILL_EXIT):
+            run = run[i + 1:]
+            break
+    return {"error": run[-1] if run else f"the fill exited with code {lines[-1][len(FILL_EXIT):]}",
+            "log": "\n".join(run[-20:])}
+
+
 def status(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> dict[str, Any]:
     """`tab`: open (the filled tab is alive) | needs_refill (it died: sleep, crash, reboot) | none (never filled).
-    `submitted`: the live tab shows the Greenhouse confirmation page. `can_fill`: saved answers exist."""
+    `submitted`: the live tab shows the Greenhouse confirmation page. `can_fill`: saved answers exist.
+    `fill_error`/`fill_log`: the last UI fill failed (see fill_failure)."""
     rec = record(job_dir)
-    out = {"tab": "none", "submitted": False, "can_fill": (Path(job_dir) / "fill_plan.json").is_file()}
+    out: dict[str, Any] = {"tab": "none", "submitted": False, "can_fill": (Path(job_dir) / "fill_plan.json").is_file()}
+    if fail := fill_failure(job_dir):
+        out |= {"fill_error": fail["error"], "fill_log": fail["log"]}
     if not rec:
         return out
     live = next((t for t in tabs(rec.get("cdp") or cdp, get) or [] if t.get("id") == rec.get("tab_id")), None)

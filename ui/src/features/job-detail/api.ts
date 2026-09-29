@@ -114,6 +114,8 @@ export interface ApplicationTab {
   submitted: boolean;
   can_fill: boolean;
   marked_applied?: boolean;
+  fill_error?: string;
+  fill_log?: string;
 }
 export function useApplicationTab(id: string) {
   return useQuery({

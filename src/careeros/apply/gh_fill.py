@@ -30,6 +30,14 @@ def sync_playwright() -> Any:
     return sp()
 
 
+def preflight() -> None:
+    """Raise MissingPlaywright when playwright or its Chromium is missing, so the UI refuses up front instead of
+    spawning a detached fill that could only write the error to application.log."""
+    with sync_playwright() as p:
+        if not Path(p.chromium.executable_path).exists():
+            raise MissingPlaywright("Playwright's Chromium is missing: playwright install chromium")
+
+
 def plan_problems(plan: dict[str, Any]) -> list[str]:
     """Reasons the plan must not be filled: sensitive fields, or legal/salary/EEO pauses with no answer."""
     if plan.get("blocked"):

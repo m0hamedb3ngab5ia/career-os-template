@@ -449,10 +449,22 @@ def test_application_status_open_and_confirmation(client, data, monkeypatch):
     monkeypatch.setattr(browser, "_get", get)
     spawned: list[list[str]] = []
     monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv))
+    from careeros.apply import gh_fill
+
+    def missing():
+        raise gh_fill.MissingPlaywright("playwright is not installed")
+
+    monkeypatch.setattr(gh_fill, "preflight", missing)
     h = {"x-careeros": "1"}
     assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "needs_refill"
+    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
+    assert r.status_code == 409 and "playwright is not installed" in r.json()["detail"] and not spawned
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
     r = client.post(f"/api/jobs/{jid}/application/open", headers=h).json()
     assert r["action"] == "filling" and "apply plan" in spawned[0][-1] and "apply fill" in spawned[0][-1]
+    assert browser.FILL_EXIT in spawned[0][-1]
+    (jdir / "application.log").write_text(f"boom: chromium missing\n{browser.FILL_EXIT}1\n")
+    assert client.get(f"/api/jobs/{jid}/application").json()["fill_error"] == "boom: chromium missing"
     live.append({"id": "T1", "type": "page", "url": "https://job-boards.example/embed"})
     assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "open"
     assert client.post(f"/api/jobs/{jid}/application/open", headers=h).json() == {"action": "focused"}
