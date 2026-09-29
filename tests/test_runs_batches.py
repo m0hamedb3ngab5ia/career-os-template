@@ -73,6 +73,15 @@ def test_tier_a_is_never_submitted(settings):
     assert runs[a]["auto_submit"] is False and runs[b]["auto_submit"] is True
 
 
+def test_submit_verdict_only_for_jobs_already_at_apply(settings):
+    allow_submit(settings)
+    s = Store(settings)
+    found = add_job(s, 1)
+    out = batches.preview(settings, [found], "submit", now=NOW)
+    r = out["selected"][0]
+    assert r["stage"] == "score" and r["auto_submit"] is False and r["submit_reason"] == "decided at apply"
+
+
 def test_fill_never_submits_even_when_allowed(settings):
     allow_submit(settings)
     s = Store(settings)

@@ -3,7 +3,8 @@
 Slice 7 = the model and the preview: which jobs can go, from which stage, in which order, and why the others
 cannot. The driver that works the queue (one `run_batch(kind, job_ids=[id])` per job and stage, under the global
 runner lock) comes next. Hard rules, not configurable: Tier A is never auto-submitted, LinkedIn is never
-automated (excluded from fill/submit), apply is one job per run, and a batch only narrows `runs.auto_submit`.
+automated (excluded from fill/submit), apply is one job per run, and a batch may only narrow `runs.auto_submit`
+(the driver, slice 8, enforces that).
 Files: `<runs_dir>/batches/<id>.json`.
 """
 from __future__ import annotations
@@ -25,6 +26,7 @@ STOP_POINTS = {"score": ("score",), "prepare": ("score", "prepare"), "fill": ("s
 MAX_JOBS = 500
 _ID = re.compile(r"[\w-]{1,80}")
 # reasons found after the job-state rules passed: more telling than a later stage's "status found"
+# ponytail: these strings mirror the free-text reasons in runner.select_candidates; a rename there silently breaks this
 _HARD = ("not found", "pruned", "posting.json unreadable")
 
 
@@ -43,7 +45,11 @@ def is_linkedin(posting: dict[str, Any]) -> bool:
 
 def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime | None = None) -> dict[str, Any]:
     """{stop_at, kind, selected, excluded}. Each selected job starts at the first stage it is eligible for and
-    runs every later stage up to the stop point (`stages`); excluded jobs carry the reason."""
+    runs every later stage up to the stop point (`stages`); excluded jobs carry the reason.
+
+    `auto_submit` is only a provisional verdict, computed for jobs already at the apply stage; earlier-stage jobs
+    have no score/safety files yet, so they get False ("decided at apply"). The driver MUST re-run
+    `auto_submit_verdict` and the LinkedIn check right before each apply run and never trust the saved flag."""
     if stop_at not in STOP_POINTS:
         raise ValueError(f"stop_at must be one of {', '.join(STOP_POINTS)}")
     ids = list(dict.fromkeys(job_ids or []))
@@ -77,10 +83,12 @@ def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime 
     for n, r in enumerate(selected, 1):
         r["rank"] = n
         excluded.pop(r["job_id"], None)
-        if stop_at == "submit":
-            ok, why = auto_submit_verdict(settings, store, cfg, r)
-        else:
+        if stop_at != "submit":
             ok, why = False, f"stop point {stop_at}: never submits"
+        elif r["stage"] != "apply":
+            ok, why = False, "decided at apply"
+        else:
+            ok, why = auto_submit_verdict(settings, store, cfg, r)
         r["auto_submit"], r["submit_reason"] = ok, why
     return {"stop_at": stop_at, "kind": kinds[-1], "selected": selected,
             "excluded": [{"job_id": j, "reason": excluded[j]} for j in ids if j in excluded]}
@@ -96,7 +104,9 @@ def job_runs(batch: dict[str, Any]) -> list[dict[str, Any]]:
 
 def create(settings: Settings, job_ids: list[str], stop_at: str, name: str | None = None, dry_run: bool = False,
            now: datetime | None = None) -> dict[str, Any]:
-    """The preview (dry run), or a saved batch in status `queued` (ValueError when no job can run)."""
+    """The preview (dry run), or a saved batch in status `queued` (ValueError when no job can run).
+
+    The driver must hold the runner lock while working a batch, and be the single writer of batch status."""
     now = now or datetime.now(timezone.utc)
     out = preview(settings, job_ids, stop_at, now)
     if dry_run:
