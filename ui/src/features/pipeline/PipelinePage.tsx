@@ -194,7 +194,10 @@ export function PipelinePage() {
                 onValueChange={(v) => setParam(k, v)}
               />
             ))}
-            <Link to={jobsHref("status", closedStatuses.join(","))} className={styles.closed}>
+            <Link
+              to={`${jobsHref("status", closedStatuses.join(","))}${FILTER_KEYS.filter((k) => filters[k]).map((k) => `&f.${k}=${encodeURIComponent(filters[k])}`).join("")}`}
+              className={styles.closed}
+            >
               Closed: {formatCount(board.closed.count)}
               {closedParts.length ? ` (${closedParts.join(" · ")})` : ""}
             </Link>

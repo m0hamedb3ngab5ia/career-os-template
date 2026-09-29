@@ -35,14 +35,14 @@ function board(over: Partial<Board> = {}): Board {
   };
 }
 
-function setup(b: Board | ((url: string) => Board) = board(), extra: Record<string, unknown> = {}) {
+function setup(b: Board | ((url: string) => Board) = board(), extra: Record<string, unknown> = {}, path = "/pipeline") {
   const calls = mockApi({
     "GET /api/meta": META,
     "GET /api/status": {},
     "GET /api/pipeline": ({ url }: { url: string }) => (typeof b === "function" ? b(url) : b),
     ...extra,
   });
-  return { calls, ...renderRoutes(routes, "/pipeline") };
+  return { calls, ...renderRoutes(routes, path) };
 }
 
 beforeEach(() => {
@@ -148,6 +148,12 @@ describe("Pipeline", () => {
     await user.click(within(dialog).getByRole("radio", { name: "Rejected" }));
     await user.click(within(dialog).getByRole("button", { name: "Move" }));
     await waitFor(() => expect(calls.find((c) => c.method === "POST")?.body).toMatchObject({ status: "rejected" }));
+  });
+
+  it("Closed link carries the active filters to Jobs", async () => {
+    setup(board(), {}, "/pipeline?tier=A");
+    expect(await screen.findByRole("link", { name: /^Closed: 3/ })).toHaveAttribute(
+      "href", "/jobs?tab=all&f.status=skipped%2Crejected%2Cwithdrawn%2Cghosted&f.tier=A");
   });
 
   it("empty data shows zeros and empty groups, never sample cards", async () => {
