@@ -66,7 +66,10 @@ def _pick(root: Any, inp: Any, value: str, exact: bool) -> None:
     inp.fill(value)
     opt = (root.get_by_role("option", name=value, exact=True) if exact
            else root.get_by_role("option").filter(has_text=value))
-    opt.first.click()
+    try:
+        opt.first.click()
+    except Exception:
+        raise LookupError(f"no option {value!r} after typing it") from None
 
 
 def _fill_one(root: Any, f: dict[str, Any]) -> bool:
@@ -76,9 +79,10 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
     if t in ("text", "textarea"):
         loc.fill(str(v))
         return loc.input_value() == str(v)
-    if t == "file":
+    if t == "file":  # job-boards swaps the input for a filename chip once a file is picked: read that back
         loc.set_input_files(v)
-        return loc.evaluate("e => e.files.length ? e.files[0].name : ''") == Path(v).name
+        root.get_by_text(Path(v).name).first.wait_for()
+        return True
     if t == "checkbox_group":
         box = root.locator(f'fieldset:has(input[type=checkbox][name="{fid}"], input[type=checkbox][name="{fid}[]"], '
                            f'input[type=checkbox][id^="{fid}_"])')
@@ -86,9 +90,11 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
             box.get_by_label(opt, exact=True).check()
         return all(box.get_by_label(opt, exact=True).is_checked() for opt in v)
     if t in ("select", "multiselect", "select_async"):
-        for one in v if isinstance(v, list) else [v]:
-            _pick(root, loc, str(one), exact=t != "select_async")
-        loc.press("Escape")  # an open menu blocks the next field (spike: set_input_files timed out)
+        try:
+            for one in v if isinstance(v, list) else [v]:
+                _pick(root, loc, str(one), exact=t != "select_async")
+        finally:
+            loc.press("Escape")  # an open menu (also after a failed pick) blocks the next field
         shown = loc.locator("xpath=ancestor::div[contains(@class, 'select__control')][1]").inner_text()
         return matches(t, v, shown, fid)
     raise ValueError(f"unknown field type {t!r}")
@@ -103,7 +109,11 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
     page.wait_for_load_state()
     root = page.frame_locator(IFRAME).first if page.locator(IFRAME).count() else page
     filled, failed, skipped = 0, [], []
+    hispanic = next((f.get("value") for f in plan["fields"] if f["field_id"] == "hispanic_ethnicity"), "No")
     for f in plan["fields"]:
+        if f["field_id"] == "race" and hispanic != "No":  # job-boards shows race only after Hispanic/Latino = No
+            skipped.append(f["label"])
+            continue
         if f["type"] == "hidden" or f.get("value") in (None, "", []):
             if f["type"] != "hidden":
                 skipped.append(f["label"])
