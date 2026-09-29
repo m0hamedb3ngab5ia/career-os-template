@@ -144,7 +144,10 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
         else:
             failed.append({"field_id": f["field_id"], "label": f["label"], "error": err})
     summary = {"filled": filled, "failed": failed, "skipped": skipped, "fill_s": round(time.monotonic() - t0, 1)}
-    page.screenshot(path=str(ApplySession.screenshot_dir(job_dir) / "fill.png"), full_page=True)
+    try:  # proof only: a slow full-page capture (background tab) must not fail a filled form
+        page.screenshot(path=str(ApplySession.screenshot_dir(job_dir) / "fill.png"), full_page=True)
+    except Exception as e:
+        print(f"screenshot skipped: {str(e).splitlines()[0][:200]}", file=sys.stderr)
     (Path(job_dir) / "fill_summary.json").write_text(json.dumps(summary, indent=2), encoding="utf-8")
     return summary
 

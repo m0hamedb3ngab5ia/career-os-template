@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import subprocess
 import time
 import urllib.request
@@ -81,7 +82,8 @@ def fill_failure(job_dir: str | Path) -> dict[str, str] | None:
             break
     if any(ln.startswith(STAGED) for ln in run):
         return None  # form staged; exit 1 only means some fields were left for the user (fill_summary.json)
-    return {"error": run[-1] if run else f"the fill exited with code {lines[-1][len(FILL_EXIT):]}",
+    exc = next((ln for ln in reversed(run) if re.match(r"[\w.]+(Error|Exception): ", ln)), None)  # not the call log
+    return {"error": (exc or run[-1]) if run else f"the fill exited with code {lines[-1][len(FILL_EXIT):]}",
             "log": "\n".join(run[-20:])}
 
 
