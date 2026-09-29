@@ -59,7 +59,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["inbox"]); // follow-up due days (ui.followup_*_days)
     add(["contacts"]); // outreach.manual_if_connected / manual_if_mutuals
     add(["status"]);
-    add(["pipeline"]); // columns come from ui.pipeline
+    add(["pipeline"]); // columns are fixed
   }
   if (p.status) {
     add(["status"]);

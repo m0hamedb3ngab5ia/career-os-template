@@ -308,8 +308,8 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
   index_path, `due_soon_hours` (Action Items' orange window), `pause_until_tomorrow_at` (Runs › Pause all ›
   "Until tomorrow") and `followup_after_apply_days` / `followup_no_response_days` (Inbox & follow-ups due
   windows), each with its "(Recommended)" default. The Pipeline board's columns are fixed (the old
-  `ui.pipeline.columns` / `card_limit` keys are ignored with a warning). `/api/meta` serves these plus every status, tier,
-  action type and stop reason from the models, so the frontend renders codes it was never told about (grey
+  `ui.pipeline.columns` / `card_limit` keys are ignored with a warning). `/api/meta` serves these plus every status,
+  tier, action type and stop reason from the models, so the frontend renders codes it was never told about (grey
   fallback).
 - Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write
   needs the `X-CareerOS: 1` header.

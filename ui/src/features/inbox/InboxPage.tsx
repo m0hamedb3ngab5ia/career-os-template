@@ -64,7 +64,7 @@ export function InboxPage() {
     >
       {isError ? (
         <div role="alert" className={styles.card}>
-          <EmptyState title="Couldn't load the inbox">{error instanceof Error ? `${error.message}. ` : ""}Check that careeros ui is still running, then reload.</EmptyState>
+          <EmptyState title="Couldn't load the inbox">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
         </div>
       ) : isPending ? (
         <div className={styles.card} aria-busy="true">
@@ -135,7 +135,7 @@ function ThreadPane({ jobId, sendingReason }: { jobId: string; sendingReason: st
   if (isError)
     return (
       <div role="alert" className={styles.card}>
-        <EmptyState title="Couldn't load this job">{error instanceof Error ? `${error.message}. ` : ""}Check that careeros ui is still running, then reload.</EmptyState>
+        <EmptyState title="Couldn't load this job">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
       </div>
     );
   if (isPending || !data)

@@ -57,7 +57,7 @@ export const STOP_FIX: Record<string, string> = {
   permission_denied: "A skill needed a tool missing from llm.allowed_tools.",
   timeout: "One skill call ran past its timeout; often a login or prompt wait.",
   consecutive_failures: "3 jobs failed in a row; open the attempts.",
-  doctor_failed: "careeros doctor has FAIL lines.",
+  doctor_failed: "The setup check found problems; open Settings to fix them.",
   error: "The run failed; open the attempt and run.log.",
   interrupted: "The run's process stopped without recording why.",
 };

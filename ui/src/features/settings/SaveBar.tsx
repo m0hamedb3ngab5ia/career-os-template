@@ -129,7 +129,7 @@ export function SaveBar() {
           const body = errorBody(e);
           if (body) return showErrors(body.fields, body.general);
           if (e instanceof ApiError && e.status === 409) return setConflict(e.message);
-          showErrors({}, [e instanceof ApiError ? e.message : "Couldn't save. Check that careeros ui is running."]);
+          showErrors({}, [e instanceof ApiError ? e.message : "Couldn't save. Check that Career OS is running."]);
         },
       },
     );

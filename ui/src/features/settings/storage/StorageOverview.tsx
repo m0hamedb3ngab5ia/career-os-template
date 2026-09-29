@@ -127,7 +127,7 @@ export function StorageOverview() {
     <>
       {storage.isError ? (
         <p role="alert" className={styles.panelSub}>
-          Couldn't read storage. Check that careeros ui is running.
+          Couldn't read storage. Check that Career OS is running.
         </p>
       ) : st ? (
         <StorageTiles st={st} advice={advice.data} />
@@ -145,7 +145,7 @@ export function StorageOverview() {
           <StorageChart weeks={weeks} />
         ) : (
           <EmptyState title="No storage snapshots yet" headingLevel={3}>
-            One is recorded after each prune, or with careeros storage --snapshot.
+            One is recorded after each prune.
           </EmptyState>
         )}
       </section>

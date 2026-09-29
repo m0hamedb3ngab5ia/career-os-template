@@ -143,7 +143,7 @@ function SectionBody({ id }: { id: string }) {
       </EmptyState>
     ) : (
       <EmptyState title="Couldn't load these settings">
-        {q.error instanceof Error ? q.error.message : "Check that careeros ui is running."}
+        {q.error instanceof Error ? q.error.message : "Check that Career OS is running."}
       </EmptyState>
     );
   }

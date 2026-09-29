@@ -38,7 +38,7 @@ function jobsHref(field: string, value: string): string {
 }
 
 function problem(e: unknown): string {
-  return e instanceof ApiError ? e.message : "Couldn't reach careeros ui. Is it still running?";
+  return e instanceof ApiError ? e.message : "Couldn't reach Career OS. Is it still running?";
 }
 
 interface Target {

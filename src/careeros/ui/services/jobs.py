@@ -143,7 +143,7 @@ def _like(q: str) -> str:
     return "%" + q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-# Jobs screen tabs: key -> label. "active" leaves out the closed statuses (config `ui.pipeline`), "applied" is
+# Jobs screen tabs: key -> label. "active" leaves out the closed statuses (fixed board columns, DEFAULT_COLUMNS), "applied" is
 # everything after applying.
 TABS = (("active", "Active"), ("review", "Needs review"), ("applied", "Applied"), ("tier_a", "Tier A"), ("all", "All"))
 APPLIED_STATUSES = ("applied", "screening", "interview", "offer")

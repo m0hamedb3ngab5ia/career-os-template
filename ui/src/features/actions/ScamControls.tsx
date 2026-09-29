@@ -12,7 +12,7 @@ import { useUndoSeconds } from "./useUndoSeconds";
 type Ask = "idle" | "block" | "safe";
 
 function message(e: unknown): string {
-  return e instanceof ApiError ? e.message : "Couldn't reach careeros ui. Is it still running?";
+  return e instanceof ApiError ? e.message : "Couldn't reach Career OS. Is it still running?";
 }
 
 /** A possible-scam item's two ways out, each confirmed first and undoable from the toast. */

@@ -36,6 +36,19 @@
   box-shadow: var(--shadow-card);
   min-width: 0;
 }
+/* Job detail supporting sections: dividers and spacing, not cards (design doc §3). */
+.supporting {
+  display: flex;
+  flex-direction: column;
+}
+.supporting > .card {
+  padding: var(--space-4) 0;
+  border: 0;
+  border-top: 1px solid var(--sep);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
 .card[data-size="large"] {
   padding: 20px;
 }

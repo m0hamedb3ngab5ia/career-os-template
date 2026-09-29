@@ -25,7 +25,7 @@ export function useJobTasks(jobId: string): ActionItem[] {
 
 /** The state sentence and the human list of what needs you; no codes (those live in ReasonDetails). */
 export function NextStepSummary({ state, tasks }: { state: PipelineState; tasks: readonly ActionItem[] }) {
-  const needs = [...state.review_reasons.map((r) => r.text), ...tasks.map((t) => t.what)];
+  const needs = [...new Set([...state.review_reasons.map((r) => r.text), ...tasks.map((t) => t.what)])];
   return (
     <div className={styles.reviewReasons}>
       <p className={styles.strong}>{stateSentence(state, tasks.length)}</p>

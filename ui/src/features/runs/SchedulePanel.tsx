@@ -109,7 +109,7 @@ export function SchedulePanel({ schedule, runningKind }: SchedulePanelProps) {
       ) : null}
       {asking === "install" ? (
         <ConfirmPanel
-          question="Install the scheduler? It runs careeros tick every few minutes while you're logged in."
+          question="Install the scheduler? It checks for work every few minutes while you're logged in."
           cancelLabel="Not now"
           confirmLabel="Install"
           confirmVariant="primary"

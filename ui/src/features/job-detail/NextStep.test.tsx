@@ -49,6 +49,13 @@ describe("NextStepSummary", () => {
     expect(screen.queryByText(/long letter/)).not.toBeInTheDocument();
   });
 
+  it("lists an item once when a review reason and a task say the same thing", () => {
+    const dup = { ...task, what: "Review and submit the application" } as ActionItem;
+    render(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[dup]} />);
+    const items = within(screen.getByRole("list", { name: "Needs you" })).getAllByRole("listitem");
+    expect(items.map((li) => li.textContent)).toEqual(["A document check left a warning", "Review and submit the application"]);
+  });
+
   it("shows no list when nothing needs you", () => {
     render(<NextStepSummary state={base} tasks={[]} />);
     expect(screen.queryByRole("list", { name: "Needs you" })).not.toBeInTheDocument();
