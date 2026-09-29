@@ -14,7 +14,11 @@ Status writes while a run or skill holds the job's lock: JobLocked (409).
 """
 from __future__ import annotations
 
+import os
 import re
+import shlex
+import subprocess
+import sys
 from pathlib import Path
 from typing import Any
 
@@ -210,6 +214,37 @@ def open_folder(settings: Any, job_id: str) -> dict[str, Any]:
     d = _job(settings, job_id).resolve()
     desktop.open_path(d)
     return {"opened": True}
+
+
+def application_status(settings: Any, job_id: str) -> dict[str, Any]:
+    """Is the staged form's tab alive? Never claims ready for a dead tab. A live tab on the Greenhouse
+    confirmation page marks the job applied."""
+    from careeros.apply import browser
+    from careeros.store import Store
+
+    st = browser.status(_job(settings, job_id), browser.cdp_url(settings))
+    if st["submitted"] and Store(settings).get_status(job_id) != "applied":
+        mark_submitted(settings, job_id, "submitted: Greenhouse confirmation page seen in the apply tab")
+        st["marked_applied"] = True
+    return st
+
+
+def open_application(settings: Any, job_id: str, popen: Any = None) -> dict[str, Any]:
+    """Focus the live filled tab; otherwise fill the form again in a visible tab from the saved answers (plan
+    first when there is none), detached from this server so a rebuild never kills it. Never submits."""
+    from careeros.apply import browser
+
+    d = _job(settings, job_id)
+    if browser.activate(d, browser.cdp_url(settings)):
+        return {"action": "focused"}
+    ensure_unlocked(settings, job_id)
+    steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
+    cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
+    root = str(settings.root)
+    with (d / "application.log").open("ab") as fh:
+        (popen or subprocess.Popen)(["/bin/sh", "-c", cmd], cwd=root, env={**os.environ, "CAREEROS_ROOT": root}, stdin=subprocess.DEVNULL,
+              stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
+    return {"action": "filling", "log": "application.log"}
 
 
 def open_tracker(settings: Any) -> dict[str, Any]:

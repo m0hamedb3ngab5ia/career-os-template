@@ -280,6 +280,21 @@ def open_folder(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
         return acts.open_folder(c.settings, job_id)
 
 
+@router.get("/jobs/{job_id}/application")
+def application_status(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        out = acts.application_status(c.settings, job_id)
+    if out.get("marked_applied"):
+        after_write(c, jobs=[job_id], tracker=True)
+    return out
+
+
+@router.post("/jobs/{job_id}/application/open")
+def open_application(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        return acts.open_application(c.settings, job_id)
+
+
 @router.post("/jobs/{job_id}/safety/verify")
 def safety_verify(job_id: str, body: VerifyBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():

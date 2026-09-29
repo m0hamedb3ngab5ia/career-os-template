@@ -106,3 +106,21 @@ export function useStartPipeline(id: string) {
     },
   });
 }
+
+/** The staged form's browser tab: alive ("open"), gone ("needs_refill") or never filled ("none"). Polled so a
+ * tab closed by sleep or a crash is never shown as ready. */
+export interface ApplicationTab {
+  tab: "open" | "needs_refill" | "none";
+  submitted: boolean;
+  can_fill: boolean;
+  marked_applied?: boolean;
+}
+export function useApplicationTab(id: string) {
+  return useQuery({
+    queryKey: ["job", id, "application"],
+    queryFn: () => apiFetch<ApplicationTab>(`${jobPath(id)}/application`),
+    refetchInterval: 15_000,
+  });
+}
+export const useOpenApplication = (id: string) =>
+  useJobWrite<undefined, { action: "focused" | "filling"; log?: string }>(id, "application/open");

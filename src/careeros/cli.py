@@ -452,7 +452,7 @@ def cmd_apply_fill(args: argparse.Namespace) -> int:
         return SAFETY_HARD_EXIT if plan.get("blocked") else 2
     profile_dir = s.paths.get("browser_profile") or Path.home() / ".careeros" / "chrome-apply"
     try:
-        summary = gh_fill.run(plan, store.job_dir(args.job_id), cdp=args.cdp, profile_dir=profile_dir, url=args.url)
+        summary = gh_fill.run(plan, store.job_dir(args.job_id), cdp=args.cdp or s.paths.get("apply_cdp"), profile_dir=profile_dir, url=args.url)
     except gh_fill.MissingPlaywright as e:
         print(e, file=sys.stderr)
         return 2
@@ -1826,8 +1826,9 @@ def build_parser() -> argparse.ArgumentParser:
     apf = apls.add_parser("fill", help="stage fill_plan.json in the browser via Playwright ([fast-apply] extra); "
                                        "never submits")
     apf.add_argument("job_id")
-    apf.add_argument("--cdp", help="attach to a running Chrome, e.g. http://localhost:9222 (default: launch a "
-                                   "visible browser on paths.browser_profile)")
+    apf.add_argument("--cdp", help="attach to a running Chrome, e.g. http://localhost:9222 (default: paths.apply_cdp, else a "
+                                   "detached visible browser on paths.browser_profile at 127.0.0.1:9223; the "
+                                   "filled tab stays open)")
     apf.add_argument("--url", help="form page to open (default: the job-boards.greenhouse.io embed form)")
     apf.add_argument("--lock-token", help="re-enter a job lock you hold (default: $CAREEROS_LOCK_TOKEN)")
     apf.add_argument("--force", action="store_true", help="ignore a held job lock")
