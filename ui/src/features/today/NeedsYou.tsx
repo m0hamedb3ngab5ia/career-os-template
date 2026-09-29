@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
 import { Button } from "../../kit/Button";
 import { ActionTypeLabel, NeedsLabel, PriorityChip } from "../../kit/chips";
+import { taskText } from "../../kit/labels";
 import { Details } from "../../kit/Details";
 import { EmptyState } from "../../kit/EmptyState";
 import { ExternalLink } from "../../kit/ExternalLink";
@@ -158,17 +159,13 @@ function ActionRow({ item, now, onDone, showCompany }: { item: ActionItem; now: 
             </span>
           </div>
         ) : null}
-        <div className={styles.rowWhat}>{item.what}</div>
+        <div className={styles.rowWhat}>{taskText(item.type, item.what)}</div>
         {item.detail ? <Details summary="Details">{item.detail}</Details> : null}
         {due ? (
           <div className={styles.due} data-level={due.level}>
             {item.due_reason ? `${due.text} · ${item.due_reason}` : due.text}
           </div>
-        ) : (
-          <div className={styles.due} data-level="none">
-            No date
-          </div>
-        )}
+        ) : null}
         <div className={styles.rowMeta}>
           {link?.kind === "web" ? (
             <ExternalLink href={link.href}>{link.label}</ExternalLink>
@@ -177,12 +174,12 @@ function ActionRow({ item, now, onDone, showCompany }: { item: ActionItem; now: 
               {link.text}
             </span>
           ) : null}
-          <ActionTypeLabel type={item.type} />
+          {item.type && item.type !== "other" ? <ActionTypeLabel type={item.type} /> : null}
         </div>
       </div>
       <div className={styles.rowSide}>
         <PriorityChip priority={item.priority} />
-        <NeedsLabel needs={item.needs} />
+        {item.needs && item.needs !== "anytime" ? <NeedsLabel needs={item.needs} /> : null}
       </div>
     </li>
   );

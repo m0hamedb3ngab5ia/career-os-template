@@ -19,8 +19,9 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
   if (!offered(tab, stage)) return null;
   const live = tab.tab === "open";
   const label = live ? "Open application" : tab.fill_error ? "Retry fill" : tab.tab === "needs_refill" ? "Refill application" : "Fill application";
-  function onOpen() {
-    openApp.mutate(undefined, {
+  const left = tab.fields_left?.length ?? 0;
+  function onOpen(refill?: boolean) {
+    openApp.mutate(refill ? { refill: true } : undefined, {
       onSuccess: (r) =>
         toast.show({
           message: r.action === "focused" ? "Switched to the filled tab" : "Filling the form in a new browser tab; it stops before submit",
@@ -34,10 +35,16 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
         variant={live ? "primary" : undefined}
         disabled={openApp.isPending}
         title={live ? "Focus the tab with the filled form" : "Open a visible tab and fill the form from your saved answers (stops before submit)"}
-        onClick={onOpen}
+        onClick={() => onOpen()}
       >
         {label}
       </Button>
+      {live ? (
+        <Button disabled={openApp.isPending} title="Fill the form again in a new tab from your saved answers" onClick={() => onOpen(true)}>
+          Refill
+        </Button>
+      ) : null}
+      {left > 0 && !tab.fill_error ? <Chip tone="orange">{left} field{left === 1 ? "" : "s"} left for you</Chip> : null}
       {tab.fill_error ? <Chip tone="red">Fill failed</Chip> : tab.tab !== "none" ? (
         <Chip tone={live ? "green" : "orange"}>{live ? "Tab open" : "Needs refill"}</Chip>
       ) : null}

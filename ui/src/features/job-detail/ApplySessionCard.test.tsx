@@ -9,16 +9,26 @@ import { renderWithProviders } from "./testUtils";
 const d = detail();
 
 describe("ApplySessionCard", () => {
-  it("lists steps with spoken done/stopped state and the outcome", () => {
+  it("one short check line per step, raw detail behind a click, and the outcome", () => {
     renderWithProviders(<ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={d.screenshots} />);
     const card = screen.getByRole("region", { name: "Apply session" });
-    const steps = within(card).getAllByRole("listitem").filter((li) => li.textContent?.match(/^\d\d/));
-    expect(steps.map((s) => s.textContent)).toEqual([
-      "01Done: Opened form",
-      "02Done: Uploaded resume.pdf · 1 file",
-      "03Stopped: Stopped before submit (Tier A)",
+    const steps = within(card).getAllByRole("listitem").filter((li) => li.dataset.step);
+    expect(steps.map((s) => s.firstChild?.textContent)).toEqual([
+      "✓ Done: Opened form",
+      "✓ Done: Uploaded resume.pdf",
+      "✗ Stopped: Stopped before submit (Tier A)",
     ]);
+    const note = within(steps[1]!).getByText("1 file");
+    expect(note.closest("details")).not.toHaveAttribute("open");
     expect(within(card).getByText("Needs review")).toHaveAttribute("data-tone", "orange");
+  });
+
+  it("lists fields left as a checklist of remaining questions", () => {
+    renderWithProviders(
+      <ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={[]} fieldsLeft={["Visa status", "Start date"]} />,
+    );
+    const list = screen.getByRole("list", { name: "Questions left for you" });
+    expect(within(list).getAllByRole("checkbox").map((c) => c.closest("label")?.textContent?.trim())).toEqual(["Visa status", "Start date"]);
   });
 
   it("thumbnails have alt text, a size and lazy loading", () => {

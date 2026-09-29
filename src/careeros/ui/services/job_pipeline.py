@@ -21,8 +21,7 @@ LABELS: dict[str, str] = {"start": "Start pipeline", "continue": "Continue pipel
                           "stage_review": "Prepare & stage for review"}  # Tier A apply (assisted)
 TIER_A_NOTE = "Tier A: the run fills and stages the form; you review and submit."
 STAGE_NOTE = "auto_submit is off: the run fills and stages the form; you review and submit."
-APPLY_STAGED = ("Application staged in the browser: review and submit it yourself. Open application (Apply session) "
-                "focuses the filled tab, or fills it again if the tab is gone")
+APPLY_STAGED = "Application staged in the browser: review and submit it yourself"
 # HANDS_OFF_OUTCOMES (runner): apply_session.json outcomes after which nothing runs again, a human finishes.
 APPROVE_NOTE = "Approved for apply from the UI"
 # Statuses after which the pipeline has nothing left to run (the job is done, dropped or in the human's hands).

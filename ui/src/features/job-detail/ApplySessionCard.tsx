@@ -2,6 +2,7 @@ import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
+import { Details } from "../../kit/Details";
 import { Dialog } from "../../kit/Dialog";
 import { describeCode, type CodeTable } from "../../kit/labels";
 import { formatDateTime } from "../../lib/format";
@@ -92,10 +93,12 @@ export function ApplySessionCard({
   jobId,
   session,
   screenshots,
+  fieldsLeft = [],
 }: {
   jobId: string;
   session: ApplySession | null;
   screenshots: FileEntry[];
+  fieldsLeft?: string[];
 }) {
   const [open, setOpen] = useState<number | null>(null);
   const steps = session?.steps ?? [];
@@ -118,16 +121,12 @@ export function ApplySessionCard({
       {steps.length ? (
         <ol className={styles.steps}>
           {steps.map((s, i) => (
-            <li key={i} className={styles.stepRow}>
-              <span aria-hidden="true" className={styles.stepNo}>
-                {String(i + 1).padStart(2, "0")}
-              </span>
-              <span aria-hidden="true" className={styles.stepDot} data-ok={s.ok} />
-              <span className={styles.grow}>
-                <span className="sr-only">{s.ok ? "Done: " : "Stopped: "}</span>
+            <li key={i} data-step>
+              <span>
+                <span aria-hidden="true">{s.ok ? "✓" : "✗"}</span> <span className="sr-only">{s.ok ? "Done: " : "Stopped: "}</span>
                 {s.action}
-                {s.note ? <span className={styles.sec}> · {s.note}</span> : null}
               </span>
+              {s.note ? <Details summary="Details">{s.note}</Details> : null}
             </li>
           ))}
         </ol>
@@ -135,6 +134,17 @@ export function ApplySessionCard({
         <Muted>No steps recorded.</Muted>
       ) : null}
       {session?.reason ? <Muted>{session.reason}</Muted> : null}
+      {fieldsLeft.length ? (
+        <ul className={styles.steps} aria-label="Questions left for you">
+          {fieldsLeft.map((f) => (
+            <li key={f}>
+              <label>
+                <input type="checkbox" /> {f}
+              </label>
+            </li>
+          ))}
+        </ul>
+      ) : null}
       {screenshots.length ? (
         <ul className={styles.thumbs} aria-label="Screenshots">
           {screenshots.map((f, i) => (

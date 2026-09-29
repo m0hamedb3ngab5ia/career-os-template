@@ -82,11 +82,17 @@ def fill_failure(job_dir: str | Path) -> dict[str, str] | None:
 def status(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> dict[str, Any]:
     """`tab`: open (the filled tab is alive) | needs_refill (it died: sleep, crash, reboot) | none (never filled).
     `submitted`: the live tab shows the Greenhouse confirmation page. `can_fill`: saved answers exist.
-    `fill_error`/`fill_log`: the last UI fill failed (see fill_failure)."""
+    `fill_error`/`fill_log`: the last UI fill failed (see fill_failure). `fields_left`: labels the last fill
+    left for the user (fill_summary.json failed + skipped)."""
     rec = record(job_dir)
     out: dict[str, Any] = {"tab": "none", "submitted": False, "can_fill": (Path(job_dir) / "fill_plan.json").is_file()}
     if fail := fill_failure(job_dir):
         out |= {"fill_error": fail["error"], "fill_log": fail["log"]}
+    try:
+        s = json.loads((Path(job_dir) / "fill_summary.json").read_text(encoding="utf-8"))
+        out["fields_left"] = [f["label"] for f in s.get("failed", [])] + list(s.get("skipped", []))
+    except (OSError, ValueError):
+        pass
     if not rec:
         return out
     live = next((t for t in tabs(rec.get("cdp") or cdp, get) or [] if t.get("id") == rec.get("tab_id")), None)

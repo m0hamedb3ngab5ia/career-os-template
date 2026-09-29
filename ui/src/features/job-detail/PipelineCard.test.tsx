@@ -366,4 +366,14 @@ describe("PipelineCard", () => {
     expect(await screen.findByRole("button", { name: "Open application" })).toBeEnabled();
     expect(screen.getByText("Tab open")).toHaveAttribute("data-tone", "green");
   });
+
+  it("keeps Refill beside a live tab and says how many fields are left", async () => {
+    const api = setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
+      "GET /api/jobs/j1/application": { tab: "open", submitted: false, can_fill: true, fields_left: ["Q1", "Q2"] },
+      "POST /api/jobs/j1/application/open": { action: "filling" },
+    });
+    expect(await screen.findByText("2 fields left for you")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Refill" }));
+    expect(api.callsTo("POST /api/jobs/j1/application/open")[0]?.body).toEqual({ refill: true });
+  });
 });

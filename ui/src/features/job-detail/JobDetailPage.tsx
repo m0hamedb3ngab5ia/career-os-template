@@ -9,7 +9,7 @@ import { EmptyState } from "../../kit/EmptyState";
 import { STATUSES, describeCode } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { ActivityCard } from "./ActivityCard";
-import { errorText, useJob, useSetStatus, useWithdraw } from "./api";
+import { errorText, useApplicationTab, useJob, useSetStatus, useWithdraw } from "./api";
 import { ApplySessionCard } from "./ApplySessionCard";
 import { ContactsCard } from "./ContactsCard";
 import { DocumentsCard } from "./DocumentsCard";
@@ -36,6 +36,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
   const meta = useMeta();
   const withdraw = useWithdraw(jobId);
   const restore = useSetStatus(jobId);
+  const fieldsLeft = useApplicationTab(jobId).data?.fields_left;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const withdrawRef = useRef<HTMLButtonElement>(null);
 
@@ -117,7 +118,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             submitted={detail.submitted}
             qa={detail.qa}
           />
-          <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} />
+          <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} fieldsLeft={fieldsLeft} />
           <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
           <ScoreCard score={detail.score} />
           <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />

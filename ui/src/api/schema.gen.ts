@@ -637,6 +637,14 @@ export interface components {
       /** Locations */
       locations: components["schemas"]["LocationOption"][];
     };
+    /** Body_open_application_api_jobs__job_id__application_open_post */
+    Body_open_application_api_jobs__job_id__application_open_post: {
+      /**
+       * Refill
+       * @default false
+       */
+      refill?: boolean;
+    };
     /** CancelBody */
     CancelBody: {
       /** Run Id */
@@ -3245,6 +3253,11 @@ export interface operations {
     parameters: {
       path: {
         job_id: string;
+      };
+    };
+    requestBody?: {
+      content: {
+        "application/json": components["schemas"]["Body_open_application_api_jobs__job_id__application_open_post"];
       };
     };
     responses: {

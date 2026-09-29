@@ -41,14 +41,24 @@ describe("NeedsYou", () => {
     expect(screen.getByRole("heading", { name: "Needs you 4" })).toBeInTheDocument();
   });
 
-  it("colours the due line: red overdue, orange within 48 h, 'No date' when missing", async () => {
+  it("colours the due line: red overdue, orange within 48 h, nothing when missing", async () => {
     setup();
     const hooli = within((await screen.findByText("Hooli")).closest("li")!);
     expect(hooli.getByText("Overdue by 1 day · note was due")).toHaveAttribute("data-level", "overdue");
     const globex = within(screen.getByText("Globex").closest("li")!);
     expect(globex.getByText("Tomorrow, 3:00 PM · reply within 48 hours")).toHaveAttribute("data-level", "soon");
     const initech = within(screen.getByText("Initech").closest("li")!);
-    expect(initech.getByText("No date")).toHaveAttribute("data-level", "none");
+    expect(initech.queryByText("No date")).not.toBeInTheDocument();
+    expect(initech.queryByText("Anytime")).not.toBeInTheDocument();
+  });
+
+  it("shows plain task text and hides the empty 'Other' type", async () => {
+    setup("/", {
+      "GET /api/today": { ...today, actions: [actionItem({ id: "9", company: "Umbrella", job_id: "u1", what: "tier_a_review", type: "other" })] },
+    });
+    const row = within((await screen.findByText("Umbrella")).closest("li")!);
+    expect(row.getByText("Review resume + cover letter")).toBeInTheDocument();
+    expect(row.queryByText("Other")).not.toBeInTheDocument();
   });
 
   it("shows a non-web link as text, not an anchor; no link at all shows nothing", async () => {

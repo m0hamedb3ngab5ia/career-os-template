@@ -115,6 +115,7 @@ export interface ApplicationTab {
   marked_applied?: boolean;
   fill_error?: string;
   fill_log?: string;
+  fields_left?: string[];
 }
 export function useApplicationTab(id: string) {
   return useQuery({
@@ -124,4 +125,4 @@ export function useApplicationTab(id: string) {
   });
 }
 export const useOpenApplication = (id: string) =>
-  useJobWrite<undefined, { action: "focused" | "filling"; log?: string }>(id, "application/open");
+  useJobWrite<{ refill: true } | undefined, { action: "focused" | "filling"; log?: string }>(id, "application/open");

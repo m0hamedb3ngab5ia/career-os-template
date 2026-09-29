@@ -1,3 +1,4 @@
+import { taskText } from "../../kit/labels";
 import { groupByJob } from "../today/actions";
 import { useToday } from "../today/api";
 import type { ActionItem } from "../today/types";
@@ -24,7 +25,13 @@ export function useJobTasks(jobId: string): ActionItem[] {
 
 /** The state sentence and the human list of what needs you; no codes (those live in ReasonDetails). */
 export function NextStepSummary({ state, tasks }: { state: PipelineState; tasks: readonly ActionItem[] }) {
-  const needs = [...new Set([...state.review_reasons.map((r) => r.text), ...tasks.map((t) => t.what)])];
+  const rs = state.review_reasons;
+  // A QA warning repeats a failed check's finding: show it only when no check failed.
+  const shown = rs.filter((r) => r.code !== "qa_warning" || !rs.some((o) => o.code.startsWith("qa_") && o.code !== "qa_warning"));
+  const needs = [...new Set([
+    ...shown.map((r) => r.text),
+    ...tasks.map((t) => taskText(t.type, t.what)),
+  ])];
   return (
     <div className={styles.reviewReasons}>
       <p className={styles.strong}>{stateSentence(state, needs.length)}</p>

@@ -469,6 +469,11 @@ def test_application_status_open_and_confirmation(client, data, monkeypatch):
     assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "open"
     assert client.post(f"/api/jobs/{jid}/application/open", headers=h).json() == {"action": "focused"}
     assert len(spawned) == 1
+    # Refill skips the live tab and fills again; a staged fill's leftover fields show as fields_left, not an error
+    assert client.post(f"/api/jobs/{jid}/application/open", headers=h, json={"refill": True}).json()["action"] == "filling"
+    assert len(spawned) == 2
+    (jdir / "fill_summary.json").write_text('{"filled": 3, "failed": [{"field_id": "q1", "label": "Q1", "error": "x"}], "skipped": ["Q2"]}')
+    assert client.get(f"/api/jobs/{jid}/application").json()["fields_left"] == ["Q1", "Q2"]
     live[0]["url"] = "https://job-boards.example/acme/jobs/1/confirmation"
     assert client.get(f"/api/jobs/{jid}/application").json()["marked_applied"] is True
     assert Store(data["settings"]).get_status(jid) == "applied"
