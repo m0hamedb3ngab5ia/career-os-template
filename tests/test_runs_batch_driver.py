@@ -266,3 +266,54 @@ def test_driver_renews_its_lock_per_job(settings, monkeypatch):
     monkeypatch.setattr(batches.locks, "refresh", lambda *a, **kw: refreshed.append(a) or True)
     batches.drive(settings, b["id"], run=fake_run([]))
     assert len(refreshed) == 2
+
+
+def test_failed_stage_that_left_its_artifact_does_not_advance(settings):
+    """A score that failed but wrote score.json: the retry says `already scored`; the recorded failure wins."""
+    b = make(settings, n=1, stop_at="prepare")
+    jid = b["selected"][0]["job_id"]
+    Failures(RunStore(settings)).record("score", jid, "timeout", "", "r0", NOW)
+    calls = []
+
+    def run(settings, kind, budget, *, job_ids, **kw):
+        calls.append(kind)
+        raise batches.JobNotRunnable(kind, {jid: "already scored"})
+    out = batches.drive(settings, b["id"], run=run)
+    assert calls == ["score"] and states(out) == ["failed"]
+
+
+def test_pause_request_right_after_lock_is_kept(settings, monkeypatch):
+    b = make(settings)
+    real = locks.acquire
+
+    def acquire(*a, **kw):  # the pause lands while the driver already holds the lock
+        lk = real(*a, **kw)
+        if kw.get("owner") == f"batch:{b['id']}":
+            batches.control(settings, b["id"], "pause")
+        return lk
+    monkeypatch.setattr(batches.locks, "acquire", acquire)
+    run = fake_run([])
+    out = batches.drive(settings, b["id"], run=run)
+    assert not run.calls and out["status"] == "paused"
+
+
+def test_pause_between_start_and_driver_is_honoured(settings):
+    from datetime import timedelta
+    b = make(settings)
+    batches.control(settings, b["id"], "pause", now=NOW + timedelta(seconds=1))  # no driver yet: status paused
+    run = fake_run([])
+    out = batches.drive(settings, b["id"], run=run, since=NOW, now=lambda: NOW)
+    assert not run.calls and out["status"] == "paused"
+    out = batches.drive(settings, b["id"], run=run, since=NOW + timedelta(seconds=2))  # a later start resumes
+    assert out["status"] == "done"
+
+
+def test_batch_run_busy_exits_6(settings, monkeypatch):
+    from careeros import cli
+
+    def busy(*a, **kw):
+        raise batches.BatchBusy("running")
+    monkeypatch.setattr(batches, "drive", busy)
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    args = cli.build_parser().parse_args(["batch", "run", "b1"])
+    assert args.fn(args) == 6
