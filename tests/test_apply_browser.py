@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import json
 import sys
+import types
 
 import pytest
 
@@ -126,3 +127,60 @@ def test_preflight_missing_playwright_and_chromium(monkeypatch, tmp_path):
     monkeypatch.setattr(gh_fill, "sync_playwright", lambda: P())
     with pytest.raises(gh_fill.MissingPlaywright, match="playwright install chromium"):
         gh_fill.preflight()
+
+
+def test_fill_running_from_log(tmp_path):
+    import os
+    import subprocess as sp
+
+    from careeros.apply import browser
+
+    assert browser.fill_running(tmp_path) is False  # never ran
+    log = tmp_path / "application.log"
+    log.write_text(f"{browser.FILL_PID}{os.getpid()}\nfilling...\n")
+    assert browser.fill_running(tmp_path) is True  # process alive, no exit line yet
+    log.write_text(f"{browser.FILL_PID}{os.getpid()}\n{browser.FILL_EXIT}0\n")
+    assert browser.fill_running(tmp_path) is False  # finished
+    dead = sp.Popen(["true"])
+    dead.wait()
+    log.write_text(f"{browser.FILL_PID}{dead.pid}\nfilling...\n")
+    assert browser.fill_running(tmp_path) is False  # killed mid-fill (reboot, crash): not stuck forever
+
+
+def _open_app_env(monkeypatch, tmp_path, live_tab=False):
+    from careeros.apply import browser, gh_fill
+    from careeros.ui.services import job_actions
+
+    monkeypatch.setattr(job_actions, "_job", lambda s, j: tmp_path)
+    monkeypatch.setattr(job_actions, "ensure_unlocked", lambda s, j: None)
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
+    monkeypatch.setattr(browser, "cdp_url", lambda s: browser.DEFAULT_CDP)
+    monkeypatch.setattr(browser, "activate", lambda d, c, get=None: live_tab)
+    closed = []
+    monkeypatch.setattr(browser, "close", lambda d, c, get=None: closed.append(d) or live_tab)
+    spawned = []
+
+    def popen(argv, **kw):
+        spawned.append(argv)
+        kw["stdout"].write(f"{browser.FILL_PID}{__import__('os').getpid()}\n".encode())  # the shell's first line
+    return job_actions, spawned, closed, popen
+
+
+def test_open_application_double_click_spawns_once(monkeypatch, tmp_path):
+    job_actions, spawned, _, popen = _open_app_env(monkeypatch, tmp_path)
+    (tmp_path / "fill_plan.json").write_text("{}")
+    (tmp_path / "fill_summary.json").write_text('{"failed": [{"label": "Old"}]}')
+    assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "filling"
+    assert not (tmp_path / "fill_summary.json").exists()  # stale fields_left gone while the new fill runs
+    assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "filling"
+    assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen, refill=True)["action"] == "filling"
+    assert len(spawned) == 1
+
+
+def test_open_application_refill_closes_live_tab(monkeypatch, tmp_path):
+    job_actions, spawned, closed, popen = _open_app_env(monkeypatch, tmp_path, live_tab=True)
+    (tmp_path / "fill_plan.json").write_text("{}")
+    assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "focused"
+    assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen, refill=True)["action"] == "filling"
+    assert closed == [tmp_path] and len(spawned) == 1
+    assert "careeros-fill-pid" in spawned[0][-1]  # the shell records its pid first

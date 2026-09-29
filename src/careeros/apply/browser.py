@@ -1,11 +1,12 @@
 """The apply browser: a visible Chromium the app does NOT own, reached over CDP, so a staged form survives app
-rebuilds and restarts. The filled tab is never closed by us; `application.json` in the job dir records it.
+rebuilds and restarts. The filled tab is only closed by us on a refill; `application.json` in the job dir records it.
 
 Liveness and focus use Chrome's DevTools HTTP endpoints (`/json/list`, `/json/activate/<id>`): stdlib only.
 """
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import time
 import urllib.request
@@ -15,6 +16,7 @@ from typing import Any, Callable
 DEFAULT_CDP = "http://127.0.0.1:9223"   # dedicated port: not the 9222 a user's own debug Chrome may use
 RECORD = "application.json"
 FILL_EXIT = "careeros-fill-exit: "  # the UI's detached fill appends this + its exit code to application.log
+FILL_PID = "careeros-fill-pid: "  # ...and starts with this + its shell's pid
 STAGED = "staged, not submitted"  # gh_fill's line once the form is filled and the tab kept open
 
 
@@ -83,6 +85,26 @@ def fill_failure(job_dir: str | Path) -> dict[str, str] | None:
             "log": "\n".join(run[-20:])}
 
 
+def fill_running(job_dir: str | Path) -> bool:
+    """A detached UI fill is still running: its log has no exit line after its pid line and that pid is alive."""
+    try:
+        lines = (Path(job_dir) / "application.log").read_text(encoding="utf-8", errors="replace").splitlines()
+    except OSError:
+        return False
+    for ln in reversed(lines):
+        if ln.startswith(FILL_EXIT):
+            return False
+        if ln.startswith(FILL_PID):
+            try:
+                os.kill(int(ln[len(FILL_PID):]), 0)
+            except PermissionError:
+                return True
+            except (OSError, ValueError):
+                return False
+            return True
+    return False
+
+
 def status(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> dict[str, Any]:
     """`tab`: open (the filled tab is alive) | needs_refill (it died: sleep, crash, reboot) | none (never filled).
     `submitted`: the live tab shows the Greenhouse confirmation page. `can_fill`: saved answers exist.
@@ -107,12 +129,21 @@ def status(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = Non
 
 def activate(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> bool:
     """Focus the exact filled tab. False when it is gone."""
+    return _tab_cmd("activate", job_dir, cdp, get)
+
+
+def close(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> bool:
+    """Close the filled tab (before a refill opens a new one). False when it is gone."""
+    return _tab_cmd("close", job_dir, cdp, get)
+
+
+def _tab_cmd(verb: str, job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None) -> bool:
     rec = record(job_dir)
     if not rec or status(job_dir, cdp, get)["tab"] != "open":
         return False
     try:
-        (get or _get)(f"{rec.get('cdp') or cdp}/json/activate/{rec['tab_id']}")
-    except ValueError:  # activate answers plain text ("Target activated"), not JSON
+        (get or _get)(f"{rec.get('cdp') or cdp}/json/{verb}/{rec['tab_id']}")
+    except ValueError:  # answers plain text ("Target activated"/"Target is closing"), not JSON
         pass
     except OSError:
         return False
