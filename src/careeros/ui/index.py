@@ -24,7 +24,7 @@ from typing import Any, Iterable
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 4   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error
+SCHEMA_VERSION = 5   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -40,7 +40,7 @@ CREATE TABLE status_history (job_id TEXT, seq INTEGER, status TEXT, at TEXT, not
 CREATE INDEX status_history_job ON status_history(job_id);
 CREATE TABLE action_items (
     id TEXT PRIMARY KEY, created TEXT, job_id TEXT, company TEXT, role TEXT, type TEXT, what TEXT, link TEXT,
-    priority TEXT, needs TEXT, done INTEGER, done_date TEXT, due TEXT, due_reason TEXT);
+    priority TEXT, needs TEXT, done INTEGER, done_date TEXT, due TEXT, due_reason TEXT, detail TEXT);
 CREATE TABLE contacts (
     job_id TEXT, seq INTEGER, name TEXT, title TEXT, company TEXT, linkedin TEXT, email TEXT,
     email_confidence TEXT, linkedin_degree INTEGER, mutuals INTEGER, sent INTEGER, replied TEXT);
@@ -455,11 +455,12 @@ class Index:
                     return False                 # and no signature, so the next change retries
             self.con.execute("DELETE FROM action_items")
             self.con.executemany(
-                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+                "INSERT OR REPLACE INTO action_items VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
                 [(str(it.get("ID")), _s(it.get("Created")), _s(it.get("JobID")), _s(it.get("Company")),
                   _s(it.get("Role")), _s(it.get("Type")), _s(it.get("What to do")), _s(it.get("Link")),
                   _s(it.get("Priority")), _s(it.get("Needs")), int(str(it.get("Done") or "N").upper() == "Y"),
-                  _s(it.get("DoneDate")), _due(it.get("Due")), _s(it.get("Due reason")))
+                  _s(it.get("DoneDate")), _due(it.get("Due")), _s(it.get("Due reason")),
+                  _s(it.get("Detail")))
                  for it in items if it.get("ID")])
             self.set_meta("tracker_sig", sig)
             self.set_meta("indexed_at", _now())

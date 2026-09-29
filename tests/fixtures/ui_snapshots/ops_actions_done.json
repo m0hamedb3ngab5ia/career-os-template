@@ -13,6 +13,7 @@
           "bucket": "nodate",
           "company": "Hooli",
           "created": "<created>",
+          "detail": null,
           "done": true,
           "done_date": "<done_date>",
           "due": null,

@@ -57,12 +57,12 @@ JOB_COLUMNS: list[tuple[str, str, int]] = [
 ACTION_COLUMNS = [
     ("ID", 10), ("Created", 18), ("JobID", 14), ("Company", 22), ("Role", 36), ("Type", 14),
     ("What to do", 50), ("Link", 40), ("Priority", 9), ("Needs", 9), ("Done", 7), ("DoneDate", 12),
-    ("Due", 18), ("Due reason", 28),
+    ("Due", 18), ("Due reason", 28), ("Detail", 50),
 ]
 # Action Items columns added after the first release, appended to older workbooks in this order on open.
 # (header, width, value for existing rows or None)
 ACTION_MIGRATIONS: list[tuple[str, int, str | None]] = [("Needs", 9, "anytime"), ("Due", 18, None),
-                                                        ("Due reason", 28, None)]
+                                                        ("Due reason", 28, None), ("Detail", 50, None)]
 CONTACT_COLUMNS = [
     ("JobID", 14), ("Company", 22), ("Name", 24), ("Title", 28), ("LinkedIn", 40), ("Email", 30),
     ("EmailConfidence", 15), ("DraftMessage", 60), ("Sent", 7), ("SentDate", 12), ("Replied", 10),
@@ -562,12 +562,13 @@ class Tracker:
         needs: str = "anytime",
         due: str | None = None,
         due_reason: str | None = None,
+        detail: str | None = None,
     ) -> str:
         item = ActionItem(
             id=id or uuid.uuid4().hex[:8],
             what=what, type=type, job_id=job_id, company=company, role=role,  # type: ignore[arg-type]
             link=link, priority=priority, needs=needs,  # type: ignore[arg-type]
-            due=due, due_reason=(due_reason or None) if due else None,
+            due=due, due_reason=(due_reason or None) if due else None, detail=detail or None,
         )
 
         def fn(wb: Workbook) -> str:
@@ -579,7 +580,7 @@ class Tracker:
             vals = {"ID": item.id, "Created": item.created[:19].replace("T", " "), "JobID": item.job_id,
                     "Company": item.company, "Role": item.role, "Type": item.type, "What to do": item.what,
                     "Link": item.link, "Priority": item.priority, "Needs": item.needs, "Done": "N", "DoneDate": "",
-                    "Due": item.due or "", "Due reason": item.due_reason or ""}
+                    "Due": item.due or "", "Due reason": item.due_reason or "", "Detail": item.detail or ""}
             for h, v in vals.items():
                 if h in hdr:
                     _put(ws, r, hdr[h], v)
@@ -587,7 +588,7 @@ class Tracker:
             return item.id
 
         payload = item.model_dump(include={"what", "type", "job_id", "company", "role", "link", "priority", "id", "needs",
-                                           "due", "due_reason"})
+                                           "due", "due_reason", "detail"})
         return self._mutate("add_action_item", payload, fn) or item.id
 
     def list_action_items(self, open_only: bool = True) -> list[dict[str, Any]]:
@@ -729,7 +730,7 @@ def set_status_both(settings: Settings, job_id: str, status: str, note: str) -> 
 
 def add_action(settings: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
                link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False,
-               due: str | None = None, due_reason: str | None = None) -> str:
+               due: str | None = None, due_reason: str | None = None, detail: str | None = None) -> str:
     """Add an Action Item (company/role filled from the job's posting). `dedupe`: no-op when an open item with the
     same job + type exists. Returns the line `careeros action add` prints."""
     from careeros.store import Store
@@ -744,7 +745,8 @@ def add_action(settings: Settings, what: str, type: str, job_id: str = "", compa
             if str(it.get("JobID") or "") == job_id and str(it.get("Type") or "") == type:
                 return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
     aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
-                             role=role, link=link, priority=priority, needs=needs, due=due, due_reason=due_reason)
+                             role=role, link=link, priority=priority, needs=needs, due=due, due_reason=due_reason,
+                             detail=detail)
     return f"action item {aid} added ({type}/{priority}/{needs})"
 
 

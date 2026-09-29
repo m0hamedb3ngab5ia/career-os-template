@@ -208,7 +208,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <p className={styles.caption}>{state.stage === "review" ? "Waiting on you" : "Notes from the pipeline"}</p>
           <ul className={styles.bullets}>
             {state.review_reasons.map((r) => (
-              <li key={r}>{r}</li>
+              <li key={`${r.code}:${r.detail ?? ""}`}>{r.text}</li>
             ))}
           </ul>
         </div>

@@ -158,6 +158,8 @@ class ActionItem(BaseModel):
     # Optional natural deadline (ISO date or datetime) and why ("posting closes"); never invented.
     due: str | None = None
     due_reason: str | None = None
+    # Technical text behind `what` (run ids, CLI hints) for the UI's Details; `what` stays human.
+    detail: str | None = None
 
     @field_validator("due")
     @classmethod

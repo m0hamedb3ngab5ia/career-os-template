@@ -14,7 +14,7 @@ export const NOW = new Date("2026-09-25T10:00:00Z"); // Friday
 /** An Action Item with every field the server sends; tests override what they care about. */
 export function actionItem(over: Partial<ActionItem> & Pick<ActionItem, "id" | "company" | "what">): ActionItem {
   return {
-    created: null, job_id: null, role: "", type: "other", link: "", priority: "", needs: "", done: false,
+    created: null, detail: null, job_id: null, role: "", type: "other", link: "", priority: "", needs: "", done: false,
     done_date: null, due: null, due_date_only: false, due_reason: null, bucket: "nodate", level: "none",
     scam_actions: false, ...over,
   };

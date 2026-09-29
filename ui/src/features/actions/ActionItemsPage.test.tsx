@@ -11,7 +11,7 @@ import type { ActionItem, ActionsView } from "./types";
 function item(over: Partial<ActionItem>): ActionItem {
   return {
     id: "a1", created: "2026-09-20 10:00:00", job_id: "j1", company: "Umbrella Labs", role: "Infrastructure Engineer",
-    type: "review", what: "Review and submit", link: "https://boards.greenhouse.io/umbrella/jobs/1", priority: "H",
+    type: "review", what: "Review and submit", detail: null, link: "https://boards.greenhouse.io/umbrella/jobs/1", priority: "H",
     needs: "laptop", done: false, done_date: null, due: null, due_date_only: false, due_reason: null,
     bucket: "nodate", level: "none", scam_actions: false, ...over,
   };
