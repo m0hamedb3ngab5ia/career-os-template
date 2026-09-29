@@ -869,6 +869,17 @@
             ],
             "title": "Requested"
           },
+          "retried": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Retried"
+          },
           "selected": {
             "items": {
               "$ref": "#/components/schemas/BatchJob"

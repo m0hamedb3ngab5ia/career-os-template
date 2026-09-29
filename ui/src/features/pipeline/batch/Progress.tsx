@@ -1,5 +1,6 @@
 import { useRef, useState } from "react";
 import { Link, useParams } from "react-router";
+import { ApiError } from "../../../api/client";
 import { Page } from "../../../app/PageHeader";
 import { Button } from "../../../kit/Button";
 import { ConfirmPanel } from "../../../kit/ConfirmPanel";
@@ -55,7 +56,11 @@ export function BatchProgressPage() {
   if (!b) {
     return (
       <Page title="Batch" busy={batch.isPending}>
-        {batch.isError ? (
+        {batch.error instanceof ApiError && batch.error.status === 404 ? (
+          <EmptyState title="Batch not found" action={<Link to="/pipeline">Back to Pipeline</Link>}>
+            It may have been deleted, or the link is wrong.
+          </EmptyState>
+        ) : batch.isError ? (
           <EmptyState title="Couldn’t load this batch" action={<Button size="small" onClick={() => void batch.refetch()}>Retry</Button>}>
             {errorText(batch.error)}
           </EmptyState>
@@ -70,7 +75,8 @@ export function BatchProgressPage() {
   const retryable = b.selected.filter((r) => RETRYABLE.has(r.state ?? "")).length;
   const pending = act.isPending;
   const run = (a: "start" | "pause" | "cancel") => act.mutate(a, { onSuccess: () => setConfirmCancel(false) });
-  const retry = () => act.mutate("retry");
+  const retry = () => act.mutate("retry", { onSuccess: () => setConfirmCancel(false) });
+  const nothingRetried = act.data?.retried === 0 && !pending;
   const requested = b.requested === "pause" ? "Pausing after the current job…" : b.requested === "cancel" ? "Cancelling after the current step…" : null;
 
   return (
@@ -102,8 +108,12 @@ export function BatchProgressPage() {
           ) : null}
         </div>
         {requested ? <p className={styles.note} role="status">{requested}</p> : null}
+        {nothingRetried ? (
+          <p className={styles.note} role="status">Nothing to retry: {b.selected.find((r) => r.reason?.startsWith("not retried"))?.reason ?? "no failed or cancelled job can run again"}.</p>
+        ) : null}
+        {!open ? <Summary b={b} /> : null}
         {act.isError ? <p className={styles.note} role="alert">Couldn’t update the batch: {errorText(act.error)}</p> : null}
-        {confirmCancel ? (
+        {confirmCancel && open ? (
           <ConfirmPanel
             question="Cancel this batch?"
             detail="Jobs not yet started are dropped; the current job finishes its step. Failed and cancelled jobs can be retried later."
@@ -134,5 +144,32 @@ export function BatchProgressPage() {
         </div>
       </div>
     </Page>
+  );
+}
+
+const RESULTS = ["submitted", "staged", "prepared", "scored"] as const;
+
+/** §4.2 Completed: submitted / staged / prepared (from each job's result or reason) / skipped, then why jobs were
+ *  skipped or left out. */
+function Summary({ b }: { b: Batch }) {
+  const text = (r: Row) => r.reason ?? r.result ?? "";
+  const skipped = b.selected.filter((r) => r.state === "skipped");
+  const parts = RESULTS.map((k) => [k, b.selected.filter((r) => r.state !== "skipped" && text(r).startsWith(k)).length] as const)
+    .filter(([, n]) => n)
+    .map(([k, n]) => `${formatCount(n)} ${k}`);
+  if (skipped.length) parts.push(`${formatCount(skipped.length)} skipped`);
+  const why = [
+    ...skipped.map((r) => `${r.company} · ${r.title}: ${text(r) || "skipped"}`),
+    ...b.excluded.map((e) => `${e.job_id}: ${e.reason}`),
+  ];
+  return (
+    <section aria-label="Summary">
+      {parts.length ? <p className={styles.note}>{parts.join(" · ")}</p> : null}
+      {why.length ? (
+        <ul className={styles.note}>
+          {why.map((w, i) => <li key={i}>{w}</li>)}
+        </ul>
+      ) : null}
+    </section>
   );
 }
