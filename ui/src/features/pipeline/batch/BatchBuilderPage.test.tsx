@@ -25,7 +25,7 @@ function preview(ids: string[], stop_at = "prepare"): Batch {
     excluded: ids.includes("l1") ? [{ job_id: "l1", reason: "LinkedIn application: apply yourself" }] : [] };
 }
 
-function setup(path = "/pipeline/batch/new?f.fit=75..", autoSubmit = false) {
+function setup(path = "/pipeline/batch/new?f.fit=75..", autoSubmit = false, extra: Record<string, unknown> = {}) {
   const calls = mockApi({
     "GET /api/meta": META,
     "GET /api/status": {},
@@ -38,6 +38,7 @@ function setup(path = "/pipeline/batch/new?f.fit=75..", autoSubmit = false) {
     "POST /api/batches": ({ body }: { body: { job_ids: string[]; stop_at: string; dry_run?: boolean } }) =>
       body.dry_run ? preview(body.job_ids, body.stop_at) : { ...preview(body.job_ids, body.stop_at), id: "b-1", dry_run: false, status: "ready" },
     "POST /api/batches/b-1/start": { ...preview(["a1"]), id: "b-1", dry_run: false, status: "ready" },
+    ...extra,
   });
   return { calls, ...renderRoutes(routes, path) };
 }
@@ -76,6 +77,54 @@ describe("Batch builder", () => {
     await screen.findByText("2 of 2 selected", {}, opts);
     expect(calls.some((c) => c.url.startsWith("/api/jobs"))).toBe(false);
     expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ job_ids: ["a1", "h1"], dry_run: true });
+  });
+
+  it("dedupes and trims ?ids=", { timeout: 20_000 }, async () => {
+    const { calls } = setup("/pipeline/batch/new?ids=a1,%20h1,a1,,");
+    await screen.findByText("2 of 2 selected", {}, opts);
+    expect(calls.find((c) => c.method === "POST")!.body).toMatchObject({ job_ids: ["a1", "h1"] });
+    expect(screen.getByText("2 jobs from your Jobs selection")).toBeInTheDocument();
+  });
+
+  it("hides the auto-submit note until settings load", { timeout: 20_000 }, async () => {
+    setup(undefined, false, { "GET /api/settings/runs": () => new Promise(() => {}) });
+    await screen.findByText("2 of 2 selected", {}, opts);
+    expect(screen.queryByText(/Auto-submit is off/)).toBeNull();
+  });
+
+  it("disables starting while the preview is stale", { timeout: 20_000 }, async () => {
+    let release = () => {};
+    const { calls } = setup(undefined, false, {
+      "POST /api/batches": ({ body }: { body: { job_ids: string[]; stop_at: string } }) =>
+        body.stop_at === "score" ? new Promise((r) => { release = () => r(preview(body.job_ids, "score")); }) : preview(body.job_ids, body.stop_at),
+    });
+    await screen.findByText("2 of 2 selected", {}, opts);
+    await userEvent.click(screen.getByRole("radio", { name: /^Score/ }));
+    await waitFor(() => expect(calls.some((c) => (c.body as { stop_at?: string } | undefined)?.stop_at === "score")).toBe(true));
+    expect(screen.getByRole("button", { name: "Review and start" })).toBeDisabled();
+    release();
+    await waitFor(() => expect(screen.getByRole("button", { name: "Review and start" })).toBeEnabled());
+  });
+
+  it("keeps a saved batch when start fails: retry only starts it, and links to it", { timeout: 20_000 }, async () => {
+    let fail = true;
+    const { calls } = setup(undefined, false, {
+      "POST /api/batches/b-1/start": () => fail ? new Response(JSON.stringify({ detail: "driver busy" }), { status: 409 })
+        : { ...preview(["a1"]), id: "b-1", dry_run: false, status: "running" },
+    });
+    await screen.findByText("2 of 2 selected", {}, opts);
+    await userEvent.clear(screen.getByRole("textbox", { name: "Name" }));
+    await userEvent.click(screen.getByRole("button", { name: "Review and start" }));
+    await userEvent.click(screen.getByRole("button", { name: "Start batch" }));
+    const alert = await screen.findByRole("alert", {}, opts);
+    expect(alert).toHaveTextContent(/Batch saved but not started/);
+    expect(within(alert).getByRole("link")).toHaveAttribute("href", "/pipeline/batch/b-1");
+    const create = calls.filter((c) => c.method === "POST" && c.url === "/api/batches" && !dry(c));
+    expect((create[0]!.body as { name: string }).name).toMatch(/^Batch — /);
+    fail = false;
+    await userEvent.click(screen.getByRole("button", { name: "Start batch" }));
+    await screen.findByRole("link", { name: /Follow batch/ }, opts);
+    expect(calls.filter((c) => c.method === "POST" && c.url === "/api/batches" && !dry(c))).toHaveLength(1);
   });
 
   it("disables Submit when allowed with the reason while auto-submit is off", { timeout: 20_000 }, async () => {

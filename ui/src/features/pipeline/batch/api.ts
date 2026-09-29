@@ -1,4 +1,5 @@
 import { keepPreviousData, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useState } from "react";
 import { apiFetch, apiSend } from "../../../api/client";
 import type { components } from "../../../api/schema.gen";
 
@@ -18,14 +19,21 @@ export function useBatchPreview(jobIds: string[], stopAt: StopAt) {
   });
 }
 
-/** Save the batch, then start its driver. Two calls so a failed start still leaves the saved batch to retry. */
+/** Save the batch once, then start its driver. A failed start keeps the saved id (`savedId`): retrying only calls
+ *  /start, so it never saves a duplicate batch. */
 export function useStartBatch() {
-  return useMutation({
+  const [savedId, setSavedId] = useState<string | null>(null);
+  const m = useMutation({
     mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name: string }) => {
-      const b = await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name });
-      return apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(b.id!)}/start`);
+      let id = savedId;
+      if (!id) {
+        id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name })).id!;
+        setSavedId(id);
+      }
+      return apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/start`);
     },
   });
+  return { ...m, savedId };
 }
 
 /** One saved batch; the SSE `changed` event (batches: [ids]) invalidates ["batch", id]. */
