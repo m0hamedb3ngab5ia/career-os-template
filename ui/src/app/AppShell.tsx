@@ -1,10 +1,11 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Inbox, KanbanSquare, ListChecks, Search, Settings, Sun, Table2, Users, Zap } from "lucide-react";
+import { Activity, Inbox, KanbanSquare, Search, Settings, Sun, Table2, Users, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
 import { useStatus } from "../api/queries";
 import type { StatusSummary } from "../api/types";
+import { HUMAN } from "../kit/labels";
 import { formatCount, formatRelative } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import styles from "./AppShell.module.css";
@@ -17,28 +18,22 @@ interface NavItem {
   end?: boolean;
 }
 
-// Sidebar order and groups from the mockup (Today artboard).
+// Sidebar groups and counts from design doc 2.1. All tasks (/actions) is linked from Today, not the nav.
 const NAV: { group: string; items: NavItem[] }[] = [
   {
-    group: "Overview",
+    group: "Job search",
     items: [
-      { to: "/", label: "Today", icon: Sun, end: true },
+      { to: "/", label: "Today", icon: Sun, end: true, count: (s) => s.counts?.action_items_open },
+      { to: "/jobs", label: "Jobs", icon: Table2 },
       { to: "/pipeline", label: "Pipeline", icon: KanbanSquare },
-      { to: "/jobs", label: "Jobs", icon: Table2, count: (s) => s.counts?.jobs },
+      { to: "/inbox", label: "Inbox", icon: Inbox, count: (s) => s.counts?.inbox },
     ],
   },
   {
-    group: "Work",
+    group: "More",
     items: [
-      { to: "/actions", label: "Action Items", icon: ListChecks, count: (s) => s.counts?.action_items_open },
-      { to: "/inbox", label: "Inbox & Follow-ups", icon: Inbox, count: (s) => s.counts?.inbox },
+      { to: "/automation", label: HUMAN.term.runs, icon: Activity },
       { to: "/contacts", label: "Contacts", icon: Users },
-    ],
-  },
-  {
-    group: "System",
-    items: [
-      { to: "/runs", label: "Runs", icon: Activity },
       { to: "/settings", label: "Settings", icon: Settings },
     ],
   },

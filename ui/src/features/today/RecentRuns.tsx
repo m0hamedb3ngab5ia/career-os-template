@@ -28,7 +28,7 @@ export function RecentRuns({ runs, now }: { runs: RunRow[]; now: Date }) {
         <h2 id="recent-runs-title" className={styles.h2}>
           Recent runs
         </h2>
-        <Link to="/runs" className={styles.headLink}>
+        <Link to="/automation" className={styles.headLink}>
           All runs
         </Link>
       </div>

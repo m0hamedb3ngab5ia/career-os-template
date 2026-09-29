@@ -13,8 +13,8 @@ import type { CurrentRun, RunRecord } from "./types";
 vi.setConfig({ testTimeout: 20_000 });
 
 const routes = [
-  { path: "/runs", element: <RunsPage /> },
-  { path: "/runs/:runId", element: <RunDetailPage /> },
+  { path: "/automation", element: <RunsPage /> },
+  { path: "/automation/runs/:runId", element: <RunDetailPage /> },
   { path: "/settings/runs", element: <p>Settings › Runs</p> },
 ];
 
@@ -108,16 +108,31 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-function open(data: ApiData = {}, path = "/runs") {
+function open(data: ApiData = {}, path = "/automation") {
   const api = mockApi(data);
   const view = renderRoute(routes, path);
   return { api, ...view };
 }
 
 describe("Runs page", () => {
+  it("keeps manual runs and run history under a collapsed Advanced section", async () => {
+    open();
+    const advanced = screen.getByText("Advanced").closest("details")!;
+    expect(advanced).not.toHaveAttribute("open");
+    expect(within(advanced).getByText(/uses your Claude Code subscription/)).toBeInTheDocument();
+    expect(await within(advanced).findByRole("heading", { name: "Start a run", hidden: true })).toBeInTheDocument();
+    expect(await within(advanced).findByRole("heading", { name: "No runs yet", hidden: true })).toBeInTheDocument();
+    expect(within(advanced).queryByText(/Scheduler not installed/)).toBeNull(); // schedule stays up top
+  });
+
+  it("opens Advanced when the URL already picks a run kind (deep link to a manual run or history filter)", () => {
+    open({}, "/automation?kind=score");
+    expect(screen.getByText("Advanced").closest("details")).toHaveAttribute("open");
+  });
+
   it("shows empty states, never invented data, when nothing has run", async () => {
     const { container } = open();
-    expect(screen.getByRole("heading", { level: 1, name: "Runs" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1, name: "Automation" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Nothing running" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "No runs yet" })).toBeInTheDocument();
     expect(await screen.findByRole("heading", { name: "Nothing to score" })).toBeInTheDocument();
@@ -248,7 +263,7 @@ describe("Runs page", () => {
   it("forgets a dry-run selection when the custom limits change", async () => {
     const user = userEvent.setup();
     const selection = { dry_run: true, kind: "score", budget: {}, candidates: 1, selected: [] };
-    const { api } = open({ post: { "/api/runs": selection } }, "/runs?kind=score&budget=custom");
+    const { api } = open({ post: { "/api/runs": selection } }, "/automation?kind=score&budget=custom");
     await user.type(await screen.findByRole("spinbutton", { name: "Jobs" }), "3");
     await user.click(screen.getByRole("button", { name: "Show the selection" }));
     expect(await screen.findByRole("region", { name: "Dry run selection" })).toBeInTheDocument();
@@ -261,7 +276,7 @@ describe("Runs page", () => {
 
   it("refuses a fractional job count before asking the server", async () => {
     const user = userEvent.setup();
-    const { api } = open({ post: { "/api/runs": { started: true } } }, "/runs?kind=score&budget=custom");
+    const { api } = open({ post: { "/api/runs": { started: true } } }, "/automation?kind=score&budget=custom");
     const jobs = await screen.findByRole("spinbutton", { name: "Jobs" });
     expect(jobs).toHaveAttribute("step", "1");
     await user.type(jobs, "2.5");
@@ -272,7 +287,7 @@ describe("Runs page", () => {
 
   it("disables Inbox with a reason until inbox sync is set up; steps start directly", async () => {
     const user = userEvent.setup();
-    const { api } = open({ post: { "/api/runs/steps/scout": { kind: "scout", started: true, pid: 3 } } }, "/runs?kind=inbox");
+    const { api } = open({ post: { "/api/runs/steps/scout": { kind: "scout", started: true, pid: 3 } } }, "/automation?kind=inbox");
     const start = await screen.findByRole("button", { name: "Start inbox run" });
     expect(start).toBeDisabled();
     expect(start).toHaveAccessibleDescription(/Inbox sync isn't set up yet/);
@@ -290,7 +305,7 @@ describe("Runs page", () => {
           "/api/runs": new Response(JSON.stringify({ detail: "Runs are paused. Resume them first." }), { status: 409 }),
         },
       },
-      "/runs?kind=score",
+      "/automation?kind=score",
     );
     await user.click(await screen.findByRole("switch", { name: "Dry run first" }));
     await user.click(screen.getByRole("button", { name: "Start score run" }));
@@ -370,7 +385,7 @@ describe("Runs page", () => {
     expect(rows[0]).toHaveTextContent("retries at the next slot");
     expect(rows[1]).toHaveTextContent("Interrupted");
     expect(rows[2]).toHaveTextContent("Done");
-    expect(rows[2]).toHaveAttribute("href", "/runs/20260925-010000-score-aaaa");
+    expect(rows[2]).toHaveAttribute("href", "/automation/runs/20260925-010000-score-aaaa");
     expect(screen.getByRole("button", { name: "Load older runs" })).toBeInTheDocument();
     await user.click(within(screen.getByRole("radiogroup", { name: "Run kind" })).getByRole("radio", { name: "Score" }));
     expect(router.state.location.search).toContain("history=score");
@@ -452,7 +467,7 @@ describe("Run detail", () => {
           },
         },
       },
-      "/runs/r9",
+      "/automation/runs/r9",
     );
     expect(await screen.findByRole("heading", { level: 1, name: "Prepare run" })).toBeInTheDocument();
     const table = screen.getByRole("table");
@@ -465,8 +480,8 @@ describe("Run detail", () => {
   });
 
   it("says so when the run does not exist", async () => {
-    open({}, "/runs/nope");
+    open({}, "/automation/runs/nope");
     expect(await screen.findByRole("heading", { level: 1, name: "Run not found" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "/runs");
+    expect(screen.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "/automation");
   });
 });

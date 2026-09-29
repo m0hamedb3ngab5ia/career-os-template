@@ -85,6 +85,10 @@ describe("label tables", () => {
     expect(HUMAN.term["tier a"]).toBe("Top choice (always submitted by you)");
     expect(questionsLabel(3)).toBe("Answer 3 application questions");
     expect(keywordCoverageLabel(1)).toBe("Resume misses 1 key skill from this role");
+    expect(questionsLabel(0)).toBe("Answer 0 application questions");
+    expect(questionsLabel(2)).toBe("Answer 2 application questions");
+    expect(keywordCoverageLabel(0)).toBe("Resume misses 0 key skills from this role");
+    expect(keywordCoverageLabel(2)).toBe("Resume misses 2 key skills from this role");
     for (const g of [HUMAN.status, HUMAN.preset, HUMAN.qa, HUMAN.term, HUMAN.tier, HUMAN.safety, HUMAN.action, HUMAN.stop]) for (const [k, v] of Object.entries(g)) if (k !== "action item") expect(v[0]).toBe(v[0]!.toUpperCase());
   });
 });

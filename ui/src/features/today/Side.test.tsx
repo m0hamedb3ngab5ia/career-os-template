@@ -33,7 +33,7 @@ describe("RecentRuns", () => {
     const unknown = within(items[2]!).getByText("Mystery reason");
     expect(unknown).toHaveAttribute("data-tone", "gray");
     expect(within(items[2]!).getByText("Mon 4:40 PM")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "/runs");
+    expect(screen.getByRole("link", { name: "All runs" })).toHaveAttribute("href", "/automation");
   });
 
   it("shows at most five runs", () => {
@@ -67,7 +67,7 @@ describe("NextScheduled", () => {
     expect(within(row("Score")).getByText("Tomorrow, 1:00 AM")).toBeInTheDocument();
     expect(within(row("Inbox sync")).getByText("off")).toBeInTheDocument();
     expect(within(row("Prune + storage check")).getByText("Sun 3:00 AM")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Run schedule" })).toHaveAttribute("href", "/runs");
+    expect(screen.getByRole("link", { name: "Run schedule" })).toHaveAttribute("href", "/automation");
     expect(screen.queryByText(/runs missed/)).not.toBeInTheDocument();
   });
 

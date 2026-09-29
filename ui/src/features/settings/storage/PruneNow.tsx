@@ -93,7 +93,7 @@ export function PruneNow() {
         </>
       )}
       <p className={styles.panelSub}>
-        Past prunes are in <Link to="/runs">Runs</Link>.
+        Past prunes are in <Link to="/automation">Automation</Link>.
       </p>
     </section>
   );

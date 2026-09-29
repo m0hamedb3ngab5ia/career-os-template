@@ -1,6 +1,8 @@
 import { Clock } from "lucide-react";
-import { Link } from "react-router";
+import { Link, useSearchParams } from "react-router";
 import { Page } from "../../app/PageHeader";
+import { Details } from "../../kit/Details";
+import { HUMAN } from "../../kit/labels";
 import { useCurrentRun, useMeta, useSchedule } from "./api";
 import { CatchUpBanner, PauseAllControl, PausedBanner } from "./Banners";
 import { CurrentRunCard } from "./CurrentRunCard";
@@ -10,7 +12,7 @@ import { SchedulePanel } from "./SchedulePanel";
 import { StartRunCard } from "./StartRunCard";
 import { UpNextCard } from "./UpNextCard";
 
-/** Runs (docs/UI.md screen 8, Runs artboard): now, start, schedule, up next, history, pause and catch-up. */
+/** Automation (design doc 3, was Runs): status, schedule, up next; manual runs and history under Advanced. */
 export function RunsPage() {
   const meta = useMeta();
   const current = useCurrentRun();
@@ -18,10 +20,11 @@ export function RunsPage() {
   const run = current.data?.id ? current.data : null;
   const paused = schedule.data?.paused ?? null;
   const catchUp = schedule.data?.catch_up ?? null;
+  const [params] = useSearchParams();
   return (
     <Page
-      title="Runs"
-      subtitle="Scheduled runs score and prepare only · uses your Claude Code subscription, no API calls"
+      title={HUMAN.term.runs}
+      subtitle="What runs by itself, when, and whether it worked"
       actions={
         <>
           <PauseAllControl paused={paused} />
@@ -43,14 +46,17 @@ export function RunsPage() {
         <div className={styles.topRow}>
           <CurrentRunCard key={run?.id ?? "idle"} run={run} />
           <div className={styles.side}>
-            <StartRunCard meta={meta.data} schedule={schedule.data} paused={Boolean(paused)} />
             <SchedulePanel schedule={schedule.data} runningKind={run?.kind} />
           </div>
         </div>
-        <div className={styles.bottomRow}>
-          <UpNextCard />
-          <HistoryCard />
-        </div>
+        <UpNextCard />
+        <Details summary="Advanced" defaultOpen={params.has("kind")}>
+          <p>Scheduled runs score and prepare only · uses your Claude Code subscription, no API calls</p>
+          <div className={styles.bottomRow}>
+            <StartRunCard meta={meta.data} schedule={schedule.data} paused={Boolean(paused)} />
+            <HistoryCard />
+          </div>
+        </Details>
       </div>
     </Page>
   );
