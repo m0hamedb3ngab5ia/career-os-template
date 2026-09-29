@@ -6,13 +6,14 @@ import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
 import { errorText, useToday, useTodayStatus } from "./api";
 import { HeaderActions } from "./HeaderActions";
+import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
 import { NextScheduled } from "./NextScheduled";
 import { PausedBanner } from "./PausedBanner";
 import { PipelineChart } from "./PipelineChart";
 import { RecentRuns } from "./RecentRuns";
-import { StatTiles } from "./StatTiles";
 import styles from "./Today.module.css";
+import type { ActionItem } from "./types";
 
 /** Route `/` (docs/UI.md "Today"; mockup Main / TodayDark). */
 export function TodayPage() {
@@ -20,24 +21,16 @@ export function TodayPage() {
   const status = useTodayStatus();
   const today = useToday();
   const s = status.data;
-  const open = today.data ? (today.data.actions ?? []).length : s ? (s.tiles?.needs_you?.value ?? 0) : null;
-  const subtitle =
-    open === null ? formatLongDate(now) : `${formatLongDate(now)} · ${formatCount(open)} ${open === 1 ? "item needs" : "items need"} you`;
+  const subtitle = today.data ? `${formatLongDate(now)} · ${headline(today.data.actions ?? [])}` : formatLongDate(now);
 
   return (
     <Page title="Today" subtitle={subtitle} actions={<HeaderActions queue={today.data?.prepare_queue ?? (today.data ? { total: null, error: null } : undefined)} paused={!!s?.paused} />}>
       <div className={styles.stack}>
         {s?.paused ? <PausedBanner paused={s.paused} now={now} /> : null}
-        {status.isPending ? (
-          <div className={styles.tiles} role="img" aria-label="Loading today’s numbers">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className={styles.skeletonTile} />
-            ))}
-          </div>
-        ) : status.isError ? (
+        {status.isError ? (
           <div className={styles.panel}>
             <EmptyState
-              title="Couldn’t load today’s numbers"
+              title="Couldn’t load automation status"
               action={
                 <Button size="small" onClick={() => void status.refetch()}>
                   Retry
@@ -47,9 +40,7 @@ export function TodayPage() {
               {errorText(status.error)}
             </EmptyState>
           </div>
-        ) : (
-          <StatTiles tiles={s?.tiles} now={now} />
-        )}
+        ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
             <NeedsYou />
@@ -65,4 +56,16 @@ export function TodayPage() {
       </div>
     </Page>
   );
+}
+
+/** Headline sentence (replaces the stat tiles): "3 jobs need you · 1 other task". */
+function headline(actions: ActionItem[]): string {
+  const groups = groupByJob(actions);
+  const jobs = groups.filter((g) => g.jobId !== null).length;
+  const other = groups.find((g) => g.jobId === null)?.items.length ?? 0;
+  const parts = [
+    jobs ? `${formatCount(jobs)} ${jobs === 1 ? "job needs" : "jobs need"} you` : null,
+    other ? `${formatCount(other)} other ${other === 1 ? "task" : "tasks"}` : null,
+  ].filter(Boolean);
+  return parts.length ? parts.join(" · ") : "nothing needs you";
 }
