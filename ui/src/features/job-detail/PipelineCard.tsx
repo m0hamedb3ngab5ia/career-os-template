@@ -256,7 +256,6 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           <Button variant="primary" title={state.blocked_reason ?? label} disabled>
             {label}
           </Button>
-          {state.blocked_reason ? <span className={styles.sec}>{state.blocked_reason}</span> : null}
           {state.failures?.excluded ? (
             <Button
               title="Clear this job's failure count so runs pick it up again"

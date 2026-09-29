@@ -137,6 +137,14 @@ export interface paths {
     /** Job Detail */
     get: operations["job_detail_api_jobs__job_id__get"];
   };
+  "/api/jobs/{job_id}/application": {
+    /** Application Status */
+    get: operations["application_status_api_jobs__job_id__application_get"];
+  };
+  "/api/jobs/{job_id}/application/open": {
+    /** Open Application */
+    post: operations["open_application_api_jobs__job_id__application_open_post"];
+  };
   "/api/jobs/{job_id}/failures/reset": {
     /**
      * Reset Job Failures
@@ -3180,6 +3188,54 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["JobDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Application Status */
+  application_status_api_jobs__job_id__application_get: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Open Application */
+  open_application_api_jobs__job_id__application_open_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */
