@@ -86,6 +86,31 @@ export const STOP_REASONS: CodeTable = {
   interrupted: { label: "Interrupted", tone: "gray" },
 };
 
+// Design doc 2.4 wording, keyed like the tables above. Slices 3-9 switch pages over to it; tone stays in the tables.
+export const HUMAN = {
+  status: {
+    found: "New", scored: "Scored", queued: "Ready to prepare", prepared: "Ready to apply",
+    needs_review: "Needs your review", skipped: "Not a fit",
+  },
+  tier: { A: "Top choice", B: "Good match", C: "Stretch" },
+  safety: { pass: "Company verified", review: "Check company", block: "Blocked" },
+  action: {
+    captcha: "Solve a verification check", bot_detection: "Solve a verification check",
+    question: "Answer application questions", salary: "Decide a salary answer",
+    profile_gap: "Add missing experience to your profile", laptop_required: "Finish on your laptop",
+    qa_fail: "Review tailored resume", scam_suspected: "Check this company is real",
+    ghost_job: "Posting may be stale",
+  },
+  stop: { auth_required: "Sign-in needed", usage_limit: "Claude usage limit reached" },
+  // Terms with no code table.
+  term: {
+    "score run": "Score jobs", "prepare run": "Prepare documents", "apply run": "Fill application",
+    "dry run": "Preview", Runs: "Automation", "Action Item": "task", Scout: "Job discovery",
+    tick: "Automation schedule", schedule: "Automation schedule", "catch-up": "Missed runs",
+    "qa-review fail": "Documents need review",
+  },
+} as const;
+
 export function humanize(code: string): string {
   const words = code.replace(/[_-]+/g, " ").trim().toLowerCase();
   return words ? words[0]!.toUpperCase() + words.slice(1) : "—";
