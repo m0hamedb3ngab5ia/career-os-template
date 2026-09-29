@@ -82,12 +82,14 @@ class Group:
     title: str
     items: tuple[Field | Policy, ...]
     help: str = ""
+    advanced: bool = False          # system detail: the UI folds it under Advanced (ui-redesign.md §2.3)
 
     def fields(self) -> list[Field]:
         return [i for i in self.items if isinstance(i, Field)]
 
     def to_dict(self) -> dict[str, Any]:
-        return {"id": self.id, "title": self.title, "help": self.help, "items": [i.to_dict() for i in self.items]}
+        return {"id": self.id, "title": self.title, "help": self.help, "advanced": self.advanced,
+                "items": [i.to_dict() for i in self.items]}
 
 
 @dataclass(frozen=True)
@@ -97,6 +99,7 @@ class Section:
     groups: tuple[Group, ...]
     help: str = ""
     checks: tuple[SectionCheck, ...] = ()
+    advanced: bool = False          # the whole page is system detail: listed under Advanced in the nav
 
     def fields(self) -> list[Field]:
         return [f for g in self.groups for f in g.fields()]
@@ -116,7 +119,7 @@ class Section:
 
     def to_dict(self) -> dict[str, Any]:
         return {"id": self.id, "title": self.title, "help": self.help, "files": self.files(),
-                "groups": [g.to_dict() for g in self.groups]}
+                "advanced": self.advanced, "groups": [g.to_dict() for g in self.groups]}
 
 
 # --- validation -------------------------------------------------------------------------------------------

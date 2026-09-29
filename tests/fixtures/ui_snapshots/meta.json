@@ -28,7 +28,6 @@
     "cancelled"
   ],
   "pipeline": {
-    "card_limit": 10,
     "closed": [
       "skipped",
       "rejected",

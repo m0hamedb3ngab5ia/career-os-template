@@ -269,7 +269,6 @@ export function KeyValueControl({ field, value, onChange, inputId, describedBy, 
 // Columns for record lists that may start empty (the example boards have these keys).
 const RECORD_COLUMNS: Record<string, string[]> = {
   "companies:boards": ["company", "ats", "slug", "url"],
-  "pipeline:ui.pipeline.columns": ["name", "statuses"],
 };
 
 /** records: a small table, one row per record; list cells are comma-separated. */

@@ -1,6 +1,7 @@
 {
   "sections": [
     {
+      "advanced": false,
       "files": [
         "pipeline"
       ],
@@ -9,6 +10,7 @@
       "title": "General"
     },
     {
+      "advanced": false,
       "files": [
         "targets"
       ],
@@ -17,6 +19,7 @@
       "title": "Targets"
     },
     {
+      "advanced": false,
       "files": [
         "pipeline",
         "targets"
@@ -26,6 +29,7 @@
       "title": "Autonomy"
     },
     {
+      "advanced": false,
       "files": [
         "targets"
       ],
@@ -34,6 +38,7 @@
       "title": "Safety"
     },
     {
+      "advanced": false,
       "files": [
         "companies",
         "targets"
@@ -43,6 +48,7 @@
       "title": "Scout"
     },
     {
+      "advanced": false,
       "files": [
         "companies"
       ],
@@ -51,6 +57,7 @@
       "title": "Companies"
     },
     {
+      "advanced": false,
       "files": [
         "pipeline"
       ],
@@ -59,6 +66,7 @@
       "title": "Outreach"
     },
     {
+      "advanced": false,
       "files": [
         "pipeline"
       ],
@@ -67,6 +75,7 @@
       "title": "Notifications"
     },
     {
+      "advanced": false,
       "files": [
         "pipeline"
       ],
@@ -75,6 +84,7 @@
       "title": "Runs & schedule"
     },
     {
+      "advanced": true,
       "files": [
         "pipeline"
       ],
@@ -83,6 +93,7 @@
       "title": "Storage & efficiency"
     },
     {
+      "advanced": true,
       "files": [
         "qa"
       ],

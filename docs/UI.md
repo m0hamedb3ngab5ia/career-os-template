@@ -306,9 +306,9 @@ stopped with Pause all instead. A `running` run whose process no longer holds it
   Phone below is not built yet.
 - `pipeline.yaml: ui` (built): port, host, open_browser, theme, undo_seconds, page_size, watch_debounce_ms,
   index_path, `due_soon_hours` (Action Items' orange window), `pause_until_tomorrow_at` (Runs › Pause all ›
-  "Until tomorrow"), `followup_after_apply_days` / `followup_no_response_days` (Inbox & follow-ups due windows) and
-  `pipeline.columns` and `pipeline.card_limit` (status groups; statuses in no column form the Pipeline "Closed"
-  line), each with its "(Recommended)" default. `/api/meta` serves these plus every status, tier,
+  "Until tomorrow") and `followup_after_apply_days` / `followup_no_response_days` (Inbox & follow-ups due
+  windows), each with its "(Recommended)" default. The Pipeline board's columns are fixed (the old
+  `ui.pipeline.columns` / `card_limit` keys are ignored with a warning). `/api/meta` serves these plus every status, tier,
   action type and stop reason from the models, so the frontend renders codes it was never told about (grey
   fallback).
 - Request guard (built): Host must be loopback (DNS rebinding), a browser Origin must be loopback, and every write

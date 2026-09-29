@@ -2626,6 +2626,10 @@
       },
       "GroupSchema": {
         "properties": {
+          "advanced": {
+            "title": "Advanced",
+            "type": "boolean"
+          },
           "help": {
             "title": "Help",
             "type": "string"
@@ -2657,6 +2661,7 @@
           "id",
           "title",
           "help",
+          "advanced",
           "items"
         ],
         "title": "GroupSchema",
@@ -4615,10 +4620,6 @@
       },
       "PipelineConfig": {
         "properties": {
-          "card_limit": {
-            "title": "Card Limit",
-            "type": "integer"
-          },
           "closed": {
             "items": {
               "type": "string"
@@ -4636,8 +4637,7 @@
         },
         "required": [
           "columns",
-          "closed",
-          "card_limit"
+          "closed"
         ],
         "title": "PipelineConfig",
         "type": "object"
@@ -6411,6 +6411,10 @@
       },
       "SectionSchema": {
         "properties": {
+          "advanced": {
+            "title": "Advanced",
+            "type": "boolean"
+          },
           "files": {
             "items": {
               "type": "string"
@@ -6443,6 +6447,7 @@
           "title",
           "help",
           "files",
+          "advanced",
           "groups"
         ],
         "title": "SectionSchema",
@@ -6450,6 +6455,10 @@
       },
       "SectionSummary": {
         "properties": {
+          "advanced": {
+            "title": "Advanced",
+            "type": "boolean"
+          },
           "files": {
             "items": {
               "type": "string"
@@ -6474,7 +6483,8 @@
           "id",
           "title",
           "help",
-          "files"
+          "files",
+          "advanced"
         ],
         "title": "SectionSummary",
         "type": "object"

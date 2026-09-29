@@ -171,14 +171,7 @@ export function SaveBar() {
           <span className={styles.saveDot} data-dirty={dirty} aria-hidden="true" />
           <span role="status" className={styles.saveText}>
             {status}
-            {nErrors ? <span className={styles.saveErrors}> · fix {plural(nErrors, "error")} to save</span> : null} · writes{" "}
-            {files.map((f, i) => (
-              <span key={f}>
-                {i ? (i === files.length - 1 ? " and " : ", ") : null}
-                <code translate="no">{f}</code>
-              </span>
-            ))}
-            , comments kept
+            {nErrors ? <span className={styles.saveErrors}> · fix {plural(nErrors, "error")} to save</span> : null}
           </span>
           <Button size="small" disabled={!dirty} pending={diff.isPending} pendingLabel="Building diff…" onClick={onShowDiff}>
             Show diff

@@ -1093,6 +1093,8 @@ export interface components {
     };
     /** GroupSchema */
     GroupSchema: {
+      /** Advanced */
+      advanced: boolean;
       /** Help */
       help: string;
       /** Id */
@@ -1644,8 +1646,6 @@ export interface components {
     };
     /** PipelineConfig */
     PipelineConfig: {
-      /** Card Limit */
-      card_limit: number;
       /** Closed */
       closed: string[];
       /** Columns */
@@ -2167,6 +2167,8 @@ export interface components {
     };
     /** SectionSchema */
     SectionSchema: {
+      /** Advanced */
+      advanced: boolean;
       /** Files */
       files: string[];
       /** Groups */
@@ -2180,6 +2182,8 @@ export interface components {
     };
     /** SectionSummary */
     SectionSummary: {
+      /** Advanced */
+      advanced: boolean;
       /** Files */
       files: string[];
       /** Help */

@@ -268,3 +268,24 @@ def test_every_editable_field_has_a_reader():
         if not f.editable and not f.locked and "Not used yet" in f.note:
             assert not hits, f"{f.id} has a reader now; make it editable"
     assert not unread, unread
+
+
+# --- Advanced (docs/design/ui-redesign.md §2.3, §3 Settings) ------------------------------------------------
+
+def test_system_settings_sit_behind_advanced():
+    adv = {s.id for s in SECTIONS if s.advanced}
+    assert adv == {"storage", "qa"}
+    adv_groups = {(s.id, g.id) for s in SECTIONS for g in s.groups if g.advanced}
+    assert adv_groups == {("general", "files"), ("general", "app"), ("general", "claude"),
+                          ("runs", "timeouts"), ("runs", "ranking"), ("runs", "retry")}
+    app = get_section("general").group("app")
+    assert {f.key for f in app.fields()} == {"ui.port", "ui.host", "ui.open_browser", "ui.watch_debounce_ms"}
+    assert get_section("general").group("appearance").fields()[0].key == "ui.theme"
+    assert get_section("storage").to_dict()["advanced"] is True
+    assert get_section("general").to_dict()["groups"][0]["advanced"] is True
+    assert get_section("targets").to_dict()["advanced"] is False
+
+
+def test_pipeline_board_keys_are_gone():
+    keys = {f.key for s in SECTIONS for f in s.fields()}
+    assert not {"ui.pipeline.columns", "ui.pipeline.card_limit"} & keys

@@ -60,7 +60,7 @@ def test_meta_lists_codes_from_config_and_models(data):
     assert "rejected" in m["pipeline"]["closed"]
     assert m["ui"] == {"theme": "system", "undo_seconds": 8, "page_size": 100, "due_soon_hours": 48,
                        "pause_until_tomorrow_at": "08:00"}
-    assert m["pipeline"]["card_limit"] == 10
+    assert "card_limit" not in m["pipeline"]
 
 
 # --- status ----------------------------------------------------------------------------------------------------

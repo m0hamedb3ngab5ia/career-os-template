@@ -6,7 +6,7 @@ import styles from "./Today.module.css";
 // One series of magnitudes: horizontal bars on one scale (the largest column), each value printed as text next to
 // its bar, so the numbers are read, not guessed. Bars are decoration for screen readers (aria-hidden); the list
 // reads "Found 412". Colour marks the stage the way its status chip does (the name is always there, never
-// colour alone). Column names come from `pipeline.yaml: ui.pipeline.columns` via /api/status.
+// colour alone). Column names come from the fixed board (ui/config.py DEFAULT_COLUMNS) via /api/status.
 
 export function PipelineChart({ columns }: { columns: PipelineColumn[] }) {
   const top = columns.reduce<PipelineColumn | null>((m, c) => (!m || c.count > m.count ? c : m), null);

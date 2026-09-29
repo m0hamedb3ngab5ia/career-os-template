@@ -30,6 +30,29 @@ describe("Settings navigation", () => {
     expect(within(nav).getByRole("link", { name: "Autonomy" })).toHaveAttribute("aria-current", "page");
   });
 
+  it("folds system sections under a collapsed Advanced group, open when one is current", async () => {
+    await openAutonomy();
+    const nav = screen.getByRole("navigation", { name: "Settings sections" });
+    const storage = await within(nav).findByRole("link", { name: "Storage & efficiency" });
+    expect(storage.closest("details")).not.toHaveAttribute("open");
+    expect(within(nav).getByText("Advanced")).toBeInTheDocument();
+    expect(within(nav).getByRole("link", { name: "General" }).closest("details")).toBeNull();
+  });
+});
+
+describe("Advanced groups", () => {
+  it("puts advanced groups and where the settings are saved inside a collapsed Advanced section", async () => {
+    mockApi(...sectionRoutes(runsData()));
+    renderSettings("/settings/runs");
+    const ranking = await screen.findByRole("heading", { name: /^Ranking/, hidden: true }, { timeout: 5000 });
+    const adv = ranking.closest("details") as HTMLElement;
+    expect(adv).not.toHaveAttribute("open");
+    expect(within(adv).getByText("Advanced")).toBeInTheDocument();
+    expect(within(adv).getByText("config/pipeline.yaml")).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /^(Budget|How much)/ }).closest("details")).toBeNull();
+    screen.getAllByRole("status").forEach((el) => expect(el.textContent).not.toContain("config/"));
+  });
+
   it("/settings opens General", async () => {
     mockApi(...sectionRoutes(), route("GET", "/api/settings/general", { detail: "x" }, 404));
     const { router } = renderSettings("/settings");

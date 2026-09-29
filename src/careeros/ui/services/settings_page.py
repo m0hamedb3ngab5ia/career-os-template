@@ -28,6 +28,7 @@ class SectionSummary(TypedDict):
     title: str
     help: str
     files: list[str]
+    advanced: bool
 
 
 class SectionList(TypedDict):
@@ -70,6 +71,7 @@ class GroupSchema(TypedDict):
     id: str
     title: str
     help: str
+    advanced: bool
     items: list[Union[PolicyItem, FieldSchema]]
 
 
@@ -78,6 +80,7 @@ class SectionSchema(TypedDict):
     title: str
     help: str
     files: list[str]
+    advanced: bool
     groups: list[GroupSchema]
 
 
@@ -96,7 +99,8 @@ class SectionData(TypedDict):
 
 
 def section_list() -> list[SectionSummary]:
-    return [{"id": s.id, "title": s.title, "help": s.help, "files": s.files()} for s in SECTIONS]
+    return [{"id": s.id, "title": s.title, "help": s.help, "files": s.files(), "advanced": s.advanced}
+            for s in SECTIONS]
 
 
 def invalid_body(e: SettingsInvalid) -> dict[str, Any]:

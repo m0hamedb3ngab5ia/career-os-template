@@ -70,7 +70,6 @@ export const META = {
       { name: "Offer", statuses: ["offer"] },
     ],
     closed: ["skipped", "rejected", "withdrawn", "ghosted"],
-    card_limit: 10,
   },
   ui: { theme: "system", undo_seconds: 8, page_size: 100, due_soon_hours: 48 },
 };
