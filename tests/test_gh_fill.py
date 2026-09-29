@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import sys
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -74,3 +75,12 @@ def test_run_closes_its_tab_when_fill_raises(monkeypatch, tmp_path):
     with pytest.raises(RuntimeError, match="boom"):
         gh_fill.run(_plan(), tmp_path, cdp="http://127.0.0.1:1", profile_dir=tmp_path)
     page.close.assert_called_once()
+
+
+def test_fill_survives_screenshot_timeout(tmp_path):
+    """The proof screenshot is best-effort: a timeout there must not fail an already filled form."""
+    page = MagicMock()
+    page.locator.return_value.count.return_value = 0
+    page.screenshot.side_effect = RuntimeError("Page.screenshot: Timeout 10000ms exceeded.")
+    summary = gh_fill.fill({"fields": []}, page, tmp_path, url="http://x")
+    assert summary["filled"] == 0 and (tmp_path / "fill_summary.json").is_file()

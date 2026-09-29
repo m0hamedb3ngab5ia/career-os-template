@@ -108,6 +108,9 @@ def test_fill_failure_from_log(tmp_path):
     f = browser.fill_failure(tmp_path)
     assert f["error"] == "playwright is not installed: pip install x" and "Traceback" in f["log"]
     assert browser.status(tmp_path, browser.DEFAULT_CDP)["fill_error"] == f["error"]
+    log.write_text(f"Traceback...\nplaywright._impl._errors.TimeoutError: Page.screenshot: Timeout\nCall log:\n"
+                   f"  - fonts loaded\n{browser.FILL_EXIT}1\n")  # Playwright call log after the error line
+    assert browser.fill_failure(tmp_path)["error"] == "playwright._impl._errors.TimeoutError: Page.screenshot: Timeout"
 
 
 def test_preflight_missing_playwright_and_chromium(monkeypatch, tmp_path):
