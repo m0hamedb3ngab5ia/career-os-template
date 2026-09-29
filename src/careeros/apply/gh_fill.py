@@ -10,6 +10,7 @@ import time
 from pathlib import Path
 from typing import Any
 
+from careeros.apply import browser
 from careeros.apply.session import ApplySession
 
 EMBED = "https://job-boards.greenhouse.io/embed/job_app?for={board}&token={token}"
@@ -115,18 +116,20 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
 
 def run(plan: dict[str, Any], job_dir: str | Path, *, cdp: str | None, profile_dir: str | Path,
         url: str | None = None) -> dict[str, Any]:
-    """Real use: attach to your Chrome over CDP (left open) or launch a visible dedicated profile, then wait
-    until you close the window after reviewing and submitting yourself."""
+    """Real use: fill in a new visible tab of the apply browser (your Chrome over `cdp`, or a detached dedicated
+    profile on browser.DEFAULT_CDP), record the tab in application.json and return. The tab is never closed:
+    you review and submit there, and it outlives this process and app rebuilds."""
     with sync_playwright() as p:
-        if cdp:
-            browser = p.chromium.connect_over_cdp(cdp)
-            ctx = browser.contexts[0] if browser.contexts else browser.new_context()
-            return fill(plan, ctx.new_page(), job_dir, url)
-        ctx = p.chromium.launch_persistent_context(str(profile_dir), headless=False)
-        page = ctx.pages[0] if ctx.pages else ctx.new_page()
+        if not cdp:
+            cdp = browser.DEFAULT_CDP
+            browser.ensure(cdp, profile_dir, p.chromium.executable_path)
+        b = p.chromium.connect_over_cdp(cdp)
+        ctx = b.contexts[0] if b.contexts else b.new_context()
+        page = ctx.new_page()
         summary = fill(plan, page, job_dir, url)
+        tab_id = ctx.new_cdp_session(page).send("Target.getTargetInfo")["targetInfo"]["targetId"]
+        browser.save_record(job_dir, tab_id=tab_id, url=page.url, cdp=cdp)
+        page.bring_to_front()
         print(f"staged, not submitted ({summary['filled']} filled, {len(summary['failed'])} failed; "
-              "fill_summary.json): review + submit in the browser, then close the window", file=sys.stderr)
-        page.wait_for_event("close", timeout=0)
-        ctx.close()
-        return summary
+              "fill_summary.json): review + submit in the open tab", file=sys.stderr)
+        return summary  # leaving the block only disconnects: the browser and the tab stay open

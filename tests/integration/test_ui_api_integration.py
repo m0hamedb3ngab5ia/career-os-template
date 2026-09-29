@@ -426,3 +426,37 @@ def test_cli_reindex_refuses_another_apps_sqlite_file(data, tmp_path):
                        env=subprocess_env(data["settings"].root, home), capture_output=True, text=True, timeout=30)
     assert r.returncode == 1 and "not a careeros index" in r.stderr
     assert db.read_bytes() == before
+
+
+def test_application_status_open_and_confirmation(client, data, monkeypatch):
+    """Staged form reachability: dead tab -> needs refill + a detached fill; live tab -> focus; confirmation -> applied."""
+    from careeros.apply import browser
+    from careeros.ui.services import job_actions
+
+    jid = data["jobs"]["review"]
+    jdir = Store(data["settings"]).job_dir(jid)
+    assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "none"
+    browser.save_record(jdir, tab_id="T1", url="https://job-boards.example/embed", cdp=browser.DEFAULT_CDP)
+    live: list[dict] = []
+
+    def get(url):
+        if "/json/activate/" in url:
+            raise ValueError("Target activated")
+        if not live:
+            raise OSError("refused")
+        return live
+
+    monkeypatch.setattr(browser, "_get", get)
+    spawned: list[list[str]] = []
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv))
+    h = {"x-careeros": "1"}
+    assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "needs_refill"
+    r = client.post(f"/api/jobs/{jid}/application/open", headers=h).json()
+    assert r["action"] == "filling" and "apply plan" in spawned[0][-1] and "apply fill" in spawned[0][-1]
+    live.append({"id": "T1", "type": "page", "url": "https://job-boards.example/embed"})
+    assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "open"
+    assert client.post(f"/api/jobs/{jid}/application/open", headers=h).json() == {"action": "focused"}
+    assert len(spawned) == 1
+    live[0]["url"] = "https://job-boards.example/acme/jobs/1/confirmation"
+    assert client.get(f"/api/jobs/{jid}/application").json()["marked_applied"] is True
+    assert Store(data["settings"]).get_status(jid) == "applied"
