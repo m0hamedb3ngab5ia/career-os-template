@@ -145,9 +145,8 @@ def test_mark_safe_and_undo(env, data):
     assert Store(s).get_status(scam["job_id"]) == "queued"
     assert Tracker(settings=s).get_job(scam["job_id"])["Status"] == "queued"
     assert registry.is_flagged(registry.load(reg), scam["company"]) is None
-    board = c.get("/api/pipeline").json()
-    queued = next(col for col in board["columns"] if col["name"] == "Queued")
-    assert scam["job_id"] in [card["job_id"] for card in queued["cards"]]
+    funnel = {f["status"]: f["count"] for f in c.get("/api/pipeline").json()["funnel"]}
+    assert funnel["queued"] == 2 and funnel["needs_review"] == 1
     r = c.post(f"/api/actions/{scam['action_id']}/mark-safe/undo", headers=W,
                json={"previous_status": out["previous_status"], "registry_before": out["registry_before"]})
     assert r.status_code == 200
@@ -164,11 +163,13 @@ def test_mark_safe_and_undo(env, data):
 def test_pipeline_board(env, data):
     c, _ = env
     b = c.get("/api/pipeline").json()
-    assert [col["count"] for col in b["columns"]] == [2, 1, 2, 1, 1, 0]
+    assert [f["count"] for f in b["funnel"]] == [1, 1, 1, 0, 2]
+    assert b["submitted"]["count"] == 1 and len(b["submitted"]["since"]) == 10
+    assert [card["status"] for card in b["applications"]] == ["interview", "applied"]
     assert b["closed"] == {"count": 2, "by_status": {"skipped": 1, "rejected": 1}}
     assert b["options"]["categories"] == ["swe_backend"]
     only_a = c.get("/api/pipeline", params=[("tier", "A")]).json()
-    assert sum(col["count"] for col in only_a["columns"]) == 2
+    assert [card["status"] for card in only_a["applications"]] == ["interview"]
     m = c.get("/api/meta").json()
     assert m["pipeline"]["card_limit"] == 10 and m["ui"]["due_soon_hours"] == 48
 
@@ -181,8 +182,7 @@ def test_set_status_moves_the_card(env, data):
     assert r.status_code == 200 and r.json() == {"job_id": jid, "status": "needs_review", "previous": "queued"}
     assert spy.sent[-1][1]["jobs"] == [jid]
     b = c.get("/api/pipeline").json()
-    review = next(col for col in b["columns"] if col["name"] == "Needs review")
-    assert jid in [card["job_id"] for card in review["cards"]]
+    assert {f["status"]: f["count"] for f in b["funnel"]}["needs_review"] == 3
     # undo = set it back
     assert c.post(f"/api/jobs/{jid}/status", headers=W, json={"status": "queued"}).json()["previous"] == "needs_review"
     assert c.post(f"/api/jobs/{jid}/status", headers=W, json={"status": "launched"}).status_code == 400

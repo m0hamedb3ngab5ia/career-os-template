@@ -2,18 +2,17 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
 import type { Board, Filters, StatusResult } from "./types";
 
-export function boardUrl(f: Filters, expand: string[]): string {
+export function boardUrl(f: Filters): string {
   const q = new URLSearchParams();
   for (const k of ["tier", "category", "safety", "location"] as const) if (f[k]) q.append(k, f[k]);
-  for (const e of expand) q.append("expand", e);
   const s = q.toString();
   return s ? `/api/pipeline?${s}` : "/api/pipeline";
 }
 
-export function useBoard(f: Filters, expand: string[]) {
+export function useBoard(f: Filters) {
   return useQuery({
-    queryKey: ["pipeline", f, expand],
-    queryFn: () => apiFetch<Board>(boardUrl(f, expand)),
+    queryKey: ["pipeline", f],
+    queryFn: () => apiFetch<Board>(boardUrl(f)),
     placeholderData: (prev) => prev,
   });
 }

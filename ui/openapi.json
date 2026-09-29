@@ -970,28 +970,35 @@
       },
       "Board": {
         "properties": {
-          "card_limit": {
-            "title": "Card Limit",
-            "type": "integer"
+          "applications": {
+            "items": {
+              "$ref": "#/components/schemas/Card"
+            },
+            "title": "Applications",
+            "type": "array"
           },
           "closed": {
             "$ref": "#/components/schemas/Closed"
           },
-          "columns": {
+          "funnel": {
             "items": {
-              "$ref": "#/components/schemas/Column"
+              "$ref": "#/components/schemas/FunnelStage"
             },
-            "title": "Columns",
+            "title": "Funnel",
             "type": "array"
           },
           "options": {
             "$ref": "#/components/schemas/BoardOptions"
+          },
+          "submitted": {
+            "$ref": "#/components/schemas/Submitted"
           }
         },
         "required": [
-          "columns",
+          "funnel",
+          "submitted",
+          "applications",
           "closed",
-          "card_limit",
           "options"
         ],
         "title": "Board",
@@ -1369,40 +1376,6 @@
           "by_status"
         ],
         "title": "ClosedCount",
-        "type": "object"
-      },
-      "Column": {
-        "properties": {
-          "cards": {
-            "items": {
-              "$ref": "#/components/schemas/Card"
-            },
-            "title": "Cards",
-            "type": "array"
-          },
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "name": {
-            "title": "Name",
-            "type": "string"
-          },
-          "statuses": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Statuses",
-            "type": "array"
-          }
-        },
-        "required": [
-          "name",
-          "statuses",
-          "count",
-          "cards"
-        ],
-        "title": "Column",
         "type": "object"
       },
       "ColumnConfig": {
@@ -2565,6 +2538,24 @@
           }
         },
         "title": "FlagBody",
+        "type": "object"
+      },
+      "FunnelStage": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "status": {
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "count"
+        ],
+        "title": "FunnelStage",
         "type": "object"
       },
       "GroupSchema": {
@@ -6730,6 +6721,24 @@
         "title": "StorageView",
         "type": "object"
       },
+      "Submitted": {
+        "properties": {
+          "count": {
+            "title": "Count",
+            "type": "integer"
+          },
+          "since": {
+            "title": "Since",
+            "type": "string"
+          }
+        },
+        "required": [
+          "count",
+          "since"
+        ],
+        "title": "Submitted",
+        "type": "object"
+      },
       "TierAHint": {
         "properties": {
           "kind": {
@@ -10011,19 +10020,6 @@
                 "type": "string"
               },
               "title": "Location",
-              "type": "array"
-            }
-          },
-          {
-            "in": "query",
-            "name": "expand",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "type": "string"
-              },
-              "title": "Expand",
               "type": "array"
             }
           }

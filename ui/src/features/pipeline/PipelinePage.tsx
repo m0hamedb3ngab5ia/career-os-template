@@ -1,33 +1,40 @@
-import { Filter, Plus } from "lucide-react";
-import { useEffect, useState, type CSSProperties } from "react";
+import { Filter } from "lucide-react";
+import { useEffect, useId, useState } from "react";
 import { Link, useSearchParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
-import { SAFETY, STATUSES, describeCode, humanize } from "../../kit/labels";
+import { HUMAN, SAFETY, STATUSES, describeCode, humanize } from "../../kit/labels";
 import { Listbox } from "../../kit/Listbox";
 import { Sheet } from "../../kit/Sheet";
 import type { MenuItem } from "../../kit/Menu";
 import { useToast } from "../../kit/Toast";
-import { UnavailableButton } from "../../kit/UnavailableButton";
 import { formatCount } from "../../lib/format";
 import { useBoard, useSetStatus } from "./api";
-import { BoardColumn } from "./BoardColumn";
 import { JobCard } from "./JobCard";
 import styles from "./Pipeline.module.css";
 import { StatusChooser } from "./StatusChooser";
 import type { Card, Filters } from "./types";
 
-const ADD_JOB_REASON = "Adding jobs by hand isn't supported yet — run scout";
 const CLOSED = "Closed";
+const APPLICATIONS = ["applied", "screening", "interview", "offer"];
 // Applied records the date applied and counts toward the daily cap, so it is confirmed first and has no Undo.
 const APPLIED = "applied";
 const FILTER_KEYS = ["tier", "category", "safety", "location"] as const;
 
 function statusLabel(s: string): string {
   return describeCode(STATUSES, s).label;
+}
+
+function humanStatus(s: string): string {
+  return (HUMAN.status as Record<string, string>)[s] ?? statusLabel(s);
+}
+
+/** Jobs (every tab) filtered to one column value or date range: the funnel's "open the list" link. */
+function jobsHref(field: string, value: string): string {
+  return `/jobs?${new URLSearchParams({ tab: "all", [`f.${field}`]: value })}`;
 }
 
 function problem(e: unknown): string {
@@ -43,19 +50,18 @@ export function PipelinePage() {
   const [params, setParams] = useSearchParams();
   const filters: Filters = { tier: "", category: "", safety: "", location: "" };
   for (const k of FILTER_KEYS) filters[k] = params.get(k) ?? "";
-  const expand = params.getAll("expand");
-  const { data: board, isPending, error } = useBoard(filters, expand);
+  const { data: board, isPending, error } = useBoard(filters);
   const meta = useMeta().data;
   const setStatus = useSetStatus();
   const toast = useToast();
-  const [dragged, setDragged] = useState<Card | null>(null);
   const [choosing, setChoosing] = useState<{ card: Card; target: Target } | null>(null);
   const [confirmApplied, setConfirmApplied] = useState<Card | null>(null);
-  // A moved card remounts in its new column: once the board shows it there, focus its Move to… again.
+  const titleId = useId();
+  // A moved card remounts in its new group: once the board shows it there, focus its Move to… again.
   const [refocus, setRefocus] = useState<{ jobId: string; status: string } | null>(null);
   useEffect(() => {
     if (!refocus || !board) return;
-    const moved = board.columns.flatMap((c) => c.cards).find((c) => c.job_id === refocus.jobId);
+    const moved = board.applications.find((c) => c.job_id === refocus.jobId);
     if (moved && moved.status !== refocus.status) return; // not refetched yet
     const el = [...document.querySelectorAll<HTMLElement>("[data-job-id]")].find((n) => n.dataset.jobId === refocus.jobId);
     el?.querySelector<HTMLElement>("[data-move] button")?.focus();
@@ -74,26 +80,12 @@ export function PipelinePage() {
     );
   }
 
-  function toggleExpand(name: string) {
-    setParams(
-      (prev) => {
-        const next = new URLSearchParams(prev);
-        const cur = next.getAll("expand");
-        next.delete("expand");
-        for (const e of cur.includes(name) ? cur.filter((x) => x !== name) : [...cur, name]) next.append("expand", e);
-        return next;
-      },
-      { replace: true },
-    );
-  }
-
   const closedStatuses = meta?.pipeline.closed ?? Object.keys(board?.closed.by_status ?? {});
-  const columnOf = (status: string) => board?.columns.find((c) => c.statuses.includes(status))?.name ?? CLOSED;
 
   function move(card: Card, status: string) {
     const company = card.company || card.job_id;
     setStatus.mutate(
-      { jobId: card.job_id, status, note: `moved on the board to ${statusLabel(status)}` },
+      { jobId: card.job_id, status, note: `moved on the pipeline to ${statusLabel(status)}` },
       {
         onSuccess: (r) => {
           setRefocus({ jobId: card.job_id, status });
@@ -104,7 +96,7 @@ export function PipelinePage() {
               r.previous && status !== APPLIED
                 ? () =>
                     setStatus.mutate(
-                      { jobId: card.job_id, status: r.previous!, note: "undo: board move" },
+                      { jobId: card.job_id, status: r.previous!, note: "undo: pipeline move" },
                       {
                         onSuccess: () => setRefocus({ jobId: card.job_id, status: r.previous! }),
                         onError: (e) => toast.show({ message: `Undo failed: ${problem(e)}` }),
@@ -131,16 +123,15 @@ export function PipelinePage() {
   }
 
   const targets: Target[] = [
-    ...(board?.columns.map((c) => ({ name: c.name, statuses: c.statuses })) ?? []),
+    ...APPLICATIONS.map((st) => ({ name: statusLabel(st), statuses: [st] })),
     ...(closedStatuses.length ? [{ name: CLOSED, statuses: closedStatuses }] : []),
   ];
 
   function moveItems(card: Card): MenuItem[] {
-    const here = columnOf(card.status);
     return targets.map((t) => ({
       key: t.name,
       label: t.name === CLOSED ? "Closed…" : t.name,
-      disabled: t.name === here && t.statuses.every((s) => s === card.status),
+      disabled: t.statuses.every((s) => s === card.status),
       onSelect: () => requestMove(card, t),
     }));
   }
@@ -162,79 +153,81 @@ export function PipelinePage() {
   }
 
   return (
-    <Page
-      title="Pipeline"
-      subtitle={
-        <>
-          Drag a card or use Move to… to change status · writes <code translate="no">status.json</code> and the tracker
-        </>
-      }
-      actions={
-        <>
-          <nav aria-label="View" className={styles.views}>
-            <Link to="/pipeline" aria-current="page" className={styles.view}>
-              Board
-            </Link>
-            <Link to="/jobs" className={styles.view}>
-              Table
-            </Link>
-          </nav>
-          <UnavailableButton reason={ADD_JOB_REASON} icon={<Plus size={14} strokeWidth={1.7} aria-hidden="true" />}>
-            Add job
-          </UnavailableButton>
-        </>
-      }
-    >
-      <div className={styles.toolbar}>
-        <span className={styles.filterIcon}>
-          <Filter size={14} strokeWidth={1.7} aria-hidden="true" />
-        </span>
-        {FILTER_KEYS.map((k) => (
-          <Listbox
-            key={k}
-            label={k[0]!.toUpperCase() + k.slice(1)}
-            labelPlacement="inline"
-            value={filters[k]}
-            options={filterOptions[k]}
-            onValueChange={(v) => setParam(k, v)}
-          />
-        ))}
-        {board ? (
-          <span className={styles.closed}>
-            Closed: {formatCount(board.closed.count)}
-            {closedParts.length ? ` (${closedParts.join(" · ")})` : ""}
-          </span>
-        ) : null}
-      </div>
-
+    <Page title="Pipeline" subtitle="How jobs move from discovery to an offer">
       {error ? (
-        <EmptyState title="Couldn't load the board">{problem(error)}</EmptyState>
+        <EmptyState title="Couldn't load the pipeline">{problem(error)}</EmptyState>
       ) : isPending || !board ? null : (
-        <div className={styles.board} style={{ "--cols": board.columns.length } as CSSProperties}>
-          {board.columns.map((col) => (
-            <BoardColumn
-              key={col.name}
-              column={col}
-              expanded={expand.includes(col.name)}
-              onToggleExpand={() => toggleExpand(col.name)}
-              canDrop={!!dragged && col.statuses.some((s) => s !== dragged.status) && columnOf(dragged.status) !== col.name}
-              onDropCard={() => {
-                if (dragged) requestMove(dragged, { name: col.name, statuses: col.statuses });
-                setDragged(null);
-              }}
-              renderCard={(card) => (
-                <JobCard
-                  card={card}
-                  moveItems={moveItems(card)}
-                  dragging={dragged?.job_id === card.job_id}
-                  pending={setStatus.isPending && setStatus.variables?.jobId === card.job_id}
-                  onDragStart={setDragged}
-                  onDragEnd={() => setDragged(null)}
-                />
-              )}
-            />
-          ))}
-        </div>
+        <>
+          <h2 className={styles.sectionTitle} id={`${titleId}-funnel`}>
+            Automation funnel
+          </h2>
+          <nav aria-labelledby={`${titleId}-funnel`}>
+            <ul className={styles.funnel}>
+              {board.funnel.map((f) => (
+                <li key={f.status}>
+                  <Link to={jobsHref("status", f.status)} className={styles.stage}>
+                    <span className={styles.stageCount}>{formatCount(f.count)}</span> <span>{humanStatus(f.status)}</span>
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link to={jobsHref("applied_at", `${board.submitted.since}..`)} className={styles.stage}>
+                  <span className={styles.stageCount}>{formatCount(board.submitted.count)}</span>{" "}
+                  <span>Submitted this week</span>
+                </Link>
+              </li>
+            </ul>
+          </nav>
+
+          <h2 className={styles.sectionTitle}>Applications</h2>
+          <div className={styles.toolbar}>
+            <span className={styles.filterIcon}>
+              <Filter size={14} strokeWidth={1.7} aria-hidden="true" />
+            </span>
+            {FILTER_KEYS.map((k) => (
+              <Listbox
+                key={k}
+                label={k[0]!.toUpperCase() + k.slice(1)}
+                labelPlacement="inline"
+                value={filters[k]}
+                options={filterOptions[k]}
+                onValueChange={(v) => setParam(k, v)}
+              />
+            ))}
+            <Link to={jobsHref("status", closedStatuses.join(","))} className={styles.closed}>
+              Closed: {formatCount(board.closed.count)}
+              {closedParts.length ? ` (${closedParts.join(" · ")})` : ""}
+            </Link>
+          </div>
+          <div className={styles.board}>
+            {APPLICATIONS.map((st) => {
+              const cards = board.applications.filter((c) => c.status === st);
+              const id = `${titleId}-${st}`;
+              return (
+                <section key={st} className={styles.column} aria-labelledby={id}>
+                  <h3 className={styles.columnTitle} id={id}>
+                    {statusLabel(st)} <span className={styles.count}>{formatCount(cards.length)}</span>
+                  </h3>
+                  {cards.length ? (
+                    <ul className={styles.cards}>
+                      {cards.map((card) => (
+                        <li key={card.job_id}>
+                          <JobCard
+                            card={card}
+                            moveItems={moveItems(card)}
+                            pending={setStatus.isPending && setStatus.variables?.jobId === card.job_id}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  ) : (
+                    <p className={styles.emptyColumn}>None yet</p>
+                  )}
+                </section>
+              );
+            })}
+          </div>
+        </>
       )}
       {choosing ? (
         <StatusChooser
