@@ -359,6 +359,23 @@ describe("PipelineCard", () => {
     expect(api.callsTo("POST /api/jobs/j1/application/open")).toHaveLength(1);
   });
 
+  it("hides the old error while a retry fills, then confirms the filled form", async () => {
+    let tab: object = { tab: "none", submitted: false, can_fill: true, fill_error: "- fonts loaded" };
+    setup({ stage: "review", next_action: null, next_label: null, next_kind: null }, {
+      "GET /api/jobs/j1/application": () => tab,
+      "POST /api/jobs/j1/application/open": () => {
+        tab = { tab: "none", submitted: false, can_fill: true, filling: true };
+        return { action: "filling" };
+      },
+    });
+    await userEvent.click(await screen.findByRole("button", { name: "Retry fill" }));
+    expect(await screen.findByText("Filling…")).toHaveAttribute("data-tone", "blue");
+    expect(screen.queryByText(/Filling the application failed/)).not.toBeInTheDocument();
+    tab = { tab: "open", submitted: false, can_fill: true, fields_left: ["Race"] };
+    expect(await screen.findByText(/Form filled, 1 field left for you/, {}, { timeout: 5000 })).toBeInTheDocument();
+    expect(screen.getByText("Tab open")).toHaveAttribute("data-tone", "green");
+  }, 10_000);
+
   it("shows Connect Chrome + Retry when your Chrome is not connected, and retries the same request", async () => {
     const api = setup({ stage: "apply", next_action: null, next_label: null, next_kind: null }, {
       "GET /api/jobs/j1/application": { tab: "needs_refill", submitted: false, can_fill: true },

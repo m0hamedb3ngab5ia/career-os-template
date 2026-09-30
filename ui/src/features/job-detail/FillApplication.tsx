@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
@@ -23,6 +23,15 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
   const toast = useToast();
   // Chrome (paths.apply_cdp) didn't answer: a plain connect-and-retry state; the recorded tab is kept for the retry.
   const [notConnected, setNotConnected] = useState<{ refill?: boolean } | null>(null);
+  const wasFilling = useRef(false);
+  useEffect(() => {
+    if (!tab) return;
+    if (wasFilling.current && !tab.filling && !tab.fill_error) {
+      const n = tab.fields_left?.length ?? 0;
+      toast.show({ message: `Form filled${n ? `, ${n} field${n === 1 ? "" : "s"} left for you` : ""}: review and submit in the open tab` });
+    }
+    wasFilling.current = !!tab.filling;
+  }, [tab, toast]);
   if (!offered(tab, stage)) return null;
   const live = tab.tab === "open";
   const label = live ? "Open application" : tab.fill_error ? "Retry fill" : tab.tab === "needs_refill" ? "Refill application" : "Fill application";
@@ -69,7 +78,7 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
         </Button>
       ) : null}
       {left > 0 && !tab.fill_error ? <Chip tone="orange">{left} field{left === 1 ? "" : "s"} left for you</Chip> : null}
-      {tab.fill_error ? <Chip tone="red">Fill failed</Chip> : tab.tab !== "none" ? (
+      {tab.filling ? <Chip tone="blue">Filling…</Chip> : tab.fill_error ? <Chip tone="red">Fill failed</Chip> : tab.tab !== "none" ? (
         <Chip tone={live ? "green" : "orange"}>{live ? "Tab open" : "Needs refill"}</Chip>
       ) : null}
     </>
@@ -79,7 +88,7 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
 /** The last fill's error in plain words, the raw output behind a disclosure. */
 export function FillApplicationError({ jobId, stage }: { jobId: string; stage: string }) {
   const tab = useApplicationTab(jobId).data;
-  if (!offered(tab, stage) || !tab.fill_error) return null;
+  if (!offered(tab, stage) || !tab.fill_error || tab.filling) return null;
   return (
     <div>
       <p className={styles.alert}>{CHROME_DOWN.test(tab.fill_error) ? CONNECT : `Filling the application failed: ${tab.fill_error}`}</p>

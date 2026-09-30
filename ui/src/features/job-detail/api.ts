@@ -113,6 +113,7 @@ export interface ApplicationTab {
   submitted: boolean;
   can_fill: boolean;
   marked_applied?: boolean;
+  filling?: boolean;
   fill_error?: string;
   fill_log?: string;
   fields_left?: string[];
@@ -121,7 +122,7 @@ export function useApplicationTab(id: string) {
   return useQuery({
     queryKey: ["job", id, "application"],
     queryFn: () => apiFetch<ApplicationTab>(`${jobPath(id)}/application`),
-    refetchInterval: 15_000,
+    refetchInterval: (q) => (q.state.data?.filling ? 3_000 : 15_000),
   });
 }
 export const useOpenApplication = (id: string) =>
