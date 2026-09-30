@@ -6,6 +6,7 @@ from __future__ import annotations
 import json
 import socket
 import subprocess
+import types
 import sys
 import time
 from datetime import datetime, timezone
@@ -448,7 +449,7 @@ def test_application_status_open_and_confirmation(client, data, monkeypatch):
 
     monkeypatch.setattr(browser, "_get", get)
     spawned: list[list[str]] = []
-    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv))
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=999_999))
     from careeros.apply import gh_fill
 
     def missing():
@@ -502,7 +503,7 @@ def test_application_open_refuses_when_own_chrome_not_connected(client, data, mo
     monkeypatch.setattr(browser, "_get", get)
     monkeypatch.setattr(gh_fill, "preflight", lambda: None)
     spawned: list = []
-    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv))
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=999_999))
     h = {"x-careeros": "1"}
     r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
     assert r.status_code == 409 and r.json()["detail"].startswith("Chrome not connected") and not spawned

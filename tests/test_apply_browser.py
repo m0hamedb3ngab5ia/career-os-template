@@ -165,16 +165,19 @@ def _open_app_env(monkeypatch, tmp_path, live_tab=False):
 
     def popen(argv, **kw):
         spawned.append(argv)
-        kw["stdout"].write(f"{browser.FILL_PID}{__import__('os').getpid()}\n".encode())  # the shell's first line
+        return types.SimpleNamespace(pid=__import__('os').getpid())
     return job_actions, spawned, closed, popen
 
 
 def test_open_application_double_click_spawns_once(monkeypatch, tmp_path):
+    from careeros.apply import browser
+
     job_actions, spawned, _, popen = _open_app_env(monkeypatch, tmp_path)
     (tmp_path / "fill_plan.json").write_text("{}")
     (tmp_path / "fill_summary.json").write_text('{"failed": [{"label": "Old"}]}')
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "filling"
     assert not (tmp_path / "fill_summary.json").exists()  # stale fields_left gone while the new fill runs
+    assert browser.status(tmp_path, browser.DEFAULT_CDP, get=lambda u: [])["filling"] is True  # before the reply
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "filling"
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen, refill=True)["action"] == "filling"
     assert len(spawned) == 1
@@ -186,4 +189,4 @@ def test_open_application_refill_closes_live_tab(monkeypatch, tmp_path):
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "focused"
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen, refill=True)["action"] == "filling"
     assert closed == [tmp_path] and len(spawned) == 1
-    assert "careeros-fill-pid" in spawned[0][-1]  # the shell records its pid first
+    assert "careeros-fill-pid" in (tmp_path / "application.log").read_text()  # pid recorded before the reply

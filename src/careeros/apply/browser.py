@@ -110,10 +110,12 @@ def fill_running(job_dir: str | Path) -> bool:
 def status(job_dir: str | Path, cdp: str, get: Callable[[str], Any] | None = None) -> dict[str, Any]:
     """`tab`: open (the filled tab is alive) | needs_refill (it died: sleep, crash, reboot) | none (never filled).
     `submitted`: the live tab shows the Greenhouse confirmation page. `can_fill`: saved answers exist.
-    `fill_error`/`fill_log`: the last UI fill failed (see fill_failure). `fields_left`: labels the last fill
+    `filling`: a UI fill is running now. `fill_error`/`fill_log`: the last UI fill failed (see fill_failure). `fields_left`: labels the last fill
     left for the user (fill_summary.json failed + skipped)."""
     rec = record(job_dir)
     out: dict[str, Any] = {"tab": "none", "submitted": False, "can_fill": (Path(job_dir) / "fill_plan.json").is_file()}
+    if fill_running(job_dir):
+        out["filling"] = True
     if fail := fill_failure(job_dir):
         out |= {"fill_error": fail["error"], "fill_log": fail["log"]}
     try:

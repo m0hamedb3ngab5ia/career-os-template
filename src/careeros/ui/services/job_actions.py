@@ -250,11 +250,12 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
     (d / "fill_summary.json").unlink(missing_ok=True)  # else status() shows the last fill's fields_left
     steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
     cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
-    cmd = f"echo {shlex.quote(browser.FILL_PID)}$$; {cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
+    cmd = f"{cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
     root = str(settings.root)
     with (d / "application.log").open("ab") as fh:
-        (popen or subprocess.Popen)(["/bin/sh", "-c", cmd], cwd=root, env={**os.environ, "CAREEROS_ROOT": root}, stdin=subprocess.DEVNULL,
-              stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
+        p = (popen or subprocess.Popen)(["/bin/sh", "-c", cmd], cwd=root, env={**os.environ, "CAREEROS_ROOT": root},
+                                        stdin=subprocess.DEVNULL, stdout=fh, stderr=subprocess.STDOUT, start_new_session=True)
+        fh.write(f"{browser.FILL_PID}{p.pid}\n".encode())  # before the reply: the UI's refetch already sees `filling`
     return {"action": "filling", "log": "application.log"}
 
 
