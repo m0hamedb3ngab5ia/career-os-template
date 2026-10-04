@@ -1,0 +1,67 @@
+# Canonical status + links. See ~/.claude/skills/product/SKILL.md.
+requirements:
+  REQ-001: {status: proposed, provenance: observed}
+  REQ-002: {status: proposed, provenance: observed}
+  REQ-003: {status: proposed, provenance: observed}
+  REQ-004: {status: proposed, provenance: observed}
+  REQ-010: {status: proposed, provenance: observed}
+  REQ-011: {status: proposed, provenance: observed}
+  REQ-012: {status: proposed, provenance: observed}
+  REQ-013: {status: proposed, provenance: observed}
+  REQ-014: {status: proposed, provenance: observed}
+  REQ-015: {status: proposed, provenance: observed}
+  REQ-016: {status: proposed, provenance: observed}
+  REQ-020: {status: proposed, provenance: observed}
+  REQ-021: {status: proposed, provenance: observed}
+  REQ-022: {status: proposed, provenance: observed}
+  REQ-023: {status: proposed, provenance: observed}
+  REQ-024: {status: proposed, provenance: observed}
+  REQ-025: {status: proposed, provenance: observed}
+  REQ-026: {status: proposed, provenance: observed}
+  REQ-027: {status: proposed, provenance: observed}
+  REQ-030: {status: proposed, provenance: observed}
+  REQ-031: {status: proposed, provenance: observed}
+  REQ-032: {status: proposed, provenance: observed}
+  REQ-033: {status: proposed, provenance: contradictory}
+  REQ-034: {status: proposed, provenance: observed}
+  REQ-035: {status: proposed, provenance: observed}
+  REQ-036: {status: proposed, provenance: observed}
+  REQ-037: {status: proposed, provenance: observed}
+  REQ-038: {status: proposed, provenance: inferred}
+  REQ-040: {status: proposed, provenance: observed}
+  REQ-041: {status: proposed, provenance: observed}
+  REQ-042: {status: proposed, provenance: observed}
+  REQ-043: {status: proposed, provenance: observed}
+  REQ-044: {status: proposed, provenance: observed}
+  REQ-045: {status: proposed, provenance: observed}
+  REQ-046: {status: proposed, provenance: inferred}
+  REQ-050: {status: proposed, provenance: observed}
+  REQ-051: {status: proposed, provenance: observed}
+  REQ-052: {status: proposed, provenance: observed}
+  REQ-053: {status: proposed, provenance: observed}
+  REQ-054: {status: proposed, provenance: observed}
+  REQ-060: {status: proposed, provenance: observed}
+  REQ-061: {status: proposed, provenance: observed}
+  REQ-062: {status: proposed, provenance: contradictory}
+  REQ-063: {status: proposed, provenance: inferred}
+  REQ-070: {status: proposed, provenance: observed}
+  REQ-071: {status: proposed, provenance: observed}
+  REQ-072: {status: proposed, provenance: observed}
+  REQ-073: {status: proposed, provenance: observed}
+  REQ-074: {status: proposed, provenance: observed}
+  REQ-075: {status: proposed, provenance: observed}
+  REQ-076: {status: proposed, provenance: observed}
+  REQ-077: {status: proposed, provenance: observed}
+  REQ-078: {status: proposed, provenance: decision-needed}
+  REQ-079: {status: proposed, provenance: inferred}
+  REQ-090: {status: proposed, provenance: observed}
+  REQ-091: {status: proposed, provenance: observed}
+  REQ-092: {status: proposed, provenance: inferred}
+  NFR-001: {status: proposed, provenance: observed}
+  NFR-002: {status: proposed, provenance: observed}
+  NFR-003: {status: proposed, provenance: observed}
+  NFR-004: {status: proposed, provenance: observed}
+  NFR-005: {status: proposed, provenance: inferred}
+use_cases: {}
+flows: {}
+tasks: {}
