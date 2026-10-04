@@ -145,6 +145,9 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         raise ValueError("run apply needs --job <id>: applications never run in bulk")
     if force and not job_ids:
         raise ValueError("--force needs --job <id>: a batch never reruns finished jobs")
+    if kind == "apply" and not dry_run:  # REQ-103: NotReady (CLI exit 7, API 409) before anything runs
+        from careeros.readiness import require_ready
+        require_ready(settings.root)
     cfg = cfg or load_runs_config(settings)
     retry = load_retry_config(cfg.raw)
     fails = Failures(RunStore(settings))

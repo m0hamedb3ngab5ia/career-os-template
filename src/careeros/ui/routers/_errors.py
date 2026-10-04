@@ -14,6 +14,7 @@ def refusals() -> Iterator[None]:
     from careeros.apply.browser import NotConnected
     from careeros.apply.gh_fill import MissingPlaywright
     from careeros.ui.services.desktop import Unsupported
+    from careeros.readiness import NotReady
     from careeros.runs.runner import JobNotRunnable
     from careeros.ui.services.job_pipeline import NotRunnable
     from careeros.ui.services.runs import Busy, NotSetUp, Paused
@@ -22,6 +23,8 @@ def refusals() -> Iterator[None]:
         yield
     except LookupError as e:
         raise HTTPException(404, str(e).strip("'\"")) from None
+    except NotReady as e:  # REQ-103
+        raise HTTPException(409, {"code": "not_ready", "message": str(e), "items": e.items}) from None
     except JobNotRunnable as e:  # before ValueError (its base): the runner's reasons, not a 400
         raise HTTPException(409, "; ".join(f"{j}: {r}" for j, r in e.reasons.items()) or str(e)) from None
     except (Busy, Paused, NotSetUp, NotRunnable, Unsupported, MissingPlaywright,

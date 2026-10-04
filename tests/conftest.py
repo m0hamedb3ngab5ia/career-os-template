@@ -180,6 +180,14 @@ def personalize_identity(root: Path) -> Path:
     return root
 
 
+def add_master_resume(root: Path) -> Path:
+    """A master résumé in profile/resumes (DEC-008 layout): readiness must-have `master_resume` (REQ-102)."""
+    d = root / "profile" / "resumes" / "master-0000"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "meta.json").write_text(json.dumps({"name": "Master", "type": "master", "versions": []}), encoding="utf-8")
+    return root
+
+
 def personalize(root: Path) -> Path:
     """A fully filled-in root: new identity, renamed entry/bullet ids (categories follow), edited standard
     answers, one voice sample. YAML is re-dumped, so no `# INSERT` markers survive."""
@@ -197,6 +205,7 @@ def personalize(root: Path) -> Path:
             q["bullet_id"] = f"{FILLED_IDS.get(old, old)}.{n}"
 
     _yaml_rw(root / "profile" / "master.yaml", _ids)
+    add_master_resume(root)
 
     def _cats(d):
         for c in d.values():

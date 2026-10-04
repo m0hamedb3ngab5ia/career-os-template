@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import Any
 
 from careeros.config import Settings
+from careeros.readiness import NotReady
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
 from careeros.runs.failures import JOB_FAILURES, Failures
@@ -253,6 +254,8 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
                 if action == "next" and (f := Failures(RunStore(settings)).get(kind, jid)):
                     # the last call failed yet left its files (ok clears the record): not a finished stage
                     action, why = "failed", f"failed {kind} ({f.get('last_outcome')}) but left its files; see Action Items"
+            except NotReady as e:  # REQ-103: fill/submit wait until the readiness must-haves are done
+                action, why = "needs_you", str(e)
             except RunBusy as e:  # another run (or a JobBusy job lock): wait for it, not counted as a try
                 if paused():
                     r["state"], r["reason"] = "pending", "paused by you"

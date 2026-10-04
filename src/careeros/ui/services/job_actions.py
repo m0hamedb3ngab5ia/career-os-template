@@ -22,6 +22,7 @@ import sys
 from pathlib import Path
 from typing import Any
 
+from careeros.readiness import require_ready
 from careeros.ui.services import desktop
 from careeros.ui.services.jobs import job_dir_for
 
@@ -240,6 +241,7 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
     if browser.fill_running(d):  # double click / refill mid-fill: one fill, one tab, one application.json
         return {"action": "filling", "log": "application.log"}
     ensure_unlocked(settings, job_id)
+    require_ready(settings.root)  # REQ-103: NotReady -> 409 before plan/fill spawn
     gh_fill.preflight()
     cdp = browser.cdp_url(settings)
     if cdp != browser.DEFAULT_CDP and browser.tabs(cdp) is None:  # the default browser starts itself; yours can't
