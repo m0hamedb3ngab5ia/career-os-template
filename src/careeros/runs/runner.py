@@ -273,14 +273,13 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
 
 def company_fetch_tools(settings: Settings, posting: dict[str, Any]) -> list[str]:
     """DEC-005: prepare may WebFetch only the company's own domains (companies.yaml / boards) and the posting's
-    URLs when they are the company's or a known ATS domain; an attacker-chosen apply URL never qualifies."""
-    from careeros.safety.scam import company_domains, is_company_or_ats_domain, registrable_domain
+    URLs only on a known ATS domain; a posting-chosen domain (name match included) never qualifies."""
+    from careeros.safety.scam import KNOWN_ATS_DOMAINS, company_domains, registrable_domain
 
-    company = str(posting.get("company") or "")
-    doms = company_domains(settings, company) | {
-        registrable_domain(str(u)) for u in (posting.get("url"), posting.get("apply_url"))
-        if u and is_company_or_ats_domain(str(u), company, settings)}
-    # ponytail: `*.d` covers subdomains (boards.greenhouse.io) if the CLI matches wildcards; harmless if not.
+    doms = company_domains(settings, str(posting.get("company") or "")) | {
+        d for u in (posting.get("url"), posting.get("apply_url")) if u
+        and (d := registrable_domain(str(u))) in KNOWN_ATS_DOMAINS}
+    # CC `domain:*.d` matches subdomains only; apex + `*.` both needed.
     return [f"WebFetch(domain:{p}{d})" for d in sorted(doms) for p in ("", "*.")]
 
 

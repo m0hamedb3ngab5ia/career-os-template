@@ -755,3 +755,10 @@ def test_sec01_prepare_gets_websearch_and_company_scoped_webfetch_only(settings,
     assert "WebSearch" in web and "WebFetch" not in web
     assert "WebFetch(domain:ledgerline.com)" in web and "WebFetch(domain:greenhouse.io)" in web
     assert not [t for t in web if "evil.example" in t]
+
+
+def test_sec01_unknown_company_never_gets_webfetch_to_a_posting_chosen_domain(settings, store):
+    """An attacker posting as an unknown company cannot pick its own fetchable domain via the apply URL."""
+    tools = _tools(_capture_run(settings, store, "prepare", company="Exfilco", url="https://exfilco.com/jobs/1",
+                                apply_url="https://exfilco.com/x?leak=1"))
+    assert not [t for t in tools if "exfilco" in t]

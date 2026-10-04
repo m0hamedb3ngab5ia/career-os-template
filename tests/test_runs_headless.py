@@ -258,3 +258,14 @@ def test_apply_with_chrome_connected_at_startup_passes_the_check():
 def test_chrome_check_applies_only_to_apply_runs():
     ev = ok_events('RESULT: {"job_id": "j", "decision": "prepare"}')
     assert classify(res_of(ev), CFG, "score", "j")[0] == "ok"
+
+
+@pytest.mark.parametrize("flag", ["--allowedTools", "--allowed-tools"])
+def test_headless_cmd_allowed_tools_is_replaced_by_the_per_kind_list(flag):
+    from dataclasses import replace
+
+    cfg = replace(CFG, headless_cmd=["claude", "-p", flag, "Read,WebFetch,Bash"])
+    cmd = build_command(cfg, "/x", session_id="u", kind="score")
+    assert cmd[:2] == ["claude", "-p"] and "Read,WebFetch,Bash" not in cmd
+    assert cmd.count("--allowedTools") == 1 and "--allowed-tools" not in cmd
+    assert "WebFetch" not in cmd[cmd.index("--allowedTools") + 1].split(",")

@@ -82,9 +82,14 @@ def untrusted(text: Any, source: str) -> str:
 
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
                   extra_tools: list[str] | tuple = ()) -> list[str]:
-    cmd = list(cfg.headless_cmd)
+    cmd, it = [], iter(cfg.headless_cmd)
+    for a in it:  # the per-kind list is the only allowlist: drop any configured one (and its value)
+        if a in ("--allowedTools", "--allowed-tools"):
+            next(it, None)
+        elif not a.startswith(("--allowedTools=", "--allowed-tools=")):
+            cmd.append(a)
     tools = allowed_tools_for(cfg, kind, extra_tools)
-    if tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
+    if tools:
         cmd += ["--allowedTools", ",".join(tools)]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
     if cfg.model and "--model" not in cmd:
