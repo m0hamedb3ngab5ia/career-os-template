@@ -87,6 +87,19 @@ def tectonic_cache() -> Path | None:
     return cand if cand and cand.is_dir() and any(cand.iterdir()) else None
 
 
+def ready_env(root: Path, home: Path) -> dict[str, str]:
+    """subprocess_env for a root that passes the apply gate (REQ-103): personalize() it and put a stub `claude`
+    on PATH. For subprocess tests reaching an apply path (the in-process gate is patched off in conftest)."""
+    personalize(root)
+    b = home / "fake-bin"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "claude").write_text("#!/bin/sh\nexit 0\n")
+    (b / "claude").chmod(0o755)
+    env = subprocess_env(root, home)
+    env["PATH"] = f"{b}{os.pathsep}{env.get('PATH', '')}"
+    return env
+
+
 def subprocess_env(root: Path, home: Path) -> dict[str, str]:
     """Env for `python -m careeros...` subprocesses: temp repo root, temp HOME, src on path, LaTeX offline."""
     env = dict(os.environ)

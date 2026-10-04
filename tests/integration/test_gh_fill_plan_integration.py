@@ -6,7 +6,8 @@ import subprocess
 from pathlib import Path
 
 import pytest
-from conftest import FIXTURES, PY, subprocess_env
+import yaml
+from conftest import FILLED_IDENTITY, FIXTURES, PY, ready_env, subprocess_env
 
 pytestmark = pytest.mark.integration
 
@@ -19,14 +20,19 @@ def test_apply_plan_writes_fill_plan(temp_root: Path, tmp_path: Path):
         "job_id": job_id, "company": "Ledgerline", "title": "Software Engineer, New Grad", "ats": "greenhouse",
         "source_slug": "ledgerline", "ats_job_id": "8128744", "url": "https://example.com/j"}))
     (jd / "resume.pdf").write_bytes(b"%PDF-1.4")
-    # no work-auth/sponsorship answers stored -> those fields pause and raise an Action Item
-    (temp_root / "profile" / "standard_answers.yaml").write_text(
-        "answers:\n  - key: current_employer\n    match: ['current or previous employer']\n    answer: Foo\n")
     home = tmp_path / "home"
     home.mkdir()
+    env = ready_env(temp_root, home)
+    # work-auth/sponsorship set (the apply gate) but matching no form label -> those fields pause, Action Item
+    sa = temp_root / "profile" / "standard_answers.yaml"
+    d = yaml.safe_load(sa.read_text())
+    for x in d["answers"]:
+        if x["key"] in ("work_authorization", "sponsorship"):
+            x["match"] = []
+    sa.write_text(yaml.safe_dump(d))
     r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(temp_root), "apply", "plan", job_id,
                         "--schema-json", str(FIXTURES / "greenhouse" / "job_questions.json")],
-                       capture_output=True, text=True, env=subprocess_env(temp_root, home), timeout=120)
+                       capture_output=True, text=True, env=env, timeout=120)
     assert r.returncode == 0, r.stderr
     assert "needs_review" in r.stdout
     plan = json.loads((jd / "fill_plan.json").read_text())
@@ -34,7 +40,7 @@ def test_apply_plan_writes_fill_plan(temp_root: Path, tmp_path: Path):
     assert plan["board"] == "ledgerline" and plan["ats_job_id"] == "8128744"
     assert plan["files"]["resume"] == str(jd / "resume.pdf") and plan["files"]["cover_letter"] is None
     by = {f["field_id"]: f for f in plan["fields"]}
-    assert by["email"]["value"] == "alex@example.com"
+    assert by["email"]["value"] == FILLED_IDENTITY["email"]
     assert by["resume"]["value"] == str(jd / "resume.pdf")
     assert any(str(a["JobID"]) == job_id and a["Type"] == "question" and a["What to do"] == f"fill plan: {job_id}"
                for a in _actions(temp_root))
