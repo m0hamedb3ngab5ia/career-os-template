@@ -25,5 +25,5 @@
 
 Open questions: 4
 Needs review: none
-User requirements: 21 (3 approved)
+User requirements: 24 (6 approved)
 <!-- /trace:status -->

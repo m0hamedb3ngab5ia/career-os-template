@@ -32,6 +32,19 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users can delete versions they no longer want.
 - Why: never lose good work and always know what changed
 
+### USR-022 Teach the app my writing style
+- In the same place as the résumé upload, users can upload past cover letters or other things they wrote.
+- The app learns how users write from these samples.
+- New cover letters are written in the users' own style, based on those samples.
+- Users can see which samples the app is using and remove any of them.
+- Why: cover letters that sound like the user, not like AI
+
+### USR-023 Know when I'm ready to start applying
+- Users see a simple checklist of what must be done before the first application goes out.
+- Each item shows done or not done, with a link to where to fix it.
+- Users can't start applying until the must-have items are done.
+- Why: no half-ready applications going out
+
 ## Finding jobs
 ### USR-005 Find jobs that fit me automatically
 - The app pulls new postings from the job boards users pick.
@@ -46,6 +59,14 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - The app spots old or fake (ghost) postings.
 - Users can flag or clear a company, and flagged companies stop showing up.
 - Why: protect personal data and avoid wasted effort
+
+### USR-024 Pick which jobs go into my pipeline
+- Users see found jobs in a clear list with a checkbox next to each one.
+- Users tick the jobs they want in their pipeline and leave the rest out.
+- Users can tick or untick many jobs at once.
+- Unticked jobs are never prepared or applied to.
+- Users can change their mind later and add or remove a job.
+- Why: users decide where their applications go
 
 ## Preparing applications
 ### USR-007 Get a tailored résumé and cover letter for each job
@@ -164,4 +185,7 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-019 Keep the app tidy | proposed | REQ-090, REQ-091 |
 | USR-020 See how my search is going | proposed | REQ-092 |
 | USR-021 Use the app from my phone (later) | proposed | REQ-079 |
+| USR-022 Teach the app my writing style | approved | — (derive) |
+| USR-023 Know when I'm ready to start applying | approved | — (derive) |
+| USR-024 Pick which jobs go into my pipeline | approved | — (derive) |
 <!-- /trace:map -->
