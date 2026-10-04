@@ -41,12 +41,12 @@ Reason: REQ-097 — user owns facts in their own résumé; bullet ids don't exis
 Consequences: a user-typed fabrication passes QA; that is the user's call.
 
 ### DEC-008 Résumé store under profile/resumes
-Decision: layout in ARCHITECTURE.md delta "Storage layout"; `rid` = server-generated slug + 4 hex; tailored/tweaked outputs saved as `type: tailored` résumés with `category` (score category) so later jobs reuse them.
+Decision: layout in 09_ARCHITECTURE.md delta "Storage layout"; `rid` = server-generated slug + 4 hex; tailored/tweaked outputs saved as `type: tailored` résumés with `category` (score category) so later jobs reuse them.
 Reason: profile/ already gitignored and `--link`-able to the private repo; résumés are profile data.
 Consequences: `careeros prune` never touches profile/resumes.
 
 ### DEC-009 Minimal UI: only what an approved REQ needs
-Decision: IA + UX are the minimum that meets approved REQs/UCs/FLOWs, nothing more. Every screen, section, control and dialog cites a REQ/UC/FLOW in IA.md; anything in the current UI without one is a removal candidate (IA.md "Trim list"), removed before or alongside frontend TASKs, never extended. Visual/interaction quality follows Vercel Web Interface Guidelines (`web-design-guidelines` skill audit per frontend PR).
+Decision: IA + UX are the minimum that meets approved REQs/UCs/FLOWs, nothing more. Every screen, section, control and dialog cites a REQ/UC/FLOW in 06_IA.md; anything in the current UI without one is a removal candidate (06_IA.md "Trim list"), removed before or alongside frontend TASKs, never extended. Visual/interaction quality follows Vercel Web Interface Guidelines (`web-design-guidelines` skill audit per frontend PR).
 Reason: current UI grew well beyond the requirements (user, 2026-10-04); every extra surface costs build, test and review.
 Alternatives: keep current UI and add delta on top (more slop); full redesign now (unscoped).
 Consequences: frontend TASK-013..015 start with a trim pass; new UI needs a REQ first (`/product change`). Not implemented yet: recorded before development.

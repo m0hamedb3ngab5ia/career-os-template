@@ -8,7 +8,7 @@ schedule panel (cadence, next time, LaunchAgent state, quiet hours), job names o
 from __future__ import annotations
 
 import re
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import Any, Literal, cast
 
 from typing_extensions import NotRequired, TypedDict
@@ -268,16 +268,16 @@ def _steps(store: Store, kind: str, job_id: str, state: str, since: datetime | N
     return out
 
 
-def _cap(rc: RunControl) -> dict[str, Any] | None:
+def _cap(rc: RunControl, day: date | None = None) -> dict[str, Any] | None:
     from careeros.runs.policy import current_cap
 
     try:
-        return current_cap(rc.settings)
+        return current_cap(rc.settings, day)
     except Exception:  # noqa: BLE001 - a locked or broken tracker must not hide the running batch
         return None
 
 
-def current_view(rc: RunControl) -> CurrentRun | None:
+def current_view(rc: RunControl, day: date | None = None) -> CurrentRun | None:
     """rc.current() plus one row per job of the batch: done / failed (attempted), active (holds its job lock),
     queued (the rest of the run's selection), each with step pills; today's apply cap for prepare runs."""
     cur = rc.current()
@@ -315,7 +315,7 @@ def current_view(rc: RunControl) -> CurrentRun | None:
                          "duration_s": None, "detail": "", "steps": _steps(store, kind, jid, "queued")})
             seen.add(jid)
     return cast(CurrentRun, {**cur, "scheduled": cur.get("trigger") == "schedule", "jobs": rows,
-                             "cap": _cap(rc) if kind == "prepare" else None})
+                             "cap": _cap(rc, day) if kind == "prepare" else None})
 
 
 def history_view(rc: RunControl, kind: str | None, limit: int, cursor: str | None) -> HistoryPage:

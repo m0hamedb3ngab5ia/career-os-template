@@ -3,7 +3,7 @@ TOC: Rule · Tokens · Components · Patterns · A11y · Responsive · Delta 202
 Source: `ui/src/styles/tokens.css`, `global.css`, `ui/src/kit` (CSS modules + CSS vars, no Tailwind).
 
 ## Rule (DEC-009)
-Reuse kit components; no new component unless a delta screen can't be built from existing ones. Every frontend PR: `web-design-guidelines` (Vercel) audit + `vitest-axe`. Unused tokens/components → IA.md Trim list.
+Reuse kit components; no new component unless a delta screen can't be built from existing ones. Every frontend PR: `web-design-guidelines` (Vercel) audit + `vitest-axe`. Unused tokens/components → 06_IA.md Trim list.
 
 
 ## Tokens
