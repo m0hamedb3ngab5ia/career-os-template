@@ -13,7 +13,8 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 ### USR-030 Use the app without being technical (later)
 - Today users need to download the code from GitHub and build it.
 - Later, users can use the app on the web, or download it from a website.
-- Users connect the AI account they already pay for, such as Claude or ChatGPT.
+- Users sign in to the AI subscription they already pay for, such as Claude or ChatGPT.
+- The app never asks for or uses an API key. It only checks that the user's AI account is signed in.
 - Why: anyone looking for a job can use it, not only developers
 
 ### USR-002 Upload my résumé and get feedback

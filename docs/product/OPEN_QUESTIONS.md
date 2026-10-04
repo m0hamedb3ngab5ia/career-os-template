@@ -3,7 +3,7 @@
 ### Q-001 Who is the template for?
 - Links: VISION User, NFR-005
 - Default (recommended): owner first; template users = technical Mac users who self-serve via GETTING_STARTED. macOS-only stays.
-- Answer (2026-10-04): anyone job hunting. Now: technical users clone + build. Later: hosted web app or downloadable app; user connects own LLM subscription (Claude, ChatGPT, other). → USR-030. Conflicts with "no API key / Claude Code skills only" → architecture decision when USR-030 scheduled.
+- Answer (2026-10-04): anyone job hunting. Now: technical users clone + build. Later: hosted web app or downloadable app. Never an API key: user signs in to own subscription (Claude Code login, Codex CLI "Sign in with ChatGPT", other); app only checks signed-in status. → USR-030. Arch note: subscription logins live in local CLIs, so downloadable app is the likely fit; verify each provider's terms on third-party use of subscription login before build.
 - Status: answered
 
 ### Q-002 Success metrics
