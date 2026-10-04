@@ -32,7 +32,7 @@ from careeros.ui.services.stream import parse_event
 
 BATCH_KINDS = ("score", "prepare")
 JOB_KINDS = ("score", "prepare", "apply")  # `--job <id>` runs: one explicit job, apply only this way
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master")
 KEEP_OUTPUTS = 50  # launch output files kept under data/runs/ui/
 
 
@@ -316,6 +316,8 @@ class RunControl:
                 raise NotSetUp("Inbox sync is not set up yet: turn on schedule.jobs.inbox_sync once the inbox-sync "
                                "skill is finished and Gmail is logged in")
             self._check_can_start()  # a headless skill call: the runner lock and pause apply
+        elif kind == "extract_master":
+            self._check_can_start()
         else:
             from careeros.ui.services.step import PIPELINE_STEPS
 

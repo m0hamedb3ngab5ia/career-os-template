@@ -53,6 +53,8 @@ def test_resume_http_api(root: Path):
     ix = Index(s)
     ix.rebuild()
     app = create_app(s, index=ix, broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
+    started = []
+    app.state.run_control = lambda settings: type("RC", (), {"start_step": lambda self, k: started.append(k)})()
     W = {"X-CareerOS": "1"}
     with TestClient(app) as c:
         r = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W)
@@ -69,6 +71,12 @@ def test_resume_http_api(root: Path):
         rows = c.get("/api/profile/resumes", headers=W).json()["resumes"]
         assert {x["rid"]: x["type"] for x in rows} == {a["rid"]: "master", b: "variant"}
         assert c.post(f"/api/profile/resumes/{b}/master", headers=W).json()["type"] == "master"
+        # E2E-003-02: marking B master launches extract-master; until a proposal is approved master.yaml is stale
+        assert started == ["extract_master"]
+        assert c.get("/api/profile/master/proposal", headers=W).json()["state"] == "stale"
+        ready = {i["id"]: i for i in c.get("/api/readiness", headers=W).json()["items"]}
+        assert not ready["master_synced"]["done"]
+        assert c.post(f"/api/profile/resumes/{b}/master", headers=W).status_code == 200 and len(started) == 1
         assert c.get(f"/api/profile/resumes/{a['rid']}", headers=W).json()["type"] == "variant"
         r = c.patch(f"/api/profile/resumes/{a['rid']}", json={"name": "Old", "type": "other"}, headers=W)
         assert r.status_code == 200 and r.json()["name"] == "Old"
@@ -128,6 +136,9 @@ def test_master_diff_cli_and_api(root: Path, tmp_path: Path):
     bad.write_text("experience: []\n", encoding="utf-8")
     r = _cli(root, "resume", "propose-master", str(bad))
     assert r.returncode == 1 and "identity" in r.stderr
+    bad.write_text("identity: x\n", encoding="utf-8")  # wrongly-typed section: a validation problem, not a crash
+    r = _cli(root, "resume", "propose-master", str(bad))
+    assert r.returncode == 1 and "Traceback" not in r.stderr, r.stderr
     r = _cli(root, "resume", "propose-master", str(prop))
     assert r.returncode == 0, r.stderr
     s = Settings.load(root)

@@ -60,7 +60,7 @@ class VersionDetail(Version):
 
 
 class MasterProposal(BaseModel):
-    state: Literal["synced", "pending", "rejected"]
+    state: Literal["synced", "pending", "rejected", "stale"]
     diff: str
 
 
@@ -114,16 +114,35 @@ def get_resume(rid: str, c=Depends(ctx)) -> Resume:
         return Resume(**store.get(c.settings.root, rid))
 
 
+def _extract_master(request: Request, c: Any) -> None:
+    """REQ-099: a new master -> launch the extract-master skill run. Best effort: if it can't start (busy, paused),
+    master_sync.state() is `stale`, so readiness `master_synced` stays open until a proposal is approved."""
+    from careeros.ui.services.runs import RunControl
+
+    try:
+        (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step("extract_master")
+    except Exception:  # noqa: BLE001 - never fail set-master on the follow-up run
+        pass
+
+
 @router.patch("/profile/resumes/{rid}")
-def patch_resume(rid: str, body: ResumePatch, c=Depends(ctx)) -> Resume:
+def patch_resume(rid: str, body: ResumePatch, request: Request, c=Depends(ctx)) -> Resume:
     with _refusals():
-        return Resume(**store.update(c.settings.root, rid, name=body.name, type=body.type))
+        was = store.get(c.settings.root, rid)["type"]
+        out = Resume(**store.update(c.settings.root, rid, name=body.name, type=body.type))
+    if body.type == "master" and was != "master":
+        _extract_master(request, c)
+    return out
 
 
 @router.post("/profile/resumes/{rid}/master")
-def set_master(rid: str, c=Depends(ctx)) -> Resume:
+def set_master(rid: str, request: Request, c=Depends(ctx)) -> Resume:
     with _refusals():
-        return Resume(**store.update(c.settings.root, rid, type="master"))
+        was = store.get(c.settings.root, rid)["type"]
+        out = Resume(**store.update(c.settings.root, rid, type="master"))
+    if was != "master":
+        _extract_master(request, c)
+    return out
 
 
 @router.delete("/profile/resumes/{rid}", status_code=204)

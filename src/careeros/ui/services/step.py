@@ -32,7 +32,7 @@ from careeros.runs import locks
 from careeros.runs.store import RunStore, iso
 from careeros.ui.services.runs import Busy
 
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master")
 LOCK_TTL_S = 3 * 3600  # a dead pid frees it sooner
 PIPELINE_STEPS = ("scout", "prune")  # steps that also take the pipeline lock (never beside a batch)
 # (status, detail), or (status, detail, after): `after` runs once the pipeline lock is released (scout's tracker sync)
@@ -223,6 +223,10 @@ def main(argv: list[str] | None = None) -> int:
     settings = Settings.load(Path(args.root) if args.root else None)
     if args.kind == "inbox_sync":
         rec = run_inbox_sync(settings)
+    elif args.kind == "extract_master":  # REQ-099: master résumé -> proposed master.yaml diff (headless skill)
+        from careeros.runs.service import run_skill
+
+        rec = run_skill(settings, "extract_master", "extract-master")
     else:
         signal.signal(signal.SIGTERM, _raise_interrupt)
         try:
