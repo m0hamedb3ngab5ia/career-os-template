@@ -16,6 +16,7 @@ SCORE = "score.json"
 QA = "qa.json"
 ANSWERS = "answers.json"
 STATUS = "status.json"
+FLAGS = "flags.json"
 LOG = "log.md"
 
 
@@ -30,6 +31,7 @@ def _is_finder_copy(name: str) -> bool:
 class Store:
     def __init__(self, settings: Settings | None = None, jobs_dir: Path | None = None, seen_file: Path | None = None):
         s = settings or get_settings()
+        self.settings = s
         self.jobs_dir = (jobs_dir or s.paths["jobs_dir"]).resolve()
         self.seen_file = (seen_file or s.paths["seen_file"]).resolve()
         self.jobs_dir.mkdir(parents=True, exist_ok=True)
@@ -68,7 +70,40 @@ class Store:
         path = self._write(posting.job_id, POSTING, posting.model_dump())
         if new:
             self.set_status(posting.job_id, "found", "posting stored by scout")
+        self._scan_injection(posting)
         return path
+
+    def _scan_injection(self, posting: Posting) -> None:
+        """REQ-109: flag a posting whose text looks like a prompt-injection attempt (flags.json + Action Item).
+        A clear (`clear_injection`) holds while the reasons stay the same; new reasons flag the job again."""
+        from careeros import untrusted
+
+        extra = (self.settings.pipeline.get("injection") or {}).get("extra_patterns") or []
+        reasons = untrusted.scan(posting.description_text, posting.description_html, extra)
+        flags = self.load_flags(posting.job_id)
+        if not reasons and not flags.get("injection_suspected"):
+            return
+        if reasons == flags.get("injection_reasons"):
+            return
+        flags.update(injection_suspected=bool(reasons), injection_reasons=reasons, injection_cleared_at=None)
+        self._write(posting.job_id, FLAGS, flags)
+        if reasons:
+            from careeros.tracker import add_action
+
+            add_action(self.settings, f"Possible prompt injection in posting: {'; '.join(reasons)}"[:300]
+                       + ". Read it, then `careeros job clear-injection <id>` if it is safe",
+                       "injection_suspected", job_id=posting.job_id, link=posting.url, priority="H",
+                       needs="laptop", dedupe=True)
+
+    def load_flags(self, job_id: str) -> dict[str, Any]:
+        return self._read(job_id, FLAGS) or {}
+
+    def clear_injection(self, job_id: str) -> dict[str, Any]:
+        """The user checked a flagged posting ("I checked it"): prepare/apply are allowed again."""
+        flags = self.load_flags(job_id)
+        flags["injection_cleared_at"] = now_iso()
+        self._write(job_id, FLAGS, flags)
+        return flags
 
     def load_posting(self, job_id: str) -> Posting | None:
         d = self._read(job_id, POSTING)

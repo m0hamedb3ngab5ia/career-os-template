@@ -28,11 +28,11 @@ Status = Literal[
 
 ACTION_TYPES: tuple[str, ...] = (
     "captcha", "review", "question", "salary", "bot_detection", "qa_fail",
-    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "other",
+    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "other",
 )
 ActionType = Literal[
     "captcha", "review", "question", "salary", "bot_detection", "qa_fail",
-    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "other",
+    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "other",
 ]
 
 # What the user needs on hand to complete an action item (tracker `Needs` column).
