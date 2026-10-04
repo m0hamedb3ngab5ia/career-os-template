@@ -53,3 +53,19 @@ flowchart TD
   K -- no --> M[discard attempt]
 ```
 What to notice: max one tailor run per check; a flagged posting is still scored but can't be prepared until cleared.
+
+### FLOW-004 Select jobs → start pipeline
+UCs: UC-007 (+ USR-034; REQs to derive)
+```mermaid
+flowchart TD
+  A[Jobs list] --> B[filter / sort optional]
+  B --> C[tick jobs: row, select visible, bulk]
+  C --> D[Start pipeline]
+  D --> E[Review sheet: one 'Go as far as' for all (default Fill, I submit), override per row: Prepare / Fill / Submit]
+  E --> F{readiness ok for fill/submit?}
+  F -- no --> F1[those rows capped at Prepare, reason + link to Profile]
+  F -- yes --> G
+  F1 --> G[Start] --> H[Progress: per-job stage, Pause / Cancel / Retry]
+  H --> I[done: Prepared / Filled (open tab) / Submitted / Needs you]
+```
+What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A + LinkedIn never offered Submit.

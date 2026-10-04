@@ -162,6 +162,9 @@ Steps in one dialog: input (textarea or file; inline errors type/size/no text) â
 Purpose: see and edit every value before the browser fill. Entry: Job detail "Preview fill" (replaces direct Fill). UC-008.
 Table field / value / source (profile, answer, ai, unknown); edit inline; unknown rows ask (fill / skip if optional, "save to profile" toggle). Fill disabled + reason while required unanswered or legal/salary/EEO pending.
 
+## Page guidance (USR-035)
+Every screen: one-line purpose + next step under h1; empty state says what to do; disabled buttons say why (UnavailableButton). Nav â‰¤6 items, plain names.
+
 ## Trim list
 Candidates only; not removed yet. Decide per item at audit triage gate (61 proposed audit REQs). Kept only if an approved REQ cites it. Frontend TASK-013..015 trim their touched screens first.
 
@@ -170,9 +173,9 @@ Candidates only; not removed yet. Decide per item at audit triage gate (61 propo
 | `/kit` page | dev-only sheet, no user REQ | drop from build or dev flag |
 | `/runs*` redirects | legacy paths | drop |
 | Pipeline board + funnel | duplicates Jobs status tabs | fold into Jobs status filter |
-| Batch new/progress pages | overlaps Jobs select (REQ-104) + Runs | keep only if batch REQ approved |
+| Batch new page | replaced by Jobs "Start pipeline" + review sheet (FLOW-004) | fold into Jobs; keep progress page |
 | Today side panel (runs, schedule, funnel chart) | not in any approved REQ | readiness card + Needs you only |
-| Jobs saved views, export xlsx, open folder | no REQ | drop unless audit REQ approved |
+| Jobs saved views, export xlsx, open folder | no REQ (Excel-style table, filters, row-count pager KEPT: USR-036) | drop unless audit REQ approved |
 | Contacts page, outreach drafts | outreach USR not triaged | decide at triage |
 | Inbox drafts pane | depends on inbox REQs (triage) | decide at triage |
 | Runs: schedule panel, queue kinds, budget presets | partly duplicated by CLI | keep minimum the run REQs need |
