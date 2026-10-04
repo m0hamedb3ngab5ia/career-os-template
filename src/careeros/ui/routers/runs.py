@@ -79,8 +79,8 @@ def history(kind: str | None = None, cursor: str | None = None,
 
 
 @router.get("/runs/current")
-def current(rc: RunControl = Depends(run_control)) -> view.CurrentRun | None:
-    return view.current_view(rc)
+def current(c=Depends(ctx), rc: RunControl = Depends(run_control)) -> view.CurrentRun | None:
+    return view.current_view(rc, c.now().astimezone().date())
 
 
 @router.get("/runs/queue/{kind}")
