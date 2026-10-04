@@ -1476,6 +1476,19 @@
         "title": "ColumnConfig",
         "type": "object"
       },
+      "Comment": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "Comment",
+        "type": "object"
+      },
       "ContactPolicy": {
         "properties": {
           "detail": {
@@ -2437,6 +2450,109 @@
           "excluded"
         ],
         "title": "FailureInfo",
+        "type": "object"
+      },
+      "Feedback": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/FeedbackItem"
+            },
+            "title": "Items",
+            "type": "array"
+          },
+          "review": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReviewState"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "title": "Feedback",
+        "type": "object"
+      },
+      "FeedbackItem": {
+        "properties": {
+          "applied_v": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Applied V"
+          },
+          "comments": {
+            "default": [],
+            "items": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "title": "Comments",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "issue": {
+            "title": "Issue",
+            "type": "string"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "section": {
+            "title": "Section",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "open",
+              "redrafting",
+              "applied",
+              "dismissed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "suggestion": {
+            "title": "Suggestion",
+            "type": "string"
+          },
+          "v": {
+            "title": "V",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "section",
+          "issue",
+          "suggestion",
+          "state",
+          "v"
+        ],
+        "title": "FeedbackItem",
         "type": "object"
       },
       "FieldSchema": {
@@ -5422,6 +5538,19 @@
         "title": "ResumeRow",
         "type": "object"
       },
+      "ResumeText": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ResumeText",
+        "type": "object"
+      },
       "Resumes": {
         "properties": {
           "resumes": {
@@ -5456,6 +5585,45 @@
           }
         },
         "title": "RetryBody",
+        "type": "object"
+      },
+      "ReviewState": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run"
+          },
+          "state": {
+            "enum": [
+              "running",
+              "done",
+              "failed"
+            ],
+            "title": "State",
+            "type": "string"
+          },
+          "v": {
+            "title": "V",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "state",
+          "v",
+          "at"
+        ],
+        "title": "ReviewState",
         "type": "object"
       },
       "RunBudget": {
@@ -6792,6 +6960,19 @@
           "kind"
         ],
         "title": "StartBody",
+        "type": "object"
+      },
+      "Started": {
+        "properties": {
+          "kind": {
+            "title": "Kind",
+            "type": "string"
+          }
+        },
+        "required": [
+          "kind"
+        ],
+        "title": "Started",
         "type": "object"
       },
       "Status": {
@@ -11106,6 +11287,273 @@
         ]
       }
     },
+    "/api/profile/resumes/{rid}/feedback": {
+      "get": {
+        "operationId": "get_feedback_api_profile_resumes__rid__feedback_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Feedback"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/feedback/{fid}/apply": {
+      "post": {
+        "operationId": "apply_feedback_api_profile_resumes__rid__feedback__fid__apply_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fid",
+            "required": true,
+            "schema": {
+              "title": "Fid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Apply Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/feedback/{fid}/comment": {
+      "post": {
+        "operationId": "comment_feedback_api_profile_resumes__rid__feedback__fid__comment_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fid",
+            "required": true,
+            "schema": {
+              "title": "Fid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/Comment"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Comment Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/feedback/{fid}/dismiss": {
+      "post": {
+        "operationId": "dismiss_feedback_api_profile_resumes__rid__feedback__fid__dismiss_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fid",
+            "required": true,
+            "schema": {
+              "title": "Fid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FeedbackItem"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Dismiss Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/feedback/{fid}/rewrite": {
+      "put": {
+        "description": "The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095).",
+        "operationId": "rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "fid",
+            "required": true,
+            "schema": {
+              "title": "Fid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Rewrite Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
     "/api/profile/resumes/{rid}/master": {
       "post": {
         "operationId": "set_master_api_profile_resumes__rid__master_post",
@@ -11143,6 +11591,101 @@
           }
         },
         "summary": "Set Master",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/review": {
+      "post": {
+        "operationId": "start_review_api_profile_resumes__rid__review_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Start Review",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/text": {
+      "put": {
+        "description": "REQ-097: hand edit -> new version author=user, no guard.",
+        "operationId": "edit_resume_api_profile_resumes__rid__text_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumeText"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Resume",
         "tags": [
           "resumes"
         ]
