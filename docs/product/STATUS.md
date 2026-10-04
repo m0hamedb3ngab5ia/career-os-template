@@ -2,7 +2,7 @@
 
 ## Now
 - Lane: Feature — onboarding + profile (USR-002..004, 022..027) + injection guard, résumé reuse, check a job (USR-033, 031, 028)
-- Stage: Build (TASK-001 next). Arch delta approved 2026-10-04 (ARCHITECTURE.md Delta, DEC-001..008, FLOW-003)
+- Stage: Build (TASK-001 next). IA + UI approved 2026-10-04 (IA.md, DESIGN_SYSTEM.md, mockups, DEC-009 minimal UI; Trim list decided at audit triage) Arch delta approved 2026-10-04 (ARCHITECTURE.md Delta, DEC-001..008, FLOW-003)
 - Done: REQ-093..116, UC-001..012, FLOW-001/002 approved (gates 2026-10-04)
 - Next: build TASKS.md in order: USR-033 (REQ-108..110) first, then readiness/selected, profile store, match/reuse, check-a-job
 - Waiting on user: other USR triage. All Q answered 2026-10-04.
@@ -15,6 +15,7 @@
 | Onboarding+profile spec (Feature) | approved | 2026-10-04 |
 | Injection guard + résumé reuse + check-a-job spec (Feature) | approved | 2026-10-04 |
 | Architecture delta (DEC-001..008, REQ-108 tools amended) | approved | 2026-10-04 |
+| IA + UI (IA.md, DESIGN_SYSTEM.md, mockups, DEC-009) | approved | 2026-10-04 |
 
 ## Deletion candidates
 <!-- rejected REQs whose code still exists -->
