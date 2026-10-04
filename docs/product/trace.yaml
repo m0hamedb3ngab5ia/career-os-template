@@ -22,7 +22,7 @@ requirements:
   REQ-030: {status: proposed, provenance: observed}
   REQ-031: {status: proposed, provenance: observed}
   REQ-032: {status: proposed, provenance: observed}
-  REQ-033: {status: proposed, provenance: contradictory}
+  REQ-033: {status: proposed, provenance: confirmed}
   REQ-034: {status: proposed, provenance: observed}
   REQ-035: {status: proposed, provenance: observed}
   REQ-036: {status: proposed, provenance: observed}
@@ -34,7 +34,7 @@ requirements:
   REQ-043: {status: proposed, provenance: observed}
   REQ-044: {status: proposed, provenance: observed}
   REQ-045: {status: proposed, provenance: observed}
-  REQ-046: {status: proposed, provenance: inferred}
+  REQ-046: {status: proposed, provenance: confirmed}
   REQ-050: {status: proposed, provenance: observed}
   REQ-051: {status: proposed, provenance: observed}
   REQ-052: {status: proposed, provenance: observed}
@@ -42,7 +42,7 @@ requirements:
   REQ-054: {status: proposed, provenance: observed}
   REQ-060: {status: proposed, provenance: observed}
   REQ-061: {status: proposed, provenance: observed}
-  REQ-062: {status: proposed, provenance: contradictory}
+  REQ-062: {status: rejected, provenance: confirmed}
   REQ-063: {status: proposed, provenance: inferred}
   REQ-070: {status: proposed, provenance: observed}
   REQ-071: {status: proposed, provenance: observed}
@@ -52,7 +52,7 @@ requirements:
   REQ-075: {status: proposed, provenance: observed}
   REQ-076: {status: proposed, provenance: observed}
   REQ-077: {status: proposed, provenance: observed}
-  REQ-078: {status: proposed, provenance: decision-needed}
+  REQ-078: {status: proposed, provenance: confirmed}
   REQ-079: {status: proposed, provenance: inferred}
   REQ-090: {status: proposed, provenance: observed}
   REQ-091: {status: proposed, provenance: observed}

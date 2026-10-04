@@ -79,8 +79,8 @@ observed · Evidence: src/careeros/apply/ · Tests: tests/test_gh_fill.py, tests
 Click persisted before submit; second session raises.
 observed · Evidence: src/careeros/apply/session.py:123-138
 ### REQ-033 Auto-submit policy
-Off by default; Tier A + non-pass safety always assisted; `manual: [tier_a, fit_gte_85]`; allowlisted ATS on own domain only.
-contradictory (Q-003) · Evidence: src/careeros/runs/policy.py:25,134-144, safety/scam.py:338 vs README.md:44 · Tests: tests/test_runs_policy.py
+Opt-in mode alongside assisted (Q-003). Off by default; Tier A + non-pass safety always assisted; `manual: [tier_a, fit_gte_85]`; allowlisted ATS on own domain only.
+confirmed (Q-003; README.md:44 overstates today) · Evidence: src/careeros/runs/policy.py:25,134-144, safety/scam.py:338 vs README.md:44 · Tests: tests/test_runs_policy.py
 ### REQ-034 Assisted mode hand-off
 Fill everything, upload docs, stage, `needs_review` + "review & submit" Action Item.
 observed · Evidence: ARCHITECTURE.md:206-213
@@ -118,7 +118,7 @@ observed · Evidence: ARCHITECTURE.md:226-232 · Tests: tests/test_catch_up_canc
 observed · Evidence: src/careeros/runs/batches.py:72 · Tests: tests/test_runs_batches.py, test_runs_batch_driver.py
 ### REQ-046 Scheduled apply path
 Scheduler honours `runs.auto_submit.enabled` gated by cap + decision.
-inferred, not built · Evidence: TODO.md:33
+confirmed, not built (Q-003) · Evidence: TODO.md:33
 
 ## Tracker, actions, learning
 ### REQ-050 Excel tracker, atomic, queued when locked
@@ -145,7 +145,7 @@ observed (skill) · Evidence: .claude/skills/find-contacts/
 Notes ≤300 chars; 1st-degree/mutuals → tailor manually; auto email only verified; thank-yous manual.
 observed · Evidence: src/careeros/outreach.py:22-68, qa_ext/outreach_policy.py · Tests: tests/test_outreach.py
 ### REQ-062 Gmail auto-send after template confirmed
-contradictory (Q-005) · Evidence: ARCHITECTURE.md:32 vs UI "sending shown off" docs/UI.md:8
+Rejected 2026-10-04 (Q-005): drafts only. confirmed · Evidence: ARCHITECTURE.md:32 vs UI "sending shown off" docs/UI.md:8
 ### REQ-063 Inbox sync
 Classify Gmail mail, update tracker, push + Action Item on interview/assessment/offer.
 inferred, half-built (scheduler job off) · Evidence: TODO.md:12,35 · Tests: tests/test_runs_inbox.py
@@ -173,10 +173,10 @@ observed · Evidence: routers/settings.py, storage.py · Tests: tests/test_ui_se
 ### REQ-077 Contacts + Inbox pages (read + mark)
 observed · Evidence: routers/contacts.py, inbox.py · Tests: tests/test_ui_contacts_inbox.py
 ### REQ-078 Component kit page in prod routes
-`/kit` dev showcase ships to users.
-observed · Evidence: ui/src/app/routes.tsx:28 · (decision-needed Q-006)
+`/kit` stays, hidden from nav (dev-only) (Q-006).
+confirmed · Evidence: ui/src/app/routes.tsx:28
 ### REQ-079 Phone-width layout + phone companion
-inferred, deferred · Evidence: docs/UI.md:21, TODO.md:49
+inferred, deferred (Q-004) · Evidence: docs/UI.md:21, TODO.md:49
 
 ## Ops
 ### REQ-090 Retention prune
