@@ -173,7 +173,7 @@ sequenceDiagram
 ```
 What to notice: flag lives with the job, so CLI, UI and scheduler see the same block.
 
-### FLOW-003 (UC-010) → USER_FLOWS.md
+### FLOW-003 (UC-010) → 07_USER_FLOWS.md
 
 ### Contracts
 | endpoint / CLI | in | out / errors |
