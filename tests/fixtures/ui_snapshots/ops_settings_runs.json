@@ -8,9 +8,7 @@
       "Grep",
       "Bash(.venv/bin/careeros *)",
       "Bash(.venv/bin/python *)",
-      "Bash(date *)",
-      "WebSearch",
-      "WebFetch"
+      "Bash(date *)"
     ],
     "pipeline:runs.auto_submit.allow": [
       "tier_c",
@@ -930,9 +928,7 @@
               "Grep",
               "Bash(.venv/bin/careeros *)",
               "Bash(.venv/bin/python *)",
-              "Bash(date *)",
-              "WebSearch",
-              "WebFetch"
+              "Bash(date *)"
             ],
             "file": "pipeline",
             "help": "A tool missing here ends a run with \"Tool not allowed\", never a hang.",
@@ -1260,9 +1256,7 @@
       "Grep",
       "Bash(.venv/bin/careeros *)",
       "Bash(.venv/bin/python *)",
-      "Bash(date *)",
-      "WebSearch",
-      "WebFetch"
+      "Bash(date *)"
     ],
     "pipeline:runs.auto_submit.allow": [
       "tier_c",

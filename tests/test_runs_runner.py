@@ -149,7 +149,7 @@ def test_invoker_gets_prompt_cwd_env_and_job_lock(settings, store):
     inv = FakeInvoke(settings)
     rec = run(settings, inv)
     c = inv.calls[0]
-    assert c["cmd"][-1] == f"/score-job {store.job_dir(jid)}"  # absolute: jobs_dir is outside the root here
+    assert c["cmd"][-1].splitlines()[0] == f"/score-job {store.job_dir(jid)}"  # absolute: jobs_dir is outside the root here
     assert c["cwd"] == str(settings.root)
     assert c["env"]["CAREEROS_RUN_ID"] == rec["id"]
     assert c["lock"]["owner"] == f"run:{rec['id']}" and c["env"]["CAREEROS_LOCK_TOKEN"] == c["lock"]["token"]
