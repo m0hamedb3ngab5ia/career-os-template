@@ -11,7 +11,8 @@ from typing import Any, Iterable
 
 log = logging.getLogger(__name__)
 _INSTRUCTION = re.compile(
-    r"\b(?:ignore (?:all |the )?(?:previous|prior|above) (?:instructions|prompts?)|system prompt|you are now (?:a|an|in|the)\b"
+    r"\b(?:ignore (?:all |the )?(?:previous|prior|above) (?:instructions|prompts?)"
+    r"|disregard\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above)|system prompt|you are now (?:a|an|in|the)\b"
     r"|as an ai (?:language )?model|new instructions)", re.I)
 _HIDDEN_CHARS = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
 _HIDDEN_HTML = re.compile(
