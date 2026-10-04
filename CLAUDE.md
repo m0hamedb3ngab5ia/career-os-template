@@ -49,6 +49,7 @@ Personal context (who the candidate is, where their private files live) lives in
 ## Gotchas
 - `.venv` inside an iCloud-synced folder gets the macOS hidden flag and "* 2.py" duplicates; keep the
   checkout outside iCloud. If `import careeros` breaks: `chflags -R nohidden .venv` or `PYTHONPATH=src`.
+- In a worktree the shared `.venv` imports another checkout's `src/`: prefix pytest and openapi regen with `PYTHONPATH=src`.
 - Tracker default `data/JobTracker.xlsx` (override `config/pipeline.yaml: paths.tracker_xlsx`). Always write via
   `careeros.tracker.Tracker` or the `careeros` CLI (atomic). If Excel has it open, ops queue to `.pending.json`; `careeros tracker flush`.
 - `data/` is gitignored; regenerable via scout.
@@ -72,6 +73,9 @@ Personal context (who the candidate is, where their private files live) lives in
 - Stacked PRs are fine: set `--base` to the parent branch. GitHub retargets children when the parent merges.
 - Review with `/review <PR>` (Claude + Codex in parallel, merged findings). `--post` comments on the PR.
 - Merge only after `/review` returns `None.` or remaining findings are consciously accepted.
+- `--admin` can't skip protection: wait for `pytest`, then `gh pr merge --squash` (or `--auto`).
+- UI bundle conflicts: never hand-merge `src/careeros/ui/static/`; `git checkout origin/main -- src/careeros/ui/static`,
+  rebuild, update UI snapshots. Merge UI PRs one at a time.
 
 ## Response format
 Every reply that finishes a piece of work ends with a `**Next:**` block: numbered, concrete next steps split into
