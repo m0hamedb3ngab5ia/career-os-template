@@ -32,7 +32,7 @@ from careeros.runs import locks
 from careeros.runs.store import RunStore, iso
 from careeros.ui.services.runs import Busy
 
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master", "review", "resume_edit")
 LOCK_TTL_S = 3 * 3600  # a dead pid frees it sooner
 PIPELINE_STEPS = ("scout", "prune")  # steps that also take the pipeline lock (never beside a batch)
 # (status, detail), or (status, detail, after): `after` runs once the pipeline lock is released (scout's tracker sync)
@@ -207,6 +207,28 @@ def run_inbox_sync(settings: Settings) -> dict[str, Any]:
         signal.signal(signal.SIGTERM, old)
 
 
+def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, run_skill: Any = None) -> dict[str, Any]:
+    """review-resume (REQ-094) or edit-resume (REQ-095/096) on one résumé. A new master version afterwards launches
+    extract-master (REQ-099: each new master version), here because the edit run holds the runner lock."""
+    from careeros import resume_feedback, resumes
+
+    if run_skill is None:
+        from careeros.runs.service import run_skill
+    root = settings.root
+    before = resumes.get(root, rid)["versions"][-1]["n"]
+    if kind == "review":
+        resume_feedback.set_review(root, rid, "running")
+        rec = run_skill(settings, "review", f"review-resume {rid}")
+        if rec.get("stop_reason") != "completed" or (resume_feedback.load(root, rid)["review"] or {}).get("state") != "done":
+            resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
+        return rec
+    rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}")
+    meta = resumes.get(root, rid)
+    if meta["type"] == "master" and meta["versions"][-1]["n"] > before:
+        run_skill(settings, "extract_master", "extract-master")
+    return rec
+
+
 def _raise_interrupt(*_: Any) -> None:
     raise KeyboardInterrupt
 
@@ -217,6 +239,8 @@ def main(argv: list[str] | None = None) -> int:
     p.add_argument("kind", choices=STEP_KINDS)
     p.add_argument("--job")
     p.add_argument("--run-id")
+    p.add_argument("--resume")
+    p.add_argument("--item")
     args = p.parse_args(argv)
     if args.kind == "qa" and not args.job:
         p.error("qa needs --job")
@@ -227,6 +251,8 @@ def main(argv: list[str] | None = None) -> int:
         from careeros.runs.service import run_skill
 
         rec = run_skill(settings, "extract_master", "extract-master")
+    elif args.kind in ("review", "resume_edit"):
+        rec = run_resume_skill(settings, args.kind, args.resume, args.item)
     else:
         signal.signal(signal.SIGTERM, _raise_interrupt)
         try:

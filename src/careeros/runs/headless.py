@@ -160,7 +160,7 @@ def validate_result(stage: str, job_id: str, res: dict[str, Any]) -> list[str]:
     """Problems with a skill RESULT for this stage (empty = valid). A RESULT with `error` is valid here:
     `classify` reports it as `skill_error`."""
     probs = []
-    if stage in ("inbox_sync", "extract_master"):  # not about one job; any RESULT object is its summary
+    if stage in ("inbox_sync", "extract_master", "review", "resume_edit"):  # not about one job; any RESULT object is its summary
         return probs
     if str(res.get("job_id") or "") != job_id:
         probs.append(f"RESULT job_id {res.get('job_id')!r} is not {job_id!r}")
