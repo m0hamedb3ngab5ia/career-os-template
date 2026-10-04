@@ -31,3 +31,25 @@ stateDiagram-v2
   dismissed --> [*]
 ```
 What to notice: nothing reaches the résumé except via `applied`, and only after the zero-fabrication guard.
+
+### FLOW-003 Check a job
+UCs: UC-010
+```mermaid
+flowchart TD
+  A[Jobs › Check a job] --> B{paste or file ok?}
+  B -- no --> B1[inline error: type / size / no text]
+  B -- yes --> C[stored + scanned] --> D{flagged?}
+  D -- yes --> D1[badge + Action Item; scoring continues]
+  D -- no --> E
+  D1 --> E[fit score + résumé match table]
+  E --> F{best ≥ threshold?}
+  F -- yes --> G[Use this résumé → job ready to tick]
+  F -- no --> H[Tailor from master? one run]
+  H -- no --> Z[keep job, no résumé chosen]
+  H -- yes --> I{attempt ≥ threshold?}
+  I -- yes --> G
+  I -- no --> J[notice best X / needed Y + missing] --> K{Create closest anyway?}
+  K -- yes --> L[keep attempt, below_threshold]
+  K -- no --> M[discard attempt]
+```
+What to notice: max one tailor run per check; a flagged posting is still scored but can't be prepared until cleared.
