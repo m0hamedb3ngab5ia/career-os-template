@@ -5,7 +5,8 @@
 - Stage: Architecture delta (next), then Tasks → Build
 - Done: REQ-093..107, UC-001..009, FLOW-001/002 approved (gate 2026-10-04)
 - Next: ARCHITECTURE delta (profile store layout, résumé text extraction lib, review run, readiness API, `selected` field) + DECISIONS
-- Waiting on user: other USR triage; Q-001, Q-002, Q-007, Q-008
+- Waiting on user: other USR triage. All Q answered 2026-10-04.
+- Next REQ derivation: USR-033 (injection guard), USR-031 (résumé reuse), USR-028 (job match), Q-008 action items json; later USR-029/030/032
 
 ## Gates
 | gate | status | date |

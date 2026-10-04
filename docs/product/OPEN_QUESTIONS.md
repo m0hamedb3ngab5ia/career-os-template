@@ -3,12 +3,14 @@
 ### Q-001 Who is the template for?
 - Links: VISION User, NFR-005
 - Default (recommended): owner first; template users = technical Mac users who self-serve via GETTING_STARTED. macOS-only stays.
-- Status: open
+- Answer (2026-10-04): anyone job hunting. Now: technical users clone + build. Later: hosted web app or downloadable app; user connects own LLM subscription (Claude, ChatGPT, other). → USR-030. Conflicts with "no API key / Claude Code skills only" → architecture decision when USR-030 scheduled.
+- Status: answered
 
 ### Q-002 Success metrics
 - Links: VISION, REQ-092
 - Default (recommended): applications/week, QA first-pass rate, interview rate by tier, candidate minutes per application.
-- Status: open
+- Answer (2026-10-04): default metrics accepted + marketing metrics: hours saved, applications sent, interview rate vs manual, match-score lift; opt-in aggregate for website. → USR-032.
+- Status: answered
 
 ### Q-003 Auto-submit: does Tier B/C actually auto-submit today?
 - Links: REQ-033, REQ-046
@@ -39,13 +41,15 @@
 ### Q-007 Prompt injection from posting text
 - Links: ARCHITECTURE threat model, REQ-020..023
 - Default (recommended): accept current `dontAsk` + allowedTools; add QA check later only if seen.
-- Status: open
+- Answer (2026-10-04): implement protections. → USR-033 (posting text = data only, flag suspected injection, never act on it).
+- Status: answered
 
 ### Q-008 Action Items source of truth
 - Links: REQ-052, REQ-073
 - Evidence: TODO.md:52 move xlsx → data/action_items.json
 - Default (recommended): approve the move as a requirement change (next Feature lane).
-- Status: open
+- Answer (2026-10-04): move to data/action_items.json; xlsx kept as synced backup.
+- Status: answered
 
 ### Q-009 Résumé file types and size
 - Links: REQ-093, REQ-101
@@ -86,10 +90,12 @@
 ### Q-015 Match threshold for USR-028
 - Links: USR-028, REQ-020
 - Default (recommended): one user setting "minimum match score" (0-100, default 70) in Settings, reusing the existing fit score; overridable per check.
-- Status: open
+- Answer (2026-10-04): 70 default.
+- Status: answered
 
 ### Q-016 LinkedIn/Indeed/Handshake vs "never automate LinkedIn" hard rule
 - Links: USR-029, CLAUDE.md hard rules, REQ-010
 - Conflict: hard rule forbids automating LinkedIn; their terms forbid scraping; no public job APIs. Options: (a) user-side import only: browser bookmarklet/"send to career-os" on a page the user opened, email job-alert parsing via Gmail inbox sync, saved-search RSS where offered; (b) automated browsing (breaks hard rule + ToS, account-ban risk).
 - Default (recommended): (a) only; hard rule stays. Plan in its own `/product new` when USR-029 is scheduled.
-- Status: open
+- Answer (2026-10-04): (a) user-side import only; hard rule stays. Imports land in a batch that waits for user "ready to tailor"; then tailor résumé/cover letter where needed (reuse per USR-031) + fill instructions. → USR-029.
+- Status: answered

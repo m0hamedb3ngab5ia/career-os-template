@@ -29,6 +29,10 @@ user_requirements:
   USR-027: {status: approved, provenance: confirmed}
   USR-028: {status: approved, provenance: confirmed}
   USR-029: {status: approved, provenance: confirmed}
+  USR-030: {status: approved, provenance: confirmed}
+  USR-031: {status: approved, provenance: confirmed}
+  USR-032: {status: approved, provenance: confirmed}
+  USR-033: {status: approved, provenance: confirmed}
 requirements:
   REQ-001: {status: proposed, provenance: observed, user_requirements: [USR-001]}
   REQ-002: {status: proposed, provenance: observed, user_requirements: [USR-001, USR-023]}

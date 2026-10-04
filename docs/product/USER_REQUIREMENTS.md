@@ -10,6 +10,12 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users can pull in updates to the shared app without losing their own data.
 - Why: get running in minutes, safely
 
+### USR-030 Use the app without being technical (later)
+- Today users need to download the code from GitHub and build it.
+- Later, users can use the app on the web, or download it from a website.
+- Users connect the AI account they already pay for, such as Claude or ChatGPT.
+- Why: anyone looking for a job can use it, not only developers
+
 ### USR-002 Upload my résumé and get feedback
 - Users can easily find a section in the app to upload their résumé.
 - While it uploads, users see a progress screen that shows the résumé review running in the background.
@@ -54,10 +60,12 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Why: spend time only on jobs worth applying to
 
 ### USR-029 Find jobs on more job boards (later)
-- Users can connect other job boards, such as LinkedIn, Handshake and Indeed.
-- Jobs from these boards show up in the same list as all other jobs.
-- These boards may be slower or less complete than the boards the app connects to directly, and that is fine.
-- Later: needs a plan for how each board would work, what each board's rules allow, and how to keep the user's accounts safe.
+- Users can bring in jobs from other job boards, such as LinkedIn, Handshake and Indeed.
+- The user does the browsing; the app never logs in to or clicks around these boards by itself.
+- Users can send a job page they have open, or a job-alert email, into the app.
+- Imported jobs go into a batch that waits until the user marks it ready.
+- When the user marks the batch ready, the app makes résumés and cover letters where needed and tells the user how to fill in each application.
+- Later: needs a plan for each board and what its rules allow.
 - Why: many jobs are only posted on these boards, so the app misses them today
 
 ### USR-006 Stay safe from scams and fake jobs
@@ -82,7 +90,14 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - The app shows which of the user's résumés would score highest for that job.
 - If no résumé reaches the score the user needs, the app offers to build a tailored résumé from the master résumé.
 - If even a tailored résumé can't reach that score, the app tells the user the score was not met and asks if they still want the closest possible match.
+- The user sets the score they need in Settings. It starts at 70 out of 100.
 - Why: know before applying how well a résumé fits a job, wherever the job was found
+
+### USR-031 Reuse résumés instead of making one per job
+- The app reuses a résumé that already fits many similar jobs, even 100 or more.
+- The app makes small changes only when they raise the score enough to be worth it.
+- The app makes a new résumé only when no existing one is close enough.
+- Why: fewer résumés to check, less waiting, less AI use
 
 ### USR-007 Get a tailored résumé and cover letter for each job
 - For each good job, the app writes a one-page résumé using only the user's own experience.
@@ -168,7 +183,7 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users see all jobs and their stage, from found to offer.
 - Users see what needs them today on the home screen.
 - Users can change a job's status, withdraw, or open its files.
-- The app keeps a spreadsheet of everything up to date.
+- The app keeps a spreadsheet copy of everything up to date as a backup.
 - Why: one place instead of spreadsheets and folders
 
 ### USR-014 Get a to-do list of things that need me
@@ -194,6 +209,19 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 ### USR-021 Use the app from my phone (later)
 - Users can check to-dos, approve drafts and get alerts from their phone.
 - Why: act on the go
+
+### USR-032 See proof that the app works
+- Users see how many hours the app saved them and how many applications it sent.
+- Users see how often their applications led to interviews, compared with applying by hand.
+- Users see how much their résumé match scores went up.
+- The product website can show these numbers, added up across users who agree to share them.
+- Why: know the app is worth it, and show others why to use it
+
+### USR-033 Job postings can't trick the app
+- A job posting may hide instructions meant to trick the AI.
+- The app treats posting text as information only, never as instructions.
+- The app flags postings that look like they try this, and never acts on them.
+- Why: keep the user's data and accounts safe
 
 ## Map to technical requirements
 <!-- trace:map -->
@@ -226,6 +254,10 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
 | USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
 | USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
-| USR-028 ### Q-015 Match threshold for USR-028 | approved | — (derive) |
+| USR-028 Check any job I find against my résumés | approved | — (derive) |
 | USR-029 Find jobs on more job boards (later) | approved | — (derive) |
+| USR-030 Use the app without being technical (later) | approved | — (derive) |
+| USR-031 Reuse résumés instead of making one per job | approved | — (derive) |
+| USR-032 See proof that the app works | approved | — (derive) |
+| USR-033 Job postings can't trick the app | approved | — (derive) |
 <!-- /trace:map -->
