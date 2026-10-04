@@ -29,7 +29,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 | 7 | Applier | `src/careeros/apply/` + Chrome (Claude in Chrome) | apply session | one adapter per ATS |
 | 8 | Tracker | `src/careeros/tracker.py` → `data/JobTracker.xlsx` (configurable) | always | tabs: Jobs, Action Items, Contacts, Log, Config |
 | 9 | Inbox sync | `.claude/skills/inbox-sync/` (Gmail MCP) | daily | status updates + push on interview |
-| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail auto-send after template confirmed; connected / mutuals → tailored by hand (`careeros outreach`) |
+| 10 | Outreach | `.claude/skills/find-contacts/`, `.claude/skills/draft-outreach/` | after apply | draft-only LinkedIn; Gmail drafts only (auto-send deferred); connected / mutuals → tailored by hand (`careeros outreach`) |
 | 11 | Runner | `src/careeros/runs/` (`careeros run score\|prepare`) → `data/runs/` | on demand or scheduled | Python ranks and budgets; one headless skill call per job; never applies |
 | 12 | Scheduler | `careeros tick` (`runs/tick.py`, `runs/schedule.py`) + macOS LaunchAgent (`careeros schedule install`) | every 15 min | scout, score, prepare, prune when due; quiet hours; catch-up |
 | 13 | Storage + advisor | `careeros storage`, `careeros advise [apply <id>]` | after each prune / on demand | suggest-only; a config change only on `advise apply` |

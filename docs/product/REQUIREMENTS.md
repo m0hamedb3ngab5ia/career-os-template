@@ -143,7 +143,7 @@ observed · Evidence: src/careeros/learning.py, ARCHITECTURE.md:271-277
 Recruiter/HM/lead from posting + site, LinkedIn search URLs, email guesses w/ confidence.
 observed (skill) · Evidence: .claude/skills/find-contacts/
 ### REQ-061 Draft outreach, never auto LinkedIn
-Notes ≤300 chars; 1st-degree/mutuals → tailor manually; auto email only verified; thank-yous manual.
+Notes ≤300 chars; 1st-degree/mutuals → tailor manually; email drafts only (Q-005; auto-send deferred, REQ-062); thank-yous manual.
 observed · Evidence: src/careeros/outreach.py:22-68, qa_ext/outreach_policy.py · Tests: tests/test_outreach.py
 ### REQ-062 Gmail auto-send after template confirmed
 Rejected 2026-10-04 (Q-005): drafts only. confirmed · Evidence: ARCHITECTURE.md:32 vs UI "sending shown off" docs/UI.md:8
@@ -206,7 +206,7 @@ Failure: `claude` missing/timeout → review state `failed` + Retry; upload kept
 ### REQ-095 Apply feedback with one click
 Apply → AI rewrites only the targeted section → new version (author=ai), diff shown, undo = open previous version.
 Given feedback item · When Apply · Then new version vN+1 author=ai; item marked applied.
-Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
+Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version, nor stronger claims (scope, outcome, seniority verb e.g. supported → led) (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
 
 ### REQ-096 Comment on feedback
 User comment on an item replaces one-click: AI re-drafts the suggestion using the comment (Q-010); user then Applies or Dismisses. Comments kept on the item.
@@ -235,7 +235,7 @@ Given 0 samples · When upload 2 · Then learn-voice runs once, list shows 2, ne
 
 ### REQ-102 Readiness checklist
 `GET /api/readiness` + UI card (Today + Profile) + `careeros doctor` reuse: items `{id, label, must, done, fix_link}`.
-Must-haves (Q-013): master résumé set; master.yaml has no example/placeholder data (doctor); legal/work-auth + salary standard answers set; `claude` installed. Nice: ≥1 writing sample, ATS credentials, EEO answers.
+Must-haves (Q-013): master résumé set; master.yaml has no example/placeholder data (doctor); legal/work-auth + salary standard answers set; `claude` installed; master.yaml synced with master résumé (open while a REQ-099 diff is pending or rejected). Nice: ≥1 writing sample, ATS credentials, EEO answers.
 Given fresh install · When open Today · Then checklist shows each item with link; all must-haves done → "Ready to apply".
 
 ### REQ-103 Apply blocked until ready
@@ -243,8 +243,9 @@ While any must-have open: `apply plan|fill`, `run apply`, batch stages fill|subm
 Given must-have open · When `careeros run apply --job X` · Then exit 7 "not ready: <items>", nothing filled.
 
 ### REQ-104 Pick jobs for pipeline
-Job field `selected` (default false for every newly scouted job). Jobs list: checkbox per row, select all/visible, bulk tick/untick. Only selected jobs are ever prepared or applied (manual run, batch, scheduler). Scoring runs on all (Q-014). Untick later → excluded from future runs; a job mid-run finishes its current step then stops.
+Job field `selected` (default false for every newly scouted job). Jobs list: checkbox per row, select all/visible, bulk tick/untick. Only selected jobs are ever prepared or applied (manual run, batch, scheduler). Scoring runs on all (Q-014). Untick later → excluded from future runs; a job mid-run finishes its current step then stops. Jobs existing before this change: missing field = true. Explicit `--job X` counts as selecting X.
 Given 10 scouted, 3 ticked · When `run prepare` · Then only those 3 prepared.
+Given pre-existing job without `selected` · When `run prepare` · Then it is prepared.
 
 ### REQ-105 Fill preview + edit
 Before fill: UI table of the fill plan, per field: label, value, source (saved answer | AI draft | resume | default), required. User edits any value → plan updated (job only); checkbox "save to profile" also writes standard answer (REQ-053).

@@ -255,7 +255,7 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
 | USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
 | USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
-| USR-028 Check any job I find against my résumés | approved | REQ-111, REQ-114, REQ-115, REQ-116 |
+| USR-028 ### Q-015 Match threshold for USR-028 | approved | REQ-111, REQ-114, REQ-115, REQ-116 |
 | USR-029 Find jobs on more job boards (later) | approved | — (derive) |
 | USR-030 Use the app without being technical (later) | approved | — (derive) |
 | USR-031 Reuse résumés instead of making one per job | approved | REQ-111, REQ-112, REQ-113 |

@@ -23,11 +23,11 @@
 <!-- trace:status -->
 | REQ status | n |
 |---|---|
-| approved | 15 |
+| approved | 24 |
 | proposed | 61 |
 | rejected | 1 |
 
-Open questions: 6
+Open questions: 0
 Needs review: none
-User requirements: 29 (11 approved)
+User requirements: 33 (15 approved)
 <!-- /trace:status -->

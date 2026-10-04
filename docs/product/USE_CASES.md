@@ -37,6 +37,7 @@ Fail: guard finds new number/employer/tool → version not created, item shows r
 Outcome: new version, provenance recorded
 E2E-002-01: Given item When Apply Then v2 author=ai, diff shown, item `applied`.
 E2E-002-02: Given AI rewrite adding "40%" absent from v1 When guard runs Then no v2, item open with reason.
+E2E-002-03: Given v1 "supported migration" When rewrite says "led migration" Then no v2, item open with reason.
 E2E-002-03: Given v2 When manual edit + Save Then v3 author=user.
 
 ### UC-003 Check ATS read, set master
