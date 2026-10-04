@@ -93,9 +93,9 @@ requirements:
   REQ-092: {status: proposed, provenance: inferred, user_requirements: [USR-020]}
   REQ-093: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
   REQ-094: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
-  REQ-095: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
-  REQ-096: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
-  REQ-097: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
+  REQ-095: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-04]}
+  REQ-096: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-002-01, E2E-002-02, E2E-002-04]}
+  REQ-097: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-04]}
   REQ-098: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
   REQ-099: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
   REQ-100: {status: approved, provenance: confirmed, user_requirements: [USR-004], tests: [E2E-004-01]}
