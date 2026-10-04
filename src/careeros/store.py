@@ -103,6 +103,12 @@ class Store:
         flags = self.load_flags(job_id)
         flags["injection_cleared_at"] = now_iso()
         self._write(job_id, FLAGS, flags)
+        from careeros.tracker import Tracker
+
+        tr = Tracker(settings=self.settings)
+        for it in tr.list_action_items(open_only=True):
+            if str(it.get("JobID") or "") == job_id and it.get("Type") == "injection_suspected":
+                tr.mark_action_done(str(it["ID"]))
         return flags
 
     def load_posting(self, job_id: str) -> Posting | None:
