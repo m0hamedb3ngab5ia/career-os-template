@@ -291,6 +291,25 @@ Given 3 résumés · When open job · Then sorted by match, best marked, scores 
 No résumé ≥ threshold → offer "Tailor from master" (REQ-113/021). Result ≥ threshold → done. Still below → notice "threshold not met: best X, needed Y; missing: …" + ask "Create closest match anyway?" Yes → keep best attempt, marked `below_threshold`; No → discard attempt. Max one tailor run per check.
 Given threshold 70, all résumés < 60, tailored = 64 · When check · Then notice shows 64/70 + missing skills, asks; Yes keeps it flagged.
 
+### REQ-117 Start pipeline from the Jobs list
+Jobs list "Start pipeline" button, enabled while ≥1 job ticked (REQ-104; disabled reason "Tick jobs first"). Opens a review sheet: one "Go as far as" for all ticked jobs (Prepare / Fill / Submit, default Fill = the user submits), override per row. Caps, each shown with its reason: LinkedIn → Prepare; Tier A → Fill (never Submit); readiness must-have open (REQ-103) → Prepare + link to Profile; injection flag (REQ-109) → excluded. Start creates one batch (REQ-118) and opens its progress (per-job stage, Pause / Cancel / Retry). Only entry point for multi-job runs in the UI.
+Given 3 ticked (1 Tier A, 1 LinkedIn) and default Fill · When Start pipeline · Then review shows Fill / Fill (Tier A) / Prepare (LinkedIn) with reasons, and Submit is not offered on those two rows.
+### REQ-118 Per-job stop point in batches
+Batch keeps `stop_at` (default for all) plus optional `stops: {job_id: stage}`; driver stops each job at its own stage. CLI `batch create … --stop-at S [--job-stop J=S ...]`; `POST /api/batches` accepts `stops`. Same caps as REQ-117 enforced server-side (a requested Submit on Tier A or LinkedIn is lowered with reason, never trusted from the client). Old batch files without `stops` behave as today.
+Given batch stop_at fill, stops {B: prepare, C: submit} · When run · Then A filled, B prepared only, C submitted only if auto-submit verdict allows.
+### REQ-119 Page guidance line
+Every page header: h1 + one short line saying what the page is for and the next thing to do, + its primary action (08_DESIGN_SYSTEM.md Page header). Empty states say what to do, with a button. Disabled buttons show why (UnavailableButton). Nav ≤6 items, plain names.
+Given any route · When rendered · Then header has h1 + non-empty guidance line; no disabled button lacks a reason.
+### REQ-120 Spreadsheet-style job tables
+Every list of jobs (Jobs list, pipeline review sheet, batch progress) uses the current Jobs table: column header sort + filter menus, filter chips, pager rows 10/25/50/100, chosen size remembered (`ui.page_size`).
+Given Jobs list · When choose 50 rows and reload · Then 50 rows shown; review sheet uses the same table.
+### REQ-121 First-run tour
+First open of the UI → short overlay tour, one step per main nav item + Start pipeline (≤8 steps), each pointing at its element with one line. Skip / Esc at any step ends it. Done or skipped → `tour_done: true` in `data/ui_state.json` (per install, not per browser); never shown again automatically. Settings "How to use" restarts it. Keyboard accessible, focus returns to the page.
+Given fresh install · When open UI, skip at step 2, reload · Then no tour; Settings "How to use" shows it from step 1.
+### REQ-122 Next-step card
+Today shows one "Next step" card with one button, from the first rule that holds: readiness must-have open → "Finish setup" (link to first open item); no jobs → "Find jobs" (scout); no ticked jobs → "Pick jobs" (Jobs list); a batch running → "See progress"; else → "Start pipeline" (REQ-117). Also shown once on the Profile page when the last must-have closes.
+Given ready, 12 jobs, 0 ticked · When open Today · Then card says "Pick jobs" and links to the Jobs list.
+
 ## Non-functional
 ### NFR-001 No API key; LLM only via Claude Code subscription
 observed · Evidence: CLAUDE.md, .agent/DECISIONS.md

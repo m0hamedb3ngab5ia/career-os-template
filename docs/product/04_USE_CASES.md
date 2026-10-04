@@ -112,3 +112,21 @@ Fail: artifacts with untrusted contact info/URLs → QA hard fail
 Outcome: injected instructions never acted on
 E2E-012-01: Given recorded posting with hidden "ignore previous instructions" When scouted Then flagged and `run prepare --job X` exits 2 until cleared.
 E2E-012-02: Given fake tailor output containing an unknown URL When qa runs Then hard fail `untrusted_content`.
+
+### UC-013 Start pipeline with a stop point per job
+REQs: REQ-117, REQ-118, REQ-120 · Pre: jobs ticked (UC-007) · Trigger: Jobs list "Start pipeline"
+Main: 1 review sheet lists ticked jobs, "Go as far as" Fill for all 2 user changes some rows 3 caps shown with reasons 4 Start → batch → progress
+Alt: readiness open → fill/submit rows capped at Prepare; flagged posting → excluded
+Fail: client asks Submit for Tier A/LinkedIn → server lowers it, reason logged
+Outcome: each job goes exactly as far as chosen, never past the safety caps
+E2E-013-01: Given 3 ticked jobs (Tier A, LinkedIn, plain) When start with default Fill and C=Submit Then Tier A filled, LinkedIn prepared, plain submitted only if auto-submit verdict allows.
+E2E-013-02: Given `POST /api/batches` with stops {tierA: submit} When run Then Tier A never submitted, reason in batch file.
+
+### UC-014 First run and next step
+REQs: REQ-119, REQ-121, REQ-122 · Trigger: first UI open; Today page
+Main: 1 tour runs once 2 user skips or finishes 3 Today shows next-step card 4 one click goes there
+Alt: Settings "How to use" restarts the tour
+Outcome: new user always sees one clear next action
+E2E-014-01: Given fresh data dir When open UI, finish tour, reload Then no tour; `data/ui_state.json` tour_done true.
+E2E-014-02: Given readiness done and 0 ticked jobs When open Today Then next-step card "Pick jobs".
+

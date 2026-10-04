@@ -5,7 +5,7 @@
 - Stage: Build (TASK-001 next). IA + UI approved 2026-10-04 (06_IA.md, 08_DESIGN_SYSTEM.md, mockups, DEC-009 minimal UI; Trim list decided at audit triage) Arch delta approved 2026-10-04 (09_ARCHITECTURE.md Delta, DEC-001..008, FLOW-003)
 - Done: REQ-093..116, UC-001..012, FLOW-001/002 approved (gates 2026-10-04)
 - Next: build 10_TASKS.md in order: USR-033 (REQ-108..110) first, then readiness/selected, profile store, match/reuse, check-a-job
-- Waiting on user: other USR triage. All Q answered 2026-10-04.
+- Waiting on user: gate for REQ-117..122 (USR-034..037); other USR triage. All Q answered 2026-10-04.
 - Approved 2026-10-04: REQ-108..110 (USR-033), REQ-111..113 (USR-031), REQ-114..116 (USR-028), UC-010..012. Later: Q-008 json, USR-029/030/032
 
 ## Gates
@@ -16,6 +16,7 @@
 | Injection guard + résumé reuse + check-a-job spec (Feature) | approved | 2026-10-04 |
 | Architecture delta (DEC-001..008, REQ-108 tools amended) | approved | 2026-10-04 |
 | IA + UI (06_IA.md, 08_DESIGN_SYSTEM.md, mockups, DEC-009) | approved | 2026-10-04 |
+| Pipeline start + guidance + tour spec (USR-034..037: REQ-117..122, UC-013/014, TASK-016..020) | pending | |
 
 ## Deletion candidates
 <!-- rejected REQs whose code still exists -->
@@ -26,10 +27,10 @@
 | REQ status | n |
 |---|---|
 | approved | 24 |
-| proposed | 61 |
+| proposed | 67 |
 | rejected | 1 |
 
 Open questions: 0
 Needs review: none
-User requirements: 33 (15 approved)
+User requirements: 37 (19 approved)
 <!-- /trace:status -->
