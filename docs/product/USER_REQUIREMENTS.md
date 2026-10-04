@@ -103,6 +103,16 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users set a daily limit on how many applications go out.
 - Why: apply at volume when users choose to
 
+### USR-025 Preview and edit how my applications get filled
+- Before an application goes out, users can see exactly how the app will fill in each field.
+- Users can change any answer before it is used.
+- Why: no surprises in what employers see
+
+### USR-026 Get asked when the app doesn't know an answer
+- When a form has a field the app can't fill, users are asked to fill it in or skip it.
+- What users enter is saved to their profile, so the app knows it next time.
+- Why: applications never stall or get a guessed answer
+
 ## Running on its own
 ### USR-012 Let the app work overnight within my limits
 - The app finds, scores and prepares jobs on a schedule, outside the hours users pick.
@@ -111,7 +121,32 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Missed runs wait for the user instead of running by surprise.
 - A job that keeps failing becomes a to-do for the user.
 - Users can pick a set of jobs and choose how far the app takes them.
+- Users can watch runs live and see their history.
 - Why: wake up to applications ready to review
+
+## My profile
+### USR-027 One place for everything the app knows about me
+- Each user has their own profile.
+- The profile holds their documents: résumés, cover letters and writing samples.
+- The profile holds every saved answer the app uses to fill in applications, and users can view, edit or delete them.
+- The profile holds anything else the app has learned about the user.
+- Why: users can see and control all their information in one place
+
+### USR-015 Answer a question once, never again
+- When users answer an application question, the app remembers it for next time.
+- The app remembers tricky steps on each job site.
+- Why: less repeated work with every application
+
+## Settings
+### USR-018 Change settings without editing files
+- Users can change every setting in one Settings page in the app.
+- Each setting shows the recommended default and what it does.
+- Why: no need to touch config files
+
+### USR-019 Keep the app tidy
+- The app cleans up old files on a schedule.
+- The app suggests better settings; nothing changes until the user says so.
+- Why: the app stays small and fast
 
 ## Staying on top of my search
 ### USR-013 See every job and where it stands
@@ -126,11 +161,6 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users can mark items done, reopen them or set due dates.
 - Why: the app never guesses; it asks
 
-### USR-015 Answer a question once, never again
-- When users answer an application question, the app remembers it for next time.
-- The app remembers tricky steps on each job site.
-- Why: less repeated work with every application
-
 ### USR-016 Reach out to people at the company
 - The app finds likely recruiters and hiring managers.
 - The app drafts messages; users always send them themselves.
@@ -141,16 +171,6 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - The app reads job emails and updates each job's status.
 - Users get a heads-up on interviews, assessments and offers.
 - Why: never miss a reply
-
-### USR-018 Change settings without editing files
-- Users can change every setting in the app.
-- Users can watch runs live and see their history.
-- Why: no need to touch config files
-
-### USR-019 Keep the app tidy
-- The app cleans up old files on a schedule.
-- The app suggests better settings; nothing changes until the user says so.
-- Why: the app stays small and fast
 
 ### USR-020 See how my search is going
 - Users get a weekly report: applications, replies and interview rate by job type.
@@ -188,4 +208,7 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-022 Teach the app my writing style | approved | — (derive) |
 | USR-023 Know when I'm ready to start applying | approved | — (derive) |
 | USR-024 Pick which jobs go into my pipeline | approved | — (derive) |
+| USR-025 Preview and edit how my applications get filled | approved | — (derive) |
+| USR-026 Get asked when the app doesn't know an answer | approved | — (derive) |
+| USR-027 One place for everything the app knows about me | approved | — (derive) |
 <!-- /trace:map -->
