@@ -33,8 +33,12 @@ def run_control(request: Request, c=Depends(ctx)) -> RunControl:
 
 @contextmanager
 def refusals() -> Iterator[None]:
+    from careeros.readiness import NotReady
+
     try:
         yield
+    except NotReady as e:  # REQ-103
+        raise HTTPException(409, {"code": "not_ready", "message": str(e), "items": e.items}) from None
     except Busy as e:
         raise HTTPException(409, f"{str(e)[:1].upper()}{str(e)[1:]}. Wait for it to finish, or cancel it.") from None
     except Paused:

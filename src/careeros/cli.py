@@ -46,18 +46,39 @@ def cmd_init(args: argparse.Namespace) -> int:
 
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Setup checklist (see careeros.doctor). Exit 1 on any FAIL. Needs no setup itself."""
-    from careeros.doctor import exit_code, format_report, run_doctor
+    from careeros.doctor import PASS, WARN, Check, exit_code, format_report, run_doctor
 
     try:
         root = Path(args.root).resolve() if getattr(args, "root", None) else find_repo_root()
     except FileNotFoundError as e:
         print(f"  FAIL  setup                  {e}")
         return 1
+    from careeros.readiness import items as readiness_items
+
     checks = run_doctor(root)
+    # REQ-102: the readiness must-haves doctor itself does not check; WARN, not FAIL (score/prepare still run)
+    checks += [Check(PASS if i["done"] else WARN, "readiness", i["label"] + ("" if i["done"] else ": apply blocked"))
+               for i in readiness_items(root, checks=list(checks)) if i["must"] and i["id"] in ("master_resume", "legal_answers",
+                                                                          "salary_answer", "master_synced")]
     out = format_report(checks, quiet=args.quiet, root=root)
     if out:
         print(out)
     return exit_code(checks)
+
+
+def _not_ready(e: Exception) -> int:
+    """REQ-103: an apply path refused while a readiness must-have is open (exit 7)."""
+    print(f"{e}; nothing filled. Fix them: careeros doctor (or the Profile page)", file=sys.stderr)
+    return 7
+
+
+def _ready_guard(s) -> int | None:
+    from careeros.readiness import NotReady, require_ready
+    try:
+        require_ready(s.root)
+    except NotReady as e:
+        return _not_ready(e)
+    return None
 
 
 def _pipeline_busy(e: Exception) -> int:
@@ -440,6 +461,8 @@ def cmd_apply_fill(args: argparse.Namespace) -> int:
     from careeros.apply import gh_fill
 
     s = _settings(args)
+    if (nr := _ready_guard(s)) is not None:
+        return nr
     store = Store(s)
     plan = store._read(args.job_id, "fill_plan.json")
     if not plan:
@@ -470,6 +493,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     from careeros.scout.base import BoardNotFound, FetchError
 
     s = _settings(args)
+    if (nr := _ready_guard(s)) is not None:
+        return nr
     store = Store(s)
     posting = store._read(args.job_id, "posting.json")
     if not posting:
@@ -1054,6 +1079,7 @@ def _cancel_on_signals(hard: bool = False):
 def _run_kind(args: argparse.Namespace, kind: str) -> int:
     from careeros.runs.config import budget_for, load_runs_config
     from careeros.runs.runner import CLEAN_STOPS, JobNotRunnable, RunBusy
+    from careeros.readiness import NotReady
     from careeros.runs.service import run_batch
 
     s = _settings(args)
@@ -1073,6 +1099,10 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     except RunBusy as e:
         print(f"run {kind}: {e}; not started", file=sys.stderr)
         return RUN_BUSY_EXIT
+    except NotReady as e:
+        if args.json:
+            print(json.dumps({"error": str(e), "kind": kind, "code": "not_ready", "items": e.items}, indent=2))
+        return _not_ready(e)
     except JobNotRunnable as e:
         if args.json:
             print(json.dumps({"error": str(e), "kind": kind, "reasons": e.reasons}, indent=2))

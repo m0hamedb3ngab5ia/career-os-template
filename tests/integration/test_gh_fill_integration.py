@@ -9,7 +9,7 @@ import threading
 from pathlib import Path
 
 import pytest
-from conftest import FIXTURES, PY, subprocess_env
+from conftest import FIXTURES, PY, ready_env, subprocess_env
 
 pytestmark = pytest.mark.integration
 GH = FIXTURES / "greenhouse"
@@ -29,7 +29,7 @@ def _cli(root: Path, tmp_path: Path, *args: str) -> subprocess.CompletedProcess:
     home = tmp_path / "home"
     home.mkdir(exist_ok=True)
     return subprocess.run([PY, "-m", "careeros.cli", "--root", str(root), "apply", "fill", *args],
-                          capture_output=True, text=True, env=subprocess_env(root, home), timeout=120)
+                          capture_output=True, text=True, env=ready_env(root, home), timeout=120)
 
 
 def test_fill_refuses_without_plan(temp_root: Path, tmp_path: Path):

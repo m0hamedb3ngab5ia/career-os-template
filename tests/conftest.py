@@ -40,6 +40,16 @@ def settings(tmp_path: Path) -> Settings:
 
 
 @pytest.fixture(autouse=True)
+def _readiness_off(request, monkeypatch):
+    """The apply gate (REQ-103) passes in-process unless a test is marked `readiness`: older apply tests use example
+    roots. Subprocess tests reaching an apply path use personalize() + a fake `claude` on PATH instead."""
+    if not request.node.get_closest_marker("readiness"):
+        import careeros.readiness as r
+        monkeypatch.setattr(r, "items", lambda root, *a, **k: [
+            {"id": "all", "label": "", "must": True, "done": True, "fix_link": ""}])
+
+
+@pytest.fixture(autouse=True)
 def _temp_home(tmp_path_factory, monkeypatch):
     """Tests never read the developer's $HOME (e.g. the default `~/.careeros/credentials.yaml`)."""
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))
@@ -75,6 +85,19 @@ def tectonic_cache() -> Path | None:
     env = os.environ.get("TECTONIC_CACHE_DIR")
     cand = Path(env) if env else None
     return cand if cand and cand.is_dir() and any(cand.iterdir()) else None
+
+
+def ready_env(root: Path, home: Path) -> dict[str, str]:
+    """subprocess_env for a root that passes the apply gate (REQ-103): personalize() it and put a stub `claude`
+    on PATH. For subprocess tests reaching an apply path (the in-process gate is patched off in conftest)."""
+    personalize(root)
+    b = home / "fake-bin"
+    b.mkdir(parents=True, exist_ok=True)
+    (b / "claude").write_text("#!/bin/sh\nexit 0\n")
+    (b / "claude").chmod(0o755)
+    env = subprocess_env(root, home)
+    env["PATH"] = f"{b}{os.pathsep}{env.get('PATH', '')}"
+    return env
 
 
 def subprocess_env(root: Path, home: Path) -> dict[str, str]:
@@ -180,6 +203,14 @@ def personalize_identity(root: Path) -> Path:
     return root
 
 
+def add_master_resume(root: Path) -> Path:
+    """A master résumé in profile/resumes (DEC-008 layout): readiness must-have `master_resume` (REQ-102)."""
+    d = root / "profile" / "resumes" / "master-0000"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "meta.json").write_text(json.dumps({"name": "Master", "type": "master", "versions": []}), encoding="utf-8")
+    return root
+
+
 def personalize(root: Path) -> Path:
     """A fully filled-in root: new identity, renamed entry/bullet ids (categories follow), edited standard
     answers, one voice sample. YAML is re-dumped, so no `# INSERT` markers survive."""
@@ -197,6 +228,7 @@ def personalize(root: Path) -> Path:
             q["bullet_id"] = f"{FILLED_IDS.get(old, old)}.{n}"
 
     _yaml_rw(root / "profile" / "master.yaml", _ids)
+    add_master_resume(root)
 
     def _cats(d):
         for c in d.values():

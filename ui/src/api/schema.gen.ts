@@ -225,6 +225,13 @@ export interface paths {
     /** Prune */
     post: operations["prune_api_prune_post"];
   };
+  "/api/readiness": {
+    /**
+     * Get Readiness
+     * @description REQ-102: `{ready, items: [{id, label, must, done, fix_link}]}` (same list as `careeros doctor`).
+     */
+    get: operations["get_readiness_api_readiness_get"];
+  };
   "/api/runs": {
     /** History */
     get: operations["history_api_runs_get"];
@@ -3742,6 +3749,22 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Readiness
+   * @description REQ-102: `{ready, items: [{id, label, must, done, fix_link}]}` (same list as `careeros doctor`).
+   */
+  get_readiness_api_readiness_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
     };

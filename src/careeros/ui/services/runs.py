@@ -232,6 +232,10 @@ class RunControl:
             return run_batch(self.settings, kind, budget_for(cfg, kind, preset=preset, max_jobs=max_jobs,
                                                              max_minutes=max_minutes), cfg=cfg, dry_run=True,
                              job_ids=[job_id] if job_id else None, force=force)
+        if kind == "apply":  # REQ-103: NotReady (409) before anything is spawned
+            from careeros.readiness import require_ready
+
+            require_ready(self.settings.root)
         run_id = None
         if job_id:
             from careeros.runs.runner import JobNotRunnable, new_run_id, select_candidates
