@@ -73,11 +73,23 @@ class HeadlessResult:
                 "api_errors": self.api_errors, "events": self.events, "duration_s": round(self.duration_s, 1)}
 
 
+def untrusted(text: Any, source: str) -> str:
+    """REQ-108: outside text (posting, JD, email, imported page) as one delimited data block for a prompt; any
+    `<untrusted` / `</untrusted` inside the text is defused so it cannot close the block early."""
+    body = re.sub(r"<(/?untrusted)", r"&lt;\1", str(text or ""), flags=re.I)
+    return f'<untrusted source="{source}">\n{body}\n</untrusted>'
+
+
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
-                  ) -> list[str]:
-    cmd = list(cfg.headless_cmd)
-    tools = allowed_tools_for(cfg, kind)
-    if tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
+                  extra_tools: list[str] | tuple = ()) -> list[str]:
+    cmd, it = [], iter(cfg.headless_cmd)
+    for a in it:  # the per-kind list is the only allowlist: drop any configured one (and its value)
+        if a in ("--allowedTools", "--allowed-tools"):
+            next(it, None)
+        elif not a.startswith(("--allowedTools=", "--allowed-tools=")):
+            cmd.append(a)
+    tools = allowed_tools_for(cfg, kind, extra_tools)
+    if tools:
         cmd += ["--allowedTools", ",".join(tools)]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
     if cfg.model and "--model" not in cmd:

@@ -32,7 +32,7 @@ from careeros.config import Settings
 from careeros.models import Posting
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
-from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line
+from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line, untrusted
 from careeros.runs.headless import invoke as default_invoke
 from careeros.runs.ranking import Candidate, fit_first_within_company, rank
 from careeros.runs.store import RunStore, iso
@@ -271,6 +271,18 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
 # the loop
 # --------------------------------------------------------------------------------------------------------
 
+def company_fetch_tools(settings: Settings, posting: dict[str, Any]) -> list[str]:
+    """DEC-005: prepare may WebFetch only the company's own domains (companies.yaml / boards) and the posting's
+    URLs only on a known ATS domain; a posting-chosen domain (name match included) never qualifies."""
+    from careeros.safety.scam import KNOWN_ATS_DOMAINS, company_domains, registrable_domain
+
+    doms = company_domains(settings, str(posting.get("company") or "")) | {
+        d for u in (posting.get("url"), posting.get("apply_url")) if u
+        and (d := registrable_domain(str(u))) in KNOWN_ATS_DOMAINS}
+    # CC `domain:*.d` matches subdomains only; apex + `*.` both needed.
+    return [f"WebFetch(domain:{p}{d})" for d in sorted(doms) for p in ("", "*.")]
+
+
 def _job_arg(root: Path, job_dir: Path) -> str:
     try:
         return str(job_dir.resolve().relative_to(root.resolve()))
@@ -307,8 +319,12 @@ class _Loop:
         jid = item["job_id"]
         n, stream_path = self.rs.next_attempt(self.run["id"])
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
+        posting = self.store._read(jid, "posting.json") or {}
+        if self.kind in ("score", "prepare"):  # REQ-108: the posting text is data, never instructions
+            prompt += "\n\n" + untrusted(posting.get("description_text"), "posting.json")
+        extra = company_fetch_tools(self.s, posting) if self.kind == "prepare" else []
         sid = str(uuid.uuid4())
-        cmd = build_command(self.cfg, prompt, session_id=sid, kind=self.kind)
+        cmd = build_command(self.cfg, prompt, session_id=sid, kind=self.kind, extra_tools=extra)
         job_s = float(self.cfg.job_timeout_minutes[self.kind]) * 60
         left_s = float(self.budget.max_minutes) * 60 - (self.clock() - self.t_start)
         timeout_s = max(1e-3, min(job_s, left_s))  # the run's time budget also caps the job in flight

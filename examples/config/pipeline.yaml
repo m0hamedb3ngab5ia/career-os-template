@@ -70,9 +70,8 @@ llm:                                       # reusable default: fine to keep
     - Grep
     - Bash(.venv/bin/careeros *)
     - Bash(.venv/bin/python *)
-    - Bash(date *)
-    - WebSearch                            # score-job: company checks, hiring-freeze signals
-    - WebFetch
+    - Bash(date *)                         # WebSearch/WebFetch are dropped here (prompt injection): only prepare
+                                           # gets WebSearch + WebFetch scoped to the company's domains
   model_hint: null                         # null = Claude Code default (Recommended); e.g. sonnet
 
 runs:                                      # reusable default: fine to keep. `careeros run score|prepare`

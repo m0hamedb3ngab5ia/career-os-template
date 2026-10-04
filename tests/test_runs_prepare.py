@@ -47,7 +47,7 @@ class Fake:
         self.s, self.modes, self.default, self.calls = settings, modes or {}, default, []
 
     def __call__(self, cmd, cwd, env, timeout_s, stream_path):
-        jid = Path(cmd[-1].split(" ", 1)[1]).name
+        jid = Path(cmd[-1].splitlines()[0].split(" ", 1)[1]).name
         self.calls.append(jid)
         mode = self.modes.get(jid, self.default)
         Path(stream_path).write_text("{}")

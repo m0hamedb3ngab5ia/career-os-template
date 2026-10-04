@@ -37,7 +37,7 @@ def main() -> int:
         with open(env_log, "a", encoding="utf-8") as f:
             f.write(json.dumps({k: v for k, v in os.environ.items() if k.startswith("CAREEROS_")}) + "\n")
     prompt = argv[-1] if argv else ""
-    skill, _, job_rel = prompt.partition(" ")
+    skill, _, job_rel = prompt.splitlines()[0].partition(" ") if prompt else ("", "", "")
     job_dir = Path.cwd() / job_rel.strip()
     job_id = job_dir.name
     mode = os.environ.get("FAKE_CLAUDE_MODE", "ok")

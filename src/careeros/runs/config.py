@@ -42,10 +42,12 @@ DEFAULT_HEADLESS_CMD: list[str] = ["claude", "-p", "--output-format", "stream-js
 DEFAULT_ALLOWED_TOOLS: list[str] = [
     "Read", "Write", "Edit", "Glob", "Grep",
     "Bash(.venv/bin/careeros *)", "Bash(.venv/bin/python *)", "Bash(date *)",
-    "WebSearch", "WebFetch",
 ]
+# Prompt injection (REQ-108, DEC-005): web tools are dropped from llm.allowed_tools for every kind; only prepare
+# gets WebSearch plus WebFetch scoped to the company's domains (the runner passes those per job).
+WEB_TOOLS = ("WebSearch", "WebFetch")
 # Extra tools per run kind, on top of llm.allowed_tools: apply-job drives Chrome through the MCP server.
-KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"]}
+KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"], "prepare": ["WebSearch"]}
 # Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
 KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}
 DEFAULT_USAGE_LIMIT_PATTERNS = [r"usage limit", r"hit your limit", r"limit reached", r"rate.?limit",
@@ -221,10 +223,10 @@ def load_runs_config(settings: Any) -> RunsConfig:
     return cfg
 
 
-def allowed_tools_for(cfg: "RunsConfig", kind: str | None) -> list[str]:
-    """`llm.allowed_tools` plus the kind's extras (KIND_TOOLS), without duplicates."""
-    extra = [t for t in KIND_TOOLS.get(kind or "", []) if t not in cfg.allowed_tools]
-    return list(cfg.allowed_tools) + extra
+def allowed_tools_for(cfg: "RunsConfig", kind: str | None, extra_tools: list[str] | tuple = ()) -> list[str]:
+    """`llm.allowed_tools` minus web tools, plus the kind's extras (KIND_TOOLS) and `extra_tools`, no duplicates."""
+    base = [t for t in cfg.allowed_tools if t.split("(")[0] not in WEB_TOOLS]
+    return list(dict.fromkeys([*base, *KIND_TOOLS.get(kind or "", []), *extra_tools]))
 
 
 def budget_for(cfg: RunsConfig, kind: str, preset: str | None = None, max_jobs: int | None = None,
