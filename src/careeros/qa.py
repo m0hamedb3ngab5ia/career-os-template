@@ -591,8 +591,8 @@ class Checker:
         ("phone", re.compile(r"(?:\+\d{1,3}[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b")),
         # ponytail: names only after an honorific or a greeting; free-text person names need NER, add if leaks show up
         ("name", re.compile(r"\b(?:(?:Dear|Hi|Hello)\s+(?:(?:Mr|Ms|Mrs|Mx|Dr)\.?\s+)?|(?:Mr|Ms|Mrs|Mx|Dr)\.?\s+)"
-                            r"((?:[A-Z][A-Za-z.'-]* ?){1,3})")),
-        ("instruction", re.compile(r"\b(?:ignore (?:all )?(?:previous|prior|above) (?:instructions|prompts?)"
+                            r"((?:[A-Z](?:\.|[A-Za-z'-]*) ?){1,3})")),  # only an initial ends in "."
+        ("instruction", re.compile(r"\b(?:ignore (?:all |the )?(?:previous|prior|above) (?:instructions|prompts?)"
                                    r"|disregard\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above)|system prompt"
                                    r"|you are now (?:a|an|in|the)\b|as an ai (?:language )?model|new instructions)", re.I)),
     )
