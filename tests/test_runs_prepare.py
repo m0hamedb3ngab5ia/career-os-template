@@ -28,6 +28,7 @@ def add_job(store: Store, n: int, company="Acme", fit=80, decision="prepare", st
                 url=f"https://boards.greenhouse.io/x/jobs/{n}", description_text="apis " * 50,
                 posted_at=(NOW - timedelta(hours=hours_old)).isoformat())
     store.save_posting(p)
+    store.set_selected([p.job_id], True)  # REQ-104: ticked for runs
     if decision:
         (store.job_dir(p.job_id) / "score.json").write_text(json.dumps(
             {"job_id": p.job_id, "decision": decision, "fit": fit, "category": category, "tier": "C"}))

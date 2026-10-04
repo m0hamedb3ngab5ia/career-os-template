@@ -19,7 +19,7 @@ def test_write_is_atomic_and_leaves_no_tmp(settings):
     st = Store(settings)
     st.save_posting(_post())
     files = sorted(p.name for p in st.job_dir("j1").iterdir())
-    assert files == ["log.md", "posting.json", "status.json"]
+    assert files == ["flags.json", "log.md", "posting.json", "status.json"]
 
 
 def test_failed_write_keeps_previous_file(settings, monkeypatch):

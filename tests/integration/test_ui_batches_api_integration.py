@@ -130,6 +130,34 @@ def test_drive_end_to_end_then_controls(client, data, monkeypatch):
     assert client.post("/api/batches/missing/pause", headers=W).status_code == 404
 
 
+def test_batch_skips_prepare_for_a_job_unticked_after_scoring(client, data):
+    """REQ-104: each batch stage re-checks `selected`; untick between score and prepare -> prepare never runs."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+    from test_runs_runner import FakeInvoke
+
+    from careeros.store import Store
+
+    s = data["settings"]
+    s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}), "preflight_doctor": False}}
+    jid = data["jobs"]["found"]
+    Store(s).set_selected([jid], True)
+    b = client.post("/api/batches", json={"job_ids": [jid], "stop_at": "prepare"}, headers=W).json()
+
+    class Untick(FakeInvoke):
+        def __call__(self, *a, **kw):
+            Store(self.s).set_selected([jid], False)
+            return super().__call__(*a, **kw)
+
+    inv = Untick(s)
+    batches.drive(s, b["id"], invoke=inv, now=lambda: NOW)
+    g = client.get(f"/api/batches/{b['id']}").json()
+    assert len(inv.calls) == 1  # score only
+    assert "not selected" in json.dumps(g["selected"][0]), g["selected"][0]
+
+
 def test_cli_batch_cancel_and_run(data, tmp_path):
     b = batches.create(data["settings"], [data["jobs"]["found"]], "score", now=NOW)
     root, env = str(data["settings"].root), subprocess_env(data["settings"].root, tmp_path / "home")

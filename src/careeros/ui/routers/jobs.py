@@ -188,6 +188,25 @@ class ClearBody(BaseModel):
     note: str = ""
 
 
+class SelectBody(BaseModel):
+    ids: list[str] = Field(min_length=1, max_length=svc.MAX_EXPORT)
+    selected: bool
+
+
+@router.post("/jobs/select")
+def select_jobs(body: SelectBody, c=Depends(ctx)) -> dict[str, Any]:
+    """REQ-104: tick/untick jobs for prepare/apply runs (flags.json `selected`). Any unknown id -> 404, none set."""
+    from careeros.store import Store
+
+    store = Store(c.settings)
+    missing = [j for j in body.ids if not store.exists(j)]
+    if missing:
+        raise HTTPException(404, f"job(s) not found: {', '.join(missing[:20])}")
+    store.set_selected(body.ids, body.selected)
+    after_write(c, jobs=body.ids)
+    return {"ids": body.ids, "selected": body.selected}
+
+
 @router.post("/jobs/{job_id}/status")
 def set_status(job_id: str, body: StatusBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():

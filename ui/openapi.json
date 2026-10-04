@@ -6696,6 +6696,29 @@
         "title": "SectionSummary",
         "type": "object"
       },
+      "SelectBody": {
+        "properties": {
+          "ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Ids",
+            "type": "array"
+          },
+          "selected": {
+            "title": "Selected",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ids",
+          "selected"
+        ],
+        "title": "SelectBody",
+        "type": "object"
+      },
       "StartBody": {
         "properties": {
           "dry_run": {
@@ -9358,6 +9381,50 @@
           }
         },
         "summary": "Job Facets",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/select": {
+      "post": {
+        "description": "REQ-104: tick/untick jobs for prepare/apply runs (flags.json `selected`). Any unknown id -> 404, none set.",
+        "operationId": "select_jobs_api_jobs_select_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/SelectBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Select Jobs Api Jobs Select Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Select Jobs",
         "tags": [
           "jobs"
         ]

@@ -56,12 +56,14 @@ def cli(root: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProc
                           env=env, timeout=120, cwd=root)
 
 
-def add_job(root: Path, n: int, status: str = "scored", fit: int = 80, decision: str | None = "prepare") -> str:
+def add_job(root: Path, n: int, status: str = "scored", fit: int = 80, decision: str | None = "prepare",
+            selected: bool = True) -> str:
     store = Store(Settings.load(root))
     p = Posting(company=f"Co{n}", title="Backend Software Engineer", ats="greenhouse", ats_job_id=f"r{n}",
                 url=f"https://boards.greenhouse.io/co/jobs/{n}", description_text="python apis " * 40,
                 posted_at=(datetime.now(timezone.utc) - timedelta(hours=60 + n)).isoformat())
     store.save_posting(p)
+    store.set_selected([p.job_id], selected)
     if decision:
         (store.job_dir(p.job_id) / "score.json").write_text(json.dumps(
             {"job_id": p.job_id, "decision": decision, "fit": fit, "category": "swe_backend", "tier": "C"}))
@@ -186,3 +188,25 @@ def test_e2e_012_01_hidden_injection_is_flagged_and_blocks_prepare_until_cleared
     r = cli(root, env, "run", "prepare", "--job", jid)
     assert r.returncode == 0, r.stdout + r.stderr
     assert status_of(root, jid) == "queued"
+
+
+def test_e2e_req_104_only_selected_jobs_are_prepared(root, env):
+    """REQ-104: new postings are unselected; `run prepare` prepares only ticked jobs and legacy jobs (no flag);
+    `--job X` counts as selecting X; `job unselect` takes a job out of future runs."""
+    a, b, c, legacy = (add_job(root, n, selected=False) for n in (1, 2, 3, 4))
+    (root / "data" / "jobs" / legacy / "flags.json").unlink()
+    r = cli(root, env, "job", "select", a, "nope")
+    assert r.returncode == 1 and "nope" in r.stderr, r.stdout + r.stderr
+    assert cli(root, env, "job", "select", a, b).returncode == 0
+    assert cli(root, env, "job", "unselect", b).returncode == 0
+    r = cli(root, env, "run", "prepare")
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert [status_of(root, j) for j in (a, b, c, legacy)] == ["queued", "scored", "scored", "queued"]
+
+    r = cli(root, env, "run", "prepare", "--job", c, "--dry-run")  # a preview never ticks: reports "not selected"
+    assert r.returncode == 2 and "not selected" in r.stderr, r.stdout + r.stderr
+    assert json.loads((root / "data" / "jobs" / c / "flags.json").read_text())["selected"] is False  # no side effect
+    r = cli(root, env, "run", "prepare", "--job", c)
+    assert r.returncode == 0, r.stdout + r.stderr
+    assert status_of(root, c) == "queued"
+    assert json.loads((root / "data" / "jobs" / c / "flags.json").read_text())["selected"] is True

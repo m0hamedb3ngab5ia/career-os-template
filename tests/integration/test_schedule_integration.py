@@ -74,12 +74,13 @@ def cli(root: Path, env: dict[str, str], *args: str) -> subprocess.CompletedProc
                           env=env, timeout=120, cwd=root)
 
 
-def add_job(root: Path) -> str:
+def add_job(root: Path, selected: bool = True) -> str:
     store = Store(Settings.load(root))
     p = Posting(company="Co", title="Backend Software Engineer", ats="greenhouse", ats_job_id="r1",
                 url="https://boards.greenhouse.io/co/jobs/1", description_text="python " * 50,
                 posted_at=datetime.now(timezone.utc).isoformat())
     store.save_posting(p)
+    store.set_selected([p.job_id], selected)  # REQ-104: ticked for runs
     return p.job_id
 
 
@@ -112,6 +113,13 @@ def test_tick_runs_due_jobs_then_is_idempotent(root, env):
     assert {r["trigger"] for r in runs} == {"schedule"}
     again = json.loads(cli(root, env, "tick", "--json").stdout)
     assert {d["action"] for d in again["decisions"]} <= {"not_due", "disabled"}
+
+
+def test_e2e_007_02_tick_never_prepares_an_unticked_job(root, env):
+    jid = add_job(root, selected=False)
+    r = cli(root, env, "tick", "--json")
+    assert r.returncode == 0, r.stderr
+    assert json.loads((root / "data" / "jobs" / jid / "status.json").read_text())["status"] == "scored"
 
 
 def test_pause_resume_and_catch_up(root, env):

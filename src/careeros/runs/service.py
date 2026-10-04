@@ -77,7 +77,8 @@ def _selectable(settings: Settings, kind: str, job_id: str) -> bool:
     score = store._read(job_id, "score.json") or {}
     prep = store._read(job_id, "prepare.json") or {}
     return eligibility(kind, store.get_status(job_id) or "found", (store.job_dir(job_id) / "score.json").exists(),
-                       score, bool(prep.get("qa_pass")), injection=untrusted.blocked(store.load_flags(job_id))) is None
+                       score, bool(prep.get("qa_pass")), injection=untrusted.blocked(store.load_flags(job_id)),
+                       selected=store.is_selected(job_id)) is None
 
 
 def daily_cap_stop(settings: Settings) -> Callable[[], tuple[str, str] | None]:

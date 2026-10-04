@@ -510,3 +510,20 @@ def test_application_open_refuses_when_own_chrome_not_connected(client, data, mo
     assert browser.record(jdir)["tab_id"] == "T1"
     live.append({"id": "T1", "type": "page", "url": "https://job-boards.example/embed"})
     assert client.post(f"/api/jobs/{jid}/application/open", headers=h).json() == {"action": "focused"}
+
+
+def test_jobs_select_endpoint_sets_flag(client, data):
+    """REQ-104: POST /api/jobs/select ticks/unticks jobs (flags.json `selected`); unknown ids -> 404, nothing set."""
+    from careeros.store import Store
+
+    store = Store(data["settings"])
+    ids = sorted(store.iter_job_ids())[:2]
+    r = client.post("/api/jobs/select", headers={"x-careeros": "1"}, json={"ids": ids, "selected": False})
+    assert r.status_code == 200, r.text
+    assert r.json() == {"ids": ids, "selected": False}
+    assert not any(store.is_selected(j) for j in ids)
+    r = client.post("/api/jobs/select", headers={"x-careeros": "1"}, json={"ids": [ids[0], "nope"], "selected": True})
+    assert r.status_code == 404 and "nope" in r.text
+    assert not store.is_selected(ids[0])
+    assert client.post("/api/jobs/select", headers={"x-careeros": "1"}, json={"ids": ids, "selected": True}).status_code == 200
+    assert all(store.is_selected(j) for j in ids)
