@@ -245,6 +245,10 @@ class RunControl:
 
             # the runner leaves a job out of retries to its Action Item: refuse it here, not in the detached child
             skip = Failures(self.rs).exhausted(kind, load_retry_config(cfg.raw)["max_attempts"])
+            from careeros.store import Store
+
+            if Store(self.settings).exists(job_id):
+                Store(self.settings).set_selected([job_id], True)  # REQ-104: running one job ticks it
             ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force,
                                                  skip_ids=skip)
             if not ranked:

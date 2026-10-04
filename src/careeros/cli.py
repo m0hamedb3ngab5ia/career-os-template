@@ -634,6 +634,18 @@ def cmd_job_clear_injection(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_job_select(args: argparse.Namespace) -> int:
+    """Tick (`select`) or untick (`unselect`) jobs for prepare/apply runs (REQ-104)."""
+    store = Store(_settings(args))
+    missing = [j for j in args.job_ids if not store.exists(j)]
+    if missing:
+        print(f"job(s) not found: {', '.join(missing)}; nothing changed", file=sys.stderr)
+        return 1
+    store.set_selected(args.job_ids, args.selected)
+    print(f"{'selected' if args.selected else 'unselected'}: {', '.join(args.job_ids)}")
+    return 0
+
+
 def cmd_job_lock(args: argparse.Namespace) -> int:
     """Take the per-job lock (exit 6 if someone else holds it). The token from CAREEROS_LOCK_TOKEN (set by
     `careeros run` for the skill it calls) re-enters the runner's lock: `reentrant: true`, nothing changes."""
@@ -1114,6 +1126,8 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     s = _settings(args)
     cfg = load_runs_config(s)
     job_ids = [args.job] if args.job else None
+    if args.job and Store(s).exists(args.job):
+        Store(s).set_selected(job_ids, True)  # REQ-104: an explicit --job counts as ticking it
     max_jobs = args.max_jobs if args.max_jobs is not None or not job_ids else 1
     try:
         budget = budget_for(cfg, kind, preset=args.preset, max_jobs=max_jobs, max_minutes=args.max_minutes)
@@ -1799,6 +1813,11 @@ def build_parser() -> argparse.ArgumentParser:
                                                    "possible prompt injection (flags.json)")
     jci.add_argument("job_id")
     jci.set_defaults(fn=cmd_job_clear_injection)
+    for name, sel, hlp in (("select", True, "tick jobs for prepare/apply runs (new postings start unticked)"),
+                           ("unselect", False, "untick jobs: left out of future prepare/apply runs")):
+        jse = jbs.add_parser(name, help=hlp)
+        jse.add_argument("job_ids", nargs="+", metavar="JOB_ID")
+        jse.set_defaults(fn=cmd_job_select, selected=sel)
     jlk = jbs.add_parser("lock", help="take the per-job lock (exit 6 if held): runs and prepare/apply skills use it")
     jlk.add_argument("job_id")
     jlk.add_argument("--owner", default="manual", help="who holds it, e.g. prepare-job")

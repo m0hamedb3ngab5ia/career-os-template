@@ -131,7 +131,8 @@ HANDS_OFF_OUTCOMES = ("staged", "submitted", "blocked")
 
 
 def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], prepared_ok: bool,
-                force: bool = False, apply_session: dict[str, Any] | None = None, injection: bool = False) -> str | None:
+                force: bool = False, apply_session: dict[str, Any] | None = None, injection: bool = False,
+                selected: bool = True) -> str | None:
     """Why a job is not a candidate for this kind of run (None = it is). Only job-state rules; the scout
     filters and the pruned check run separately. `force` (an explicit `--job` rerun) only lets a job the stage
     already finished (scored / prepared) through again; a status that makes the stage meaningless (applied,
@@ -141,13 +142,16 @@ def eligibility(kind: str, status: str, has_score: bool, score: dict[str, Any], 
     QA passed: a Tier B/C job parked there waits for the human's Approve (status queued), so a batch run with
     auto_submit on never submits past the review gate. `apply_session` (apply_session.json) rules out a job whose
     form the browser already holds (HANDS_OFF_OUTCOMES) or that ever clicked submit. `injection` (an uncleared
-    flags.json injection flag, REQ-109) blocks prepare and apply, never forced."""
+    flags.json injection flag, REQ-109) blocks prepare and apply, never forced; so does an unticked job
+    (`selected` false, REQ-104), which `run --job X` ticks first."""
     if kind == "score":
         if status != "found" and not (force and status == "scored"):
             return f"status {status}"
         return "already scored" if has_score and not force else None
     if injection:
         return "injection suspected"
+    if not selected:
+        return "not selected"
     if kind == "apply":
         from careeros.runs.policy import is_tier_a
 
@@ -200,7 +204,7 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
                 prepared_ok=bool((store._read(jid, "prepare.json") or {}).get("qa_pass")),
                 posting=partial(_posting_dict, store, jid),
                 apply_session=(store._read(jid, "apply_session.json") or {}) if kind == "apply" else None,
-                injection=untrusted.blocked(store.load_flags(jid)))
+                injection=untrusted.blocked(store.load_flags(jid)), selected=store.is_selected(jid))
     return rank_records(settings, kind, cfg, now, records(), retry_ids, skip_ids,
                         explicit=job_ids is not None, force=force)
 
@@ -222,6 +226,7 @@ class CandidateRecord:
     apply_session: dict[str, Any] | None = None
     exists: bool = True
     injection: bool = False
+    selected: bool = True
 
 
 def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, records: Iterable[CandidateRecord],
@@ -241,7 +246,7 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
             excluded.append({"job_id": jid, "reason": "not found"})
             continue
         why = eligibility(kind, status, r.has_score, score, r.prepared_ok, force=force, apply_session=r.apply_session,
-                          injection=r.injection)
+                          injection=r.injection, selected=r.selected)
         if why:
             if explicit:
                 excluded.append({"job_id": jid, "reason": why})

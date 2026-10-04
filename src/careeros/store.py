@@ -6,7 +6,7 @@ import re
 import warnings
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Iterable, Iterator
 
 from careeros.config import Settings, get_settings
 from careeros.models import Posting, QAResult, Score, now_iso
@@ -70,6 +70,7 @@ class Store:
         path = self._write(posting.job_id, POSTING, posting.model_dump())
         if new:
             self.set_status(posting.job_id, "found", "posting stored by scout")
+            self.set_selected([posting.job_id], False)  # REQ-104: the user ticks jobs for the pipeline
         self._scan_injection(posting)
         return path
 
@@ -97,6 +98,16 @@ class Store:
 
     def load_flags(self, job_id: str) -> dict[str, Any]:
         return self._read(job_id, FLAGS) or {}
+
+    def is_selected(self, job_id: str) -> bool:
+        """REQ-104: ticked for prepare/apply. A job from before the flag (no `selected` key) counts as ticked."""
+        return bool(self.load_flags(job_id).get("selected", True))
+
+    def set_selected(self, job_ids: Iterable[str], selected: bool) -> None:
+        for jid in job_ids:
+            flags = self.load_flags(jid)
+            flags["selected"] = selected
+            self._write(jid, FLAGS, flags)
 
     def clear_injection(self, job_id: str) -> dict[str, Any]:
         """The user checked a flagged posting ("I checked it"): prepare/apply are allowed again."""
