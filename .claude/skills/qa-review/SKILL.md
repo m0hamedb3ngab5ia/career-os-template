@@ -29,8 +29,9 @@ warnings, never a fail; the hard `estimate_marked` check fails a candidate estim
 `confidential_hits[]` (terms/patterns from `profile/confidential_terms.yaml`
 found in resume.txt, cover_letter.md, answers.json or outreach.json; always a hard fail, never waived).
 `untrusted_hits[]` ("<file>: url|email|phone|name|instruction '<v>'"): hard `untrusted_content`, an email, URL,
-phone or addressed name in resume.txt, cover_letter.md or answers.json that is in neither the profile, posting.json nor
-contacts.json, or an echoed instruction ("ignore previous", "as an AI"); likely prompt injection, never waived.
+phone or addressed name in resume.txt, cover_letter.md or answers.json that is in neither the profile nor posting.json
+(contacts.json is web-guessed, not trusted), or an echoed instruction ("ignore previous instructions", "as an AI model");
+likely prompt injection, never waived.
 
 Extended checks (same `checks[]` records; their details in four extra keys):
 - `wrong_company_hits[]` ({file, name, context}): hard `wrong_company`, another company's name (companies.yaml,
