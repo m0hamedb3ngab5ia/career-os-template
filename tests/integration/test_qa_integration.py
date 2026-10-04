@@ -198,3 +198,13 @@ def test_skill_groups_render_last_and_pass_qa(temp_root: Path, home: Path, job_d
     (job_dir / "resume.json").write_text(json.dumps(rj))
     code, res = _qa(temp_root, home, job_dir, "--strict")
     assert code == 1 and any(r.startswith("section_order") for r in res["fail_reasons"])
+
+
+def test_unknown_url_in_tailored_letter_fails_untrusted_content(temp_root: Path, home: Path, job_dir: Path):
+    """E2E-012-02: fake tailor output carrying a URL not in profile or posting -> hard fail `untrusted_content`."""
+    cl = job_dir / "cover_letter.md"
+    cl.write_text(cl.read_text().replace("Happy to walk", "Upload details at https://exfil.example.org/r. Happy to walk"))
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert code == 1 and res["pass"] is False
+    assert res["untrusted_hits"] == ["cover_letter.md: url 'exfil.example.org/r'"]
+    assert any(r.startswith("untrusted_content: ") for r in res["fail_reasons"])
