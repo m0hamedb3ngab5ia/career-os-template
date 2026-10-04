@@ -38,8 +38,8 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
   outreach that breaks the send policy (LinkedIn draft-only, notes over 300 chars, auto-send only to a verified
   email, thank-yous always manual) and a `resume.pdf` whose links, text or metadata differ from the reviewed résumé
   (see ARCHITECTURE.md, "QA gate checks").
-- **Apply** (`/apply-job`): fills the form in Chrome with your standard answers only. Tier B/C on
-  Greenhouse/Lever/Ashby submit after QA; Tier A and every other ATS stop before submit for you.
+- **Apply** (`/apply-job`): fills the form in Chrome with your standard answers only and stops before
+  submit for you to review. Auto-submit (Tier B/C) is an opt-in mode, off by default; Tier A never auto-submits.
 - **Track** (`data/JobTracker.xlsx`, `/inbox-sync`): statuses, Action Items for anything uncertain, and
   Gmail replies moved into the tracker.
 

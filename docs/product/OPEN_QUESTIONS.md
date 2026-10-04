@@ -46,3 +46,39 @@
 - Evidence: TODO.md:52 move xlsx → data/action_items.json
 - Default (recommended): approve the move as a requirement change (next Feature lane).
 - Status: open
+
+### Q-009 Résumé file types and size
+- Links: REQ-093, REQ-101
+- Default (recommended): PDF + DOCX, ≤5 MB; samples also txt/md.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-010 What does a comment on feedback do?
+- Links: REQ-096, USR-002
+- Default (recommended): AI re-drafts the suggestion using the comment; user then applies or dismisses. Alt: comment is just a note.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-011 Résumé types besides master
+- Links: REQ-099, USR-003
+- Default (recommended): `variant` (e.g. role-focused) and `other`; free-text name.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-012 How the master résumé feeds master.yaml
+- Links: REQ-099, REQ-021
+- Default (recommended): AI extracts bullets into a proposed master.yaml diff; user approves before write; numbers verbatim. Alt: auto-write.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-013 Readiness must-haves and what they block
+- Links: REQ-102, REQ-103, USR-023
+- Default (recommended): must = master résumé set, no example data, work-auth + salary answers, `claude` installed; nice = writing sample, credentials, EEO. Blocks apply only; score/prepare still run.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-014 Scoring unticked jobs
+- Links: REQ-104, USR-024
+- Default (recommended): score all scouted jobs (helps choose); prepare/apply only ticked. New jobs start unticked.
+- Answer (2026-10-04): default accepted.
+- Status: answered

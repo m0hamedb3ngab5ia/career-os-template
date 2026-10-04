@@ -29,7 +29,7 @@ user_requirements:
   USR-027: {status: approved, provenance: confirmed}
 requirements:
   REQ-001: {status: proposed, provenance: observed, user_requirements: [USR-001]}
-  REQ-002: {status: proposed, provenance: observed, user_requirements: [USR-001]}
+  REQ-002: {status: proposed, provenance: observed, user_requirements: [USR-001, USR-023]}
   REQ-003: {status: proposed, provenance: observed, user_requirements: [USR-001]}
   REQ-004: {status: proposed, provenance: observed, user_requirements: [USR-001]}
   REQ-010: {status: proposed, provenance: observed, user_requirements: [USR-005]}
@@ -66,7 +66,7 @@ requirements:
   REQ-050: {status: proposed, provenance: observed, user_requirements: [USR-013]}
   REQ-051: {status: proposed, provenance: observed, user_requirements: [USR-013]}
   REQ-052: {status: proposed, provenance: observed, user_requirements: [USR-014]}
-  REQ-053: {status: proposed, provenance: observed, user_requirements: [USR-015]}
+  REQ-053: {status: proposed, provenance: observed, user_requirements: [USR-015, USR-026, USR-027]}
   REQ-054: {status: proposed, provenance: observed, user_requirements: [USR-015]}
   REQ-060: {status: proposed, provenance: observed, user_requirements: [USR-016]}
   REQ-061: {status: proposed, provenance: observed, user_requirements: [USR-016]}
@@ -85,11 +85,37 @@ requirements:
   REQ-090: {status: proposed, provenance: observed, user_requirements: [USR-019]}
   REQ-091: {status: proposed, provenance: observed, user_requirements: [USR-019]}
   REQ-092: {status: proposed, provenance: inferred, user_requirements: [USR-020]}
+  REQ-093: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
+  REQ-094: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
+  REQ-095: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
+  REQ-096: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
+  REQ-097: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
+  REQ-098: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
+  REQ-099: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
+  REQ-100: {status: approved, provenance: confirmed, user_requirements: [USR-004], tests: [E2E-004-01]}
+  REQ-101: {status: approved, provenance: confirmed, user_requirements: [USR-022], tests: [E2E-005-01]}
+  REQ-102: {status: approved, provenance: confirmed, user_requirements: [USR-023], tests: [E2E-006-01, E2E-006-02]}
+  REQ-103: {status: approved, provenance: confirmed, user_requirements: [USR-023], tests: [E2E-006-01, E2E-006-02]}
+  REQ-104: {status: approved, provenance: confirmed, user_requirements: [USR-024], tests: [E2E-007-01, E2E-007-02]}
+  REQ-105: {status: approved, provenance: confirmed, user_requirements: [USR-025], tests: [E2E-008-01, E2E-008-02]}
+  REQ-106: {status: approved, provenance: confirmed, user_requirements: [USR-026], tests: [E2E-008-01, E2E-008-02]}
+  REQ-107: {status: approved, provenance: confirmed, user_requirements: [USR-027], tests: [E2E-009-01]}
   NFR-001: {status: proposed, provenance: observed}
   NFR-002: {status: proposed, provenance: observed}
   NFR-003: {status: proposed, provenance: observed}
   NFR-004: {status: proposed, provenance: observed}
   NFR-005: {status: proposed, provenance: inferred}
-use_cases: {}
-flows: {}
+use_cases:
+  UC-001: {status: approved, requirements: [REQ-093, REQ-094]}
+  UC-002: {status: approved, requirements: [REQ-095, REQ-096, REQ-097]}
+  UC-003: {status: approved, requirements: [REQ-098, REQ-099]}
+  UC-004: {status: approved, requirements: [REQ-100]}
+  UC-005: {status: approved, requirements: [REQ-101]}
+  UC-006: {status: approved, requirements: [REQ-102, REQ-103]}
+  UC-007: {status: approved, requirements: [REQ-104]}
+  UC-008: {status: approved, requirements: [REQ-105, REQ-106]}
+  UC-009: {status: approved, requirements: [REQ-107]}
+flows:
+  FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
+  FLOW-002: {status: approved, use_cases: [UC-002]}
 tasks: {}

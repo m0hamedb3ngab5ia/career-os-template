@@ -1,16 +1,17 @@
 # Status
 
 ## Now
-- Lane: audit — reconstruct existing career-os
-- Stage: Audit triage gate (HARD)
-- Next: user triages USER_REQUIREMENTS.md (21 plain USRs) item by item; résumé onboarding (USR-002..004, approved) → `/product new` Feature lane to derive REQs
-- Waiting on user: USR triage; Q-001, Q-002, Q-007, Q-008
-- Pending fix: README.md:44 overstates auto-submit (Q-003)
+- Lane: Feature — onboarding + profile (USR-002..004, 022..027)
+- Stage: Architecture delta (next), then Tasks → Build
+- Done: REQ-093..107, UC-001..009, FLOW-001/002 approved (gate 2026-10-04)
+- Next: ARCHITECTURE delta (profile store layout, résumé text extraction lib, review run, readiness API, `selected` field) + DECISIONS
+- Waiting on user: other USR triage; Q-001, Q-002, Q-007, Q-008
 
 ## Gates
 | gate | status | date |
 |---|---|---|
 | Audit triage | pending | |
+| Onboarding+profile spec (Feature) | approved | 2026-10-04 |
 
 ## Deletion candidates
 <!-- rejected REQs whose code still exists -->
@@ -20,6 +21,7 @@
 <!-- trace:status -->
 | REQ status | n |
 |---|---|
+| approved | 15 |
 | proposed | 61 |
 | rejected | 1 |
 

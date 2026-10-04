@@ -185,9 +185,9 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | user requirement | status | technical REQs |
 |---|---|---|
 | USR-001 Set up my own private copy | proposed | REQ-001, REQ-002, REQ-003, REQ-004 |
-| USR-002 Upload my résumé and get feedback | approved | — (derive) |
-| USR-003 See what hiring systems read from my résumé | approved | — (derive) |
-| USR-004 Keep a history of my résumés | approved | — (derive) |
+| USR-002 Upload my résumé and get feedback | approved | REQ-093, REQ-094, REQ-095, REQ-096, REQ-097 |
+| USR-003 See what hiring systems read from my résumé | approved | REQ-098, REQ-099 |
+| USR-004 Keep a history of my résumés | approved | REQ-095, REQ-097, REQ-100 |
 | USR-005 Find jobs that fit me automatically | proposed | REQ-010, REQ-011, REQ-012, REQ-020 |
 | USR-006 Stay safe from scams and fake jobs | proposed | REQ-013, REQ-014, REQ-015, REQ-016 |
 | USR-007 Get a tailored résumé and cover letter for each job | proposed | REQ-021, REQ-022, REQ-023, REQ-026 |
@@ -205,10 +205,10 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-019 Keep the app tidy | proposed | REQ-090, REQ-091 |
 | USR-020 See how my search is going | proposed | REQ-092 |
 | USR-021 Use the app from my phone (later) | proposed | REQ-079 |
-| USR-022 Teach the app my writing style | approved | — (derive) |
-| USR-023 Know when I'm ready to start applying | approved | — (derive) |
-| USR-024 Pick which jobs go into my pipeline | approved | — (derive) |
-| USR-025 Preview and edit how my applications get filled | approved | — (derive) |
-| USR-026 Get asked when the app doesn't know an answer | approved | — (derive) |
-| USR-027 One place for everything the app knows about me | approved | — (derive) |
+| USR-022 Teach the app my writing style | approved | REQ-101 |
+| USR-023 Know when I'm ready to start applying | approved | REQ-002, REQ-102, REQ-103 |
+| USR-024 Pick which jobs go into my pipeline | approved | REQ-104 |
+| USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
+| USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
+| USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
 <!-- /trace:map -->
