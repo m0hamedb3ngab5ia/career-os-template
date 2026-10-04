@@ -99,3 +99,22 @@
 - Default (recommended): (a) only; hard rule stays. Plan in its own `/product new` when USR-029 is scheduled.
 - Answer (2026-10-04): (a) user-side import only; hard rule stays. Imports land in a batch that waits for user "ready to tailor"; then tailor résumé/cover letter where needed (reuse per USR-031) + fill instructions. → USR-029.
 - Status: answered
+
+### Q-017 Flagged posting: block or warn?
+- Links: REQ-109, USR-033
+- Default (recommended): block prepare/apply until user clicks "I checked it". Alt: warn only.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-018 Match score: deterministic keyword coverage vs AI fit
+- Links: REQ-111, Q-015
+- Default (recommended): deterministic coverage score (cheap, compares all résumés, no AI use); AI fit score (REQ-020) stays for job-vs-candidate. Threshold 70 applies to match score.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+
+### Q-019 Tweak worth-it rule
+- Links: REQ-113, USR-031
+- Default (recommended): tweak only if ≤3 bullet swaps gain ≥5 points and reach threshold; tweaked résumé saved as reusable variant per job category.
+- Answer (2026-10-04): default accepted.
+- Status: answered
+

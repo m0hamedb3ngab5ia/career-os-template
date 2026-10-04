@@ -6,13 +6,14 @@
 - Done: REQ-093..107, UC-001..009, FLOW-001/002 approved (gate 2026-10-04)
 - Next: ARCHITECTURE delta (profile store layout, résumé text extraction lib, review run, readiness API, `selected` field) + DECISIONS
 - Waiting on user: other USR triage. All Q answered 2026-10-04.
-- Next REQ derivation: USR-033 (injection guard), USR-031 (résumé reuse), USR-028 (job match), Q-008 action items json; later USR-029/030/032
+- Approved 2026-10-04: REQ-108..110 (USR-033), REQ-111..113 (USR-031), REQ-114..116 (USR-028), UC-010..012. Later: Q-008 json, USR-029/030/032
 
 ## Gates
 | gate | status | date |
 |---|---|---|
 | Audit triage | pending | |
 | Onboarding+profile spec (Feature) | approved | 2026-10-04 |
+| Injection guard + résumé reuse + check-a-job spec (Feature) | approved | 2026-10-04 |
 
 ## Deletion candidates
 <!-- rejected REQs whose code still exists -->

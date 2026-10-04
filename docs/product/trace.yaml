@@ -106,6 +106,15 @@ requirements:
   REQ-105: {status: approved, provenance: confirmed, user_requirements: [USR-025], tests: [E2E-008-01, E2E-008-02]}
   REQ-106: {status: approved, provenance: confirmed, user_requirements: [USR-026], tests: [E2E-008-01, E2E-008-02]}
   REQ-107: {status: approved, provenance: confirmed, user_requirements: [USR-027], tests: [E2E-009-01]}
+  REQ-108: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-01]}
+  REQ-109: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-01]}
+  REQ-110: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-02]}
+  REQ-111: {status: approved, provenance: confirmed, user_requirements: [USR-028, USR-031], tests: [E2E-010-01]}
+  REQ-112: {status: approved, provenance: confirmed, user_requirements: [USR-031], tests: [E2E-011-01]}
+  REQ-113: {status: approved, provenance: confirmed, user_requirements: [USR-031], tests: [E2E-011-01]}
+  REQ-114: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
+  REQ-115: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
+  REQ-116: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-02]}
   NFR-001: {status: proposed, provenance: observed}
   NFR-002: {status: proposed, provenance: observed}
   NFR-003: {status: proposed, provenance: observed}
@@ -121,6 +130,9 @@ use_cases:
   UC-007: {status: approved, requirements: [REQ-104]}
   UC-008: {status: approved, requirements: [REQ-105, REQ-106]}
   UC-009: {status: approved, requirements: [REQ-107]}
+  UC-010: {status: approved, requirements: [REQ-111, REQ-114, REQ-115, REQ-116]}
+  UC-011: {status: approved, requirements: [REQ-112, REQ-113]}
+  UC-012: {status: approved, requirements: [REQ-108, REQ-109, REQ-110]}
 flows:
   FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
   FLOW-002: {status: approved, use_cases: [UC-002]}

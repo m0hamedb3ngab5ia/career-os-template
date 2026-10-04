@@ -11,6 +11,9 @@ flowchart LR
   C --> UC7[UC-007 Pick jobs]
   C --> UC8[UC-008 Preview + complete fill]
   C --> UC9[UC-009 Manage profile]
+  C --> UC10[UC-010 Check a found job]
+  S --> UC11[UC-011 Prepare with résumé reuse]
+  S --> UC12[UC-012 Flag suspicious posting]
   S((Scheduler)) --> UC6[UC-006 Readiness gate]
   C --> UC6
   S --> UC7
@@ -84,3 +87,26 @@ REQs: REQ-107 · Trigger: open Profile
 Main: sections résumés, samples, saved answers (view/edit/delete), learned (lessons, voice), readiness
 Fail: YAML write fails → error, file unchanged (atomic)
 E2E-009-01: Given 12 saved answers When delete one Then YAML has 11 and next plan no longer uses it.
+
+### UC-010 Check a found job
+REQs: REQ-114, REQ-115, REQ-116, REQ-111 · Trigger: Jobs › Check a job
+Main: 1 paste/upload JD 2 scan (REQ-109) 3 fit + per-résumé match 4 best ≥ threshold → "use this résumé"
+Alt: none ≥ threshold → offer tailor → result ≥ threshold → use it
+Fail: tailored still below → notice X/Y + missing skills → ask keep closest; bad file → inline error
+Outcome: job stored with chosen résumé or `below_threshold` attempt
+E2E-010-01: Given 2 résumés scoring 82/55, threshold 70 When check pasted JD Then 82 résumé marked best, no tailor run.
+E2E-010-02: Given all résumés < 60 and fake tailor returning 64 When check Then notice "64/70" and Yes keeps attempt flagged `below_threshold`.
+
+### UC-011 Prepare with résumé reuse
+REQs: REQ-112, REQ-113 · Trigger: `run prepare` on selected jobs
+Main: 1 score existing résumés 2 best ≥ threshold → reuse 3 else tweak if gain ≥ min 4 else full tailor
+Outcome: fewest new résumés; reason logged per job
+E2E-011-01: Given 5 similar jobs and variant scoring ≥ 70 on all When `run prepare` Then 0 tailor skill calls, 5 jobs link the variant.
+
+### UC-012 Flag suspicious posting
+REQs: REQ-108, REQ-109, REQ-110 · Trigger: posting stored (scout, check, import)
+Main: 1 scan 2 hit → flag + Action Item + badge 3 user reviews → "I checked it" → prepare allowed
+Fail: artifacts with untrusted contact info/URLs → QA hard fail
+Outcome: injected instructions never acted on
+E2E-012-01: Given recorded posting with hidden "ignore previous instructions" When scouted Then flagged and `run prepare --job X` exits 2 until cleared.
+E2E-012-02: Given fake tailor output containing an unknown URL When qa runs Then hard fail `untrusted_content`.
