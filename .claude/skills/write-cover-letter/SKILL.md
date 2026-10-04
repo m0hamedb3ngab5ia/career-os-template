@@ -73,7 +73,8 @@ Before drafting, decide:
 
 Greeting: the style guide's `Greeting:` line, with its placeholders filled. If the guide has none, use
 `Hi <Team> team,` when a real team name is known, else the company form. Never `Dear Hiring Manager`
-(also a banned phrase). A `departments` value is a team name only if it reads like one (e.g. "Payments Infrastructure",
+(also a banned phrase). Greet a person by name only if that name appears in the posting or profile
+(contacts.json names are web guesses; QA `untrusted_content` fails them). A `departments` value is a team name only if it reads like one (e.g. "Payments Infrastructure",
 "Developer Platform"). Values that look like ATS buckets are NOT team names: anything containing a
 digit, or matching `/general|university|early careers|campus|other/i` (e.g. "University 2026",
 "Early Careers", "General", "Other") -> use the company form and set `team: null`.

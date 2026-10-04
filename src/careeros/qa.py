@@ -21,6 +21,7 @@ Output schema (dict / JSON):
       "cover_letter_word_count": int | None,   # computed from the body; frontmatter word_count is ignored
       "orphan_numbers": [...], "unknown_tools": [...], "banned_hits": [...],
       "confidential_hits": [...],        # "<file>: term '<t>'" | "<file>: patterns[<i>]"
+      "untrusted_hits": [...],           # hard `untrusted_content`: "<file>: url|email|phone|name|instruction '<v>'"
       "bullet_shape": [ {id: str | None, line: str, issues: [weak_opener|no_metric|too_long]} ]
                                          # soft: resume.txt bullets that break _shared/resume_writing_rules.md
       # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
@@ -580,6 +581,71 @@ class Checker:
         self.add(name, "hard", not hits,
                  f"{len(terms)} terms, {len(patterns)} patterns; none found in {', '.join(docs)}" if not hits
                  else "confidential content: " + "; ".join(hits))
+
+    # REQ-110 output guard. Instruction phrases mirror DEC-002 (careeros.untrusted in PR #115); dedup once merged.
+    _UNTRUSTED_RES = (
+        # scheme/www URLs, plus bare hosts on common TLDs ("exfil.example.org/r"); not an email's domain
+        ("url", re.compile(r"(?:https?://|www\.)[^\s<>()\"']+|(?<![@\w./-])(?:[a-z0-9-]+\.)+"
+                           r"(?:com|org|net|io|co|ai|dev|app)\b(?:/[^\s<>()\"']*)?", re.I)),
+        ("email", re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)*")),
+        ("phone", re.compile(r"(?:\+\d{1,3}[\s.-]?)?\(?\b\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}\b")),
+        # ponytail: names only after an honorific or a greeting; free-text person names need NER, add if leaks show up
+        ("name", re.compile(r"\b(?:(?:Dear|Hi|Hello)\s+(?:(?:Mr|Ms|Mrs|Mx|Dr)\.?\s+)?|(?:Mr|Ms|Mrs|Mx|Dr)\.?\s+)"
+                            r"((?:[A-Z](?:\.|[A-Za-z'-]*) ?){1,3})")),  # only an initial ends in "."
+        ("instruction", re.compile(r"\b(?:ignore (?:all |the )?(?:previous|prior|above) (?:instructions|prompts?)"
+                                   r"|disregard\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above)|system prompt"
+                                   r"|you are now (?:a|an|in|the)\b|as an ai (?:language )?model|new instructions)", re.I)),
+    )
+
+    def check_untrusted_content(self) -> None:
+        """Hard fail when résumé/letter/answers carry an email, URL, phone or addressed name found in neither the
+        profile nor the posting (contacts.json is web-guessed, not trusted), or echo an injected instruction ("ignore previous", "as an AI")."""
+        name = "untrusted_content"
+        docs: dict[str, str] = {}
+        if self.resume_txt is not None:
+            docs["resume.txt"] = self.resume_txt
+        if self.cover_md is not None:
+            docs["cover_letter.md"] = self.cover_body
+        if isinstance(self.answers, list):
+            docs["answers.json"] = " \n".join(str(a.get("answer") or "") for a in self.answers if isinstance(a, dict))
+        if not docs:
+            self.skip(name, "hard", "no text artifacts")
+            return
+
+        def norm_url(u: str) -> str:
+            u = re.sub(r"^(?:https?://)?(?:www\.)?", "", u.lower())
+            return u.rstrip(".,;:!?/")
+
+        # exact sets, never substrings: "x@example.com" must not pass because "alex@example.com" is known
+        known = " ".join(json.dumps(x, ensure_ascii=False) for x in (_load_yaml(self.prof_path), self.posting) if x)
+        known_low = re.sub(r"\s+", " ", known.lower())
+        rx = dict(self._UNTRUSTED_RES)
+        known_urls = {norm_url(m) for m in rx["url"].findall(known)}
+        known_emails = {m.lower() for m in rx["email"].findall(known)}
+        known_phones = {re.sub(r"\D", "", m)[-10:] for m in rx["phone"].findall(known)}
+        hits: list[str] = []
+        for fname, text in docs.items():
+            for kind, rx in self._UNTRUSTED_RES:
+                for m in rx.finditer(text):
+                    val = m.group(1).strip().rstrip(".") if kind == "name" else m.group(0)
+                    if kind == "url":
+                        val = norm_url(val)
+                        ok = val in known_urls or any(k.startswith(val + "/") for k in known_urls)
+                    elif kind == "email":
+                        ok = val.lower() in known_emails
+                    elif kind == "phone":
+                        ok = re.sub(r"\D", "", val)[-10:] in known_phones
+                    elif kind == "name":
+                        ok = bool(re.search(r"(?<!\w)" + re.escape(" ".join(val.lower().split())) + r"(?!\w)", known_low))
+                    else:  # instruction echo: never allowed, even if the posting says it (that is the attack)
+                        ok = False
+                    hit = f"{fname}: {kind} '{val}'"
+                    if not ok and hit not in hits:
+                        hits.append(hit)
+        self.extras["untrusted_hits"] = hits
+        self.add(name, "hard", not hits,
+                 "no unknown contact info, URLs, names or instruction echo" if not hits
+                 else "not in profile or posting: " + "; ".join(hits))
 
     def check_example_identity(self) -> None:
         """Hard fail when resume.txt or cover_letter.md carries the fictional example candidate's name or
@@ -1296,6 +1362,7 @@ class Checker:
         self.check_artifacts()
         self.check_banned()
         self.check_confidential()
+        self.check_untrusted_content()
         self.check_example_identity()
         self.check_word_counts()
         self.check_em_dashes()
@@ -1339,6 +1406,7 @@ class Checker:
             "unknown_tools": self.extras["unknown_tools"],
             "banned_hits": self.extras["banned_hits"],
             "confidential_hits": self.extras.get("confidential_hits", []),
+            "untrusted_hits": self.extras.get("untrusted_hits", []),
             "bullet_shape": self.extras.get("bullet_shape", []),
             "wrong_company_hits": self.extras.get("wrong_company_hits", []),
             "consistency": self.extras.get("consistency", {}),
@@ -1357,6 +1425,7 @@ def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> di
             "summary": {"hard_fail": 1, "soft_fail": 0, "skipped": 0},
             "fail_reasons": [f"job_dir_exists: {job_dir} does not exist"], "warnings": [],
             "keyword_coverage": None, "orphan_numbers": [], "unknown_tools": [], "banned_hits": [], "confidential_hits": [],
+            "untrusted_hits": [],
             "bullet_shape": [], "wrong_company_hits": [], "consistency": {}, "outreach_policy": {}, "pdf_fidelity": {},
         }
     return Checker(job_dir, root_path).run()
