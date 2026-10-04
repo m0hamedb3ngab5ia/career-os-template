@@ -1,6 +1,11 @@
 # Design system
-TOC: Rule · Tokens · Components · Patterns · A11y · Responsive · Delta 2026-10-04 · Mockups
+TOC: UX principles · Rule · Tokens · Components · Patterns · A11y · Responsive · Delta 2026-10-04 · Mockups
 Source: `ui/src/styles/tokens.css`, `global.css`, `ui/src/kit` (CSS modules + CSS vars, no Tailwind).
+
+## UX principles
+Global: `~/.claude/skills/product/UI_UX_PRINCIPLES.md` (P1–P20 + verification checklist). Repo-specific deviations only:
+| P-id | deviation | why |
+|---|---|---|
 
 ## Rule (DEC-009)
 Reuse kit components; no new component unless a delta screen can't be built from existing ones. Every frontend PR: `web-design-guidelines` (Vercel) audit + `vitest-axe`. Unused tokens/components → 06_IA.md Trim list.

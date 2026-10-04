@@ -90,5 +90,6 @@ this file; AGENTS.md points here.
 This repo uses `/product` (docs + how-to: `docs/product/README.md`). Any agent, any task touching product behaviour:
 - Read `docs/product/STATUS.md` first. Scope reads via `~/.claude/skills/product/scripts/trace.py ids <ID>`; don't load all docs.
 - Bug → Fix lane (failing test first). Feature → `/product new`. Never change REQ/SCOPE/acceptance silently: `/product change <ID>`.
+- Any UI work: apply `~/.claude/skills/product/UI_UX_PRINCIPLES.md` (global UX heuristics, P1–P20, verification checklist).
 - Missing requirement / UX / design detail → add to `docs/product/OPEN_QUESTIONS.md` and ask; don't invent.
 - PR body: `Implements: REQ-… UC-…` / `Verification: E2E-…`. Status `verified` only via `/product verify`.
