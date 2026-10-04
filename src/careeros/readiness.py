@@ -5,7 +5,7 @@
 
 Must-haves: a master résumé (profile/resumes/<rid>/meta.json type master), doctor clean (no example data, YAML
 and schema ok), work-auth + sponsorship answers and the salary dropdown floor, `claude` installed, master.yaml
-synced (no pending profile/master.proposed.yaml). Nice: a writing sample, ATS credentials, EEO answers.
+synced (no pending or rejected master.yaml proposal, REQ-099). Nice: a writing sample, ATS credentials, EEO answers.
 Gates apply only; score/prepare never call it.
 """
 from __future__ import annotations
@@ -64,6 +64,7 @@ def _unchanged(root: Path, examples: Path | None, rel: str, hint: str) -> bool:
 def items(root: Path, which: Callable[[str], str | None] | None = None,
           env: dict[str, str] | None = None, checks: list | None = None) -> list[dict[str, Any]]:
     """`checks`: a run_doctor result already in hand (`careeros doctor`), else run here."""
+    from careeros import master_sync
     from careeros.doctor import FAIL, find_examples, run_doctor
 
     root = Path(root)
@@ -93,7 +94,7 @@ def items(root: Path, which: Callable[[str], str | None] | None = None,
          "/settings"),
         ("claude", "Claude Code (`claude`) installed", True, "claude" not in fails, "/profile#readiness"),
         ("master_synced", "master.yaml synced with the master résumé", True,
-         not (root / "profile" / "master.proposed.yaml").exists(), "/profile#resumes"),
+         master_sync.state(root)["state"] == "synced", "/profile#resumes"),
         ("writing_sample", "At least one writing sample", False,
          samples.is_dir() and any(p.is_file() and not p.name.startswith(".") for p in samples.iterdir()),
          "/profile#samples"),

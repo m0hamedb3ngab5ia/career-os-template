@@ -1,5 +1,6 @@
 """Profile › Résumés (REQ-093, REQ-099, REQ-100): raw-body upload (DEC-006), list, versions, rename/retype,
-set master, delete. Review runs (REQ-094) and the master.yaml diff (REQ-099) come with later tasks."""
+set master, delete, and the master.yaml diff from the master résumé (REQ-099: view / approve / reject).
+Review runs (REQ-094) come with a later task."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -9,6 +10,7 @@ import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from careeros import master_sync
 from careeros import resumes as store
 from careeros.ui.routers import ctx
 
@@ -57,6 +59,11 @@ class VersionDetail(Version):
     ats: dict[str, Any]
 
 
+class MasterProposal(BaseModel):
+    state: Literal["synced", "pending", "rejected"]
+    diff: str
+
+
 class ResumePatch(BaseModel):
     name: str | None = None
     type: ResumeType | None = None
@@ -74,6 +81,8 @@ def _refusals() -> Iterator[None]:
         raise HTTPException(415, str(e)) from None
     except store.Refused as e:
         raise HTTPException(409, str(e)) from None
+    except master_sync.Invalid as e:
+        raise HTTPException(422, str(e)) from None
 
 
 _RAW = {"requestBody": {"required": True, "content": {"application/octet-stream": {
@@ -134,3 +143,20 @@ def get_version(rid: str, n: int, c=Depends(ctx)) -> VersionDetail:
 def delete_version(rid: str, n: int, c=Depends(ctx)) -> Resume:
     with _refusals():
         return Resume(**store.delete_version(c.settings.root, rid, n))
+
+
+@router.get("/profile/master/proposal")
+def get_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    return MasterProposal(**master_sync.state(c.settings.root))
+
+
+@router.post("/profile/master/proposal/approve")
+def approve_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    with _refusals():
+        return MasterProposal(**master_sync.approve(c.settings.root))
+
+
+@router.post("/profile/master/proposal/reject")
+def reject_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    with _refusals():
+        return MasterProposal(**master_sync.reject(c.settings.root))

@@ -228,6 +228,18 @@ export interface paths {
     /** Board */
     get: operations["board_api_pipeline_get"];
   };
+  "/api/profile/master/proposal": {
+    /** Get Master Proposal */
+    get: operations["get_master_proposal_api_profile_master_proposal_get"];
+  };
+  "/api/profile/master/proposal/approve": {
+    /** Approve Master Proposal */
+    post: operations["approve_master_proposal_api_profile_master_proposal_approve_post"];
+  };
+  "/api/profile/master/proposal/reject": {
+    /** Reject Master Proposal */
+    post: operations["reject_master_proposal_api_profile_master_proposal_reject_post"];
+  };
   "/api/profile/resumes": {
     /** List Resumes */
     get: operations["list_resumes_api_profile_resumes_get"];
@@ -1562,6 +1574,16 @@ export interface components {
       degree?: number | null;
       /** Mutuals */
       mutuals?: number | null;
+    };
+    /** MasterProposal */
+    MasterProposal: {
+      /** Diff */
+      diff: string;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "synced" | "pending" | "rejected";
     };
     /** Meta */
     Meta: {
@@ -3875,6 +3897,39 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Master Proposal */
+  get_master_proposal_api_profile_master_proposal_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MasterProposal"];
+        };
+      };
+    };
+  };
+  /** Approve Master Proposal */
+  approve_master_proposal_api_profile_master_proposal_approve_post: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MasterProposal"];
+        };
+      };
+    };
+  };
+  /** Reject Master Proposal */
+  reject_master_proposal_api_profile_master_proposal_reject_post: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["MasterProposal"];
         };
       };
     };

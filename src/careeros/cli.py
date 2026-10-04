@@ -859,6 +859,20 @@ def cmd_resume_add(args: argparse.Namespace) -> int:
         return 1
     print(json.dumps(m, indent=2, ensure_ascii=False) if args.json else f"added {m['rid']} v1 ({m['type']})")
     return 0
+
+
+def cmd_resume_propose_master(args: argparse.Namespace) -> int:
+    """extract-master hands its proposed master.yaml here (REQ-099); written only on approve."""
+    from careeros import master_sync
+
+    try:
+        st = master_sync.propose(_settings(args).root, Path(args.file).read_text(encoding="utf-8"))
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(st["diff"] or "no change from profile/master.yaml")
+    print("proposal pending: approve or reject it in Profile › Résumés")
+    return 0
 # --- end résumé store ---------------------------------------------------------------------------------------------
 
 
@@ -1894,6 +1908,10 @@ def build_parser() -> argparse.ArgumentParser:
     rsa.add_argument("--type", choices=("master", "variant", "other", "tailored"))
     rsa.add_argument("--json", action="store_true")
     rsa.set_defaults(fn=cmd_resume_add)
+    rsp = rss.add_parser("propose-master", help="validate a proposed master.yaml -> profile/master.proposed.yaml "
+                         "(pending until approved; used by the extract-master skill)")
+    rsp.add_argument("file")
+    rsp.set_defaults(fn=cmd_resume_propose_master)
     lls = lrs.add_parser("list", help="lessons that apply: general + this ATS + this company")
     lls.add_argument("--ats")
     lls.add_argument("--company")
