@@ -92,3 +92,25 @@ def test_delete_rules(tmp_path: Path):
 def test_rid_cannot_escape(tmp_path: Path, rid: str):
     with pytest.raises(LookupError):
         resumes.get(tmp_path, rid)
+
+
+def test_blank_name_with_master_retype_changes_nothing(tmp_path: Path):
+    a = resumes.add(tmp_path, "a.pdf", PDF)["rid"]
+    b = resumes.add(tmp_path, "b.pdf", PDF)["rid"]
+    with pytest.raises(ValueError):
+        resumes.update(tmp_path, b, type="master", name="  ")
+    assert resumes.get(tmp_path, a)["type"] == "master" and resumes.get(tmp_path, b)["type"] == "variant"
+
+
+def test_concurrent_adds_make_one_master(tmp_path: Path, monkeypatch):
+    import threading
+    import time
+
+    real = resumes._store
+    monkeypatch.setattr(resumes, "_store", lambda *a: (time.sleep(0.2), real(*a)))
+    ts = [threading.Thread(target=resumes.add, args=(tmp_path, f"{i}.pdf", PDF)) for i in range(2)]
+    for t in ts:
+        t.start()
+    for t in ts:
+        t.join()
+    assert sorted(r["type"] for r in resumes.list_resumes(tmp_path)) == ["master", "variant"]

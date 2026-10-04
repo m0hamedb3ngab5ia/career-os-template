@@ -11,9 +11,15 @@ import os
 import re
 import secrets
 import shutil
+from contextlib import contextmanager
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
+from typing import Any, Iterator
+
+try:
+    import fcntl
+except ImportError:  # pragma: no cover
+    fcntl = None  # type: ignore[assignment]
 
 MAX_BYTES = 5 * 1024 * 1024  # REQ-093 (Q-009)
 MAGIC = {".pdf": b"%PDF", ".docx": b"PK"}  # DEC-006: extension + magic bytes
@@ -42,6 +48,17 @@ def _dir(root: Path, rid: str) -> Path:
     if not _RID.fullmatch(rid) or not (d / "meta.json").is_file():
         raise LookupError(f"no résumé {rid!r}")
     return d
+
+
+@contextmanager
+def _locked(root: Path) -> Iterator[None]:
+    """Serialise store mutations across threads/processes (one master, REQ-099). No-op without fcntl."""
+    base = _base(root)
+    base.mkdir(parents=True, exist_ok=True)
+    with (base / ".lock").open("a") as fh:
+        if fcntl:
+            fcntl.flock(fh, fcntl.LOCK_EX)  # released on close
+        yield
 
 
 def _write(d: Path, meta: dict[str, Any]) -> None:
@@ -98,27 +115,31 @@ def add(root: Path, filename: str, data: bytes, *, name: str | None = None, type
     slug = re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-")[:40] or "resume"
     rid = f"{slug}-{secrets.token_hex(2)}"
     d = _base(root) / rid
-    d.mkdir(parents=True)
-    has_master = any(m["type"] == "master" for m in _all(root))
-    try:
-        _store(d, 1, ext, data)
-        meta = {"rid": rid, "name": name, "type": "variant" if has_master else "master", "category": None,
-                "versions": [{"n": 1, "author": "user", "source": "upload", "at": _now()}]}
-        _write(d, meta)
-    except BaseException:
-        shutil.rmtree(d, ignore_errors=True)
-        raise
-    return update(root, rid, type=type) if type and has_master and type != meta["type"] else meta  # first one is master
+    with _locked(root):
+        d.mkdir(parents=True)
+        has_master = any(m["type"] == "master" for m in _all(root))
+        try:
+            _store(d, 1, ext, data)
+            meta = {"rid": rid, "name": name, "type": "variant" if has_master else "master", "category": None,
+                    "versions": [{"n": 1, "author": "user", "source": "upload", "at": _now()}]}
+            _write(d, meta)
+        except BaseException:
+            shutil.rmtree(d, ignore_errors=True)
+            raise
+        # first one is master
+        return _update(root, rid, type=type) if type and has_master and type != meta["type"] else meta
 
 
 def add_version(root: Path, rid: str, filename: str, data: bytes, *, author: str, source: str) -> dict[str, Any]:
     """New version vN+1 (author user|ai; source upload|edit|<feedback id>)."""
-    d, meta = _dir(root, rid), get(root, rid)
-    n = meta["versions"][-1]["n"] + 1
-    _store(d, n, _check(filename, data), data)
-    meta["versions"].append({"n": n, "author": author, "source": source, "at": _now()})
-    _write(d, meta)
-    return meta
+    ext = _check(filename, data)
+    with _locked(root):
+        d, meta = _dir(root, rid), get(root, rid)
+        n = meta["versions"][-1]["n"] + 1
+        _store(d, n, ext, data)
+        meta["versions"].append({"n": n, "author": author, "source": source, "at": _now()})
+        _write(d, meta)
+        return meta
 
 
 def version(root: Path, rid: str, n: int) -> dict[str, Any]:
@@ -133,7 +154,16 @@ def version(root: Path, rid: str, n: int) -> dict[str, Any]:
 
 def update(root: Path, rid: str, *, name: str | None = None, type: str | None = None) -> dict[str, Any]:
     """Rename / retype. Marking master demotes the old master to variant (REQ-099)."""
+    with _locked(root):
+        return _update(root, rid, name=name, type=type)
+
+
+def _update(root: Path, rid: str, *, name: str | None = None, type: str | None = None) -> dict[str, Any]:
     d, meta = _dir(root, rid), get(root, rid)
+    if name is not None:  # validate everything before any write
+        if not name.strip():
+            raise ValueError("name must not be empty")
+        meta["name"] = name.strip()
     if type is not None and type != meta["type"]:
         if type not in TYPES:
             raise ValueError(f"type must be one of {', '.join(TYPES)}")
@@ -145,29 +175,27 @@ def update(root: Path, rid: str, *, name: str | None = None, type: str | None = 
                     other["type"] = "variant"
                     _write(_base(root) / other["rid"], other)
         meta["type"] = type
-    if name is not None:
-        if not name.strip():
-            raise ValueError("name must not be empty")
-        meta["name"] = name.strip()
     _write(d, meta)
     return meta
 
 
 def delete(root: Path, rid: str) -> None:
-    d, meta = _dir(root, rid), get(root, rid)
-    if meta["type"] == "master":
-        raise Refused("the master résumé can't be deleted; mark another résumé master first")
-    shutil.rmtree(d)
+    with _locked(root):
+        d, meta = _dir(root, rid), get(root, rid)
+        if meta["type"] == "master":
+            raise Refused("the master résumé can't be deleted; mark another résumé master first")
+        shutil.rmtree(d)
 
 
 def delete_version(root: Path, rid: str, n: int) -> dict[str, Any]:
     """Only non-latest versions (REQ-100); delete the whole résumé to drop the latest."""
-    d, meta = _dir(root, rid), get(root, rid)
-    if n not in [v["n"] for v in meta["versions"]]:
-        raise LookupError(f"résumé {rid!r} has no v{n}")
-    if n == meta["versions"][-1]["n"]:
-        raise Refused(f"v{n} is the latest version" + (" of the master résumé" if meta["type"] == "master" else ""))
-    meta["versions"] = [v for v in meta["versions"] if v["n"] != n]
-    _write(d, meta)
-    shutil.rmtree(d / f"v{n}", ignore_errors=True)
-    return meta
+    with _locked(root):
+        d, meta = _dir(root, rid), get(root, rid)
+        if n not in [v["n"] for v in meta["versions"]]:
+            raise LookupError(f"résumé {rid!r} has no v{n}")
+        if n == meta["versions"][-1]["n"]:
+            raise Refused(f"v{n} is the latest version" + (" of the master résumé" if meta["type"] == "master" else ""))
+        meta["versions"] = [v for v in meta["versions"] if v["n"] != n]
+        _write(d, meta)
+        shutil.rmtree(d / f"v{n}", ignore_errors=True)
+        return meta

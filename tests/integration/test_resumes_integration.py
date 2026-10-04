@@ -62,6 +62,9 @@ def test_resume_http_api(root: Path):
         assert c.put("/api/profile/resumes", params={"filename": "cv.exe"}, content=PDF, headers=W).status_code == 415
         big = b"%PDF" + b"x" * (5 * 1024 * 1024)
         assert c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=big, headers=W).status_code == 413
+        chunked = iter([b"%PDF", b"x" * (5 * 1024 * 1024)])  # no Content-Length: only the streamed cap applies
+        assert c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=chunked, headers=W).status_code == 413
+        assert len(c.get("/api/profile/resumes", headers=W).json()["resumes"]) == 1
         b = c.put("/api/profile/resumes", params={"filename": "b.pdf"}, content=PDF, headers=W).json()["rid"]
         rows = c.get("/api/profile/resumes", headers=W).json()["resumes"]
         assert {x["rid"]: x["type"] for x in rows} == {a["rid"]: "master", b: "variant"}
@@ -75,3 +78,30 @@ def test_resume_http_api(root: Path):
         assert c.delete(f"/api/profile/resumes/{b}", headers=W).status_code == 409  # master
         assert c.delete(f"/api/profile/resumes/{a['rid']}", headers=W).status_code == 204
         assert c.get(f"/api/profile/resumes/{a['rid']}", headers=W).status_code == 404
+
+
+def test_upload_extracts_off_the_event_loop(root: Path, monkeypatch):
+    pytest.importorskip("fastapi")
+    import asyncio
+
+    from fastapi.testclient import TestClient
+
+    from careeros import resumes
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    real = resumes.add
+
+    def add(*a, **kw):
+        with pytest.raises(RuntimeError):
+            asyncio.get_running_loop()  # blocking PDF/DOCX parse must not run on the event loop
+        return real(*a, **kw)
+
+    monkeypatch.setattr(resumes, "add", add)
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
+    with TestClient(app) as c:
+        r = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers={"X-CareerOS": "1"})
+        assert r.status_code == 201, r.text

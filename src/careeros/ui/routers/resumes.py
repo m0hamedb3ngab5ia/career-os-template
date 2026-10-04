@@ -5,6 +5,7 @@ from __future__ import annotations
 from contextlib import contextmanager
 from typing import Any, Iterator, Literal
 
+import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
@@ -89,7 +90,7 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
         if len(data) > store.MAX_BYTES:
             raise HTTPException(413, f"{filename}: larger than {store.MAX_BYTES // (1024 * 1024)} MB")
     with _refusals():
-        m = store.add(c.settings.root, filename, bytes(data), name=name)
+        m = await anyio.to_thread.run_sync(lambda: store.add(c.settings.root, filename, bytes(data), name=name))
     return Uploaded(rid=m["rid"], n=1)
 
 
