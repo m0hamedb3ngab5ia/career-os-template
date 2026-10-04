@@ -25,7 +25,7 @@
 | proposed | 61 |
 | rejected | 1 |
 
-Open questions: 4
+Open questions: 6
 Needs review: none
-User requirements: 27 (9 approved)
+User requirements: 29 (11 approved)
 <!-- /trace:status -->

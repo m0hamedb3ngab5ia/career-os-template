@@ -82,3 +82,14 @@
 - Default (recommended): score all scouted jobs (helps choose); prepare/apply only ticked. New jobs start unticked.
 - Answer (2026-10-04): default accepted.
 - Status: answered
+
+### Q-015 Match threshold for USR-028
+- Links: USR-028, REQ-020
+- Default (recommended): one user setting "minimum match score" (0-100, default 70) in Settings, reusing the existing fit score; overridable per check.
+- Status: open
+
+### Q-016 LinkedIn/Indeed/Handshake vs "never automate LinkedIn" hard rule
+- Links: USR-029, CLAUDE.md hard rules, REQ-010
+- Conflict: hard rule forbids automating LinkedIn; their terms forbid scraping; no public job APIs. Options: (a) user-side import only: browser bookmarklet/"send to career-os" on a page the user opened, email job-alert parsing via Gmail inbox sync, saved-search RSS where offered; (b) automated browsing (breaks hard rule + ToS, account-ban risk).
+- Default (recommended): (a) only; hard rule stays. Plan in its own `/product new` when USR-029 is scheduled.
+- Status: open

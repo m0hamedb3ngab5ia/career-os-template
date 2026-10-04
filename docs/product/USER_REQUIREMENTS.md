@@ -53,6 +53,13 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users can see when a posting closes.
 - Why: spend time only on jobs worth applying to
 
+### USR-029 Find jobs on more job boards (later)
+- Users can connect other job boards, such as LinkedIn, Handshake and Indeed.
+- Jobs from these boards show up in the same list as all other jobs.
+- These boards may be slower or less complete than the boards the app connects to directly, and that is fine.
+- Later: needs a plan for how each board would work, what each board's rules allow, and how to keep the user's accounts safe.
+- Why: many jobs are only posted on these boards, so the app misses them today
+
 ### USR-006 Stay safe from scams and fake jobs
 - Each job gets a safe / check / blocked verdict with the reason.
 - The app never fills in very sensitive details like a social security number or bank info.
@@ -69,6 +76,14 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Why: users decide where their applications go
 
 ## Preparing applications
+### USR-028 Check any job I find against my résumés
+- Users can paste or upload any job description they find online.
+- The app scores the user's résumé against that job.
+- The app shows which of the user's résumés would score highest for that job.
+- If no résumé reaches the score the user needs, the app offers to build a tailored résumé from the master résumé.
+- If even a tailored résumé can't reach that score, the app tells the user the score was not met and asks if they still want the closest possible match.
+- Why: know before applying how well a résumé fits a job, wherever the job was found
+
 ### USR-007 Get a tailored résumé and cover letter for each job
 - For each good job, the app writes a one-page résumé using only the user's own experience.
 - The app writes a cover letter in the user's own voice when the job calls for one.
@@ -211,4 +226,6 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
 | USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
 | USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
+| USR-028 ### Q-015 Match threshold for USR-028 | approved | — (derive) |
+| USR-029 Find jobs on more job boards (later) | approved | — (derive) |
 <!-- /trace:map -->
