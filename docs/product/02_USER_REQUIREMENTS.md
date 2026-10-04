@@ -282,14 +282,14 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
 | USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
 | USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
-| USR-028 ### Q-015 Match threshold for USR-028 | approved | REQ-111, REQ-114, REQ-115, REQ-116 |
+| USR-028 Check any job I find against my résumés | approved | REQ-111, REQ-114, REQ-115, REQ-116 |
 | USR-029 Find jobs on more job boards (later) | approved | — (derive) |
 | USR-030 Use the app without being technical (later) | approved | — (derive) |
 | USR-031 Reuse résumés instead of making one per job | approved | REQ-111, REQ-112, REQ-113 |
 | USR-032 See proof that the app works | approved | — (derive) |
 | USR-033 Job postings can't trick the app | approved | REQ-108, REQ-109, REQ-110 |
-| USR-034 Start my pipeline and choose how far it goes | approved | — (derive; builds on REQ-104, REQ-045, REQ-074) |
-| USR-035 Always know what to do on each page | approved | — (derive) |
-| USR-036 Tables that work like a spreadsheet | approved | — (derive; as-is REQ-072) |
-| USR-037 First-time guide and a clear next step | approved | — (derive; builds on REQ-108..110) |
+| USR-034 Start my pipeline and choose how far it goes | approved | REQ-117, REQ-118, REQ-120 |
+| USR-035 Always know what to do on each page | approved | REQ-119 |
+| USR-036 Tables that work like a spreadsheet | approved | REQ-120 |
+| USR-037 First-time guide and a clear next step | approved | REQ-121, REQ-122 |
 <!-- /trace:map -->

@@ -55,7 +55,7 @@ flowchart TD
 What to notice: max one tailor run per check; a flagged posting is still scored but can't be prepared until cleared.
 
 ### FLOW-004 Select jobs → start pipeline
-UCs: UC-007 (+ USR-034; REQs to derive)
+UCs: UC-007, UC-013
 ```mermaid
 flowchart TD
   A[Jobs list] --> B[filter / sort optional]
@@ -68,4 +68,4 @@ flowchart TD
   F1 --> G[Start] --> H[Progress: per-job stage, Pause / Cancel / Retry]
   H --> I[done: Prepared / Filled (open tab) / Submitted / Needs you]
 ```
-What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A + LinkedIn never offered Submit.
+What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A never offered Submit, LinkedIn Easy Apply capped at Prepare (LinkedIn-found jobs on a company ATS follow the chosen stop), flagged postings excluded.

@@ -16,6 +16,7 @@
 | Injection guard + résumé reuse + check-a-job spec (Feature) | approved | 2026-10-04 |
 | Architecture delta (DEC-001..008, REQ-108 tools amended) | approved | 2026-10-04 |
 | IA + UI (06_IA.md, 08_DESIGN_SYSTEM.md, mockups, DEC-009) | approved | 2026-10-04 |
+| Pipeline start + guidance + tour spec (USR-034..037: REQ-117..122, UC-013/014, TASK-016..020) | approved | 2026-10-04 |
 
 ## Deletion candidates
 <!-- rejected REQs whose code still exists -->
@@ -25,11 +26,11 @@
 <!-- trace:status -->
 | REQ status | n |
 |---|---|
-| approved | 24 |
+| approved | 30 |
 | proposed | 61 |
 | rejected | 1 |
 
 Open questions: 0
 Needs review: none
-User requirements: 33 (15 approved)
+User requirements: 37 (19 approved)
 <!-- /trace:status -->

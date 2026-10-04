@@ -119,6 +119,12 @@ requirements:
   REQ-114: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
   REQ-115: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
   REQ-116: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-02]}
+  REQ-117: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-01]}
+  REQ-118: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-02]}
+  REQ-119: {status: approved, provenance: confirmed, user_requirements: [USR-035]}
+  REQ-120: {status: approved, provenance: confirmed, user_requirements: [USR-034, USR-036]}
+  REQ-121: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-01]}
+  REQ-122: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-02]}
   NFR-001: {status: proposed, provenance: observed}
   NFR-002: {status: proposed, provenance: observed}
   NFR-003: {status: proposed, provenance: observed}
@@ -137,11 +143,13 @@ use_cases:
   UC-010: {status: approved, requirements: [REQ-111, REQ-114, REQ-115, REQ-116]}
   UC-011: {status: approved, requirements: [REQ-112, REQ-113]}
   UC-012: {status: approved, requirements: [REQ-108, REQ-109, REQ-110]}
+  UC-013: {status: approved, requirements: [REQ-117, REQ-118, REQ-120]}
+  UC-014: {status: approved, requirements: [REQ-119, REQ-121, REQ-122]}
 flows:
   FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
   FLOW-002: {status: approved, use_cases: [UC-002]}
   FLOW-003: {status: approved, use_cases: [UC-010]}
-  FLOW-004: {status: draft, use_cases: [UC-007]}
+  FLOW-004: {status: draft, use_cases: [UC-007, UC-013]}
 tasks:
   TASK-001: {status: todo, requirements: [REQ-108]}
   TASK-002: {status: todo, requirements: [REQ-109], use_cases: [UC-012]}
@@ -158,3 +166,8 @@ tasks:
   TASK-013: {status: todo, requirements: [REQ-107, REQ-101, REQ-102], use_cases: [UC-005, UC-006], flows: [FLOW-001]}
   TASK-014: {status: todo, requirements: [REQ-105, REQ-106]}
   TASK-015: {status: todo, requirements: [REQ-104, REQ-109, REQ-114, REQ-115]}
+  TASK-016: {status: todo, requirements: [REQ-118], use_cases: [UC-013]}
+  TASK-017: {status: todo, requirements: [REQ-117, REQ-120], use_cases: [UC-013], flows: [FLOW-004]}
+  TASK-018: {status: todo, requirements: [REQ-119, REQ-120]}
+  TASK-019: {status: todo, requirements: [REQ-121], use_cases: [UC-014]}
+  TASK-020: {status: todo, requirements: [REQ-122], use_cases: [UC-014]}
