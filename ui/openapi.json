@@ -5266,6 +5266,154 @@
         "title": "ResponseRateTile",
         "type": "object"
       },
+      "Resume": {
+        "properties": {
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "master",
+              "variant",
+              "other",
+              "tailored"
+            ],
+            "title": "Type",
+            "type": "string"
+          },
+          "versions": {
+            "items": {
+              "$ref": "#/components/schemas/Version"
+            },
+            "title": "Versions",
+            "type": "array"
+          }
+        },
+        "required": [
+          "rid",
+          "name",
+          "type",
+          "versions"
+        ],
+        "title": "Resume",
+        "type": "object"
+      },
+      "ResumePatch": {
+        "properties": {
+          "name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Name"
+          },
+          "type": {
+            "anyOf": [
+              {
+                "enum": [
+                  "master",
+                  "variant",
+                  "other",
+                  "tailored"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Type"
+          }
+        },
+        "title": "ResumePatch",
+        "type": "object"
+      },
+      "ResumeRow": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "category": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Category"
+          },
+          "latest": {
+            "title": "Latest",
+            "type": "integer"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          },
+          "type": {
+            "enum": [
+              "master",
+              "variant",
+              "other",
+              "tailored"
+            ],
+            "title": "Type",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rid",
+          "name",
+          "type",
+          "latest",
+          "at"
+        ],
+        "title": "ResumeRow",
+        "type": "object"
+      },
+      "Resumes": {
+        "properties": {
+          "resumes": {
+            "items": {
+              "$ref": "#/components/schemas/ResumeRow"
+            },
+            "title": "Resumes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resumes"
+        ],
+        "title": "Resumes",
+        "type": "object"
+      },
       "RetryBody": {
         "properties": {
           "job_ids": {
@@ -7110,6 +7258,35 @@
         "title": "UnquotedWarning",
         "type": "object"
       },
+      "Uploaded": {
+        "properties": {
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "review_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Review Run"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "rid",
+          "n"
+        ],
+        "title": "Uploaded",
+        "type": "object"
+      },
       "ValidationError": {
         "properties": {
           "ctx": {
@@ -7187,6 +7364,78 @@
           "risk"
         ],
         "title": "VerifyBody",
+        "type": "object"
+      },
+      "Version": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "author",
+          "source",
+          "at"
+        ],
+        "title": "Version",
+        "type": "object"
+      },
+      "VersionDetail": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "ats": {
+            "additionalProperties": true,
+            "title": "Ats",
+            "type": "object"
+          },
+          "author": {
+            "title": "Author",
+            "type": "string"
+          },
+          "n": {
+            "title": "N",
+            "type": "integer"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          },
+          "source": {
+            "title": "Source",
+            "type": "string"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "n",
+          "author",
+          "source",
+          "at",
+          "rid",
+          "text",
+          "ats"
+        ],
+        "title": "VersionDetail",
         "type": "object"
       }
     }
@@ -10487,6 +10736,361 @@
         "summary": "Board",
         "tags": [
           "pipeline"
+        ]
+      }
+    },
+    "/api/profile/resumes": {
+      "get": {
+        "operationId": "list_resumes_api_profile_resumes_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resumes"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Resumes",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "put": {
+        "operationId": "upload_api_profile_resumes_put",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "name",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Name"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Uploaded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}": {
+      "delete": {
+        "operationId": "delete_resume_api_profile_resumes__rid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Resume",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "get": {
+        "operationId": "get_resume_api_profile_resumes__rid__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Resume",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "patch": {
+        "operationId": "patch_resume_api_profile_resumes__rid__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ResumePatch"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Patch Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/master": {
+      "post": {
+        "operationId": "set_master_api_profile_resumes__rid__master_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Set Master",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/versions/{n}": {
+      "delete": {
+        "operationId": "delete_version_api_profile_resumes__rid__versions__n__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Resume"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Version",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "get": {
+        "operationId": "get_version_api_profile_resumes__rid__versions__n__get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "n",
+            "required": true,
+            "schema": {
+              "title": "N",
+              "type": "integer"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VersionDetail"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Version",
+        "tags": [
+          "resumes"
         ]
       }
     },

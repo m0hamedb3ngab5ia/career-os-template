@@ -821,6 +821,35 @@ def cmd_learn_list(args: argparse.Namespace) -> int:
     return 0
 
 
+# --- résumé store (TASK-007) -------------------------------------------------------------------------------------
+def cmd_resume_list(args: argparse.Namespace) -> int:
+    from careeros.resumes import list_resumes
+
+    rows = list_resumes(_settings(args).root)
+    if args.json:
+        print(json.dumps(rows, indent=2, ensure_ascii=False))
+        return 0
+    for r in rows:
+        print(f"{r['rid']:<30} {r['type']:<9} v{r['latest']:<3} {r['at'][:10]}  {r['name']}")
+    if not rows:
+        print("no résumés (careeros resume add <file>)")
+    return 0
+
+
+def cmd_resume_add(args: argparse.Namespace) -> int:
+    from careeros.resumes import add
+
+    path = Path(args.file)
+    try:
+        m = add(_settings(args).root, path.name, path.read_bytes(), name=args.name, type=args.type)
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(m, indent=2, ensure_ascii=False) if args.json else f"added {m['rid']} v1 ({m['type']})")
+    return 0
+# --- end résumé store ---------------------------------------------------------------------------------------------
+
+
 def cmd_creds_set(args: argparse.Namespace) -> int:
     """Password from --password-stdin (first line) or a hidden prompt; never from argv, never echoed."""
     import getpass
@@ -1834,6 +1863,18 @@ def build_parser() -> argparse.ArgumentParser:
     ll.add_argument("--tag", action="append", default=[])
     ll.add_argument("--json", action="store_true")
     ll.set_defaults(fn=cmd_learn_lesson)
+    # résumé store (TASK-007)
+    rs = sub.add_parser("resume", help="résumés under profile/resumes (one master, variants, versions)")
+    rss = rs.add_subparsers(dest="resume_cmd", required=True)
+    rsl = rss.add_parser("list", help="name, type, latest version, date")
+    rsl.add_argument("--json", action="store_true")
+    rsl.set_defaults(fn=cmd_resume_list)
+    rsa = rss.add_parser("add", help="store a PDF/DOCX résumé (<=5 MB) as v1; the first one becomes master")
+    rsa.add_argument("file")
+    rsa.add_argument("--name")
+    rsa.add_argument("--type", choices=("master", "variant", "other", "tailored"))
+    rsa.add_argument("--json", action="store_true")
+    rsa.set_defaults(fn=cmd_resume_add)
     lls = lrs.add_parser("list", help="lessons that apply: general + this ATS + this company")
     lls.add_argument("--ats")
     lls.add_argument("--company")

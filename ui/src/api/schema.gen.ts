@@ -221,6 +221,30 @@ export interface paths {
     /** Board */
     get: operations["board_api_pipeline_get"];
   };
+  "/api/profile/resumes": {
+    /** List Resumes */
+    get: operations["list_resumes_api_profile_resumes_get"];
+    /** Upload */
+    put: operations["upload_api_profile_resumes_put"];
+  };
+  "/api/profile/resumes/{rid}": {
+    /** Get Resume */
+    get: operations["get_resume_api_profile_resumes__rid__get"];
+    /** Delete Resume */
+    delete: operations["delete_resume_api_profile_resumes__rid__delete"];
+    /** Patch Resume */
+    patch: operations["patch_resume_api_profile_resumes__rid__patch"];
+  };
+  "/api/profile/resumes/{rid}/master": {
+    /** Set Master */
+    post: operations["set_master_api_profile_resumes__rid__master_post"];
+  };
+  "/api/profile/resumes/{rid}/versions/{n}": {
+    /** Get Version */
+    get: operations["get_version_api_profile_resumes__rid__versions__n__get"];
+    /** Delete Version */
+    delete: operations["delete_version_api_profile_resumes__rid__versions__n__delete"];
+  };
   "/api/prune": {
     /** Prune */
     post: operations["prune_api_prune_post"];
@@ -1885,6 +1909,52 @@ export interface components {
       /** Rows */
       rows: components["schemas"]["TileRow"][];
     };
+    /** Resume */
+    Resume: {
+      /** Category */
+      category?: string | null;
+      /** Name */
+      name: string;
+      /** Rid */
+      rid: string;
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "master" | "variant" | "other" | "tailored";
+      /** Versions */
+      versions: components["schemas"]["Version"][];
+    };
+    /** ResumePatch */
+    ResumePatch: {
+      /** Name */
+      name?: string | null;
+      /** Type */
+      type?: ("master" | "variant" | "other" | "tailored") | null;
+    };
+    /** ResumeRow */
+    ResumeRow: {
+      /** At */
+      at: string;
+      /** Category */
+      category?: string | null;
+      /** Latest */
+      latest: number;
+      /** Name */
+      name: string;
+      /** Rid */
+      rid: string;
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "master" | "variant" | "other" | "tailored";
+    };
+    /** Resumes */
+    Resumes: {
+      /** Resumes */
+      resumes: components["schemas"]["ResumeRow"][];
+    };
     /** RetryBody */
     RetryBody: {
       /** Job Ids */
@@ -2419,6 +2489,15 @@ export interface components {
       /** Message */
       message: string;
     };
+    /** Uploaded */
+    Uploaded: {
+      /** N */
+      n: number;
+      /** Review Run */
+      review_run?: string | null;
+      /** Rid */
+      rid: string;
+    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -2454,6 +2533,36 @@ export interface components {
        * @default []
        */
       signals?: string[];
+    };
+    /** Version */
+    Version: {
+      /** At */
+      at: string;
+      /** Author */
+      author: string;
+      /** N */
+      n: number;
+      /** Source */
+      source: string;
+    };
+    /** VersionDetail */
+    VersionDetail: {
+      /** At */
+      at: string;
+      /** Ats */
+      ats: {
+        [key: string]: unknown;
+      };
+      /** Author */
+      author: string;
+      /** N */
+      n: number;
+      /** Rid */
+      rid: string;
+      /** Source */
+      source: string;
+      /** Text */
+      text: string;
     };
   };
   responses: never;
@@ -3719,6 +3828,182 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Board"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Resumes */
+  list_resumes_api_profile_resumes_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resumes"];
+        };
+      };
+    };
+  };
+  /** Upload */
+  upload_api_profile_resumes_put: {
+    parameters: {
+      query: {
+        filename: string;
+        name?: string | null;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/octet-stream": string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["Uploaded"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Resume */
+  get_resume_api_profile_resumes__rid__get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Resume */
+  delete_resume_api_profile_resumes__rid__delete: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Patch Resume */
+  patch_resume_api_profile_resumes__rid__patch: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResumePatch"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Set Master */
+  set_master_api_profile_resumes__rid__master_post: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Version */
+  get_version_api_profile_resumes__rid__versions__n__get: {
+    parameters: {
+      path: {
+        rid: string;
+        n: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["VersionDetail"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Version */
+  delete_version_api_profile_resumes__rid__versions__n__delete: {
+    parameters: {
+      path: {
+        rid: string;
+        n: number;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
         };
       };
       /** @description Validation Error */

@@ -37,6 +37,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/careeros run list|show <id> [--json|--log]|status|cap [--check]|pause [--until +2h|ISO] [--reason]|resume|catch-up [--dry-run|--dismiss]`
 - `.venv/bin/careeros job lock|unlock|check <id>` (exit 6 = held), `tick [--dry-run]`, `schedule install|uninstall|status` (LaunchAgent → `careeros tick`)
 - `.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]` — local web app on 127.0.0.1 (needs `pip install -e ".[ui]"` + `playwright install chromium` for Fill application); SQLite index `data/careeros.db` is disposable
+- `.venv/bin/careeros resume list [--json]`, `resume add <file.pdf|docx> [--name N] [--type master|variant|other|tailored] [--json]` — résumé store `profile/resumes/<rid>/` (meta.json + v<n>/original, text.txt, ats.json); first résumé = master; API `PUT /api/profile/resumes?filename=` (raw body, ≤5 MB), `GET/PATCH/DELETE /api/profile/resumes/{rid}[/versions/{n}]`, `POST .../{rid}/master` (409 = master/latest-version rule)
 - `.venv/bin/careeros prune [--yes]`, `storage [--json] [--snapshot]`, `advise [--json]`, `advise apply <id>` (suggest-only; writes config/pipeline.yaml only on apply)
 - `.venv/bin/careeros sync status [--remote template] [--no-fetch] [--json]|pull [--branch B] [--no-checks]|install-hook [--force]` — private copy vs the public template (status exit 0 in sync, 1 behind, 2 drift; pull exit 3 = conflicts; `.template-sync-keep` lists intentional differences)
 - `.venv/bin/python -m careeros.qa data/jobs/<id>` — deterministic QA
