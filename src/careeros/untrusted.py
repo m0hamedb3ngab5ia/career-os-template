@@ -11,13 +11,16 @@ from typing import Any, Iterable
 
 log = logging.getLogger(__name__)
 _INSTRUCTION = re.compile(
-    r"\b(?:ignore (?:all |the )?(?:previous|prior|above) (?:instructions|prompts?)"
-    r"|disregard\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above)|system prompt|you are now (?:a|an|in|the)\b"
-    r"|as an ai (?:language )?model|new instructions)", re.I)
+    r"\b(?:ignore\s+(?:(?:all|the)\s+)?(?:previous|prior|above)\s+(?:instructions|prompts?)"
+    r"|disregard\s+(?:all\s+)?(?:the\s+)?(?:previous|prior|above)|system\s+prompt|you\s+are\s+now\s+(?:a|an|in|the)\b"
+    r"|as\s+an\s+ai\s+(?:language\s+)?model|new\s+instructions)", re.I)
 _HIDDEN_CHARS = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060-\u2064\ufeff]")
 _HIDDEN_HTML = re.compile(
     r"display\s*:\s*none|visibility\s*:\s*hidden|font-size\s*:\s*0(?![.\d])|opacity\s*:\s*0(?![.\d])", re.I)
 _WHITE_TEXT = re.compile(r"(?<![-\w])color\s*:\s*(?:#fff(?:fff)?\b|white\b|transparent\b|rgba\([^)]*,\s*0\s*\))", re.I)
+# a background that is itself white/transparent does not make white text visible
+_VISIBLE_BG = re.compile(r"background(?:-color)?\s*:\s*(?!#fff(?:fff)?\b|white\b|transparent\b|none\b|inherit\b|initial\b"
+                         r"|rgba\([^)]*,\s*0\s*\))", re.I)
 _TOOLS = re.compile(r"\bBash\b|\bWebFetch\b|\bWebSearch\b|\bcurl\s|mcp__\w*|\bcareeros\s", re.I)
 _EMAIL = re.compile(r"mailto:|[\w.+-]+@[\w-]+\.[\w.-]+")
 _SENTENCE_END = re.compile(r"(?<=[.!?])\s+|\n")  # a "." inside "x@y.io" is not a sentence end
@@ -39,7 +42,7 @@ def scan(text: str, html: str = "", extra: Iterable[str] = ()) -> list[str]:
         reasons.append(f"zero-width/bidi char U+{ord(m.group(0)):04X}")
     if m := _hit(_HIDDEN_HTML, html):
         reasons.append(f"hidden html: {m!r}")
-    elif m := next((h for c in _STYLE_CHUNKS.split(html) if "background" not in c.lower()
+    elif m := next((h for c in _STYLE_CHUNKS.split(html) if not _VISIBLE_BG.search(c)
                     and (h := _hit(_WHITE_TEXT, c))), None):  # white text on its own background is visible
         reasons.append(f"hidden html: {m!r}")
     orders = [s for s in _SENTENCE_END.split(both) if _INSTRUCTION.search(s)]
