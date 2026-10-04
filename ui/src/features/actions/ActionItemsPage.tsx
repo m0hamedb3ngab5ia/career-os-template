@@ -5,6 +5,7 @@ import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/queries";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
+import { UnavailableButton } from "../../kit/UnavailableButton";
 import { EmptyState } from "../../kit/EmptyState";
 import { Listbox } from "../../kit/Listbox";
 import { Pager, usePaged } from "../../kit/Pager";
@@ -168,16 +169,22 @@ export function ActionItemsPage() {
           <Button icon={<Plus size={14} strokeWidth={1.7} aria-hidden="true" />} onClick={() => setAdding(true)}>
             Add item
           </Button>
+          {n === 0 || tab === "done" ? (
+            <UnavailableButton variant="primary" reason={tab === "done" ? "Already done" : "Select items first"}
+              icon={<Check size={14} strokeWidth={1.7} aria-hidden="true" />}>
+              Mark selected done
+            </UnavailableButton>
+          ) : (
           <Button
             variant="primary"
             icon={<Check size={14} strokeWidth={1.7} aria-hidden="true" />}
-            disabled={n === 0 || tab === "done"}
             pending={markDone.isPending && n > 1}
             pendingLabel="Marking…"
             onClick={() => complete(selectedOpen, `Marked ${formatCount(n)} done`)}
           >
-            {n === 0 ? "Mark selected done" : `Mark ${formatCount(n)} selected done`}
+            {`Mark ${formatCount(n)} selected done`}
           </Button>
+          )}
         </>
       }
     >

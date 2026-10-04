@@ -4,6 +4,7 @@ import { createMemoryRouter, RouterProvider } from "react-router";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ToastProvider } from "../kit/Toast";
 import { FakeEventSource } from "../test/fakeEventSource";
+import { unexplainedDisabled } from "../test/disabled";
 import { routes } from "./routes";
 
 // REQ-119: every screen's header has an h1 and a one-line guidance under it. Enumerates the route table, so a new
@@ -37,5 +38,7 @@ describe("page guidance (REQ-119)", () => {
     await waitFor(() => expect(screen.getByRole("heading", { level: 1 })).not.toHaveAttribute("aria-busy"), { timeout: 5000 });
     const settled = screen.getByRole("heading", { level: 1 });
     expect(settled.parentElement?.querySelector("h1 + *")?.textContent?.trim()).toBeTruthy();
+    // REQ-119 / P-rule: a control that can't be used says why (title or aria-describedby).
+    if (path !== "/kit") expect(unexplainedDisabled()).toEqual([]); // Kit demos disabled states on purpose
   });
 });

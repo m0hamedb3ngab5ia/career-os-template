@@ -5,6 +5,7 @@ import { routes } from "../../app/routes";
 import { axeViolations } from "../../test/axe";
 import { FakeEventSource } from "../../test/fakeEventSource";
 import { META, mockApi, renderRoutes } from "../../test/mockApi";
+import { unexplainedDisabled } from "../../test/disabled";
 import type { ActionItem, ActionsView } from "./types";
 
 // Fictional companies only.
@@ -63,6 +64,16 @@ afterEach(() => {
 });
 
 describe("Action Items", () => {
+  it("every disabled control says why, on Open and Done (REQ-119)", { timeout: 20_000 }, async () => {
+    setup((url) => (url.includes("tab=done") ? view({ tab: "done", groups: [{ key: "done", count: 1, items: [item({ done: true })] }] }) : view()));
+    await screen.findByRole("heading", { name: "Overdue 1" }, { timeout: 8000 });
+    expect(unexplainedDisabled()).toEqual([]);
+    expect(screen.getByRole("button", { name: /Mark selected done/ })).toHaveAccessibleDescription("Select items first");
+    await userEvent.click(screen.getByRole("radio", { name: /Done/ }));
+    await waitFor(() => expect(screen.getByRole("button", { name: /Mark selected done/ })).toHaveAccessibleDescription("Already done"));
+    expect(unexplainedDisabled()).toEqual([]);
+  });
+
   it("groups by due date with the mockup's headings, counts and head line", { timeout: 20_000 }, async () => {
     setup();
     expect(await screen.findByRole("heading", { level: 1, name: "Action Items" }, { timeout: 8000 })).toBeInTheDocument();
@@ -137,7 +148,7 @@ describe("Action Items", () => {
     });
     await screen.findByRole("checkbox", { name: "Select Globex" });
     const bulk = screen.getByRole("button", { name: "Mark selected done" });
-    expect(bulk).toBeDisabled();
+    expect(bulk).toHaveAttribute("aria-disabled", "true");
     await user.click(screen.getByRole("checkbox", { name: "Select Globex" }));
     await user.click(screen.getByRole("checkbox", { name: "Select Hooli" }));
     await waitFor(() => expect(router.state.location.search).toContain("sel=cap%2Cwk"));
