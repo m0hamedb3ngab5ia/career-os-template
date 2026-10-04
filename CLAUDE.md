@@ -46,7 +46,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - `.venv/bin/python -m pytest -q`
 
 ## Skills (`.claude/skills/`)
-`prepare-job` (orchestrates score-job → tailor-resume → write-cover-letter → qa-review) · `apply-job` (Chrome) · `answer-question` · `inbox-sync` · `find-contacts` · `draft-outreach` · `learn-voice`
+`prepare-job` (orchestrates score-job → tailor-resume → write-cover-letter → qa-review) · `apply-job` (Chrome) · `extract-master` (master résumé → `careeros resume propose-master` → pending master.yaml diff; approve/reject `POST /api/profile/master/proposal/approve|reject`) · `answer-question` · `inbox-sync` · `find-contacts` · `draft-outreach` · `learn-voice`
 
 ## Gotchas
 - `.venv` inside an iCloud-synced folder gets the macOS hidden flag and "* 2.py" duplicates; keep the

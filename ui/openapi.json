@@ -4294,6 +4294,30 @@
         "title": "MarkBody",
         "type": "object"
       },
+      "MasterProposal": {
+        "properties": {
+          "diff": {
+            "title": "Diff",
+            "type": "string"
+          },
+          "state": {
+            "enum": [
+              "synced",
+              "pending",
+              "rejected",
+              "stale"
+            ],
+            "title": "State",
+            "type": "string"
+          }
+        },
+        "required": [
+          "state",
+          "diff"
+        ],
+        "title": "MasterProposal",
+        "type": "object"
+      },
       "Meta": {
         "properties": {
           "action_needs": {
@@ -10803,6 +10827,69 @@
         "summary": "Board",
         "tags": [
           "pipeline"
+        ]
+      }
+    },
+    "/api/profile/master/proposal": {
+      "get": {
+        "operationId": "get_master_proposal_api_profile_master_proposal_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MasterProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Master Proposal",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/master/proposal/approve": {
+      "post": {
+        "operationId": "approve_master_proposal_api_profile_master_proposal_approve_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MasterProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Approve Master Proposal",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/master/proposal/reject": {
+      "post": {
+        "operationId": "reject_master_proposal_api_profile_master_proposal_reject_post",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MasterProposal"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Reject Master Proposal",
+        "tags": [
+          "resumes"
         ]
       }
     },

@@ -1,5 +1,6 @@
 """Profile › Résumés (REQ-093, REQ-099, REQ-100): raw-body upload (DEC-006), list, versions, rename/retype,
-set master, delete. Review runs (REQ-094) and the master.yaml diff (REQ-099) come with later tasks."""
+set master, delete, and the master.yaml diff from the master résumé (REQ-099: view / approve / reject).
+Review runs (REQ-094) come with a later task."""
 from __future__ import annotations
 
 from contextlib import contextmanager
@@ -9,6 +10,7 @@ import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from pydantic import BaseModel
 
+from careeros import master_sync
 from careeros import resumes as store
 from careeros.ui.routers import ctx
 
@@ -57,6 +59,11 @@ class VersionDetail(Version):
     ats: dict[str, Any]
 
 
+class MasterProposal(BaseModel):
+    state: Literal["synced", "pending", "rejected", "stale"]
+    diff: str
+
+
 class ResumePatch(BaseModel):
     name: str | None = None
     type: ResumeType | None = None
@@ -74,6 +81,8 @@ def _refusals() -> Iterator[None]:
         raise HTTPException(415, str(e)) from None
     except store.Refused as e:
         raise HTTPException(409, str(e)) from None
+    except master_sync.Invalid as e:
+        raise HTTPException(422, str(e)) from None
 
 
 _RAW = {"requestBody": {"required": True, "content": {"application/octet-stream": {
@@ -105,16 +114,35 @@ def get_resume(rid: str, c=Depends(ctx)) -> Resume:
         return Resume(**store.get(c.settings.root, rid))
 
 
+def _extract_master(request: Request, c: Any) -> None:
+    """REQ-099: a new master -> launch the extract-master skill run. Best effort: if it can't start (busy, paused),
+    master_sync.state() is `stale`, so readiness `master_synced` stays open until a proposal is approved."""
+    from careeros.ui.services.runs import RunControl
+
+    try:
+        (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step("extract_master")
+    except Exception:  # noqa: BLE001 - never fail set-master on the follow-up run
+        pass
+
+
 @router.patch("/profile/resumes/{rid}")
-def patch_resume(rid: str, body: ResumePatch, c=Depends(ctx)) -> Resume:
+def patch_resume(rid: str, body: ResumePatch, request: Request, c=Depends(ctx)) -> Resume:
     with _refusals():
-        return Resume(**store.update(c.settings.root, rid, name=body.name, type=body.type))
+        was = store.get(c.settings.root, rid)["type"]
+        out = Resume(**store.update(c.settings.root, rid, name=body.name, type=body.type))
+    if body.type == "master" and was != "master":
+        _extract_master(request, c)
+    return out
 
 
 @router.post("/profile/resumes/{rid}/master")
-def set_master(rid: str, c=Depends(ctx)) -> Resume:
+def set_master(rid: str, request: Request, c=Depends(ctx)) -> Resume:
     with _refusals():
-        return Resume(**store.update(c.settings.root, rid, type="master"))
+        was = store.get(c.settings.root, rid)["type"]
+        out = Resume(**store.update(c.settings.root, rid, type="master"))
+    if was != "master":
+        _extract_master(request, c)
+    return out
 
 
 @router.delete("/profile/resumes/{rid}", status_code=204)
@@ -134,3 +162,20 @@ def get_version(rid: str, n: int, c=Depends(ctx)) -> VersionDetail:
 def delete_version(rid: str, n: int, c=Depends(ctx)) -> Resume:
     with _refusals():
         return Resume(**store.delete_version(c.settings.root, rid, n))
+
+
+@router.get("/profile/master/proposal")
+def get_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    return MasterProposal(**master_sync.state(c.settings.root))
+
+
+@router.post("/profile/master/proposal/approve")
+def approve_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    with _refusals():
+        return MasterProposal(**master_sync.approve(c.settings.root))
+
+
+@router.post("/profile/master/proposal/reject")
+def reject_master_proposal(c=Depends(ctx)) -> MasterProposal:
+    with _refusals():
+        return MasterProposal(**master_sync.reject(c.settings.root))
