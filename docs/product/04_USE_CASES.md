@@ -117,9 +117,9 @@ E2E-012-02: Given fake tailor output containing an unknown URL When qa runs Then
 REQs: REQ-117, REQ-118, REQ-120 · Pre: jobs ticked (UC-007) · Trigger: Jobs list "Start pipeline"
 Main: 1 review sheet lists ticked jobs, "Go as far as" Fill for all 2 user changes some rows 3 caps shown with reasons 4 Start → batch → progress
 Alt: readiness open → fill/submit rows capped at Prepare; flagged posting → excluded
-Fail: client asks Submit for Tier A/LinkedIn → server lowers it, reason logged
+Fail: client asks Submit for Tier A or Fill/Submit for LinkedIn Easy Apply → server lowers it, reason logged
 Outcome: each job goes exactly as far as chosen, never past the safety caps
-E2E-013-01: Given 3 ticked jobs (Tier A, LinkedIn, plain) When start with default Fill and C=Submit Then Tier A filled, LinkedIn prepared, plain submitted only if auto-submit verdict allows.
+E2E-013-01: Given ticked jobs (Tier A, LinkedIn Easy Apply, LinkedIn-found with ATS URL, plain) When start with default Fill and plain=Submit Then Tier A filled, Easy Apply prepared, LinkedIn-found filled, plain submitted only if auto-submit verdict allows.
 E2E-013-02: Given `POST /api/batches` with stops {tierA: submit} When run Then Tier A never submitted, reason in batch file.
 
 ### UC-014 First run and next step

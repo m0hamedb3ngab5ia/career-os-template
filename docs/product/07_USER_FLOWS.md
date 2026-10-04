@@ -68,4 +68,4 @@ flowchart TD
   F1 --> G[Start] --> H[Progress: per-job stage, Pause / Cancel / Retry]
   H --> I[done: Prepared / Filled (open tab) / Submitted / Needs you]
 ```
-What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A never offered Submit, LinkedIn capped at Prepare, flagged postings excluded.
+What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A never offered Submit, LinkedIn Easy Apply capped at Prepare (LinkedIn-found jobs on a company ATS follow the chosen stop), flagged postings excluded.

@@ -119,12 +119,12 @@ requirements:
   REQ-114: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
   REQ-115: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
   REQ-116: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-02]}
-  REQ-117: {status: proposed, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-01]}
-  REQ-118: {status: proposed, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-02]}
-  REQ-119: {status: proposed, provenance: confirmed, user_requirements: [USR-035]}
-  REQ-120: {status: proposed, provenance: confirmed, user_requirements: [USR-034, USR-036]}
-  REQ-121: {status: proposed, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-01]}
-  REQ-122: {status: proposed, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-02]}
+  REQ-117: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-01]}
+  REQ-118: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-02]}
+  REQ-119: {status: approved, provenance: confirmed, user_requirements: [USR-035]}
+  REQ-120: {status: approved, provenance: confirmed, user_requirements: [USR-034, USR-036]}
+  REQ-121: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-01]}
+  REQ-122: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-02]}
   NFR-001: {status: proposed, provenance: observed}
   NFR-002: {status: proposed, provenance: observed}
   NFR-003: {status: proposed, provenance: observed}
@@ -143,8 +143,8 @@ use_cases:
   UC-010: {status: approved, requirements: [REQ-111, REQ-114, REQ-115, REQ-116]}
   UC-011: {status: approved, requirements: [REQ-112, REQ-113]}
   UC-012: {status: approved, requirements: [REQ-108, REQ-109, REQ-110]}
-  UC-013: {status: draft, requirements: [REQ-117, REQ-118, REQ-120]}
-  UC-014: {status: draft, requirements: [REQ-119, REQ-121, REQ-122]}
+  UC-013: {status: approved, requirements: [REQ-117, REQ-118, REQ-120]}
+  UC-014: {status: approved, requirements: [REQ-119, REQ-121, REQ-122]}
 flows:
   FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
   FLOW-002: {status: approved, use_cases: [UC-002]}
