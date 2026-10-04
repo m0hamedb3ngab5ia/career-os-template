@@ -33,7 +33,8 @@ from careeros.config import Settings
 from careeros.models import Posting
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
-from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line, untrusted
+from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line
+from careeros.runs.headless import untrusted as wrap_untrusted
 from careeros.runs.headless import invoke as default_invoke
 from careeros.runs.ranking import Candidate, fit_first_within_company, rank
 from careeros.runs.store import RunStore, iso
@@ -328,7 +329,7 @@ class _Loop:
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
         posting = self.store._read(jid, "posting.json") or {}
         if self.kind in ("score", "prepare"):  # REQ-108: the posting text is data, never instructions
-            prompt += "\n\n" + untrusted(posting.get("description_text"), "posting.json")
+            prompt += "\n\n" + wrap_untrusted(posting.get("description_text"), "posting.json")
         extra = company_fetch_tools(self.s, posting) if self.kind == "prepare" else []
         sid = str(uuid.uuid4())
         cmd = build_command(self.cfg, prompt, session_id=sid, kind=self.kind, extra_tools=extra)
