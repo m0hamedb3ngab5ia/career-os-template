@@ -74,7 +74,7 @@ export function InboxPage() {
         </div>
       ) : items.length === 0 ? (
         <div className={styles.card}>
-          <EmptyState title="Nothing after applying yet">
+          <EmptyState title="Nothing after applying yet" action={<Link to="/jobs">Open Jobs</Link>}>
             Jobs show up here once they are applied, with replies from inbox sync and the follow-ups due.
           </EmptyState>
         </div>

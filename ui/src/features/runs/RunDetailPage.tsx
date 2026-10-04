@@ -27,7 +27,7 @@ export function RunDetailPage() {
   );
   if (error || (!isPending && !run)) {
     return (
-      <Page title="Run not found">
+      <Page title="Run not found" subtitle="This run is gone or the link is wrong · go back to Automation">
         {back}
         <EmptyState title="No run with this id">{error?.message ?? "It may have been pruned."}</EmptyState>
       </Page>
@@ -35,7 +35,7 @@ export function RunDetailPage() {
   }
   if (!run) {
     return (
-      <Page busy title="Run">
+      <Page busy title="Run" subtitle="Loading the run log…">
         {back}
         <p className={styles.sub}>Loading…</p>
       </Page>

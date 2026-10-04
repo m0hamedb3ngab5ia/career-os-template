@@ -167,6 +167,7 @@ describe("InboxPage", () => {
     mockApi({ "GET /api/inbox": { items: [], last_sync: null, sync: OFF, sending: SEND_OFF } });
     renderRoutes(routes, "/inbox");
     expect(await screen.findByRole("heading", { name: "Nothing after applying yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Jobs" })).toHaveAttribute("href", "/jobs");
   });
 
   it("a job without drafts says where drafts come from", async () => {

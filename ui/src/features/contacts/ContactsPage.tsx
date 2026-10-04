@@ -149,7 +149,7 @@ export function ContactsPage() {
           </div>
         ) : items.length === 0 ? (
           <div className={styles.card}>
-            <EmptyState title="No contacts yet">
+            <EmptyState title="No contacts yet" action={<Link to="/jobs">Open Jobs</Link>}>
               People appear here after /find-contacts runs for a job in Claude Code. Nothing is ever sent from this
               list.
             </EmptyState>

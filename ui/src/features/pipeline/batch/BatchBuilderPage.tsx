@@ -77,7 +77,7 @@ export function BatchBuilderPage() {
 
   if (start.data?.id) {
     return (
-      <Page title="New batch">
+      <Page title="New batch" subtitle="The batch is running · follow its progress">
         <p role="status">
           {start.data.name ?? "Batch"} started.{" "}
           <Link to={`/pipeline/batch/${encodeURIComponent(start.data.id)}`}>Follow batch progress</Link>

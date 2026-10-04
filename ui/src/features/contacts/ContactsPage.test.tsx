@@ -165,6 +165,7 @@ describe("ContactsPage", () => {
     });
     renderRoutes(routes, "/contacts");
     expect(await screen.findByRole("heading", { name: "No contacts yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Jobs" })).toHaveAttribute("href", "/jobs");
     expect(screen.getByRole("button", { name: "Open LinkedIn drafts (0)" })).toHaveAccessibleDescription(
       "No LinkedIn drafts yet",
     );

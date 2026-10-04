@@ -276,6 +276,7 @@ describe("Jobs screen", () => {
     const empty = { items: [], total: 0, next_cursor: null };
     setup("/jobs?tab=all", { "GET /api/jobs": empty });
     expect(await screen.findByRole("heading", { name: "No jobs here yet" })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Open Automation" })).toHaveAttribute("href", "/automation");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 
