@@ -11,6 +11,7 @@ Gates apply only; score/prepare never call it.
 from __future__ import annotations
 
 import json
+import os
 import shutil
 from pathlib import Path
 from typing import Any, Callable
@@ -87,5 +88,7 @@ def status(root: Path) -> dict[str, Any]:
 
 def require_ready(root: Path) -> None:
     """Raise NotReady listing the open must-haves (every apply path calls this first)."""
+    if os.environ.get("CAREEROS_TEST_SKIP_READINESS") == "1":  # tests/conftest.py only: suites predating the gate
+        return
     if open_ := [i for i in items(root) if i["must"] and not i["done"]]:
         raise NotReady(open_)

@@ -40,6 +40,15 @@ def settings(tmp_path: Path) -> Settings:
 
 
 @pytest.fixture(autouse=True)
+def _readiness_off(request, monkeypatch):
+    """The apply gate (REQ-103) is off unless a test is marked `readiness`: older apply tests use example roots."""
+    if not request.node.get_closest_marker("readiness"):
+        monkeypatch.setenv("CAREEROS_TEST_SKIP_READINESS", "1")
+    else:
+        monkeypatch.delenv("CAREEROS_TEST_SKIP_READINESS", raising=False)
+
+
+@pytest.fixture(autouse=True)
 def _temp_home(tmp_path_factory, monkeypatch):
     """Tests never read the developer's $HOME (e.g. the default `~/.careeros/credentials.yaml`)."""
     monkeypatch.setenv("HOME", str(tmp_path_factory.mktemp("home")))

@@ -16,7 +16,7 @@ from careeros.ui.security import LOOPBACK  # noqa: E402
 
 from test_runs_integration import add_jobs, cli, env_for, fake_bin, home, root  # noqa: E402,F401
 
-pytestmark = pytest.mark.integration
+pytestmark = [pytest.mark.integration, pytest.mark.readiness]
 
 
 def test_run_apply_and_apply_plan_exit_7_while_master_resume_missing(root, home, fake_bin, tmp_path):
@@ -57,6 +57,6 @@ def test_api_readiness_and_409_on_apply(root, client, monkeypatch):
     body = client.get("/api/readiness").json()
     assert body["ready"] is False
     assert [i["id"] for i in body["items"] if i["must"] and not i["done"]] == ["master_resume"]
-    r = client.post(f"/api/jobs/{jid}/application/open", json={})
+    r = client.post(f"/api/jobs/{jid}/application/open", json={}, headers={"x-careeros": "1"})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "not_ready"
     assert r.json()["detail"]["items"][0]["id"] == "master_resume"

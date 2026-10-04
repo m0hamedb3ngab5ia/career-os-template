@@ -10533,6 +10533,30 @@
         ]
       }
     },
+    "/api/readiness": {
+      "get": {
+        "description": "REQ-102: `{ready, items: [{id, label, must, done, fix_link}]}` (same list as `careeros doctor`).",
+        "operationId": "get_readiness_api_readiness_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Get Readiness Api Readiness Get",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Readiness",
+        "tags": [
+          "health"
+        ]
+      }
+    },
     "/api/runs": {
       "get": {
         "operationId": "history_api_runs_get",

@@ -9,7 +9,7 @@ from conftest import EXAMPLE_REPO, add_master_resume, personalize
 
 from careeros import readiness
 
-pytestmark = pytest.mark.unit
+pytestmark = [pytest.mark.unit, pytest.mark.readiness]
 
 
 def which_all(name: str) -> str:
