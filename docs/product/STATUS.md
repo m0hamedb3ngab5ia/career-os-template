@@ -3,8 +3,8 @@
 ## Now
 - Lane: audit — reconstruct existing career-os
 - Stage: Audit triage gate (HARD)
-- Next: user reviews REQUIREMENTS.md, brings items one by one → approve/drop/change → Given/When/Then → UCs + E2E
-- Waiting on user: per-item triage; Q-001, Q-002, Q-007, Q-008
+- Next: user triages USER_REQUIREMENTS.md (21 plain USRs) item by item; résumé onboarding (USR-002..004, approved) → `/product new` Feature lane to derive REQs
+- Waiting on user: USR triage; Q-001, Q-002, Q-007, Q-008
 - Pending fix: README.md:44 overstates auto-submit (Q-003)
 
 ## Gates
@@ -20,8 +20,10 @@
 <!-- trace:status -->
 | REQ status | n |
 |---|---|
-| proposed | 62 |
+| proposed | 61 |
+| rejected | 1 |
 
-Open questions: 8
+Open questions: 4
 Needs review: none
+User requirements: 21 (3 approved)
 <!-- /trace:status -->

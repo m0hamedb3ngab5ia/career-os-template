@@ -1,4 +1,5 @@
-# Requirements
+# Requirements (technical)
+Derived from USER_REQUIREMENTS.md (the human layer; start there). Agent-facing detail.
 Status lives in trace.yaml. Reconstructed by `/product audit` 2026-10-04: all `proposed` until triage.
 Format: `### REQ-NNN title`, 1 line, provenance, Evidence, Tests. Given/When/Then added when approved.
 Areas: [Setup & privacy](#setup--privacy) · [Scout & safety](#scout--safety) · [Prepare & QA](#prepare--qa) · [Apply](#apply) · [Runs & schedule](#runs--schedule) · [Tracker, actions, learning](#tracker-actions-learning) · [Outreach & inbox](#outreach--inbox) · [Local UI](#local-ui) · [Ops](#ops) · [NFR](#non-functional)

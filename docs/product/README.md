@@ -27,7 +27,8 @@ Plain prompts ("fix bug X") also work: CLAUDE.md/AGENTS.md block steers agent in
 | STATUS.md | read first: current stage, next step, gates, counts |
 | OPEN_QUESTIONS.md | gaps agents need you to fill |
 | VISION.md | user, problem, outcome, metrics |
-| REQUIREMENTS.md | REQ/NFR + Given/When/Then |
+| USER_REQUIREMENTS.md | **start here**: what users can do, plain words (USR). You own this. |
+| REQUIREMENTS.md | technical REQ/NFR + Given/When/Then, derived from USRs by the agent |
 | USE_CASES.md | UC + E2E specs + use-case diagram |
 | SCOPE.md | MVP / must / should / later / excluded |
 | IA.md · USER_FLOWS.md | navigation · FLOW steps, activity/state diagrams |
