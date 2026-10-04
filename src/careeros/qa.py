@@ -53,6 +53,7 @@ from typing import Any, Iterable
 import yaml
 
 from careeros.markup import MARKER, strip_bold, validate_bold, has_markdown_bold
+from careeros.terms import term_hit, term_in_text as _term_in_text
 
 # --------------------------------------------------------------------------- #
 # helpers
@@ -183,13 +184,6 @@ def number_tokens(text: str) -> set[str]:
         if tok:
             out.add(tok)
     return out
-
-
-def _term_in_text(term: str, text: str) -> bool:
-    """Whole-term, case-insensitive match. "go" must not hit "governance"; "C++" / "Next.js" are
-    matched literally with lookarounds on non-word characters instead of \\b (which fails after '+')."""
-    pat = r"(?<![A-Za-z0-9])" + re.escape(term) + r"(?![A-Za-z0-9])"
-    return re.search(pat, text, re.IGNORECASE) is not None
 
 
 def _count_words(text: str) -> int:
@@ -1164,13 +1158,11 @@ class Checker:
             cover_text = " " + re.sub(r"\s+", " ", self.cover_body.lower()) + " "
         hit, miss, cover_mentions = [], [], []
         for s in req:
-            s_low = s.lower().strip()
-            variants = {s_low, s_low.replace("-", " "), s_low.replace(" ", ""), s_low.replace(".", "")}
-            if any(v and _term_in_text(v, text) for v in variants):
+            if term_hit(s, text):
                 hit.append(s)
             else:
                 miss.append(s)
-            if cover_text and any(v and _term_in_text(v, cover_text) for v in variants):
+            if cover_text and term_hit(s, cover_text):
                 cover_mentions.append(s)
         cov = len(hit) / len(req)
         min_cov = float((self.qa_cfg.get("resume", {}) or {}).get("soft", {}).get("keyword_coverage_min", 0.6))
