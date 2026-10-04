@@ -162,6 +162,8 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     app.include_router(learning.router, prefix="/api")
     from careeros.ui.routers import batches  # batch builder: preview, create, read
     app.include_router(batches.router, prefix="/api")
+    from careeros.ui.routers import resumes  # Profile › Résumés (TASK-007)
+    app.include_router(resumes.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:
