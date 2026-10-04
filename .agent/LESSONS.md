@@ -2,7 +2,7 @@
 
 Evidence log: mistakes, corrections, discoveries. Not instructions; promoted rules live in CLAUDE.md /
 AGENTS.md. Format and promotion rules: `~/.agent-learning/PROTOCOL.md`. Search before adding; bump
-`Occurrences` on repeats.
+`Occurrences` on repeats. How to use: `~/.agent-learning/README.md`.
 
 ## 2026-09-24 — Test silently depended on a gitignored file
 Context: a test was passing locally but relied on data outside the committed repo.
@@ -15,14 +15,14 @@ Confidence: high
 Status: promoted (CLAUDE.md#Testing (TDD))
 
 ## 2026-09-27 — Stacked/parallel UI PRs conflict on the committed bundle
-Every PR that touches `ui/src` commits a rebuilt `src/careeros/ui/static/` with new content hashes, so two
-open UI PRs always conflict there (rename/rename on every asset) and again in the UI snapshots.
-Resolve by deleting the bundle and rebuilding, never by hand-merging: `git rm -rq --cached src/careeros/ui/static &&
-rm -rf src/careeros/ui/static && (cd ui && npx -p node@22 -- npm run build)`; then
-`CAREEROS_UPDATE_SNAPSHOTS=1 pytest tests/integration/test_ui_types_*` and inspect the snapshot diff.
-Merge UI PRs one at a time and re-merge `main` into the next before its CI run.
-Repeat 2026-09-29 (parallel UI PRs again): quickest is `git checkout origin/main -- src/careeros/ui/static`, then rebuild.
+Context: two open PRs that both touch `ui/src`.
+What happened: each PR commits a rebuilt `src/careeros/ui/static/` with new content hashes, so they conflict on every asset (rename/rename) and again in the UI snapshots. Repeat 2026-09-29 with parallel UI PRs.
+Root cause: built bundle is committed and content-hashed.
+Prevention: never hand-merge the bundle: `git checkout origin/main -- src/careeros/ui/static`, rebuild (`cd ui && npx -p node@22 -- npm run build`), then `CAREEROS_UPDATE_SNAPSHOTS=1 pytest tests/integration/test_ui_types_*` and inspect the diff. Merge UI PRs one at a time.
+Scope: repo
 Occurrences: 2
+Confidence: high
+Status: promoted (CLAUDE.md#Git / PR workflow)
 
 ## 2026-09-28 — Headless run denied a chained Bash call
 Context: `careeros run apply` launches skills with `claude -p --permission-mode dontAsk --allowedTools ...`.
@@ -32,7 +32,7 @@ Prevention: skills say "one command per Bash call" (contract test); a denial beh
 Scope: repo
 Occurrences: 1
 Confidence: high
-Status: active
+Status: mechanized (tests/test_skill_contracts.py)
 
 ## 2026-09-29 — Worktree tests imported another checkout's code
 Context: template worktrees share one `.venv`, an editable install of a different checkout's `src/`.
@@ -42,7 +42,7 @@ Prevention: run `PYTHONPATH=src python -m pytest ...` and `PYTHONPATH=src` for o
 Scope: repo
 Occurrences: 1
 Confidence: high
-Status: active
+Status: promoted (CLAUDE.md#Gotchas)
 
 ## 2026-09-29 — `gh pr merge --admin` refused
 Context: merging own template PRs.
@@ -52,4 +52,4 @@ Prevention: wait for the `pytest` check, then `gh pr merge --squash` (or `--auto
 Scope: repo
 Occurrences: 1
 Confidence: high
-Status: active
+Status: promoted (CLAUDE.md#Git / PR workflow)
