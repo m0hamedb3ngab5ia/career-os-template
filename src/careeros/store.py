@@ -81,13 +81,14 @@ class Store:
 
         extra = (self.settings.pipeline.get("injection") or {}).get("extra_patterns") or []
         reasons = untrusted.scan(posting.description_text, posting.description_html, extra)
-        flags = self.load_flags(posting.job_id)
-        if not reasons and not flags.get("injection_suspected"):
-            return
-        if reasons == flags.get("injection_reasons"):
-            return
-        flags.update(injection_suspected=bool(reasons), injection_reasons=reasons, injection_cleared_at=None)
-        self._write(posting.job_id, FLAGS, flags)
+        with self._flags_lock(posting.job_id):
+            flags = self.load_flags(posting.job_id)
+            if not reasons and not flags.get("injection_suspected"):
+                return
+            if reasons == flags.get("injection_reasons"):
+                return
+            flags.update(injection_suspected=bool(reasons), injection_reasons=reasons, injection_cleared_at=None)
+            self._write(posting.job_id, FLAGS, flags)
         if reasons:
             from careeros.tracker import add_action
 
@@ -95,6 +96,14 @@ class Store:
                        + ". Read it, then `careeros job clear-injection <id>` if it is safe",
                        "injection_suspected", job_id=posting.job_id, link=posting.url, priority="H",
                        needs="laptop", dedupe=True)
+
+    def _flags_lock(self, job_id: str):
+        """Serialise flags.json read-modify-writes (scout scan, select, clear) so no writer drops another's keys."""
+        from careeros.runs import locks
+
+        d = self.jobs_dir.parent / "locks" / "flags"
+        d.mkdir(parents=True, exist_ok=True)
+        return locks._guard(d / job_id)  # flock on data/locks/flags/<job_id>.guard
 
     def load_flags(self, job_id: str) -> dict[str, Any]:
         return self._read(job_id, FLAGS) or {}
@@ -105,15 +114,17 @@ class Store:
 
     def set_selected(self, job_ids: Iterable[str], selected: bool) -> None:
         for jid in job_ids:
-            flags = self.load_flags(jid)
-            flags["selected"] = selected
-            self._write(jid, FLAGS, flags)
+            with self._flags_lock(jid):
+                flags = self.load_flags(jid)
+                flags["selected"] = selected
+                self._write(jid, FLAGS, flags)
 
     def clear_injection(self, job_id: str) -> dict[str, Any]:
         """The user checked a flagged posting ("I checked it"): prepare/apply are allowed again."""
-        flags = self.load_flags(job_id)
-        flags["injection_cleared_at"] = now_iso()
-        self._write(job_id, FLAGS, flags)
+        with self._flags_lock(job_id):
+            flags = self.load_flags(job_id)
+            flags["injection_cleared_at"] = now_iso()
+            self._write(job_id, FLAGS, flags)
         from careeros.tracker import Tracker
 
         tr = Tracker(settings=self.settings)

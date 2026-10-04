@@ -203,6 +203,9 @@ def test_e2e_req_104_only_selected_jobs_are_prepared(root, env):
     assert r.returncode == 0, r.stdout + r.stderr
     assert [status_of(root, j) for j in (a, b, c, legacy)] == ["queued", "scored", "scored", "queued"]
 
+    r = cli(root, env, "run", "prepare", "--job", c, "--dry-run")  # a preview never ticks: reports "not selected"
+    assert r.returncode == 2 and "not selected" in r.stderr, r.stdout + r.stderr
+    assert json.loads((root / "data" / "jobs" / c / "flags.json").read_text())["selected"] is False  # no side effect
     r = cli(root, env, "run", "prepare", "--job", c)
     assert r.returncode == 0, r.stdout + r.stderr
     assert status_of(root, c) == "queued"

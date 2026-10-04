@@ -1126,7 +1126,7 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     s = _settings(args)
     cfg = load_runs_config(s)
     job_ids = [args.job] if args.job else None
-    if args.job and Store(s).exists(args.job):
+    if args.job and not args.dry_run and Store(s).exists(args.job):
         Store(s).set_selected(job_ids, True)  # REQ-104: an explicit --job counts as ticking it
     max_jobs = args.max_jobs if args.max_jobs is not None or not job_ids else 1
     try:

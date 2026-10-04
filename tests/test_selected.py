@@ -55,3 +55,55 @@ def test_eligibility_requires_selected(kind):
     assert eligibility(kind, status, True, score, kind == "apply", selected=False) == "not selected"
     assert eligibility(kind, status, True, score, kind == "apply") is None
     assert eligibility("score", "found", False, {}, False, selected=False) is None
+
+
+def test_job_unticked_mid_run_is_not_prepared(settings):
+    """A multi-job run re-checks `selected` before each job: untick job 2 while job 1 runs -> job 2 is skipped."""
+    import sys
+    from pathlib import Path
+
+    sys.path.insert(0, str(Path(__file__).parent))
+    from test_runs_prepare import Fake, add_job, batch
+
+    store = Store(settings)
+    first, second = add_job(store, 1, company="A", fit=95), add_job(store, 2, company="B", fit=70)
+
+    class Untick(Fake):
+        def __call__(self, cmd, cwd, env, timeout_s, stream_path):
+            Store(self.s).set_selected([second], False)
+            return super().__call__(cmd, cwd, env, timeout_s, stream_path)
+
+    fake = Untick(settings)
+    rec = batch(settings, "prepare", fake)
+    assert fake.calls == [first]
+    assert store.get_status(second) == "scored" and rec["counters"]["gated"] == 1
+
+
+def test_concurrent_flag_writers_keep_each_others_keys(settings, monkeypatch):
+    """flags.json read-modify-writes are serialised: a select racing a clear keeps both changes."""
+    import threading
+
+    store = Store(settings)
+    p = _posting(4)
+    store.save_posting(p)
+    orig, inside, gate = Store.load_flags, threading.Event(), threading.Event()
+
+    def slow(self, job_id):
+        flags = orig(self, job_id)
+        if threading.current_thread().name == "A":
+            inside.set()
+            gate.wait(5)
+        return flags
+
+    monkeypatch.setattr(Store, "load_flags", slow)
+    a = threading.Thread(target=store.set_selected, args=([p.job_id], True), name="A")
+    a.start()
+    assert inside.wait(5)
+    b = threading.Thread(target=store.clear_injection, args=(p.job_id,))
+    b.start()
+    b.join(0.3)
+    gate.set()
+    a.join(5)
+    b.join(5)
+    flags = orig(store, p.job_id)
+    assert flags["selected"] is True and flags["injection_cleared_at"]

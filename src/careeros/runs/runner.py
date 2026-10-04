@@ -411,6 +411,9 @@ class _Loop:
             if stop:
                 return stop
             held_back = self.pre_attempt(item) if self.pre_attempt else None
+            if not held_back and self.kind != "score" and not self.explicit \
+                    and not self.store.is_selected(item["job_id"]):
+                held_back = "not selected"  # REQ-104: unticked while the run was working on an earlier job
             if held_back and self.explicit:  # `--job`: a refused job is the answer, not something to skip
                 raise JobNotRunnable(self.kind, {item["job_id"]: held_back})
             if held_back:
