@@ -1583,7 +1583,7 @@ export interface components {
        * State
        * @enum {string}
        */
-      state: "synced" | "pending" | "rejected";
+      state: "synced" | "pending" | "rejected" | "stale";
     };
     /** Meta */
     Meta: {

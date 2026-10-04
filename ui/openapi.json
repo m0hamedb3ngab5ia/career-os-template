@@ -4304,7 +4304,8 @@
             "enum": [
               "synced",
               "pending",
-              "rejected"
+              "rejected",
+              "stale"
             ],
             "title": "State",
             "type": "string"

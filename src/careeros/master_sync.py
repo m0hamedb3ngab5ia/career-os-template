@@ -36,7 +36,10 @@ def _read(p: Path) -> str:
 def _master(root: Path) -> dict[str, Any] | None:
     from careeros import resumes
 
-    return next((r for r in resumes.list_resumes(root) if r["type"] == "master"), None)
+    try:
+        return next((r for r in resumes.list_resumes(root) if r["type"] == "master"), None)
+    except (OSError, LookupError, ValueError):  # a malformed meta.json must not crash readiness
+        return None
 
 
 def _resume_text(root: Path) -> str:
