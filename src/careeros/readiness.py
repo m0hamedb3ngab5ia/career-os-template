@@ -11,7 +11,6 @@ Gates apply only; score/prepare never call it.
 from __future__ import annotations
 
 import json
-import os
 import shutil
 from pathlib import Path
 from typing import Any, Callable
@@ -20,12 +19,13 @@ import yaml
 
 NOT_READY_EXIT = 7
 LEGAL_KEYS = ("work_authorization", "sponsorship")
+LEGAL_HINTS = ("legally authorized to work", "visa sponsorship")  # the examples' INSERT comments on those answers
 
 
 class NotReady(Exception):
     def __init__(self, items: list[dict[str, Any]]):
         self.items = items
-        super().__init__("not ready: " + ", ".join(i["id"] for i in items))
+        super().__init__("not ready: " + ", ".join(i["label"] for i in items))
 
 
 def _yaml(p: Path) -> dict:
@@ -46,17 +46,37 @@ def _has_master(root: Path) -> bool:
     return False
 
 
-def items(root: Path, which: Callable[[str], str | None] = shutil.which,
-          env: dict[str, str] | None = None) -> list[dict[str, Any]]:
-    from careeros.doctor import FAIL, run_doctor
+def _unchanged(root: Path, examples: Path | None, rel: str, hint: str) -> bool:
+    """The example's `# INSERT` line holding `hint` is still verbatim in the candidate's file: an example value
+    left unreviewed (a reviewed "Yes"/"No" equal to the example's is fine once its marker comment is gone)."""
+    from careeros.doctor import MARKER_RE
+
+    if examples is None:
+        return False
+    try:
+        ex = (examples / rel).read_text(encoding="utf-8").splitlines()
+        mine = {ln.strip() for ln in (root / rel).read_text(encoding="utf-8").splitlines()}
+    except OSError:
+        return False
+    return any(ln.strip() in mine for ln in ex if hint in ln and MARKER_RE.search(ln))
+
+
+def items(root: Path, which: Callable[[str], str | None] | None = None,
+          env: dict[str, str] | None = None, checks: list | None = None) -> list[dict[str, Any]]:
+    """`checks`: a run_doctor result already in hand (`careeros doctor`), else run here."""
+    from careeros.doctor import FAIL, find_examples, run_doctor
 
     root = Path(root)
-    fails = {c.name for c in run_doctor(root, which=which, env=env) if c.level == FAIL}
+    examples = find_examples(root)
+    if checks is None:
+        checks = run_doctor(root, which=which or shutil.which, examples=examples, env=env)
+    fails = {c.name for c in checks if c.level == FAIL}
     answers = _yaml(root / "profile" / "standard_answers.yaml")
     by_key = {a.get("key"): a.get("answer") for a in answers.get("answers") or [] if isinstance(a, dict)}
     candidate = _yaml(root / "config" / "targets.yaml").get("candidate") or {}
-    pipeline = _yaml(root / "config" / "pipeline.yaml")
-    cred = Path(str((pipeline.get("paths") or {}).get("credentials") or "~/.careeros/credentials.yaml")).expanduser()
+    paths = _yaml(root / "config" / "pipeline.yaml").get("paths")
+    cred = Path(str((paths if isinstance(paths, dict) else {}).get("credentials")
+                    or "~/.careeros/credentials.yaml")).expanduser()
     cred = cred if cred.is_absolute() else root / cred
     samples = root / "profile" / "voice" / "samples"
     rows = [
@@ -64,9 +84,12 @@ def items(root: Path, which: Callable[[str], str | None] = shutil.which,
         ("setup_clean", "Profile has no example data (`careeros doctor` shows no FAIL)", True,
          not (fails - {"claude"}), "/profile"),
         ("legal_answers", "Work authorization + sponsorship answers set", True,
-         all(by_key.get(k) not in (None, "") for k in LEGAL_KEYS), "/profile#answers"),
+         all(by_key.get(k) not in (None, "") for k in LEGAL_KEYS)
+         and not any(_unchanged(root, examples, "profile/standard_answers.yaml", h) for h in LEGAL_HINTS),
+         "/profile#answers"),
         ("salary_answer", "Salary floor set (config/targets.yaml candidate.salary_dropdown_floor_usd)", True,
-         isinstance(candidate, dict) and candidate.get("salary_dropdown_floor_usd") not in (None, ""),
+         isinstance(candidate, dict) and candidate.get("salary_dropdown_floor_usd") not in (None, "")
+         and not _unchanged(root, examples, "config/targets.yaml", "salary_dropdown_floor_usd:"),
          "/settings"),
         ("claude", "Claude Code (`claude`) installed", True, "claude" not in fails, "/profile#readiness"),
         ("master_synced", "master.yaml synced with the master résumé", True,
@@ -88,7 +111,5 @@ def status(root: Path) -> dict[str, Any]:
 
 def require_ready(root: Path) -> None:
     """Raise NotReady listing the open must-haves (every apply path calls this first)."""
-    if os.environ.get("CAREEROS_TEST_SKIP_READINESS") == "1":  # tests/conftest.py only: suites predating the gate
-        return
     if open_ := [i for i in items(root) if i["must"] and not i["done"]]:
         raise NotReady(open_)

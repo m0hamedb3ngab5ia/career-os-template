@@ -41,11 +41,12 @@ def settings(tmp_path: Path) -> Settings:
 
 @pytest.fixture(autouse=True)
 def _readiness_off(request, monkeypatch):
-    """The apply gate (REQ-103) is off unless a test is marked `readiness`: older apply tests use example roots."""
+    """The apply gate (REQ-103) passes in-process unless a test is marked `readiness`: older apply tests use example
+    roots. Subprocess tests reaching an apply path use personalize() + a fake `claude` on PATH instead."""
     if not request.node.get_closest_marker("readiness"):
-        monkeypatch.setenv("CAREEROS_TEST_SKIP_READINESS", "1")
-    else:
-        monkeypatch.delenv("CAREEROS_TEST_SKIP_READINESS", raising=False)
+        import careeros.readiness as r
+        monkeypatch.setattr(r, "items", lambda root, *a, **k: [
+            {"id": "all", "label": "", "must": True, "done": True, "fix_link": ""}])
 
 
 @pytest.fixture(autouse=True)

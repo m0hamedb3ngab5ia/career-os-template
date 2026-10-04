@@ -58,7 +58,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     checks = run_doctor(root)
     # REQ-102: the readiness must-haves doctor itself does not check; WARN, not FAIL (score/prepare still run)
     checks += [Check(PASS if i["done"] else WARN, "readiness", i["label"] + ("" if i["done"] else ": apply blocked"))
-               for i in readiness_items(root) if i["must"] and i["id"] in ("master_resume", "legal_answers",
+               for i in readiness_items(root, checks=list(checks)) if i["must"] and i["id"] in ("master_resume", "legal_answers",
                                                                           "salary_answer", "master_synced")]
     out = format_report(checks, quiet=args.quiet, root=root)
     if out:

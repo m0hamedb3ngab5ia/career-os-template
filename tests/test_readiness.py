@@ -35,7 +35,26 @@ def test_items_have_the_contract_shape(tmp_path):
 
 
 def test_fresh_install_is_not_ready(tmp_path):
-    assert set(open_musts(fresh(tmp_path))) == {"master_resume", "setup_clean"}
+    assert set(open_musts(fresh(tmp_path))) == {"master_resume", "setup_clean", "legal_answers", "salary_answer"}
+
+
+def test_leftover_example_values_stay_open(tmp_path):
+    root = personalize(fresh(tmp_path))
+    assert open_musts(root) == []
+    for rel in ("profile/standard_answers.yaml", "config/targets.yaml"):  # the example's INSERT lines, untouched
+        shutil.copy(EXAMPLE_REPO / rel, root / rel)
+    assert {"legal_answers", "salary_answer"} <= set(open_musts(root))
+
+
+def test_reviewed_example_equal_answers_are_done(tmp_path):
+    root = personalize(fresh(tmp_path))  # re-dumped: same "Yes"/"No"/90000 values, markers gone
+    assert not {"legal_answers", "salary_answer"} & set(open_musts(root))
+
+
+def test_paths_list_does_not_crash(tmp_path):
+    root = personalize(fresh(tmp_path))
+    (root / "config" / "pipeline.yaml").write_text("paths: [a, b]\n")
+    assert "credentials" in {i["id"] for i in readiness.items(root, which=which_all, env={})}
 
 
 def test_filled_root_is_ready(tmp_path, monkeypatch):
@@ -76,4 +95,4 @@ def test_require_ready_raises_listing_open_ids(tmp_path, monkeypatch):
     shutil.rmtree(root / "profile" / "resumes")
     with pytest.raises(readiness.NotReady) as e:
         readiness.require_ready(root)
-    assert str(e.value) == "not ready: master_resume" and e.value.items[0]["id"] == "master_resume"
+    assert str(e.value) == "not ready: Master résumé set" and e.value.items[0]["id"] == "master_resume"
