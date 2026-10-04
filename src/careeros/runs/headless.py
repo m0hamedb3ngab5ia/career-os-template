@@ -73,10 +73,17 @@ class HeadlessResult:
                 "api_errors": self.api_errors, "events": self.events, "duration_s": round(self.duration_s, 1)}
 
 
+def untrusted(text: Any, source: str) -> str:
+    """REQ-108: outside text (posting, JD, email, imported page) as one delimited data block for a prompt; any
+    `<untrusted` / `</untrusted` inside the text is defused so it cannot close the block early."""
+    body = re.sub(r"<(/?untrusted)", r"&lt;\1", str(text or ""), flags=re.I)
+    return f'<untrusted source="{source}">\n{body}\n</untrusted>'
+
+
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
-                  ) -> list[str]:
+                  extra_tools: list[str] | tuple = ()) -> list[str]:
     cmd = list(cfg.headless_cmd)
-    tools = allowed_tools_for(cfg, kind)
+    tools = allowed_tools_for(cfg, kind, extra_tools)
     if tools and "--allowedTools" not in cmd and "--allowed-tools" not in cmd:
         cmd += ["--allowedTools", ",".join(tools)]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]

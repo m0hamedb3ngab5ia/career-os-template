@@ -104,7 +104,7 @@ def test_run_score_scores_within_budget_and_records_the_run(root, home, fake_bin
     argv = [json.loads(line) for line in argv_log.read_text().splitlines()]
     assert len(argv) == 2
     first = argv[0]
-    assert first[0] == "-p" and first[-1] == f"/score-job data/jobs/{ids[0]}"
+    assert first[0] == "-p" and first[-1].splitlines()[0] == f"/score-job data/jobs/{ids[0]}"
     assert first[first.index("--output-format") + 1] == "stream-json" and "--verbose" in first
     assert first[first.index("--permission-mode") + 1] == "dontAsk" and "--allowedTools" in first
 
@@ -206,7 +206,7 @@ def test_run_prepare_with_job_runs_only_that_job_and_reports_json(root, home, fa
     assert [q["job_id"] for q in rec["queue"]] == [ids[1]]
     assert status_of(root, ids[1]) == "queued"
     argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
-    assert argv[-1][-1] == f"/prepare-job data/jobs/{ids[1]}"
+    assert argv[-1][-1].splitlines()[0] == f"/prepare-job data/jobs/{ids[1]}"
     # done already (status queued): refused with the reason unless --force
     r = cli(root, env, "run", "prepare", "--job", ids[1], "--json")
     assert r.returncode == 2 and json.loads(r.stdout)["reasons"] == {ids[1]: "status queued"}
