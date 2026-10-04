@@ -72,6 +72,7 @@ ACTION_TEXT = {  # open Action Item type -> the next step
     "profile_gap": "Add missing experience to your profile", "laptop_required": "Finish on your laptop",
     "qa_fail": "Review the tailored resume", "scam_suspected": "Check this company is real",
     "ghost_job": "The posting may be stale", "review": "Review and submit the application",
+    "injection_suspected": "Check the posting for hidden instructions",
     "send_linkedin": "Send a LinkedIn message", "send_email": "Send an email",
 }
 
