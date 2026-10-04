@@ -80,6 +80,7 @@ def add_job(root: Path) -> str:
                 url="https://boards.greenhouse.io/co/jobs/1", description_text="python " * 50,
                 posted_at=datetime.now(timezone.utc).isoformat())
     store.save_posting(p)
+    store.set_selected([p.job_id], True)  # REQ-104: ticked for runs
     return p.job_id
 
 

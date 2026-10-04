@@ -28,6 +28,7 @@ def add_job(store: Store, n: int, hours_old: float = 10, company: str = "Acme", 
                 ats_job_id=f"id{n}", url=f"https://boards.greenhouse.io/x/jobs/{n}",
                 posted_at=(NOW - timedelta(hours=hours_old)).isoformat(), description_text="build apis " * 50)
     store.save_posting(p)
+    store.set_selected([p.job_id], True)  # REQ-104: ticked for runs
     if extra:
         path = store.job_dir(p.job_id) / "posting.json"
         path.write_text(json.dumps({**json.loads(path.read_text()), **extra}))

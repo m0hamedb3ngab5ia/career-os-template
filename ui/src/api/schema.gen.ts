@@ -129,6 +129,13 @@ export interface paths {
      */
     get: operations["job_facets_api_jobs_facets_get"];
   };
+  "/api/jobs/select": {
+    /**
+     * Select Jobs
+     * @description REQ-104: tick/untick jobs for prepare/apply runs (flags.json `selected`). Any unknown id -> 404, none set.
+     */
+    post: operations["select_jobs_api_jobs_select_post"];
+  };
   "/api/jobs/tabs": {
     /** Job Tabs */
     get: operations["job_tabs_api_jobs_tabs_get"];
@@ -2304,6 +2311,13 @@ export interface components {
       /** Title */
       title: string;
     };
+    /** SelectBody */
+    SelectBody: {
+      /** Ids */
+      ids: string[];
+      /** Selected */
+      selected: boolean;
+    };
     /** StartBody */
     StartBody: {
       /**
@@ -3267,6 +3281,33 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["JobFacets"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Select Jobs
+   * @description REQ-104: tick/untick jobs for prepare/apply runs (flags.json `selected`). Any unknown id -> 404, none set.
+   */
+  select_jobs_api_jobs_select_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["SelectBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */
