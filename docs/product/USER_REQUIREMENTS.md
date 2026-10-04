@@ -243,6 +243,14 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - Users choose how many rows they see per page (for example 10, 25, 50, 100).
 - Why: familiar, fast to scan, never overwhelming
 
+### USR-037 First-time guide and a clear next step
+- The first time a user opens the app, a short guided tour shows how to use it (for example an overlay that points at each main part).
+- The tour shows only once. Users can skip it at any time.
+- Settings has a "How to use" option that starts the tour again.
+- When setup and documents are done, the app tells users plainly what to do next, such as "Find jobs" or "Start your pipeline", with one button to do it.
+- Why: new users know where to start and never wonder what comes next
+- Later: details of the tour steps can be expanded.
+
 ## Map to technical requirements
 <!-- trace:map -->
 | user requirement | status | technical REQs |
@@ -283,4 +291,5 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-034 Start my pipeline and choose how far it goes | approved | — (derive; builds on REQ-104, REQ-045, REQ-074) |
 | USR-035 Always know what to do on each page | approved | — (derive) |
 | USR-036 Tables that work like a spreadsheet | approved | — (derive; as-is REQ-072) |
+| USR-037 First-time guide and a clear next step | approved | — (derive; builds on REQ-108..110) |
 <!-- /trace:map -->
