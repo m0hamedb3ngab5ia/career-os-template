@@ -155,6 +155,9 @@ States per delta screen: empty (first run), loading (`aria-busy`, Meter), error 
 
 Gaps (non-blocking, decide in TASK-013): shared breakpoint token (now 600/640/900/1100 ad hoc); no mobile nav (sidebar fixed 232px); input error prop unverified; hardcoded 15/16/17px sizes.
 
+Table (USR-036): keep current Jobs table as-is (Excel-like: header sort + filter menus, filter chips, Pager rows 10/25/50/100). Every list of jobs reuses it.
+Page header (USR-035): h1 + one-line `--sec` guidance + primary action, every screen.
+
 ## Mockups
 Wireframes, minimal, existing tokens: https://claude.ai/artifact/LiWEdd7CnMgFChRLo4hCMt
 | artboard | FLOW / UC |

@@ -33,6 +33,9 @@ user_requirements:
   USR-031: {status: approved, provenance: confirmed}
   USR-032: {status: approved, provenance: confirmed}
   USR-033: {status: approved, provenance: confirmed}
+  USR-034: {status: approved, provenance: confirmed}
+  USR-035: {status: approved, provenance: confirmed}
+  USR-036: {status: approved, provenance: confirmed}
 requirements:
   REQ-001: {status: proposed, provenance: observed, user_requirements: [USR-001]}
   REQ-002: {status: proposed, provenance: observed, user_requirements: [USR-001, USR-023]}
@@ -137,6 +140,7 @@ flows:
   FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
   FLOW-002: {status: approved, use_cases: [UC-002]}
   FLOW-003: {status: approved, use_cases: [UC-010]}
+  FLOW-004: {status: draft, use_cases: [UC-007]}
 tasks:
   TASK-001: {status: todo, requirements: [REQ-108]}
   TASK-002: {status: todo, requirements: [REQ-109], use_cases: [UC-012]}

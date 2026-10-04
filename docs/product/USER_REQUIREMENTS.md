@@ -224,6 +224,25 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 - The app flags postings that look like they try this, and never acts on them.
 - Why: keep the user's data and accounts safe
 
+### USR-034 Start my pipeline and choose how far it goes
+- Users pick the jobs they want (tick them, or filter the list and tick what's shown).
+- One clear "Start pipeline" button runs the automated work on the ticked jobs.
+- Before starting, users choose how far each application goes: just prepare it, fill the form and stop, or submit it.
+- One choice applies to all ticked jobs (default: fill the form, the user submits); users can change it per job.
+- Safety rules still apply: Tier A and LinkedIn jobs are never submitted automatically.
+- Why: users control how much the app does for each application
+
+### USR-035 Always know what to do on each page
+- Every page says in one short line what it is for and what to do next.
+- Navigation is simple: few pages, clear names, nothing hidden.
+- Buttons and steps use plain words; disabled buttons say why.
+- Why: users never get lost or guess
+
+### USR-036 Tables that work like a spreadsheet
+- Job tables look and behave like the current Excel-style table: column headers with sort and filter, like Excel.
+- Users choose how many rows they see per page (for example 10, 25, 50, 100).
+- Why: familiar, fast to scan, never overwhelming
+
 ## Map to technical requirements
 <!-- trace:map -->
 | user requirement | status | technical REQs |
@@ -261,4 +280,7 @@ Technical detail: REQUIREMENTS.md (REQ-NNN), each linked to the user requirement
 | USR-031 Reuse résumés instead of making one per job | approved | REQ-111, REQ-112, REQ-113 |
 | USR-032 See proof that the app works | approved | — (derive) |
 | USR-033 Job postings can't trick the app | approved | REQ-108, REQ-109, REQ-110 |
+| USR-034 Start my pipeline and choose how far it goes | approved | — (derive; builds on REQ-104, REQ-045, REQ-074) |
+| USR-035 Always know what to do on each page | approved | — (derive) |
+| USR-036 Tables that work like a spreadsheet | approved | — (derive; as-is REQ-072) |
 <!-- /trace:map -->
