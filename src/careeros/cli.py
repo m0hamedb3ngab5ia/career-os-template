@@ -594,6 +594,21 @@ def _job_lock_guard(s: Settings, job_id: str, args: argparse.Namespace) -> int |
     return JOB_LOCKED_EXIT
 
 
+def cmd_job_clear_injection(args: argparse.Namespace) -> int:
+    """The user read a posting flagged as a possible prompt injection and says it is safe (REQ-109)."""
+    store = Store(_settings(args))
+    if not store.exists(args.job_id):
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    flags = store.load_flags(args.job_id)
+    if not flags.get("injection_suspected"):
+        print(f"job {args.job_id} is not flagged; nothing to clear")
+        return 0
+    store.clear_injection(args.job_id)
+    print(f"job {args.job_id}: injection flag cleared; prepare/apply allowed")
+    return 0
+
+
 def cmd_job_lock(args: argparse.Namespace) -> int:
     """Take the per-job lock (exit 6 if someone else holds it). The token from CAREEROS_LOCK_TOKEN (set by
     `careeros run` for the skill it calls) re-enters the runner's lock: `reentrant: true`, nothing changes."""
@@ -1721,6 +1736,10 @@ def build_parser() -> argparse.ArgumentParser:
     jfz.add_argument("--answers-json", help="file or - (stdin): [{label, value, source}] or {label: value}")
     _lock_args(jfz)
     jfz.set_defaults(fn=cmd_job_freeze)
+    jci = jbs.add_parser("clear-injection", help="I checked it: allow prepare/apply on a job flagged as a "
+                                                   "possible prompt injection (flags.json)")
+    jci.add_argument("job_id")
+    jci.set_defaults(fn=cmd_job_clear_injection)
     jlk = jbs.add_parser("lock", help="take the per-job lock (exit 6 if held): runs and prepare/apply skills use it")
     jlk.add_argument("job_id")
     jlk.add_argument("--owner", default="manual", help="who holds it, e.g. prepare-job")

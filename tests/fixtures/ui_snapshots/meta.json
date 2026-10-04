@@ -17,6 +17,7 @@
     "laptop_required",
     "scam_suspected",
     "ghost_job",
+    "injection_suspected",
     "other"
   ],
   "clean_stops": [
