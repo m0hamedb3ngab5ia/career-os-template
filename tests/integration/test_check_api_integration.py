@@ -71,15 +71,19 @@ def _check(c, s) -> str:
     return jid
 
 
-def test_e2e_010_01_best_marked_no_tailor(client):
+def test_e2e_010_01_best_marked_prepare_once(client):
     c, s = client
     _resume(s, "Infra", "Backend engineer: Python Kubernetes Rust Go SQL")
     _resume(s, "Old", "Python")
     jid = _check(c, s)
     st = c.get(f"/api/jobs/{jid}/check").json()
     assert st["stage"] == "ready" and st["resumes"][0]["name"] == "Infra" and st["best"] == st["resumes"][0]["rid"]
-    assert c.post(f"/api/jobs/{jid}/check/tailor").status_code == 409
-    assert [k for k, _ in FakeRC.calls] == ["score"]
+    m = c.get(f"/api/jobs/{jid}/matches").json()["resumes"]  # "Why this score" data
+    assert m[0]["groups"]["required"] == {"hit": ["Python", "Kubernetes", "Rust", "Go", "SQL"], "missing": []}
+    assert m[1]["groups"]["required"]["hit"] == ["Python"] and "Go" in m[1]["groups"]["required"]["missing"]
+    assert c.post(f"/api/jobs/{jid}/check/tailor").json() == {"run_id": "prepare-1", "kind": "prepare"}
+    assert c.post(f"/api/jobs/{jid}/check/tailor").status_code == 409  # one prepare run per check
+    assert [k for k, _ in FakeRC.calls] == ["score", "prepare"]
 
 
 def test_e2e_010_02_below_threshold_keep(client):

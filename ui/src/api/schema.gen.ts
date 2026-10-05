@@ -177,7 +177,8 @@ export interface paths {
   "/api/jobs/{job_id}/check/tailor": {
     /**
      * Check Tailor
-     * @description The one "Tailor from master" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.
+     * @description "Prepare application" (REQ-114): the one `run prepare --job` per check (ticks the job, REQ-104); below
+     * threshold it tailors from master (REQ-116). 409 otherwise. "Cancel" needs no call: the job stays unticked.
      */
     post: operations["check_tailor_api_jobs__job_id__check_tailor_post"];
   };
@@ -3959,7 +3960,8 @@ export interface operations {
   };
   /**
    * Check Tailor
-   * @description The one "Tailor from master" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.
+   * @description "Prepare application" (REQ-114): the one `run prepare --job` per check (ticks the job, REQ-104); below
+   * threshold it tailors from master (REQ-116). 409 otherwise. "Cancel" needs no call: the job stays unticked.
    */
   check_tailor_api_jobs__job_id__check_tailor_post: {
     parameters: {

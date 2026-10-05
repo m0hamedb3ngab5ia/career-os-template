@@ -10995,7 +10995,7 @@
     },
     "/api/jobs/{job_id}/check/tailor": {
       "post": {
-        "description": "The one \"Tailor from master\" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.",
+        "description": "\"Prepare application\" (REQ-114): the one `run prepare --job` per check (ticks the job, REQ-104); below\nthreshold it tailors from master (REQ-116). 409 otherwise. \"Cancel\" needs no call: the job stays unticked.",
         "operationId": "check_tailor_api_jobs__job_id__check_tailor_post",
         "parameters": [
           {

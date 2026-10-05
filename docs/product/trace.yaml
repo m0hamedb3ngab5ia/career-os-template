@@ -176,5 +176,5 @@ tasks:
   TASK-022: {status: done, requirements: [REQ-094, REQ-095, REQ-096, REQ-097, REQ-099]}
   TASK-023: {status: done, requirements: [REQ-105], use_cases: [UC-008]}
   TASK-024: {status: todo, requirements: [REQ-095, REQ-097]}
-  TASK-025: {status: todo, requirements: [REQ-114, REQ-116], use_cases: [UC-010], flows: [FLOW-003]}
+  TASK-025: {status: done, requirements: [REQ-114, REQ-116], use_cases: [UC-010], flows: [FLOW-003]}
   TASK-026: {status: todo, requirements: [REQ-123, REQ-052, REQ-073]}

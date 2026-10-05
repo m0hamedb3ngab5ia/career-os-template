@@ -162,12 +162,12 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
 
 
 def tailor(settings: Any, job_id: str, start: Callable[[], str]) -> str:
-    """The one "Tailor from master" run of this check. `start` starts `run prepare --job` and returns its run id."""
-    st = state(settings, job_id)
-    if st["stage"] not in ("offer_tailor", "tailor_failed"):
-        raise Refused(f"job {job_id}: no tailor offer at stage {st['stage']!r} (max one tailor run per check)")
+    """The one "Prepare application" run of this check (REQ-114): above threshold = plain prepare, below = tailor
+    from master (REQ-116). `start` starts `run prepare --job` (ticks the job) and returns its run id."""
+    st, jd = state(settings, job_id), _job_dir(settings, job_id)
+    if not (st["stage"] in ("offer_tailor", "tailor_failed") or (st["stage"] == "ready" and not _load(jd).get("tailor"))):
+        raise Refused(f"job {job_id}: no prepare offer at stage {st['stage']!r} (max one prepare run per check)")
     run_id = start()
-    jd = _job_dir(settings, job_id)
     _save(jd, {**_load(jd), "tailor": {"run_id": run_id, "started_at": _now()}})
     return run_id
 

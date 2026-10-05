@@ -80,17 +80,23 @@ def test_unscored_job_is_scoring(s: Settings):
     assert check.state(s, jid)["stage"] == "scoring"
 
 
-def test_e2e_010_01_best_above_threshold_no_tailor(s: Settings):
+def test_e2e_010_01_best_above_threshold_prepare_once(s: Settings):
     good = _resume(s, "Infra", "Backend engineer: Python Kubernetes Rust Go SQL")
     _resume(s, "Old", "Python")
     jid = check.create(s, JD)["job_id"]
     _scored(s, jid)
     st = check.state(s, jid)
     assert st["stage"] == "ready" and st["best"] == good and st["resumes"][0]["score"] >= 70
+    g = st["resumes"][0]["groups"]  # "Why this score": matched / missing, required vs preferred
+    assert set(g["required"]["hit"]) >= {"Python", "Kubernetes"} and g["required"]["missing"] == []
+    assert "Python" in st["resumes"][1]["groups"]["required"]["hit"] and st["resumes"][1]["groups"]["required"]["missing"]
+    assert not Store(s).is_selected(jid)  # Cancel = job kept, unticked: nothing to undo
     calls = []
-    with pytest.raises(check.Refused):
-        check.tailor(s, jid, lambda: calls.append(1) or "r1")
-    assert calls == []
+    assert check.tailor(s, jid, lambda: calls.append(1) or "r1") == "r1"  # REQ-114 Prepare application above threshold
+    assert check.state(s, jid)["stage"] == "ready"
+    with pytest.raises(check.Refused):  # one prepare run per check
+        check.tailor(s, jid, lambda: calls.append(1) or "r2")
+    assert calls == [1]
 
 
 def _fake_tailor(s: Settings, jd: Path, text: str):
