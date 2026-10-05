@@ -47,6 +47,7 @@ class SampleChange(BaseModel):
     samples: list[Sample]
     learn_run: str | None = None
     learn_error: str | None = None
+    learn_info: str | None = None
 
 
 def _change(c: Any, fn: Any) -> None:
@@ -69,7 +70,7 @@ def edit_answer(key: str, body: AnswerEdit, c=Depends(ctx)) -> SavedAnswer:
                                             eeo=body.eeo))
     scope = "eeo" if body.eeo else "company" if body.company else "general"
     return next(SavedAnswer(**r) for r in learning.list_answers(c.settings) if r["key"] == key and r["scope"] == scope
-                and (scope != "company" or r["company"].lower() == body.company.lower()))
+                and (scope != "company" or r["company"].strip().lower() == body.company.strip().lower()))
 
 
 @router.delete("/profile/answers/{key}", status_code=204)
@@ -85,7 +86,7 @@ def _samples(c: Any) -> list[Sample]:
 def _learn(request: Request, c: Any) -> SampleChange:
     """Re-run learn-voice on the current samples; with none left, clear the learned style instead (UC-005 alt).
     If the run can't start (busy, paused, claude missing) the sample change stands and learn_error says why (Retry)."""
-    from careeros.ui.services.runs import RunControl
+    from careeros.ui.services.runs import Busy, RunControl
 
     samples = _samples(c)
     if not samples:
@@ -93,6 +94,10 @@ def _learn(request: Request, c: Any) -> SampleChange:
         return SampleChange(samples=samples)
     try:
         out = (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step("learn_voice")
+    except Busy as e:
+        if "learn_voice" in str(e.holder.get("note") or e.holder.get("owner") or ""):
+            return SampleChange(samples=samples, learn_info="voice update already running; new samples are used next run")
+        return SampleChange(samples=samples, learn_error=f"learn-voice not started: {e}")
     except Exception as e:  # noqa: BLE001 - never lose the upload over the follow-up run
         return SampleChange(samples=samples, learn_error=f"learn-voice not started: {e}")
     return SampleChange(samples=samples, learn_run=(out or {}).get("run_id"))
@@ -108,7 +113,8 @@ _RAW = {"requestBody": {"required": True, "content": {"application/octet-stream"
 
 
 @router.put("/profile/samples", status_code=201, openapi_extra=_RAW)
-async def upload_sample(request: Request, filename: str, c=Depends(ctx)) -> SampleChange:
+async def upload_sample(request: Request, filename: str, learn: bool = True, c=Depends(ctx)) -> SampleChange:
+    """`learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once."""
     data = bytearray()
     async for chunk in request.stream():  # streamed cap: never buffer more than MAX_BYTES + one chunk
         data += chunk
@@ -120,7 +126,7 @@ async def upload_sample(request: Request, filename: str, c=Depends(ctx)) -> Samp
         raise HTTPException(415, str(e)) from None
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
-    return _learn(request, c)
+    return _learn(request, c) if learn else SampleChange(samples=_samples(c))
 
 
 @router.delete("/profile/samples/{name}")

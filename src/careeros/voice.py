@@ -8,7 +8,7 @@ from typing import Any
 
 from careeros.runs.yamledit import _write_atomic
 
-EXTS = (".txt", ".md", ".pdf", ".docx")
+EXTS = (".txt", ".md", ".eml")  # what the learn-voice skill reads
 MAX_BYTES = 5 * 1024 * 1024
 _LEARNED = re.compile(r"(^## Learned[^\n]*\n)(.*?)(?=^## |\Z)", re.M | re.S)
 
@@ -44,7 +44,11 @@ def add_sample(root: Path, name: str, data: bytes) -> dict[str, Any]:
     if len(data) > MAX_BYTES:
         raise ValueError(f"{name}: larger than 5 MB")
     p.parent.mkdir(parents=True, exist_ok=True)
-    p.write_bytes(data)
+    n = 1
+    while p.exists():  # never overwrite an existing sample: letter.md -> letter-2.md
+        n += 1
+        p = p.with_name(f"{Path(name).stem}-{n}{Path(name).suffix}")
+    _write_atomic(p, data)
     return {"name": p.name, "size": len(data)}
 
 

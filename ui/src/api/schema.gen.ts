@@ -315,7 +315,10 @@ export interface paths {
   "/api/profile/samples": {
     /** List Samples */
     get: operations["list_samples_api_profile_samples_get"];
-    /** Upload Sample */
+    /**
+     * Upload Sample
+     * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
+     */
     put: operations["upload_sample_api_profile_samples_put"];
   };
   "/api/profile/samples/learn": {
@@ -2383,6 +2386,8 @@ export interface components {
     SampleChange: {
       /** Learn Error */
       learn_error?: string | null;
+      /** Learn Info */
+      learn_info?: string | null;
       /** Learn Run */
       learn_run?: string | null;
       /** Samples */
@@ -4592,11 +4597,15 @@ export interface operations {
       };
     };
   };
-  /** Upload Sample */
+  /**
+   * Upload Sample
+   * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
+   */
   upload_sample_api_profile_samples_put: {
     parameters: {
       query: {
         filename: string;
+        learn?: boolean;
       };
     };
     requestBody: {

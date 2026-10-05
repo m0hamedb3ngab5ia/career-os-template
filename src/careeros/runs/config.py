@@ -48,6 +48,12 @@ DEFAULT_ALLOWED_TOOLS: list[str] = [
 WEB_TOOLS = ("WebSearch", "WebFetch")
 # Extra tools per run kind, on top of llm.allowed_tools: apply-job drives Chrome through the MCP server.
 KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"], "prepare": ["WebSearch"]}
+# Kinds whose skill needs less than llm.allowed_tools get exactly this list instead (samples and résumés can carry
+# third-party text, so no python and no writes outside what the skill produces).
+KIND_ONLY_TOOLS: dict[str, list[str]] = {
+    "learn_voice": ["Read", "Glob", "Grep", "Edit(profile/voice/**)"],
+    "extract_master": ["Read", "Write", "Bash(.venv/bin/careeros *)"],
+}
 # Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
 KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}
 DEFAULT_USAGE_LIMIT_PATTERNS = [r"usage limit", r"hit your limit", r"limit reached", r"rate.?limit",
@@ -225,7 +231,7 @@ def load_runs_config(settings: Any) -> RunsConfig:
 
 def allowed_tools_for(cfg: "RunsConfig", kind: str | None, extra_tools: list[str] | tuple = ()) -> list[str]:
     """`llm.allowed_tools` minus web tools, plus the kind's extras (KIND_TOOLS) and `extra_tools`, no duplicates."""
-    base = [t for t in cfg.allowed_tools if t.split("(")[0] not in WEB_TOOLS]
+    base = KIND_ONLY_TOOLS.get(kind or "") or [t for t in cfg.allowed_tools if t.split("(")[0] not in WEB_TOOLS]
     return list(dict.fromkeys([*base, *KIND_TOOLS.get(kind or "", []), *extra_tools]))
 
 

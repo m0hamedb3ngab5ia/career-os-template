@@ -101,3 +101,48 @@ def test_samples_add_list_remove_and_learned(tmp_path: Path):
     voice.clear_learned(tmp_path)
     assert voice.learned(tmp_path) == ""
     assert "## Samples\n\nPut files here." in (tmp_path / "profile" / "voice" / "style_guide.md").read_text()
+
+
+def test_add_sample_keeps_same_name_and_skill_types_only(tmp_path: Path):
+    """MUST4: a same-name upload never overwrites (name-2.ext); MUST2: only what learn-voice reads."""
+    assert voice.add_sample(tmp_path, "letter.md", b"one")["name"] == "letter.md"
+    assert voice.add_sample(tmp_path, "letter.md", b"two")["name"] == "letter-2.md"
+    assert voice.add_sample(tmp_path, "letter.md", b"three")["name"] == "letter-3.md"
+    d = voice.samples_dir(tmp_path)
+    assert (d / "letter.md").read_bytes() == b"one" and (d / "letter-3.md").read_bytes() == b"three"
+    assert voice.add_sample(tmp_path, "mail.eml", b"x")["name"] == "mail.eml"
+    assert not [p for p in d.iterdir() if p.name.startswith(".")]  # no temp files left behind
+    for bad in ("cv.pdf", "cv.docx"):
+        with pytest.raises(voice.Unsupported):
+            voice.add_sample(tmp_path, bad, b"x")
+
+
+def test_step_skills_get_minimal_tools():
+    """SHOULD5: run_skill passes its kind, so learn_voice / extract_master get only what their skills need."""
+    from careeros.runs.config import RunsConfig, allowed_tools_for
+
+    cfg = RunsConfig()
+    lv = allowed_tools_for(cfg, "learn_voice")
+    assert lv == ["Read", "Glob", "Grep", "Edit(profile/voice/**)"]
+    em = allowed_tools_for(cfg, "extract_master")
+    assert "Bash(.venv/bin/careeros *)" in em and "Edit" not in em and "Bash(.venv/bin/python *)" not in em
+    assert "Bash(.venv/bin/python *)" in allowed_tools_for(cfg, "inbox_sync")
+
+
+def test_run_skill_passes_kind_to_build_command(tmp_path: Path):
+    from conftest import make_temp_root
+
+    from careeros.config import Settings
+    from careeros.runs import service
+
+    cmds: list = []
+
+    def inv(cmd, *_a):
+        cmds.append(cmd)
+        raise RuntimeError("stop here")
+    try:
+        service.run_skill(Settings.load(make_temp_root(tmp_path / "repo")), "learn_voice", "learn-voice", invoke=inv,
+                          doctor=lambda r: [])
+    except RuntimeError:
+        pass
+    assert cmds[0][cmds[0].index("--allowedTools") + 1] == "Read,Glob,Grep,Edit(profile/voice/**)"

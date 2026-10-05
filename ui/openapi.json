@@ -6584,6 +6584,17 @@
             ],
             "title": "Learn Error"
           },
+          "learn_info": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learn Info"
+          },
           "learn_run": {
             "anyOf": [
               {
@@ -12205,6 +12216,7 @@
         ]
       },
       "put": {
+        "description": "`learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.",
         "operationId": "upload_sample_api_profile_samples_put",
         "parameters": [
           {
@@ -12214,6 +12226,16 @@
             "schema": {
               "title": "Filename",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "learn",
+            "required": false,
+            "schema": {
+              "default": true,
+              "title": "Learn",
+              "type": "boolean"
             }
           }
         ],

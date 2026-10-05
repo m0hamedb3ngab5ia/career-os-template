@@ -27,8 +27,17 @@ def client(tmp_path: Path):
     ix.rebuild()
     app = create_app(s, index=ix, broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
     started: list[str] = []
-    app.state.run_control = lambda settings: type("RC", (), {
-        "start_step": lambda self, k: started.append(k) or {"run_id": f"r{len(started)}"}})()
+    busy: list[dict] = []  # a holder here makes the next start raise Busy
+
+    def start_step(self, k):
+        from careeros.ui.services.runs import Busy
+
+        if busy:
+            raise Busy(busy[0])
+        started.append(k)
+        return {"run_id": f"r{len(started)}"}
+    app.state.run_control = lambda settings: type("RC", (), {"start_step": start_step})()
+    app.state.busy = busy
     with TestClient(app) as c:
         yield c, root, started
 
@@ -44,6 +53,10 @@ def test_saved_answers_edit_and_delete(client):
     assert "relocate" not in [e["key"] for e in data["answers"]]
     assert c.delete("/api/profile/answers/relocate", headers=W).status_code == 404
     assert c.put("/api/profile/answers/gender", json={"answer": "Decline", "eeo": True}, headers=W).status_code == 200
+    p = root / "profile" / "standard_answers.yaml"
+    p.write_text(p.read_text() + '\ncompany_answers:\n  Acme:\n    - key: why_us\n      answer: "Rockets"\n')
+    r = c.put("/api/profile/answers/why_us", json={"answer": "Space", "company": " acme "}, headers=W)
+    assert r.status_code == 200 and r.json()["answer"] == "Space"  # NIT7: stray whitespace is not a 500
 
 
 def test_lesson_delete(client):
@@ -56,18 +69,30 @@ def test_lesson_delete(client):
 
 def test_writing_samples_upload_runs_learn_voice(client):
     c, root, started = client
-    for name in ("a.md", "b.txt"):
-        r = c.put("/api/profile/samples", params={"filename": name}, content=b"I wrote this.", headers=W)
-        assert r.status_code == 201, r.text
-    assert started == ["learn_voice", "learn_voice"]
+    for name in ("a.md", "b.txt"):  # E2E-005-01: one upload action of 2 files -> learn-voice once
+        r = c.put("/api/profile/samples", params={"filename": name, "learn": False}, content=b"I wrote this.",
+                  headers=W)
+        assert r.status_code == 201 and r.json()["learn_run"] is None, r.text
+    assert started == []
+    assert c.post("/api/profile/samples/learn", headers=W).json()["learn_run"] == "r1"
+    assert started == ["learn_voice"]
+    assert c.put("/api/profile/samples", params={"filename": "a.md"}, content=b"x", headers=W).json()["learn_run"] == "r2"
+    started.pop()
+    c.delete("/api/profile/samples/a-2.md", headers=W)
+    started.pop()
     got = c.get("/api/profile/samples", headers=W).json()
     assert [x["name"] for x in got["samples"]] == ["a.md", "b.txt"]
-    assert c.put("/api/profile/samples", params={"filename": "x.exe"}, content=b"x", headers=W).status_code == 415
+    assert c.put("/api/profile/samples", params={"filename": "x.pdf"}, content=b"x", headers=W).status_code == 415
     big = b"x" * (5 * 1024 * 1024 + 1)
     assert c.put("/api/profile/samples", params={"filename": "c.md"}, content=big, headers=W).status_code == 413
-    assert c.post("/api/profile/samples/learn", headers=W).json()["learn_run"] == "r3"
+    c.app.state.busy.append({"owner": "run:x", "note": "learn_voice (manual)"})  # MUST1: already learning = info
+    r = c.post("/api/profile/samples/learn", headers=W).json()
+    assert r["learn_error"] is None and "already running" in r["learn_info"]
+    c.app.state.busy[0] = {"owner": "run:y", "note": "prepare (manual)"}
+    assert "not started" in c.post("/api/profile/samples/learn", headers=W).json()["learn_error"]
+    c.app.state.busy.clear()
     c.delete("/api/profile/samples/a.md", headers=W)
     r = c.delete("/api/profile/samples/b.txt", headers=W).json()
-    assert r["samples"] == [] and r["learn_run"] is None and started == ["learn_voice"] * 4
+    assert r["samples"] == [] and r["learn_run"] is None and started == ["learn_voice"] * 2
     assert c.get("/api/profile/samples", headers=W).json()["learned"] == ""
     assert c.delete("/api/profile/samples/b.txt", headers=W).status_code == 404

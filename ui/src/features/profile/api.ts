@@ -1,6 +1,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
 import type { components } from "../../api/schema.gen";
+import { runKeys } from "../runs/api";
+import type { RunDetail } from "../runs/types";
 
 export type SavedAnswer = components["schemas"]["SavedAnswer"];
 export type SampleChange = components["schemas"]["SampleChange"];
@@ -31,7 +33,7 @@ export const useResumes = () =>
 
 /** Raw-body upload (DEC-006): the file is the request body, its name a query parameter. */
 export function upload<T>(path: string, file: File): Promise<T> {
-  return apiFetch<T>(`${path}?filename=${encodeURIComponent(file.name)}`, {
+  return apiFetch<T>(`${path}${path.includes("?") ? "&" : "?"}filename=${encodeURIComponent(file.name)}`, {
     method: "PUT",
     headers: { "X-CareerOS": "1", "Content-Type": "application/octet-stream" },
     body: file,
@@ -64,5 +66,19 @@ export const deleteAnswer = (a: SavedAnswer) =>
 export const deleteLesson = (id: string) => apiSend<void>("DELETE", `/api/learning/lessons/${encodeURIComponent(id)}`);
 export const removeSample = (name: string) => apiSend<SampleChange>("DELETE", `/api/profile/samples/${encodeURIComponent(name)}`);
 export const relearn = () => apiSend<SampleChange>("POST", "/api/profile/samples/learn");
+/** One upload action (E2E-005-01): store every file first, then start learn-voice once. */
+export async function uploadSamples(files: File[]): Promise<SampleChange> {
+  for (const f of files) await upload<SampleChange>("/api/profile/samples?learn=false", f);
+  return relearn();
+}
+/** Follow the learn-voice run the last sample change started, until it ends. */
+export const useLearnRun = (id: string | null | undefined) =>
+  useQuery({
+    queryKey: runKeys.detail(id ?? ""),
+    queryFn: () => apiFetch<RunDetail>(`/api/runs/${encodeURIComponent(id ?? "")}`),
+    enabled: !!id,
+    refetchInterval: (q) => (q.state.data && q.state.data.state !== "running" ? false : 1000),
+    retry: (n) => n < 30, // the record appears once the spawned step starts
+  });
 export const makeMaster = (rid: string) => apiSend<unknown>("POST", `/api/profile/resumes/${encodeURIComponent(rid)}/master`);
 export const deleteResume = (rid: string) => apiSend<void>("DELETE", `/api/profile/resumes/${encodeURIComponent(rid)}`);

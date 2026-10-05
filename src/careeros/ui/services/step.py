@@ -253,7 +253,7 @@ def main(argv: list[str] | None = None) -> int:
     elif args.kind in ("extract_master", "learn_voice"):  # REQ-099 / REQ-101: headless skill, no job
         from careeros.runs.service import run_skill
 
-        rec = run_skill(settings, args.kind, args.kind.replace("_", "-"))
+        rec = run_skill(settings, args.kind, args.kind.replace("_", "-"), run_id=args.run_id)
     elif args.kind in ("review", "resume_edit"):
         rec = run_resume_skill(settings, args.kind, args.resume, args.item, run_id=args.run_id)
     else:

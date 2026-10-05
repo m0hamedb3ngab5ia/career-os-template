@@ -239,7 +239,7 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
         raise RunBusy(e.holder) from None
     try:
         run = rs.new_run(kind, trigger, {"preset": None, "max_jobs": 1, "max_minutes": timeout_s / 60}, start,
-                         run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}"),
+                         run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}", kind=kind),
                          counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
     except BaseException:
         locks.release(rs.runner_lock_path, lk.token)
@@ -258,7 +258,7 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
             env = {**os.environ, "CAREEROS_RUN_ID": rid, "CAREEROS_ROOT": str(settings.root)}
             t0 = now()
             echo(f"[{n}] {kind}: /{skill}")
-            res = invoke(build_command(cfg, f"/{skill}", session_id=sid), str(settings.root), env, timeout_s,
+            res = invoke(build_command(cfg, f"/{skill}", session_id=sid, kind=kind), str(settings.root), env, timeout_s,
                          stream_path)
             outcome, detail = classify(res, cfg, kind, "")
             run["counters"]["attempted"] = 1
