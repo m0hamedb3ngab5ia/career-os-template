@@ -3,7 +3,7 @@ import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
 import { useToast } from "../../kit/Toast";
-import { errorText, useApplicationTab, useOpenApplication, type ApplicationTab } from "./api";
+import { errorText, useApplicationTab, useFillPlan, useOpenApplication, type ApplicationTab } from "./api";
 import styles from "./JobDetail.module.css";
 
 // The browser behind the fill is not reachable (refused up front, or the detached fill could not attach).
@@ -20,6 +20,8 @@ function offered(tab: ApplicationTab | undefined, stage: string): tab is Applica
 export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: string }) {
   const tab = useApplicationTab(jobId).data;
   const openApp = useOpenApplication(jobId);
+  // REQ-106: a required field nobody answered (or a legal/salary/EEO pause) keeps Fill off until Fill preview has it.
+  const blocked = (useFillPlan(jobId).data?.problems?.length ?? 0) > 0;
   const toast = useToast();
   // Chrome (paths.apply_cdp) didn't answer: a plain connect-and-retry state; the recorded tab is kept for the retry.
   const [notConnected, setNotConnected] = useState<{ refill?: boolean } | null>(null);
@@ -66,8 +68,14 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
     <>
       <Button
         variant={live ? "primary" : undefined}
-        disabled={openApp.isPending}
-        title={live ? "Focus the tab with the filled form" : "Open a visible tab and fill the form from your saved answers (stops before submit)"}
+        disabled={openApp.isPending || (blocked && !live)}
+        title={
+          live
+            ? "Focus the tab with the filled form"
+            : blocked
+              ? "Answer the open questions in Fill preview first"
+              : "Open a visible tab and fill the form from your saved answers (stops before submit)"
+        }
         onClick={() => onOpen()}
       >
         {label}

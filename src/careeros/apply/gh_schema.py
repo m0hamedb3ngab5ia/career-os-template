@@ -120,7 +120,7 @@ def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers
             source = f"pause:{kind}" if kind in ("legal", "salary", "eeo", "sensitive") else "unanswered"
         needs = value is None and f["type"] != "hidden" and (f["type"] != "file" or f["required"])
         row = {"field_id": f["field_id"], "label": f["label"], "type": f["type"], "value": value, "source": source,
-               "needs_review": needs}
+               "needs_review": needs, "required": bool(f["required"])}
         if f["options"]:
             row["options"] = f["options"]
         rows.append(row)

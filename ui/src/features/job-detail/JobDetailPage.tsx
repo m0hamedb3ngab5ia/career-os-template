@@ -11,6 +11,7 @@ import { useToast } from "../../kit/Toast";
 import { ActivityCard } from "./ActivityCard";
 import { errorText, useApplicationTab, useJob, useSetStatus, useWithdraw } from "./api";
 import { ApplySessionCard } from "./ApplySessionCard";
+import { FillPlanCard } from "./FillPlanCard";
 import { ContactsCard } from "./ContactsCard";
 import { DocumentsCard } from "./DocumentsCard";
 import { OverrideMenu, StatusMenu, WithdrawButton } from "./HeaderActions";
@@ -118,6 +119,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             submitted={detail.submitted}
             qa={detail.qa}
           />
+          <FillPlanCard jobId={jobId} />
           <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} fieldsLeft={fieldsLeft} />
           <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
           <ScoreCard score={detail.score} />

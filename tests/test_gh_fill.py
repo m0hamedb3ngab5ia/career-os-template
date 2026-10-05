@@ -84,3 +84,15 @@ def test_fill_survives_screenshot_timeout(tmp_path):
     page.screenshot.side_effect = RuntimeError("Page.screenshot: Timeout 10000ms exceeded.")
     summary = gh_fill.fill({"fields": []}, page, tmp_path, url="http://x")
     assert summary["filled"] == 0 and (tmp_path / "fill_summary.json").is_file()
+
+
+def test_plan_problems_required_needs_input_blocks():
+    """REQ-106: a required field with no answer blocks the fill; an optional or skipped one does not."""
+    p = _plan()
+    p["fields"] += [{"field_id": "q1", "label": "Notice period", "type": "text", "value": None, "source": "unanswered",
+                     "required": True},
+                    {"field_id": "q2", "label": "Hobbies", "type": "text", "value": None, "source": "unanswered",
+                     "required": False, "skipped": True}]
+    assert gh_fill.plan_problems(p) == ["needs input (required): Notice period"]
+    p["fields"][2]["value"] = "4 weeks"
+    assert gh_fill.plan_problems(p) == []

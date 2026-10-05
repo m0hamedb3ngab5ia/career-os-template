@@ -532,7 +532,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         return SAFETY_HARD_EXIT
     fields = plan["fields"]
     review = [f for f in fields if f["needs_review"]]
-    paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")]
+    paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")
+              or (f["source"] == "unanswered" and f.get("required"))]  # REQ-106: required unknowns ask too
     if paused:  # legal/salary/EEO with no stored answer: never guessed
         print(f"paused for your answer ({len(paused)}): " + "; ".join(paused))  # Action Items have no detail column
         _add_action(s, f"fill plan: {args.job_id}", "question", job_id=args.job_id,
