@@ -96,3 +96,12 @@ def test_plan_problems_required_needs_input_blocks():
     assert gh_fill.plan_problems(p) == ["needs input (required): Notice period"]
     p["fields"][2]["value"] = "4 weeks"
     assert gh_fill.plan_problems(p) == []
+
+
+@pytest.mark.unit
+def test_plan_problems_skipped_optional_pause_unblocks():
+    """An optional legal/salary pause the user skipped no longer blocks; a required one still does (never guessed)."""
+    plan = {"fields": [
+        {"field_id": "s", "label": "Salary?", "value": None, "source": "pause:salary", "required": False, "skipped": True},
+        {"field_id": "l", "label": "Sponsorship?", "value": None, "source": "pause:legal", "required": True}]}
+    assert gh_fill.plan_problems(plan) == ["unanswered (pause:legal): Sponsorship?"]

@@ -231,8 +231,8 @@ def application_status(settings: Any, job_id: str) -> dict[str, Any]:
 
 
 def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool = False) -> dict[str, Any]:
-    """Focus the live filled tab (unless `refill`); otherwise fill the form again in a visible tab from the saved answers (plan
-    first when there is none), detached from this server so a rebuild never kills it. Never submits."""
+    """Focus the live filled tab (unless `refill`); otherwise fill the form again in a visible tab from the previewed
+    fill plan, detached from this server so a rebuild never kills it. Never submits."""
     from careeros.apply import browser, gh_fill
 
     d = _job(settings, job_id)
@@ -242,7 +242,9 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
         return {"action": "filling", "log": "application.log"}
     ensure_unlocked(settings, job_id)
     require_ready(settings.root)  # REQ-103: NotReady -> 409 before plan/fill spawn
-    if (plan := _read_plan(d)) and (problems := gh_fill.plan_problems(plan)):  # REQ-106: answer first, then fill
+    if (plan := _read_plan(d)) is None:  # REQ-105: preview before fill
+        raise ValueError("preview the fill first: this job has no fill plan yet (Fill preview)")
+    if problems := gh_fill.plan_problems(plan):  # REQ-106: answer first, then fill
         raise ValueError("answer the fill plan first: " + "; ".join(problems))
     gh_fill.preflight()
     cdp = browser.cdp_url(settings)
@@ -252,8 +254,7 @@ def open_application(settings: Any, job_id: str, popen: Any = None, refill: bool
     if refill:
         browser.close(d, cdp)
     (d / "fill_summary.json").unlink(missing_ok=True)  # else status() shows the last fill's fields_left
-    steps = [] if (d / "fill_plan.json").is_file() else [["apply", "plan", job_id]]
-    cmd = " && ".join(shlex.join([sys.executable, "-m", "careeros.cli", *a]) for a in [*steps, ["apply", "fill", job_id]])
+    cmd = shlex.join([sys.executable, "-m", "careeros.cli", "apply", "fill", job_id])
     cmd = f"{cmd}; echo {shlex.quote(browser.FILL_EXIT)}$?"
     root = str(settings.root)
     with (d / "application.log").open("ab") as fh:
@@ -276,7 +277,11 @@ def fill_plan(settings: Any, job_id: str) -> dict[str, Any]:
     """The job's fill_plan.json (or None) and why it can't be filled yet."""
     from careeros.apply import gh_fill
 
+    from careeros.apply.gh_schema import field_kind
+
     plan = _read_plan(_job(settings, job_id))
+    if plan:  # `kind` (eeo/salary/legal...) from the field itself, for the UI; not stored
+        plan["fields"] = [{**f, "kind": field_kind(f)} for f in plan["fields"]]
     return {"plan": plan, "problems": gh_fill.plan_problems(plan) if plan else []}
 
 
@@ -295,44 +300,60 @@ def make_fill_plan(settings: Any, job_id: str) -> dict[str, Any]:
 def edit_fill_field(settings: Any, job_id: str, field_id: str, *, value: Any = None, skip: bool = False,
                     save: bool = True) -> dict[str, Any]:
     """Set one plan value (this job only) or skip an optional field; `save` also learns it as a standard answer
-    (REQ-053) so the next plan fills it. Legal/salary/EEO are only ever the user's own answer, never guessed."""
+    (REQ-053) so the next plan fills it. Legal/salary/EEO are only ever the user's own answer, never guessed; EEO
+    (judged from the field, not its source) never leaves this job."""
     from careeros.apply import gh_fill
-    from careeros.apply.gh_schema import _SELECTS, pick_option
+    from careeros.apply.gh_schema import _SELECTS, field_kind, pick_option
+    from careeros.runs.locks import _guard
     from careeros.store import Store
 
     d = _job(settings, job_id)
-    plan = _read_plan(d)
-    if plan is None:
-        raise LookupError(f"job {job_id} has no fill plan yet")
-    f = next((x for x in plan["fields"] if x["field_id"] == field_id), None)
-    if f is None:
-        raise LookupError(f"no field {field_id!r} in the fill plan")
-    ensure_unlocked(settings, job_id)
-    if f.get("source") == "pause:sensitive" or f["type"] in ("file", "hidden"):
-        raise ValueError(f"{f['label']}: not editable here")
-    saved = False
-    if skip:
-        if f.get("required"):
-            raise ValueError(f"{f['label']} is required: answer it to fill")
-        f.update(value=None, skipped=True, needs_review=False)
-    else:
-        text = str(value if value is not None else "").strip()
-        if not text:
-            raise ValueError("value is empty")
-        v: Any = pick_option(f["options"], text) if f.get("options") and f["type"] in _SELECTS else text
-        if v is None:
-            raise ValueError(f"{text!r} is not an option for {f['label']}")
-        eeo = f.get("source") in ("eeo", "pause:eeo")  # the structured eeo: block, not a match-pattern answer
-        f.update(value=[v] if f["type"] in ("multiselect", "checkbox_group") else v, source="user",
-                 needs_review=False)
-        f.pop("skipped", None)
-        if save and not eeo:
-            from careeros.learning import learn_answer
+    with _guard(d / "fill_plan.json"):  # one read-modify-write at a time (threads + the CLI's rebuild)
+        plan = _read_plan(d)
+        if plan is None:
+            raise LookupError(f"job {job_id} has no fill plan yet")
+        f = next((x for x in plan["fields"] if x["field_id"] == field_id), None)
+        if f is None:
+            raise LookupError(f"no field {field_id!r} in the fill plan")
+        ensure_unlocked(settings, job_id)
+        if f.get("source") == "pause:sensitive" or f["type"] in ("file", "hidden"):
+            raise ValueError(f"{f['label']}: not editable here")
+        kind, saved = field_kind(f), False
+        if skip:
+            if f.get("required"):
+                raise ValueError(f"{f['label']} is required: answer it to fill")
+            f.update(value=None, skipped=True, needs_review=False)
+        else:
+            text = str(value if value is not None else "").strip()
+            if not text:
+                raise ValueError("value is empty")
+            v: Any = pick_option(f["options"], text) if f.get("options") and f["type"] in _SELECTS else text
+            if v is None:
+                raise ValueError(f"{text!r} is not an option for {f['label']}")
+            src = str(f.get("source") or "")
+            f.update(value=[v] if f["type"] in ("multiselect", "checkbox_group") else v, source="user",
+                     needs_review=False)
+            f.pop("skipped", None)
+            if save and kind != "eeo":
+                _save_answer(settings, job_id, src, f["label"], text)
+                saved = True
+        Store(settings)._write(job_id, "fill_plan.json", plan)
+    return {"field": {**f, "kind": kind}, "saved": saved, "problems": gh_fill.plan_problems(plan)}
 
-            learn_answer(settings, question=f["label"], answer=text, job_id=job_id)
-            saved = True
-    Store(settings)._write(job_id, "fill_plan.json", plan)
-    return {"field": f, "saved": saved, "problems": gh_fill.plan_problems(plan)}
+
+def _save_answer(settings: Any, job_id: str, src: str, label: str, text: str) -> None:
+    """Update the saved answer this row came from (or the one learned from this label before); else learn it."""
+    from careeros.learning import edit_answer, learn_answer, normalize, slug
+    from careeros.store import Store
+
+    key = src.removeprefix("standard:") if src.startswith("standard:") else slug(normalize(label))
+    posting = Store(settings).load_posting(job_id) if src.startswith("standard:") else None
+    for co in dict.fromkeys([None, getattr(posting, "company", None) or None]):  # general, then company-scoped
+        try:
+            return edit_answer(settings, key=key, answer=text, company=co)
+        except KeyError:
+            pass
+    learn_answer(settings, question=label, answer=text, job_id=job_id)
 
 
 def open_tracker(settings: Any) -> dict[str, Any]:

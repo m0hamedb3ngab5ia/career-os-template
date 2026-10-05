@@ -21,7 +21,10 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
   const tab = useApplicationTab(jobId).data;
   const openApp = useOpenApplication(jobId);
   // REQ-106: a required field nobody answered (or a legal/salary/EEO pause) keeps Fill off until Fill preview has it.
-  const blocked = (useFillPlan(jobId).data?.problems?.length ?? 0) > 0;
+  const fp = useFillPlan(jobId).data;
+  const noPlan = !!fp && !fp.plan; // REQ-105: preview before fill
+  const blocked = noPlan || (fp?.problems?.length ?? 0) > 0;
+  const why = noPlan ? "Preview the fill first" : "Answer the open questions in Fill preview first";
   const toast = useToast();
   // Chrome (paths.apply_cdp) didn't answer: a plain connect-and-retry state; the recorded tab is kept for the retry.
   const [notConnected, setNotConnected] = useState<{ refill?: boolean } | null>(null);
@@ -73,13 +76,14 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
           live
             ? "Focus the tab with the filled form"
             : blocked
-              ? "Answer the open questions in Fill preview first"
+              ? why
               : "Open a visible tab and fill the form from your saved answers (stops before submit)"
         }
         onClick={() => onOpen()}
       >
         {label}
       </Button>
+      {blocked && !live ? <span className={styles.hint}>{why}</span> : null}
       {live ? (
         <Button disabled={openApp.isPending} title="Fill the form again in a new tab from your saved answers" onClick={() => onOpen(true)}>
           Refill

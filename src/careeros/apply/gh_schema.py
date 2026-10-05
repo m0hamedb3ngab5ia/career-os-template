@@ -125,3 +125,18 @@ def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers
             row["options"] = f["options"]
         rows.append(row)
     return {"fields": rows + _extras(profile), "files": files}
+
+
+def field_kind(f: dict[str, Any]) -> str:
+    """What the field asks, from the field itself (never its current `source`, which an edit rewrites)."""
+    return "eeo" if f["field_id"] in _EEO else classify_question(f["label"])
+
+
+def carry_over(old: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any]:
+    """Rebuild keeps this job's own edits and skips for fields that still exist (same field_id and type)."""
+    mine = {f["field_id"]: f for f in (old or {}).get("fields", []) if f.get("source") == "user" or f.get("skipped")}
+    for f in new["fields"]:
+        o = mine.get(f["field_id"])
+        if o and o.get("type") == f["type"] and f.get("source") != "pause:sensitive":
+            f.update({k: o[k] for k in ("value", "source", "needs_review", "skipped") if k in o})
+    return new

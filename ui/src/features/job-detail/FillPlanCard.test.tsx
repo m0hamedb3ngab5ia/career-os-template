@@ -55,4 +55,24 @@ describe("FillPlanCard", () => {
     expect(JSON.parse(post.body!)).toEqual({ value: "4 weeks", save: true });
     expect(await screen.findByText("Saved: Notice period, also saved to your profile")).toBeInTheDocument();
   });
+
+  it("never offers Save to profile for an EEO row, even after an edit; salary is job-only by default", async () => {
+    const calls = stubFetch({
+      plan: {
+        fields: [
+          { field_id: "gender", label: "Gender", type: "text", value: "x", source: "user", kind: "eeo", required: false },
+          { field_id: "pay", label: "Desired salary", type: "text", value: null, source: "pause:salary", kind: "salary", required: false },
+        ],
+      },
+      problems: [],
+    });
+    renderWithProviders(<FillPlanCard jobId="nw01" />);
+    const rows = within(await screen.findByRole("table")).getAllByRole("row").slice(1);
+    expect(within(rows[0]!).queryByRole("checkbox", { name: "Save to profile" })).toBeNull();
+    expect(within(rows[1]!).getByRole("checkbox", { name: "Save to profile" })).not.toBeChecked();
+    await userEvent.type(within(rows[0]!).getByRole("textbox", { name: "Gender" }), "y");
+    await userEvent.click(within(rows[0]!).getByRole("button", { name: "Save" }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/fields/gender"))).toBe(true));
+    expect(JSON.parse(calls.find((c) => c.url.endsWith("/fields/gender"))!.body!)).toEqual({ value: "xy", save: false });
+  });
 });

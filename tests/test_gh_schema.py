@@ -142,3 +142,22 @@ def test_plan_combined_degree_needs_review():
     f2 = _by_id(build_plan([], profile={**PROFILE, "education": [edu]}, answers_path=ANSWERS, files={})["fields"])
     assert f2["degree--0"]["value"] == "BS" and not f2["degree--0"]["needs_review"]
     assert f2["discipline--0"]["value"] == "Computer Science" and not f2["discipline--0"]["needs_review"]
+
+
+@pytest.mark.unit
+def test_carry_over_keeps_user_edits_and_skips_by_field_id():
+    from careeros.apply.gh_schema import carry_over
+
+    old = {"fields": [
+        {"field_id": "a", "type": "text", "value": "mine", "source": "user", "needs_review": False},
+        {"field_id": "b", "type": "text", "value": None, "source": "unanswered", "skipped": True, "needs_review": False},
+        {"field_id": "gone", "type": "text", "value": "x", "source": "user", "needs_review": False},
+        {"field_id": "c", "type": "text", "value": "old", "source": "standard:k", "needs_review": False}]}
+    new = {"fields": [
+        {"field_id": "a", "type": "text", "value": None, "source": "unanswered", "needs_review": True},
+        {"field_id": "b", "type": "text", "value": None, "source": "unanswered", "needs_review": True},
+        {"field_id": "c", "type": "text", "value": "new", "source": "standard:k", "needs_review": False}]}
+    by = {f["field_id"]: f for f in carry_over(old, new)["fields"]}
+    assert by["a"]["value"] == "mine" and by["a"]["source"] == "user" and not by["a"]["needs_review"]
+    assert by["b"]["skipped"] is True and by["b"]["value"] is None
+    assert by["c"]["value"] == "new" and "gone" not in by

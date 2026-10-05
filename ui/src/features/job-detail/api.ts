@@ -138,6 +138,7 @@ export interface FillField {
   required?: boolean;
   skipped?: boolean;
   options?: string[];
+  kind?: string; // from the field itself (eeo | salary | legal | ...), never from source
 }
 export interface FillPlanReply {
   plan: { fields: FillField[] } | null;

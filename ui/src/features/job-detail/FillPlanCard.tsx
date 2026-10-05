@@ -26,9 +26,10 @@ function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
   const edit = useEditFillField(jobId, f.field_id);
   const toast = useToast();
   const [value, setValue] = useState(shown(f.value));
-  const [save, setSave] = useState(true);
+  // EEO stays on this job only (judged from the field, so a re-edit can't save it); salary is per job unless ticked.
+  const eeo = f.kind === "eeo";
+  const [save, setSave] = useState(f.kind !== "salary");
   const editable = !["file", "hidden"].includes(f.type) && f.source !== "pause:sensitive";
-  const eeo = f.source === "eeo" || f.source === "pause:eeo";
   const empty = f.value == null || shown(f.value) === "";
   function send(body: { value?: string; skip?: boolean; save?: boolean }) {
     edit.mutate(body, {
