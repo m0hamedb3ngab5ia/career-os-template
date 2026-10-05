@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { QueryClient, QueryClientProvider, useQuery } from "@tanstack/react-query";
+import { apiFetch } from "../../api/client";
 import type { ReactNode } from "react";
 import { ToastProvider } from "../../kit/Toast";
 import { MemoryRouter } from "react-router";
@@ -87,6 +88,26 @@ describe("Pipeline tick + injection badge (REQ-104/109)", () => {
     expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).toBeChecked();
     rerender(ui(0));
     expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).not.toBeChecked();
+  });
+
+  it("keeps the new tick until the jobs list has refetched (no flash back to stale)", async () => {
+    let release!: () => void;
+    let selected = 0;
+    const api = mockApi({
+      "GET /api/jobs": () =>
+        selected ? new Promise((r) => (release = () => r({ items: [job({ job_id: "j1", company: "Acme", selected })] }))) : { items: [job({ job_id: "j1", company: "Acme", selected })] },
+      "POST /api/jobs/select": () => ((selected = 1), { ids: ["j1"], selected: true }),
+    });
+    function Row() {
+      const q = useQuery({ queryKey: ["jobs"], queryFn: () => apiFetch<{ items: ReturnType<typeof job>[] }>("/api/jobs") });
+      return q.data ? <>{col("pick").cell(q.data.items[0]!)}</> : null;
+    }
+    renderWithProviders(<Row />);
+    await userEvent.click(await screen.findByRole("checkbox", { name: "Tick Acme for pipeline" }));
+    await waitFor(() => expect(api.callsTo("GET /api/jobs")).toHaveLength(2));
+    expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).toBeChecked();
+    release();
+    await waitFor(() => expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).toBeChecked());
   });
 
   it("flagged row shows the injection reasons to screen readers", () => {
