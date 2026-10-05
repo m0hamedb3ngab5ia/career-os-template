@@ -182,8 +182,8 @@ def create(settings: Settings, job_ids: list[str], stop_at: str, name: str | Non
              "created_at": iso(now), "status": "queued", "dry_run": False, **out}
     for r in batch["selected"]:
         r["state"] = "pending"
-    Store(settings).set_selected([r["job_id"] for r in batch["selected"]], True)  # Start ticks them (REQ-104)
     _dump(_dir(settings) / f"{batch['id']}.json", batch)
+    Store(settings).set_selected([r["job_id"] for r in batch["selected"]], True)  # Start ticks them (REQ-104)
     return batch
 
 
