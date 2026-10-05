@@ -1431,6 +1431,190 @@
         "title": "Changes",
         "type": "object"
       },
+      "CheckCreated": {
+        "properties": {
+          "flagged": {
+            "title": "Flagged",
+            "type": "boolean"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "reasons": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Reasons",
+            "type": "array"
+          },
+          "score_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Error"
+          },
+          "score_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Score Run"
+          }
+        },
+        "required": [
+          "job_id",
+          "flagged",
+          "reasons",
+          "score_run"
+        ],
+        "title": "CheckCreated",
+        "type": "object"
+      },
+      "CheckDecision": {
+        "properties": {
+          "keep": {
+            "title": "Keep",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "keep"
+        ],
+        "title": "CheckDecision",
+        "type": "object"
+      },
+      "CheckState": {
+        "properties": {
+          "attempt": {
+            "anyOf": [
+              {
+                "additionalProperties": true,
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Attempt"
+          },
+          "best": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "decision": {
+            "anyOf": [
+              {
+                "enum": [
+                  "keep",
+                  "discard"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Decision"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "notice": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Notice"
+          },
+          "resumes": {
+            "items": {
+              "$ref": "#/components/schemas/MatchRow"
+            },
+            "title": "Resumes",
+            "type": "array"
+          },
+          "scored": {
+            "title": "Scored",
+            "type": "boolean"
+          },
+          "stage": {
+            "enum": [
+              "scoring",
+              "ready",
+              "offer_tailor",
+              "tailoring",
+              "ready_tailored",
+              "confirm",
+              "below_threshold",
+              "discarded"
+            ],
+            "title": "Stage",
+            "type": "string"
+          },
+          "tailor_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Tailor Run"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "threshold",
+          "scored",
+          "best",
+          "resumes",
+          "stage",
+          "tailor_run",
+          "decision",
+          "attempt",
+          "notice"
+        ],
+        "title": "CheckState",
+        "type": "object"
+      },
       "ClearBody": {
         "properties": {
           "note": {
@@ -9537,6 +9721,102 @@
         ]
       }
     },
+    "/api/jobs/check": {
+      "post": {
+        "description": "REQ-114 Check a job: raw body (DEC-006) = pasted JD text, or a pdf/docx/txt/md file when `filename` is\ngiven (<= 5 MB). Stores a `source: manual` job, scans it, starts its score run; poll GET .../check.",
+        "operationId": "check_job_api_jobs_check_post",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Filename"
+            }
+          },
+          {
+            "in": "query",
+            "name": "title",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Title",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Company",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "url",
+            "required": false,
+            "schema": {
+              "default": "",
+              "title": "Url",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            },
+            "text/plain": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckCreated"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Job",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/export": {
       "post": {
         "operationId": "export_api_jobs_export_post",
@@ -10450,6 +10730,145 @@
           }
         },
         "summary": "Open Application",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/check": {
+      "get": {
+        "description": "Where the check stands: match table (REQ-115), tailor offer, below-threshold notice (REQ-116).",
+        "operationId": "check_state_api_jobs__job_id__check_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check State",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/check/decision": {
+      "post": {
+        "description": "\"Create closest match anyway?\": keep = attempt kept, flagged below_threshold; no = attempt discarded.",
+        "operationId": "check_decision_api_jobs__job_id__check_decision_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CheckDecision"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CheckState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Decision",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/check/tailor": {
+      "post": {
+        "description": "The one \"Tailor from master\" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.",
+        "operationId": "check_tailor_api_jobs__job_id__check_tailor_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Check Tailor",
         "tags": [
           "jobs"
         ]
