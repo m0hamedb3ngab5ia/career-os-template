@@ -2,14 +2,18 @@
 that the learn-voice skill writes."""
 from __future__ import annotations
 
+import io
 import re
+import zipfile
 from pathlib import Path
+from xml.etree import ElementTree
 from typing import Any
 
 from careeros.runs.yamledit import _write_atomic
 
-EXTS = (".txt", ".md", ".eml")  # what the learn-voice skill reads
+EXTS = (".txt", ".md", ".eml", ".pdf", ".docx")  # .docx is stored as .txt; the rest as-is for learn-voice to Read
 MAX_BYTES = 5 * 1024 * 1024
+_W = "{http://schemas.openxmlformats.org/wordprocessingml/2006/main}"
 _LEARNED = re.compile(r"(^## Learned[^\n]*\n)(.*?)(?=^## |\Z)", re.M | re.S)
 
 
@@ -37,12 +41,33 @@ def list_samples(root: Path) -> list[dict[str, Any]]:
             if p.is_file() and not p.name.startswith(".")] if d.is_dir() else []
 
 
+def docx_text(data: bytes) -> str:
+    """Plain text of a .docx (stdlib only): one line per paragraph, tabs and line breaks kept."""
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as z:
+            if z.getinfo("word/document.xml").file_size > 4 * MAX_BYTES:  # zip bomb guard
+                raise ValueError("document too large")
+            body = ElementTree.fromstring(z.read("word/document.xml"))
+    except (zipfile.BadZipFile, KeyError, ElementTree.ParseError) as e:
+        raise ValueError(f"not a valid .docx ({e})") from None
+    tags = {_W + "t": None, _W + "tab": "\t", _W + "br": "\n", _W + "cr": "\n"}
+    return "\n".join("".join((e.text or "") if tags[e.tag] is None else tags[e.tag]
+                              for e in para.iter() if e.tag in tags)
+                      for para in body.iter(_W + "p"))
+
+
 def add_sample(root: Path, name: str, data: bytes) -> dict[str, Any]:
     p = _path(root, name)
     if p.suffix.lower() not in EXTS:
         raise Unsupported(f"{name}: only {', '.join(EXTS)} files")
     if len(data) > MAX_BYTES:
         raise ValueError(f"{name}: larger than 5 MB")
+    if p.suffix.lower() == ".docx":
+        try:
+            data = docx_text(data).encode("utf-8")
+        except ValueError as e:
+            raise ValueError(f"{name}: {e}") from None
+        p, name = p.with_suffix(".txt"), Path(name).stem + ".txt"
     p.parent.mkdir(parents=True, exist_ok=True)
     n = 1
     while p.exists():  # never overwrite an existing sample: letter.md -> letter-2.md

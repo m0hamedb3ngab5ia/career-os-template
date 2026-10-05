@@ -9,7 +9,8 @@ description: Extract the candidate's writing style from profile/voice/samples/* 
 
 ## 1. Read samples
 
-List `VOICE/samples/*` (accept .md, .txt, .eml; ignore hidden files). Read every file fully.
+List `VOICE/samples/*` (accept .md, .txt, .eml, .pdf; ignore hidden files). Read every file fully (Read handles .pdf;
+uploaded .docx files are already stored as .txt).
 If there are 0 samples: do not modify `## Learned`; print
 `RESULT: {"skill":"learn-voice","voice_samples_count":0,"error":"no samples in profile/voice/samples/"}` and stop.
 

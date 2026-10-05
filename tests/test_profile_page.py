@@ -112,9 +112,26 @@ def test_add_sample_keeps_same_name_and_skill_types_only(tmp_path: Path):
     assert (d / "letter.md").read_bytes() == b"one" and (d / "letter-3.md").read_bytes() == b"three"
     assert voice.add_sample(tmp_path, "mail.eml", b"x")["name"] == "mail.eml"
     assert not [p for p in d.iterdir() if p.name.startswith(".")]  # no temp files left behind
-    for bad in ("cv.pdf", "cv.docx"):
+    for bad in ("cv.doc", "cv.rtf"):
         with pytest.raises(voice.Unsupported):
             voice.add_sample(tmp_path, bad, b"x")
+
+
+FIXTURE_DOCX = Path(__file__).resolve().parent / "fixtures" / "voice_sample.docx"
+
+
+def test_docx_sample_stored_as_plain_text_and_pdf_as_is(tmp_path: Path):
+    """TASK-021: .docx becomes .txt (stdlib, paragraphs on their own lines); .pdf is kept for learn-voice to Read."""
+    assert voice.docx_text(FIXTURE_DOCX.read_bytes()) == "Dear hiring team,\nI build small tools\tthat last.\n\nBest regards"
+    assert voice.add_sample(tmp_path, "letter.docx", FIXTURE_DOCX.read_bytes())["name"] == "letter.txt"
+    assert voice.add_sample(tmp_path, "letter.docx", FIXTURE_DOCX.read_bytes())["name"] == "letter-2.txt"
+    d = voice.samples_dir(tmp_path)
+    assert (d / "letter.txt").read_text(encoding="utf-8").startswith("Dear hiring team,")
+    assert not list(d.glob("*.docx"))
+    assert voice.add_sample(tmp_path, "cv.pdf", b"%PDF-1.4 x")["name"] == "cv.pdf"
+    assert (d / "cv.pdf").read_bytes() == b"%PDF-1.4 x"
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "broken.docx", b"not a zip")
 
 
 def test_step_skills_get_minimal_tools():
@@ -146,3 +163,9 @@ def test_run_skill_passes_kind_to_build_command(tmp_path: Path):
     except RuntimeError:
         pass
     assert cmds[0][cmds[0].index("--allowedTools") + 1] == "Read,Glob,Grep,Edit(profile/voice/**)"
+
+
+def test_learn_voice_skill_reads_uploaded_types():
+    """TASK-021: learn-voice reads every type the upload stores (docx arrives as .txt, pdf via Read)."""
+    skill = (Path(__file__).resolve().parents[1] / ".claude" / "skills" / "learn-voice" / "SKILL.md").read_text()
+    assert all(e in skill for e in (".md", ".txt", ".eml", ".pdf"))
