@@ -187,7 +187,7 @@ export const COLUMNS: Column[] = [
 function PickCell({ job }: { job: JobListItem }) {
   const pick = useSelectJobs();
   const toast = useToast();
-  // Server state wins once the POST settles (the jobs query refetches); optimistic only while pending.
+  // Optimistic while the POST and the list refetch run (useSelectJobs waits for it); then server state wins.
   const checked = pick.isPending ? pick.variables.selected : job.selected !== 0;
   const toggle = () =>
     pick.mutate(

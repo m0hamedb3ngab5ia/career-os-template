@@ -157,6 +157,7 @@ export function useSelectJobs() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { ids: string[]; selected: boolean }) => apiSend("POST", "/api/jobs/select", body),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["jobs"] }),
+    // Returned, so the mutation stays pending (the tick stays optimistic) until the list has refetched.
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
 }

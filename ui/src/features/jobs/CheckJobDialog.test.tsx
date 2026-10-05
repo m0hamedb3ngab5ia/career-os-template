@@ -50,11 +50,11 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("jd.txt: no text found");
   });
 
-  it("E2E-010-01: pasted JD → match table, best marked, no tailor; Use this résumé ticks the job", async () => {
+  it("E2E-010-01: pasted JD → fit score + match table, best marked, no tailor; Done closes without ticking (no résumé choice is stored)", async () => {
     const api = mockApi({
       "POST /api/jobs/check": { status: 201, body: CREATED },
       "GET /api/jobs/m01/check": state("ready"),
-      "POST /api/jobs/select": { ids: ["m01"], selected: true },
+      "GET /api/jobs/m01": { job: { job_id: "m01" }, score: { fit: 82 } },
     });
     const { user, onClose } = open();
     await user.type(screen.getByLabelText("Job description"), "Backend engineer, Python");
@@ -62,15 +62,83 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     await user.click(screen.getByRole("button", { name: "Check job" }));
     const table = await screen.findByRole("table");
     expect(within(table).getAllByRole("rowheader")[0]).toHaveTextContent("Backend Best");
+    expect(await screen.findByRole("progressbar", { name: "Fit score" })).toHaveAttribute("aria-valuenow", "82");
     const post = api.calls.find((c) => c.method === "POST" && c.path === "/api/jobs/check")!;
     expect(post.body).toBe("Backend engineer, Python");
     expect(post.search.get("company")).toBe("Acme");
     expect(post.search.get("filename")).toBeNull();
     expect(screen.queryByRole("button", { name: "Tailor from master" })).toBeNull();
-    await user.click(screen.getByRole("button", { name: "Use this résumé" }));
+    expect(screen.getByText(/ready to tick/)).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Done" }));
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(api.calls.find((c) => c.path === "/api/jobs/select")?.body).toEqual({ ids: ["m01"], selected: true });
+    expect(api.calls.some((c) => c.path === "/api/jobs/select")).toBe(false);
     expect(api.calls.some((c) => c.path.endsWith("/check/tailor"))).toBe(false);
+  });
+
+  it("flagged job: no 'ready to tick' until the flag is cleared on the job page", async () => {
+    mockApi({
+      "POST /api/jobs/check": { status: 201, body: { ...CREATED, flagged: true, reasons: ["hidden text"] } },
+      "GET /api/jobs/m01/check": state("ready"),
+    });
+    const { user } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
+    expect(screen.queryByText(/ready to tick/)).toBeNull();
+    expect(screen.getByText(/Mark it checked on the job page before ticking it/)).toBeInTheDocument();
+  });
+
+  it("score_error: shows why, stops polling, no stuck 'Scoring…'", async () => {
+    const api = mockApi({
+      "POST /api/jobs/check": { status: 201, body: { ...CREATED, score_run: null, score_error: "another run is active" } },
+      "GET /api/jobs/m01/check": state("scoring"),
+    });
+    const { user } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    expect(await screen.findByText(/Scoring could not start: another run is active/)).toBeInTheDocument();
+    await vi.waitFor(() => expect(api.callsTo("GET /api/jobs/m01/check")).toHaveLength(1));
+    expect(screen.queryByText(/^Scoring…/)).toBeNull();
+    expect(screen.getByRole("link", { name: "Open job" })).toBeInTheDocument();
+  });
+
+  it("cannot be closed while the check is being sent; Cancel is disabled", async () => {
+    let release!: () => void;
+    mockApi({
+      "POST /api/jobs/check": () => new Promise((r) => (release = () => r({ status: 201, body: CREATED }))),
+      "GET /api/jobs/m01/check": state("ready"),
+    });
+    const { user, onClose } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    expect(screen.getByRole("button", { name: "Cancel" })).toBeDisabled();
+    await user.keyboard("{Escape}");
+    expect(onClose).not.toHaveBeenCalled();
+    release();
+    expect(await screen.findByRole("table")).toBeInTheDocument();
+  });
+
+  it("not_tailorable: notice plus a Keep job action", async () => {
+    mockApi({
+      "POST /api/jobs/check": { status: 201, body: CREATED },
+      "GET /api/jobs/m01/check": state("not_tailorable", { notice: "No master résumé to tailor from." }),
+    });
+    const { user, onClose } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    expect(await screen.findByText("No master résumé to tailor from.")).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Keep job" }));
+    expect(onClose).toHaveBeenCalled();
+  });
+
+  it("file input points at the error message", async () => {
+    mockApi({});
+    const { user } = open();
+    const big = new File([new Uint8Array(5 * 1024 * 1024 + 1)], "jd.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText(/Or upload a file/), big);
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    const err = screen.getByRole("alert");
+    expect(screen.getByLabelText(/Or upload a file/)).toHaveAttribute("aria-describedby", err.id);
   });
 
   it("shows the injection flag with its reasons; scoring continues", async () => {
