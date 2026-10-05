@@ -602,3 +602,7 @@
   vertical-align: middle;
   border-bottom: 1px solid var(--sep);
 }
+
+.matches { width: 100%; border-collapse: collapse; font-size: var(--text-sm, 13px); }
+.matches th, .matches td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border, #e5e5e5); vertical-align: top; }
+.matches tr[data-best] th, .matches tr[data-best] td { font-weight: 600; }

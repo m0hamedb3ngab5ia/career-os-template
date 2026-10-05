@@ -30,6 +30,8 @@ export const META: Meta = {
 export function job(over: Partial<JobListItem> & { job_id: string }): JobListItem {
   return {
     company: "Northwind Labs",
+    selected: 1,
+    injection: null,
     title: "Software Engineer",
     location: "Springfield",
     ats: "greenhouse",

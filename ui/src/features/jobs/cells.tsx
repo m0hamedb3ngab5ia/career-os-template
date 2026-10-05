@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+import { TriangleAlert } from "lucide-react";
+import { useState, type ReactNode } from "react";
+import { apiSend } from "../../api/client";
 import { Link } from "react-router";
 import { SafetyChip, StatusChip, TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
@@ -44,10 +46,21 @@ export const COLUMNS: Column[] = [
     exportField: "company",
     title: (j) => j.company ?? undefined,
     cell: (j) => (
-      <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
-        {j.company || j.job_id}
-      </Link>
+      <>
+        <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
+          {j.company || j.job_id}
+        </Link>
+        {j.injection ? <InjectionBadge reasons={j.injection} /> : null}
+      </>
     ),
+  },
+  {
+    key: "pick",
+    label: "Pipeline",
+    width: 80,
+    exportField: "selected",
+    title: () => "Ticked jobs are the only ones prepared or applied",
+    cell: (j) => <PickCell job={j} />,
   },
   {
     key: "role",
@@ -168,3 +181,31 @@ export const COLUMNS: Column[] = [
     cell: (j) => j.next_action || <Empty sr="None" />,
   },
 ];
+
+/** REQ-104: tick/untick one job for prepare/apply. A missing flag (old job) counts as ticked. */
+function PickCell({ job }: { job: JobListItem }) {
+  // Plain fetch, no query client: the server's change event refreshes the row (events.ts).
+  const [want, setWant] = useState<boolean | null>(null);
+  const checked = want ?? job.selected !== 0;
+  const toggle = () => {
+    const next = !checked;
+    setWant(next);
+    apiSend("POST", "/api/jobs/select", { ids: [job.job_id], selected: next }).catch(() => setWant(null));
+  };
+  return (
+    <label className={styles.check}>
+      <input type="checkbox" checked={checked} onChange={toggle} />
+      <span className="sr-only">Tick {job.company || job.job_id} for pipeline</span>
+    </label>
+  );
+}
+
+/** REQ-109: flagged posting; the reasons show on hover and to screen readers. */
+function InjectionBadge({ reasons }: { reasons: string }) {
+  return (
+    <span className={styles.flag} title={`Possible prompt injection: ${reasons}`}>
+      <TriangleAlert size={14} strokeWidth={1.7} aria-hidden="true" />
+      <span className="sr-only">Possible prompt injection: {reasons}</span>
+    </span>
+  );
+}

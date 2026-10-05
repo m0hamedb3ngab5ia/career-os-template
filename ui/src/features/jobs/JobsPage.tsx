@@ -10,7 +10,7 @@ import { Pager, usePaged } from "../../kit/Pager";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useExportJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
+import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsTable } from "./JobsTable";
 import { filterSummary } from "./HeaderFilterMenu";
@@ -142,6 +142,7 @@ export function JobsPage() {
   const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
   const tabs = useJobsTabs(filterParams);
   const exporter = useExportJobs();
+  const pick = useSelectJobs();
   const captionId = useId();
   const panelId = useId();
 
@@ -315,6 +316,12 @@ export function JobsPage() {
                 <Link to={`/pipeline/batch/new?${new URLSearchParams({ ids: [...selected].join(",") })}`}>
                   Add {formatCount(nSel)} to batch
                 </Link>
+                <Button size="small" disabled={pick.isPending} onClick={() => pick.mutate({ ids: [...selected], selected: true })}>
+                  Tick for pipeline
+                </Button>
+                <Button size="small" disabled={pick.isPending} onClick={() => pick.mutate({ ids: [...selected], selected: false })}>
+                  Untick
+                </Button>
                 <Button size="small" onClick={() => setSelected([])}>
                   Clear selection
                 </Button>

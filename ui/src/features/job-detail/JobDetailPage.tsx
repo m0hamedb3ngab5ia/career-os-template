@@ -12,6 +12,8 @@ import { ActivityCard } from "./ActivityCard";
 import { errorText, useApplicationTab, useJob, useSetStatus, useWithdraw } from "./api";
 import { ApplySessionCard } from "./ApplySessionCard";
 import { FillPlanCard } from "./FillPlanCard";
+import { InjectionCard } from "./InjectionCard";
+import { MatchesCard } from "./MatchesCard";
 import { ContactsCard } from "./ContactsCard";
 import { DocumentsCard } from "./DocumentsCard";
 import { OverrideMenu, StatusMenu, WithdrawButton } from "./HeaderActions";
@@ -109,6 +111,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             onConfirm={doWithdraw}
           />
         ) : null}
+        {detail.job?.injection ? <InjectionCard jobId={jobId} reasons={detail.job.injection} /> : null}
         <PipelineCard jobId={jobId} />
         {/* Supporting sections, in the design doc's order, as dividers not cards; screenshots sit under Documents. */}
         <div className={styles.supporting}>
@@ -123,6 +126,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
           <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} fieldsLeft={fieldsLeft} />
           <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
           <ScoreCard score={detail.score} />
+          <MatchesCard jobId={jobId} />
           <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
           <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
           <ActivityCard activity={detail.activity ?? []} history={detail.history} />

@@ -53,7 +53,7 @@ describe("Jobs screen", () => {
     setup();
     const table = await screen.findByRole("table");
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.replace(/,.*$/, ""));
-    expect(headers).toEqual(["Select all shown jobs", "Company", "Role", "Location", "Tier", "Fit", "Status", "Category", "Safety",
+    expect(headers).toEqual(["Select all shown jobs", "Company", "Pipeline", "Role", "Location", "Tier", "Fit", "Status", "Category", "Safety",
       "QA", "QA passed", "ATS", "Found", "Applied", "Closes", "Next action"]);
     const nw = within(table).getByRole("rowheader", { name: "Northwind Labs" }).closest("tr")!;
     expect(within(nw).getByRole("cell", { name: "Software Engineer" })).toBeInTheDocument();
@@ -225,7 +225,7 @@ describe("Jobs screen", () => {
     expect(req.headers["x-careeros"]).toBe("1");
     expect(req.body).toEqual({
       job_ids: ["nw01"],
-      columns: ["job_id", "company", "title", "location", "tier", "fit", "status", "category", "safety", "qa_score", "qa_passed",
+      columns: ["job_id", "company", "selected", "title", "location", "tier", "fit", "status", "category", "safety", "qa_score", "qa_passed",
         "found_at", "applied_at", "closes_at", "next_action"],
     });
     expect(click).toHaveBeenCalled();

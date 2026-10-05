@@ -155,7 +155,7 @@ _NEXT_ACTION = ("(SELECT a.what FROM action_items a WHERE a.job_id = jobs.job_id
 EXPORT_COLUMNS = {"company": "Company", "title": "Role", "location": "Location", "tier": "Tier", "fit": "Fit",
                   "status": "Status", "safety": "Safety", "qa_score": "QA", "ats": "ATS", "found_at": "Found",
                   "applied_at": "Applied", "next_action": "Next action", "category": "Category", "url": "URL",
-                  "closes_at": "Closes"}
+                  "closes_at": "Closes", "selected": "Pipeline"}
 DEFAULT_EXPORT = ("company", "title", "location", "tier", "fit", "status", "safety", "qa_score", "ats", "found_at",
                   "applied_at", "next_action", "url")
 MAX_EXPORT = 5000
