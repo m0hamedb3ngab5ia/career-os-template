@@ -18,9 +18,15 @@ from careeros.qa import WORD_RE, number_tokens
 from careeros.qa_ext.consistency import DEFAULT_SENIORITY_WORDS
 from careeros.runs.atomic import write_text
 
-# a rewrite may not upgrade the claim (REQ-095: supported -> led): verb stems (any inflection) + seniority words
-STRONGER_STEMS = ("lead", "led", "manag", "own", "spearhead", "direct", "architect", "found", "launch", "champion",
-                  "overs", "head", "drove", "driv", "buil")
+# a rewrite may not upgrade the claim (REQ-095: supported -> led): verb stems + their whole-word forms, plus seniority
+# words. Whole words only, so 'ledger' never hides 'led' and 'directory' is no claim.
+_SUFFIXES = ("", "e", "s", "es", "ed", "d", "ing", "er", "ers", "ership", "ment", "ement", "or", "ors")
+STRONGER_FORMS = {stem: {stem + suf for suf in _SUFFIXES} for stem in (
+    "lead", "manag", "own", "spearhead", "direct", "architect", "found", "launch", "champion", "head")}
+STRONGER_FORMS["lead"].add("led")
+STRONGER_FORMS |= {"overs": {"oversee", "oversees", "overseeing", "overseen", "oversaw"},
+                   "driv": {"drove", "drive", "drives", "driven", "driving"},
+                   "buil": {"build", "builds", "built", "building"}}
 NUMBER_WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
                 "twenty", "thirty", "forty", "fifty", "hundred", "hundreds", "thousand", "thousands", "million",
                 "millions", "billion", "half", "halved", "double", "doubled", "triple", "tripled", "twice",
@@ -126,7 +132,7 @@ def guard(prev: str, new: str, allowed: str = "") -> list[str]:
     if terms := sorted(w for w in new_words - words - GRAMMAR - NUMBER_WORDS if _stem(w) not in ok):
         reasons.append(f"adds words not in the previous version or the suggestion: {', '.join(terms)}")
     strong = {w for w in new_words - words if w in DEFAULT_SENIORITY_WORDS} | {
-        s for s in STRONGER_STEMS if any(w.startswith(s) for w in new_words) and not any(w.startswith(s) for w in words)}
+        s for s, forms in STRONGER_FORMS.items() if new_words & forms and not words & forms}
     if strong:
         reasons.append(f"makes a stronger claim than the previous version: {', '.join(sorted(strong))}")
     return reasons

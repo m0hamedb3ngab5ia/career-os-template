@@ -861,6 +861,13 @@ def cmd_resume_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def _percent(v: str) -> int:
+    n = int(v) if v.lstrip("-").isdigit() else -1
+    if not 0 <= n <= 100:
+        raise argparse.ArgumentTypeError(f"must be a whole number 0-100, got {v!r}")
+    return n
+
+
 def cmd_resume_match(args: argparse.Namespace) -> int:
     """Every résumé's match score for one job, best first (REQ-111/115, DEC-003)."""
     from careeros.match import matches
@@ -872,6 +879,9 @@ def cmd_resume_match(args: argparse.Namespace) -> int:
         print(f"error: no job {args.job_id!r}", file=sys.stderr)
         return 1
     out = matches(s, d, args.threshold)
+    if not args.json and not out["scored"]:
+        print(out["hint"])
+        return 0
     if args.json:
         print(json.dumps(out, indent=2, ensure_ascii=False))
         return 0
@@ -1955,7 +1965,7 @@ def build_parser() -> argparse.ArgumentParser:
     rsa.set_defaults(fn=cmd_resume_add)
     rsm = rss.add_parser("match", help="match score 0-100 of every résumé vs a job, best first (no LLM)")
     rsm.add_argument("job_id")
-    rsm.add_argument("--threshold", type=int, help="override thresholds.min_match (targets.yaml) for this check")
+    rsm.add_argument("--threshold", type=_percent, help="override thresholds.min_match (targets.yaml) for this check")
     rsm.add_argument("--json", action="store_true")
     rsm.set_defaults(fn=cmd_resume_match)
     rsp = rss.add_parser("propose-master", help="validate a proposed master.yaml -> profile/master.proposed.yaml "

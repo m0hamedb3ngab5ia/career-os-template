@@ -1691,10 +1691,14 @@ export interface components {
     Matches: {
       /** Best */
       best: string | null;
+      /** Hint */
+      hint?: string | null;
       /** Job Id */
       job_id: string;
       /** Resumes */
       resumes: components["schemas"]["MatchRow"][];
+      /** Scored */
+      scored: boolean;
       /** Threshold */
       threshold: number;
     };

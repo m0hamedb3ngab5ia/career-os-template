@@ -158,8 +158,10 @@ class MatchRow(BaseModel):
 class Matches(BaseModel):
     job_id: str
     threshold: int
+    scored: bool  # False: score.json has no skills yet -> no rows, `hint` says to run score
     best: str | None
     resumes: list[MatchRow]
+    hint: str | None = None
 
 
 @router.get("/jobs/{job_id}/matches")

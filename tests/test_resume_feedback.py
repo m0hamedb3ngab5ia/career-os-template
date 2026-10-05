@@ -55,6 +55,21 @@ def test_guard_closes_review_holes(new: str, why: str):
     assert reasons and why in " ".join(reasons).lower()
 
 
+@pytest.mark.parametrize("prev, new, why", [  # PR #127 deferred NIT: whole-word forms, no prefix masking
+    ("Kept the ledger", "Led the ledger", "lead"),           # 'ledger' must not hide 'led'
+    ("Kept the foundation", "Founded the foundation", "found"),
+    ("Supported services", "Built services", "buil"),
+    ("Supported services", "Building services", "buil"),
+])
+def test_guard_stronger_claim_whole_words(prev: str, new: str, why: str):
+    reasons = fb.guard(prev, new, "led founded built building")
+    assert reasons and why in " ".join(reasons).lower()
+
+
+def test_guard_stronger_claim_ignores_lookalikes():  # 'ownload'-style prefixes are not claims
+    assert fb.guard("Kept files", "Kept directory files", "directory") == []
+
+
 def test_guard_allows_rewording():  # new words may come from the item's suggestion (stemmed)
     assert fb.guard(V1, V1.replace("Supported migration of", "Supported moving"), "say what moved") == []
 

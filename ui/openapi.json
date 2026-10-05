@@ -4502,6 +4502,17 @@
             ],
             "title": "Best"
           },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
@@ -4513,6 +4524,10 @@
             "title": "Resumes",
             "type": "array"
           },
+          "scored": {
+            "title": "Scored",
+            "type": "boolean"
+          },
           "threshold": {
             "title": "Threshold",
             "type": "integer"
@@ -4521,6 +4536,7 @@
         "required": [
           "job_id",
           "threshold",
+          "scored",
           "best",
           "resumes"
         ],

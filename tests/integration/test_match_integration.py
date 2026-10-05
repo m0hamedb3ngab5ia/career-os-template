@@ -29,7 +29,8 @@ def root(tmp_path: Path) -> Path:
                        ("Old", "Java")):
         rid = resumes.add(r, "cv.pdf", PDF, name=name)["rid"]
         resumes.add_text(r, rid, text, author="user", source="edit")
-    (r / "config" / "pipeline.yaml").open("a").write("\nmatch:\n  synonyms:\n    kubernetes: [k8s]\n")
+    with (r / "config" / "pipeline.yaml").open("a") as f:
+        f.write("\nmatch:\n  synonyms:\n    kubernetes: [k8s]\n")
     return r
 
 
@@ -47,6 +48,17 @@ def test_resume_match_cli(root: Path):
     assert json.loads(run(JOB, "--json", "--threshold", "90").stdout)["threshold"] == 90
     assert "Infra" in run(JOB).stdout
     assert run("nope").returncode == 1
+    for bad in ("101", "-1"):  # same 0-100 range as the API
+        assert run(JOB, "--threshold", bad).returncode == 2
+
+
+def test_unscored_job_hint(root: Path):  # PR #130 MUST: no skills in score.json -> no score, a hint
+    (root / "data" / "jobs" / JOB / "score.json").unlink()
+    env = subprocess_env(root, root.parent / "home")
+    r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(root), "resume", "match", JOB],
+                       capture_output=True, text=True, env=env, timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert f"careeros run score --job {JOB}" in r.stdout and "Infra" not in r.stdout
 
 
 def test_matches_api(root: Path):
@@ -70,3 +82,7 @@ def test_matches_api(root: Path):
         assert body["best"] == body["resumes"][0]["rid"] and body["threshold"] == 70
         assert c.get(f"/api/jobs/{JOB}/matches", params={"threshold": 50}).json()["threshold"] == 50
         assert c.get("/api/jobs/nope/matches").status_code == 404
+        assert body["scored"] is True and body["hint"] is None
+        (root / "data" / "jobs" / JOB / "score.json").write_text("{}")
+        u = c.get(f"/api/jobs/{JOB}/matches").json()
+        assert u["scored"] is False and u["best"] is None and f"run score --job {JOB}" in u["hint"]

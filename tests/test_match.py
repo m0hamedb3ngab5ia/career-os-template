@@ -37,3 +37,22 @@ def test_variants_and_synonyms():
     assert match.score("ran k8s", ["Kubernetes"], [], "", syn)["score"] == 100
     assert match.score("ran kubernetes", ["K8s"], [], "", syn)["score"] == 100
     assert match.score("ran k8s", ["Kubernetes"], [], "")["score"] == 0
+
+
+def test_skill_in_both_groups_counted_once():
+    r = match.score("java", ["Python", "Go"], ["python", "Rust"], "")
+    assert r["missing"] == ["Python", "Go", "Rust"]
+    assert r["groups"]["preferred"]["missing"] == ["Rust"]
+
+
+@pytest.mark.parametrize("score_json", [None, "{}", '{"required_skills": [], "nice_to_have_skills": []}', "not json"])
+def test_unscored_job_gives_no_score_and_a_hint(tmp_path, score_json):  # PR #130 MUST: no title-only scoring
+    from careeros.config import Settings
+    jd = tmp_path / "data" / "jobs" / "j1"
+    jd.mkdir(parents=True)
+    (jd / "posting.json").write_text('{"title": "Backend Engineer"}')
+    if score_json is not None:
+        (jd / "score.json").write_text(score_json)
+    out = match.matches(Settings(root=tmp_path), jd)
+    assert out["scored"] is False and out["best"] is None and out["resumes"] == []
+    assert "careeros run score --job j1" in out["hint"]

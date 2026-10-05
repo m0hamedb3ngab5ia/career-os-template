@@ -41,6 +41,9 @@ def score(text: str, required: list[str], preferred: list[str], title: str,
     groups: dict[str, dict[str, list[str]]] = {}
     for name, terms in (("required", required), ("preferred", preferred), ("title", title_terms(title))):
         terms = list(dict.fromkeys(str(x).strip() for x in terms or [] if str(x).strip()))
+        if name == "preferred":  # a skill in both lists counts (and is missing) once, as required
+            req_l = {x.lower() for x in groups["required"]["hit"] + groups["required"]["missing"]}
+            terms = [x for x in terms if x.lower() not in req_l]
         hits = [x for x in terms if _hit(x, text, syn)]
         groups[name] = {"hit": hits, "missing": [x for x in terms if x not in hits]}
     used = {k: w for k, w in WEIGHTS.items() if groups[k]["hit"] or groups[k]["missing"]}
@@ -64,14 +67,17 @@ def matches(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[
     sc, posting = _json(job_dir / "score.json"), _json(job_dir / "posting.json")
     req = sc.get("required_skills") or []
     pref = sc.get("preferred_skills") or sc.get("nice_to_have_skills") or []
-    syn = (settings.pipeline.get("match") or {}).get("synonyms") or {}
     if threshold is None:
         threshold = int((settings.targets.get("thresholds") or {}).get("min_match", DEFAULT_MIN_MATCH))
+    if not (req or pref):  # unscored job: a title-only score would be meaningless (PR #130)
+        return {"job_id": job_dir.name, "threshold": threshold, "scored": False, "best": None, "resumes": [],
+                "hint": f"job not scored yet: run `careeros run score --job {job_dir.name}`"}
+    syn = (settings.pipeline.get("match") or {}).get("synonyms") or {}
     rows = []
     for r in resumes.list_resumes(settings.root):
         text = resumes.version(settings.root, r["rid"], r["latest"])["text"]
         m = score(text, req, pref, str(posting.get("title") or ""), syn)
         rows.append({"rid": r["rid"], "name": r["name"], "type": r["type"], "version": r["latest"], **m})
     rows.sort(key=lambda x: -x["score"])
-    return {"job_id": job_dir.name, "threshold": threshold, "best": rows[0]["rid"] if rows else None,
-            "resumes": rows}
+    return {"job_id": job_dir.name, "threshold": threshold, "scored": True,
+            "best": rows[0]["rid"] if rows else None, "resumes": rows, "hint": None}
