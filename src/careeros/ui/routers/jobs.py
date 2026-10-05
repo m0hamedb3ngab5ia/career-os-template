@@ -491,6 +491,12 @@ def edit_fill_field(job_id: str, field_id: str, body: FillFieldBody, c=Depends(c
         return acts.edit_fill_field(c.settings, job_id, field_id, value=body.value, skip=body.skip, save=body.save)
 
 
+@router.post("/jobs/{job_id}/fill-plan/fields/{field_id}/approve")
+def approve_fill_field(job_id: str, field_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        return acts.approve_fill_field(c.settings, job_id, field_id)
+
+
 @router.post("/jobs/{job_id}/safety/verify")
 def safety_verify(job_id: str, body: VerifyBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():

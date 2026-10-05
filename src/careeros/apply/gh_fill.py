@@ -40,14 +40,17 @@ def preflight() -> None:
 
 def plan_problems(plan: dict[str, Any]) -> list[str]:
     """Reasons the plan must not be filled: sensitive fields, legal/salary/EEO pauses with no answer, or a required
-    field nobody answered yet (REQ-106: needs input; only optional fields may be skipped)."""
+    field nobody answered yet (REQ-106: needs input; only optional fields may be skipped), or an AI draft the user
+    has not approved or edited (REQ-105)."""
     if plan.get("blocked"):
         return [f"blocked (sensitive field): {'; '.join(plan['blocked'])}"]
     empty = [f for f in plan["fields"] if f.get("value") in (None, "", [])]
     return ([f"unanswered ({f['source']}): {f['label']}" for f in empty
              if str(f.get("source")).startswith("pause:") and not f.get("skipped")]
             + [f"needs input (required): {f['label']}" for f in empty
-               if f.get("source") == "unanswered" and f.get("required") and not f.get("skipped")])
+               if f.get("source") == "unanswered" and f.get("required") and not f.get("skipped")]
+            + [f"unreviewed AI draft: {f['label']}" for f in plan["fields"]
+               if f.get("source") == "ai_draft" and not f.get("reviewed") and not f.get("skipped")])
 
 
 def job_url(plan: dict[str, Any]) -> str:
