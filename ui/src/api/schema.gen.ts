@@ -203,6 +203,10 @@ export interface paths {
     /** Edit Fill Field */
     post: operations["edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post"];
   };
+  "/api/jobs/{job_id}/fill-plan/fields/{field_id}/approve": {
+    /** Approve Fill Field */
+    post: operations["approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post"];
+  };
   "/api/jobs/{job_id}/injection/clear": {
     /**
      * Clear Injection
@@ -4086,6 +4090,31 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["FillFieldBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Approve Fill Field */
+  approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post: {
+    parameters: {
+      path: {
+        job_id: string;
+        field_id: string;
       };
     };
     responses: {

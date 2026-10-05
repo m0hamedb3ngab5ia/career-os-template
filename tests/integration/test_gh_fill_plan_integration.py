@@ -134,3 +134,31 @@ def test_apply_plan_asks_required_unknown_once_and_keeps_edits(temp_root: Path, 
     assert by["question_2"]["skipped"] is True
     asks = [a for a in _actions(temp_root) if a["What to do"] == "fill plan: x-1"]
     assert len(asks) == 1 and asks[0]["Type"] == "question"
+
+
+def test_apply_plan_ai_drafts_one_review_action_and_rebuild_keeps_approval(temp_root: Path, tmp_path: Path):
+    """REQ-105/DEC-010: answers.json drafts land unreviewed (source ai_draft), one `review N drafts` Action Item
+    (deduped), and a rebuild keeps an approved draft approved."""
+    import careeros.cli as cli_mod
+
+    jd = _gh_job(temp_root)
+    (jd / "answers.json").write_text(json.dumps([
+        {"question": "Why do you want to join X?", "answer": "The mission.", "type": "essay"},
+        {"question": "Describe a hard bug you fixed", "answer": "A race.", "type": "essay"}]))
+    schema = tmp_path / "q.json"
+    schema.write_text(json.dumps({"questions": [
+        {"label": "Why do you want to join X?", "required": True, "fields": [{"name": "q1", "type": "textarea"}]},
+        {"label": "Describe a hard bug you fixed", "required": False, "fields": [{"name": "q2", "type": "textarea"}]}]}))
+    args = ["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json", str(schema)]
+    assert cli_mod.main(args) == 0
+    plan = json.loads((jd / "fill_plan.json").read_text())
+    by = {f["field_id"]: f for f in plan["fields"]}
+    assert by["q1"]["value"] == "The mission." and by["q1"]["source"] == "ai_draft" and by["q1"]["reviewed"] is False
+    asks = [a for a in _actions(temp_root) if a["Type"] == "review"]
+    assert len(asks) == 1 and asks[0]["What to do"] == "fill plan: review 2 drafts: x-1"
+    by["q1"].update(reviewed=True, needs_review=False)
+    (jd / "fill_plan.json").write_text(json.dumps(plan))
+    assert cli_mod.main(args) == 0
+    by = {f["field_id"]: f for f in json.loads((jd / "fill_plan.json").read_text())["fields"]}
+    assert by["q1"]["reviewed"] is True and by["q2"]["reviewed"] is False
+    assert len([a for a in _actions(temp_root) if a["Type"] == "review"]) == 1

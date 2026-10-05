@@ -3,7 +3,7 @@ import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { SelectInput, TextInput } from "../../kit/inputs";
 import { useToast } from "../../kit/Toast";
-import { errorText, useEditFillField, useFillPlan, useMakeFillPlan, type FillField } from "./api";
+import { errorText, useApproveFillField, useEditFillField, useFillPlan, useMakeFillPlan, type FillField } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
 
@@ -14,6 +14,7 @@ export function sourceLabel(f: FillField): string {
   if (s.startsWith("standard:") || s === "eeo") return "Saved answer";
   if (s === "profile" || s === "file") return "Résumé / profile";
   if (s === "user") return "Edited by you";
+  if (s === "ai_draft") return f.reviewed ? "AI draft, approved" : "AI draft";
   if (s === "pause:sensitive") return "Never filled (sensitive)";
   if (s.startsWith("pause:")) return `Your answer needed (${s.slice(6)})`;
   if (s === "unanswered") return "Needs input";
@@ -24,11 +25,14 @@ const shown = (v: unknown) => (Array.isArray(v) ? v.join(", ") : v == null ? "" 
 
 function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
   const edit = useEditFillField(jobId, f.field_id);
+  const approve = useApproveFillField(jobId, f.field_id);
+  const draft = f.source === "ai_draft" && !f.reviewed;
   const toast = useToast();
   const [value, setValue] = useState(shown(f.value));
   // EEO stays on this job only (judged from the field, so a re-edit can't save it); salary is per job unless ticked.
   const eeo = f.kind === "eeo";
-  const [save, setSave] = useState(f.kind !== "salary");
+  // Drafts are AI text for this job: off by default (DEC-010).
+  const [save, setSave] = useState(f.kind !== "salary" && f.source !== "ai_draft");
   const editable = !["file", "hidden"].includes(f.type) && f.source !== "pause:sensitive";
   const empty = f.value == null || shown(f.value) === "";
   function send(body: { value?: string; skip?: boolean; save?: boolean }) {
@@ -55,7 +59,7 @@ function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
           <TextInput aria-label={f.label} value={value} onValueChange={setValue} />
         )}
       </td>
-      <td>{sourceLabel(f)}</td>
+      <td>{draft ? <Chip tone="orange">AI draft</Chip> : sourceLabel(f)}</td>
       <td>{f.required ? <Chip tone="orange">Required</Chip> : "Optional"}</td>
       <td>
         {editable ? (
@@ -71,7 +75,20 @@ function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
             >
               Save
             </Button>
-            {!f.required && empty && !f.skipped ? (
+            {draft && value === shown(f.value) ? (
+              <Button
+                disabled={approve.isPending}
+                onClick={() =>
+                  approve.mutate(undefined, {
+                    onSuccess: () => toast.show({ message: `Approved: ${f.label}` }),
+                    onError: (e) => toast.show({ message: errorText(e) }),
+                  })
+                }
+              >
+                Approve
+              </Button>
+            ) : null}
+            {!f.required && !f.skipped && (empty || draft) ? (
               <Button disabled={edit.isPending} onClick={() => send({ skip: true })}>
                 Skip
               </Button>
@@ -124,7 +141,7 @@ export function FillPlanCard({ jobId }: { jobId: string }) {
               {plan.fields
                 .filter((f) => f.type !== "hidden")
                 .map((f) => (
-                  <FieldRow key={`${f.field_id}:${shown(f.value)}:${f.skipped ? 1 : 0}`} jobId={jobId} f={f} />
+                  <FieldRow key={`${f.field_id}:${shown(f.value)}:${f.skipped ? 1 : 0}:${f.reviewed ? 1 : 0}`} jobId={jobId} f={f} />
                 ))}
             </tbody>
           </table>

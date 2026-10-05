@@ -140,6 +140,7 @@ export interface FillField {
   skipped?: boolean;
   options?: string[];
   kind?: string; // from the field itself (eeo | salary | legal | ...), never from source
+  reviewed?: boolean; // ai_draft rows only (REQ-105): fill waits until approved or edited
 }
 export interface FillPlanReply {
   plan: { fields: FillField[] } | null;
@@ -153,3 +154,5 @@ export const useEditFillField = (id: string, fieldId: string) =>
     id,
     `fill-plan/fields/${encodeURIComponent(fieldId)}`,
   );
+export const useApproveFillField = (id: string, fieldId: string) =>
+  useJobWrite<undefined, { field: FillField; problems: string[] }>(id, `fill-plan/fields/${encodeURIComponent(fieldId)}/approve`);
