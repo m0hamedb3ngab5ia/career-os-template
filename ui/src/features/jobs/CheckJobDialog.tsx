@@ -9,6 +9,7 @@ import { TextField } from "../../kit/FormField";
 import { useToast } from "../../kit/Toast";
 import detail from "../job-detail/JobDetail.module.css";
 import { MatchesTable } from "../job-detail/MatchesCard";
+import styles from "./JobsPage.module.css";
 
 type Created = components["schemas"]["CheckCreated"];
 type CheckState = components["schemas"]["CheckState"];
@@ -78,7 +79,7 @@ function CheckForm({ onCreated, onCancel }: { onCreated: (c: Created) => void; o
   }
 
   return (
-    <form onSubmit={submit} noValidate>
+    <form className={styles.stack} onSubmit={submit} noValidate>
       <label htmlFor={`${id}-jd`}>Job description</label>
       <textarea
         id={`${id}-jd`}
@@ -107,7 +108,7 @@ function CheckForm({ onCreated, onCancel }: { onCreated: (c: Created) => void; o
           {error}
         </p>
       ) : null}
-      <div>
+      <div className={styles.checkActions}>
         <Button type="button" onClick={onCancel}>
           Cancel
         </Button>
@@ -154,7 +155,7 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
   const s = q.data;
   const best = s?.resumes[0]?.score;
   return (
-    <div aria-live="polite">
+    <div className={styles.stack} aria-live="polite">
       {created.flagged ? (
         <p role="alert">
           Possible prompt injection: {created.reasons.join("; ")}. Scoring continues; prepare waits until you mark it

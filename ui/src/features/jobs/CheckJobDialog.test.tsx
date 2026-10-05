@@ -42,12 +42,12 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     expect(api.calls).toHaveLength(0);
   });
 
-  it("shows the server's refusal inline (bad type)", async () => {
-    mockApi({ "POST /api/jobs/check": { status: 415, body: { detail: "jd.png: use pdf, docx, txt or md" } } });
+  it("shows the server's refusal inline (no text in file)", async () => {
+    mockApi({ "POST /api/jobs/check": { status: 422, body: { detail: "jd.txt: no text found" } } });
     const { user } = open();
-    await user.upload(screen.getByLabelText(/Or upload a file/), new File(["x"], "jd.png"));
+    await user.upload(screen.getByLabelText(/Or upload a file/), new File([" "], "jd.txt", { type: "text/plain" }));
     await user.click(screen.getByRole("button", { name: "Check job" }));
-    expect(await screen.findByRole("alert")).toHaveTextContent("jd.png: use pdf, docx, txt or md");
+    expect(await screen.findByRole("alert")).toHaveTextContent("jd.txt: no text found");
   });
 
   it("E2E-010-01: pasted JD → match table, best marked, no tailor; Use this résumé ticks the job", async () => {
@@ -82,7 +82,7 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     await user.type(screen.getByLabelText("Job description"), "jd");
     await user.click(screen.getByRole("button", { name: "Check job" }));
     expect(await screen.findByText(/Possible prompt injection: hidden text/)).toBeInTheDocument();
-    expect(screen.getByText(/Scoring/)).toBeInTheDocument();
+    expect(screen.getByText(/^Scoring…/)).toBeInTheDocument();
   });
 
   it("E2E-010-02: below threshold → one tailor run → notice → Create closest match keeps it", async () => {

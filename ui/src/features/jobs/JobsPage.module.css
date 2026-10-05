@@ -311,3 +311,9 @@
 }
 
 .flag { display: inline-flex; margin-left: 6px; vertical-align: middle; color: var(--red, #c62828); }
+
+.checkActions {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
