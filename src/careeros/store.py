@@ -125,11 +125,12 @@ class Store:
             flags[key] = value
             self._write(job_id, FLAGS, flags)
 
-    def clear_injection(self, job_id: str) -> dict[str, Any]:
+    def clear_injection(self, job_id: str, via: str = "cli") -> dict[str, Any]:
         """The user checked a flagged posting ("I checked it"): prepare/apply are allowed again."""
         with self._flags_lock(job_id):
             flags = self.load_flags(job_id)
             flags["injection_cleared_at"] = now_iso()
+            flags["injection_cleared_via"] = via  # audit: who said "I checked it"
             self._write(job_id, FLAGS, flags)
         from careeros.tracker import Tracker
 

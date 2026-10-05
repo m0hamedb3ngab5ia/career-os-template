@@ -143,6 +143,14 @@ export function JobsPage() {
   const tabs = useJobsTabs(filterParams);
   const exporter = useExportJobs();
   const pick = useSelectJobs();
+  const bulkPick = (on: boolean) =>
+    pick.mutate(
+      { ids: [...selected], selected: on },
+      {
+        onSuccess: () => toast.show({ message: `${on ? "Ticked" : "Unticked"} ${formatCount(nSel)} for pipeline` }),
+        onError: (e) => toast.show({ message: errorText(e) }),
+      },
+    );
   const captionId = useId();
   const panelId = useId();
 
@@ -316,10 +324,10 @@ export function JobsPage() {
                 <Link to={`/pipeline/batch/new?${new URLSearchParams({ ids: [...selected].join(",") })}`}>
                   Add {formatCount(nSel)} to batch
                 </Link>
-                <Button size="small" disabled={pick.isPending} onClick={() => pick.mutate({ ids: [...selected], selected: true })}>
+                <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
                   Tick for pipeline
                 </Button>
-                <Button size="small" disabled={pick.isPending} onClick={() => pick.mutate({ ids: [...selected], selected: false })}>
+                <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(false)}>
                   Untick
                 </Button>
                 <Button size="small" onClick={() => setSelected([])}>

@@ -310,7 +310,8 @@ def export_xlsx(ix: Any, *, job_ids: list[str] | None = None, columns: list[str]
         cell.font = Font(bold=True)
     ws.freeze_panes = "A2"
     for r in rows:
-        ws.append([r["job_id"], *(_cell(r.get(c)) for c in cols)])
+        ws.append([r["job_id"], *(_cell(({0: "no", 1: "yes"}.get(r[c], r[c])) if c == "selected" else r.get(c))
+                                  for c in cols)])
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

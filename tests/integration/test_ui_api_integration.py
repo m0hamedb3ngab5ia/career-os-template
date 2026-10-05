@@ -548,7 +548,9 @@ def test_jobs_list_shows_selected_and_injection_and_clear(client, data):
     assert (row["selected"], row["injection"]) == (0, "hidden text")
     r = client.post(f"/api/jobs/{jid}/injection/clear", headers=h)
     assert r.status_code == 200, r.text
-    assert store.load_flags(jid)["injection_cleared_at"]
+    flags = store.load_flags(jid)
+    assert flags["injection_cleared_at"] and flags["injection_cleared_via"] == "ui"
+    assert client.post("/api/jobs/nope/injection/clear", headers=h).status_code == 404
     row = next(r for r in client.get("/api/jobs?tab=all").json()["items"] if r["job_id"] == jid)
     assert row["injection"] is None
 

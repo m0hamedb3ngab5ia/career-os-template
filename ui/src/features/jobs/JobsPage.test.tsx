@@ -172,6 +172,21 @@ describe("Jobs screen", () => {
     expect(screen.getByRole("button", { name: "Columns" })).toHaveFocus();
   });
 
+  it("bulk Untick POSTs the selected ids and confirms with a toast; errors toast too", async () => {
+    let fail = false;
+    const { api } = setup("/jobs", {
+      "POST /api/jobs/select": () => (fail ? { status: 404, body: { detail: "unknown job ids: nw01" } } : { ids: [], selected: false }),
+    });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("checkbox", { name: "Select Northwind Labs" }));
+    await user.click(screen.getByRole("button", { name: "Untick" }));
+    expect(await screen.findByText("Unticked 1 for pipeline")).toBeInTheDocument();
+    expect(api.callsTo("POST /api/jobs/select")[0]!.body).toEqual({ ids: ["nw01"], selected: false });
+    fail = true;
+    await user.click(screen.getByRole("button", { name: "Tick for pipeline" }));
+    expect(await screen.findByText(/unknown job ids: nw01/)).toBeInTheDocument();
+  });
+
   it("selects rows, announces the count, selects all shown and clears", async () => {
     const { router } = setup();
     const user = userEvent.setup();

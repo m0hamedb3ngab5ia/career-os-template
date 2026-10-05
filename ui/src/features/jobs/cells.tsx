@@ -1,10 +1,11 @@
 import { TriangleAlert } from "lucide-react";
-import { useState, type ReactNode } from "react";
-import { apiSend } from "../../api/client";
+import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { SafetyChip, StatusChip, TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
+import { useToast } from "../../kit/Toast";
 import { formatDate, formatDecimal } from "../../lib/format";
+import { useSelectJobs } from "./api";
 import styles from "./JobsPage.module.css";
 import type { JobListItem } from "./types";
 import type { FilterField, SortKey } from "./urlState";
@@ -184,14 +185,15 @@ export const COLUMNS: Column[] = [
 
 /** REQ-104: tick/untick one job for prepare/apply. A missing flag (old job) counts as ticked. */
 function PickCell({ job }: { job: JobListItem }) {
-  // Plain fetch, no query client: the server's change event refreshes the row (events.ts).
-  const [want, setWant] = useState<boolean | null>(null);
-  const checked = want ?? job.selected !== 0;
-  const toggle = () => {
-    const next = !checked;
-    setWant(next);
-    apiSend("POST", "/api/jobs/select", { ids: [job.job_id], selected: next }).catch(() => setWant(null));
-  };
+  const pick = useSelectJobs();
+  const toast = useToast();
+  // Server state wins once the POST settles (the jobs query refetches); optimistic only while pending.
+  const checked = pick.isPending ? pick.variables.selected : job.selected !== 0;
+  const toggle = () =>
+    pick.mutate(
+      { ids: [job.job_id], selected: !checked },
+      { onError: (e) => toast.show({ message: e instanceof Error ? e.message : "Could not save the tick" }) },
+    );
   return (
     <label className={styles.check}>
       <input type="checkbox" checked={checked} onChange={toggle} />

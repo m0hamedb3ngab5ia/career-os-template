@@ -1,6 +1,12 @@
-import { render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { ToastProvider } from "../../kit/Toast";
 import { MemoryRouter } from "react-router";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { mockApi } from "../../test/apiMock";
+import { renderWithProviders } from "../job-detail/testUtils";
 import { COLUMNS } from "./cells";
 import { job } from "./fixtures";
 
@@ -49,5 +55,42 @@ describe("header filter columns (Codex #1)", () => {
   it("closes_at: falls back to Empty when missing", () => {
     renderCell("closes_at", job({ job_id: "j1", closes_at: null }));
     expect(screen.getByText("No closing date")).toBeInTheDocument();
+  });
+});
+
+describe("Pipeline tick + injection badge (REQ-104/109)", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("unticked row renders unchecked; click POSTs selected:true; null counts as ticked", async () => {
+    const api = mockApi({ "POST /api/jobs/select": { ids: ["j1"], selected: true } });
+    renderWithProviders(col("pick").cell(job({ job_id: "j1", company: "Acme", selected: 0 })));
+    const box = screen.getByRole("checkbox", { name: "Tick Acme for pipeline" });
+    expect(box).not.toBeChecked();
+    await userEvent.click(box);
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/select")).toHaveLength(1));
+    expect(api.callsTo("POST /api/jobs/select")[0]!.body).toEqual({ ids: ["j1"], selected: true });
+    cleanup();
+    renderWithProviders(col("pick").cell(job({ job_id: "j2", company: "Beta", selected: null })));
+    expect(screen.getByRole("checkbox", { name: "Tick Beta for pipeline" })).toBeChecked();
+  });
+
+  it("follows server state after a click (no sticky local state); failed POST toasts", async () => {
+    mockApi({ "POST /api/jobs/select": { status: 500, body: { detail: "disk full" } } });
+    const ui = (selected: number) => col("pick").cell(job({ job_id: "j1", company: "Acme", selected }));
+    const qc = new QueryClient({ defaultOptions: { mutations: { retry: false } } });
+    const wrapper = ({ children }: { children: ReactNode }) => (
+      <QueryClientProvider client={qc}><ToastProvider>{children}</ToastProvider></QueryClientProvider>
+    );
+    const { rerender } = render(ui(1), { wrapper });
+    await userEvent.click(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" }));
+    expect(await screen.findByText(/disk full/)).toBeInTheDocument();
+    expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).toBeChecked();
+    rerender(ui(0));
+    expect(screen.getByRole("checkbox", { name: "Tick Acme for pipeline" })).not.toBeChecked();
+  });
+
+  it("flagged row shows the injection reasons to screen readers", () => {
+    renderCell("company", job({ job_id: "j1", company: "Acme", injection: "hidden text" }));
+    expect(screen.getByText("Possible prompt injection: hidden text")).toBeInTheDocument();
   });
 });

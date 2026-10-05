@@ -1,6 +1,6 @@
 import { TriangleAlert } from "lucide-react";
 import { Button } from "../../kit/Button";
-import { Card, Muted } from "./Card";
+import { Card } from "./Card";
 import { errorText, useClearInjection } from "./api";
 
 /** REQ-109: a flagged posting blocks prepare/apply until the user reads it and says "I checked it". */
@@ -14,7 +14,7 @@ export function InjectionCard({ jobId, reasons }: { jobId: string; reasons: stri
           I checked it
         </Button>
       </div>
-      {clear.isError ? <Muted>{errorText(clear.error)}</Muted> : null}
+      {clear.isError ? <p role="alert">{errorText(clear.error)}</p> : null}
     </Card>
   );
 }
