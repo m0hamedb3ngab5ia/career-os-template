@@ -29,7 +29,7 @@ export function RunDetailPage() {
   );
   if (error && !(error instanceof ApiError && error.status === 404)) {
     return (
-      <Page title="Couldn't load this run" subtitle="Career OS didn’t answer · try again">
+      <Page title="Couldn’t load this run" subtitle="Career OS didn’t answer · try again">
         {back}
         <EmptyState title="Something went wrong" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{error.message}</EmptyState>
       </Page>

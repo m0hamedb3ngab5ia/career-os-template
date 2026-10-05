@@ -4,6 +4,7 @@ import { createPortal } from "react-dom";
 import { apiFetch, apiSend } from "../api/client";
 import { Button } from "../kit/Button";
 import { Dialog } from "../kit/Dialog";
+import { useToast } from "../kit/Toast";
 import styles from "./Tour.module.css";
 
 interface UiState {
@@ -57,6 +58,7 @@ function Ring({ to }: { to: string }) {
  */
 export function Tour() {
   const qc = useQueryClient();
+  const toast = useToast();
   const { data } = useQuery({
     queryKey: ["ui-state"],
     queryFn: () => apiFetch<UiState>("/api/ui-state"),
@@ -66,6 +68,7 @@ export function Tour() {
   const save = useMutation({
     mutationFn: (s: UiState) => apiSend<UiState>("PUT", "/api/ui-state", s),
     onSuccess: (s) => qc.setQueryData(["ui-state"], s),
+    onError: () => toast.show({ message: "Couldn’t save tour progress. It may show again next time." }),
   });
   const [step, setStep] = useState<number | null>(null);
   const shown = useRef(false);
@@ -103,20 +106,32 @@ export function Tour() {
         className={styles.card}
         footer={
           <>
-            <span className={styles.count}>
+            <span className={styles.count} aria-live="polite">
               Step {step + 1} of {TOUR_STEPS.length}
             </span>
             <Button onClick={end}>
               Skip tour
             </Button>
-            {step > 0 ? <Button onClick={() => setStep(step - 1)}>Back</Button> : null}
+            {step > 0 ? (
+              <Button
+                onClick={() => {
+                  // Back unmounts itself on step 1; keep focus inside the dialog.
+                  nextRef.current?.focus();
+                  setStep(step - 1);
+                }}
+              >
+                Back
+              </Button>
+            ) : null}
             <Button ref={nextRef} variant="primary" onClick={last ? end : () => setStep(step + 1)}>
               {last ? "Done" : "Next"}
             </Button>
           </>
         }
       >
-        <p className={styles.text}>{s.text}</p>
+        <p className={styles.text} aria-live="polite">
+          {s.text}
+        </p>
       </Dialog>
     </>
   );

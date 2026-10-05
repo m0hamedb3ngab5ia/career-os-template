@@ -11,6 +11,7 @@ import { TOUR_STEPS } from "./Tour";
 // A fake server holding data/ui_state.json; survives "reloads" (fresh renders) like the real file.
 let state: { tour_done: boolean } | null;
 let puts: unknown[];
+let failPut = false;
 
 function renderApp(path = "/") {
   vi.stubGlobal(
@@ -18,6 +19,7 @@ function renderApp(path = "/") {
     vi.fn(async (url: string, init?: RequestInit) => {
       const json = (b: unknown) => new Response(JSON.stringify(b), { headers: { "content-type": "application/json" } });
       if (String(url) === "/api/ui-state") {
+        if (init?.method === "PUT" && failPut) return new Response(JSON.stringify({ detail: "disk full" }), { status: 500 });
         if (init?.method === "PUT") {
           state = JSON.parse(String(init.body));
           puts.push(state);
@@ -42,6 +44,7 @@ function renderApp(path = "/") {
 beforeEach(() => {
   state = null;
   puts = [];
+  failPut = false;
   vi.stubGlobal("EventSource", FakeEventSource);
 });
 afterEach(() => vi.unstubAllGlobals());
@@ -94,5 +97,27 @@ describe("first-run tour (REQ-121)", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(how).toHaveFocus();
     expect(puts).toHaveLength(1); // already done: no second write
+  });
+
+  it("Back keeps focus in the dialog (on Next), so Escape still closes it", async () => {
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("dialog", { name: "Today" });
+    await user.click(screen.getByRole("button", { name: "Next" }));
+    await screen.findByRole("dialog", { name: "Jobs" });
+    await user.click(screen.getByRole("button", { name: "Back" }));
+    await screen.findByRole("dialog", { name: "Today" });
+    expect(screen.getByRole("button", { name: "Next" })).toHaveFocus();
+    await user.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+  });
+
+  it("a failed save shows a toast", async () => {
+    failPut = true;
+    const user = userEvent.setup();
+    renderApp();
+    await screen.findByRole("dialog", { name: "Today" });
+    await user.click(screen.getByRole("button", { name: "Skip tour" }));
+    expect(await screen.findByText(/Couldn’t save tour progress/)).toBeInTheDocument();
   });
 });
