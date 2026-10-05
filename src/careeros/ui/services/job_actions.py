@@ -341,6 +341,29 @@ def edit_fill_field(settings: Any, job_id: str, field_id: str, *, value: Any = N
     return {"field": {**f, "kind": kind}, "saved": saved, "problems": gh_fill.plan_problems(plan)}
 
 
+def approve_fill_field(settings: Any, job_id: str, field_id: str) -> dict[str, Any]:
+    """Approve an AI draft as is (REQ-105): reviewed, this job only; never written to the profile."""
+    from careeros.apply import gh_fill
+    from careeros.apply.gh_schema import field_kind
+    from careeros.runs.locks import _guard
+    from careeros.store import Store
+
+    d = _job(settings, job_id)
+    with _guard(d / "fill_plan.json"):
+        plan = _read_plan(d)
+        if plan is None:
+            raise LookupError(f"job {job_id} has no fill plan yet")
+        f = next((x for x in plan["fields"] if x["field_id"] == field_id), None)
+        if f is None:
+            raise LookupError(f"no field {field_id!r} in the fill plan")
+        ensure_unlocked(settings, job_id)
+        if f.get("source") != "ai_draft" or f.get("value") in (None, ""):
+            raise ValueError(f"{f['label']}: not an AI draft")
+        f.update(reviewed=True, needs_review=False)
+        Store(settings)._write(job_id, "fill_plan.json", plan)
+    return {"field": {**f, "kind": field_kind(f)}, "problems": gh_fill.plan_problems(plan)}
+
+
 def _save_answer(settings: Any, job_id: str, src: str, label: str, text: str) -> None:
     """Update the saved answer this row came from (or the one learned from this label before); else learn it."""
     from careeros.learning import edit_answer, learn_answer, normalize, slug

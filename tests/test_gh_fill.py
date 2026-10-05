@@ -105,3 +105,16 @@ def test_plan_problems_skipped_optional_pause_unblocks():
         {"field_id": "s", "label": "Salary?", "value": None, "source": "pause:salary", "required": False, "skipped": True},
         {"field_id": "l", "label": "Sponsorship?", "value": None, "source": "pause:legal", "required": True}]}
     assert gh_fill.plan_problems(plan) == ["unanswered (pause:legal): Sponsorship?"]
+
+
+def test_plan_problems_unreviewed_ai_draft_blocks():
+    """REQ-105: fill refuses while any AI draft is unreviewed; approved or skipped drafts pass."""
+    p = _plan()
+    draft = {"field_id": "q", "label": "Why us?", "type": "textarea", "value": "Mission.", "source": "ai_draft",
+             "reviewed": False, "required": True}
+    p["fields"].append(draft)
+    assert gh_fill.plan_problems(p) == ["unreviewed AI draft: Why us?"]
+    draft["reviewed"] = True
+    assert gh_fill.plan_problems(p) == []
+    draft.update(reviewed=False, value=None, skipped=True, required=False)
+    assert gh_fill.plan_problems(p) == []

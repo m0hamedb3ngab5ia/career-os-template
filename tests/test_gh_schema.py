@@ -161,3 +161,44 @@ def test_carry_over_keeps_user_edits_and_skips_by_field_id():
     assert by["a"]["value"] == "mine" and by["a"]["source"] == "user" and not by["a"]["needs_review"]
     assert by["b"]["skipped"] is True and by["b"]["value"] is None
     assert by["c"]["value"] == "new" and "gone" not in by
+
+
+DRAFT_FIELDS = [{"field_id": "q_why", "label": "Why do you want to work here?", "type": "textarea", "options": [],
+                 "required": True},
+                {"field_id": "q_sal", "label": "What are your salary expectations?", "type": "text", "options": [],
+                 "required": True},
+                {"field_id": "q_visa", "label": "Will you require visa sponsorship?", "type": "text", "options": [],
+                 "required": True},
+                {"field_id": "q_tea", "label": "Favourite tea", "type": "select", "options": ["Green", "Black"],
+                 "required": False}]
+DRAFTS = [{"question": "Why do you want to work here? ", "answer": "Because of the mission.", "type": "essay"},
+          {"question": "What are your salary expectations?", "answer": "Lots", "type": "essay"},
+          {"question": "Will you require visa sponsorship?", "answer": "No", "type": "essay"},
+          {"question": "Favourite tea", "answer": "Green", "type": "essay"}]
+
+
+@pytest.mark.unit
+def test_build_plan_ai_draft_only_for_freetext_never_legal_salary():
+    """REQ-105/DEC-010: answers.json drafts fill freetext fields with no saved answer, unreviewed; never
+    legal/salary/EEO, never selects."""
+    by = _by_id(build_plan(DRAFT_FIELDS, profile={}, answers_path=ANSWERS, files={}, drafts=DRAFTS)["fields"])
+    assert by["q_why"]["value"] == "Because of the mission." and by["q_why"]["source"] == "ai_draft"
+    assert by["q_why"]["reviewed"] is False and by["q_why"]["needs_review"] is True
+    for fid in ("q_sal", "q_visa"):  # salary/legal: saved answer or pause, never the draft
+        assert by[fid]["source"] != "ai_draft" and "reviewed" not in by[fid]
+    assert by["q_tea"]["value"] is None and by["q_tea"]["source"] == "unanswered"
+    assert _by_id(build_plan(DRAFT_FIELDS, profile={}, answers_path=ANSWERS, files={})["fields"])["q_why"]["value"] is None
+
+
+@pytest.mark.unit
+def test_carry_over_keeps_draft_review_only_for_same_text():
+    from careeros.apply.gh_schema import carry_over
+
+    def plan(text, **kw):
+        return {"fields": [{"field_id": "q", "type": "textarea", "value": text, "source": "ai_draft",
+                            "reviewed": False, "needs_review": True, **kw}]}
+    old = plan("A", reviewed=True, needs_review=False)
+    assert carry_over(old, plan("A"))["fields"][0]["reviewed"] is True
+    assert carry_over(old, plan("A"))["fields"][0]["needs_review"] is False
+    assert carry_over(old, plan("B"))["fields"][0]["reviewed"] is False  # draft rewritten: review again
+    assert carry_over(plan("A"), plan("A"))["fields"][0]["reviewed"] is False

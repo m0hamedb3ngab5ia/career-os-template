@@ -516,8 +516,13 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     jd = store.job_dir(args.job_id)
     files = {k: str(jd / f"{k}.pdf") if (jd / f"{k}.pdf").exists() else None for k in ("resume", "cover_letter")}
     profile = yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}
+    try:  # this job's /answer-question drafts (REQ-105); missing or damaged = none
+        drafts = json.loads((jd / "answers.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        drafts = []
     plan = build_plan(normalize(data), profile=profile, answers_path=s.paths["standard_answers"],
-                      company=posting.get("company") or "", files=files)
+                      company=posting.get("company") or "", files=files,
+                      drafts=drafts if isinstance(drafts, list) else [])
     plan = {"job_id": args.job_id, "ats": "greenhouse", "board": board, "ats_job_id": ats_id,
             "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"), **plan}
     blocked = [f["label"] for f in plan["fields"] if f["source"] == "pause:sensitive"]
@@ -543,6 +548,11 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     if paused:  # legal/salary/EEO with no stored answer: never guessed
         print(f"paused for your answer ({len(paused)}): " + "; ".join(paused))  # Action Items have no detail column
         _add_action(s, f"fill plan: {args.job_id}", "question", job_id=args.job_id,
+                    company=posting.get("company") or "", dedupe=True)
+    drafts = [f for f in fields if f["source"] == "ai_draft" and not f.get("reviewed")]
+    if drafts:  # DEC-010: AI text never reaches an employer unreviewed
+        print(f"AI drafts to review ({len(drafts)}): " + "; ".join(f["label"] for f in drafts))
+        _add_action(s, f"fill plan: review {len(drafts)} drafts: {args.job_id}", "review", job_id=args.job_id,
                     company=posting.get("company") or "", dedupe=True)
     if args.json:
         print(json.dumps(plan, indent=2))
