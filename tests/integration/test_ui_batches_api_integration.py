@@ -203,3 +203,22 @@ def test_cli_job_stop(data, tmp_path):
     assert bad.returncode == 2 and "JOB_ID=STAGE" in bad.stderr
     dup = cli("--job-stop", f"{jid}=prepare", "--job-stop", f"{jid}=fill")
     assert dup.returncode == 2 and "more than once" in dup.stderr
+
+
+def test_create_ticks_named_unticked_job_but_dry_run_does_not(client, data):
+    """REQ-117 / Q-022: a batch takes the jobs it names (Jobs-table selection), ticked or not; the dry run leaves
+    the REQ-104 tick alone, the real create persists it and the Jobs list sees it at once."""
+    from careeros.store import Store
+
+    store, jid = Store(data["settings"]), data["jobs"]["found"]
+    assert client.post("/api/jobs/select", headers=W, json={"ids": [jid], "selected": False}).status_code == 200
+    body = {"job_ids": [jid], "stop_at": "prepare"}
+    r = client.post("/api/batches", json={**body, "dry_run": True}, headers=W)
+    assert r.status_code == 200, r.text
+    assert [s["job_id"] for s in r.json()["selected"]] == [jid]
+    assert not store.is_selected(jid)
+    r = client.post("/api/batches", json=body, headers=W)
+    assert r.status_code == 200, r.text
+    assert json.loads((data["settings"].root / "data" / "jobs" / jid / "flags.json").read_text())["selected"] is True
+    row = next(x for x in client.get("/api/jobs?tab=all").json()["items"] if x["job_id"] == jid)
+    assert row["selected"] == 1
