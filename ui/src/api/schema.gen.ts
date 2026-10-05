@@ -374,6 +374,12 @@ export interface paths {
     /** Sync */
     post: operations["sync_api_tracker_sync_post"];
   };
+  "/api/ui-state": {
+    /** Get Ui State */
+    get: operations["get_ui_state_api_ui_state_get"];
+    /** Put Ui State */
+    put: operations["put_ui_state_api_ui_state_put"];
+  };
 }
 
 export type webhooks = Record<string, never>;
@@ -2498,6 +2504,14 @@ export interface components {
       theme: string;
       /** Undo Seconds */
       undo_seconds: number;
+    };
+    /** UiState */
+    UiState: {
+      /**
+       * Tour Done
+       * @default false
+       */
+      tour_done?: boolean;
     };
     /** Unblock */
     Unblock: {
@@ -4636,6 +4650,39 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+    };
+  };
+  /** Get Ui State */
+  get_ui_state_api_ui_state_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["UiState"];
+        };
+      };
+    };
+  };
+  /** Put Ui State */
+  put_ui_state_api_ui_state_put: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["UiState"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["UiState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
