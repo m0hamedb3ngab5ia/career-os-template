@@ -96,7 +96,7 @@ Main: 1 paste/upload JD 2 scan (REQ-109) 3 fit + per-résumé match 4 best ≥ t
 Alt: none ≥ threshold → offer tailor → result ≥ threshold → use it
 Fail: tailored still below → notice X/Y + missing skills → ask keep closest; bad file → inline error
 Outcome: job stored with chosen résumé or `below_threshold` attempt
-E2E-010-01: Given 2 résumés scoring 82/55, threshold 70 When check pasted JD Then 82 résumé marked best, no tailor run.
+E2E-010-01: Given 2 résumés scoring 82/55, threshold 70 When check pasted JD Then 82 résumé marked best, "Why this score" lists matched ✓ / missing (required vs preferred); When Prepare application Then one prepare run starts (job ticked); When Cancel Then no run, job unticked.
 E2E-010-02: Given all résumés < 60 and fake tailor returning 64 When check Then notice "64/70" and Yes keeps attempt flagged `below_threshold`.
 
 ### UC-011 Prepare with résumé reuse

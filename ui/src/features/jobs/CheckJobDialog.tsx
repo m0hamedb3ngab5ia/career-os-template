@@ -18,6 +18,7 @@ type CheckState = components["schemas"]["CheckState"];
 
 const MAX_BYTES = 5 * 1024 * 1024; // same cap as the server (check.MAX_BYTES)
 const BUSY = new Set(["scoring", "tailoring"]);
+const PREPARE = new Set(["ready", "offer_tailor", "tailor_failed"]); // stages offering the one prepare run
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong";
@@ -36,7 +37,7 @@ function postCheck(text: string, file: File | null, title: string, company: stri
   });
 }
 
-/** REQ-114 / UC-010 / FLOW-003: paste or upload a JD, see the scan, fit and résumé match, then use, tailor or keep. */
+/** REQ-114 / UC-010 / FLOW-003: paste or upload a JD, see the scan, fit and résumé match, then Prepare application or Cancel. */
 export function CheckJobDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const [created, setCreated] = useState<Created | null>(null);
   const [sending, setSending] = useState(false);
@@ -153,21 +154,23 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
     void qc.invalidateQueries({ queryKey: ["jobs"] });
   };
   const fail = (e: unknown) => toast.show({ message: errorText(e) });
-  const tailor = useMutation({ mutationFn: () => apiSend("POST", `${path}/tailor`), onSuccess: () => refresh(), onError: fail });
+  // REQ-114: one prepare run per check (ticks the job). Above threshold it just runs; below, it tailors from
+  // master and the dialog stays open for the REQ-116 keep/discard question.
+  const prepare = useMutation({
+    mutationFn: (_stage: string) => apiSend("POST", `${path}/tailor`),
+    onSuccess: (_data, stage) => {
+      if (stage !== "ready") return refresh(); // the stage clicked on, not a later poll's
+      refresh();
+      toast.show({ message: "Prepare run started. Follow it on the Runs page." });
+      onDone();
+    },
+    onError: fail,
+  });
   const decide = useMutation({
     mutationFn: (keep: boolean) => apiSend<CheckState>("POST", `${path}/decision`, { keep }),
     onSuccess: refresh,
     onError: fail,
   });
-  // FLOW-003: the user ticks the job separately (REQ-104); a flagged job waits for the injection check first.
-  const readyNote = created.flagged
-    ? "Mark it checked on the job page before ticking it to prepare."
-    : "The job is ready to tick: tick it in the Jobs list to prepare it.";
-  const use = () => {
-    toast.show({ message: readyNote });
-    onDone();
-  };
-
   const s = q.data;
   const best = s?.resumes[0]?.score;
   return (
@@ -189,26 +192,33 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
           {s.scored ? <Fit jobId={jobId} /> : null}
           {s.scored && s.resumes.length ? <MatchesTable m={s} /> : null}
           {s.scored && !s.resumes.length ? <p>No résumés yet. Add one on the Profile page.</p> : null}
-          {s.notice ? <p>{s.notice}</p> : null}
-          {s.stage === "ready" || s.stage === "ready_tailored" ? (
+          {s.notice ? <p id={`${jobId}-check-notice`}>{s.notice}</p> : null}
+          {s.stage === "ready" ? <p>Best match {best}, threshold {s.threshold}.</p> : null}
+          {s.stage === "ready_tailored" ? (
+            <p>The tailored résumé scores {String(s.attempt?.score)}, threshold {s.threshold}.</p>
+          ) : null}
+          {s.stage === "offer_tailor" ? (
             <p>
-              {s.stage === "ready_tailored" ? `The tailored résumé scores ${s.attempt?.score}` : `Best match ${best}`},
-              threshold {s.threshold}. {readyNote}{" "}
-              <Button variant="primary" onClick={use}>
-                Done
-              </Button>
+              No résumé reaches the threshold (best {best ?? "none"}, needed {s.threshold}). Preparing tailors one from
+              your master résumé.
             </p>
           ) : null}
-          {s.stage === "offer_tailor" || s.stage === "tailor_failed" ? (
-            <p>
-              {s.stage === "tailor_failed"
-                ? "The tailor run ended without a résumé. You can try again."
-                : `No résumé reaches the threshold (best ${best ?? "none"}, needed ${s.threshold}).`}{" "}
-              <Button variant="primary" pending={tailor.isPending} onClick={() => tailor.mutate()}>
-                Tailor from master
-              </Button>{" "}
-              <Button onClick={onDone}>Keep job, no résumé</Button>
-            </p>
+          {s.stage === "tailor_failed" ? <p>The tailor run ended without a résumé. You can try again.</p> : null}
+          {PREPARE.has(s.stage) || s.stage === "not_tailorable" ? (
+            <div className={styles.checkActions}>
+              <Button onClick={onDone} disabled={prepare.isPending}>
+                Cancel
+              </Button>
+              <Button
+                variant="primary"
+                pending={prepare.isPending}
+                disabled={!PREPARE.has(s.stage)}
+                aria-describedby={s.notice ? `${jobId}-check-notice` : undefined}
+                onClick={() => prepare.mutate(s.stage)}
+              >
+                Prepare application
+              </Button>
+            </div>
           ) : null}
           {s.stage === "confirm" ? (
             <p>
@@ -218,11 +228,6 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
               <Button disabled={decide.isPending} onClick={() => decide.mutate(false)}>
                 Discard attempt
               </Button>
-            </p>
-          ) : null}
-          {s.stage === "not_tailorable" ? (
-            <p>
-              <Button onClick={onDone}>Keep job</Button>
             </p>
           ) : null}
         </>

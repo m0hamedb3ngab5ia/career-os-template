@@ -50,11 +50,35 @@ export function MatchesTable({ m }: { m: Matches }) {
             <td className="tabular">
               {r.score}
               {r.score < m.threshold ? <span className="sr-only"> (below threshold)</span> : null}
+              <Why groups={r.groups} />
             </td>
             <td>{r.missing.length ? r.missing.join(", ") : "None"}</td>
           </tr>
         ))}
       </tbody>
     </table>
+  );
+}
+
+const GROUPS = [["required", "Required"], ["preferred", "Preferred"], ["title", "Title"]] as const;
+
+/** REQ-114 "Why this score": matched (✓) and missing keywords per group, from match.py `groups`. */
+function Why({ groups }: { groups: Matches["resumes"][number]["groups"] }) {
+  const lines = GROUPS.flatMap(([k, label]) => {
+    const g = groups[k];
+    const hit = g?.hit ?? [];
+    const miss = g?.missing ?? [];
+    if (!hit.length && !miss.length) return [];
+    const parts = [hit.length ? `✓ ${hit.join(", ")}` : "", miss.length ? `missing ${miss.join(", ")}` : ""];
+    return [`${label}: ${parts.filter(Boolean).join(" · ")}`];
+  });
+  if (!lines.length) return null;
+  return (
+    <details>
+      <summary>Why this score</summary>
+      {lines.map((l) => (
+        <div key={l}>{l}</div>
+      ))}
+    </details>
   );
 }

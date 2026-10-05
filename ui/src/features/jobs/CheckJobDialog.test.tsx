@@ -5,8 +5,10 @@ import { mockApi } from "../../test/apiMock";
 import { renderWithProviders } from "../job-detail/testUtils";
 import { CheckJobDialog } from "./CheckJobDialog";
 
-const row = (rid: string, name: string, score: number, missing: string[]) =>
-  ({ rid, name, type: "variant", version: 1, score, missing, groups: {} });
+const row = (rid: string, name: string, score: number, missing: string[]) => ({
+  rid, name, type: "variant", version: 1, score, missing,
+  groups: { required: { hit: ["Python"], missing }, preferred: { hit: [], missing: ["Rust"] }, title: { hit: [], missing: [] } },
+});
 
 const CREATED = { job_id: "m01", flagged: false, reasons: [], score_run: "r1", score_error: null };
 const state = (stage: string, extra: Record<string, unknown> = {}) => ({
@@ -50,10 +52,11 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     expect(await screen.findByRole("alert")).toHaveTextContent("jd.txt: no text found");
   });
 
-  it("E2E-010-01: pasted JD → fit score + match table, best marked, no tailor; Done closes without ticking (no résumé choice is stored)", async () => {
+  it("E2E-010-01: pasted JD → fit score + match table, best marked; Prepare application starts the prepare run", async () => {
     const api = mockApi({
       "POST /api/jobs/check": { status: 201, body: CREATED },
       "GET /api/jobs/m01/check": state("ready"),
+      "POST /api/jobs/m01/check/tailor": { run_id: "r2", kind: "prepare" },
       "GET /api/jobs/m01": { job: { job_id: "m01" }, score: { fit: 82 } },
     });
     const { user, onClose } = open();
@@ -67,25 +70,49 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     expect(post.body).toBe("Backend engineer, Python");
     expect(post.search.get("company")).toBe("Acme");
     expect(post.search.get("filename")).toBeNull();
-    expect(screen.queryByRole("button", { name: "Tailor from master" })).toBeNull();
-    expect(screen.getByText(/ready to tick/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Done" }));
+    for (const gone of ["Done", "Tailor from master", "Keep job, no résumé"])
+      expect(screen.queryByRole("button", { name: gone })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Prepare application" }));
     await vi.waitFor(() => expect(onClose).toHaveBeenCalled());
-    expect(api.calls.some((c) => c.path === "/api/jobs/select")).toBe(false);
-    expect(api.calls.some((c) => c.path.endsWith("/check/tailor"))).toBe(false);
+    expect(api.callsTo("POST /api/jobs/m01/check/tailor")).toHaveLength(1);
   });
 
-  it("flagged job: no 'ready to tick' until the flag is cleared on the job page", async () => {
+  it("Cancel keeps the job unticked: no run, no select", async () => {
+    const api = mockApi({ "POST /api/jobs/check": { status: 201, body: CREATED }, "GET /api/jobs/m01/check": state("offer_tailor") });
+    const { user, onClose } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    expect(await screen.findByRole("button", { name: "Prepare application" })).toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    expect(onClose).toHaveBeenCalled();
+    expect(api.calls.filter((c) => c.method === "POST")).toHaveLength(1);
+  });
+
+  it("Why this score: per-résumé matched ✓ and missing, required vs preferred", async () => {
+    mockApi({ "POST /api/jobs/check": { status: 201, body: CREATED }, "GET /api/jobs/m01/check": state("ready") });
+    const { user } = open();
+    await user.type(screen.getByLabelText("Job description"), "jd");
+    await user.click(screen.getByRole("button", { name: "Check job" }));
+    const why = (await screen.findAllByText("Why this score"))[1]!;
+    await user.click(why);
+    const box = why.closest("details")!;
+    expect(box).toHaveAttribute("open");
+    expect(box).toHaveTextContent("Required: ✓ Python · missing Go");
+    expect(box).toHaveTextContent("Preferred: missing Rust");
+  });
+
+  it("flagged job: Prepare disabled, the reason names the job page", async () => {
+    const notice = "possible prompt injection: mark it checked on the job page first; Prepare application is not offered for this job";
     mockApi({
       "POST /api/jobs/check": { status: 201, body: { ...CREATED, flagged: true, reasons: ["hidden text"] } },
-      "GET /api/jobs/m01/check": state("ready"),
+      "GET /api/jobs/m01/check": state("not_tailorable", { notice }),
     });
     const { user } = open();
     await user.type(screen.getByLabelText("Job description"), "jd");
     await user.click(screen.getByRole("button", { name: "Check job" }));
-    expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
-    expect(screen.queryByText(/ready to tick/)).toBeNull();
-    expect(screen.getByText(/Mark it checked on the job page before ticking it/)).toBeInTheDocument();
+    const btn = await screen.findByRole("button", { name: "Prepare application" });
+    expect(btn).toBeDisabled();
+    expect(btn).toHaveAccessibleDescription(notice);
   });
 
   it("score_error: shows why, stops polling, no stuck 'Scoring…'", async () => {
@@ -118,7 +145,7 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     expect(await screen.findByRole("table")).toBeInTheDocument();
   });
 
-  it("not_tailorable: notice plus a Keep job action", async () => {
+  it("not_tailorable: notice plus Cancel, Prepare disabled with the reason", async () => {
     mockApi({
       "POST /api/jobs/check": { status: 201, body: CREATED },
       "GET /api/jobs/m01/check": state("not_tailorable", { notice: "No master résumé to tailor from." }),
@@ -127,7 +154,11 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     await user.type(screen.getByLabelText("Job description"), "jd");
     await user.click(screen.getByRole("button", { name: "Check job" }));
     expect(await screen.findByText("No master résumé to tailor from.")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Keep job" }));
+    expect(screen.getByRole("button", { name: "Prepare application" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Prepare application" })).toHaveAccessibleDescription(
+      "No master résumé to tailor from.",
+    );
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
     expect(onClose).toHaveBeenCalled();
   });
 
@@ -165,7 +196,7 @@ describe("CheckJobDialog (REQ-114, UC-010)", () => {
     const { user } = open();
     await user.type(screen.getByLabelText("Job description"), "jd");
     await user.click(screen.getByRole("button", { name: "Check job" }));
-    await user.click(await screen.findByRole("button", { name: "Tailor from master" }));
+    await user.click(await screen.findByRole("button", { name: "Prepare application" }));
     expect(await screen.findByText(notice)).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Create closest match" }));
     expect(await screen.findByText(/Kept, flagged below threshold/)).toBeInTheDocument();
