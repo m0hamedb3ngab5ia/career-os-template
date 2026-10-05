@@ -12,8 +12,8 @@ CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
 ATS_WITH_SLUG = ("greenhouse", "lever", "ashby")  # adapters that fetch by board slug (custom uses url)
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
-    "pipeline": ("paths", "outreach", "credentials"),
-    "targets": ("candidate", "location", "seniority", "categories", "volume", "safety"),
+    "pipeline": ("paths", "outreach", "credentials", "match"),
+    "targets": ("candidate", "location", "seniority", "categories", "volume", "safety", "thresholds"),
     "companies": ("blocklist", "prestige_scoring", "prestige_tiers", "company_caps"),
 }
 # targets.yaml `volume` keys read by careeros.company_policy: key -> (default, minimum).
@@ -244,6 +244,7 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
             if data.get(key) is not None and not isinstance(data[key], dict):
                 raise ConfigError(f"config/{name}.yaml: {key} must be a mapping, got {type(data[key]).__name__}")
     _check_volume(cfg.get("targets", {}).get("volume"))
+    _check_match(cfg.get("pipeline", {}).get("match"), cfg.get("targets", {}).get("thresholds"))
     _check_safety(cfg.get("targets", {}).get("safety"))
     _check_company_caps(cfg.get("companies", {}).get("company_caps"))
     boards = cfg.get("companies", {}).get("boards")
@@ -262,6 +263,19 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
 
 def _whole(v: Any, minimum: int) -> bool:
     return isinstance(v, int) and not isinstance(v, bool) and v >= minimum
+
+
+def _check_match(match: Any, thresholds: Any) -> None:
+    syn = (match or {}).get("synonyms")
+    if syn is not None:
+        if not isinstance(syn, dict):
+            raise ConfigError(f"config/pipeline.yaml: match.synonyms must be a mapping, got {type(syn).__name__}")
+        for k, v in syn.items():
+            if v is not None and not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
+                raise ConfigError(f"config/pipeline.yaml: match.synonyms.{k} must be a list of strings, got {v!r}")
+    mm = (thresholds or {}).get("min_match")
+    if mm is not None and not (_whole(mm, 0) and mm <= 100):
+        raise ConfigError(f"config/targets.yaml: thresholds.min_match must be a whole number 0-100, got {mm!r}")
 
 
 def _check_volume(volume: Any) -> None:

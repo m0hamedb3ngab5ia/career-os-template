@@ -165,6 +165,13 @@ outreach:                                  # reusable default: fine to keep
   manual_if_mutuals: true                  # mutual connections (see below): same. Record with `careeros outreach mark`
   mutuals_threshold: 1                     # 1 (Recommended): this many mutual connections or more counts (1 to 50)
 
+match:                                     # reusable default: fine to keep. `careeros resume match <job>`
+  synonyms:                                # spellings counted as the same skill (match score, DEC-003)
+    kubernetes: [k8s]
+    javascript: [js]
+    typescript: [ts]
+    postgresql: [postgres]
+
 resume_build:
   engine: tectonic                         # tectonic | pdflatex
   fallback: markdown_to_pdf

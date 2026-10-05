@@ -164,6 +164,13 @@ export interface paths {
     /** Job File */
     get: operations["job_file_api_jobs__job_id__files__name__get"];
   };
+  "/api/jobs/{job_id}/matches": {
+    /**
+     * Job Matches
+     * @description Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003).
+     */
+    get: operations["job_matches_api_jobs__job_id__matches_get"];
+  };
   "/api/jobs/{job_id}/open-folder": {
     /** Open Folder */
     post: operations["open_folder_api_jobs__job_id__open_folder_post"];
@@ -1664,6 +1671,42 @@ export interface components {
        * @enum {string}
        */
       state: "synced" | "pending" | "rejected" | "stale";
+    };
+    /** MatchRow */
+    MatchRow: {
+      /** Groups */
+      groups: {
+        [key: string]: {
+          [key: string]: string[];
+        };
+      };
+      /** Missing */
+      missing: string[];
+      /** Name */
+      name: string;
+      /** Rid */
+      rid: string;
+      /** Score */
+      score: number;
+      /** Type */
+      type: string;
+      /** Version */
+      version: number;
+    };
+    /** Matches */
+    Matches: {
+      /** Best */
+      best: string | null;
+      /** Hint */
+      hint?: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Resumes */
+      resumes: components["schemas"]["MatchRow"][];
+      /** Scored */
+      scored: boolean;
+      /** Threshold */
+      threshold: number;
     };
     /** Meta */
     Meta: {
@@ -3623,6 +3666,34 @@ export interface operations {
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Job Matches
+   * @description Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003).
+   */
+  job_matches_api_jobs__job_id__matches_get: {
+    parameters: {
+      query?: {
+        threshold?: number | null;
+      };
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Matches"];
         };
       };
       /** @description Validation Error */

@@ -861,6 +861,40 @@ def cmd_resume_add(args: argparse.Namespace) -> int:
     return 0
 
 
+def _percent(v: str) -> int:
+    n = int(v) if v.lstrip("-").isdigit() else -1
+    if not 0 <= n <= 100:
+        raise argparse.ArgumentTypeError(f"must be a whole number 0-100, got {v!r}")
+    return n
+
+
+def cmd_resume_match(args: argparse.Namespace) -> int:
+    """Every résumé's match score for one job, best first (REQ-111/115, DEC-003)."""
+    from careeros.match import matches
+    from careeros.ui.services.jobs import job_dir_for
+
+    s = _settings(args)
+    d = job_dir_for(s, args.job_id)
+    if d is None:
+        print(f"error: no job {args.job_id!r}", file=sys.stderr)
+        return 1
+    out = matches(s, d, args.threshold)
+    if not args.json and not out["scored"]:
+        print(out["hint"])
+        return 0
+    if args.json:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        return 0
+    for r in out["resumes"]:
+        mark = "*" if r["rid"] == out["best"] else " "
+        print(f"{mark} {r['score']:>3}  {r['rid']:<30} v{r['version']:<3} {r['name']}"
+              + (f"  missing: {', '.join(r['missing'])}" if r["missing"] else ""))
+    if not out["resumes"]:
+        print("no résumés (careeros resume add <file>)")
+    print(f"threshold {out['threshold']}")
+    return 0
+
+
 def cmd_resume_propose_master(args: argparse.Namespace) -> int:
     """extract-master hands its proposed master.yaml here (REQ-099); written only on approve."""
     from careeros import master_sync
@@ -1929,6 +1963,11 @@ def build_parser() -> argparse.ArgumentParser:
     rsa.add_argument("--type", choices=("master", "variant", "other", "tailored"))
     rsa.add_argument("--json", action="store_true")
     rsa.set_defaults(fn=cmd_resume_add)
+    rsm = rss.add_parser("match", help="match score 0-100 of every résumé vs a job, best first (no LLM)")
+    rsm.add_argument("job_id")
+    rsm.add_argument("--threshold", type=_percent, help="override thresholds.min_match (targets.yaml) for this check")
+    rsm.add_argument("--json", action="store_true")
+    rsm.set_defaults(fn=cmd_resume_match)
     rsp = rss.add_parser("propose-master", help="validate a proposed master.yaml -> profile/master.proposed.yaml "
                          "(pending until approved; used by the extract-master skill)")
     rsp.add_argument("file")

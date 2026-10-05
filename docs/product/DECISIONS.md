@@ -14,7 +14,7 @@ Alternatives: LLM classifier (costs a run per job, injectable itself).
 Consequences: false positives cost one "I checked it" click.
 
 ### DEC-003 Match score formula
-Decision: `match = 100 * (0.7*req_cov + 0.2*pref_cov + 0.1*title_cov)`, weights renormalised over non-empty groups. Skills = `score.json` required_skills / preferred_skills (one LLM score per job, then deterministic); title terms = posting title tokens minus stopwords. Term hit = `qa._term_in_text` with qa's variants (moved to shared `careeros.terms`). Résumé text = `extract` output (REQ-098).
+Decision: `match = 100 * (0.7*req_cov + 0.2*pref_cov + 0.1*title_cov)`, weights renormalised over non-empty groups. Skills = `score.json` required_skills / nice_to_have_skills (one LLM score per job, then deterministic); title terms = posting title tokens minus stopwords. Term hit = `qa._term_in_text` with qa's variants (moved to shared `careeros.terms`). Résumé text = `extract` output (REQ-098).
 Reason: Q-018 deterministic; reuses QA keyword logic so QA and match agree.
 Alternatives: embeddings (dep + non-explainable), LLM rank (cost).
 Consequences: synonyms not matched ("k8s" vs "Kubernetes") unless listed in `config/pipeline.yaml: match.synonyms`.

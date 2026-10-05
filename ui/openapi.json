@@ -4434,6 +4434,115 @@
         "title": "MasterProposal",
         "type": "object"
       },
+      "MatchRow": {
+        "properties": {
+          "groups": {
+            "additionalProperties": {
+              "additionalProperties": {
+                "items": {
+                  "type": "string"
+                },
+                "type": "array"
+              },
+              "type": "object"
+            },
+            "title": "Groups",
+            "type": "object"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          },
+          "score": {
+            "title": "Score",
+            "type": "integer"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rid",
+          "name",
+          "type",
+          "version",
+          "score",
+          "missing",
+          "groups"
+        ],
+        "title": "MatchRow",
+        "type": "object"
+      },
+      "Matches": {
+        "properties": {
+          "best": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Best"
+          },
+          "hint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Hint"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "resumes": {
+            "items": {
+              "$ref": "#/components/schemas/MatchRow"
+            },
+            "title": "Resumes",
+            "type": "array"
+          },
+          "scored": {
+            "title": "Scored",
+            "type": "boolean"
+          },
+          "threshold": {
+            "title": "Threshold",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "job_id",
+          "threshold",
+          "scored",
+          "best",
+          "resumes"
+        ],
+        "title": "Matches",
+        "type": "object"
+      },
       "Meta": {
         "properties": {
           "action_needs": {
@@ -10255,6 +10364,67 @@
           }
         },
         "summary": "Job File",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/matches": {
+      "get": {
+        "description": "Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003).",
+        "operationId": "job_matches_api_jobs__job_id__matches_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "threshold",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 100,
+                  "minimum": 0,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Threshold"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Matches"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Job Matches",
         "tags": [
           "jobs"
         ]

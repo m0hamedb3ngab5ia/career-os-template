@@ -211,6 +211,13 @@ def test_active_categories_and_keyword_helpers():
     ("pipeline.yaml", "outreach: true\n", "pipeline.yaml: outreach"),
     ("companies.yaml", "- Acme\n- Initech\n", "companies.yaml"),
     ("targets.yaml", "location: [US]\n", "targets.yaml: location"),
+    ("pipeline.yaml", "match: []\n", "pipeline.yaml: match"),
+    ("pipeline.yaml", "match: {synonyms: [k8s]}\n", "match.synonyms must be a mapping"),
+    ("pipeline.yaml", "match: {synonyms: {kubernetes: k8s}}\n", r"match.synonyms.kubernetes must be a list"),
+    ("pipeline.yaml", "match: {synonyms: {kubernetes: [1]}}\n", r"match.synonyms.kubernetes must be a list"),
+    ("targets.yaml", "thresholds: [70]\n", "targets.yaml: thresholds"),
+    ("targets.yaml", "thresholds: {min_match: high}\n", r"thresholds.min_match must be a whole number 0-100"),
+    ("targets.yaml", "thresholds: {min_match: 101}\n", r"thresholds.min_match must be a whole number 0-100"),
 ])
 def test_settings_load_rejects_wrong_shapes(tmp_path, fname, body, where):
     root = _root(tmp_path)
