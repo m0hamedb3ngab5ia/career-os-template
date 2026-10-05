@@ -92,15 +92,15 @@ def test_e2e_010_01_best_above_threshold_prepare_once(s: Settings):
     assert "Python" in st["resumes"][1]["groups"]["required"]["hit"] and st["resumes"][1]["groups"]["required"]["missing"]
     assert not Store(s).is_selected(jid)  # Cancel = job kept, unticked: nothing to undo
     calls = []
-    assert check.tailor(s, jid, lambda: calls.append(1) or "r1") == "r1"  # REQ-114 Prepare application above threshold
+    assert check.tailor(s, jid, lambda f: calls.append(1) or "r1") == "r1"  # REQ-114 Prepare application above threshold
     assert check.state(s, jid)["stage"] == "ready"
     with pytest.raises(check.Refused):  # one prepare run per check
-        check.tailor(s, jid, lambda: calls.append(1) or "r2")
+        check.tailor(s, jid, lambda f: calls.append(1) or "r2")
     assert calls == [1]
 
 
 def _fake_tailor(s: Settings, jd: Path, text: str):
-    def start() -> str:
+    def start(force: bool = False) -> str:
         (jd / "resume.txt").write_text(text)
         (jd / "resume_choice.json").write_text(json.dumps({"action": "tailor"}))
         for f in ("cover_letter.md", "cover_letter.txt", "prepare.json", "answers.json"):
@@ -118,7 +118,7 @@ def _below(s: Settings) -> tuple[str, Path]:
     jd = _scored(s, jid)
     st = check.state(s, jid)
     assert st["stage"] == "offer_tailor" and st["resumes"][0]["score"] < 60
-    assert check.tailor(s, jid, lambda: "run-1") == "run-1"
+    assert check.tailor(s, jid, lambda f: "run-1") == "run-1"
     assert check.state(s, jid)["stage"] == "tailoring"
     _fake_tailor(s, jd, "Backend engineer Python Kubernetes Rust")()
     Store(s).set_status(jid, "queued")
@@ -132,7 +132,7 @@ def test_e2e_010_02_below_threshold_keep(s: Settings):
     assert st["stage"] == "confirm" and a < 70
     assert f"{a}/70" in st["notice"] and "Go" in st["notice"] and "SQL" in st["notice"]
     with pytest.raises(check.Refused):  # max one tailor run per check
-        check.tailor(s, jid, lambda: "run-2")
+        check.tailor(s, jid, lambda f: "run-2")
     before = len(resumes.list_resumes(s.root))
     st = check.decide(s, jid, keep=True)
     assert st["stage"] == "below_threshold"
@@ -190,7 +190,7 @@ def test_attempt_waits_for_run_end_and_failed_run_can_retry(s: Settings):
     (jd / "resume.txt").unlink()
     _run(s, status="failed")
     assert check.state(s, jid)["stage"] == "tailor_failed"
-    assert check.tailor(s, jid, lambda: "run-2") == "run-2"
+    assert check.tailor(s, jid, lambda f: "run-2" if f else "unforced") == "run-2"  # the one forced retry
 
 
 def test_skip_decision_is_not_tailorable(s: Settings):
@@ -202,7 +202,7 @@ def test_skip_decision_is_not_tailorable(s: Settings):
     st = check.state(s, jid)
     assert st["stage"] == "not_tailorable" and "location" in st["notice"]
     with pytest.raises(check.Refused):
-        check.tailor(s, jid, lambda: "r1")
+        check.tailor(s, jid, lambda f: "r1")
 
 
 def test_tailored_reaches_threshold_is_ready(s: Settings):
@@ -241,7 +241,7 @@ def test_runner_holds_below_threshold_save_until_keep(s: Settings, capsys):
 
     s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}), "preflight_doctor": False}}
     cfg = load_runs_config(s)
-    check.tailor(s, jid, lambda: run_batch(s, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg,
+    check.tailor(s, jid, lambda f: run_batch(s, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg,
                                            invoke=invoke, job_ids=[jid], echo=print)["id"])
     out = capsys.readouterr().out
     assert "tailored résumé held: below threshold, awaiting keep/discard" in out and "failed" not in out
@@ -249,3 +249,39 @@ def test_runner_holds_below_threshold_save_until_keep(s: Settings, capsys):
     assert check.state(s, jid)["stage"] == "confirm" and tailored() == []
     check.decide(s, jid, keep=True)
     assert len(tailored()) == 1
+
+
+def test_already_prepared_job_is_not_offered_prepare_again(s: Settings):
+    """Review #150 [1]: re-checking a JD of a job already prepared must not rerun prepare (it would overwrite
+    the résumé/cover letter): no offer, 409, and the one allowed rerun (tailor_failed) is the only forced one."""
+    _resume(s, "Infra", "Backend engineer: Python Kubernetes Rust Go SQL")
+    jid = check.create(s, JD)["job_id"]
+    jd = _scored(s, jid)
+    (jd / "prepare.json").write_text(json.dumps({"qa_pass": True}))
+    Store(s).set_status(jid, "queued")
+    st = check.state(s, jid)
+    assert st["stage"] == "not_tailorable" and "queued" in st["notice"]
+    calls = []
+    with pytest.raises(check.Refused, match="queued"):
+        check.tailor(s, jid, lambda f: calls.append(f) or "r1")
+    assert calls == []
+
+
+def test_force_only_for_tailor_failed_retry(s: Settings):
+    _resume(s, "Infra", "Backend engineer: Python Kubernetes Rust Go SQL")
+    jid = check.create(s, JD)["job_id"]
+    _scored(s, jid)
+    forced = []
+    check.tailor(s, jid, lambda f: forced.append(f) or "r1")
+    assert forced == [False]
+
+
+def test_flagged_job_is_not_offered_prepare(s: Settings):
+    _resume(s, "Infra", "Backend engineer: Python Kubernetes Rust Go SQL")
+    jid = check.create(s, JD)["job_id"]
+    _scored(s, jid)
+    Store(s).set_flag(jid, "injection_suspected", True)
+    st = check.state(s, jid)
+    assert st["stage"] == "not_tailorable" and "injection" in st["notice"]
+    with pytest.raises(check.Refused):
+        check.tailor(s, jid, lambda f: "r1")

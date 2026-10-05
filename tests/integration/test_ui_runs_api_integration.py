@@ -336,3 +336,18 @@ def test_validation_errors_do_not_echo_a_whole_body(client):
     r = client.post("/api/runs/cancel", json=["x" * 500], headers=W)
     assert r.status_code == 422
     assert "x" * 100 not in r.text and "…" in r.text
+
+
+def test_refused_job_run_leaves_the_job_unticked(client, data, fakes):
+    """Review #150 [2]: `run --job` ticks the job only when the runner accepts it; a 409 changes nothing."""
+    from careeros.store import Store
+
+    jid, store = data["jobs"]["queued"], Store(data["settings"])
+    store.set_selected([jid], False)
+    from careeros.runs.runner import JobNotRunnable
+
+    with pytest.raises(JobNotRunnable, match="queued"):  # the API maps it to 409
+        fakes.factory(data["settings"]).start("prepare", job_id=jid)
+    assert not store.is_selected(jid) and fakes.spawned == []
+    fakes.factory(data["settings"]).start("prepare", job_id=jid, force=True)  # accepted: ticked (REQ-104)
+    assert store.is_selected(jid) and fakes.spawned

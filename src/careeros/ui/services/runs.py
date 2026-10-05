@@ -247,11 +247,15 @@ class RunControl:
             skip = Failures(self.rs).exhausted(kind, load_retry_config(cfg.raw)["max_attempts"])
             from careeros.store import Store
 
-            if Store(self.settings).exists(job_id):
-                Store(self.settings).set_selected([job_id], True)  # REQ-104: running one job ticks it
+            store = Store(self.settings)
+            untick = store.exists(job_id) and not store.is_selected(job_id)
+            if untick:
+                store.set_selected([job_id], True)  # REQ-104: running one job ticks it
             ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force,
                                                  skip_ids=skip)
             if not ranked:
+                if untick:  # refused: the tick never happened (REQ-114 "no run = unticked")
+                    store.set_selected([job_id], False)
                 raise JobNotRunnable(kind, {e["job_id"]: e["reason"] for e in excluded})
             run_id = new_run_id(kind, self.now())
         self._check_can_start()

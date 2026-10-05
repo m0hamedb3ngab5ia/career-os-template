@@ -120,6 +120,23 @@ def holds_save(settings: Any, jd: Path) -> bool:
     return a["score"] < match.matches(settings, jd)["threshold"]
 
 
+def _not_preparable(settings: Any, job_id: str, jd: Path) -> str | None:
+    """Why an unforced `run prepare --job` would refuse this job (runner eligibility, as if ticked), else None:
+    flagged, score decision not prepare, or already prepared/queued (a rerun would overwrite its artifacts)."""
+    from careeros import untrusted
+    from careeros.runs.runner import eligibility
+
+    store, sc = Store(settings), match._json(jd / "score.json")
+    why = eligibility("prepare", store.get_status(job_id) or "found", (jd / "score.json").exists(), sc,
+                      bool(match._json(jd / "prepare.json").get("qa_pass")),
+                      injection=untrusted.blocked(store.load_flags(job_id)))
+    if why == "injection suspected":
+        return "possible prompt injection: mark it checked on the job page first"
+    if why and why.startswith("score decision") and sc.get("skip_reason"):
+        return f"{why}: {sc['skip_reason']}"
+    return why
+
+
 def state(settings: Any, job_id: str) -> dict[str, Any]:
     """stage: scoring | ready | not_tailorable | offer_tailor | tailoring | tailor_failed | ready_tailored | confirm |
     below_threshold | discarded."""
@@ -131,14 +148,13 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
                            "attempt": None, "notice": None}
     if not m["scored"]:
         stage = "scoring"
-    elif best is not None and best >= thr:
-        stage = "ready"
     elif c.get("decision") == "discard":
         stage = "discarded"
-    elif not c.get("tailor") and (sc := match._json(jd / "score.json")).get("decision") != "prepare":
-        stage = "not_tailorable"  # prepare would refuse it (runner eligibility): no dead-end offer
-        out["notice"] = (f"score decision {sc.get('decision')}"
-                         + (f": {sc['skip_reason']}" if sc.get("skip_reason") else "") + "; no tailoring for this job")
+    elif not c.get("tailor") and (why := _not_preparable(settings, job_id, jd)):
+        stage = "not_tailorable"  # prepare would refuse it (runner eligibility) or redo a done job: no dead-end offer
+        out["notice"] = f"{why}; Prepare application is not offered for this job"
+    elif best is not None and best >= thr:
+        stage = "ready"
     elif not c.get("tailor"):
         stage = "offer_tailor"
     elif not _run_done(settings, c):
@@ -163,11 +179,13 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
 
 def tailor(settings: Any, job_id: str, start: Callable[[], str]) -> str:
     """The one "Prepare application" run of this check (REQ-114): above threshold = plain prepare, below = tailor
-    from master (REQ-116). `start` starts `run prepare --job` (ticks the job) and returns its run id."""
+    from master (REQ-116). `start(force)` starts `run prepare --job` (ticks the job) and returns its run id."""
     st, jd = state(settings, job_id), _job_dir(settings, job_id)
+    if st["stage"] == "not_tailorable":
+        raise Refused(f"job {job_id}: {st['notice']}")
     if not (st["stage"] in ("offer_tailor", "tailor_failed") or (st["stage"] == "ready" and not _load(jd).get("tailor"))):
         raise Refused(f"job {job_id}: no prepare offer at stage {st['stage']!r} (max one prepare run per check)")
-    run_id = start()
+    run_id = start(st["stage"] == "tailor_failed")  # force only reruns this check's own failed tailor run
     _save(jd, {**_load(jd), "tailor": {"run_id": run_id, "started_at": _now()}})
     return run_id
 

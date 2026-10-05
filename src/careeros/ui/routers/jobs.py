@@ -333,7 +333,7 @@ def check_tailor(job_id: str, request: Request, c=Depends(ctx)) -> PipelineStart
 
     with _check_refusals():
         run = check.tailor(c.settings, job_id,
-                           lambda: _rc(request, c).start("prepare", job_id=job_id, force=True)["run_id"])
+                           lambda force: _rc(request, c).start("prepare", job_id=job_id, force=force)["run_id"])
     return PipelineStarted(run_id=run, kind="prepare")
 
 
