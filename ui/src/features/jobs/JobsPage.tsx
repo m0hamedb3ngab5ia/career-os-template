@@ -1,4 +1,4 @@
-import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
+import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";

@@ -152,7 +152,7 @@ describe("Start pipeline (REQ-117)", () => {
     await waitFor(() => expect(within(sheet).queryByRole("rowheader", { name: "Plainco" })).not.toBeInTheDocument(), opts);
     expect(within(sheet).getByRole("rowheader", { name: "Topco" })).toBeInTheDocument();
     await user.click(within(sheet).getByRole("button", { name: "Remove filter Tier" }));
-    expect(await within(sheet).findByRole("rowheader", { name: "Plainco" }, {}, opts)).toBeInTheDocument();
+    expect(await within(sheet).findByRole("rowheader", { name: "Plainco" }, opts)).toBeInTheDocument();
   });
 
   it("Tier A row's default reads Fill when all go to Submit", async () => {
