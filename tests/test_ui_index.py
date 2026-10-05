@@ -500,3 +500,21 @@ def test_a_pre_detail_tracker_item_is_indexed_with_detail_none(idx, data, monkey
     monkeypatch.setattr(idx, "get_meta", lambda k: None if k == "tracker_sig" else "x")
     idx.sync()
     assert [(r["id"], r["detail"]) for r in idx.query("SELECT id, detail FROM action_items")] == [("old1", None)]
+
+
+def test_selected_and_injection_flags_are_indexed(data):
+    """REQ-104/109: jobs rows carry `selected` (missing flag = ticked) and the uncleared injection reasons."""
+    store = Store(data["settings"])
+    jid, other = data["jobs"]["review"], data["jobs"]["found"]
+    store.set_selected([jid], False)
+    store._write(jid, "flags.json", {**store.load_flags(jid), "injection_suspected": True,
+                                     "injection_reasons": ["hidden text", "instruction phrase"]})
+    ix = Index(data["settings"])
+    ix.rebuild()
+    jobs = _jobs(ix)
+    assert (jobs[jid]["selected"], jobs[jid]["injection"]) == (0, "hidden text; instruction phrase")
+    assert (jobs[other]["selected"], jobs[other]["injection"]) == (1, None)
+    store.clear_injection(jid)
+    ix.update_jobs([jid])
+    assert _jobs(ix)[jid]["injection"] is None
+    ix.close()

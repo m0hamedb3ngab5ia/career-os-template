@@ -21,17 +21,20 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterable
 
+from careeros import untrusted
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 5   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail
+SCHEMA_VERSION = 6   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail;
+#                      6: jobs.selected, jobs.injection
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
 CREATE TABLE jobs (
     job_id TEXT PRIMARY KEY, company TEXT, title TEXT, location TEXT, ats TEXT, url TEXT, apply_url TEXT,
     category TEXT, fit INTEGER, tier TEXT, status TEXT, safety TEXT, qa_passed INTEGER, qa_score REAL,
-    found_at TEXT, applied_at TEXT, updated_at TEXT, closes_at TEXT, pruned INTEGER, sig TEXT);
+    found_at TEXT, applied_at TEXT, updated_at TEXT, closes_at TEXT, pruned INTEGER, sig TEXT,
+    selected INTEGER, injection TEXT);
 CREATE INDEX jobs_status ON jobs(status);
 CREATE TABLE candidates (
     job_id TEXT PRIMARY KEY, status TEXT, score TEXT, has_score INTEGER, prepared_ok INTEGER, posting TEXT,
@@ -346,14 +349,18 @@ class Index:
         applied_at = next((h.get("at") for h in hist if h.get("status") == "applied"), None)
         found_at = posting.get("fetched_at") or next((h.get("at") for h in hist if h.get("status") == "found"), None)
         fit = score.get("fit")
+        flags = _obj(d / "flags.json")
+        reasons = flags.get("injection_reasons") if isinstance(flags.get("injection_reasons"), list) else []
+        injection = ("; ".join(map(str, reasons)) or "suspected") if untrusted.blocked(flags) else None
         self._delete_job(jid)
         self.con.execute(
-            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (jid, posting.get("company"), posting.get("title"), posting.get("location"), posting.get("ats"),
              posting.get("url"), posting.get("apply_url"), score.get("category"),
              fit if isinstance(fit, int) and not isinstance(fit, bool) else None, score.get("tier"),
              status.get("status") or "found", safety.get("verdict"), qa_passed, qa_score, found_at, applied_at,
-             status.get("updated_at"), posting.get("closes_at"), int(bool(posting.get("pruned"))), sig))
+             status.get("updated_at"), posting.get("closes_at"), int(bool(posting.get("pruned"))), sig,
+             int(bool(flags.get("selected", True))), injection))
         self.con.execute("INSERT INTO candidates VALUES (?,?,?,?,?,?,?)",
                          (jid, status.get("status") or "found", json.dumps(candidate_score(score)),
                           int(bool(score) or (d / "score.json").exists()),

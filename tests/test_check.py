@@ -209,7 +209,7 @@ def test_tailored_reaches_threshold_is_ready(s: Settings):
         check.decide(s, jid, keep=True)
 
 
-def test_runner_holds_below_threshold_save_until_keep(s: Settings):
+def test_runner_holds_below_threshold_save_until_keep(s: Settings, capsys):
     """REQ-116 at the runner: a passing prepare run of a check job below the threshold saves nothing; keep saves once."""
     from careeros.runs.config import budget_for, load_runs_config
     from careeros.runs.headless import parse_stream
@@ -236,7 +236,9 @@ def test_runner_holds_below_threshold_save_until_keep(s: Settings):
     s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}), "preflight_doctor": False}}
     cfg = load_runs_config(s)
     check.tailor(s, jid, lambda: run_batch(s, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg,
-                                           invoke=invoke, job_ids=[jid])["id"])
+                                           invoke=invoke, job_ids=[jid], echo=print)["id"])
+    out = capsys.readouterr().out
+    assert "tailored résumé held: below threshold, awaiting keep/discard" in out and "failed" not in out
     tailored = lambda: [r for r in resumes.list_resumes(s.root) if r["type"] == "tailored"]  # noqa: E731
     assert check.state(s, jid)["stage"] == "confirm" and tailored() == []
     check.decide(s, jid, keep=True)

@@ -27,7 +27,7 @@ NUMBER_COLUMNS = ("fit", "qa_score")
 DATE_COLUMNS = ("found_at", "applied_at", "closes_at")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
-               "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at")
+               "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at", "selected", "injection")
 
 
 # Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable (qa_passed is the index's 0/1
@@ -51,6 +51,8 @@ class JobRow(TypedDict):
     applied_at: str | None
     updated_at: str | None
     closes_at: str | None
+    selected: int | None     # REQ-104: 1 = ticked for prepare/apply (a missing flag counts as ticked)
+    injection: str | None    # REQ-109: uncleared injection reasons; None = not flagged or "I checked it"
 
 
 class JobListItem(JobRow):
@@ -153,7 +155,7 @@ _NEXT_ACTION = ("(SELECT a.what FROM action_items a WHERE a.job_id = jobs.job_id
 EXPORT_COLUMNS = {"company": "Company", "title": "Role", "location": "Location", "tier": "Tier", "fit": "Fit",
                   "status": "Status", "safety": "Safety", "qa_score": "QA", "ats": "ATS", "found_at": "Found",
                   "applied_at": "Applied", "next_action": "Next action", "category": "Category", "url": "URL",
-                  "closes_at": "Closes"}
+                  "closes_at": "Closes", "selected": "Pipeline"}
 DEFAULT_EXPORT = ("company", "title", "location", "tier", "fit", "status", "safety", "qa_score", "ats", "found_at",
                   "applied_at", "next_action", "url")
 MAX_EXPORT = 5000
@@ -308,7 +310,8 @@ def export_xlsx(ix: Any, *, job_ids: list[str] | None = None, columns: list[str]
         cell.font = Font(bold=True)
     ws.freeze_panes = "A2"
     for r in rows:
-        ws.append([r["job_id"], *(_cell(r.get(c)) for c in cols)])
+        ws.append([r["job_id"], *(_cell(({0: "no", 1: "yes"}.get(r[c], r[c])) if c == "selected" else r.get(c))
+                                  for c in cols)])
     buf = io.BytesIO()
     wb.save(buf)
     return buf.getvalue()

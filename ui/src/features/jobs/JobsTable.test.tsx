@@ -1,11 +1,19 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import type { ReactNode } from "react";
+import { ToastProvider } from "../../kit/Toast";
 import { MemoryRouter } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { COLUMNS } from "./cells";
 import { job } from "./fixtures";
 import { JobsTable } from "./JobsTable";
+
+const qc = new QueryClient();
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <QueryClientProvider client={qc}><ToastProvider>{children}</ToastProvider></QueryClientProvider>
+);
 
 const MANY = Array.from({ length: 1000 }, (_, i) => job({ job_id: `j${i}`, company: `Company ${i}`, fit: 99 - (i % 99) }));
 
@@ -32,6 +40,7 @@ function renderTable(props: Partial<Parameters<typeof JobsTable>[0]> = {}) {
         {...props}
       />
     </MemoryRouter>,
+    { wrapper }
   );
   return { ...utils, onSort, onToggle, onToggleAll };
 }
