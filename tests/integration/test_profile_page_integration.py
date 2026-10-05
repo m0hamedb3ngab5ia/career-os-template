@@ -82,7 +82,7 @@ def test_writing_samples_upload_runs_learn_voice(client):
     started.pop()
     got = c.get("/api/profile/samples", headers=W).json()
     assert [x["name"] for x in got["samples"]] == ["a.md", "b.txt"]
-    assert c.put("/api/profile/samples", params={"filename": "x.pdf"}, content=b"x", headers=W).status_code == 415
+    assert c.put("/api/profile/samples", params={"filename": "x.doc"}, content=b"x", headers=W).status_code == 415
     big = b"x" * (5 * 1024 * 1024 + 1)
     assert c.put("/api/profile/samples", params={"filename": "c.md"}, content=big, headers=W).status_code == 413
     c.app.state.busy.append({"owner": "run:x", "note": "learn_voice (manual)"})  # MUST1: already learning = info
@@ -96,3 +96,16 @@ def test_writing_samples_upload_runs_learn_voice(client):
     assert r["samples"] == [] and r["learn_run"] is None and started == ["learn_voice"] * 2
     assert c.get("/api/profile/samples", headers=W).json()["learned"] == ""
     assert c.delete("/api/profile/samples/b.txt", headers=W).status_code == 404
+
+
+def test_writing_samples_upload_docx_as_text_and_pdf(client):
+    """TASK-021 (REQ-101): a .docx upload is stored as its plain text, a .pdf as-is; both trigger learn-voice."""
+    c, root, started = client
+    docx = (Path(__file__).resolve().parents[1] / "fixtures" / "voice_sample.docx").read_bytes()
+    r = c.put("/api/profile/samples", params={"filename": "letter.docx", "learn": False}, content=docx, headers=W)
+    assert r.status_code == 201, r.text
+    r = c.put("/api/profile/samples", params={"filename": "essay.pdf"}, content=b"%PDF-1.4 x", headers=W)
+    assert r.status_code == 201 and started == ["learn_voice"], r.text
+    assert [x["name"] for x in r.json()["samples"]] == ["essay.pdf", "letter.txt"]
+    assert "small tools" in (root / "profile" / "voice" / "samples" / "letter.txt").read_text(encoding="utf-8")
+    assert c.put("/api/profile/samples", params={"filename": "bad.docx"}, content=b"x", headers=W).status_code == 422

@@ -124,6 +124,8 @@ async def upload_sample(request: Request, filename: str, learn: bool = True, c=D
         voice.add_sample(c.settings.root, filename, bytes(data))
     except voice.Unsupported as e:
         raise HTTPException(415, str(e)) from None
+    except voice.TooLarge as e:
+        raise HTTPException(413, str(e)) from None
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
     return _learn(request, c) if learn else SampleChange(samples=_samples(c))

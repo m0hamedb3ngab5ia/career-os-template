@@ -151,7 +151,7 @@ export function ProfilePage() {
             )}
           </Loaded>
         </Section>
-        <Section id="samples" title="Writing samples" intro="Letters or emails you wrote (txt, md or eml, up to 5 MB). Cover letters copy your style from them.">
+        <Section id="samples" title="Writing samples" intro="Letters or emails you wrote (txt, md, eml, pdf or docx, up to 5 MB). Cover letters copy your style from them.">
           {learnInfo && !learnError ? <p role="status" className={styles.muted}>{learnInfo}</p> : null}
           {learnError ? (
             <p role="alert" className={styles.banner}>
@@ -172,7 +172,7 @@ export function ProfilePage() {
               </ul>
             )}
           </Loaded>
-          <FilePick multiple label="Add samples" accept=".txt,.md,.eml" pending={addSample.isPending} onFiles={(f) => addSample.mutate(f, onSamples)} />
+          <FilePick multiple label="Add samples" accept=".txt,.md,.eml,.pdf,.docx" pending={addSample.isPending} onFiles={(f) => addSample.mutate(f, onSamples)} />
         </Section>
         <Section id="answers" title="Saved answers" intro="The only answers the applier types without asking you.">
           <Loaded q={answers} empty={(d) => !d.answers.length}>

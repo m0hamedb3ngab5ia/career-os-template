@@ -112,9 +112,66 @@ def test_add_sample_keeps_same_name_and_skill_types_only(tmp_path: Path):
     assert (d / "letter.md").read_bytes() == b"one" and (d / "letter-3.md").read_bytes() == b"three"
     assert voice.add_sample(tmp_path, "mail.eml", b"x")["name"] == "mail.eml"
     assert not [p for p in d.iterdir() if p.name.startswith(".")]  # no temp files left behind
-    for bad in ("cv.pdf", "cv.docx"):
+    for bad in ("cv.doc", "cv.rtf"):
         with pytest.raises(voice.Unsupported):
             voice.add_sample(tmp_path, bad, b"x")
+
+
+FIXTURE_DOCX = Path(__file__).resolve().parent / "fixtures" / "voice_sample.docx"
+
+
+def test_docx_sample_stored_as_plain_text_and_pdf_as_is(tmp_path: Path):
+    """TASK-021: .docx becomes .txt (stdlib, paragraphs on their own lines); .pdf is kept for learn-voice to Read."""
+    assert voice.docx_text(FIXTURE_DOCX.read_bytes()) == "Dear hiring team,\nI build small tools\tthat last.\n\nBest regards"
+    assert voice.add_sample(tmp_path, "letter.docx", FIXTURE_DOCX.read_bytes())["name"] == "letter.txt"
+    assert voice.add_sample(tmp_path, "letter.docx", FIXTURE_DOCX.read_bytes())["name"] == "letter-2.txt"
+    d = voice.samples_dir(tmp_path)
+    assert (d / "letter.txt").read_text(encoding="utf-8").startswith("Dear hiring team,")
+    assert not list(d.glob("*.docx"))
+    assert voice.add_sample(tmp_path, "cv.pdf", b"%PDF-1.4 x")["name"] == "cv.pdf"
+    assert (d / "cv.pdf").read_bytes() == b"%PDF-1.4 x"
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "broken.docx", b"not a zip")
+
+
+def _docx(xml: bytes, method: int = 8) -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", method) as z:
+        z.writestr("word/document.xml", xml)
+    return buf.getvalue()
+
+
+def _patch(data: bytes, local_off: int, central_off: int, value: int) -> bytes:
+    """Set a 2-byte field in both the local and central header (zipfile can't write encrypted/method-99 members)."""
+    b = bytearray(data)
+    for sig, off in ((b"PK\x03\x04", local_off), (b"PK\x01\x02", central_off)):
+        i = b.index(sig) + off
+        b[i:i + 2] = value.to_bytes(2, "little")
+    return bytes(b)
+
+
+@pytest.mark.parametrize("data", [
+    _patch(_docx(b"<x/>", 0), 6, 8, 1),     # encrypted member -> RuntimeError
+    _patch(_docx(b"<x/>", 0), 8, 10, 99),   # unsupported compression -> NotImplementedError
+    _docx(b"<x/>", 8).replace(b"\xb3\xa9\xd0\xb7\x03\x00", b"\xff" * 6),  # corrupt deflate -> zlib.error
+], ids=["encrypted", "method99", "corrupt"])
+def test_docx_unreadable_zip_member_is_invalid(tmp_path: Path, data: bytes):
+    """Review141 MUST: every unreadable member is a ValueError (422), never a 500."""
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "bad.docx", data)
+
+
+def test_docx_doctype_rejected_and_text_capped(tmp_path: Path):
+    """Review141 SHOULDs: no DTD in document.xml; extracted text obeys the 5 MB cap (TooLarge -> 413)."""
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "dtd.docx", _docx(b'<!DOCTYPE x [<!ENTITY a "b">]><x>&a;</x>'))
+    w = b'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    big = _docx(b"<w:document " + w + b"><w:p><w:t>" + b"a" * (voice.MAX_BYTES + 1) + b"</w:t></w:p></w:document>")
+    with pytest.raises(voice.TooLarge, match="larger than 5 MB"):
+        voice.add_sample(tmp_path, "big.docx", big)
+    assert not voice.list_samples(tmp_path)
 
 
 def test_step_skills_get_minimal_tools():
@@ -146,3 +203,9 @@ def test_run_skill_passes_kind_to_build_command(tmp_path: Path):
     except RuntimeError:
         pass
     assert cmds[0][cmds[0].index("--allowedTools") + 1] == "Read,Glob,Grep,Edit(profile/voice/**)"
+
+
+def test_learn_voice_skill_reads_uploaded_types():
+    """TASK-021: learn-voice reads every type the upload stores (docx arrives as .txt, pdf via Read)."""
+    skill = (Path(__file__).resolve().parents[1] / ".claude" / "skills" / "learn-voice" / "SKILL.md").read_text()
+    assert all(e in skill for e in (".md", ".txt", ".eml", ".pdf"))
