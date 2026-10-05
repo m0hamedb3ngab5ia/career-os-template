@@ -346,6 +346,21 @@ def check_decision(job_id: str, body: CheckDecision, c=Depends(ctx)) -> CheckSta
     after_write(c, jobs=[job_id])
     return CheckState(**out)
 
+@router.post("/jobs/{job_id}/injection/clear")
+def clear_injection(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    """REQ-109 "I checked it": the user read a flagged posting; prepare/apply are allowed again."""
+    from careeros import untrusted
+    from careeros.store import Store
+
+    store = Store(c.settings)
+    if not store.exists(job_id):
+        raise HTTPException(404, f"no job {job_id!r}")
+    if not untrusted.blocked(store.load_flags(job_id)):
+        raise HTTPException(409, "job is not flagged as a possible injection")
+    store.clear_injection(job_id)
+    after_write(c, jobs=[job_id])
+    return {"job_id": job_id, "cleared": True}
+
 
 @router.post("/jobs/{job_id}/status")
 def set_status(job_id: str, body: StatusBody, c=Depends(ctx)) -> dict[str, Any]:
