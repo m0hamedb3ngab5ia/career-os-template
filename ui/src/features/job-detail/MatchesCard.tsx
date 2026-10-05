@@ -23,31 +23,38 @@ export function MatchesCard({ jobId }: { jobId: string }) {
       ) : m.resumes.length === 0 ? (
         <Muted>No résumés yet. Add one on the Profile page.</Muted>
       ) : (
-        <table className={styles.matches}>
-          <thead>
-            <tr>
-              <th scope="col">Résumé</th>
-              <th scope="col">Match</th>
-              <th scope="col">Missing skills</th>
-            </tr>
-          </thead>
-          <tbody>
-            {m.resumes.map((r) => (
-              <tr key={r.rid} data-best={r.rid === m.best || undefined}>
-                <th scope="row">
-                  {r.name} {r.rid === m.best ? <Chip tone="green">Best</Chip> : null}
-                </th>
-                <td className="tabular">
-                  {r.score}
-                  {r.score < m.threshold ? <span className="sr-only"> (below threshold)</span> : null}
-                </td>
-                <td>{r.missing.length ? r.missing.join(", ") : "None"}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <MatchesTable m={m} />
       )}
       {m?.scored && m.hint ? <Muted>{m.hint}</Muted> : null}
     </Card>
+  );
+}
+
+/** The match table itself (also used by the Check a job dialog). */
+export function MatchesTable({ m }: { m: Matches }) {
+  return (
+    <table className={styles.matches}>
+      <thead>
+        <tr>
+          <th scope="col">Résumé</th>
+          <th scope="col">Match</th>
+          <th scope="col">Missing skills</th>
+        </tr>
+      </thead>
+      <tbody>
+        {m.resumes.map((r) => (
+          <tr key={r.rid} data-best={r.rid === m.best || undefined}>
+            <th scope="row">
+              {r.name} {r.rid === m.best ? <Chip tone="green">Best</Chip> : null}
+            </th>
+            <td className="tabular">
+              {r.score}
+              {r.score < m.threshold ? <span className="sr-only"> (below threshold)</span> : null}
+            </td>
+            <td>{r.missing.length ? r.missing.join(", ") : "None"}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   );
 }

@@ -1,9 +1,10 @@
-import { Download, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
+import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
+import { CheckJobDialog } from "./CheckJobDialog";
 import { EmptyState } from "../../kit/EmptyState";
 import { Menu } from "../../kit/Menu";
 import { Pager, usePaged } from "../../kit/Pager";
@@ -50,8 +51,13 @@ function HeaderActions() {
   const toast = useToast();
   const sync = useSyncTracker();
   const open = useOpenTracker();
+  const [checking, setChecking] = useState(false);
   return (
     <>
+      <Button variant="primary" icon={<FileSearch size={14} strokeWidth={1.7} aria-hidden="true" />} onClick={() => setChecking(true)}>
+        Check a job
+      </Button>
+      <CheckJobDialog open={checking} onClose={() => setChecking(false)} />
       <Button
         icon={<RefreshCw size={14} strokeWidth={1.7} aria-hidden="true" />}
         pending={sync.isPending}

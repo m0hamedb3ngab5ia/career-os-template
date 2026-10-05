@@ -134,6 +134,46 @@ def test_docx_sample_stored_as_plain_text_and_pdf_as_is(tmp_path: Path):
         voice.add_sample(tmp_path, "broken.docx", b"not a zip")
 
 
+def _docx(xml: bytes, method: int = 8) -> bytes:
+    import io
+    import zipfile
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", method) as z:
+        z.writestr("word/document.xml", xml)
+    return buf.getvalue()
+
+
+def _patch(data: bytes, local_off: int, central_off: int, value: int) -> bytes:
+    """Set a 2-byte field in both the local and central header (zipfile can't write encrypted/method-99 members)."""
+    b = bytearray(data)
+    for sig, off in ((b"PK\x03\x04", local_off), (b"PK\x01\x02", central_off)):
+        i = b.index(sig) + off
+        b[i:i + 2] = value.to_bytes(2, "little")
+    return bytes(b)
+
+
+@pytest.mark.parametrize("data", [
+    _patch(_docx(b"<x/>", 0), 6, 8, 1),     # encrypted member -> RuntimeError
+    _patch(_docx(b"<x/>", 0), 8, 10, 99),   # unsupported compression -> NotImplementedError
+    _docx(b"<x/>", 8).replace(b"\xb3\xa9\xd0\xb7\x03\x00", b"\xff" * 6),  # corrupt deflate -> zlib.error
+], ids=["encrypted", "method99", "corrupt"])
+def test_docx_unreadable_zip_member_is_invalid(tmp_path: Path, data: bytes):
+    """Review141 MUST: every unreadable member is a ValueError (422), never a 500."""
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "bad.docx", data)
+
+
+def test_docx_doctype_rejected_and_text_capped(tmp_path: Path):
+    """Review141 SHOULDs: no DTD in document.xml; extracted text obeys the 5 MB cap (TooLarge -> 413)."""
+    with pytest.raises(ValueError, match="not a valid .docx"):
+        voice.add_sample(tmp_path, "dtd.docx", _docx(b'<!DOCTYPE x [<!ENTITY a "b">]><x>&a;</x>'))
+    w = b'xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"'
+    big = _docx(b"<w:document " + w + b"><w:p><w:t>" + b"a" * (voice.MAX_BYTES + 1) + b"</w:t></w:p></w:document>")
+    with pytest.raises(voice.TooLarge, match="larger than 5 MB"):
+        voice.add_sample(tmp_path, "big.docx", big)
+    assert not voice.list_samples(tmp_path)
+
+
 def test_step_skills_get_minimal_tools():
     """SHOULD5: run_skill passes its kind, so learn_voice / extract_master get only what their skills need."""
     from careeros.runs.config import RunsConfig, allowed_tools_for
