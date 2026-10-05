@@ -153,7 +153,7 @@ export function PipelinePage() {
   }
 
   return (
-    <Page title="Pipeline" subtitle="How jobs move from discovery to an offer" actions={<Link to="/pipeline/batch/new">New batch</Link>}>
+    <Page title="Pipeline" subtitle="How jobs move from discovery to an offer">
       {error ? (
         <EmptyState title="Couldn't load the pipeline" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{problem(error)}</EmptyState>
       ) : isPending || !board ? null : (

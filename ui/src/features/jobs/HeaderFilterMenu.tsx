@@ -1,13 +1,13 @@
-import { Filter } from "lucide-react";
+import { Filter, X } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import { Button } from "../../kit/Button";
 import { TextInput } from "../../kit/inputs";
 import { humanize } from "../../kit/labels";
 import { Popover } from "../../kit/Popover";
 import { useJobFacets, type FilterParams } from "./api";
-import type { Column } from "./cells";
+import { COLUMNS, type Column } from "./cells";
 import styles from "./JobsPage.module.css";
-import { FILTERS, sortDirection, type ColumnFilter, type FilterField } from "./urlState";
+import { FILTERS, sortDirection, type ColumnFilter, type FilterField, type Filters } from "./urlState";
 
 /** Column values that read better humanized (status codes, verdicts); everything else is shown as stored. */
 const CODE_FIELDS = new Set<FilterField>(["status", "safety", "category"]);
@@ -22,6 +22,36 @@ export function filterSummary(field: FilterField, f: ColumnFilter): string {
   if (f.kind === "values") return f.values.map((v) => facetLabel(field, v)).join(", ");
   if (f.min && f.max) return `${f.min} – ${f.max}`;
   return f.min ? `≥ ${f.min}` : `≤ ${f.max}`;
+}
+
+/** Active column filters as removable chips, plus Clear all. */
+export function FilterChips({ filters, onFilter, onClearAll }: {
+  filters: Filters;
+  onFilter: (field: FilterField, f: ColumnFilter | null) => void;
+  onClearAll: () => void;
+}) {
+  const active = (Object.entries(filters) as [FilterField, ColumnFilter][]).filter(([, f]) => f);
+  if (!active.length) return null;
+  return (
+    <div className={styles.chips} aria-label="Active filters">
+      {active.map(([field, f]) => {
+        const label = COLUMNS.find((c) => c.filter === field)?.label ?? field;
+        return (
+          <span key={field} className={styles.chip}>
+            <span>
+              {label}: {filterSummary(field, f)}
+            </span>
+            <button type="button" className={styles.chipRemove} aria-label={`Remove filter ${label}`} onClick={() => onFilter(field, null)}>
+              <X size={12} strokeWidth={2} aria-hidden="true" />
+            </button>
+          </span>
+        );
+      })}
+      <button type="button" className={styles.linkButton} onClick={onClearAll}>
+        Clear all
+      </button>
+    </div>
+  );
 }
 
 interface Props {
@@ -137,14 +167,21 @@ interface ValuesListProps {
 /** The searchable checklist; mounted only while the menu is open, so the facets are fetched on open. */
 function ValuesList({ col, field, params, picked, setPicked }: ValuesListProps) {
   const [search, setSearch] = useState("");
-  const facets = useJobFacets(field, params, true);
+  const local = params.rows;
+  const facets = useJobFacets(field, params, !local);
+  const pending = !local && facets.isPending;
   const options = useMemo(() => {
     const seen = new Map<string, number>();
-    for (const v of facets.data?.values ?? []) if (v.value !== null && v.value !== "") seen.set(String(v.value), v.count);
+    if (local) {
+      for (const r of local) {
+        const v = (r as unknown as Record<string, unknown>)[field];
+        if (v != null && v !== "") seen.set(String(v), (seen.get(String(v)) ?? 0) + 1);
+      }
+    } else for (const v of facets.data?.values ?? []) if (v.value !== null && v.value !== "") seen.set(String(v.value), v.count);
     for (const v of picked) if (!seen.has(v)) seen.set(v, 0);
     const needle = search.trim().toLowerCase();
     return [...seen].filter(([v]) => !needle || facetLabel(field, v).toLowerCase().includes(needle));
-  }, [facets.data, picked, search, field]);
+  }, [local, facets.data, picked, search, field]);
   function toggle(v: string) {
     const next = new Set(picked);
     if (next.has(v)) next.delete(v);
@@ -168,7 +205,7 @@ function ValuesList({ col, field, params, picked, setPicked }: ValuesListProps) 
           Clear
         </button>
       </div>
-      <ul className={styles.filterList} aria-label={`${col.label} values`} aria-busy={facets.isPending || undefined}>
+      <ul className={styles.filterList} aria-label={`${col.label} values`} aria-busy={pending || undefined}>
         {options.map(([v, n]) => (
           <li key={v}>
             <label className={styles.filterOption}>
@@ -178,7 +215,7 @@ function ValuesList({ col, field, params, picked, setPicked }: ValuesListProps) 
             </label>
           </li>
         ))}
-        {!facets.isPending && options.length === 0 ? <li className={styles.filterEmpty}>No values</li> : null}
+        {!pending && options.length === 0 ? <li className={styles.filterEmpty}>No values</li> : null}
       </ul>
     </>
   );

@@ -1,0 +1,1 @@
+import{i as e}from"./index-5BmphMd9.js";function t(){return e().data?.ui.undo_seconds}export{t};

@@ -40,4 +40,4 @@ def test_running_batch_sees_progress():
 
 def test_else_start_pipeline():
     s = pick(DONE, jobs=12, ticked=3, running_batch=None)
-    assert (s.key, s.label, s.href) == ("start_pipeline", "Start pipeline", "/pipeline/batch/new")
+    assert (s.key, s.label, s.href) == ("start_pipeline", "Start pipeline", "/jobs")

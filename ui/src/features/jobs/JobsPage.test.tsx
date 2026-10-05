@@ -201,24 +201,16 @@ describe("Jobs screen", () => {
     await user.click(all);
     expect(screen.getByText("3 selected")).toBeInTheDocument();
     expect(all).toBeChecked();
-    const add = screen.getByRole("link", { name: "Add 3 to batch" });
-    expect(new URL(add.getAttribute("href")!, "http://x").searchParams.get("ids")!.split(",").sort()).toEqual(
-      [...new URLSearchParams(router.state.location.search).get("sel")!.split(",")].sort(),
-    );
-    await user.click(add);
-    await waitFor(() => expect(router.state.location.pathname).toBe("/pipeline/batch/new"), { timeout: 5000 });
+    expect(screen.getByRole("button", { name: "Start pipeline" })).not.toHaveAttribute("aria-disabled");
   });
 
-  it("clears the selection and hides Add to batch", async () => {
+  it("clears the selection and Start pipeline says why it is unavailable", async () => {
     setup("/jobs?sel=nw01");
     const user = userEvent.setup();
-    expect(await screen.findByRole("link", { name: "Add 1 to batch" })).toHaveAttribute(
-      "href",
-      "/pipeline/batch/new?ids=nw01",
-    );
+    expect(await screen.findByText("1 selected")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear selection" }));
     expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /to batch/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Start pipeline" })).toHaveAttribute("aria-disabled", "true");
     expect(screen.getByRole("button", { name: "Export xlsx" })).toBeInTheDocument();
   });
 
