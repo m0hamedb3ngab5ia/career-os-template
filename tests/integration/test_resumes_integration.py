@@ -149,7 +149,7 @@ def test_master_diff_cli_and_api(root: Path, tmp_path: Path):
         assert st["state"] == "pending" and "re-extracted" in st["diff"]
         assert master.read_text(encoding="utf-8") == before
         synced = lambda: next(i for i in c.get("/api/readiness", headers=W).json()["items"] if i["id"] == "master_synced")
-        assert not synced()["done"]
+        assert not synced()["done"] and synced()["fix_link"] == "/profile#master"  # TASK-022: links to the diff panel
         assert c.post("/api/profile/master/proposal/reject", headers=W).json()["state"] == "rejected"
         assert master.read_text(encoding="utf-8") == before and not synced()["done"]
         assert c.post("/api/profile/master/proposal/approve", headers=W).status_code == 404

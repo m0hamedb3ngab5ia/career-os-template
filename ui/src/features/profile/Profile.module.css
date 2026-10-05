@@ -19,3 +19,8 @@
 .banner { margin: 0 0 var(--space-2); padding: 10px 14px; border-radius: 10px; background: var(--orange-bg); }
 .learned { white-space: pre-wrap; margin: 0; font: inherit; }
 .file { position: absolute; width: 1px; height: 1px; opacity: 0; }
+.full { flex-basis: 100%; }
+.comment { display: inline-flex; gap: var(--space-2); align-items: center; }
+.diff { margin: var(--space-2) 0; padding: 10px 14px; border-radius: 10px; background: var(--bg); border: 1px solid var(--sep); overflow-x: auto; font-size: 13px; }
+.add { color: var(--green); }
+.del { color: var(--red); }
