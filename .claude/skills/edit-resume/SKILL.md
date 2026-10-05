@@ -21,8 +21,9 @@ Re-draft the suggestion so it honors the latest comment (e.g. "keep the Python l
 
 Rewrite **only** the item's section, following its suggestion; copy every other line verbatim. Never add a number,
 date, employer, title or tool absent from the current text, and never make a claim stronger (scope, outcome,
-seniority verb: supported → led). Write the full new text to a temp file, then
-`.venv/bin/careeros resume apply-edit <rid> <item> <file>`.
+seniority verb: supported → led). Every new word must come from the current text or the item's suggestion/comments.
+Write the full new text to a temp file, then `.venv/bin/careeros resume apply-edit <rid> <item> <latest> <file>`
+(`<latest>` = the version you read; newer by then = refused, re-read). Write versions only this way.
 
 - Exit 0: new version author=ai, item `applied`.
 - Exit 1: the guard's reasons are printed and recorded on the item. Do not retry with the same claim; the item

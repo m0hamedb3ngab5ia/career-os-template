@@ -2082,6 +2082,13 @@ export interface components {
       /** V */
       v: number;
     };
+    /** Rewrite */
+    Rewrite: {
+      /** Base */
+      base: number;
+      /** Text */
+      text: string;
+    };
     /** RunBudget */
     RunBudget: {
       /** Max Jobs */
@@ -2453,6 +2460,8 @@ export interface components {
     Started: {
       /** Kind */
       kind: string;
+      /** Run Id */
+      run_id?: string | null;
     };
     /** Status */
     Status: {
@@ -4249,7 +4258,7 @@ export interface operations {
     };
     requestBody: {
       content: {
-        "application/json": components["schemas"]["ResumeText"];
+        "application/json": components["schemas"]["Rewrite"];
       };
     };
     responses: {

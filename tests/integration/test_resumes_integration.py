@@ -175,27 +175,27 @@ def test_feedback_lifecycle_http_api(root: Path):  # TASK-008: E2E-001-01, E2E-0
     app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "x")
     started = []
     app.state.run_control = lambda settings: type("RC", (), {
-        "start_step": lambda self, k, **kw: started.append((k, kw.get("resume"), kw.get("item")))})()
+        "start_step": lambda self, k, **kw: started.append((k, kw.get("resume"), kw.get("item"))) or {"run_id": "run-1"}})()
     W = {"X-CareerOS": "1"}
     with TestClient(app) as c:
         up = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W).json()
         rid = up["rid"]
-        assert up["review_run"] == "review" and started == [("review", rid, None)]  # REQ-094: upload starts review
+        assert up["review_run"] == "run-1" and started == [("review", rid, None)]  # REQ-094: upload starts review
         assert c.put(f"/api/profile/resumes/{rid}/text", json={"text": V1}, headers=W).json()["versions"][-1] == {
             **c.get(f"/api/profile/resumes/{rid}", headers=W).json()["versions"][-1], "n": 2, "author": "user"}
         assert started[-1] == ("extract_master", None, None)  # new master version -> extract-master (REQ-099)
-        resume_feedback.save_review(root, rid, [{"section": "Experience", "issue": "weak", "suggestion": "s"}] * 2)
+        resume_feedback.save_review(root, rid, [{"section": "Experience", "issue": "weak", "suggestion": "say what moved"}] * 2)
         f = c.get(f"/api/profile/resumes/{rid}/feedback", headers=W).json()
         assert f["review"]["state"] == "done" and [i["id"] for i in f["items"]] == ["f1", "f2"]
         assert c.post(f"/api/profile/resumes/{rid}/feedback/f1/apply", headers=W).status_code == 202
         assert started[-1] == ("resume_edit", rid, "f1")
-        bad = c.put(f"/api/profile/resumes/{rid}/feedback/f1/rewrite", json={"text": V1.replace("Supported", "Led")},
+        bad = c.put(f"/api/profile/resumes/{rid}/feedback/f1/rewrite", json={"text": V1.replace("Supported", "Led"), "base": 2},
                     headers=W)
         assert bad.status_code == 422 and "led" in bad.json()["detail"]  # E2E-002-04
         f1 = c.get(f"/api/profile/resumes/{rid}/feedback", headers=W).json()["items"][0]
         assert f1["state"] == "open" and "led" in f1["reason"]
         ok = c.put(f"/api/profile/resumes/{rid}/feedback/f1/rewrite",
-                   json={"text": V1.replace("migration of", "moving")}, headers=W).json()
+                   json={"text": V1.replace("migration of", "moving"), "base": 2}, headers=W).json()
         assert ok["versions"][-1]["author"] == "ai" and ok["versions"][-1]["n"] == 3  # E2E-002-01
         assert c.post(f"/api/profile/resumes/{rid}/feedback/f1/apply", headers=W).status_code == 409  # applied
         assert c.post(f"/api/profile/resumes/{rid}/feedback/f2/comment", json={"text": "keep Python"},
@@ -203,6 +203,17 @@ def test_feedback_lifecycle_http_api(root: Path):  # TASK-008: E2E-001-01, E2E-0
         assert started[-1] == ("resume_edit", rid, "f2")
         assert c.post(f"/api/profile/resumes/{rid}/feedback/f2/dismiss", headers=W).json()["state"] == "dismissed"
         assert c.get("/api/profile/resumes/nope-0000/feedback", headers=W).status_code == 404
+
+        def busy(self, k, **kw):
+            raise RuntimeError("runner busy")
+        app.state.run_control = lambda settings: type("RC", (), {"start_step": busy})()
+        resume_feedback.save_review(root, rid, [{"section": "Experience", "issue": "weak", "suggestion": "s"}])
+        assert c.post(f"/api/profile/resumes/{rid}/feedback/f1/comment", json={"text": "x"},
+                      headers=W).status_code == 409
+        assert c.get(f"/api/profile/resumes/{rid}/feedback", headers=W).json()["items"][0]["state"] == "open"
+        up2 = c.put("/api/profile/resumes", params={"filename": "cv2.pdf"}, content=PDF, headers=W).json()
+        assert up2["review_run"] is None  # PR #127: start failure -> review failed (Retry), not null
+        assert c.get(f"/api/profile/resumes/{up2['rid']}/feedback", headers=W).json()["review"]["state"] == "failed"
 
 
 def test_feedback_cli_and_edit_run_launches_extract(root: Path, tmp_path: Path):
@@ -213,24 +224,26 @@ def test_feedback_cli_and_edit_run_launches_extract(root: Path, tmp_path: Path):
     resumes.add(root, "master.pdf", PDF)  # rid is a variant here: the CLI edit spawns no extract-master run
     rid = resumes.add(root, "cv.pdf", PDF)["rid"]
     (tmp_path / "v1.txt").write_text(V1)
-    assert _cli(root, "resume", "edit", rid, str(tmp_path / "v1.txt")).returncode == 0
-    (tmp_path / "items.json").write_text(json.dumps([{"section": "Experience", "issue": "i", "suggestion": "s"}]))
+    assert _cli(root, "resume", "edit", rid, str(tmp_path / "v1.txt")).returncode == 2  # PR #127: no CLI hand edit
+    resumes.add_text(root, rid, V1, author="user", source="edit")
+    (tmp_path / "items.json").write_text(json.dumps([{"section": "Experience", "issue": "i",
+                                                      "suggestion": "say what moved"}]))
     assert _cli(root, "resume", "review-save", rid, str(tmp_path / "items.json")).returncode == 0
     (tmp_path / "bad.txt").write_text(V1.replace("12 services", "40% of 12 services"))
-    r = _cli(root, "resume", "apply-edit", rid, "f1", str(tmp_path / "bad.txt"))
+    r = _cli(root, "resume", "apply-edit", rid, "f1", "2", str(tmp_path / "bad.txt"))
     assert r.returncode == 1 and "40%" in r.stderr  # E2E-002-02: no new version
     assert resumes.get(root, rid)["versions"][-1]["n"] == 2
 
     resumes.update(root, rid, type="master")
     calls = []
 
-    def fake_run_skill(settings, kind, skill):  # the skill applies a clean rewrite
+    def fake_run_skill(settings, kind, skill, **kw):  # the skill applies a clean rewrite
         calls.append(kind)
         if kind == "resume_edit":
-            resume_feedback.apply(root, rid, "f1", V1.replace("migration of", "moving"))
+            resume_feedback.apply(root, rid, "f1", V1.replace("migration of", "moving"), base=2)
         return {"id": kind, "stop_reason": "completed"}
 
     run_resume_skill(Settings.load(root), "resume_edit", rid, "f1", run_skill=fake_run_skill)
     assert calls == ["resume_edit", "extract_master"]  # new master version -> extract-master (REQ-099)
-    run_resume_skill(Settings.load(root), "review", rid, None, run_skill=lambda *a: {"id": "r", "stop_reason": "timeout"})
+    run_resume_skill(Settings.load(root), "review", rid, None, run_skill=lambda *a, **kw: {"id": "r", "stop_reason": "timeout"})
     assert resume_feedback.load(root, rid)["review"]["state"] == "failed"  # REQ-094: failed + Retry

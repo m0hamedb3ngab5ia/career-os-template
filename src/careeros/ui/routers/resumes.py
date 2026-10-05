@@ -97,10 +97,15 @@ class Feedback(BaseModel):
 
 class Started(BaseModel):
     kind: str
+    run_id: str | None = None
 
 
 class ResumeText(BaseModel):
     text: str
+
+
+class Rewrite(ResumeText):
+    base: int  # the version the rewrite was written from; not the latest -> 422
 
 
 class ResumePatch(BaseModel):
@@ -141,10 +146,10 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
             raise HTTPException(413, f"{filename}: larger than {store.MAX_BYTES // (1024 * 1024)} MB")
     with _refusals():
         m = await anyio.to_thread.run_sync(lambda: store.add(c.settings.root, filename, bytes(data), name=name))
-    try:  # REQ-094: upload starts the review; if it can't start now, POST .../review retries it
-        _start(request, c, "review", m["rid"])
-        review = "review"
+    try:  # REQ-094: upload starts the review; if it can't start now: failed + Retry (POST .../review)
+        review = _start(request, c, "review", m["rid"]).run_id
     except HTTPException:
+        fb.set_review(c.settings.root, m["rid"], "failed")
         review = None
     return Uploaded(rid=m["rid"], n=1, review_run=review)
 
@@ -175,12 +180,13 @@ def _start(request: Request, c: Any, kind: str, rid: str, item: str | None = Non
     from careeros.ui.services.runs import RunControl
 
     try:
-        (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step(kind, resume=rid, item=item)
-    except ValueError as e:
-        raise HTTPException(422, str(e)) from None
-    except Exception as e:  # noqa: BLE001 - busy, paused, claude missing: the item/review stays as it was
-        raise HTTPException(409, f"{kind} run not started: {e}") from None
-    return Started(kind=kind)
+        out = (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step(
+            kind, resume=rid, item=item)
+    except Exception as e:  # noqa: BLE001 - busy, paused, claude missing: a commented item goes back to open
+        if item:
+            fb.reopen(c.settings.root, rid, item, f"re-draft not started: {e}")
+        raise HTTPException(422 if isinstance(e, ValueError) else 409, f"{kind} run not started: {e}") from None
+    return Started(kind=kind, run_id=(out or {}).get("run_id"))
 
 
 def _new_version(request: Request, c: Any, meta: dict[str, Any]) -> Resume:
@@ -212,10 +218,10 @@ def apply_feedback(rid: str, fid: str, request: Request, c=Depends(ctx)) -> Star
 
 
 @router.put("/profile/resumes/{rid}/feedback/{fid}/rewrite")
-def rewrite_feedback(rid: str, fid: str, body: ResumeText, request: Request, c=Depends(ctx)) -> Resume:
+def rewrite_feedback(rid: str, fid: str, body: Rewrite, request: Request, c=Depends(ctx)) -> Resume:
     """The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095)."""
     with _refusals():
-        meta = fb.apply(c.settings.root, rid, fid, body.text)
+        meta = fb.apply(c.settings.root, rid, fid, body.text, base=body.base)
     return _new_version(request, c, meta)
 
 

@@ -873,20 +873,10 @@ def cmd_resume_propose_master(args: argparse.Namespace) -> int:
     print(st["diff"] or "no change from profile/master.yaml")
     print("proposal pending: approve or reject it in Profile › Résumés")
     return 0
-def _launch_extract_master(settings) -> None:
-    """REQ-099: a new master version -> extract-master run. Best effort (busy/paused leaves readiness stale)."""
-    from careeros.ui.services.runs import RunControl
-
-    try:
-        RunControl(settings).start_step("extract_master")
-    except Exception as e:  # noqa: BLE001
-        print(f"note: extract-master not started ({e}); master.yaml stays stale until it runs", file=sys.stderr)
-
-
 def cmd_resume_feedback(args: argparse.Namespace) -> int:
-    """review/edit skills (REQ-094..097): feedback | review-save | apply-edit | redraft | edit."""
+    """review/edit skills (REQ-094..097): feedback | review-save | apply-edit | redraft. No hand edit here: the
+    edit-resume run may call this CLI, and a hand edit is unguarded (UI PUT .../text only)."""
     from careeros import resume_feedback as fb
-    from careeros import resumes
 
     s = _settings(args)
     root, c = s.root, args.resume_cmd
@@ -896,13 +886,9 @@ def cmd_resume_feedback(args: argparse.Namespace) -> int:
         elif c == "review-save":
             out = fb.save_review(root, args.rid, json.loads(Path(args.file).read_text(encoding="utf-8")))
         elif c == "apply-edit":
-            out = fb.apply(root, args.rid, args.item, Path(args.file).read_text(encoding="utf-8"))
-        elif c == "redraft":
-            out = fb.redraft(root, args.rid, args.item, args.suggestion)
+            out = fb.apply(root, args.rid, args.item, Path(args.file).read_text(encoding="utf-8"), base=int(args.base))
         else:
-            out = fb.edit(root, args.rid, Path(args.file).read_text(encoding="utf-8"))
-            if resumes.get(root, args.rid)["type"] == "master":
-                _launch_extract_master(s)
+            out = fb.redraft(root, args.rid, args.item, args.suggestion)
     except (OSError, ValueError, LookupError) as e:  # fb.Rejected is a ValueError: guard reasons
         print(f"error: {e}", file=sys.stderr)
         return 1
@@ -1950,10 +1936,9 @@ def build_parser() -> argparse.ArgumentParser:
     for name, hlp, extra in (
             ("feedback", "review state + feedback items (JSON)", ()),
             ("review-save", "save a review's items from a JSON list of {section, issue, suggestion}", ("file",)),
-            ("apply-edit", "guarded AI rewrite of one item -> new version (exit 1 + reasons if refused)",
-             ("item", "file")),
-            ("redraft", "replace a commented item's suggestion", ("item", "suggestion")),
-            ("edit", "hand edit: text file -> new version author=user (no guard)", ("file",))):
+            ("apply-edit", "guarded AI rewrite of one item, written from version <base> -> new version "
+             "(exit 1 + reasons if refused or <base> is not the latest)", ("item", "base", "file")),
+            ("redraft", "replace a commented item's suggestion", ("item", "suggestion"))):
         sp = rss.add_parser(name, help=hlp)
         sp.add_argument("rid")
         for a in extra:

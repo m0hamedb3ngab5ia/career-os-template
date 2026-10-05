@@ -207,7 +207,8 @@ def run_inbox_sync(settings: Settings) -> dict[str, Any]:
         signal.signal(signal.SIGTERM, old)
 
 
-def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, run_skill: Any = None) -> dict[str, Any]:
+def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, run_skill: Any = None,
+                     run_id: str | None = None) -> dict[str, Any]:
     """review-resume (REQ-094) or edit-resume (REQ-095/096) on one résumé. A new master version afterwards launches
     extract-master (REQ-099: each new master version), here because the edit run holds the runner lock."""
     from careeros import resume_feedback, resumes
@@ -217,12 +218,14 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     root = settings.root
     before = resumes.get(root, rid)["versions"][-1]["n"]
     if kind == "review":
-        resume_feedback.set_review(root, rid, "running")
-        rec = run_skill(settings, "review", f"review-resume {rid}")
+        resume_feedback.set_review(root, rid, "running", run=run_id)
+        rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id)
         if rec.get("stop_reason") != "completed" or (resume_feedback.load(root, rid)["review"] or {}).get("state") != "done":
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
         return rec
-    rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}")
+    rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id)
+    resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
+    resume_feedback.reopen(root, rid, item, f"re-draft run ended without a new suggestion ({rec.get('stop_reason')})")
     meta = resumes.get(root, rid)
     if meta["type"] == "master" and meta["versions"][-1]["n"] > before:
         run_skill(settings, "extract_master", "extract-master")
@@ -252,7 +255,7 @@ def main(argv: list[str] | None = None) -> int:
 
         rec = run_skill(settings, "extract_master", "extract-master")
     elif args.kind in ("review", "resume_edit"):
-        rec = run_resume_skill(settings, args.kind, args.resume, args.item)
+        rec = run_resume_skill(settings, args.kind, args.resume, args.item, run_id=args.run_id)
     else:
         signal.signal(signal.SIGTERM, _raise_interrupt)
         try:

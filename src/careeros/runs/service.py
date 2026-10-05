@@ -205,7 +205,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
 def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[str] | None = None,
               allowed_tools_extra: list[str] | None = None, trigger: str = "manual", invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, cancel=None,
-              echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
+              echo: Callable[[str], None] = lambda s: None, run_id: str | None = None) -> dict[str, Any]:
     """One headless call of a skill that is not about a single job (the scheduled inbox_sync). Same runner lock,
     pause, doctor preflight and run records as a batch; `mcp_servers` must be logged in (auth_required if not).
     Stop reason: completed, a hard stop (usage_limit, auth_required, permission_denied, timeout, cancelled),
@@ -231,7 +231,7 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
     rs = RunStore(settings)
     start = now()
     timeout_s = float(cfg.job_timeout_minutes.get(kind, 20)) * 60
-    rid = f"{start.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
+    rid = run_id or f"{start.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
     try:
         lk = locks.acquire(rs.runner_lock_path, owner=f"run:{rid}", ttl_seconds=timeout_s + 600, pid=os.getpid(),
                            now=start, note=f"{kind} ({trigger})")

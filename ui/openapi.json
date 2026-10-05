@@ -5626,6 +5626,24 @@
         "title": "ReviewState",
         "type": "object"
       },
+      "Rewrite": {
+        "properties": {
+          "base": {
+            "title": "Base",
+            "type": "integer"
+          },
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text",
+          "base"
+        ],
+        "title": "Rewrite",
+        "type": "object"
+      },
       "RunBudget": {
         "properties": {
           "max_jobs": {
@@ -6967,6 +6985,17 @@
           "kind": {
             "title": "Kind",
             "type": "string"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
           }
         },
         "required": [
@@ -11520,7 +11549,7 @@
           "content": {
             "application/json": {
               "schema": {
-                "$ref": "#/components/schemas/ResumeText"
+                "$ref": "#/components/schemas/Rewrite"
               }
             }
           },

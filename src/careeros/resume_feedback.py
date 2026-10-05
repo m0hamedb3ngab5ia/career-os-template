@@ -4,7 +4,7 @@ profile/resumes/<rid>/feedback.json  {review: {state: running|done|failed, run, 
 suggestion, state: open|redrafting|applied|dismissed, comments: [{text, at}], reason, v}]}
 The review-resume skill saves items (`careeros resume review-save`); edit-resume rewrites one item's section
 (`resume apply-edit`, guarded -> new version author=ai) or re-drafts a commented item (`resume redraft`).
-A hand edit (`edit`) is a new version author=user with no guard (the user owns the facts).
+A hand edit (UI only, PUT .../text) is a new version author=user with no guard (the user owns the facts).
 """
 from __future__ import annotations
 
@@ -14,13 +14,19 @@ from pathlib import Path
 from typing import Any
 
 from careeros import resumes as store
-from careeros.qa import TOOL_ALLOWLIST, WORD_RE, number_tokens
+from careeros.qa import WORD_RE, number_tokens
 from careeros.qa_ext.consistency import DEFAULT_SENIORITY_WORDS
 from careeros.runs.atomic import write_text
 
-# a rewrite may not upgrade the claim (REQ-095: supported -> led); seniority words count too
-STRONGER = {"led", "lead", "owned", "spearheaded", "headed", "directed", "managed", "drove", "architected",
-            "founded", "launched", "championed", "oversaw", *DEFAULT_SENIORITY_WORDS}
+# a rewrite may not upgrade the claim (REQ-095: supported -> led): verb stems (any inflection) + seniority words
+STRONGER_STEMS = ("lead", "led", "manag", "own", "spearhead", "direct", "architect", "found", "launch", "champion",
+                  "overs", "head", "drove", "driv", "buil")
+NUMBER_WORDS = {"one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve",
+                "twenty", "thirty", "forty", "fifty", "hundred", "hundreds", "thousand", "thousands", "million",
+                "millions", "billion", "half", "halved", "double", "doubled", "triple", "tripled", "twice",
+                "quarter", "dozen", "dozens", "percent"}
+GRAMMAR = {"i", "a", "an", "the", "and", "or", "of", "for", "with", "in", "on", "at", "to", "by", "from", "as", "is",
+           "are", "was", "were", "be", "via", "per", "across", "into", "using", "vs"}
 ITEM_KEYS = ("section", "issue", "suggestion")
 
 
@@ -97,45 +103,100 @@ def dismiss(root: Path, rid: str, fid: str) -> dict[str, Any]:
     return _change(root, rid, fid, state="dismissed")
 
 
-def _cap_terms(text: str) -> set[str]:
-    """Capitalised words not at line/sentence start (employers, titles, tools), like qa's tool audit.
-    ponytail: a lowercase new tool or one opening a line slips past; the stronger-verb and number checks still run."""
-    out = set()
-    for line in text.splitlines():
-        for sent in re.split(r"(?<=[.!?])\s+", line.strip().lstrip("-•*·").strip()):
-            out |= {w.rstrip(".,;:").strip("/") for w in WORD_RE.findall(sent)[1:] if w[0].isupper()}
-    return {w for w in out if len(w) >= 2}
+def _words(text: str) -> set[str]:
+    return {w.strip(".,;:/").lower() for w in WORD_RE.findall(text)} - {""}
 
 
-def guard(prev: str, new: str) -> list[str]:
-    """Zero-fabrication check of an AI rewrite against the previous version (REQ-095). Empty = ok."""
-    words = {w.rstrip(".,;:").lower() for w in WORD_RE.findall(prev)}
+def _stem(w: str) -> str:
+    for suf in ("ing", "ed", "es", "s", "ion", "e"):
+        if w.endswith(suf) and len(w) - len(suf) >= 3:
+            return w[:-len(suf)]
+    return w
+
+
+def guard(prev: str, new: str, allowed: str = "") -> list[str]:
+    """Zero-fabrication check of an AI rewrite against the previous version (REQ-095). Empty = ok.
+    ponytail: every new word (any case/position) must come from `prev` or `allowed` (the item's suggestion +
+    comments), compared by crude stem; a synonym in neither is refused. Add a synonym list if refusals annoy."""
+    words, new_words = _words(prev), _words(new)
     reasons = []
-    if nums := sorted(number_tokens(new) - number_tokens(prev)):
+    if nums := sorted((number_tokens(new) - number_tokens(prev)) | ((new_words & NUMBER_WORDS) - words)):
         reasons.append(f"adds numbers/dates not in the previous version: {', '.join(nums)}")
-    if terms := sorted(t for t in _cap_terms(new) if t.lower() not in words and t.lower() not in TOOL_ALLOWLIST):
-        reasons.append(f"adds names/titles/tools not in the previous version: {', '.join(terms)}")
-    new_words = {w.rstrip(".,;:").lower() for w in WORD_RE.findall(new)}
-    if strong := sorted((new_words & STRONGER) - words):
-        reasons.append(f"makes a stronger claim than the previous version: {', '.join(strong)}")
+    ok = {_stem(w) for w in words | _words(allowed)}
+    if terms := sorted(w for w in new_words - words - GRAMMAR - NUMBER_WORDS if _stem(w) not in ok):
+        reasons.append(f"adds words not in the previous version or the suggestion: {', '.join(terms)}")
+    strong = {w for w in new_words - words if w in DEFAULT_SENIORITY_WORDS} | {
+        s for s in STRONGER_STEMS if any(w.startswith(s) for w in new_words) and not any(w.startswith(s) for w in words)}
+    if strong:
+        reasons.append(f"makes a stronger claim than the previous version: {', '.join(sorted(strong))}")
     return reasons
 
 
-def apply(root: Path, rid: str, fid: str, text: str) -> dict[str, Any]:
-    """Guarded AI rewrite of one open item -> new version author=ai source=<fid>; item applied. Guard fails ->
-    Rejected, no version, item open with the reason."""
-    it = next((i for i in load(root, rid)["items"] if i["id"] == fid), None)
-    if it is None:
-        raise LookupError(f"résumé {rid!r} has no feedback item {fid!r}")
-    if it["state"] != "open":  # FLOW-002: only open items apply
-        raise Rejected(f"feedback item {fid} is {it['state']}")
-    prev = store.version(root, rid, _latest(root, rid))["text"]
-    if reasons := guard(prev, text):
-        _change(root, rid, fid, state="open", reason="; ".join(reasons))
-        raise Rejected("; ".join(reasons))
-    meta = store.add_text(root, rid, text, author="ai", source=fid)
-    _change(root, rid, fid, state="applied", reason=None, applied_v=meta["versions"][-1]["n"])
-    return meta
+def _allowed(it: dict[str, Any]) -> str:
+    return " ".join([it["suggestion"], *(c["text"] for c in it["comments"])])
+
+
+def apply(root: Path, rid: str, fid: str, text: str, *, base: int) -> dict[str, Any]:
+    """Guarded AI rewrite of one open item, written from version `base` -> new version author=ai source=<fid>;
+    item applied. Guard fails or `base` is not the latest -> Rejected, no version, item open with the reason.
+    One lock for check + write, so a hand edit can't slip in between (and gets refused instead of overwritten)."""
+    with store._locked(root):
+        fb = load(root, rid)
+        it = next((i for i in fb["items"] if i["id"] == fid), None)
+        if it is None:
+            raise LookupError(f"résumé {rid!r} has no feedback item {fid!r}")
+        if it["state"] != "open":  # FLOW-002: only open items apply
+            raise Rejected(f"feedback item {fid} is {it['state']}")
+        latest = _latest(root, rid)
+        reasons = [f"résumé changed since v{base}: latest is v{latest}; re-run Apply"] if base != latest else \
+            guard(store.version(root, rid, latest)["text"], text, _allowed(it))
+        if reasons:
+            it.update(reason="; ".join(reasons))
+            _save(root, rid, fb)
+            raise Rejected("; ".join(reasons))
+        meta = store.add_text(root, rid, text, author="ai", source=fid, lock=False)
+        it.update(state="applied", reason=None, applied_v=meta["versions"][-1]["n"])
+        _save(root, rid, fb)
+        return meta
+
+
+def reopen(root: Path, rid: str, fid: str, reason: str) -> None:
+    """A redrafting item whose run never started or ended without a redraft goes back to open (FLOW-002)."""
+    with store._locked(root):
+        fb = load(root, rid)
+        for it in fb["items"]:
+            if it["id"] == fid and it["state"] == "redrafting":
+                it.update(state="open", reason=reason)
+                _save(root, rid, fb)
+
+
+def check_edit_run(root: Path, rid: str, fid: str, before: int) -> list[int]:
+    """After an edit-resume run: every version newer than `before` must be author=ai source=<fid> and pass the guard
+    against its predecessor, else it is moved aside to rejected-v<n> (kept on disk, dropped from the list).
+    ponytail: a UI hand edit made during the run is moved aside too; the user re-saves it."""
+    import shutil
+
+    with store._locked(root):
+        meta, fb = store.get(root, rid), load(root, rid)
+        it = next((i for i in fb["items"] if i["id"] == fid), None)
+        allowed, bad, prev_n = _allowed(it) if it else "", [], before
+        for v in [v for v in meta["versions"] if v["n"] > before]:
+            if bad or v["author"] != "ai" or v["source"] != fid or guard(
+                    store.version(root, rid, prev_n)["text"], store.version(root, rid, v["n"])["text"], allowed):
+                bad.append(v["n"])
+            else:
+                prev_n = v["n"]
+        if bad:
+            d = store._dir(root, rid)
+            for n in bad:
+                dst = d / f"rejected-v{n}"
+                shutil.move(str(d / f"v{n}"), str(dst if not dst.exists() else d / f"rejected-v{n}-{store._now()}"))
+            meta["versions"] = [v for v in meta["versions"] if v["n"] not in bad]
+            store._write(d, meta)
+            if it:
+                it.update(state="open", reason=f"unguarded edit v{', v'.join(map(str, bad))} rejected", applied_v=None)
+                _save(root, rid, fb)
+        return bad
 
 
 def edit(root: Path, rid: str, text: str) -> dict[str, Any]:
