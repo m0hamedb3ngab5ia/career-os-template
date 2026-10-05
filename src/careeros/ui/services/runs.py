@@ -32,7 +32,7 @@ from careeros.ui.services.stream import parse_event
 
 BATCH_KINDS = ("score", "prepare")
 JOB_KINDS = ("score", "prepare", "apply")  # `--job <id>` runs: one explicit job, apply only this way
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master", "review", "resume_edit")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master", "review", "resume_edit", "learn_voice")
 KEEP_OUTPUTS = 50  # launch output files kept under data/runs/ui/
 
 
@@ -317,8 +317,10 @@ class RunControl:
                 raise NotSetUp("Inbox sync is not set up yet: turn on schedule.jobs.inbox_sync once the inbox-sync "
                                "skill is finished and Gmail is logged in")
             self._check_can_start()  # a headless skill call: the runner lock and pause apply
-        elif kind == "extract_master":
+        elif kind in ("extract_master", "learn_voice"):  # run id here, so the UI can follow the run
             self._check_can_start()
+            rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
+            return {"kind": kind, **self.spawn(rid, ["careeros.ui.services.step", kind, "--run-id", rid]), "run_id": rid}
         elif kind in ("review", "resume_edit"):  # REQ-094/095/096: headless skill on one résumé (+ item)
             if not resume or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume) or (kind == "resume_edit") != bool(item) \
                     or (item and not re.fullmatch(r"f\d+", item)):

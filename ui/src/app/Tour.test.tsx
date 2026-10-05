@@ -51,7 +51,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("first-run tour (REQ-121)", () => {
   it("only points at main nav items, at most 8 steps", () => {
-    expect(TOUR_STEPS.map((s) => s.to)).toEqual(["/", "/jobs", "/pipeline", "/inbox", "/settings"]);
+    expect(TOUR_STEPS.map((s) => s.to)).toEqual(["/", "/jobs", "/pipeline", "/inbox", "/profile", "/settings"]);
     expect(TOUR_STEPS.length).toBeLessThanOrEqual(8);
   });
 
@@ -119,5 +119,20 @@ describe("first-run tour (REQ-121)", () => {
     await screen.findByRole("dialog", { name: "Today" });
     await user.click(screen.getByRole("button", { name: "Skip tour" }));
     expect(await screen.findByText(/Couldn’t save tour progress/)).toBeInTheDocument();
+  });
+});
+
+describe("tour announcements", () => {
+  it("has one live region, so each step is announced once", async () => {
+    const { Tour } = await import("./Tour");
+    const { mockApi, renderRoutes } = await import("../test/mockApi");
+    mockApi({ "GET /api/ui-state": { tour_done: false } });
+    renderRoutes([{ path: "/", element: <Tour /> }], "/");
+    const live = await waitFor(() => {
+      const l = screen.getByRole("dialog").querySelectorAll("[aria-live]");
+      expect(l).toHaveLength(1);
+      return l[0]!;
+    });
+    expect(live).toHaveTextContent("Step 1 of 6");
   });
 });

@@ -63,10 +63,10 @@ def get_path(data: Any, dotted: str) -> Any:
     return cur
 
 
-def _write_atomic(real: Path, text: str) -> None:
+def _write_atomic(real: Path, text: str | bytes) -> None:
     tmp = real.with_name(f".{real.name}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")  # unique per call (threads)
     try:
-        tmp.write_text(text, encoding="utf-8")
+        tmp.write_bytes(text) if isinstance(text, bytes) else tmp.write_text(text, encoding="utf-8")
         try:    # keep the target's permissions (a 0600 private config must not become 0644)
             os.chmod(tmp, os.stat(real).st_mode & 0o7777)
         except FileNotFoundError:

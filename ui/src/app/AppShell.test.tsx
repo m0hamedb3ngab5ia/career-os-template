@@ -50,6 +50,7 @@ describe("AppShell", () => {
       "Jobs",
       "Pipeline",
       "Inbox",
+      "Profile",
       "Settings",
     ]);
     for (const g of ["Job search", "More"]) expect(within(nav).getByText(g)).toBeInTheDocument();

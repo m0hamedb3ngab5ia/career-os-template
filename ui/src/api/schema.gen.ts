@@ -227,6 +227,10 @@ export interface paths {
     /** Add Lesson */
     post: operations["add_lesson_api_learning_lessons_post"];
   };
+  "/api/learning/lessons/{lid}": {
+    /** Delete Lesson */
+    delete: operations["delete_lesson_api_learning_lessons__lid__delete"];
+  };
   "/api/meta": {
     /** Meta */
     get: operations["meta_api_meta_get"];
@@ -234,6 +238,16 @@ export interface paths {
   "/api/pipeline": {
     /** Board */
     get: operations["board_api_pipeline_get"];
+  };
+  "/api/profile/answers": {
+    /** List Answers */
+    get: operations["list_answers_api_profile_answers_get"];
+  };
+  "/api/profile/answers/{key}": {
+    /** Edit Answer */
+    put: operations["edit_answer_api_profile_answers__key__put"];
+    /** Delete Answer */
+    delete: operations["delete_answer_api_profile_answers__key__delete"];
   };
   "/api/profile/master/proposal": {
     /** Get Master Proposal */
@@ -304,6 +318,23 @@ export interface paths {
     get: operations["get_version_api_profile_resumes__rid__versions__n__get"];
     /** Delete Version */
     delete: operations["delete_version_api_profile_resumes__rid__versions__n__delete"];
+  };
+  "/api/profile/samples": {
+    /** List Samples */
+    get: operations["list_samples_api_profile_samples_get"];
+    /**
+     * Upload Sample
+     * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
+     */
+    put: operations["upload_sample_api_profile_samples_put"];
+  };
+  "/api/profile/samples/learn": {
+    /** Relearn */
+    post: operations["relearn_api_profile_samples_learn_post"];
+  };
+  "/api/profile/samples/{name}": {
+    /** Remove Sample */
+    delete: operations["remove_sample_api_profile_samples__name__delete"];
   };
   "/api/prune": {
     /** Prune */
@@ -602,6 +633,18 @@ export interface components {
        * @default general
        */
       scope?: string;
+    };
+    /** AnswerEdit */
+    AnswerEdit: {
+      /** Answer */
+      answer: string;
+      /** Company */
+      company?: string | null;
+      /**
+       * Eeo
+       * @default false
+       */
+      eeo?: boolean;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -2375,6 +2418,57 @@ export interface components {
       /** Text */
       text: string;
     };
+    /** Sample */
+    Sample: {
+      /** Name */
+      name: string;
+      /** Size */
+      size: number;
+    };
+    /** SampleChange */
+    SampleChange: {
+      /** Learn Error */
+      learn_error?: string | null;
+      /** Learn Info */
+      learn_info?: string | null;
+      /** Learn Run */
+      learn_run?: string | null;
+      /** Samples */
+      samples: components["schemas"]["Sample"][];
+    };
+    /** Samples */
+    Samples: {
+      /** Learned */
+      learned: string;
+      /** Samples */
+      samples: components["schemas"]["Sample"][];
+    };
+    /** SavedAnswer */
+    SavedAnswer: {
+      /** Answer */
+      answer?: string | null;
+      /** Company */
+      company?: string | null;
+      /** Key */
+      key: string;
+      /**
+       * Match
+       * @default []
+       */
+      match?: string[];
+      /** Note */
+      note?: string | null;
+      /**
+       * Scope
+       * @enum {string}
+       */
+      scope: "general" | "company" | "eeo";
+    };
+    /** SavedAnswers */
+    SavedAnswers: {
+      /** Answers */
+      answers: components["schemas"]["SavedAnswer"][];
+    };
     /** Schedule */
     Schedule: {
       catch_up: components["schemas"]["CatchUp"] | null;
@@ -4057,6 +4151,26 @@ export interface operations {
       };
     };
   };
+  /** Delete Lesson */
+  delete_lesson_api_learning_lessons__lid__delete: {
+    parameters: {
+      path: {
+        lid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Meta */
   meta_api_meta_get: {
     responses: {
@@ -4084,6 +4198,68 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Board"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Answers */
+  list_answers_api_profile_answers_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SavedAnswers"];
+        };
+      };
+    };
+  };
+  /** Edit Answer */
+  edit_answer_api_profile_answers__key__put: {
+    parameters: {
+      path: {
+        key: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnswerEdit"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SavedAnswer"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Answer */
+  delete_answer_api_profile_answers__key__delete: {
+    parameters: {
+      query?: {
+        company?: string | null;
+        eeo?: boolean;
+      };
+      path: {
+        key: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      204: {
+        content: never;
       };
       /** @description Validation Error */
       422: {
@@ -4471,6 +4647,81 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** List Samples */
+  list_samples_api_profile_samples_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Samples"];
+        };
+      };
+    };
+  };
+  /**
+   * Upload Sample
+   * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
+   */
+  upload_sample_api_profile_samples_put: {
+    parameters: {
+      query: {
+        filename: string;
+        learn?: boolean;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/octet-stream": string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["SampleChange"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Relearn */
+  relearn_api_profile_samples_learn_post: {
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["SampleChange"];
+        };
+      };
+    };
+  };
+  /** Remove Sample */
+  remove_sample_api_profile_samples__name__delete: {
+    parameters: {
+      path: {
+        name: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SampleChange"];
         };
       };
       /** @description Validation Error */

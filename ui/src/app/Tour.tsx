@@ -17,6 +17,7 @@ export const TOUR_STEPS: { to: string; title: string; text: string }[] = [
   { to: "/jobs", title: "Jobs", text: "Every job found. Tick the ones you want to work on." },
   { to: "/pipeline", title: "Pipeline", text: "Where each application stands, from found to offer." },
   { to: "/inbox", title: "Inbox", text: "Replies from companies, sorted so you see what matters first." },
+  { to: "/profile", title: "Profile", text: "Your résumés, saved answers and writing samples, plus the checklist to finish before applying." },
   { to: "/settings", title: "Settings", text: "Searches, limits and schedule. “How to use” here replays this tour." },
 ];
 
@@ -106,7 +107,7 @@ export function Tour() {
         className={styles.card}
         footer={
           <>
-            <span className={styles.count} aria-live="polite">
+            <span className={styles.count}>
               Step {step + 1} of {TOUR_STEPS.length}
             </span>
             <Button onClick={end}>
@@ -129,7 +130,8 @@ export function Tour() {
           </>
         }
       >
-        <p className={styles.text} aria-live="polite">
+        <p className={styles.text} aria-live="polite" aria-atomic="true">
+          <span className="sr-only">Step {step + 1} of {TOUR_STEPS.length}: </span>
           {s.text}
         </p>
       </Dialog>
