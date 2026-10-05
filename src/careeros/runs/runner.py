@@ -183,12 +183,13 @@ def new_run_id(kind: str, now: datetime) -> str:
 
 def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datetime,
                       retry_ids: set[str] | None = None, skip_ids: dict[str, str] | None = None,
-                      job_ids: list[str] | None = None, force: bool = False,
+                      job_ids: list[str] | None = None, force: bool = False, ticked: bool = False,
                       ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """(ranked candidates, excluded [{job_id, reason}]). Excluded lists only jobs that would otherwise be
     candidates (pruned postings, scout filters that now fail, `skip_ids`), not every other status. With
     `job_ids` only those jobs are considered and every one left out is in `excluded` with its reason
-    (`not found`, an eligibility reason, ...); `force` reruns a job that is already scored/prepared."""
+    (`not found`, an eligibility reason, ...); `force` reruns a job that is already scored/prepared; `ticked`
+    counts every `job_ids` job as ticked (REQ-104; a batch names its jobs from the Jobs-table selection)."""
     store = Store(settings)
 
     def records() -> Iterator[CandidateRecord]:
@@ -204,7 +205,7 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
                 prepared_ok=bool((store._read(jid, "prepare.json") or {}).get("qa_pass")),
                 posting=partial(_posting_dict, store, jid),
                 apply_session=(store._read(jid, "apply_session.json") or {}) if kind == "apply" else None,
-                injection=untrusted.blocked(store.load_flags(jid)), selected=store.is_selected(jid))
+                injection=untrusted.blocked(store.load_flags(jid)), selected=ticked or store.is_selected(jid))
     return rank_records(settings, kind, cfg, now, records(), retry_ids, skip_ids,
                         explicit=job_ids is not None, force=force)
 

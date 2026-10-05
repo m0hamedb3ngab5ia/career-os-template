@@ -10,6 +10,7 @@ from pydantic import BaseModel, Field
 from careeros.runs import batches
 from careeros.ui.routers import ctx
 from careeros.ui.routers.runs import run_control
+from careeros.ui.services.reindex import after_write
 from careeros.ui.services.runs import RunControl
 
 router = APIRouter(tags=["batches"])
@@ -72,10 +73,13 @@ class RetryBody(BaseModel):
 @router.post("/batches")
 def create(body: CreateBody, c=Depends(ctx)) -> Batch:
     try:
-        return Batch.model_validate(batches.create(c.settings, body.job_ids, body.stop_at, name=body.name,
-                                                   dry_run=body.dry_run, now=c.now(), stops=body.stops))
+        b = batches.create(c.settings, body.job_ids, body.stop_at, name=body.name, dry_run=body.dry_run,
+                           now=c.now(), stops=body.stops)
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
+    if not body.dry_run:
+        after_write(c, jobs=[r["job_id"] for r in b["selected"]])  # create ticked them (REQ-104)
+    return Batch.model_validate(b)
 
 
 @router.get("/batches/{batch_id}")

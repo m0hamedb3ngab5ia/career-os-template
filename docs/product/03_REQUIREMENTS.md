@@ -246,6 +246,7 @@ Given must-have open · When `careeros run apply --job X` · Then exit 7 "not re
 Job field `selected` (default false for every newly scouted job). Jobs list: checkbox per row, select all/visible, bulk tick/untick. Only selected jobs are ever prepared or applied (manual run, batch, scheduler). Scoring runs on all (Q-014). Untick later → excluded from future runs; a job mid-run finishes its current step then stops. Jobs existing before this change: missing field = true. Explicit `--job X` counts as selecting X.
 Given 10 scouted, 3 ticked · When `run prepare` · Then only those 3 prepared.
 Given pre-existing job without `selected` · When `run prepare` · Then it is prepared.
+Amendment (Q-022, user-approved 2026-10-05): creating a batch counts as selecting its named jobs, like `--job X` (REQ-117).
 
 ### REQ-105 Fill preview + edit
 Before fill: UI table of the fill plan, per field: label, value, source (saved answer | AI draft | resume | default), required. User edits any value → plan updated (job only); checkbox "save to profile" also writes standard answer (REQ-053).
@@ -316,6 +317,7 @@ Given ready, 12 jobs, 0 ticked · When open Today · Then card says "Pick jobs" 
 ### REQ-123 Action Items stored in data/action_items.json
 Action Items live in `data/action_items.json`, written atomically like `status.json` (NFR-002). The tracker xlsx Action Items sheet is a one-way synced view (json → xlsx only); edits in Excel are never read back. Amends REQ-052, REQ-073 (Q-008).
 Given an Action Item added · When written · Then json updated atomically and xlsx sheet refreshed on sync; an Excel edit is overwritten.
+Amendment (Q-022, user-approved 2026-10-05): "ticked" here = rows selected in the Jobs table. The batch takes the jobs it names, ticked or not, and creating it ticks them (REQ-104 `selected`); the dry-run preview changes nothing. Unticking a job mid-run holds it back from its next stage.
 
 ## Non-functional
 ### NFR-001 No API key; LLM only via Claude Code subscription

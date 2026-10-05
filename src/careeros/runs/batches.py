@@ -144,7 +144,7 @@ def _select(settings: Settings, store: Store, cfg: RunsConfig, now: datetime, id
     for i, kind in enumerate(kinds):
         if not remaining:
             break
-        ranked, out = select_candidates(settings, kind, cfg, now, job_ids=remaining)
+        ranked, out = select_candidates(settings, kind, cfg, now, job_ids=remaining, ticked=True)
         for r in ranked:
             selected.append({**r, "stage": kind, "stages": list(kinds[i:])})
         for e in out:  # a later stage's reason wins, except one found after the job-state rules passed
@@ -183,6 +183,7 @@ def create(settings: Settings, job_ids: list[str], stop_at: str, name: str | Non
     for r in batch["selected"]:
         r["state"] = "pending"
     _dump(_dir(settings) / f"{batch['id']}.json", batch)
+    Store(settings).set_selected([r["job_id"] for r in batch["selected"]], True)  # Start ticks them (REQ-104)
     return batch
 
 
