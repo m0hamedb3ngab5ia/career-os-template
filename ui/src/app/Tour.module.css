@@ -1,0 +1,21 @@
+.ring {
+  position: fixed;
+  z-index: 41; /* above the dialog backdrop (40) */
+  border: 2px solid var(--accent);
+  border-radius: 10px;
+  pointer-events: none;
+}
+
+.card {
+  max-width: 360px;
+}
+
+.text {
+  margin: 0;
+}
+
+.count {
+  margin-right: auto;
+  color: var(--sec);
+  font-size: 12px;
+}

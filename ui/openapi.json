@@ -7241,6 +7241,17 @@
         "title": "UiSettings",
         "type": "object"
       },
+      "UiState": {
+        "properties": {
+          "tour_done": {
+            "default": false,
+            "title": "Tour Done",
+            "type": "boolean"
+          }
+        },
+        "title": "UiState",
+        "type": "object"
+      },
       "Unblock": {
         "properties": {
           "company": {
@@ -12301,6 +12312,66 @@
         "summary": "Sync",
         "tags": [
           "tracker"
+        ]
+      }
+    },
+    "/api/ui-state": {
+      "get": {
+        "operationId": "get_ui_state_api_ui_state_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Ui State",
+        "tags": [
+          "ui-state"
+        ]
+      },
+      "put": {
+        "operationId": "put_ui_state_api_ui_state_put",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/UiState"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/UiState"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Ui State",
+        "tags": [
+          "ui-state"
         ]
       }
     }

@@ -8,6 +8,7 @@ import type { StatusSummary } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import styles from "./AppShell.module.css";
+import { Tour } from "./Tour";
 
 interface NavItem {
   to: string;
@@ -202,6 +203,7 @@ export function AppShell() {
       <main ref={main} id="main" tabIndex={-1} className={styles.main}>
         <Outlet />
       </main>
+      <Tour />
     </div>
   );
 }
