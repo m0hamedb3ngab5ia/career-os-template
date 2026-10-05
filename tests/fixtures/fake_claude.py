@@ -96,6 +96,9 @@ def main() -> int:
         st.setdefault("history", []).append({"status": "queued", "at": "2026-01-01T00:00:00+00:00", "note": "fake"})
         (job_dir / "status.json").write_text(json.dumps(st))
         (job_dir / "prepare.json").write_text(json.dumps({"job_id": job_id, "status": "queued", "qa_pass": True}))
+        choice = job_dir / "resume_choice.json"  # TASK-011: the real skill skips tailor-resume on reuse
+        if not choice.exists() or json.loads(choice.read_text()).get("action") != "reuse":
+            (job_dir / "tailor.called").write_text("1")
         res = {"skill": "prepare-job", "job_id": job_id, "status": "queued", "tier": "C", "fit": 80,
                "decision": "prepare", "skip_reason": None, "qa_pass": True, "ACTION_ITEMS": []}
     elif skill == "/apply-job":

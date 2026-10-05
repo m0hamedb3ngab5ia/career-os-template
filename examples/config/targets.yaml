@@ -56,6 +56,7 @@ thresholds:
   boost_industry_bonus: 5    # added to fit for boost industries (doesn't bypass min)
   tier_a_min_fit: 60         # dream firms: prepare even at lower fit, but flag gap
   min_match: 70              # 70 (Recommended): résumé match score (0-100) a résumé needs to be reused for a job
+  min_tweak_gain: 5          # 5 (Recommended): points a <=3-bullet tweak must add (and reach min_match) to beat a full tailor
 
 # reusable default: fine to keep. Autonomy per tier (README "Autonomy tiers").
 tiers:

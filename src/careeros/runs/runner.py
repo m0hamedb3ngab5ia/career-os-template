@@ -351,6 +351,13 @@ class _Loop:
             allowed, reason = auto_submit_verdict(self.s, self.store, self.cfg, item)
             submit = {"allowed": allowed, "reason": reason}
             env.update(CAREEROS_AUTO_SUBMIT="1" if allowed else "0", CAREEROS_AUTO_SUBMIT_REASON=reason)
+        if self.kind == "prepare":  # REQ-112/113: reuse / tweak / tailor decided in code before the skill
+            from careeros import match
+            try:
+                c = match.pick(self.s, self.store.job_dir(jid))
+                self.echo(f"    résumé: {c['action']} ({c['reason']})")
+            except Exception as e:  # noqa: BLE001  a broken résumé store must not block the existing flow
+                self.echo(f"    résumé pick failed ({e}); full tailor")
         started, t0 = self.now(), self.clock()
         self.echo(f"[{n}] {self.kind} {jid} {item.get('company', '')} — {item.get('title', '')}")
         if submit:
@@ -371,6 +378,9 @@ class _Loop:
             st = self.store.get_status(jid)
             if st != result.get("status"):
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
+        if outcome == "ok" and self.kind == "prepare" and result and result.get("qa_pass"):
+            from careeros import match
+            match.save_tailored(self.s, self.store.job_dir(jid))  # DEC-008: later jobs of the category reuse it
         att = {"n": n, "run_id": self.run["id"], "job_id": jid, "company": item.get("company"),
                "title": item.get("title"), "stage": self.kind, "rank": item.get("rank"), "why": item.get("why"),
                "session_id": res.session_id or sid, "outcome": outcome, "detail": detail, "result": result,

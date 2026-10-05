@@ -895,6 +895,21 @@ def cmd_resume_match(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_resume_pick(args: argparse.Namespace) -> int:
+    """reuse / tweak / tailor for one job -> resume_choice.json; prepare-job obeys it (REQ-112/113)."""
+    from careeros.match import pick
+    from careeros.ui.services.jobs import job_dir_for
+
+    s = _settings(args)
+    d = job_dir_for(s, args.job_id)
+    if d is None:
+        print(f"error: no job {args.job_id!r}", file=sys.stderr)
+        return 1
+    c = pick(s, d, args.threshold)
+    print(json.dumps(c, indent=2, ensure_ascii=False) if args.json else f"{c['action']}: {c['reason']}")
+    return 0
+
+
 def cmd_resume_propose_master(args: argparse.Namespace) -> int:
     """extract-master hands its proposed master.yaml here (REQ-099); written only on approve."""
     from careeros import master_sync
@@ -1968,6 +1983,11 @@ def build_parser() -> argparse.ArgumentParser:
     rsm.add_argument("--threshold", type=_percent, help="override thresholds.min_match (targets.yaml) for this check")
     rsm.add_argument("--json", action="store_true")
     rsm.set_defaults(fn=cmd_resume_match)
+    rsp = rss.add_parser("pick", help="reuse / tweak / tailor decision for a job -> resume_choice.json (no LLM)")
+    rsp.add_argument("job_id")
+    rsp.add_argument("--threshold", type=_percent, help="override thresholds.min_match (targets.yaml) for this check")
+    rsp.add_argument("--json", action="store_true")
+    rsp.set_defaults(fn=cmd_resume_pick)
     rsp = rss.add_parser("propose-master", help="validate a proposed master.yaml -> profile/master.proposed.yaml "
                          "(pending until approved; used by the extract-master skill)")
     rsp.add_argument("file")

@@ -88,7 +88,18 @@ Hand off in `careeros jobs list --status queued --order urgent` order.
 
 ## Step 2: resume
 
-Follow `.claude/skills/tailor-resume/SKILL.md` with `JOB`. Store RESULT as `steps.resume`.
+Read `JOB/resume_choice.json` (written by `careeros run prepare` before this skill; REQ-112/113). If it is
+missing or has `"scored": false`, run `.venv/bin/careeros resume pick <job_id>` now (score.json exists after
+Step 1) and read it again. Then obey `action`, never override it:
+- `reuse`: `resume.txt` / `resume.json` (and `resume.pdf` when the résumé had one) are already in `JOB`. Do NOT
+  run tailor-resume and never edit the text. If `resume.pdf` is missing, `careeros action add "export résumé <rid>
+  as PDF for <job_id>" --type resume --needs laptop`. `steps.resume = {"reused": rid, "version": version}`.
+- `tweak`: follow tailor-resume with `JOB`, but change at most 3 bullets: bring in exactly the master.yaml ids in
+  `add_bullet_ids` (swap out the weakest bullets), keep everything else as the best résumé `rid` has it. Only
+  master.yaml bullets by id; numbers frozen.
+- `tailor`: follow `.claude/skills/tailor-resume/SKILL.md` with `JOB` (full tailor from master).
+After a passing QA, `careeros run prepare` saves a tweak/tailor `resume.txt` as a `tailored` résumé for the job's
+category so later jobs reuse it. Store RESULT as `steps.resume`.
 If it reports `qa_hard_fails` non-empty after its own fix loop, continue (qa-review will judge).
 
 ## Step 3: cover letter (per tier rule)

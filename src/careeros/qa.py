@@ -470,6 +470,9 @@ class Checker:
         self.outreach, self.outreach_error = _parse_json(self.outreach_raw)
         self.contacts, _ = _parse_json(_read_text(job_dir / "contacts.json"))
         self.pdf_path = job_dir / "resume.pdf"
+        # DEC-007: a reused user-authored résumé has no bullet ids; skip bullet-trace checks on it
+        choice, _ = _parse_json(_read_text(job_dir / "resume_choice.json"))
+        self.user_reuse = isinstance(choice, dict) and choice.get("action") == "reuse" and choice.get("author") == "user"
         self.artifacts = {
             "posting.json": self.posting is not None,
             "score.json": self.score is not None,
@@ -721,7 +724,7 @@ class Checker:
 
     def _cited_ids(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}
-        if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json:
+        if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json and not self.user_reuse:
             out["resume.json"] = collect_ids(self.resume_json)
         if self.cover_md is not None:
             out["cover_letter.md"] = cited_ids_cover_letter(self.cover_fm)
@@ -800,7 +803,7 @@ class Checker:
     def check_numbers(self) -> None:
         cited = self._cited_ids()
         ran = False
-        if self.resume_txt is not None:
+        if self.resume_txt is not None and not self.user_reuse:  # DEC-007
             ran = True
             ids = cited.get("resume.json", set())
             extra = self.profile.skills_text() + " " + self.profile.summary_text()
@@ -904,6 +907,9 @@ class Checker:
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         if rj is None:
             self.skip("bullet_fidelity", "hard", "resume.json missing")
+            return
+        if self.user_reuse:
+            self.skip("bullet_fidelity", "hard", "reused user-authored résumé (DEC-007)")
             return
         problems, n = [], 0
         for e in self._resume_entries():

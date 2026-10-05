@@ -130,6 +130,26 @@ def add(root: Path, filename: str, data: bytes, *, name: str | None = None, type
         return _update(root, rid, type=type) if type and has_master and type != meta["type"] else meta
 
 
+def add_tailored(root: Path, text: str, *, category: str | None, source: str) -> dict[str, Any]:
+    """AI tailored/tweaked résumé text as a `tailored` résumé (DEC-008) so later jobs of the category reuse it."""
+    if not text.strip():
+        raise ValueError("résumé text must not be empty")
+    name = f"{category or 'general'} (tailored)"
+    rid = f"{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:40]}-{secrets.token_hex(2)}"
+    d = _base(root) / rid
+    with _locked(root):
+        d.mkdir(parents=True)
+        try:
+            _store(d, 1, ".txt", text.encode("utf-8"))
+            meta = {"rid": rid, "name": name, "type": "tailored", "category": category,
+                    "versions": [{"n": 1, "author": "ai", "source": source, "at": _now()}]}
+            _write(d, meta)
+        except BaseException:
+            shutil.rmtree(d, ignore_errors=True)
+            raise
+        return meta
+
+
 def add_version(root: Path, rid: str, filename: str, data: bytes, *, author: str, source: str) -> dict[str, Any]:
     """New version vN+1 (author user|ai; source upload|edit|<feedback id>)."""
     return _append(root, rid, _check(filename, data), data, author, source)
