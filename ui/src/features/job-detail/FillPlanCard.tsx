@@ -102,7 +102,7 @@ export function FillPlanCard({ jobId }: { jobId: string }) {
         <>
           <div role="status" aria-live="polite">
             {problems.length ? (
-              <p className={styles.alert}>Fill application waits until you answer: {problems.map((p) => p.replace(/^[^:]+: /, "")).join("; ")}</p>
+              <p className={styles.alert}>Fill application waits until you answer: {problems.map((p) => p.replace(/^[^)]*\): /, "")).join("; ")}</p>
             ) : null}
           </div>
           <div className={styles.planWrap}>

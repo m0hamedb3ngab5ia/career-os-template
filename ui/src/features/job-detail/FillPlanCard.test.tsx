@@ -44,7 +44,7 @@ describe("FillPlanCard", () => {
     expect(within(rows[0]!).getByText("Résumé / profile")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("Needs input")).toBeInTheDocument();
     expect(within(rows[3]!).getByText("Your answer needed (legal)")).toBeInTheDocument();
-    expect(screen.getByRole("status")).toHaveTextContent("Fill application waits until you answer: Sponsorship?; Notice period");
+    expect(screen.getByText("Fill application waits until you answer: Sponsorship?; Notice period")).toBeInTheDocument();
     expect(within(rows[1]!).queryByRole("button", { name: "Skip" })).toBeNull(); // required: no skip
     expect(within(rows[2]!).getByRole("button", { name: "Skip" })).toBeEnabled();
     await userEvent.type(within(rows[1]!).getByRole("textbox", { name: "Notice period" }), "4 weeks");

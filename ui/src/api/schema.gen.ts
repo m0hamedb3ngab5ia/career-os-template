@@ -164,6 +164,16 @@ export interface paths {
     /** Job File */
     get: operations["job_file_api_jobs__job_id__files__name__get"];
   };
+  "/api/jobs/{job_id}/fill-plan": {
+    /** Fill Plan */
+    get: operations["fill_plan_api_jobs__job_id__fill_plan_get"];
+    /** Make Fill Plan */
+    post: operations["make_fill_plan_api_jobs__job_id__fill_plan_post"];
+  };
+  "/api/jobs/{job_id}/fill-plan/fields/{field_id}": {
+    /** Edit Fill Field */
+    post: operations["edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post"];
+  };
   "/api/jobs/{job_id}/matches": {
     /**
      * Job Matches
@@ -1261,6 +1271,21 @@ export interface components {
       name: string;
       /** Size */
       size: number;
+    };
+    /** FillFieldBody */
+    FillFieldBody: {
+      /**
+       * Save
+       * @default true
+       */
+      save?: boolean;
+      /**
+       * Skip
+       * @default false
+       */
+      skip?: boolean;
+      /** Value */
+      value?: string | null;
     };
     /** FlagBody */
     FlagBody: {
@@ -3760,6 +3785,84 @@ export interface operations {
       200: {
         content: {
           "application/json": unknown;
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Fill Plan */
+  fill_plan_api_jobs__job_id__fill_plan_get: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Make Fill Plan */
+  make_fill_plan_api_jobs__job_id__fill_plan_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Edit Fill Field */
+  edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post: {
+    parameters: {
+      path: {
+        job_id: string;
+        field_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["FillFieldBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
         };
       };
       /** @description Validation Error */
