@@ -119,6 +119,12 @@ class Store:
                 flags["selected"] = selected
                 self._write(jid, FLAGS, flags)
 
+    def set_flag(self, job_id: str, key: str, value: Any) -> None:
+        with self._flags_lock(job_id):
+            flags = self.load_flags(job_id)
+            flags[key] = value
+            self._write(job_id, FLAGS, flags)
+
     def clear_injection(self, job_id: str) -> dict[str, Any]:
         """The user checked a flagged posting ("I checked it"): prepare/apply are allowed again."""
         with self._flags_lock(job_id):

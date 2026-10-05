@@ -931,7 +931,7 @@ export interface components {
        * Stage
        * @enum {string}
        */
-      stage: "scoring" | "ready" | "offer_tailor" | "tailoring" | "ready_tailored" | "confirm" | "below_threshold" | "discarded";
+      stage: "scoring" | "ready" | "not_tailorable" | "offer_tailor" | "tailoring" | "tailor_failed" | "ready_tailored" | "confirm" | "below_threshold" | "discarded";
       /** Tailor Run */
       tailor_run: string | null;
       /** Threshold */

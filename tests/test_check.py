@@ -9,6 +9,8 @@ import pytest
 from conftest import make_temp_root
 
 from careeros import check, resumes
+from careeros.runs.store import RunStore
+from careeros.store import Store
 from careeros.config import Settings
 
 pytestmark = pytest.mark.unit
@@ -31,8 +33,16 @@ def _resume(s: Settings, name: str, text: str) -> str:
 
 def _scored(s: Settings, jid: str) -> Path:
     jd = s.paths["jobs_dir"] / jid
-    (jd / "score.json").write_text(json.dumps({"required_skills": REQ}))
+    (jd / "score.json").write_text(json.dumps({"required_skills": REQ, "decision": "prepare"}))
     return jd
+
+
+def _run(s: Settings, rid: str = "run-1", status: str = "done") -> None:
+    RunStore(s).save_run({"id": rid, "kind": "prepare", "status": status})
+
+
+def _qa(jd: Path, ok: bool) -> None:
+    (jd / "qa.json").write_text(json.dumps({"pass": ok}))
 
 
 def test_text_from_paste_and_files(tmp_path: Path):
@@ -85,6 +95,10 @@ def _fake_tailor(s: Settings, jd: Path, text: str):
     def start() -> str:
         (jd / "resume.txt").write_text(text)
         (jd / "resume_choice.json").write_text(json.dumps({"action": "tailor"}))
+        for f in ("cover_letter.md", "cover_letter.txt", "prepare.json", "answers.json"):
+            (jd / f).write_text("{}")
+        _qa(jd, True)
+        _run(s)
         return "run-1"
     return start
 
@@ -99,6 +113,7 @@ def _below(s: Settings) -> tuple[str, Path]:
     assert check.tailor(s, jid, lambda: "run-1") == "run-1"
     assert check.state(s, jid)["stage"] == "tailoring"
     _fake_tailor(s, jd, "Backend engineer Python Kubernetes Rust")()
+    Store(s).set_status(jid, "queued")
     return jid, jd
 
 
@@ -115,7 +130,11 @@ def test_e2e_010_02_below_threshold_keep(s: Settings):
     assert st["stage"] == "below_threshold"
     assert json.loads((jd / "check.json").read_text())["below_threshold"] is True
     assert json.loads((jd / "resume_choice.json").read_text())["below_threshold"] is True
-    assert len(resumes.list_resumes(s.root)) == before + 1  # kept attempt saved as a tailored résumé
+    lib = resumes.list_resumes(s.root)
+    assert len(lib) == before + 1  # kept attempt saved once as a tailored résumé
+    assert json.loads((jd / "flags.json").read_text())["below_threshold"] is True
+    new = next(r for r in lib if r["type"] == "tailored")
+    assert resumes.get(s.root, new["rid"])["versions"][-1]["below_threshold"] is True
     with pytest.raises(check.Refused):
         check.decide(s, jid, keep=False)
 
@@ -123,8 +142,56 @@ def test_e2e_010_02_below_threshold_keep(s: Settings):
 def test_below_threshold_discard(s: Settings):
     jid, jd = _below(s)
     st = check.decide(s, jid, keep=False)
-    assert st["stage"] == "discarded" and not (jd / "resume.txt").exists()
-    assert not (jd / "resume_choice.json").exists()
+    assert st["stage"] == "discarded"
+    for f in ("resume.txt", "resume_choice.json", "cover_letter.md", "cover_letter.txt", "qa.json",
+              "prepare.json", "answers.json"):
+        assert not (jd / f).exists(), f
+    assert Store(s).get_status(jid) == "scored"  # not apply-eligible any more
+    assert not [r for r in resumes.list_resumes(s.root) if r["type"] == "tailored"]
+
+
+def test_below_threshold_attempt_not_saved_by_runner(s: Settings):
+    jid, jd = _below(s)
+    assert check.holds_save(s, jd) is True  # runner leaves it to keep/discard (no early or double save)
+    plain = s.paths["jobs_dir"] / "plain"
+    plain.mkdir()
+    assert check.holds_save(s, plain) is False
+
+
+def test_keep_after_failed_qa_not_saved_to_library(s: Settings):
+    jid, jd = _below(s)
+    _qa(jd, False)
+    st = check.decide(s, jid, keep=True)
+    assert st["stage"] == "below_threshold"
+    assert not [r for r in resumes.list_resumes(s.root) if r["type"] == "tailored"]
+    assert json.loads((jd / "flags.json").read_text())["below_threshold"] is True
+
+
+def test_attempt_waits_for_run_end_and_failed_run_can_retry(s: Settings):
+    _resume(s, "A", "Python")
+    jid = check.create(s, JD)["job_id"]
+    jd = _scored(s, jid)
+    check.tailor(s, jid, _fake_tailor(s, jd, "Backend engineer Python Kubernetes"))
+    _run(s, status="running")
+    assert check.state(s, jid)["stage"] == "tailoring"  # résumé written but run (qa regen) not done
+    with pytest.raises(check.Refused):
+        check.decide(s, jid, keep=False)
+    (jd / "resume.txt").unlink()
+    _run(s, status="failed")
+    assert check.state(s, jid)["stage"] == "tailor_failed"
+    assert check.tailor(s, jid, lambda: "run-2") == "run-2"
+
+
+def test_skip_decision_is_not_tailorable(s: Settings):
+    _resume(s, "A", "Python")
+    jid = check.create(s, JD)["job_id"]
+    jd = _scored(s, jid)
+    (jd / "score.json").write_text(json.dumps({"required_skills": REQ, "decision": "skip",
+                                               "skip_reason": "hard filter: location"}))
+    st = check.state(s, jid)
+    assert st["stage"] == "not_tailorable" and "location" in st["notice"]
+    with pytest.raises(check.Refused):
+        check.tailor(s, jid, lambda: "r1")
 
 
 def test_tailored_reaches_threshold_is_ready(s: Settings):

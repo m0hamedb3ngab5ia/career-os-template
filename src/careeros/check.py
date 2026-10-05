@@ -19,12 +19,14 @@ from typing import Any, Callable
 from careeros import match, resumes
 from careeros.extract import extract_text
 from careeros.models import Posting
+from careeros.runs.status import run_state
+from careeros.runs.store import RunStore
 from careeros.store import Store
 
 MAX_BYTES = resumes.MAX_BYTES  # REQ-114: <= 5 MB, same cap as résumé uploads
 TEXT_TYPES = (".txt", ".md")
 CHECK = "check.json"
-_ATTEMPT_FILES = ("resume.txt", "resume.json", "resume.pdf", "resume.tex", "resume_choice.json")
+_ATTEMPT_GLOBS = ("resume.*", "resume_choice.json", "cover_letter.*", "qa.json", "prepare.json", "answers.json")
 
 
 class BadInput(ValueError):
@@ -104,8 +106,23 @@ def _attempt(settings: Any, jd: Path) -> dict[str, Any] | None:
     return {"score": m["score"], "missing": m["missing"]}
 
 
+def _run_done(settings: Any, c: dict[str, Any]) -> bool:
+    """The tailor run ended (prepare may regenerate resume.txt until then)."""
+    rs = RunStore(settings)
+    run = rs.load_run((c.get("tailor") or {}).get("run_id") or "")
+    return bool(run) and run_state(rs, run) != "running"
+
+
+def holds_save(settings: Any, jd: Path) -> bool:
+    """A check's tailored attempt below the threshold is not saved by the runner; keep saves it, discard never."""
+    if not (jd / CHECK).exists() or not (a := _attempt(settings, jd)):
+        return False
+    return a["score"] < match.matches(settings, jd)["threshold"]
+
+
 def state(settings: Any, job_id: str) -> dict[str, Any]:
-    """stage: scoring | ready | offer_tailor | tailoring | ready_tailored | confirm | below_threshold | discarded."""
+    """stage: scoring | ready | not_tailorable | offer_tailor | tailoring | tailor_failed | ready_tailored | confirm |
+    below_threshold | discarded."""
     jd = _job_dir(settings, job_id)
     c, m = _load(jd), match.matches(settings, jd)
     thr, rows = m["threshold"], m["resumes"]
@@ -118,10 +135,16 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
         stage = "ready"
     elif c.get("decision") == "discard":
         stage = "discarded"
+    elif not c.get("tailor") and (sc := match._json(jd / "score.json")).get("decision") != "prepare":
+        stage = "not_tailorable"  # prepare would refuse it (runner eligibility): no dead-end offer
+        out["notice"] = (f"score decision {sc.get('decision')}"
+                         + (f": {sc['skip_reason']}" if sc.get("skip_reason") else "") + "; no tailoring for this job")
     elif not c.get("tailor"):
         stage = "offer_tailor"
-    elif not (a := _attempt(settings, jd)):
+    elif not _run_done(settings, c):
         stage = "tailoring"
+    elif not (a := _attempt(settings, jd)):
+        stage = "tailor_failed"  # run ended without a résumé: one more try allowed
     else:
         out["attempt"] = a
         if a["score"] >= thr:
@@ -131,7 +154,7 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
         else:
             stage = "confirm"
         if stage != "ready_tailored":
-            x = max(a["score"], best or 0)
+            x = a["score"]  # the attempt's score and its missing list (REQ-116)
             out["notice"] = (f"threshold not met: best {x}, needed {thr} ({x}/{thr}); missing: "
                              + (", ".join(a["missing"]) or "none") + ". Create closest match anyway?")
     out["stage"] = stage
@@ -141,7 +164,7 @@ def state(settings: Any, job_id: str) -> dict[str, Any]:
 def tailor(settings: Any, job_id: str, start: Callable[[], str]) -> str:
     """The one "Tailor from master" run of this check. `start` starts `run prepare --job` and returns its run id."""
     st = state(settings, job_id)
-    if st["stage"] != "offer_tailor":
+    if st["stage"] not in ("offer_tailor", "tailor_failed"):
         raise Refused(f"job {job_id}: no tailor offer at stage {st['stage']!r} (max one tailor run per check)")
     run_id = start()
     jd = _job_dir(settings, job_id)
@@ -159,10 +182,16 @@ def decide(settings: Any, job_id: str, keep: bool) -> dict[str, Any]:
         choice = match._json(jd / "resume_choice.json")
         (jd / "resume_choice.json").write_text(json.dumps({**choice, "below_threshold": True}, indent=2,
                                                           ensure_ascii=False) + "\n", encoding="utf-8")
-        match.save_tailored(settings, jd)
+        Store(settings).set_flag(job_id, "below_threshold", True)
+        if match._json(jd / "qa.json").get("pass"):  # QA-failed text never becomes a reusable résumé
+            match.save_tailored(settings, jd, below_threshold=True)
     else:
-        for f in _ATTEMPT_FILES:
-            (jd / f).unlink(missing_ok=True)
+        from careeros.tracker import set_status_both
+
+        for pat in _ATTEMPT_GLOBS:
+            for f in jd.glob(pat):
+                f.unlink(missing_ok=True)
+        set_status_both(settings, job_id, "scored", "check: tailored attempt discarded")
     _save(jd, {**_load(jd), "decision": "keep" if keep else "discard", "below_threshold": keep,
                "decided_at": _now()})
     return state(settings, job_id)

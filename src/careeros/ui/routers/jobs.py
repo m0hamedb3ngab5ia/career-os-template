@@ -252,8 +252,8 @@ class CheckCreated(BaseModel):
 
 
 class CheckState(Matches):
-    stage: Literal["scoring", "ready", "offer_tailor", "tailoring", "ready_tailored", "confirm",
-                   "below_threshold", "discarded"]
+    stage: Literal["scoring", "ready", "not_tailorable", "offer_tailor", "tailoring", "tailor_failed",
+                   "ready_tailored", "confirm", "below_threshold", "discarded"]
     tailor_run: str | None
     decision: Literal["keep", "discard"] | None
     attempt: dict[str, Any] | None  # {score, missing} of the tailored résumé
