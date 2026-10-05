@@ -10,30 +10,34 @@ export type Batch = components["schemas"]["Batch"];
 export const MAX_JOBS = 500;
 export type StopAt = "score" | "prepare" | "fill" | "submit";
 
-export function useBatchPreview(jobIds: string[], stopAt: StopAt) {
+/** Per-job stop points (REQ-118); the server lowers them by its caps. */
+export type Stops = Record<string, StopAt>;
+
+export function useBatchPreview(jobIds: string[], stopAt: StopAt, stops?: Stops) {
   return useQuery({
-    queryKey: ["batch-preview", stopAt, jobIds],
-    queryFn: () => apiSend<Batch>("POST", "/api/batches", { job_ids: jobIds, stop_at: stopAt, dry_run: true }),
+    queryKey: ["batch-preview", stopAt, jobIds, stops],
+    queryFn: () => apiSend<Batch>("POST", "/api/batches", { job_ids: jobIds, stop_at: stopAt, stops, dry_run: true }),
     enabled: jobIds.length > 0,
     placeholderData: keepPreviousData,
   });
 }
 
-/** Save the batch once, then start its driver. A failed start keeps the saved id (`savedId`): retrying only calls
- *  /start, so it never saves a duplicate batch. */
+/** Save the batch once, then start its driver. A failed start keeps the saved id: retrying the same choices only
+ *  calls /start, so it never saves a duplicate; changed choices save a new batch, so the retry runs what you see. */
 export function useStartBatch() {
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saved, setSaved] = useState<{ key: string; id: string } | null>(null);
   const m = useMutation({
-    mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name: string }) => {
-      let id = savedId;
+    mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name?: string; stops?: Stops }) => {
+      const key = JSON.stringify(v);
+      let id = saved?.key === key ? saved.id : null;
       if (!id) {
-        id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name })).id!;
-        setSavedId(id);
+        id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name, stops: v.stops })).id!;
+        setSaved({ key, id });
       }
       return apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/start`);
     },
   });
-  return { ...m, savedId };
+  return { ...m, savedId: saved?.id ?? null };
 }
 
 /** One saved batch; the SSE `changed` event (batches: [ids]) invalidates ["batch", id]. */

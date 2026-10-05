@@ -1,4 +1,4 @@
-import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2, X } from "lucide-react";
+import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
@@ -14,7 +14,9 @@ import { formatCount } from "../../lib/format";
 import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsTable } from "./JobsTable";
-import { filterSummary } from "./HeaderFilterMenu";
+import { StartPipeline } from "./StartPipeline";
+import { UnavailableButton } from "../../kit/UnavailableButton";
+import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
 import { TABS, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
 import type { TabKey } from "./types";
@@ -206,12 +208,22 @@ export function JobsPage() {
     },
     [update, filters],
   );
-  const activeFilters = (Object.entries(filters) as [FilterField, ColumnFilter][]).filter(([, f]) => f);
   const onSearch = useCallback((text: string) => update({ q: text }, true), [update]);
   const onLocation = useCallback((text: string) => update({ location: text }, true), [update]);
 
   const serverTabs = new Map((tabs.data?.tabs ?? []).map((t) => [t.key, t]));
   const nSel = selected.size;
+  const [reviewing, setReviewing] = useState(false);
+  const startRef = useRef<HTMLButtonElement>(null);
+  const wasReviewing = useRef(false);
+  // Unticking every job ends the review, so ticking the next one doesn't reopen it; Back refocuses Start pipeline.
+  useEffect(() => {
+    if (!nSel) setReviewing(false);
+  }, [nSel]);
+  useEffect(() => {
+    if (wasReviewing.current && !reviewing) startRef.current?.focus();
+    wasReviewing.current = reviewing;
+  }, [reviewing]);
 
   function onExport() {
     const cols = ["job_id", ...columns.map((c) => c.exportField)];
@@ -297,6 +309,15 @@ export function JobsPage() {
       subtitle="Every tracked posting · same columns as the Jobs tab in JobTracker.xlsx"
       actions={<HeaderActions />}
     >
+      {reviewing && nSel > 0 ? (
+        <StartPipeline
+          ids={[...selected]}
+          rows={rows.filter((r) => selected.has(r.job_id))}
+          onToggle={onToggle}
+          onUntick={(drop) => setSelected([...selected].filter((id) => !drop.includes(id)))}
+          onClose={() => setReviewing(false)}
+        />
+      ) : (
       <div className={styles.stack}>
         <div className={styles.toolbar}>
           <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey })} controls={panelId}>
@@ -327,9 +348,6 @@ export function JobsPage() {
             {nSel > 0 ? (
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
-                <Link to={`/pipeline/batch/new?${new URLSearchParams({ ids: [...selected].join(",") })}`}>
-                  Add {formatCount(nSel)} to batch
-                </Link>
                 <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
                   Tick for pipeline
                 </Button>
@@ -342,6 +360,17 @@ export function JobsPage() {
               </>
             ) : null}
           </div>
+          <span data-tour="start-pipeline">
+            {nSel > 0 ? (
+              <Button ref={startRef} size="small" variant="primary" onClick={() => setReviewing(true)}>
+                Start pipeline
+              </Button>
+            ) : (
+              <UnavailableButton size="small" variant="primary" reason="Tick jobs first">
+                Start pipeline
+              </UnavailableButton>
+            )}
+          </span>
           <Menu label="Columns">
             <Menu.Trigger size="small" icon={<Table2 size={14} strokeWidth={1.7} aria-hidden="true" />}>
               Columns
@@ -370,26 +399,7 @@ export function JobsPage() {
             {nSel > 0 ? `Export ${formatCount(nSel)} to xlsx` : "Export xlsx"}
           </Button>
         </div>
-        {activeFilters.length > 0 ? (
-          <div className={styles.chips} aria-label="Active filters">
-            {activeFilters.map(([field, f]) => {
-              const label = COLUMNS.find((c) => c.filter === field)?.label ?? field;
-              return (
-                <span key={field} className={styles.chip}>
-                  <span>
-                    {label}: {filterSummary(field, f)}
-                  </span>
-                  <button type="button" className={styles.chipRemove} aria-label={`Remove filter ${label}`} onClick={() => onFilter(field, null)}>
-                    <X size={12} strokeWidth={2} aria-hidden="true" />
-                  </button>
-                </span>
-              );
-            })}
-            <button type="button" className={styles.linkButton} onClick={() => update({ filters: {} })}>
-              Clear all
-            </button>
-          </div>
-        ) : null}
+        <FilterChips filters={filters} onFilter={onFilter} onClearAll={() => update({ filters: {} })} />
         <section
           id={panelId}
           role="tabpanel"
@@ -410,6 +420,7 @@ export function JobsPage() {
           ) : null}
         </section>
       </div>
+      )}
     </Page>
   );
 }

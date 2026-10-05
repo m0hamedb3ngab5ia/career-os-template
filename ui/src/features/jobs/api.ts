@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
-import type { JobFacets, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
+import type { JobFacets, JobListItem, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
 import { FILTERS, type FilterField, type Filters } from "./urlState";
 
 export interface FilterParams {
@@ -8,6 +8,8 @@ export interface FilterParams {
   q: string;
   location: string;
   filters: Filters;
+  /** Count filter values over these rows instead of asking the server (the Start pipeline review table). */
+  rows?: JobListItem[];
 }
 
 export interface ListParams extends FilterParams {

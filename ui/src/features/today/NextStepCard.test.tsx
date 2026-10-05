@@ -34,14 +34,14 @@ describe("NextStepCard (REQ-122)", () => {
   });
 
   it("Profile: shown once the last must-have closes, not when already ready", async () => {
-    mockApi({ "GET /api/readiness": { ready: false, items: [] }, ...step("start_pipeline", "Start pipeline", "/pipeline/batch/new") });
+    mockApi({ "GET /api/readiness": { ready: false, items: [] }, ...step("start_pipeline", "Start pipeline", "/jobs") });
     const { qc } = renderWithApp(<JustReadyNextStep />);
     await waitFor(() => expect(qc.getQueryData(["readiness"])).toBeTruthy());
     expect(screen.queryByRole("heading", { name: "Next step" })).not.toBeInTheDocument();
     act(() => qc.setQueryData(["today", "next-step"], { key: "finish_setup", label: "Finish setup", href: "/profile" }));
     await act(async () => qc.setQueryData(["readiness"], { ready: true, items: [] }));
     expect(screen.queryByRole("link", { name: "Finish setup" })).not.toBeInTheDocument(); // no stale flash
-    expect(await screen.findByRole("link", { name: "Start pipeline" })).toHaveAttribute("href", "/pipeline/batch/new");
+    expect(await screen.findByRole("link", { name: "Start pipeline" })).toHaveAttribute("href", "/jobs");
   });
 
   it("Profile: a stale cached not-ready that refetches as ready shows no card", async () => {

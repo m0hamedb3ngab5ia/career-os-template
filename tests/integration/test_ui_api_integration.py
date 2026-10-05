@@ -606,6 +606,41 @@ def test_fill_plan_preview_edit_and_save_to_profile(client, data):
     assert nxt["fields"][0]["value"] == "4 weeks"
 
 
+def test_fill_plan_ai_draft_approve_or_edit_then_fill(client, data, monkeypatch):
+    """REQ-105/DEC-010, E2E-008-01 extended: an unreviewed AI draft blocks the fill; Approve keeps the draft text,
+    an edit replaces it; both mark it reviewed. Approve never writes the profile and only works on drafts."""
+    from careeros.apply import gh_fill
+    from careeros.ui.services import job_actions
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    plan = _write_plan(data, jid)
+    plan["fields"] = [f for f in plan["fields"] if f["field_id"] == "email"] + [
+        {"field_id": "d1", "label": "Why us?", "type": "textarea", "value": "The mission.", "source": "ai_draft",
+         "reviewed": False, "needs_review": True, "required": True},
+        {"field_id": "d2", "label": "Notice period", "type": "text", "value": "2 weeks", "source": "ai_draft",
+         "reviewed": False, "needs_review": True, "required": True}]
+    Store(data["settings"])._write(jid, "fill_plan.json", plan)
+    h = {"x-careeros": "1"}
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
+    spawned: list = []
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=1))
+    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
+    assert r.status_code == 400 and "unreviewed AI draft: Why us?" in r.json()["detail"] and not spawned
+    sa = data["settings"].paths["standard_answers"]
+    before = open(sa).read()
+    url = f"/api/jobs/{jid}/fill-plan/fields"
+    assert client.post(f"{url}/email/approve", headers=h).status_code == 400  # not a draft
+    r = client.post(f"{url}/d1/approve", headers=h).json()
+    assert r["field"]["reviewed"] is True and r["field"]["value"] == "The mission."
+    assert r["problems"] == ["unreviewed AI draft: Notice period"]
+    r = client.post(f"{url}/d2", headers=h, json={"value": "4 weeks", "save": False}).json()
+    assert r["field"]["source"] == "user" and r["problems"] == [] and open(sa).read() == before
+    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
+    assert r.status_code == 200 and spawned
+    vals = {f["field_id"]: f["value"] for f in json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())["fields"]}
+    assert vals["d1"] == "The mission." and vals["d2"] == "4 weeks"
+
+
 def test_application_open_refuses_required_needs_input(client, data, monkeypatch):
     """REQ-106: a plan with a required unanswered field is not filled; no fill is spawned."""
     from careeros.apply import gh_fill

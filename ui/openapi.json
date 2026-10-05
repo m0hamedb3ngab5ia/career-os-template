@@ -11296,6 +11296,59 @@
         ]
       }
     },
+    "/api/jobs/{job_id}/fill-plan/fields/{field_id}/approve": {
+      "post": {
+        "operationId": "approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "field_id",
+            "required": true,
+            "schema": {
+              "title": "Field Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Approve Fill Field Api Jobs  Job Id  Fill Plan Fields  Field Id  Approve Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Approve Fill Field",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
     "/api/jobs/{job_id}/injection/clear": {
       "post": {
         "description": "REQ-109 \"I checked it\": the user read a flagged posting; prepare/apply are allowed again.",

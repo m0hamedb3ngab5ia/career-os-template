@@ -8,6 +8,8 @@ appears after hispanic_ethnicity is answered). Answers come only from profile id
 standard_answers.yaml (`answer_for`) and its `eeo:` block (`select_eeo_option`). A select value is always an
 exact option label from the schema; anything unanswered is `needs_review` with value null (legal/salary/EEO
 are never guessed: source `pause:<kind>`, the caller raises an Action Item; essays go to the prepare skill).
+A freetext field still empty takes the job's `answers.json` draft (`drafts`) as source `ai_draft`, `reviewed: false`
+(REQ-105, DEC-010): fill refuses it until the user approves or edits it.
 """
 from __future__ import annotations
 
@@ -111,20 +113,34 @@ def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers
 
 
 def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers_path: str | Path,
-               company: str = "", files: dict[str, Any]) -> dict[str, Any]:
+               company: str = "", files: dict[str, Any], drafts: list[Any] | None = None) -> dict[str, Any]:
     ident, eeo, rows = _identity(profile), load_eeo_answers(answers_path), []
     for f in fields:
         value, source = _fill(f, ident, eeo, Path(answers_path), company, files)
+        draft = None
         if value is None and f["type"] not in ("hidden", "file"):
             kind = classify_question(f["label"]) if f["field_id"] not in _EEO else "eeo"
             source = f"pause:{kind}" if kind in ("legal", "salary", "eeo", "sensitive") else "unanswered"
-        needs = value is None and f["type"] != "hidden" and (f["type"] != "file" or f["required"])
+            if source == "unanswered" and f["type"] in ("text", "textarea"):  # never legal/salary/EEO/selects
+                draft = _draft_for(f["label"], drafts or [])
+        if draft:
+            value, source = draft, "ai_draft"
+        needs = (value is None or draft is not None) and f["type"] != "hidden" and (f["type"] != "file" or f["required"])
         row = {"field_id": f["field_id"], "label": f["label"], "type": f["type"], "value": value, "source": source,
                "needs_review": needs, "required": bool(f["required"])}
+        if draft:
+            row["reviewed"] = False
         if f["options"]:
             row["options"] = f["options"]
         rows.append(row)
     return {"fields": rows + _extras(profile), "files": files}
+
+
+def _draft_for(label: str, drafts: list[Any]) -> str | None:
+    """The answers.json answer whose question is this label (whitespace/case-insensitive), else None."""
+    return next((d["answer"].strip() for d in drafts if isinstance(d, dict) and isinstance(d.get("answer"), str)
+                 and d["answer"].strip() and d.get("class") not in ("sensitive", "salary_freeform", "unknown")
+                 and _label_matches(str(d.get("question") or ""), label) == "exact"), None)
 
 
 def field_kind(f: dict[str, Any]) -> str:
@@ -133,10 +149,17 @@ def field_kind(f: dict[str, Any]) -> str:
 
 
 def carry_over(old: dict[str, Any] | None, new: dict[str, Any]) -> dict[str, Any]:
-    """Rebuild keeps this job's own edits and skips for fields that still exist (same field_id and type)."""
-    mine = {f["field_id"]: f for f in (old or {}).get("fields", []) if f.get("source") == "user" or f.get("skipped")}
+    """Rebuild keeps this job's own edits and skips for fields that still exist (same field_id and type), and an
+    approved AI draft's review while the draft text is unchanged."""
+    mine = {f["field_id"]: f for f in (old or {}).get("fields", [])
+            if f.get("source") == "user" or f.get("skipped") or (f.get("source") == "ai_draft" and f.get("reviewed"))}
     for f in new["fields"]:
         o = mine.get(f["field_id"])
-        if o and o.get("type") == f["type"] and f.get("source") != "pause:sensitive":
+        if not o or o.get("type") != f["type"] or f.get("source") == "pause:sensitive":
+            continue
+        if o.get("source") == "ai_draft" and not o.get("skipped"):
+            if f.get("source") == "ai_draft" and f.get("value") == o.get("value"):
+                f.update(reviewed=True, needs_review=False)
+        else:
             f.update({k: o[k] for k in ("value", "source", "needs_review", "skipped") if k in o})
     return new
