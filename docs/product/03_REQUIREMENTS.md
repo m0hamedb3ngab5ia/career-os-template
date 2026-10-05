@@ -286,6 +286,8 @@ Given best 66, tweak estimate 74 · When prepare · Then one variant created, ne
 ### REQ-114 Check any job (paste/upload)
 Jobs page "Check a job": paste JD text or upload PDF/DOCX/txt (≤5 MB). Creates job `source: manual`, runs REQ-109 scan, REQ-020 fit score, REQ-111 per résumé. LinkedIn etc. text pasted by user allowed (user-side, Q-016).
 Given pasted JD · When submit · Then job listed with fit score + per-résumé match table.
+Result actions (2026-10-05): primary "Prepare application" (ticks the job, starts a prepare run: tailor from master + cover letter + QA) whether best is above or below threshold; secondary "Cancel" (job kept, not ticked). No "Done", "Keep job, no résumé" or separate "Tailor from master" button. Below-threshold keep/discard of the tailored résumé (REQ-116) stays. Match table has a per-résumé "Why this score" toggle: matched (✓) and missing keywords, required vs preferred, minimal; data from `GET /api/jobs/{id}/matches`.
+Given result shown · When Prepare application · Then job ticked and prepare run started; When Cancel · Then job kept, unticked.
 ### REQ-115 Rank my résumés for a job
 Job detail: table of every résumé with match score, best highlighted, threshold line, missing skills per résumé.
 Given 3 résumés · When open job · Then sorted by match, best marked, scores = REQ-111.
@@ -311,6 +313,9 @@ Given fresh install · When open UI, skip at step 2, reload · Then no tour; Set
 ### REQ-122 Next-step card
 Today shows one "Next step" card with one button, from the first rule that holds: readiness must-have open → "Finish setup" (link to first open item); no jobs → "Find jobs" (scout); no ticked jobs → "Pick jobs" (Jobs list); a batch running → "See progress"; else → "Start pipeline" (REQ-117). Also shown once on the Profile page when the last must-have closes.
 Given ready, 12 jobs, 0 ticked · When open Today · Then card says "Pick jobs" and links to the Jobs list.
+### REQ-123 Action Items stored in data/action_items.json
+Action Items live in `data/action_items.json`, written atomically like `status.json` (NFR-002). The tracker xlsx Action Items sheet is a one-way synced view (json → xlsx only); edits in Excel are never read back. Amends REQ-052, REQ-073 (Q-008).
+Given an Action Item added · When written · Then json updated atomically and xlsx sheet refreshed on sync; an Excel edit is overwritten.
 
 ## Non-functional
 ### NFR-001 No API key; LLM only via Claude Code subscription

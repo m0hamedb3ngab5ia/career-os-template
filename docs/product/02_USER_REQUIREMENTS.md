@@ -268,7 +268,7 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | USR-011 Optionally let the app submit for me | proposed | REQ-032, REQ-033, REQ-035, REQ-046 |
 | USR-012 Let the app work overnight within my limits | proposed | REQ-040, REQ-041, REQ-042, REQ-043, REQ-044, REQ-045 |
 | USR-013 See every job and where it stands | proposed | REQ-050, REQ-051, REQ-070, REQ-071, REQ-072, REQ-074 |
-| USR-014 Get a to-do list of things that need me | proposed | REQ-052, REQ-073 |
+| USR-014 Get a to-do list of things that need me | proposed | REQ-052, REQ-073, REQ-123 |
 | USR-015 Answer a question once, never again | proposed | REQ-053, REQ-054 |
 | USR-016 Reach out to people at the company | proposed | REQ-060, REQ-061, REQ-062, REQ-077 |
 | USR-017 Have company replies tracked automatically | proposed | REQ-063 |
