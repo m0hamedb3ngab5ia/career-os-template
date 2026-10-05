@@ -9,6 +9,7 @@ import pytest
 from conftest import make_temp_root
 
 from careeros import resumes
+from careeros.runs.store import RunStore
 
 pytestmark = pytest.mark.integration
 
@@ -66,7 +67,7 @@ def _check(c, s) -> str:
     assert FakeRC.calls == [("score", jid)]
     assert c.get(f"/api/jobs/{jid}/check").json()["stage"] == "scoring"
     (s.paths["jobs_dir"] / jid / "score.json").write_text(
-        json.dumps({"required_skills": ["Python", "Kubernetes", "Rust", "Go", "SQL"]}))
+        json.dumps({"decision": "prepare", "required_skills": ["Python", "Kubernetes", "Rust", "Go", "SQL"]}))
     return jid
 
 
@@ -88,6 +89,8 @@ def test_e2e_010_02_below_threshold_keep(client):
     def tailor(jd: Path) -> None:
         (jd / "resume.txt").write_text("Backend engineer Python Kubernetes Rust")
         (jd / "resume_choice.json").write_text(json.dumps({"action": "tailor"}))
+        (jd / "qa.json").write_text(json.dumps({"pass": True}))
+        RunStore(s).save_run({"id": "prepare-1", "kind": "prepare", "status": "done"})
 
     FakeRC.on_prepare = tailor
     jid = _check(c, s)
@@ -99,6 +102,7 @@ def test_e2e_010_02_below_threshold_keep(client):
     assert c.post(f"/api/jobs/{jid}/check/tailor").status_code == 409  # one tailor run per check
     st = c.post(f"/api/jobs/{jid}/check/decision", json={"keep": True}).json()
     assert st["stage"] == "below_threshold" and st["decision"] == "keep"
+    assert [r["type"] for r in resumes.list_resumes(s.root)].count("tailored") == 1  # saved once, on keep
     assert c.post(f"/api/jobs/{jid}/check/decision", json={"keep": False}).status_code == 409
 
 

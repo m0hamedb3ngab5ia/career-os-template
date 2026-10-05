@@ -3,12 +3,14 @@ one tailor offer, below_threshold keep/discard."""
 from __future__ import annotations
 
 import json
+import os
 from pathlib import Path
 
 import pytest
 from conftest import make_temp_root
 
 from careeros import check, resumes
+from careeros.runs import locks
 from careeros.runs.store import RunStore
 from careeros.store import Store
 from careeros.config import Settings
@@ -173,9 +175,12 @@ def test_attempt_waits_for_run_end_and_failed_run_can_retry(s: Settings):
     jd = _scored(s, jid)
     check.tailor(s, jid, _fake_tailor(s, jd, "Backend engineer Python Kubernetes"))
     _run(s, status="running")
+    rs = RunStore(s)  # a live run holds the runner lock; without it `running` reads as interrupted (= ended)
+    lk = locks.acquire(rs.runner_lock_path, owner="run:run-1", ttl_seconds=3600, pid=os.getpid())
     assert check.state(s, jid)["stage"] == "tailoring"  # résumé written but run (qa regen) not done
     with pytest.raises(check.Refused):
         check.decide(s, jid, keep=False)
+    locks.release(rs.runner_lock_path, lk.token)
     (jd / "resume.txt").unlink()
     _run(s, status="failed")
     assert check.state(s, jid)["stage"] == "tailor_failed"
@@ -202,3 +207,37 @@ def test_tailored_reaches_threshold_is_ready(s: Settings):
     assert check.state(s, jid)["stage"] == "ready_tailored"
     with pytest.raises(check.Refused):
         check.decide(s, jid, keep=True)
+
+
+def test_runner_holds_below_threshold_save_until_keep(s: Settings):
+    """REQ-116 at the runner: a passing prepare run of a check job below the threshold saves nothing; keep saves once."""
+    from careeros.runs.config import budget_for, load_runs_config
+    from careeros.runs.headless import parse_stream
+    from careeros.runs.service import run_batch
+
+    _resume(s, "A", "Python")
+    jid = check.create(s, JD)["job_id"]
+    jd = _scored(s, jid)
+    (jd / "score.json").write_text(json.dumps({"required_skills": REQ, "decision": "prepare", "fit": 60,
+                                               "category": "swe_backend", "tier": "C"}))
+    Store(s).set_status(jid, "scored", "test")
+    Store(s).set_selected([jid], True)
+
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        Path(stream_path).write_text("{}")
+        (jd / "resume.txt").write_text("Backend engineer Python Kubernetes")
+        (jd / "resume_choice.json").write_text(json.dumps({"action": "tailor"}))
+        _qa(jd, True)
+        Store(s).set_status(jid, "queued", "fake prepare")
+        res = {"skill": "prepare-job", "job_id": jid, "status": "queued", "qa_pass": True}
+        return parse_stream([json.dumps({"type": "result", "subtype": "success", "is_error": False,
+                                         "session_id": "s", "result": "RESULT: " + json.dumps(res)})])
+
+    s.pipeline = {**s.pipeline, "runs": {**(s.pipeline.get("runs") or {}), "preflight_doctor": False}}
+    cfg = load_runs_config(s)
+    check.tailor(s, jid, lambda: run_batch(s, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg,
+                                           invoke=invoke, job_ids=[jid])["id"])
+    tailored = lambda: [r for r in resumes.list_resumes(s.root) if r["type"] == "tailored"]  # noqa: E731
+    assert check.state(s, jid)["stage"] == "confirm" and tailored() == []
+    check.decide(s, jid, keep=True)
+    assert len(tailored()) == 1
