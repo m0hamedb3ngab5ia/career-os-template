@@ -132,7 +132,7 @@ def add(root: Path, filename: str, data: bytes, *, name: str | None = None, type
 
 
 def add_tailored(root: Path, text: str, *, category: str | None, source: str,
-                 files: dict[str, Path] | None = None) -> dict[str, Any]:
+                 files: dict[str, Path] | None = None, below_threshold: bool = False) -> dict[str, Any]:
     """AI tailored/tweaked résumé text as a `tailored` résumé (DEC-008) so later jobs of the category reuse it.
     `files` (e.g. resume.json, resume.pdf) are snapshotted into the version dir, so a later reuse never reads the
     source job's (possibly re-prepared) files. A re-prepare of the same `source` job adds a version, not a résumé."""
@@ -159,6 +159,9 @@ def add_tailored(root: Path, text: str, *, category: str | None, source: str,
         for dst, src in (files or {}).items():
             if Path(src).is_file():
                 shutil.copyfile(src, d / f"v{meta['versions'][-1]['n']}" / dst)
+        if below_threshold:  # REQ-116: kept although it missed the match threshold
+            meta["versions"][-1]["below_threshold"] = True
+            _write(d, meta)
         return meta
 
 

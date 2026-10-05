@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from contextlib import contextmanager
 from datetime import datetime
-from typing import Any, Literal
+from typing import Any, Iterator, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse, Response
@@ -237,6 +238,115 @@ def select_jobs(body: SelectBody, c=Depends(ctx)) -> dict[str, Any]:
     return {"ids": body.ids, "selected": body.selected}
 
 
+class PipelineStarted(BaseModel):
+    run_id: str
+    kind: str
+
+
+class CheckCreated(BaseModel):
+    job_id: str
+    flagged: bool  # REQ-109 scan hit: badge + Action Item; scoring continues, prepare waits for a clear
+    reasons: list[str]
+    score_run: str | None  # the `run score --job` started for it
+    score_error: str | None = None  # why scoring could not start now (busy, paused, not set up)
+
+
+class CheckState(Matches):
+    stage: Literal["scoring", "ready", "not_tailorable", "offer_tailor", "tailoring", "tailor_failed",
+                   "ready_tailored", "confirm", "below_threshold", "discarded"]
+    tailor_run: str | None
+    decision: Literal["keep", "discard"] | None
+    attempt: dict[str, Any] | None  # {score, missing} of the tailored résumé
+    notice: str | None  # "threshold not met: best X, needed Y (X/Y); missing: ..." (REQ-116)
+
+
+class CheckDecision(BaseModel):
+    keep: bool
+
+
+@contextmanager
+def _check_refusals() -> Iterator[None]:
+    from careeros import check, resumes
+
+    with refusals():
+        try:
+            yield
+        except resumes.TooLarge as e:
+            raise HTTPException(413, str(e)) from None
+        except resumes.BadType as e:
+            raise HTTPException(415, str(e)) from None
+        except check.BadInput as e:
+            raise HTTPException(422, str(e)) from None
+        except check.Refused as e:
+            raise HTTPException(409, str(e)) from None
+
+
+_RAW = {"requestBody": {"required": True, "content": {
+    "text/plain": {"schema": {"type": "string"}},
+    "application/octet-stream": {"schema": {"type": "string", "format": "binary"}}}}}
+
+
+@router.post("/jobs/check", status_code=201, openapi_extra=_RAW)
+async def check_job(request: Request, filename: str | None = None, title: str = "", company: str = "",
+                    url: str = "", c=Depends(ctx)) -> CheckCreated:
+    """REQ-114 Check a job: raw body (DEC-006) = pasted JD text, or a pdf/docx/txt/md file when `filename` is
+    given (<= 5 MB). Stores a `source: manual` job, scans it, starts its score run; poll GET .../check."""
+    import anyio
+
+    from careeros import check
+
+    cap = f"{filename or 'pasted text'}: larger than {check.MAX_BYTES // (1024 * 1024)} MB"
+    if int(request.headers.get("content-length") or 0) > check.MAX_BYTES:
+        raise HTTPException(413, cap)
+    data = bytearray()
+    async for chunk in request.stream():  # streamed cap: never buffer more than MAX_BYTES + one chunk
+        data += chunk
+        if len(data) > check.MAX_BYTES:
+            raise HTTPException(413, cap)
+    with _check_refusals():
+        out = await anyio.to_thread.run_sync(lambda: check.create(
+            c.settings, check.text_from(filename, bytes(data)), title=title, company=company, url=url))
+    after_write(c, jobs=[out["job_id"]])
+    run, err = None, None
+    try:
+        with _check_refusals():
+            run = _rc(request, c).start("score", job_id=out["job_id"])["run_id"]
+    except HTTPException as e:  # stored either way; the check page offers scoring again
+        err = str(e.detail)
+    return CheckCreated(**out, score_run=run, score_error=err)
+
+
+@router.get("/jobs/{job_id}/check")
+def check_state(job_id: str, c=Depends(ctx)) -> CheckState:
+    """Where the check stands: match table (REQ-115), tailor offer, below-threshold notice (REQ-116)."""
+    from careeros import check
+
+    with _check_refusals():
+        return CheckState(**check.state(c.settings, job_id))
+
+
+@router.post("/jobs/{job_id}/check/tailor")
+def check_tailor(job_id: str, request: Request, c=Depends(ctx)) -> PipelineStarted:
+    """The one "Tailor from master" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise."""
+    from careeros import check
+
+    with _check_refusals():
+        run = check.tailor(c.settings, job_id,
+                           lambda: _rc(request, c).start("prepare", job_id=job_id, force=True)["run_id"])
+    return PipelineStarted(run_id=run, kind="prepare")
+
+
+@router.post("/jobs/{job_id}/check/decision")
+def check_decision(job_id: str, body: CheckDecision, c=Depends(ctx)) -> CheckState:
+    """"Create closest match anyway?": keep = attempt kept, flagged below_threshold; no = attempt discarded."""
+    from careeros import check
+
+    with _check_refusals():
+        out = check.decide(c.settings, job_id, body.keep)
+    after_write(c, jobs=[job_id])
+    return CheckState(**out)
+
+
 @router.post("/jobs/{job_id}/status")
 def set_status(job_id: str, body: StatusBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
@@ -272,11 +382,6 @@ def set_override(job_id: str, body: OverrideBody, c=Depends(ctx)) -> dict[str, A
 class PipelineBody(BaseModel):
     action: Literal["start", "continue", "approve_continue"]
     force: bool = False
-
-
-class PipelineStarted(BaseModel):
-    run_id: str
-    kind: str
 
 
 def _rc(request: Request, c: Any) -> RunControl:

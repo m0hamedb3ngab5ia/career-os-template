@@ -118,6 +118,14 @@ export interface paths {
     /** List Jobs */
     get: operations["list_jobs_api_jobs_get"];
   };
+  "/api/jobs/check": {
+    /**
+     * Check Job
+     * @description REQ-114 Check a job: raw body (DEC-006) = pasted JD text, or a pdf/docx/txt/md file when `filename` is
+     * given (<= 5 MB). Stores a `source: manual` job, scans it, starts its score run; poll GET .../check.
+     */
+    post: operations["check_job_api_jobs_check_post"];
+  };
   "/api/jobs/export": {
     /** Export */
     post: operations["export_api_jobs_export_post"];
@@ -151,6 +159,27 @@ export interface paths {
   "/api/jobs/{job_id}/application/open": {
     /** Open Application */
     post: operations["open_application_api_jobs__job_id__application_open_post"];
+  };
+  "/api/jobs/{job_id}/check": {
+    /**
+     * Check State
+     * @description Where the check stands: match table (REQ-115), tailor offer, below-threshold notice (REQ-116).
+     */
+    get: operations["check_state_api_jobs__job_id__check_get"];
+  };
+  "/api/jobs/{job_id}/check/decision": {
+    /**
+     * Check Decision
+     * @description "Create closest match anyway?": keep = attempt kept, flagged below_threshold; no = attempt discarded.
+     */
+    post: operations["check_decision_api_jobs__job_id__check_decision_post"];
+  };
+  "/api/jobs/{job_id}/check/tailor": {
+    /**
+     * Check Tailor
+     * @description The one "Tailor from master" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.
+     */
+    post: operations["check_tailor_api_jobs__job_id__check_tailor_post"];
   };
   "/api/jobs/{job_id}/failures/reset": {
     /**
@@ -869,6 +898,54 @@ export interface components {
       };
       /** Version */
       version?: string | null;
+    };
+    /** CheckCreated */
+    CheckCreated: {
+      /** Flagged */
+      flagged: boolean;
+      /** Job Id */
+      job_id: string;
+      /** Reasons */
+      reasons: string[];
+      /** Score Error */
+      score_error?: string | null;
+      /** Score Run */
+      score_run: string | null;
+    };
+    /** CheckDecision */
+    CheckDecision: {
+      /** Keep */
+      keep: boolean;
+    };
+    /** CheckState */
+    CheckState: {
+      /** Attempt */
+      attempt: {
+        [key: string]: unknown;
+      } | null;
+      /** Best */
+      best: string | null;
+      /** Decision */
+      decision: ("keep" | "discard") | null;
+      /** Hint */
+      hint?: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Notice */
+      notice: string | null;
+      /** Resumes */
+      resumes: components["schemas"]["MatchRow"][];
+      /** Scored */
+      scored: boolean;
+      /**
+       * Stage
+       * @enum {string}
+       */
+      stage: "scoring" | "ready" | "not_tailorable" | "offer_tailor" | "tailoring" | "tailor_failed" | "ready_tailored" | "confirm" | "below_threshold" | "discarded";
+      /** Tailor Run */
+      tailor_run: string | null;
+      /** Threshold */
+      threshold: number;
     };
     /** ClearBody */
     ClearBody: {
@@ -3528,6 +3605,41 @@ export interface operations {
       };
     };
   };
+  /**
+   * Check Job
+   * @description REQ-114 Check a job: raw body (DEC-006) = pasted JD text, or a pdf/docx/txt/md file when `filename` is
+   * given (<= 5 MB). Stores a `source: manual` job, scans it, starts its score run; poll GET .../check.
+   */
+  check_job_api_jobs_check_post: {
+    parameters: {
+      query?: {
+        filename?: string | null;
+        title?: string;
+        company?: string;
+        url?: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/octet-stream": string;
+        "text/plain": string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["CheckCreated"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Export */
   export_api_jobs_export_post: {
     requestBody: {
@@ -3729,6 +3841,86 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Check State
+   * @description Where the check stands: match table (REQ-115), tailor offer, below-threshold notice (REQ-116).
+   */
+  check_state_api_jobs__job_id__check_get: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CheckState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Check Decision
+   * @description "Create closest match anyway?": keep = attempt kept, flagged below_threshold; no = attempt discarded.
+   */
+  check_decision_api_jobs__job_id__check_decision_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["CheckDecision"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["CheckState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Check Tailor
+   * @description The one "Tailor from master" run per check (`run prepare --job`: résumé pick tweak/tailor). 409 otherwise.
+   */
+  check_tailor_api_jobs__job_id__check_tailor_post: {
+    parameters: {
+      path: {
+        job_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PipelineStarted"];
         };
       };
       /** @description Validation Error */

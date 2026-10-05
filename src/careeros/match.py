@@ -183,11 +183,12 @@ def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str
     return c
 
 
-def save_tailored(settings: Any, job_dir: Path) -> dict[str, Any] | None:
+def save_tailored(settings: Any, job_dir: Path, below_threshold: bool = False) -> dict[str, Any] | None:
     """After a tweak/tailor prepare: keep resume.txt as a `tailored` résumé of the job's category (DEC-008)."""
     c, txt = _json(job_dir / "resume_choice.json"), job_dir / "resume.txt"
     if c.get("action") not in ("tweak", "tailor") or not txt.exists():
         return None
     return resumes.add_tailored(settings.root, txt.read_text(encoding="utf-8"),
                                 category=_json(job_dir / "score.json").get("category"), source=f"job:{job_dir.name}",
-                                files={f: job_dir / f for f in ("resume.json", "resume.pdf")})
+                                files={f: job_dir / f for f in ("resume.json", "resume.pdf")},
+                                below_threshold=below_threshold)

@@ -379,8 +379,10 @@ class _Loop:
             if st != result.get("status"):
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
         if outcome == "ok" and self.kind == "prepare" and result and result.get("qa_pass"):
-            from careeros import match
-            try:  # DEC-008: later jobs of the category reuse it; never lose the attempt record over it
+            from careeros import check, match
+            try:
+                if check.holds_save(self.s, self.store.job_dir(jid)):  # REQ-116: saved on keep, never on discard
+                    raise check.Refused("below the threshold, waiting for keep/discard")  # DEC-008: later jobs of the category reuse it; never lose the attempt record over it
                 match.save_tailored(self.s, self.store.job_dir(jid))
             except Exception as e:  # noqa: BLE001
                 self.echo(f"    saving tailored résumé failed ({e})")
