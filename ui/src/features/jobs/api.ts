@@ -1,4 +1,4 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
 import type { JobFacets, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
 import { FILTERS, type FilterField, type Filters } from "./urlState";
@@ -150,4 +150,13 @@ export async function exportJobs(body: ExportRequest): Promise<string> {
 
 export function useExportJobs() {
   return useMutation({ mutationFn: exportJobs });
+}
+
+/** REQ-104: bulk tick/untick for prepare/apply runs; the list refreshes at once (SSE also does). */
+export function useSelectJobs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { ids: string[]; selected: boolean }) => apiSend("POST", "/api/jobs/select", body),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
 }

@@ -309,3 +309,5 @@
 .chipRemove:hover {
   color: var(--label);
 }
+
+.flag { display: inline-flex; margin-left: 6px; vertical-align: middle; color: var(--red, #c62828); }

@@ -203,6 +203,13 @@ export interface paths {
     /** Edit Fill Field */
     post: operations["edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post"];
   };
+  "/api/jobs/{job_id}/injection/clear": {
+    /**
+     * Clear Injection
+     * @description REQ-109 "I checked it": the user read a flagged posting; prepare/apply are allowed again.
+     */
+    post: operations["clear_injection_api_jobs__job_id__injection_clear_post"];
+  };
   "/api/jobs/{job_id}/matches": {
     /**
      * Job Matches
@@ -1675,6 +1682,8 @@ export interface components {
       fit: number | null;
       /** Found At */
       found_at: string | null;
+      /** Injection */
+      injection: string | null;
       /** Job Id */
       job_id: string;
       /** Location */
@@ -1687,6 +1696,8 @@ export interface components {
       qa_score: number | null;
       /** Safety */
       safety: string | null;
+      /** Selected */
+      selected: number | null;
       /** Status */
       status: string | null;
       /** Tier */
@@ -1714,6 +1725,8 @@ export interface components {
       fit: number | null;
       /** Found At */
       found_at: string | null;
+      /** Injection */
+      injection: string | null;
       /** Job Id */
       job_id: string;
       /** Location */
@@ -1724,6 +1737,8 @@ export interface components {
       qa_score: number | null;
       /** Safety */
       safety: string | null;
+      /** Selected */
+      selected: number | null;
       /** Status */
       status: string | null;
       /** Tier */
@@ -4046,6 +4061,33 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["FillFieldBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+            [key: string]: unknown;
+          };
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Clear Injection
+   * @description REQ-109 "I checked it": the user read a flagged posting; prepare/apply are allowed again.
+   */
+  clear_injection_api_jobs__job_id__injection_clear_post: {
+    parameters: {
+      path: {
+        job_id: string;
       };
     };
     responses: {

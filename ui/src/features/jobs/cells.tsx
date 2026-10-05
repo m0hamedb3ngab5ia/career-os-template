@@ -1,8 +1,11 @@
+import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
 import { Link } from "react-router";
 import { SafetyChip, StatusChip, TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
+import { useToast } from "../../kit/Toast";
 import { formatDate, formatDecimal } from "../../lib/format";
+import { useSelectJobs } from "./api";
 import styles from "./JobsPage.module.css";
 import type { JobListItem } from "./types";
 import type { FilterField, SortKey } from "./urlState";
@@ -44,10 +47,21 @@ export const COLUMNS: Column[] = [
     exportField: "company",
     title: (j) => j.company ?? undefined,
     cell: (j) => (
-      <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
-        {j.company || j.job_id}
-      </Link>
+      <>
+        <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
+          {j.company || j.job_id}
+        </Link>
+        {j.injection ? <InjectionBadge reasons={j.injection} /> : null}
+      </>
     ),
+  },
+  {
+    key: "pick",
+    label: "Pipeline",
+    width: 80,
+    exportField: "selected",
+    title: () => "Ticked jobs are the only ones prepared or applied",
+    cell: (j) => <PickCell job={j} />,
   },
   {
     key: "role",
@@ -168,3 +182,32 @@ export const COLUMNS: Column[] = [
     cell: (j) => j.next_action || <Empty sr="None" />,
   },
 ];
+
+/** REQ-104: tick/untick one job for prepare/apply. A missing flag (old job) counts as ticked. */
+function PickCell({ job }: { job: JobListItem }) {
+  const pick = useSelectJobs();
+  const toast = useToast();
+  // Server state wins once the POST settles (the jobs query refetches); optimistic only while pending.
+  const checked = pick.isPending ? pick.variables.selected : job.selected !== 0;
+  const toggle = () =>
+    pick.mutate(
+      { ids: [job.job_id], selected: !checked },
+      { onError: (e) => toast.show({ message: e instanceof Error ? e.message : "Could not save the tick" }) },
+    );
+  return (
+    <label className={styles.check}>
+      <input type="checkbox" checked={checked} onChange={toggle} />
+      <span className="sr-only">Tick {job.company || job.job_id} for pipeline</span>
+    </label>
+  );
+}
+
+/** REQ-109: flagged posting; the reasons show on hover and to screen readers. */
+function InjectionBadge({ reasons }: { reasons: string }) {
+  return (
+    <span className={styles.flag} title={`Possible prompt injection: ${reasons}`}>
+      <TriangleAlert size={14} strokeWidth={1.7} aria-hidden="true" />
+      <span className="sr-only">Possible prompt injection: {reasons}</span>
+    </span>
+  );
+}

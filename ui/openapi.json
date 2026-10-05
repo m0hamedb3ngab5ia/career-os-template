@@ -4078,6 +4078,17 @@
             ],
             "title": "Found At"
           },
+          "injection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Injection"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
@@ -4136,6 +4147,17 @@
               }
             ],
             "title": "Safety"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
           },
           "status": {
             "anyOf": [
@@ -4211,6 +4233,8 @@
           "applied_at",
           "updated_at",
           "closes_at",
+          "selected",
+          "injection",
           "next_action"
         ],
         "title": "JobListItem",
@@ -4295,6 +4319,17 @@
             ],
             "title": "Found At"
           },
+          "injection": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Injection"
+          },
           "job_id": {
             "title": "Job Id",
             "type": "string"
@@ -4342,6 +4377,17 @@
               }
             ],
             "title": "Safety"
+          },
+          "selected": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Selected"
           },
           "status": {
             "anyOf": [
@@ -4416,7 +4462,9 @@
           "found_at",
           "applied_at",
           "updated_at",
-          "closes_at"
+          "closes_at",
+          "selected",
+          "injection"
         ],
         "title": "JobRow",
         "type": "object"
@@ -11158,6 +11206,51 @@
           }
         },
         "summary": "Edit Fill Field",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/{job_id}/injection/clear": {
+      "post": {
+        "description": "REQ-109 \"I checked it\": the user read a flagged posting; prepare/apply are allowed again.",
+        "operationId": "clear_injection_api_jobs__job_id__injection_clear_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "job_id",
+            "required": true,
+            "schema": {
+              "title": "Job Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "title": "Response Clear Injection Api Jobs  Job Id  Injection Clear Post",
+                  "type": "object"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Clear Injection",
         "tags": [
           "jobs"
         ]

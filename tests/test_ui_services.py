@@ -224,6 +224,8 @@ def test_tabs_and_export_honour_column_filters(idx):
     import io
     wb = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, tab="all", ranges={"fit": (85, None)})))
     assert wb["Jobs"].max_row == 4
+    ws = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, tab="all", columns=["selected"])))["Jobs"]
+    assert ws["B1"].value == "Pipeline" and {c.value for c in ws["B"][1:]} <= {"yes", "no"}
 
 
 def test_jobs_list_sorts(idx):

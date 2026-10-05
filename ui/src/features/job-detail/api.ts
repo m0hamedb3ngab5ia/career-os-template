@@ -60,6 +60,7 @@ export const useVerifyCompany = (id: string) =>
   useJobWrite<{ risk: string; signals: string[]; evidence?: string[]; domain?: string }, unknown>(id, "safety/verify");
 export const useFlagCompany = (id: string) =>
   useJobWrite<{ reason?: string; confidence: string; evidence?: string[]; notes?: string }, unknown>(id, "safety/flag");
+export const useClearInjection = (id: string) => useJobWrite<undefined, unknown>(id, "injection/clear");
 export const useClearFlag = (id: string) => useJobWrite<{ note?: string }, unknown>(id, "safety/clear");
 
 export function errorText(e: unknown): string {

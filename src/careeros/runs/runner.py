@@ -382,8 +382,9 @@ class _Loop:
             from careeros import check, match
             try:
                 if check.holds_save(self.s, self.store.job_dir(jid)):  # REQ-116: saved on keep, never on discard
-                    raise check.Refused("below the threshold, waiting for keep/discard")  # DEC-008: later jobs of the category reuse it; never lose the attempt record over it
-                match.save_tailored(self.s, self.store.job_dir(jid))
+                    self.echo("    tailored résumé held: below threshold, awaiting keep/discard")
+                else:  # DEC-008: later jobs of the category reuse it; never lose the attempt record over it
+                    match.save_tailored(self.s, self.store.job_dir(jid))
             except Exception as e:  # noqa: BLE001
                 self.echo(f"    saving tailored résumé failed ({e})")
         att = {"n": n, "run_id": self.run["id"], "job_id": jid, "company": item.get("company"),

@@ -533,6 +533,27 @@ def test_jobs_select_endpoint_sets_flag(client, data):
     assert all(store.is_selected(j) for j in ids)
 
 
+
+def test_jobs_list_shows_selected_and_injection_and_clear(client, data):
+    """REQ-104/109: list rows carry `selected` + uncleared injection reasons; POST injection/clear = "I checked it"."""
+    from careeros.store import Store
+
+    store = Store(data["settings"])
+    h = {"x-careeros": "1"}
+    jid = sorted(store.iter_job_ids())[0]
+    assert client.post(f"/api/jobs/{jid}/injection/clear", headers=h).status_code == 409  # not flagged
+    store._write(jid, "flags.json", {"injection_suspected": True, "injection_reasons": ["hidden text"]})
+    client.post("/api/jobs/select", headers=h, json={"ids": [jid], "selected": False})
+    row = next(r for r in client.get("/api/jobs?tab=all").json()["items"] if r["job_id"] == jid)
+    assert (row["selected"], row["injection"]) == (0, "hidden text")
+    r = client.post(f"/api/jobs/{jid}/injection/clear", headers=h)
+    assert r.status_code == 200, r.text
+    flags = store.load_flags(jid)
+    assert flags["injection_cleared_at"] and flags["injection_cleared_via"] == "ui"
+    assert client.post("/api/jobs/nope/injection/clear", headers=h).status_code == 404
+    row = next(r for r in client.get("/api/jobs?tab=all").json()["items"] if r["job_id"] == jid)
+    assert row["injection"] is None
+
 def _write_plan(data, jid):
     from careeros.store import Store
 
