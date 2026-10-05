@@ -317,3 +317,28 @@ def test_batch_run_busy_exits_6(settings, monkeypatch):
     monkeypatch.setattr(cli, "_settings", lambda a: settings)
     args = cli.build_parser().parse_args(["batch", "run", "b1"])
     assert args.fn(args) == 6
+
+
+def test_driver_stops_each_job_at_its_own_stop(settings):
+    s = Store(settings)
+    a, b = put(s, add_job(s, 1), "scored", tier="B"), put(s, add_job(s, 2, company="Other"), "scored", tier="B")
+    bt = batches.create(settings, [a, b], "score", now=NOW, stops={b: "prepare"})
+    run = fake_run([])
+    batches.drive(settings, bt["id"], run=run)
+    assert [(k, ids) for k, ids, _ in run.calls] == [("prepare", [b])]
+
+
+def test_e2e_013_02_tier_a_submit_never_submits(settings):
+    """E2E-013-02 (driver half): stops {tierA: submit} -> never submitted, the reason saved in the batch file."""
+    allow_submit(settings)
+    settings.pipeline["runs"]["auto_submit"]["allow"] = ["tier_a", "tier_b"]
+    s = Store(settings)
+    a = put(s, add_job(s, 1), "prepared", tier="A", qa=True)
+    bt = batches.create(settings, [a], "prepare", now=NOW, stops={a: "submit"})
+    run = fake_run([])
+    out = batches.drive(settings, bt["id"], run=run)
+    assert [k for k, _, _ in run.calls] == ["apply"]
+    assert run.calls[0][2].raw["auto_submit"]["enabled"] is False
+    saved = batches.load(settings, bt["id"])["selected"][0]
+    assert saved["auto_submit"] is False and "tier_a" in saved["submit_reason"] and "tier_a" in saved["cap"]
+    assert out["selected"][0]["stop_at"] == "fill"

@@ -763,6 +763,10 @@ export interface components {
       status?: string | null;
       /** Stop At */
       stop_at: string;
+      /** Stops */
+      stops?: {
+        [key: string]: string;
+      } | null;
       /** Updated At */
       updated_at?: string | null;
     };
@@ -770,6 +774,8 @@ export interface components {
     BatchJob: {
       /** Auto Submit */
       auto_submit: boolean;
+      /** Cap */
+      cap?: string | null;
       /** Company */
       company: string;
       /** Fit */
@@ -792,6 +798,8 @@ export interface components {
       state?: string | null;
       /** Status */
       status: string;
+      /** Stop At */
+      stop_at?: string | null;
       /** Submit Reason */
       submit_reason: string;
       /** Title */
@@ -1078,6 +1086,10 @@ export interface components {
        * @enum {string}
        */
       stop_at: "score" | "prepare" | "fill" | "submit";
+      /** Stops */
+      stops?: ({
+        [key: string]: "score" | "prepare" | "fill" | "submit";
+      }) | null;
     };
     /** CurrentRun */
     CurrentRun: {

@@ -931,6 +931,20 @@
             "title": "Stop At",
             "type": "string"
           },
+          "stops": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stops"
+          },
           "updated_at": {
             "anyOf": [
               {
@@ -958,6 +972,17 @@
           "auto_submit": {
             "title": "Auto Submit",
             "type": "boolean"
+          },
+          "cap": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cap"
           },
           "company": {
             "title": "Company",
@@ -1033,6 +1058,17 @@
           "status": {
             "title": "Status",
             "type": "string"
+          },
+          "stop_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stop At"
           },
           "submit_reason": {
             "title": "Submit Reason",
@@ -2033,6 +2069,26 @@
             ],
             "title": "Stop At",
             "type": "string"
+          },
+          "stops": {
+            "anyOf": [
+              {
+                "additionalProperties": {
+                  "enum": [
+                    "score",
+                    "prepare",
+                    "fill",
+                    "submit"
+                  ],
+                  "type": "string"
+                },
+                "type": "object"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Stops"
           }
         },
         "required": [

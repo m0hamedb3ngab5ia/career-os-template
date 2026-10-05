@@ -1565,7 +1565,11 @@ def cmd_batch_create(args: argparse.Namespace) -> int:
     from careeros.runs import batches
 
     try:
-        b = batches.create(_settings(args), args.job_ids, args.stop_at, name=args.name, dry_run=args.dry_run)
+        stops = dict(js.split("=", 1) for js in args.job_stop or [] if "=" in js)
+        if len(stops) != len(args.job_stop or []):
+            raise ValueError("--job-stop takes JOB_ID=STAGE")
+        b = batches.create(_settings(args), args.job_ids, args.stop_at, name=args.name, dry_run=args.dry_run,
+                           stops=stops)
     except ValueError as e:
         print(f"batch: {e}", file=sys.stderr)
         return 2
@@ -1628,7 +1632,8 @@ def _print_batch(b: dict, as_json: bool) -> int:
     for r in b["selected"]:
         sub = "auto-submit" if r["auto_submit"] else "no submit"
         state = f"  [{r['state']}: {r.get('reason') or ''}]" if r.get("state") not in (None, "pending") else ""
-        print(f"  {r['rank']:>3}. {r['job_id']}  {'>'.join(r['stages'])}  {sub}  {r['why']}{state}")
+        cap = f"  (capped: {r['cap']})" if r.get("cap") else ""
+        print(f"  {r['rank']:>3}. {r['job_id']}  {'>'.join(r['stages'])}  {sub}  {r['why']}{cap}{state}")
     for e in b["excluded"]:
         print(f"   -  {e['job_id']}  {e['reason']}")
     return 0
@@ -2166,6 +2171,8 @@ def build_parser() -> argparse.ArgumentParser:
     bc = bats.add_parser("create", help="preview (--dry-run) or save a batch (exit 2 = no job can run)")
     bc.add_argument("job_ids", nargs="+")
     bc.add_argument("--stop-at", required=True, choices=["score", "prepare", "fill", "submit"])
+    bc.add_argument("--job-stop", action="append", metavar="JOB_ID=STAGE",
+                    help="this job's own stop point (repeatable); Tier A / LinkedIn / readiness caps still apply")
     bc.add_argument("--name")
     bc.add_argument("--dry-run", action="store_true")
     bc.add_argument("--json", action="store_true")

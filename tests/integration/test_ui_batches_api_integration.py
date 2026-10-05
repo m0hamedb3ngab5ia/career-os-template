@@ -168,3 +168,36 @@ def test_cli_batch_cancel_and_run(data, tmp_path):
     out = subprocess.run([PY, "-m", "careeros.cli", "--root", root, "batch", "run", b["id"], "--json"],
                          capture_output=True, text=True, env=env, timeout=60, cwd=root)
     assert out.returncode == 0 and json.loads(out.stdout)["status"] == "cancelled"  # nothing left to run
+
+
+def test_e2e_013_02_api_stops_are_capped_server_side(client, data):
+    """E2E-013-02: POST /api/batches with stops {tierA: submit} -> Tier A never submitted, reason in batch file."""
+    ids = data["jobs"]
+    body = {"job_ids": [ids["found"], ids["review"]], "stop_at": "score",
+            "stops": {ids["review"]: "submit", ids["found"]: "prepare"}}
+    r = client.post("/api/batches", json=body, headers=W)
+    assert r.status_code == 200, r.text
+    saved = batches.load(data["settings"], r.json()["id"])
+    assert saved["stops"] == body["stops"]
+    rows = {x["job_id"]: x for x in saved["selected"]}
+    assert rows[ids["found"]]["stop_at"] == "prepare"
+    tier_a = rows.get(ids["review"]) or {x["job_id"]: x for x in saved["excluded"]}[ids["review"]]
+    assert "tier_a" in (tier_a.get("cap") or tier_a.get("reason"))
+    assert not tier_a.get("auto_submit")
+    assert client.post("/api/batches", json={**body, "stops": {ids["found"]: "mass"}}, headers=W).status_code == 422
+
+
+def test_cli_job_stop(data, tmp_path):
+    root, jid = data["settings"].root, data["jobs"]["found"]
+    env = subprocess_env(root, tmp_path / "home")
+
+    def cli(*args):
+        return subprocess.run([PY, "-m", "careeros.cli", "--root", str(root), "batch", "create", "--stop-at",
+                               "score", "--dry-run", *args, jid], capture_output=True, text=True, env=env,
+                              timeout=60, cwd=root)
+
+    ok = cli("--json", "--job-stop", f"{jid}=prepare")
+    assert ok.returncode == 0, ok.stderr
+    assert json.loads(ok.stdout)["selected"][0]["stages"] == ["score", "prepare"]
+    bad = cli("--job-stop", "nope")
+    assert bad.returncode == 2 and "JOB_ID=STAGE" in bad.stderr

@@ -3,7 +3,7 @@
 The model and preview: which jobs can go, from which stage, in which order, and why the others cannot. The
 driver (`drive`, `careeros batch run <id>`) works the queue: one `run_batch(kind, job_ids=[id])` per job and
 stage, each under the global runner lock, and maps each outcome to a job state. Hard rules, not configurable:
-Tier A is never auto-submitted, LinkedIn is never automated (excluded from fill/submit, re-checked before each
+Tier A is never auto-submitted, LinkedIn Easy Apply is never automated (capped at prepare, re-checked before each
 apply run), apply is one job per run, and a batch may only narrow `runs.auto_submit` (the verdict is re-run right
 before each apply run; a no turns auto-submit off for that run only).
 Single writer: batch status and job states are written only by whoever holds `<id>.lock` (the driver while it
@@ -19,12 +19,15 @@ from dataclasses import replace
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
+from careeros import readiness
 from careeros.config import Settings
 from careeros.readiness import NotReady
 from careeros.runs import locks
 from careeros.runs.config import Budget, RunsConfig, load_runs_config
 from careeros.runs.failures import JOB_FAILURES, Failures
+from careeros.runs.policy import is_tier_a
 from careeros.runs.runner import JobNotRunnable, RunBusy, auto_submit_verdict, new_run_id, select_candidates
 from careeros.runs.store import RunStore, _dump, _load, iso, runs_dir_for
 from careeros.store import Store
@@ -48,33 +51,88 @@ def _dir(settings: Settings) -> Path:
 
 
 def is_linkedin(posting: dict[str, Any]) -> bool:
-    urls = f"{posting.get('url') or ''} {posting.get('apply_url') or ''}".lower()
-    return str(posting.get("ats") or "").lower() == "linkedin" or "linkedin.com" in urls
+    """LinkedIn Easy Apply: keyed on the apply URL host (REQ-118), not the board the job was found on."""
+    host = urlparse(str(posting.get("apply_url") or posting.get("url") or "")).hostname or ""
+    return host == "linkedin.com" or host.endswith(".linkedin.com")
 
 
-def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime | None = None) -> dict[str, Any]:
+def _cap(settings: Settings, store: Store, jid: str, stop: str, ready) -> tuple[str, str | None]:
+    """(stop, why lowered) — the server-side caps on a requested stop point, never trusted from the client."""
+    if stop not in ("fill", "submit"):
+        return stop, None
+    if is_linkedin(store._read(jid, "posting.json") or {}):
+        return "prepare", "LinkedIn: apply yourself on LinkedIn"
+    if not ready():
+        return "prepare", "setup not finished (readiness must-haves open): stops at prepare"
+    if stop == "submit" and is_tier_a((store._read(jid, "score.json") or {}).get("tier")):
+        return "fill", "tier_a: never auto-submitted, stops at fill"
+    return stop, None
+
+
+def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime | None = None,
+            stops: dict[str, str] | None = None) -> dict[str, Any]:
     """{stop_at, kind, selected, excluded}. Each selected job starts at the first stage it is eligible for and
-    runs every later stage up to the stop point (`stages`); excluded jobs carry the reason.
+    runs every later stage up to its stop point (`stops[job_id]`, else `stop_at`), lowered by the caps
+    (`_cap`: LinkedIn, readiness, Tier A; flagged postings are excluded by `select_candidates`); excluded jobs
+    carry the reason.
 
     `auto_submit` is only a provisional verdict, computed for jobs already at the apply stage; earlier-stage jobs
     have no score/safety files yet, so they get False ("decided at apply"). The driver MUST re-run
     `auto_submit_verdict` and the LinkedIn check right before each apply run and never trust the saved flag."""
-    if stop_at not in STOP_POINTS:
-        raise ValueError(f"stop_at must be one of {', '.join(STOP_POINTS)}")
+    stops = dict(stops or {})
+    for st in (stop_at, *stops.values()):
+        if st not in STOP_POINTS:
+            raise ValueError(f"stop_at must be one of {', '.join(STOP_POINTS)}")
     ids = list(dict.fromkeys(job_ids or []))
     if not ids:
         raise ValueError("pick at least one job")
     if len(ids) > MAX_JOBS:
         raise ValueError(f"at most {MAX_JOBS} jobs per batch")
+    if extra := sorted(set(stops) - set(ids)):
+        raise ValueError(f"stops for jobs not picked: {', '.join(extra[:5])}")
     now = now or datetime.now(timezone.utc)
-    kinds = STOP_POINTS[stop_at]
     store, cfg = Store(settings), load_runs_config(settings)
+    ready_memo: list[bool] = []
+
+    def ready() -> bool:
+        if not ready_memo:
+            ready_memo.append(readiness.status(settings.root)["ready"])
+        return ready_memo[0]
+
+    want, caps = {}, {}
+    for jid in ids:
+        want[jid], why = _cap(settings, store, jid, stops.get(jid, stop_at), ready)
+        if why:
+            caps[jid] = why
+    selected: list[dict[str, Any]] = []
     excluded: dict[str, str] = {}
-    if "apply" in kinds:  # LinkedIn is never automated: the candidate applies there by hand
-        for jid in ids:
-            if is_linkedin(store._read(jid, "posting.json") or {}):
-                excluded[jid] = "LinkedIn: apply yourself on LinkedIn"
-    remaining = [j for j in ids if j not in excluded]
+    for stop in STOP_POINTS:  # one pass per stop point, as many as the jobs ask for
+        group = [j for j in ids if want[j] == stop]
+        sel, out = _select(settings, store, cfg, now, group, stop)
+        selected += [{**r, "stop_at": stop, **({"cap": caps[r["job_id"]]} if r["job_id"] in caps else {})}
+                     for r in sel]
+        excluded |= {j: f"{caps[j]} ({why})" if j in caps else why for j, why in out.items()}
+    # ponytail: stage scores differ in weights (fit counts only for prepare); one merged sort is good enough
+    selected.sort(key=lambda r: (-r["score"], r["job_id"]))
+    for n, r in enumerate(selected, 1):
+        r["rank"] = n
+        if r["stop_at"] != "submit":
+            ok, why = False, r.get("cap") or f"stop point {r['stop_at']}: never submits"
+        elif r["stage"] != "apply":
+            ok, why = False, "decided at apply"
+        else:
+            ok, why = auto_submit_verdict(settings, store, cfg, r)
+        r["auto_submit"], r["submit_reason"] = ok, why
+    return {"stop_at": stop_at, **({"stops": stops} if stops else {}), "kind": STOP_POINTS[stop_at][-1],
+            "selected": selected, "excluded": [{"job_id": j, "reason": excluded[j]} for j in ids if j in excluded]}
+
+
+def _select(settings: Settings, store: Store, cfg: RunsConfig, now: datetime, ids: list[str],
+            stop_at: str) -> tuple[list[dict[str, Any]], dict[str, str]]:
+    """(selected rows, {job_id: reason excluded}) for jobs that all stop at `stop_at`."""
+    kinds = STOP_POINTS[stop_at]
+    excluded: dict[str, str] = {}
+    remaining = list(ids)
     selected: list[dict[str, Any]] = []
     for i, kind in enumerate(kinds):
         if not remaining:
@@ -87,20 +145,9 @@ def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime 
                 excluded[e["job_id"]] = e["reason"]
         done = {r["job_id"] for r in ranked}
         remaining = [j for j in remaining if j not in done and not _hard(excluded.get(j, ""))]
-    # ponytail: stage scores differ in weights (fit counts only for prepare); one merged sort is good enough
-    selected.sort(key=lambda r: (-r["score"], r["job_id"]))
-    for n, r in enumerate(selected, 1):
-        r["rank"] = n
+    for r in selected:
         excluded.pop(r["job_id"], None)
-        if stop_at != "submit":
-            ok, why = False, f"stop point {stop_at}: never submits"
-        elif r["stage"] != "apply":
-            ok, why = False, "decided at apply"
-        else:
-            ok, why = auto_submit_verdict(settings, store, cfg, r)
-        r["auto_submit"], r["submit_reason"] = ok, why
-    return {"stop_at": stop_at, "kind": kinds[-1], "selected": selected,
-            "excluded": [{"job_id": j, "reason": excluded[j]} for j in ids if j in excluded]}
+    return selected, excluded
 
 
 def job_runs(batch: dict[str, Any]) -> list[dict[str, Any]]:
@@ -112,12 +159,12 @@ def job_runs(batch: dict[str, Any]) -> list[dict[str, Any]]:
 
 
 def create(settings: Settings, job_ids: list[str], stop_at: str, name: str | None = None, dry_run: bool = False,
-           now: datetime | None = None) -> dict[str, Any]:
+           now: datetime | None = None, stops: dict[str, str] | None = None) -> dict[str, Any]:
     """The preview (dry run), or a saved batch in status `queued` (ValueError when no job can run).
 
     The driver must hold the runner lock while working a batch, and be the single writer of batch status."""
     now = now or datetime.now(timezone.utc)
-    out = preview(settings, job_ids, stop_at, now)
+    out = preview(settings, job_ids, stop_at, now, stops)
     if dry_run:
         return {**out, "dry_run": True}
     if not out["selected"]:
@@ -241,8 +288,9 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
                 if is_linkedin(store._read(jid, "posting.json") or {}):
                     r["state"], r["reason"] = "needs_you", "LinkedIn: apply yourself on LinkedIn"
                     return None
-                ok, why = (auto_submit_verdict(settings, store, cfg, r) if b["stop_at"] == "submit"
-                           else (False, f"stop point {b['stop_at']}: never submits"))
+                at = r.get("stop_at") or b["stop_at"]  # per-job stop (REQ-118); old batches: the batch's
+                ok, why = (auto_submit_verdict(settings, store, cfg, r) if at == "submit"
+                           else (False, r.get("cap") or f"stop point {at}: never submits"))
                 r["auto_submit"], r["submit_reason"] = ok, why
                 if not ok:
                     c = _no_submit(cfg)
