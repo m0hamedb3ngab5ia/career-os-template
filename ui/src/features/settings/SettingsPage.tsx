@@ -24,6 +24,8 @@ import { TierCards } from "./custom/TierCards";
 import { SettingsFormProvider } from "./form";
 import { GroupCard } from "./GroupCard";
 import { SaveBar } from "./SaveBar";
+import { startTour } from "../../app/Tour";
+import { Button } from "../../kit/Button";
 import styles from "./settings.module.css";
 import { StorageOverview } from "./storage/StorageOverview";
 import type { GroupSchema, SectionData, SectionSummary } from "./types";
@@ -96,6 +98,9 @@ function SectionNav({ current }: { current: string }) {
           <NavList sections={advanced} current={current} />
         </Details>
       ) : null}
+      <Button size="small" onClick={startTour}>
+        How to use
+      </Button>
     </nav>
   );
 }
