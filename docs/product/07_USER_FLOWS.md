@@ -43,12 +43,12 @@ flowchart TD
   D -- no --> E
   D1 --> E[fit score + résumé match table]
   E --> F{best ≥ threshold?}
-  F -- yes --> G[Use this résumé → job ready to tick]
-  F -- no --> H[Tailor from master? one run]
-  H -- no --> Z[keep job, no résumé chosen]
-  H -- yes --> I{attempt ≥ threshold?}
-  I -- yes --> G
-  I -- no --> J[notice best X / needed Y + missing] --> K{Create closest anyway?}
+  F -- yes --> P[Prepare application: tick job + prepare run]
+  F -- no --> P
+  E --> X[Cancel: job kept, not ticked]
+  P --> I{below threshold after tailor?}
+  I -- no --> G[job ready]
+  I -- yes --> J[notice best X / needed Y + missing] --> K{Create closest anyway?}
   K -- yes --> L[keep attempt, below_threshold]
   K -- no --> M[discard attempt]
 ```

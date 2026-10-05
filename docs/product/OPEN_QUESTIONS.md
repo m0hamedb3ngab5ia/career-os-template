@@ -49,6 +49,7 @@
 - Evidence: TODO.md:52 move xlsx → data/action_items.json
 - Default (recommended): approve the move as a requirement change (next Feature lane).
 - Answer (2026-10-04): move to data/action_items.json; xlsx kept as synced backup.
+- Answer (2026-10-05): json is the source of truth, atomic write like status.json; xlsx is a one-way synced view (json → xlsx only, never edited in Excel). → REQ-123, TASK-026 (not built).
 - Status: answered
 
 ### Q-009 Résumé file types and size
@@ -124,4 +125,14 @@
 - Context: Settings has no header primary action; its sticky SaveBar (Save changes) is the page's primary action. Kit is an internal component showcase, not in nav, with no primary action.
 - Default (recommended): Settings counts its SaveBar as the primary action; Kit is exempt from REQ-119's primary-action rule (guidance line still required).
 - Answer (2026-10-04): both fine as they are — Settings SaveBar counts as primary action; Kit (/kit, internal component gallery) exempt.
+- Status: answered
+
+### Q-021 Next-step card while a batch runs (#142)
+- Links: REQ-122, TASK-020
+- Answer (2026-10-05): while a batch runs the card keeps "See progress" (current behaviour).
+- Status: answered
+
+### Q-022 Meaning of "ticked" in Start pipeline review (#144)
+- Links: REQ-117, REQ-104, TASK-017
+- Answer (2026-10-05): "ticked" = rows selected in the Jobs table, not the persisted REQ-104 pick.
 - Status: answered
