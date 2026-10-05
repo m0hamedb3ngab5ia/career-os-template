@@ -29,7 +29,7 @@ def pick(items: list[dict[str, Any]], *, jobs: int, ticked: int, running_batch: 
         return NextStep(key="pick_jobs", label="Pick jobs", href="/jobs")
     if running_batch:
         return NextStep(key="see_progress", label="See progress", href=f"/pipeline/batch/{quote(running_batch, safe='')}")
-    return NextStep(key="start_pipeline", label="Start pipeline", href="/pipeline/batch/new")
+    return NextStep(key="start_pipeline", label="Start pipeline", href="/jobs")
 
 
 @router.get("/next-step")

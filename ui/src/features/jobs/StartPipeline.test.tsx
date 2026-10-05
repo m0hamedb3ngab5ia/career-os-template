@@ -105,6 +105,65 @@ describe("Start pipeline (REQ-117)", () => {
     expect(api.callsTo("POST /api/batches/b-1/start")).toHaveLength(1);
   });
 
+  it("review header checkbox unticks only the shown rows; review stays open for the rest", async () => {
+    const { router } = setup("/jobs?sel=pl,ta,zz");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
+    const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await user.click(within(sheet).getAllByRole("checkbox")[0]!);
+    await waitFor(() => expect(router.state.location.search).toMatch(/sel=zz(&|$)/), opts);
+    expect(screen.getByRole("region", { name: "Review pipeline" })).toBeInTheDocument();
+  });
+
+  it("unticking every job closes the review; ticking again doesn't reopen it; Back refocuses Start pipeline", async () => {
+    setup("/jobs?sel=pl");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
+    let sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await user.click(within(sheet).getAllByRole("checkbox")[0]!);
+    await waitFor(() => expect(screen.queryByRole("region", { name: "Review pipeline" })).not.toBeInTheDocument(), opts);
+    const row = (await screen.findByRole("rowheader", { name: "Plainco" }, opts)).closest("tr")!;
+    await user.click(within(row).getAllByRole("checkbox")[0]!);
+    await screen.findByRole("button", { name: "Start pipeline" }, opts);
+    expect(screen.queryByRole("region", { name: "Review pipeline" })).not.toBeInTheDocument();
+    await user.click(screen.getByRole("button", { name: "Start pipeline" }));
+    sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await user.click(within(sheet).getByRole("button", { name: "Back" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Start pipeline" })).toHaveFocus(), opts);
+  });
+
+  it("Start says why it can't start when every ticked job is excluded", async () => {
+    setup("/jobs?sel=fl");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
+    const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await waitFor(() => expect(within(sheet).getByRole("button", { name: "Start" })).toHaveAccessibleDescription("Every ticked job is excluded"), opts);
+  });
+
+  it("filters the review rows from a column menu, with a removable chip (REQ-120)", async () => {
+    setup("/jobs?sel=pl,ta,li");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
+    const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await user.click(within(sheet).getByRole("button", { name: "Filter Tier" }));
+    const menu = await screen.findByRole("dialog", { name: "Filter Tier" }, opts);
+    await user.click(within(menu).getByRole("checkbox", { name: /^A/ }));
+    await user.click(within(menu).getByRole("button", { name: "Apply" }));
+    await waitFor(() => expect(within(sheet).queryByRole("rowheader", { name: "Plainco" })).not.toBeInTheDocument(), opts);
+    expect(within(sheet).getByRole("rowheader", { name: "Topco" })).toBeInTheDocument();
+    await user.click(within(sheet).getByRole("button", { name: "Remove filter Tier" }));
+    expect(await within(sheet).findByRole("rowheader", { name: "Plainco" }, {}, opts)).toBeInTheDocument();
+  });
+
+  it("Tier A row's default reads Fill when all go to Submit", async () => {
+    setup("/jobs?sel=ta");
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
+    const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
+    await user.click(within(sheet).getByRole("radio", { name: /Submit/ }));
+    expect(within(sheet).getByRole("option", { name: "Same as all (Fill)" })).toBeInTheDocument();
+  });
+
   it("readiness cap links to Profile", async () => {
     notReady = true;
     setup("/jobs?sel=pl");

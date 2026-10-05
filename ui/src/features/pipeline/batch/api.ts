@@ -22,21 +22,22 @@ export function useBatchPreview(jobIds: string[], stopAt: StopAt, stops?: Stops)
   });
 }
 
-/** Save the batch once, then start its driver. A failed start keeps the saved id (`savedId`): retrying only calls
- *  /start, so it never saves a duplicate batch. */
+/** Save the batch once, then start its driver. A failed start keeps the saved id: retrying the same choices only
+ *  calls /start, so it never saves a duplicate; changed choices save a new batch, so the retry runs what you see. */
 export function useStartBatch() {
-  const [savedId, setSavedId] = useState<string | null>(null);
+  const [saved, setSaved] = useState<{ key: string; id: string } | null>(null);
   const m = useMutation({
     mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name?: string; stops?: Stops }) => {
-      let id = savedId;
+      const key = JSON.stringify(v);
+      let id = saved?.key === key ? saved.id : null;
       if (!id) {
         id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name, stops: v.stops })).id!;
-        setSavedId(id);
+        setSaved({ key, id });
       }
       return apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/start`);
     },
   });
-  return { ...m, savedId };
+  return { ...m, savedId: saved?.id ?? null };
 }
 
 /** One saved batch; the SSE `changed` event (batches: [ids]) invalidates ["batch", id]. */
