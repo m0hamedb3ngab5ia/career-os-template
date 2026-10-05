@@ -238,3 +238,23 @@ def test_resume_pick_cli_unscored_falls_back_to_tailor(root, env):
     r = cli(root, env, "resume", "pick", jid, "--json")
     assert r.returncode == 0, r.stderr
     assert json.loads(r.stdout)["action"] == "tailor"
+
+
+def test_resume_pick_cli_forced_reuse_drops_a_stale_tailored_pdf(root, env):
+    import shutil
+
+    from careeros import resumes
+
+    shutil.rmtree(root / "profile" / "resumes")
+    rid = resumes.add(root, "cv.pdf", b"%PDF-1.4\nx\n", name="backend")["rid"]
+    resumes.add_text(root, rid, "Python APIs backend software engineer", author="user", source="edit")  # no PDF
+    jid = add_job(root, 1)
+    jd = root / "data" / "jobs" / jid
+    sp = jd / "score.json"
+    sp.write_text(json.dumps({**json.loads(sp.read_text()), "required_skills": ["Python", "APIs"]}))
+    (jd / "resume.pdf").write_bytes(b"%PDF stale tailored")
+    r = cli(root, env, "resume", "pick", jid, "--json")
+    assert r.returncode == 0, r.stderr
+    c = json.loads(r.stdout)
+    assert c["action"] == "reuse" and c["text_sha256"]
+    assert not (jd / "resume.pdf").exists()

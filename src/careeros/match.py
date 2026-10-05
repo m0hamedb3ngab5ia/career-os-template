@@ -111,23 +111,36 @@ def tweak_estimate(text: str, required: list[str], preferred: list[str], title: 
     return best, ids
 
 
-def _link(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> None:
-    """Reuse: the chosen version becomes the job's résumé (resume.txt + resume.json, resume.pdf when known)."""
+def _vdir(settings: Any, rid: str, n: int) -> Path:
+    return resumes._dir(settings.root, rid) / f"v{n}"
+
+
+def _sha(text: str) -> str:
+    import hashlib
+
+    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+
+
+def _link(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> str:
+    """Reuse: the chosen version becomes the job's résumé (resume.txt + resume.json, resume.pdf when known).
+    Copies only from the version's own dir (ARCHITECTURE: tailored versions snapshot resume.json/pdf). A stale job
+    resume.pdf/tex is removed when the version has no PDF. Returns sha256 of the written resume.txt (DEC-007)."""
     import shutil
 
-    (job_dir / "resume.txt").write_text(v["text"].rstrip() + "\n", encoding="utf-8")
-    src = str(v.get("source") or "")
-    from_job = settings.root / "data" / "jobs" / src[4:] if src.startswith("job:") else None
-    if from_job and (from_job / "resume.json").exists():  # AI-tailored earlier: full QA needs its bullet ids
-        for f in ("resume.json", "resume.pdf"):
-            if (from_job / f).exists():
-                shutil.copyfile(from_job / f, job_dir / f)
-        return
-    (job_dir / "resume.json").write_text(json.dumps(
-        {"reused": {"rid": rid, "version": v["n"], "author": v.get("author")}}, indent=2) + "\n", encoding="utf-8")
-    pdf = resumes._dir(settings.root, rid) / f"v{v['n']}" / "original.pdf"
-    if pdf.exists():
+    text = v["text"].rstrip() + "\n"
+    (job_dir / "resume.txt").write_text(text, encoding="utf-8")
+    for f in ("resume.pdf", "resume.tex"):
+        (job_dir / f).unlink(missing_ok=True)
+    vd = _vdir(settings, rid, v["n"])
+    if (vd / "resume.json").exists():  # AI-tailored earlier: full QA needs its bullet ids
+        shutil.copyfile(vd / "resume.json", job_dir / "resume.json")
+    else:
+        (job_dir / "resume.json").write_text(json.dumps(
+            {"reused": {"rid": rid, "version": v["n"], "author": v.get("author")}}, indent=2) + "\n", encoding="utf-8")
+    pdf = next((p for p in (vd / "resume.pdf", vd / "original.pdf") if p.exists()), None)
+    if pdf:
         shutil.copyfile(pdf, job_dir / "resume.pdf")
+    return _sha(text)
 
 
 def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str, Any]:
@@ -146,7 +159,7 @@ def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str
         c.update(rid=b["rid"], version=b["version"], name=b["name"], author=v.get("author"), score=b["score"])
         if b["score"] >= thr:
             c.update(action="reuse", reason=f"best résumé {b['name']!r} scores {b['score']} >= {thr}")
-            _link(settings, job_dir, b["rid"], v)
+            c["text_sha256"] = _link(settings, job_dir, b["rid"], v)
         else:
             sc, posting = _json(job_dir / "score.json"), _json(job_dir / "posting.json")
             gain_min = int((settings.targets.get("thresholds") or {}).get("min_tweak_gain", DEFAULT_MIN_TWEAK_GAIN))
@@ -156,7 +169,11 @@ def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str
                                       (settings.pipeline.get("match") or {}).get("synonyms") or {},
                                       _master_bullets(settings))
             c["estimate"] = est
-            if ids and est - b["score"] >= gain_min and est >= thr:
+            has_ids = (_vdir(settings, b["rid"], b["version"]) / "resume.json").exists()  # user-authored: no ids
+            if not has_ids:
+                c.update(action="tailor", reason=f"best {b['score']} < {thr}; {b['name']!r} has no bullet ids "
+                                                 "(user-authored), so no tweak base: full tailor")
+            elif ids and est - b["score"] >= gain_min and est >= thr:
                 c.update(action="tweak", add_bullet_ids=ids,
                          reason=f"best {b['score']} < {thr}; adding {len(ids)} master bullet(s) reaches {est}")
             else:
@@ -172,4 +189,5 @@ def save_tailored(settings: Any, job_dir: Path) -> dict[str, Any] | None:
     if c.get("action") not in ("tweak", "tailor") or not txt.exists():
         return None
     return resumes.add_tailored(settings.root, txt.read_text(encoding="utf-8"),
-                                category=_json(job_dir / "score.json").get("category"), source=f"job:{job_dir.name}")
+                                category=_json(job_dir / "score.json").get("category"), source=f"job:{job_dir.name}",
+                                files={f: job_dir / f for f in ("resume.json", "resume.pdf")})

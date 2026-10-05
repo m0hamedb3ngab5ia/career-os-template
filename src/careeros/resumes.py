@@ -2,6 +2,7 @@
 
 profile/resumes/<rid>/meta.json  {rid, name, type, category, versions: [{n, author, source, at}]}
 profile/resumes/<rid>/v<n>/      original.<ext>, text.txt, ats.json (careeros.extract)
+                                  [+ resume.json, resume.pdf: snapshot of a tailored version's job files]
 Exactly one résumé is `master` (the first upload; marking another demotes the old one to `variant`).
 """
 from __future__ import annotations
@@ -130,23 +131,34 @@ def add(root: Path, filename: str, data: bytes, *, name: str | None = None, type
         return _update(root, rid, type=type) if type and has_master and type != meta["type"] else meta
 
 
-def add_tailored(root: Path, text: str, *, category: str | None, source: str) -> dict[str, Any]:
-    """AI tailored/tweaked résumé text as a `tailored` résumé (DEC-008) so later jobs of the category reuse it."""
+def add_tailored(root: Path, text: str, *, category: str | None, source: str,
+                 files: dict[str, Path] | None = None) -> dict[str, Any]:
+    """AI tailored/tweaked résumé text as a `tailored` résumé (DEC-008) so later jobs of the category reuse it.
+    `files` (e.g. resume.json, resume.pdf) are snapshotted into the version dir, so a later reuse never reads the
+    source job's (possibly re-prepared) files. A re-prepare of the same `source` job adds a version, not a résumé."""
     if not text.strip():
         raise ValueError("résumé text must not be empty")
-    name = f"{category or 'general'} (tailored)"
-    rid = f"{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:40]}-{secrets.token_hex(2)}"
-    d = _base(root) / rid
     with _locked(root):
-        d.mkdir(parents=True)
-        try:
-            _store(d, 1, ".txt", text.encode("utf-8"))
-            meta = {"rid": rid, "name": name, "type": "tailored", "category": category,
-                    "versions": [{"n": 1, "author": "ai", "source": source, "at": _now()}]}
-            _write(d, meta)
-        except BaseException:
-            shutil.rmtree(d, ignore_errors=True)
-            raise
+        old = next((m for m in _all(root) if m["type"] == "tailored" and m["versions"][0]["source"] == source), None)
+        if old:
+            meta = _append(root, old["rid"], ".txt", text.encode("utf-8"), "ai", source, lock=False)
+            d = _dir(root, meta["rid"])
+        else:
+            name = f"{category or 'general'} (tailored)"
+            rid = f"{re.sub(r'[^a-z0-9]+', '-', name.lower()).strip('-')[:40]}-{secrets.token_hex(2)}"
+            d = _base(root) / rid
+            d.mkdir(parents=True)
+            try:
+                _store(d, 1, ".txt", text.encode("utf-8"))
+                meta = {"rid": rid, "name": name, "type": "tailored", "category": category,
+                        "versions": [{"n": 1, "author": "ai", "source": source, "at": _now()}]}
+                _write(d, meta)
+            except BaseException:
+                shutil.rmtree(d, ignore_errors=True)
+                raise
+        for dst, src in (files or {}).items():
+            if Path(src).is_file():
+                shutil.copyfile(src, d / f"v{meta['versions'][-1]['n']}" / dst)
         return meta
 
 

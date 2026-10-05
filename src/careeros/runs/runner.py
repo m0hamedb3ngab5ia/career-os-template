@@ -380,7 +380,10 @@ class _Loop:
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
         if outcome == "ok" and self.kind == "prepare" and result and result.get("qa_pass"):
             from careeros import match
-            match.save_tailored(self.s, self.store.job_dir(jid))  # DEC-008: later jobs of the category reuse it
+            try:  # DEC-008: later jobs of the category reuse it; never lose the attempt record over it
+                match.save_tailored(self.s, self.store.job_dir(jid))
+            except Exception as e:  # noqa: BLE001
+                self.echo(f"    saving tailored résumé failed ({e})")
         att = {"n": n, "run_id": self.run["id"], "job_id": jid, "company": item.get("company"),
                "title": item.get("title"), "stage": self.kind, "rank": item.get("rank"), "why": item.get("why"),
                "session_id": res.session_id or sid, "outcome": outcome, "detail": detail, "result": result,
