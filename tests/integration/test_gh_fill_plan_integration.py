@@ -106,3 +106,31 @@ def test_apply_plan_refuses_locked_job(temp_root: Path, monkeypatch):
     assert cli_mod.main(["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json",
                          str(FIXTURES / "greenhouse" / "job_questions.json")]) == 6
     assert not (jd / "fill_plan.json").exists()
+
+
+def test_apply_plan_asks_required_unknown_once_and_keeps_edits(temp_root: Path, tmp_path: Path):
+    """REQ-106: a required unknown raises one `fill plan: <id>` question Action Item (deduped on re-run); a rebuild
+    keeps this job's edits and skips by field_id."""
+    import careeros.cli as cli_mod
+
+    jd = _gh_job(temp_root)
+    schema = tmp_path / "q.json"
+    schema.write_text(json.dumps({"questions": [
+        {"label": "What is your favourite tea?", "required": True,
+         "fields": [{"name": "question_1", "type": "input_text"}]},
+        {"label": "Favourite biscuit", "required": False, "fields": [{"name": "question_2", "type": "input_text"}]}]}))
+    args = ["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json", str(schema)]
+    assert cli_mod.main(args) == 0
+    plan = json.loads((jd / "fill_plan.json").read_text())
+    for f in plan["fields"]:
+        if f["field_id"] == "question_1":
+            f.update(value="Green", source="user", needs_review=False)
+        if f["field_id"] == "question_2":
+            f.update(skipped=True, needs_review=False)
+    (jd / "fill_plan.json").write_text(json.dumps(plan))
+    assert cli_mod.main(args) == 0
+    by = {f["field_id"]: f for f in json.loads((jd / "fill_plan.json").read_text())["fields"]}
+    assert by["question_1"]["value"] == "Green" and by["question_1"]["source"] == "user"
+    assert by["question_2"]["skipped"] is True
+    asks = [a for a in _actions(temp_root) if a["What to do"] == "fill plan: x-1"]
+    assert len(asks) == 1 and asks[0]["Type"] == "question"

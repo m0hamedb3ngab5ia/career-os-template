@@ -456,13 +456,15 @@ def test_application_status_open_and_confirmation(client, data, monkeypatch):
         raise gh_fill.MissingPlaywright("playwright is not installed")
 
     monkeypatch.setattr(gh_fill, "preflight", missing)
+    Store(data["settings"])._write(jid, "fill_plan.json", {"fields": [
+        {"field_id": "email", "label": "Email", "type": "text", "value": "a@example.com", "source": "profile"}]})
     h = {"x-careeros": "1"}
     assert client.get(f"/api/jobs/{jid}/application").json()["tab"] == "needs_refill"
     r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
     assert r.status_code == 409 and "playwright is not installed" in r.json()["detail"] and not spawned
     monkeypatch.setattr(gh_fill, "preflight", lambda: None)
     r = client.post(f"/api/jobs/{jid}/application/open", headers=h).json()
-    assert r["action"] == "filling" and "apply plan" in spawned[0][-1] and "apply fill" in spawned[0][-1]
+    assert r["action"] == "filling" and "apply plan" not in spawned[0][-1] and "apply fill" in spawned[0][-1]
     assert browser.FILL_EXIT in spawned[0][-1]
     (jdir / "application.log").write_text(f"boom: chromium missing\n{browser.FILL_EXIT}1\n")
     assert client.get(f"/api/jobs/{jid}/application").json()["fill_error"] == "boom: chromium missing"
@@ -504,6 +506,8 @@ def test_application_open_refuses_when_own_chrome_not_connected(client, data, mo
     monkeypatch.setattr(gh_fill, "preflight", lambda: None)
     spawned: list = []
     monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=999_999))
+    Store(data["settings"])._write(jid, "fill_plan.json", {"fields": [
+        {"field_id": "email", "label": "Email", "type": "text", "value": "a@example.com", "source": "profile"}]})
     h = {"x-careeros": "1"}
     r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
     assert r.status_code == 409 and r.json()["detail"].startswith("Chrome not connected") and not spawned
@@ -527,3 +531,159 @@ def test_jobs_select_endpoint_sets_flag(client, data):
     assert not store.is_selected(ids[0])
     assert client.post("/api/jobs/select", headers={"x-careeros": "1"}, json={"ids": ids, "selected": True}).status_code == 200
     assert all(store.is_selected(j) for j in ids)
+
+
+def _write_plan(data, jid):
+    from careeros.store import Store
+
+    plan = {"job_id": jid, "ats": "greenhouse", "board": "acme", "ats_job_id": "1", "files": {}, "fields": [
+        {"field_id": "email", "label": "Email", "type": "text", "value": "a@example.com", "source": "profile",
+         "needs_review": False, "required": True},
+        {"field_id": "q1", "label": "What is your notice period?", "type": "text", "value": None,
+         "source": "unanswered", "needs_review": True, "required": True},
+        {"field_id": "q2", "label": "Favourite editor", "type": "text", "value": None, "source": "unanswered",
+         "needs_review": True, "required": False},
+        {"field_id": "q3", "label": "Will you need sponsorship?", "type": "select", "value": None,
+         "source": "pause:legal", "needs_review": True, "required": True, "options": ["Yes", "No"]}]}
+    Store(data["settings"])._write(jid, "fill_plan.json", plan)
+    return plan
+
+
+def test_fill_plan_preview_edit_and_save_to_profile(client, data):
+    """REQ-105/106, E2E-008-01/02: the plan table, edits land in fill_plan.json, save-to-profile learns the answer
+    and the next plan auto-fills it; required unanswered blocks the fill, optional ones may be skipped."""
+    import yaml
+
+    from careeros.apply.gh_schema import build_plan
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    h = {"x-careeros": "1"}
+    assert client.get(f"/api/jobs/{jid}/fill-plan").json() == {"plan": None, "problems": []}
+    _write_plan(data, jid)
+    r = client.get(f"/api/jobs/{jid}/fill-plan").json()
+    assert [f["field_id"] for f in r["plan"]["fields"]] == ["email", "q1", "q2", "q3"]
+    assert r["problems"] == ["unanswered (pause:legal): Will you need sponsorship?",
+                             "needs input (required): What is your notice period?"]
+    url = f"/api/jobs/{jid}/fill-plan/fields"
+    assert client.post(f"{url}/q1", headers=h, json={"skip": True}).status_code == 400  # required: no skip
+    assert client.post(f"{url}/q3", headers=h, json={"value": "Maybe", "save": False}).status_code == 400  # not an option
+    assert client.post(f"{url}/nope", headers=h, json={"value": "x"}).status_code == 404
+    r = client.post(f"{url}/q2", headers=h, json={"skip": True}).json()
+    assert r["field"]["skipped"] is True and r["saved"] is False
+    sa = data["settings"].paths["standard_answers"]
+    n = len(yaml.safe_load(open(sa))["answers"])
+    r = client.post(f"{url}/q3", headers=h, json={"value": "No", "save": False}).json()
+    assert r["field"]["value"] == "No" and r["field"]["source"] == "user" and r["saved"] is False
+    r = client.post(f"{url}/q1", headers=h, json={"value": "4 weeks", "save": True}).json()
+    assert r["saved"] is True and r["problems"] == []
+    plan = json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())
+    assert {f["field_id"]: f["value"] for f in plan["fields"]}["q1"] == "4 weeks"
+    answers = yaml.safe_load(open(sa))["answers"]
+    assert len(answers) == n + 1 and answers[-1]["answer"] == "4 weeks"  # save off (q3): job only
+    nxt = build_plan([{"field_id": "q9", "label": "What is your notice period?", "type": "text", "options": [],
+                       "required": True}], profile={}, answers_path=sa, files={})
+    assert nxt["fields"][0]["value"] == "4 weeks"
+
+
+def test_application_open_refuses_required_needs_input(client, data, monkeypatch):
+    """REQ-106: a plan with a required unanswered field is not filled; no fill is spawned."""
+    from careeros.apply import gh_fill
+    from careeros.ui.services import job_actions
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    _write_plan(data, jid)
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
+    spawned: list = []
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=1))
+    r = client.post(f"/api/jobs/{jid}/application/open", headers={"x-careeros": "1"})
+    assert r.status_code == 400 and "needs input (required)" in r.json()["detail"] and not spawned
+
+
+def test_fill_plan_eeo_never_saved_on_reedit(client, data):
+    """MUST: EEO is derived from the field, not its current source; a second edit never writes the profile."""
+    import yaml
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    plan = _write_plan(data, jid)
+    plan["fields"] += [
+        {"field_id": "gender", "label": "Gender", "type": "select", "value": None, "source": "pause:eeo",
+         "needs_review": True, "required": False, "options": ["Male", "Female", "Decline To Self Identify"]},
+        {"field_id": "q7", "label": "What is your race or ethnicity?", "type": "text", "value": "x", "source": "user",
+         "needs_review": False, "required": False}]
+    Store(data["settings"])._write(jid, "fill_plan.json", plan)
+    kinds = {f["field_id"]: f.get("kind") for f in client.get(f"/api/jobs/{jid}/fill-plan").json()["plan"]["fields"]}
+    assert kinds["gender"] == "eeo" and kinds["q7"] == "eeo" and kinds["q2"] != "eeo"
+    sa = data["settings"].paths["standard_answers"]
+    before = open(sa).read()
+    url = f"/api/jobs/{jid}/fill-plan/fields"
+    h = {"x-careeros": "1"}
+    for v in ("Female", "Decline To Self Identify"):
+        r = client.post(f"{url}/gender", headers=h, json={"value": v, "save": True}).json()
+        assert r["saved"] is False and r["field"]["kind"] == "eeo"
+    assert client.post(f"{url}/q7", headers=h, json={"value": "y", "save": True}).json()["saved"] is False
+    assert open(sa).read() == before
+
+
+def test_fill_plan_reedit_saved_answer_updates_profile(client, data):
+    """MUST: re-editing a learned answer, or a row filled from a saved answer, updates that entry (no 400); the
+    next plan fills the new value."""
+    import yaml
+
+    from careeros.apply.gh_schema import build_plan
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    plan = _write_plan(data, jid)
+    plan["fields"].append({"field_id": "q4", "label": "Do you require visa sponsorship?", "type": "text",
+                           "value": "No", "source": "standard:sponsorship", "needs_review": False, "required": True})
+    Store(data["settings"])._write(jid, "fill_plan.json", plan)
+    sa = data["settings"].paths["standard_answers"]
+    url = f"/api/jobs/{jid}/fill-plan/fields"
+    h = {"x-careeros": "1"}
+    assert client.post(f"{url}/q1", headers=h, json={"value": "4 weeks", "save": True}).json()["saved"] is True
+    n = len(yaml.safe_load(open(sa))["answers"])
+    r = client.post(f"{url}/q1", headers=h, json={"value": "6 weeks", "save": True})
+    assert r.status_code == 200 and r.json()["saved"] is True, r.text
+    r = client.post(f"{url}/q4", headers=h, json={"value": "Yes", "save": True})
+    assert r.status_code == 200 and r.json()["saved"] is True, r.text
+    assert len(yaml.safe_load(open(sa))["answers"]) == n
+
+    def nxt(label):
+        return build_plan([{"field_id": "z", "label": label, "type": "text", "options": [], "required": True}],
+                          profile={}, answers_path=sa, files={})["fields"][0]["value"]
+    assert nxt("What is your notice period?") == "6 weeks"
+    assert nxt("Do you require visa sponsorship?") == "Yes"
+
+
+def test_fill_plan_skip_optional_pause_unblocks_and_edits_serialize(client, data):
+    """SHOULD: skipping an optional salary pause unblocks Fill; concurrent row saves all land (locked RMW)."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from careeros.ui.services import job_actions
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    plan = _write_plan(data, jid)
+    plan["fields"].append({"field_id": "s1", "label": "Desired salary", "type": "text", "value": None,
+                           "source": "pause:salary", "needs_review": True, "required": False})
+    plan["fields"] += [{"field_id": f"t{i}", "label": f"Free text {i}", "type": "text", "value": None,
+                        "source": "unanswered", "needs_review": True, "required": False} for i in range(12)]
+    Store(data["settings"])._write(jid, "fill_plan.json", plan)
+    r = client.post(f"/api/jobs/{jid}/fill-plan/fields/s1", headers={"x-careeros": "1"}, json={"skip": True}).json()
+    assert not any("Desired salary" in p for p in r["problems"])
+    with ThreadPoolExecutor(6) as ex:
+        list(ex.map(lambda i: job_actions.edit_fill_field(data["settings"], jid, f"t{i}", value=f"v{i}", save=False),
+                    range(12)))
+    by = {f["field_id"]: f["value"] for f in json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())["fields"]}
+    assert all(by[f"t{i}"] == f"v{i}" for i in range(12))
+
+
+def test_application_open_refuses_without_plan(client, data, monkeypatch):
+    """SHOULD: Fill with no plan yet is refused up front (preview first); nothing is spawned."""
+    from careeros.apply import gh_fill
+    from careeros.ui.services import job_actions
+
+    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
+    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
+    spawned: list = []
+    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=1))
+    r = client.post(f"/api/jobs/{jid}/application/open", headers={"x-careeros": "1"})
+    assert r.status_code == 400 and "preview" in r.json()["detail"].lower() and not spawned

@@ -30,7 +30,7 @@ def test_never_filled_is_none(tmp_path):
 
 
 def test_live_tab_is_open_and_focusable(tmp_path):
-    (tmp_path / "fill_plan.json").write_text("{}")
+    (tmp_path / "fill_plan.json").write_text('{"fields": []}')
     browser.save_record(tmp_path, tab_id="T1", url="https://job-boards.example/embed", cdp=CDP)
     calls: list[str] = []
     get = fake([{"id": "T1", "type": "page", "url": "https://job-boards.example/embed"}], calls)
@@ -173,7 +173,7 @@ def test_open_application_double_click_spawns_once(monkeypatch, tmp_path):
     from careeros.apply import browser
 
     job_actions, spawned, _, popen = _open_app_env(monkeypatch, tmp_path)
-    (tmp_path / "fill_plan.json").write_text("{}")
+    (tmp_path / "fill_plan.json").write_text('{"fields": []}')
     (tmp_path / "fill_summary.json").write_text('{"failed": [{"label": "Old"}]}')
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "filling"
     assert not (tmp_path / "fill_summary.json").exists()  # stale fields_left gone while the new fill runs
@@ -185,7 +185,7 @@ def test_open_application_double_click_spawns_once(monkeypatch, tmp_path):
 
 def test_open_application_refill_closes_live_tab(monkeypatch, tmp_path):
     job_actions, spawned, closed, popen = _open_app_env(monkeypatch, tmp_path, live_tab=True)
-    (tmp_path / "fill_plan.json").write_text("{}")
+    (tmp_path / "fill_plan.json").write_text('{"fields": []}')
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen)["action"] == "focused"
     assert job_actions.open_application(types.SimpleNamespace(root=tmp_path), "j1", popen=popen, refill=True)["action"] == "filling"
     assert closed == [tmp_path] and len(spawned) == 1

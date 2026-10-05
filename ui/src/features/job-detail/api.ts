@@ -127,3 +127,28 @@ export function useApplicationTab(id: string) {
 }
 export const useOpenApplication = (id: string) =>
   useJobWrite<{ refill: true } | undefined, { action: "focused" | "filling"; log?: string }>(id, "application/open");
+
+/** REQ-105/106: the job's fill plan (null before Preview fill) and why it can't be filled yet. */
+export interface FillField {
+  field_id: string;
+  label: string;
+  type: string;
+  value: unknown;
+  source: string | null;
+  required?: boolean;
+  skipped?: boolean;
+  options?: string[];
+  kind?: string; // from the field itself (eeo | salary | legal | ...), never from source
+}
+export interface FillPlanReply {
+  plan: { fields: FillField[] } | null;
+  problems: string[];
+}
+export const useFillPlan = (id: string) =>
+  useQuery({ queryKey: ["job", id, "fill-plan"], queryFn: () => apiFetch<FillPlanReply>(`${jobPath(id)}/fill-plan`) });
+export const useMakeFillPlan = (id: string) => useJobWrite<undefined, FillPlanReply>(id, "fill-plan");
+export const useEditFillField = (id: string, fieldId: string) =>
+  useJobWrite<{ value?: string; skip?: boolean; save?: boolean }, { field: FillField; saved: boolean; problems: string[] }>(
+    id,
+    `fill-plan/fields/${encodeURIComponent(fieldId)}`,
+  );

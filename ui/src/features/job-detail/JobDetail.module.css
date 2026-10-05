@@ -586,3 +586,19 @@
   font-weight: 600;
   min-height: 24px;
 }
+
+/* Fill preview table (REQ-105): scrolls sideways inside the card on a phone, never the page. */
+.planWrap {
+  overflow-x: auto;
+}
+.planTable {
+  width: 100%;
+  border-collapse: collapse;
+}
+.planTable th,
+.planTable td {
+  padding: 6px 8px;
+  text-align: left;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--sep);
+}

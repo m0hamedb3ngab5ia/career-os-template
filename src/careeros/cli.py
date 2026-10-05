@@ -489,7 +489,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
 
     import requests
 
-    from careeros.apply.gh_schema import build_plan, fetch_questions, normalize
+    from careeros.apply.gh_schema import build_plan, carry_over, fetch_questions, normalize
+    from careeros.runs.locks import _guard
     from careeros.scout.base import BoardNotFound, FetchError
 
     s = _settings(args)
@@ -522,7 +523,12 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     blocked = [f["label"] for f in plan["fields"] if f["source"] == "pause:sensitive"]
     if blocked:  # SSN/bank/passport...: hard stop like the form gate, never auto-filled
         plan["blocked"] = blocked
-    path = store._write(args.job_id, "fill_plan.json", plan)
+    with _guard(jd / "fill_plan.json"):  # same lock as the UI's row edits
+        try:
+            old = json.loads((jd / "fill_plan.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            old = None
+        path = store._write(args.job_id, "fill_plan.json", carry_over(old, plan))  # keep this job's edits/skips
     if blocked:
         what = "; ".join(blocked)[:300]
         print(f"  BLOCK  sensitive_field {what}")
@@ -532,7 +538,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         return SAFETY_HARD_EXIT
     fields = plan["fields"]
     review = [f for f in fields if f["needs_review"]]
-    paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")]
+    paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")
+              or (f["source"] == "unanswered" and f.get("required"))]  # REQ-106: required unknowns ask too
     if paused:  # legal/salary/EEO with no stored answer: never guessed
         print(f"paused for your answer ({len(paused)}): " + "; ".join(paused))  # Action Items have no detail column
         _add_action(s, f"fill plan: {args.job_id}", "question", job_id=args.job_id,

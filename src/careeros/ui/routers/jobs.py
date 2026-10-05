@@ -344,6 +344,32 @@ def open_application(job_id: str, refill: bool = Body(False, embed=True), c=Depe
         return acts.open_application(c.settings, job_id, refill=refill)
 
 
+class FillFieldBody(BaseModel):
+    value: str | None = None
+    skip: bool = False
+    save: bool = True
+
+
+@router.get("/jobs/{job_id}/fill-plan")
+def fill_plan(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        return acts.fill_plan(c.settings, job_id)
+
+
+@router.post("/jobs/{job_id}/fill-plan")
+def make_fill_plan(job_id: str, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        out = acts.make_fill_plan(c.settings, job_id)
+    after_write(c, jobs=[job_id])
+    return out
+
+
+@router.post("/jobs/{job_id}/fill-plan/fields/{field_id}")
+def edit_fill_field(job_id: str, field_id: str, body: FillFieldBody, c=Depends(ctx)) -> dict[str, Any]:
+    with refusals():
+        return acts.edit_fill_field(c.settings, job_id, field_id, value=body.value, skip=body.skip, save=body.save)
+
+
 @router.post("/jobs/{job_id}/safety/verify")
 def safety_verify(job_id: str, body: VerifyBody, c=Depends(ctx)) -> dict[str, Any]:
     with refusals():
