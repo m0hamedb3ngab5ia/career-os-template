@@ -11,11 +11,13 @@ import { runSummary } from "./HistoryCard";
 import { STOP_FIX, kindLabel, needsYou, runChipCode, triggerLabel } from "./labels";
 import { LogPane } from "./LogPane";
 import styles from "./Runs.module.css";
+import { ApiError } from "../../api/client";
+import { Button } from "../../kit/Button";
 
 /** One run: its attempts (job, outcome, duration, session id, detail) and run.log; live while it runs. */
 export function RunDetailPage() {
   const { runId = "" } = useParams();
-  const { data: run, error, isPending } = useRunDetail(runId);
+  const { data: run, error, isPending, refetch } = useRunDetail(runId);
   const now = useNow(60_000);
   const live = run?.state === "running";
   const stream = useRunStream(runId, live);
@@ -25,11 +27,19 @@ export function RunDetailPage() {
       All runs
     </Link>
   );
+  if (error && !(error instanceof ApiError && error.status === 404)) {
+    return (
+      <Page title="Couldn’t load this run" subtitle="Career OS didn’t answer · try again">
+        {back}
+        <EmptyState title="Something went wrong" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{error.message}</EmptyState>
+      </Page>
+    );
+  }
   if (error || (!isPending && !run)) {
     return (
       <Page title="Run not found" subtitle="This run is gone or the link is wrong · go back to Automation">
         {back}
-        <EmptyState title="No run with this id">{error?.message ?? "It may have been pruned."}</EmptyState>
+        <EmptyState title="No run with this id">It may have been pruned.</EmptyState>
       </Page>
     );
   }

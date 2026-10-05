@@ -11,6 +11,9 @@
   white-space: nowrap;
   cursor: pointer;
 }
+.button:hover {
+  text-decoration: none;
+}
 .button[data-size="small"] {
   height: 28px;
 }

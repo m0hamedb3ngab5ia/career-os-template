@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { Pager, usePaged } from "../../kit/Pager";
-import { Button } from "../../kit/Button";
+import { Button, ButtonLink } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { EmptyState } from "../../kit/EmptyState";
 import { UnavailableButton } from "../../kit/UnavailableButton";
@@ -80,7 +80,7 @@ interface Selected {
 let sessions = 0;
 
 export function ContactsPage() {
-  const { data, isPending, isError, error } = useContacts();
+  const { data, isPending, isError, error, refetch } = useContacts();
   const [marking, setMarking] = useState<ContactRow | null>(null);
   const [open, setOpen] = useState<Selected | null>(null);
   const items = data?.items ?? [];
@@ -141,7 +141,7 @@ export function ContactsPage() {
 
         {isError ? (
           <div role="alert" className={styles.card}>
-            <EmptyState title="Couldn't load contacts">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
+            <EmptyState title="Couldn't load contacts" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then try again.</EmptyState>
           </div>
         ) : isPending ? (
           <div className={styles.card} aria-busy="true">
@@ -149,7 +149,7 @@ export function ContactsPage() {
           </div>
         ) : items.length === 0 ? (
           <div className={styles.card}>
-            <EmptyState title="No contacts yet" action={<Link to="/jobs">Open Jobs</Link>}>
+            <EmptyState title="No contacts yet" action={<ButtonLink to="/jobs">Open Jobs</ButtonLink>}>
               People appear here after /find-contacts runs for a job in Claude Code. Nothing is ever sent from this
               list.
             </EmptyState>

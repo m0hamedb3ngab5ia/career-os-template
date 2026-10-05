@@ -72,7 +72,7 @@ export function ActionItemsPage() {
   const group = pick(params.get("group"), GROUP_OPTIONS);
   const sort = pick(params.get("sort"), SORT_OPTIONS);
   const selected = new Set((params.get("sel") ?? "").split(",").filter(Boolean));
-  const { data, isPending, error } = useActions({ tab, group, sort });
+  const { data, isPending, error, refetch } = useActions({ tab, group, sort });
   const soonHours = useMeta().data?.ui.due_soon_hours ?? 48;
   const now = useNow(60_000);
   const toast = useToast();
@@ -209,7 +209,7 @@ export function ActionItemsPage() {
 
       <div className={styles.list}>
         {error ? (
-          <EmptyState title="Couldn't load Action Items">{problem(error)}</EmptyState>
+          <EmptyState title="Couldn't load Action Items" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{problem(error)}</EmptyState>
         ) : isPending ? null : tab === "done" ? (
           <DoneList items={paged.pageItems} more={data?.more_done ?? 0} onReopen={reopenOne} />
         ) : data && data.groups.length ? (

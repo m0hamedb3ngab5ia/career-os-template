@@ -1,5 +1,6 @@
 import { Loader2 } from "lucide-react";
 import type { ComponentProps, ReactNode } from "react";
+import { Link, type LinkProps } from "react-router";
 import styles from "./controls.module.css";
 
 export type ButtonVariant = "primary" | "secondary" | "destructive" | "destructive-filled";
@@ -40,4 +41,9 @@ export function Button({
       {pending && pendingLabel ? pendingLabel : children}
     </button>
   );
+}
+
+/** A navigation link that looks like a Button (empty-state next steps). */
+export function ButtonLink({ variant = "secondary", size = "small", ...rest }: LinkProps & { variant?: ButtonVariant; size?: "regular" | "small" }) {
+  return <Link {...rest} className={styles.button} data-variant={variant} data-size={size} />;
 }
