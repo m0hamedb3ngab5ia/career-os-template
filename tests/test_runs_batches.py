@@ -224,3 +224,16 @@ def test_flagged_posting_is_excluded_whatever_its_stop(settings):
     (s.job_dir(a) / "flags.json").write_text(json.dumps({"injection_suspected": True}))
     out = batches.preview(settings, [a], "prepare", now=NOW, stops={a: "submit"})
     assert out["selected"] == [] and "injection" in out["excluded"][0]["reason"]
+
+
+@pytest.mark.unit
+def test_named_jobs_count_as_ticked_and_start_ticks_them(settings):
+    """#144 decision: Start pipeline review takes the Jobs-table row selection, not the persisted REQ-104 tick."""
+    s = Store(settings)
+    jid = put(s, add_job(s, 1), "scored")
+    s.set_selected([jid], False)
+    out = batches.preview(settings, [jid], "prepare", now=NOW)
+    assert [r["job_id"] for r in out["selected"]] == [jid], out["excluded"]
+    assert not s.is_selected(jid)  # a preview never ticks
+    batches.create(settings, [jid], "prepare", now=NOW)
+    assert s.is_selected(jid)  # Start ticks it, so the driver's mid-run untick check still applies
