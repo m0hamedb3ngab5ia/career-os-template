@@ -249,7 +249,9 @@ Given pre-existing job without `selected` · When `run prepare` · Then it is pr
 
 ### REQ-105 Fill preview + edit
 Before fill: UI table of the fill plan, per field: label, value, source (saved answer | AI draft | resume | default), required. User edits any value → plan updated (job only); checkbox "save to profile" also writes standard answer (REQ-053).
+AI draft = the job's `/answer-question` draft (`answers.json`) for a freetext field with no saved answer; never for legal/salary/EEO (REQ-014, REQ-030). Draft rows start unreviewed; fill refuses while any is unreviewed (like `needs_input`). Approve or edit marks it reviewed. "Save to profile" defaults off for drafts. CLI/scheduled: one Action Item "review N drafts". (DEC-010)
 Given fill_plan · When user edits "Notice period" · Then fill uses edited value; `fill_summary` read-back matches.
+Given plan with 1 unreviewed AI draft · When fill · Then refused; When user approves it · Then fill uses the draft text.
 
 ### REQ-106 Ask on unknown fields
 Plan field with no answer → `needs_input`; UI (and an Action Item for CLI/scheduled runs) asks: fill or skip. Skip allowed only for optional fields; required unanswered → job not filled. Filled answer saved to profile (REQ-053) unless user unticks save.

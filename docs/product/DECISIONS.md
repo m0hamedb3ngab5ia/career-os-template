@@ -50,3 +50,9 @@ Decision: IA + UX are the minimum that meets approved REQs/UCs/FLOWs, nothing mo
 Reason: current UI grew well beyond the requirements (user, 2026-10-04); every extra surface costs build, test and review.
 Alternatives: keep current UI and add delta on top (more slop); full redesign now (unscoped).
 Consequences: frontend TASK-013..015 start with a trim pass; new UI needs a REQ first (`/product change`). Not implemented yet: recorded before development.
+
+### DEC-010 AI-drafted form answers need review before fill
+Decision: fill plan uses the job's `/answer-question` drafts for freetext fields with no saved answer, source "AI draft", unreviewed until the user approves or edits it; fill refuses unreviewed drafts. Save-to-profile off by default for drafts.
+Reason: user wants drafts offered but reviewed before fill (2026-10-04). Reasoned by: human (gate); agent (accepted) for edit = reviewed, save default off, Action Item.
+Alternatives: drop "AI draft" from REQ-105 (user types every essay); auto-fill drafts (unreviewed AI text reaches employers).
+Consequences: new TASK-023; TASK-014 tests re-reviewed for the draft source.

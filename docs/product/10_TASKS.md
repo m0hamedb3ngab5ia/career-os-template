@@ -67,3 +67,6 @@ Links: REQ-101 · Area: full · After: TASK-013 · Done when: `voice.py` EXTS an
 
 ### TASK-022 Résumé feedback + master approve/reject UI
 Links: REQ-094 REQ-095 REQ-096 REQ-097 REQ-099 · Area: frontend · After: TASK-013 · Done when: Profile page panel shows proposed master.yaml diff and résumé feedback (TASK-008/009 backend); Approve / Reject buttons call the existing endpoints; readiness card links to the panel when master is not synced and updates after approve/reject; UI_UX_PRINCIPLES applied; vitest + API integration test; before MVP
+
+### TASK-023 AI draft answers in fill plan (review gate)
+Links: REQ-105 UC-008 · Area: full · After: TASK-014 · Done when: `build_plan` reads the job's `answers.json` drafts for freetext fields with no saved answer (never legal/salary/EEO), source `ai_draft`, `reviewed: false`; `plan_problems` blocks fill on unreviewed drafts; approve endpoint + edit marks reviewed; carry_over keeps review state; Fill preview shows "AI draft" badge + Approve; save-to-profile off for drafts; CLI/scheduled one Action Item "review N drafts"; unit + integration tests (E2E-008-01 extended); before MVP
