@@ -285,6 +285,10 @@ export interface paths {
     /** Meta */
     get: operations["meta_api_meta_get"];
   };
+  "/api/next-step": {
+    /** Next Step */
+    get: operations["next_step_api_next_step_get"];
+  };
   "/api/pipeline": {
     /** Board */
     get: operations["board_api_pipeline_get"];
@@ -1974,6 +1978,15 @@ export interface components {
       tags?: string[];
       /** Text */
       text: string;
+    };
+    /** NextStep */
+    NextStep: {
+      /** Href */
+      href?: string | null;
+      /** Key */
+      key: string;
+      /** Label */
+      label: string;
     };
     /** NotScoredHint */
     NotScoredHint: {
@@ -4556,6 +4569,17 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Meta"];
+        };
+      };
+    };
+  };
+  /** Next Step */
+  next_step_api_next_step_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["NextStep"];
         };
       };
     };

@@ -1,0 +1,1 @@
+import{i as e}from"./index-cown39Wf.js";function t(){return e().data?.ui.undo_seconds}export{t};

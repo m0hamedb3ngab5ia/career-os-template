@@ -5123,6 +5123,35 @@
         "title": "NewLesson",
         "type": "object"
       },
+      "NextStep": {
+        "properties": {
+          "href": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Href"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "label"
+        ],
+        "title": "NextStep",
+        "type": "object"
+      },
       "NotScoredHint": {
         "properties": {
           "kind": {
@@ -12164,6 +12193,27 @@
         "summary": "Meta",
         "tags": [
           "meta"
+        ]
+      }
+    },
+    "/api/next-step": {
+      "get": {
+        "operationId": "next_step_api_next_step_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/NextStep"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Next Step",
+        "tags": [
+          "next-step"
         ]
       }
     },
