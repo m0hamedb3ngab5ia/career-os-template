@@ -61,3 +61,9 @@ Links: REQ-121 UC-014 · Area: full · Done when: `GET/PUT /api/ui-state` (tour_
 ### TASK-020 Next-step card
 Links: REQ-122 UC-014 · Area: full · Done when: `GET /api/next-step` rule order per REQ-122 (unit tests per rule); Today card + Profile once on readiness done. E2E-014-02 green
 
+
+### TASK-021 Voice samples accept pdf + docx
+Links: REQ-101 · Area: full · After: TASK-013 · Done when: `voice.py` EXTS and UI accept list include .pdf/.docx; docx converted to plain text (stdlib zipfile+xml, no new dep) and stored as .txt; pdf stored as-is and read by learn-voice (extract text if a test shows Read cannot); size cap; unit test for docx extraction (tiny fixture in tests/fixtures) + upload integration test; learn-voice run uses their text
+
+### TASK-022 Résumé feedback + master approve/reject UI
+Links: REQ-094 REQ-095 REQ-096 REQ-097 REQ-099 · Area: frontend · After: TASK-013 · Done when: Profile page panel shows proposed master.yaml diff and résumé feedback (TASK-008/009 backend); Approve / Reject buttons call the existing endpoints; readiness card links to the panel when master is not synced and updates after approve/reject; UI_UX_PRINCIPLES applied; vitest + API integration test; before MVP
