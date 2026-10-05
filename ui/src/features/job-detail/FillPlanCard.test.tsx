@@ -75,4 +75,24 @@ describe("FillPlanCard", () => {
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/fields/gender"))).toBe(true));
     expect(JSON.parse(calls.find((c) => c.url.endsWith("/fields/gender"))!.body!)).toEqual({ value: "xy", save: false });
   });
+
+  it("badges an unreviewed AI draft, offers Approve, and keeps Save to profile off for it", async () => {
+    const calls = stubFetch({
+      plan: {
+        fields: [
+          { field_id: "d1", label: "Why us?", type: "textarea", value: "The mission.", source: "ai_draft", reviewed: false, required: true },
+          { field_id: "d2", label: "Hard bug", type: "textarea", value: "A race.", source: "ai_draft", reviewed: true, required: false },
+        ],
+      },
+      problems: ["unreviewed AI draft: Why us?"],
+    });
+    renderWithProviders(<FillPlanCard jobId="nw01" />);
+    const rows = within(await screen.findByRole("table")).getAllByRole("row").slice(1);
+    expect(within(rows[0]!).getByText("AI draft")).toBeInTheDocument();
+    expect(within(rows[1]!).getByText("AI draft, approved")).toBeInTheDocument();
+    expect(within(rows[1]!).queryByRole("button", { name: "Approve" })).toBeNull();
+    expect(within(rows[0]!).getByRole("checkbox", { name: "Save to profile" })).not.toBeChecked();
+    await userEvent.click(within(rows[0]!).getByRole("button", { name: "Approve" }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/fill-plan/fields/d1/approve"))).toBe(true));
+  });
 });
