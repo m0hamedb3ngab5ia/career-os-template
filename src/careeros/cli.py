@@ -517,7 +517,8 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
     files = {k: str(jd / f"{k}.pdf") if (jd / f"{k}.pdf").exists() else None for k in ("resume", "cover_letter")}
     profile = yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}
     try:  # this job's /answer-question drafts (REQ-105); missing or damaged = none
-        drafts = json.loads((jd / "answers.json").read_text(encoding="utf-8"))
+        a = jd / "answers.json"
+        drafts = json.loads(a.read_text(encoding="utf-8")) if a.stat().st_size <= 1_000_000 else []
     except (OSError, ValueError):
         drafts = []
     plan = build_plan(normalize(data), profile=profile, answers_path=s.paths["standard_answers"],

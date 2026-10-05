@@ -138,7 +138,8 @@ def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers
 
 def _draft_for(label: str, drafts: list[Any]) -> str | None:
     """The answers.json answer whose question is this label (whitespace/case-insensitive), else None."""
-    return next((str(d["answer"]).strip() for d in drafts if isinstance(d, dict) and str(d.get("answer") or "").strip()
+    return next((d["answer"].strip() for d in drafts if isinstance(d, dict) and isinstance(d.get("answer"), str)
+                 and d["answer"].strip() and d.get("class") not in ("sensitive", "salary_freeform", "unknown")
                  and _label_matches(str(d.get("question") or ""), label) == "exact"), None)
 
 

@@ -191,6 +191,14 @@ def test_build_plan_ai_draft_only_for_freetext_never_legal_salary():
 
 
 @pytest.mark.unit
+@pytest.mark.parametrize("bad", [{"answer": {"x": 1}}, {"answer": ["a"]}, {"answer": "Fine", "class": "sensitive"},
+                                 {"answer": "Fine", "class": "salary_freeform"}, {"answer": "Fine", "class": "unknown"}])
+def test_build_plan_ignores_non_text_or_sensitive_class_drafts(bad):
+    drafts = [{"question": "Why do you want to work here?", **bad}]
+    f = _by_id(build_plan(DRAFT_FIELDS, profile={}, answers_path=ANSWERS, files={}, drafts=drafts)["fields"])["q_why"]
+    assert f["value"] is None and f["source"] != "ai_draft"
+
+@pytest.mark.unit
 def test_carry_over_keeps_draft_review_only_for_same_text():
     from careeros.apply.gh_schema import carry_over
 

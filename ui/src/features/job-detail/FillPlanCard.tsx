@@ -88,7 +88,7 @@ function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
                 Approve
               </Button>
             ) : null}
-            {!f.required && empty && !f.skipped ? (
+            {!f.required && !f.skipped && (empty || draft) ? (
               <Button disabled={edit.isPending} onClick={() => send({ skip: true })}>
                 Skip
               </Button>
