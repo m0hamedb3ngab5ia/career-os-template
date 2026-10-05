@@ -35,8 +35,8 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 - **QA** (`python -m careeros.qa`, `/qa-review`): fabrication audit, banned phrases, confidential terms,
   the example-identity guard and a critic score; one regeneration, then an Action Item. It also catches another
   company's name left in a letter, answer or outreach draft, titles/years/numbers that disagree across documents,
-  outreach that breaks the send policy (LinkedIn draft-only, notes over 300 chars, auto-send only to a verified
-  email, thank-yous always manual) and a `resume.pdf` whose links, text or metadata differ from the reviewed résumé
+  outreach that breaks the send policy (LinkedIn draft-only, notes over 300 chars, email drafts only, never auto-sent,
+  thank-yous always manual) and a `resume.pdf` whose links, text or metadata differ from the reviewed résumé
   (see ARCHITECTURE.md, "QA gate checks").
 - **Apply** (`/apply-job`): fills the form in Chrome with your standard answers only and stops before
   submit for you to review. Auto-submit (Tier B/C) is an opt-in mode, off by default; Tier A never auto-submits.
