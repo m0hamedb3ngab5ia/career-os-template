@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, HTTPException, Response
 from pydantic import BaseModel
 
 from careeros.ui.routers import ctx
@@ -48,3 +48,14 @@ def add_lesson(body: NewLesson, c=Depends(ctx)) -> Lesson:
     e = learn_lesson(c.settings, text=body.text, ats=body.ats, company=body.company, job_id=body.job_id,
                      tags=tuple(body.tags))
     return Lesson(**e)
+
+
+@router.delete("/learning/lessons/{lid}", status_code=204)
+def delete_lesson(lid: str, c=Depends(ctx)) -> Response:
+    from careeros.learning import delete_lesson as _delete
+
+    try:
+        _delete(c.settings, lid)
+    except KeyError:
+        raise HTTPException(404, f"lesson {lid} not found") from None
+    return Response(status_code=204)

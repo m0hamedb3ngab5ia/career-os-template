@@ -19,7 +19,7 @@ import uuid
 from contextlib import contextmanager
 from datetime import date, datetime
 from pathlib import Path
-from typing import Any, Iterator
+from typing import Any, Callable, Iterator
 
 try:
     import fcntl
@@ -414,3 +414,84 @@ def learn_from_action(settings: Settings, tracker: Any, aid: str, answer: str, *
             raise ValueError("scope company needs a company (the item has none)")
     return learn_answer(settings, question=question_from_action(str(item.get("what") or "")), answer=answer,
                         job_id=str(item.get("job_id") or "") or None, scope=scope, company=company)
+
+
+# --- Profile › Saved answers / Learned (REQ-107) ------------------------------------------------------------------
+
+def list_answers(settings: Settings) -> list[dict[str, Any]]:
+    """Every saved answer: general, per company, then EEO, file order."""
+    import yaml
+
+    p = answers_path(settings)
+    data = (yaml.safe_load(p.read_text(encoding="utf-8")) if p.exists() else None) or {}
+
+    def row(scope: str, key: Any, e: dict[str, Any], company: str | None = None) -> dict[str, Any]:
+        a = e.get("answer")
+        return {"scope": scope, "key": str(key), "company": company, "answer": None if a is None else str(a),
+                "match": [str(m) for m in (e.get("match") or [])], "note": e.get("note")}
+
+    out = [row("general", e.get("key"), e) for e in data.get("answers") or [] if isinstance(e, dict)]
+    ca = data.get("company_answers") if isinstance(data.get("company_answers"), dict) else {}
+    for co, lst in ca.items():
+        out += [row("company", e.get("key"), e, str(co)) for e in (lst if isinstance(lst, list) else [])
+                if isinstance(e, dict)]
+    eeo = data.get("eeo") if isinstance(data.get("eeo"), dict) else {}
+    out += [row("eeo", k, v) for k, v in eeo.items() if isinstance(v, dict)]
+    return out
+
+
+def _find_answer(data: dict[str, Any], key: str, company: str | None, eeo: bool) -> tuple[Any, Any]:
+    """(container, index): container[index] is that saved answer's mapping. KeyError when there is none."""
+    if eeo:
+        m = data.get("eeo")
+        if isinstance(m, dict) and isinstance(m.get(key), dict):
+            return m, key
+        raise KeyError(key)
+    lst: Any = data.get("answers")
+    if company:
+        ca = data.get("company_answers") if isinstance(data.get("company_answers"), dict) else {}
+        lst = next((v for co, v in ca.items() if str(co).strip().lower() == company.strip().lower()), None)
+    for i, e in enumerate(lst if isinstance(lst, list) else []):
+        if isinstance(e, dict) and str(e.get("key")) == key:
+            return lst, i
+    raise KeyError(key)
+
+
+def _edit_answers(settings: Settings, fn: Callable[[CommentedMap], None]) -> None:
+    real = _guard_path(answers_path(settings))
+    with _locked(real):
+        y, data = _load_rt(real)
+        fn(data)
+        _dump(y, data, real)
+
+
+def edit_answer(settings: Settings, *, key: str, answer: str, company: str | None = None, eeo: bool = False) -> None:
+    """Replace one saved answer's text in place (comments and order kept)."""
+    a = answer.strip()
+    if not a:
+        raise ValueError("answer is empty")
+
+    def fn(data: CommentedMap) -> None:
+        c, i = _find_answer(data, key, company, eeo)
+        c[i]["answer"] = DQ(a)
+    _edit_answers(settings, fn)
+
+
+def delete_answer(settings: Settings, *, key: str, company: str | None = None, eeo: bool = False) -> None:
+    """Remove one saved answer; future fill plans no longer match it."""
+    def fn(data: CommentedMap) -> None:
+        c, i = _find_answer(data, key, company, eeo)
+        del c[i]
+    _edit_answers(settings, fn)
+
+
+def delete_lesson(settings: Settings, lid: str) -> None:
+    real = _guard_path(lessons_path(settings))
+    with _locked(real):
+        y, data = _load_rt(real)
+        lst = data.get("lessons") if isinstance(data.get("lessons"), list) else []
+        i = next((i for i, e in enumerate(lst) if isinstance(e, dict) and str(e.get("id")) == lid), None)
+        if i is None:
+            raise KeyError(lid)
+        del lst[i]
+        _dump(y, data, real)

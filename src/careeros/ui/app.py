@@ -164,6 +164,8 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     app.include_router(batches.router, prefix="/api")
     from careeros.ui.routers import resumes  # Profile › Résumés (TASK-007)
     app.include_router(resumes.router, prefix="/api")
+    from careeros.ui.routers import profile  # Profile › Saved answers + Writing samples (TASK-013)
+    app.include_router(profile.router, prefix="/api")
     from careeros.ui.routers import ui_state  # first-run tour flag (TASK-019)
     app.include_router(ui_state.router, prefix="/api")
 
