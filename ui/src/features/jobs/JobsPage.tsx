@@ -14,6 +14,8 @@ import { formatCount } from "../../lib/format";
 import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsTable } from "./JobsTable";
+import { StartPipeline } from "./StartPipeline";
+import { UnavailableButton } from "../../kit/UnavailableButton";
 import { filterSummary } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
 import { TABS, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
@@ -212,6 +214,7 @@ export function JobsPage() {
 
   const serverTabs = new Map((tabs.data?.tabs ?? []).map((t) => [t.key, t]));
   const nSel = selected.size;
+  const [reviewing, setReviewing] = useState(false);
 
   function onExport() {
     const cols = ["job_id", ...columns.map((c) => c.exportField)];
@@ -297,6 +300,15 @@ export function JobsPage() {
       subtitle="Every tracked posting · same columns as the Jobs tab in JobTracker.xlsx"
       actions={<HeaderActions />}
     >
+      {reviewing && nSel > 0 ? (
+        <StartPipeline
+          ids={[...selected]}
+          rows={rows.filter((r) => selected.has(r.job_id))}
+          onToggle={onToggle}
+          onUntickAll={() => setSelected([])}
+          onClose={() => setReviewing(false)}
+        />
+      ) : (
       <div className={styles.stack}>
         <div className={styles.toolbar}>
           <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey })} controls={panelId}>
@@ -327,9 +339,6 @@ export function JobsPage() {
             {nSel > 0 ? (
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
-                <Link to={`/pipeline/batch/new?${new URLSearchParams({ ids: [...selected].join(",") })}`}>
-                  Add {formatCount(nSel)} to batch
-                </Link>
                 <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
                   Tick for pipeline
                 </Button>
@@ -342,6 +351,17 @@ export function JobsPage() {
               </>
             ) : null}
           </div>
+          <span data-tour="start-pipeline">
+            {nSel > 0 ? (
+              <Button size="small" variant="primary" onClick={() => setReviewing(true)}>
+                Start pipeline
+              </Button>
+            ) : (
+              <UnavailableButton size="small" variant="primary" reason="Tick jobs first">
+                Start pipeline
+              </UnavailableButton>
+            )}
+          </span>
           <Menu label="Columns">
             <Menu.Trigger size="small" icon={<Table2 size={14} strokeWidth={1.7} aria-hidden="true" />}>
               Columns
@@ -410,6 +430,7 @@ export function JobsPage() {
           ) : null}
         </section>
       </div>
+      )}
     </Page>
   );
 }

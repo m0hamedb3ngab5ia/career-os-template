@@ -11,10 +11,12 @@ interface UiState {
   tour_done: boolean;
 }
 
-/** One step per main nav item (REQ-121, ≤8). Add Start pipeline here once it has a global button (REQ-117). */
-export const TOUR_STEPS: { to: string; title: string; text: string }[] = [
+/** One step per main nav item + Start pipeline (REQ-121, ≤8). `selector` points at a page control when it is on
+ *  screen (the Jobs page), else the step points at its nav item. */
+export const TOUR_STEPS: { to: string; title: string; text: string; selector?: string }[] = [
   { to: "/", title: "Today", text: "What needs you now: tasks, running batches and your next step." },
   { to: "/jobs", title: "Jobs", text: "Every job found. Tick the ones you want to work on." },
+  { to: "/jobs", selector: '[data-tour="start-pipeline"]', title: "Start pipeline", text: "Tick jobs, then Start pipeline to choose how far each one goes: prepare, fill or submit." },
   { to: "/pipeline", title: "Pipeline", text: "Where each application stands, from found to offer." },
   { to: "/inbox", title: "Inbox", text: "Replies from companies, sorted so you see what matters first." },
   { to: "/profile", title: "Profile", text: "Your résumés, saved answers and writing samples, plus the checklist to finish before applying." },
@@ -28,19 +30,19 @@ export function startTour() {
   window.dispatchEvent(new Event(RESTART));
 }
 
-function target(to: string): HTMLElement | null {
-  return document.querySelector<HTMLElement>(`nav[aria-label="Sections"] a[href="${to}"]`);
+function target(to: string, selector?: string): HTMLElement | null {
+  return (selector && document.querySelector<HTMLElement>(selector)) || document.querySelector<HTMLElement>(`nav[aria-label="Sections"] a[href="${to}"]`);
 }
 
 /** Ring drawn above the backdrop around the nav item the current step points at. */
-function Ring({ to }: { to: string }) {
+function Ring({ to, selector }: { to: string; selector?: string }) {
   const [rect, setRect] = useState<DOMRect | null>(null);
   useLayoutEffect(() => {
-    const update = () => setRect(target(to)?.getBoundingClientRect() ?? null);
+    const update = () => setRect(target(to, selector)?.getBoundingClientRect() ?? null);
     update();
     window.addEventListener("resize", update);
     return () => window.removeEventListener("resize", update);
-  }, [to]);
+  }, [to, selector]);
   if (!rect) return null;
   return createPortal(
     <div
@@ -98,7 +100,7 @@ export function Tour() {
 
   return (
     <>
-      <Ring to={s.to} />
+      <Ring to={s.to} selector={s.selector} />
       <Dialog
         open
         onClose={end}

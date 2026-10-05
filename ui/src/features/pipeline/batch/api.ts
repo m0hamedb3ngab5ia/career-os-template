@@ -10,10 +10,13 @@ export type Batch = components["schemas"]["Batch"];
 export const MAX_JOBS = 500;
 export type StopAt = "score" | "prepare" | "fill" | "submit";
 
-export function useBatchPreview(jobIds: string[], stopAt: StopAt) {
+/** Per-job stop points (REQ-118); the server lowers them by its caps. */
+export type Stops = Record<string, StopAt>;
+
+export function useBatchPreview(jobIds: string[], stopAt: StopAt, stops?: Stops) {
   return useQuery({
-    queryKey: ["batch-preview", stopAt, jobIds],
-    queryFn: () => apiSend<Batch>("POST", "/api/batches", { job_ids: jobIds, stop_at: stopAt, dry_run: true }),
+    queryKey: ["batch-preview", stopAt, jobIds, stops],
+    queryFn: () => apiSend<Batch>("POST", "/api/batches", { job_ids: jobIds, stop_at: stopAt, stops, dry_run: true }),
     enabled: jobIds.length > 0,
     placeholderData: keepPreviousData,
   });
@@ -24,10 +27,10 @@ export function useBatchPreview(jobIds: string[], stopAt: StopAt) {
 export function useStartBatch() {
   const [savedId, setSavedId] = useState<string | null>(null);
   const m = useMutation({
-    mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name: string }) => {
+    mutationFn: async (v: { jobIds: string[]; stopAt: StopAt; name?: string; stops?: Stops }) => {
       let id = savedId;
       if (!id) {
-        id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name })).id!;
+        id = (await apiSend<Batch>("POST", "/api/batches", { job_ids: v.jobIds, stop_at: v.stopAt, name: v.name, stops: v.stops })).id!;
         setSavedId(id);
       }
       return apiSend<Batch>("POST", `/api/batches/${encodeURIComponent(id)}/start`);
