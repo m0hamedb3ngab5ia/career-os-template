@@ -11,6 +11,7 @@ import { errorText, useToday, useTodayStatus } from "./api";
 import { HeaderActions } from "./HeaderActions";
 import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
+import { NextStepCard } from "./NextStepCard";
 import { NextScheduled } from "./NextScheduled";
 import { PausedBanner } from "./PausedBanner";
 import { PipelineChart } from "./PipelineChart";
@@ -52,6 +53,7 @@ export function TodayPage() {
         ) : null}
         <div className={styles.columns}>
           <div className={styles.main}>
+            <NextStepCard />
             {batchId ? (
               <p className={styles.batchNote}>
                 Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}

@@ -168,6 +168,8 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     app.include_router(profile.router, prefix="/api")
     from careeros.ui.routers import ui_state  # first-run tour flag (TASK-019)
     app.include_router(ui_state.router, prefix="/api")
+    from careeros.ui.routers import next_step  # Today next-step card (TASK-020)
+    app.include_router(next_step.router, prefix="/api")
 
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:

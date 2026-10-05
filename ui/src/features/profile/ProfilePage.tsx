@@ -10,6 +10,7 @@ import {
 } from "./api";
 import styles from "./Profile.module.css";
 import { ReadinessCard } from "./ReadinessCard";
+import { JustReadyNextStep } from "../today/NextStepCard";
 
 /** Loading / error (with Try again) / empty states shared by every section. */
 function Loaded<T>({ q, empty, children }: { q: { data?: T; isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown }; empty: (d: T) => boolean; children: (d: T) => ReactNode }) {
@@ -132,6 +133,7 @@ export function ProfilePage() {
       <div className={styles.stack}>
         {failed ? <p role="alert" className={styles.banner}>{errorText(failed.error)}</p> : null}
         <ReadinessCard />
+        <JustReadyNextStep />
         <Section id="resumes" title="Résumés" intro="The master résumé is the source for profile/master.yaml.">
           <Loaded q={resumes} empty={(d) => !d.resumes.length}>
             {(d) => (
