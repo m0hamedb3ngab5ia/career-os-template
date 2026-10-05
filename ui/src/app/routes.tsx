@@ -24,6 +24,7 @@ export const routes: RouteObject[] = [
       // Old Runs paths (design doc 2.1): kept as redirects so bookmarks and links still land.
       { path: "runs", loader: ({ request }) => redirect(`/automation${new URL(request.url).search}`) },
       { path: "runs/:runId", loader: ({ request, params }) => redirect(`/automation/runs/${encodeURIComponent(params.runId!)}${new URL(request.url).search}`) },
+      { path: "profile", lazy: () => import("../features/profile/ProfilePage").then((m) => ({ Component: m.ProfilePage })) },
       { path: "settings/:section?", lazy: () => import("../features/settings/SettingsPage").then((m) => ({ Component: m.SettingsPage })) },
       { path: "kit", lazy: () => import("../features/kit/KitPage").then((m) => ({ Component: m.KitPage })) },
       { path: "*", element: <NotFoundPage /> },

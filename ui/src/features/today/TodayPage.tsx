@@ -15,6 +15,7 @@ import { NextScheduled } from "./NextScheduled";
 import { PausedBanner } from "./PausedBanner";
 import { PipelineChart } from "./PipelineChart";
 import { RecentRuns } from "./RecentRuns";
+import { ReadinessCard } from "../profile/ReadinessCard";
 import styles from "./Today.module.css";
 import type { ActionItem } from "./types";
 
@@ -64,6 +65,7 @@ export function TodayPage() {
           </div>
           {s ? (
             <aside className={styles.side} aria-label="Runs and pipeline">
+              <ReadinessCard />
               <RecentRuns runs={s.recent_runs ?? []} now={now} />
               <NextScheduled schedule={s.schedule ?? {}} catchUp={s.catch_up} now={now} />
               <PipelineChart columns={s.pipeline?.columns ?? []} />

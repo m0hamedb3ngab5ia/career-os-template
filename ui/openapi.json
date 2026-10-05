@@ -605,6 +605,35 @@
         "title": "Answer",
         "type": "object"
       },
+      "AnswerEdit": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "eeo": {
+            "default": false,
+            "title": "Eeo",
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "answer"
+        ],
+        "title": "AnswerEdit",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -6524,6 +6553,163 @@
         "title": "SafetyHint",
         "type": "object"
       },
+      "Sample": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size"
+        ],
+        "title": "Sample",
+        "type": "object"
+      },
+      "SampleChange": {
+        "properties": {
+          "learn_error": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learn Error"
+          },
+          "learn_run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Learn Run"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/Sample"
+            },
+            "title": "Samples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "samples"
+        ],
+        "title": "SampleChange",
+        "type": "object"
+      },
+      "Samples": {
+        "properties": {
+          "learned": {
+            "title": "Learned",
+            "type": "string"
+          },
+          "samples": {
+            "items": {
+              "$ref": "#/components/schemas/Sample"
+            },
+            "title": "Samples",
+            "type": "array"
+          }
+        },
+        "required": [
+          "samples",
+          "learned"
+        ],
+        "title": "Samples",
+        "type": "object"
+      },
+      "SavedAnswer": {
+        "properties": {
+          "answer": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Answer"
+          },
+          "company": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Company"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          },
+          "match": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Match",
+            "type": "array"
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Note"
+          },
+          "scope": {
+            "enum": [
+              "general",
+              "company",
+              "eeo"
+            ],
+            "title": "Scope",
+            "type": "string"
+          }
+        },
+        "required": [
+          "scope",
+          "key"
+        ],
+        "title": "SavedAnswer",
+        "type": "object"
+      },
+      "SavedAnswers": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/SavedAnswer"
+            },
+            "title": "Answers",
+            "type": "array"
+          }
+        },
+        "required": [
+          "answers"
+        ],
+        "title": "SavedAnswers",
+        "type": "object"
+      },
       "Schedule": {
         "properties": {
           "catch_up": {
@@ -10945,6 +11131,41 @@
         ]
       }
     },
+    "/api/learning/lessons/{lid}": {
+      "delete": {
+        "operationId": "delete_lesson_api_learning_lessons__lid__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "lid",
+            "required": true,
+            "schema": {
+              "title": "Lid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Lesson",
+        "tags": [
+          "learning"
+        ]
+      }
+    },
     "/api/meta": {
       "get": {
         "operationId": "meta_api_meta_get",
@@ -11048,6 +11269,138 @@
         "summary": "Board",
         "tags": [
           "pipeline"
+        ]
+      }
+    },
+    "/api/profile/answers": {
+      "get": {
+        "operationId": "list_answers_api_profile_answers_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnswers"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Answers",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/profile/answers/{key}": {
+      "delete": {
+        "operationId": "delete_answer_api_profile_answers__key__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "company",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Company"
+            }
+          },
+          {
+            "in": "query",
+            "name": "eeo",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Eeo",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "204": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Answer",
+        "tags": [
+          "profile"
+        ]
+      },
+      "put": {
+        "operationId": "edit_answer_api_profile_answers__key__put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "key",
+            "required": true,
+            "schema": {
+              "title": "Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/AnswerEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SavedAnswer"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Answer",
+        "tags": [
+          "profile"
         ]
       }
     },
@@ -11828,6 +12181,141 @@
         "summary": "Get Version",
         "tags": [
           "resumes"
+        ]
+      }
+    },
+    "/api/profile/samples": {
+      "get": {
+        "operationId": "list_samples_api_profile_samples_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Samples"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "List Samples",
+        "tags": [
+          "profile"
+        ]
+      },
+      "put": {
+        "operationId": "upload_sample_api_profile_samples_put",
+        "parameters": [
+          {
+            "in": "query",
+            "name": "filename",
+            "required": true,
+            "schema": {
+              "title": "Filename",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/octet-stream": {
+              "schema": {
+                "format": "binary",
+                "type": "string"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "201": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Upload Sample",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/profile/samples/learn": {
+      "post": {
+        "operationId": "relearn_api_profile_samples_learn_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Relearn",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/profile/samples/{name}": {
+      "delete": {
+        "operationId": "remove_sample_api_profile_samples__name__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "name",
+            "required": true,
+            "schema": {
+              "title": "Name",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SampleChange"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Remove Sample",
+        "tags": [
+          "profile"
         ]
       }
     },
