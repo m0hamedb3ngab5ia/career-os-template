@@ -157,9 +157,9 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
   // REQ-114: one prepare run per check (ticks the job). Above threshold it just runs; below, it tailors from
   // master and the dialog stays open for the REQ-116 keep/discard question.
   const prepare = useMutation({
-    mutationFn: () => apiSend("POST", `${path}/tailor`),
-    onSuccess: () => {
-      if (q.data?.stage !== "ready") return refresh();
+    mutationFn: (_stage: string) => apiSend("POST", `${path}/tailor`),
+    onSuccess: (_data, stage) => {
+      if (stage !== "ready") return refresh(); // the stage clicked on, not a later poll's
       refresh();
       toast.show({ message: "Prepare run started. Follow it on the Runs page." });
       onDone();
@@ -192,7 +192,7 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
           {s.scored ? <Fit jobId={jobId} /> : null}
           {s.scored && s.resumes.length ? <MatchesTable m={s} /> : null}
           {s.scored && !s.resumes.length ? <p>No résumés yet. Add one on the Profile page.</p> : null}
-          {s.notice ? <p>{s.notice}</p> : null}
+          {s.notice ? <p id={`${jobId}-check-notice`}>{s.notice}</p> : null}
           {s.stage === "ready" ? <p>Best match {best}, threshold {s.threshold}.</p> : null}
           {s.stage === "ready_tailored" ? (
             <p>The tailored résumé scores {String(s.attempt?.score)}, threshold {s.threshold}.</p>
@@ -204,19 +204,20 @@ function Result({ created, onDone }: { created: Created; onDone: () => void }) {
             </p>
           ) : null}
           {s.stage === "tailor_failed" ? <p>The tailor run ended without a résumé. You can try again.</p> : null}
-          {created.flagged && PREPARE.has(s.stage) ? (
-            <p>Mark it checked on the job page before preparing it.</p>
-          ) : null}
           {PREPARE.has(s.stage) || s.stage === "not_tailorable" ? (
             <div className={styles.checkActions}>
               <Button onClick={onDone} disabled={prepare.isPending}>
                 Cancel
               </Button>
-              {PREPARE.has(s.stage) ? (
-                <Button variant="primary" pending={prepare.isPending} onClick={() => prepare.mutate()}>
-                  Prepare application
-                </Button>
-              ) : null}
+              <Button
+                variant="primary"
+                pending={prepare.isPending}
+                disabled={!PREPARE.has(s.stage)}
+                aria-describedby={s.notice ? `${jobId}-check-notice` : undefined}
+                onClick={() => prepare.mutate(s.stage)}
+              >
+                Prepare application
+              </Button>
             </div>
           ) : null}
           {s.stage === "confirm" ? (

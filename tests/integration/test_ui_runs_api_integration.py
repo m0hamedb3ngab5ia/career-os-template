@@ -349,5 +349,7 @@ def test_refused_job_run_leaves_the_job_unticked(client, data, fakes):
     with pytest.raises(JobNotRunnable, match="queued"):  # the API maps it to 409
         fakes.factory(data["settings"]).start("prepare", job_id=jid)
     assert not store.is_selected(jid) and fakes.spawned == []
-    fakes.factory(data["settings"]).start("prepare", job_id=jid, force=True)  # accepted: ticked (REQ-104)
-    assert store.is_selected(jid) and fakes.spawned
+    store.set_selected([jid], True)  # a job the user ticked stays ticked
+    with pytest.raises(JobNotRunnable):
+        fakes.factory(data["settings"]).start("prepare", job_id=jid)
+    assert store.is_selected(jid)
