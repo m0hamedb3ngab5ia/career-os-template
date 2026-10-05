@@ -1,5 +1,5 @@
 """GET /api/next-step (REQ-122): the one next action for the Today card, from the first rule that holds:
-setup open -> Finish setup; no jobs -> Find jobs (scout); none ticked -> Pick jobs; a batch running -> See progress;
+setup open -> Finish setup; no active (non-closed) jobs -> Find jobs (scout); none ticked -> Pick jobs; a batch running -> See progress;
 else Start pipeline."""
 from __future__ import annotations
 
@@ -36,7 +36,11 @@ def pick(items: list[dict[str, Any]], *, jobs: int, ticked: int, running_batch: 
 def next_step(c=Depends(ctx)) -> NextStep:
     from careeros import readiness
     from careeros.runs import batches
+    from careeros.ui.config import load_ui_config
+    from careeros.ui.services.jobs import _tab_clause
 
-    row = c.index.query("SELECT COUNT(*) AS n, COALESCE(SUM(selected), 0) AS t FROM jobs", ())[0]
+    where, params = _tab_clause("active", load_ui_config(c.settings).closed)
+    row = c.index.query("SELECT COUNT(*) AS n, COALESCE(SUM(selected), 0) AS t FROM jobs"
+                        + (f" WHERE {where}" if where else ""), params)[0]
     running = next((b for b in batches.list_ids(c.settings) if batches.running(c.settings, b)), None)
     return pick(readiness.items(c.settings.root), jobs=row["n"], ticked=row["t"], running_batch=running)

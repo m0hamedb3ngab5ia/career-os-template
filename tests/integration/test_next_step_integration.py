@@ -48,3 +48,11 @@ def test_e2e_014_02_ready_no_ticked_jobs_says_pick_jobs(client):
 def test_ticked_jobs_no_batch_says_start_pipeline(client):
     client, _ = client
     assert client.get("/api/next-step").json()["key"] == "start_pipeline"
+
+
+def test_all_jobs_closed_says_find_jobs(client):
+    client, ix = client
+    from careeros.ui.config import load_ui_config
+    closed = load_ui_config(ix.settings).closed
+    ix.con.execute("UPDATE jobs SET status = ?", (closed[0],))
+    assert client.get("/api/next-step").json()["key"] == "find_jobs"

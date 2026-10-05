@@ -26,8 +26,12 @@ const WHY: Record<NextStep["key"], string> = {
 export function NextStepCard() {
   const qc = useQueryClient();
   const toast = useToast();
-  const step = useQuery({ queryKey: ["next-step"], queryFn: () => apiFetch<NextStep>("/api/next-step") });
-  const scout = useStepRun("scout", undefined, () => void qc.invalidateQueries({ queryKey: ["next-step"] }));
+  const step = useQuery({ queryKey: ["today", "next-step"], queryFn: () =>
+    apiFetch<NextStep>("/api/next-step").catch((e: unknown) => {
+      console.warn("GET /api/next-step failed; Next step card hidden", e); // hidden per spec, but not invisible
+      throw e;
+    }) });
+  const scout = useStepRun("scout", undefined, () => void qc.invalidateQueries({ queryKey: ["today", "next-step"] }));
   const s = step.data;
   if (!s) return null;
   return (
@@ -54,7 +58,8 @@ export function NextStepCard() {
 
 /** REQ-122 on Profile: the card appears once, when the last must-have closes while the page is open. */
 export function JustReadyNextStep() {
-  const ready = useReadiness().data?.ready;
+  const r = useReadiness();
+  const ready = r.isFetchedAfterMount ? r.data?.ready : undefined; // ignore a stale cached value until refetched
   const [was, setWas] = useState(ready);
   const [shown, setShown] = useState(false);
   if (ready !== was) {

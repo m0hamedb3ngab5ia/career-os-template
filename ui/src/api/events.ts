@@ -44,6 +44,7 @@ export function keysForChange(p: ChangedPayload): QueryKey[] {
     add(["today"]); // recent runs, catch-up and the prepare queue
   }
   for (const id of p.batches ?? []) add(["batch", id]);
+  if (p.batches?.length) add(["today"]); // the Next step card (["today", "next-step"]) says See progress while one runs
   if (p.actions) {
     add(["status"]);
     add(["actions"]);

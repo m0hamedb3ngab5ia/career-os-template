@@ -38,8 +38,23 @@ describe("NextStepCard (REQ-122)", () => {
     const { qc } = renderWithApp(<JustReadyNextStep />);
     await waitFor(() => expect(qc.getQueryData(["readiness"])).toBeTruthy());
     expect(screen.queryByRole("heading", { name: "Next step" })).not.toBeInTheDocument();
-    act(() => qc.setQueryData(["readiness"], { ready: true, items: [] }));
+    act(() => qc.setQueryData(["today", "next-step"], { key: "finish_setup", label: "Finish setup", href: "/profile" }));
+    await act(async () => qc.setQueryData(["readiness"], { ready: true, items: [] }));
+    expect(screen.queryByRole("link", { name: "Finish setup" })).not.toBeInTheDocument(); // no stale flash
     expect(await screen.findByRole("link", { name: "Start pipeline" })).toHaveAttribute("href", "/pipeline/batch/new");
+  });
+
+  it("Profile: a stale cached not-ready that refetches as ready shows no card", async () => {
+    let ready = false;
+    mockApi({ "GET /api/readiness": () => Response.json({ ready, items: [] }), ...step("pick_jobs", "Pick jobs", "/jobs") });
+    const { qc, router } = renderWithApp(<JustReadyNextStep />);
+    await waitFor(() => expect(qc.getQueryData(["readiness"])).toEqual({ ready: false, items: [] }));
+    await act(() => router.navigate("/elsewhere"));
+    ready = true;
+    await act(() => router.navigate("/"));
+    await waitFor(() => expect(qc.getQueryData(["readiness"])).toEqual({ ready: true, items: [] }));
+    await new Promise((r) => setTimeout(r, 20));
+    expect(screen.queryByRole("heading", { name: "Next step" })).not.toBeInTheDocument();
   });
 
   it("Profile: no card when readiness is already done on load", async () => {
