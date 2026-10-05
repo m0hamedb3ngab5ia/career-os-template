@@ -55,7 +55,7 @@ export function BatchProgressPage() {
 
   if (!b) {
     return (
-      <Page title="Batch" busy={batch.isPending}>
+      <Page title="Batch" busy={batch.isPending} subtitle="Follow each job through its stages · pause, cancel or retry here">
         {batch.error instanceof ApiError && batch.error.status === 404 ? (
           <EmptyState title="Batch not found" action={<Link to="/pipeline">Back to Pipeline</Link>}>
             It may have been deleted, or the link is wrong.

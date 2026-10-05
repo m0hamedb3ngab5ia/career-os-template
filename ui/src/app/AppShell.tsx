@@ -1,11 +1,10 @@
 import type { LucideIcon } from "lucide-react";
-import { Activity, Inbox, KanbanSquare, Search, Settings, Sun, Table2, Users, Zap } from "lucide-react";
+import { Inbox, KanbanSquare, Search, Settings, Sun, Table2, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
 import { useStatus } from "../api/queries";
 import type { StatusSummary } from "../api/types";
-import { HUMAN } from "../kit/labels";
 import { formatCount, formatRelative } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import styles from "./AppShell.module.css";
@@ -18,7 +17,7 @@ interface NavItem {
   end?: boolean;
 }
 
-// Sidebar groups and counts from design doc 2.1. All tasks (/actions) is linked from Today, not the nav.
+// Sidebar groups and counts from design doc 2.1; max 6 items (REQ-119/IA). Runs open from Today, Contacts from a job. All tasks (/actions) is linked from Today, not the nav.
 const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Job search",
@@ -32,8 +31,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "More",
     items: [
-      { to: "/automation", label: HUMAN.term.runs, icon: Activity },
-      { to: "/contacts", label: "Contacts", icon: Users },
       { to: "/settings", label: "Settings", icon: Settings },
     ],
   },

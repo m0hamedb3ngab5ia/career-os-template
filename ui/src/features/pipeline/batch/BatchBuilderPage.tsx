@@ -77,7 +77,7 @@ export function BatchBuilderPage() {
 
   if (start.data?.id) {
     return (
-      <Page title="New batch">
+      <Page title="New batch" subtitle="The batch is running · follow its progress">
         <p role="status">
           {start.data.name ?? "Batch"} started.{" "}
           <Link to={`/pipeline/batch/${encodeURIComponent(start.data.id)}`}>Follow batch progress</Link>
@@ -94,7 +94,7 @@ export function BatchBuilderPage() {
           <SegmentedControl label="Stop after" value={stop} onValueChange={pickStop}>
             {STOP_POINTS.map((s) => (
               <SegmentedControl.Option key={s.value} value={s.value} disabled={s.value === "submit" && !autoSubmit}
-                describedBy={s.value === "submit" && autoOff ? reasonId : undefined}>
+                describedBy={s.value === "submit" && !autoSubmit ? reasonId : undefined}>
                 {s.label}
               </SegmentedControl.Option>
             ))}
@@ -104,6 +104,8 @@ export function BatchBuilderPage() {
               Auto-submit is off in Settings, so a batch can fill applications but not submit them.{" "}
               <Link to="/settings/runs">Change in Settings</Link>
             </p>
+          ) : !autoSubmit ? (
+            <p id={reasonId} className={styles.note}>Checking whether auto-submit is on in Settings…</p>
           ) : null}
           <ul className={styles.rules}>
             {HARD_RULES.map((r) => <li key={r}>{r}</li>)}
@@ -190,7 +192,9 @@ export function BatchBuilderPage() {
           </section>
         ) : (
           <div className={styles.row}>
-            <Button variant="primary" disabled={chosen.length === 0 || stale} onClick={() => setConfirming(true)}>
+            <Button variant="primary" disabled={chosen.length === 0 || stale}
+              title={chosen.length === 0 ? "Pick at least one job" : stale ? "Updating the job list…" : undefined}
+              onClick={() => setConfirming(true)}>
               Review and start
             </Button>
           </div>

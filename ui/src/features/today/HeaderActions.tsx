@@ -65,6 +65,7 @@ export function HeaderActions({ queue, paused }: Props) {
           pendingLabel="Starting…"
           disabled={!queue || reason !== null}
           aria-describedby={reason ? reasonId : undefined}
+          title={!queue ? "Loading the queue…" : undefined}
           onClick={() =>
             prepare.mutate(meta.data?.presets?.recommended, {
               onSuccess: () => toast.show({ message: "Prepare started." }),

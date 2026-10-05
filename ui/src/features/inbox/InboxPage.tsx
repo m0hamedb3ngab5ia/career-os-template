@@ -2,7 +2,7 @@ import { ArrowLeft, Mail, RefreshCw, Settings, TriangleAlert } from "lucide-reac
 import { useState, type ReactNode } from "react";
 import { Link, useParams } from "react-router";
 import { Page } from "../../app/PageHeader";
-import { Button } from "../../kit/Button";
+import { Button, ButtonLink } from "../../kit/Button";
 import { Chip, StatusChip } from "../../kit/chips";
 import { EmptyState } from "../../kit/EmptyState";
 import { ExternalLink } from "../../kit/ExternalLink";
@@ -39,7 +39,7 @@ function nextChipText(r: InboxRow): string {
 export function InboxPage() {
   const { jobId } = useParams();
   const now = useNow(60_000);
-  const { data, isPending, isError, error } = useInbox();
+  const { data, isPending, isError, error, refetch } = useInbox();
   const items = data?.items ?? [];
   const paged = usePaged(items);
   const selectedId = jobId ?? items[0]?.job_id;
@@ -66,7 +66,7 @@ export function InboxPage() {
     >
       {isError ? (
         <div role="alert" className={styles.card}>
-          <EmptyState title="Couldn't load the inbox">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
+          <EmptyState title="Couldn't load the inbox" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then try again.</EmptyState>
         </div>
       ) : isPending ? (
         <div className={styles.card} aria-busy="true">
@@ -74,7 +74,7 @@ export function InboxPage() {
         </div>
       ) : items.length === 0 ? (
         <div className={styles.card}>
-          <EmptyState title="Nothing after applying yet">
+          <EmptyState title="Nothing after applying yet" action={<ButtonLink to="/jobs">Open Jobs</ButtonLink>}>
             Jobs show up here once they are applied, with replies from inbox sync and the follow-ups due.
           </EmptyState>
         </div>
@@ -134,11 +134,11 @@ export function InboxPage() {
 }
 
 function ThreadPane({ jobId, sendingReason }: { jobId: string; sendingReason: string }) {
-  const { data, isPending, isError, error } = useInboxThread(jobId);
+  const { data, isPending, isError, error, refetch } = useInboxThread(jobId);
   if (isError)
     return (
       <div role="alert" className={styles.card}>
-        <EmptyState title="Couldn't load this job">{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then reload.</EmptyState>
+        <EmptyState title="Couldn't load this job" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{error instanceof Error ? `${error.message}. ` : ""}Check that Career OS is still running, then try again.</EmptyState>
       </div>
     );
   if (isPending || !data)

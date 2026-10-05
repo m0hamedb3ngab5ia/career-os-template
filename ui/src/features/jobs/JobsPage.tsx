@@ -239,9 +239,20 @@ export function JobsPage() {
         Try a company, role or location, or another tab.
       </EmptyState>
     ) : (
-      <EmptyState title="No jobs here yet">
+      <EmptyState
+        title="No jobs here yet"
+        action={
+          tab === "all" ? (
+            <Link to="/automation">Open Automation</Link>
+          ) : (
+            <Button size="small" onClick={() => update({ tab: "all" }, true)}>
+              Show all jobs
+            </Button>
+          )
+        }
+      >
         {tab === "all"
-          ? "Scout adds postings to this table. Run scout from Runs or the command line."
+          ? "Scout adds postings to this table. Run scout from Automation or the command line."
           : "Nothing in this tab right now. Other tabs may have jobs."}
       </EmptyState>
     );

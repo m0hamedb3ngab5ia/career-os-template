@@ -3,14 +3,15 @@ import styles from "./PageHeader.module.css";
 
 interface PageProps {
   title: string;
-  subtitle?: ReactNode;
+  /** REQ-119 guidance line: what the page is for and the next thing to do. */
+  subtitle: ReactNode;
   actions?: ReactNode;
   children?: ReactNode;
   /** The title is a placeholder while the page loads: marked aria-busy so the route announcer waits for the real one. */
   busy?: boolean;
 }
 
-/** Page frame: large title, optional subtitle and right-aligned actions, then the body. Sets the tab title. */
+/** Page frame: large title, guidance line and right-aligned actions, then the body. Sets the tab title. */
 export function Page({ title, subtitle, actions, children, busy }: PageProps) {
   useEffect(() => {
     document.title = `${title} · career-os`;

@@ -144,7 +144,10 @@ export function JobDetailPage() {
   if (job.isError) {
     const missing = job.error instanceof ApiError && job.error.status === 404;
     return (
-      <Page title={missing ? "Job not found" : "Couldn’t load this job"}>
+      <Page
+        title={missing ? "Job not found" : "Couldn’t load this job"}
+        subtitle={missing ? "This job is gone or the link is wrong · go back to Jobs" : "Career OS didn’t answer · try again"}
+      >
         <EmptyState
           title={missing ? "No job with this ID" : "Something went wrong"}
           action={

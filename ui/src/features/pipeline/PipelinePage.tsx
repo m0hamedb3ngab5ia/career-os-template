@@ -50,7 +50,7 @@ export function PipelinePage() {
   const [params, setParams] = useSearchParams();
   const filters: Filters = { tier: "", category: "", safety: "", location: "" };
   for (const k of FILTER_KEYS) filters[k] = params.get(k) ?? "";
-  const { data: board, isPending, error } = useBoard(filters);
+  const { data: board, isPending, error, refetch } = useBoard(filters);
   const meta = useMeta().data;
   const setStatus = useSetStatus();
   const toast = useToast();
@@ -155,7 +155,7 @@ export function PipelinePage() {
   return (
     <Page title="Pipeline" subtitle="How jobs move from discovery to an offer" actions={<Link to="/pipeline/batch/new">New batch</Link>}>
       {error ? (
-        <EmptyState title="Couldn't load the pipeline">{problem(error)}</EmptyState>
+        <EmptyState title="Couldn't load the pipeline" action={<Button size="small" onClick={() => void refetch()}>Try again</Button>}>{problem(error)}</EmptyState>
       ) : isPending || !board ? null : (
         <>
           <h2 className={styles.sectionTitle} id={`${titleId}-funnel`}>

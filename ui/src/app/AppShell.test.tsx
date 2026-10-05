@@ -50,8 +50,6 @@ describe("AppShell", () => {
       "Jobs",
       "Pipeline",
       "Inbox",
-      "Automation",
-      "Contacts",
       "Settings",
     ]);
     for (const g of ["Job search", "More"]) expect(within(nav).getByText(g)).toBeInTheDocument();
@@ -67,10 +65,10 @@ describe("AppShell", () => {
   });
 
   it("marks the current section and shows its page heading", async () => {
-    renderAt("/automation");
-    expect(await screen.findByRole("link", { name: "Automation" })).toHaveAttribute("aria-current", "page");
+    renderAt("/settings");
+    expect(await screen.findByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
     // the screen is a lazy route: allow for its chunk to load
-    expect(await screen.findByRole("heading", { level: 1, name: "Automation" }, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Settings" }, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it("shows live counts from /api/status; zero when there is no data yet", async () => {
@@ -178,12 +176,12 @@ describe("AppShell route changes", () => {
     const user = userEvent.setup();
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: "Sections" });
-    await user.click(within(nav).getByRole("link", { name: /^Automation/ }));
-    const h1 = await screen.findByRole("heading", { level: 1, name: "Automation" });
+    await user.click(within(nav).getByRole("link", { name: /^Settings/ }));
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Settings" });
     const main = screen.getByRole("main");
     await waitFor(() => expect(main).toHaveFocus());
     expect(main.contains(h1)).toBe(true);
-    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Automation");
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Settings");
   });
 
   it("does not announce or move focus on the first load", async () => {

@@ -118,3 +118,9 @@
 - Answer (2026-10-04): default accepted.
 - Status: answered
 
+
+### Q-020 Header primary action on Settings and Kit
+- Links: REQ-119, TASK-018
+- Context: Settings has no header primary action; its sticky SaveBar (Save changes) is the page's primary action. Kit is an internal component showcase, not in nav, with no primary action.
+- Default (recommended): Settings counts its SaveBar as the primary action; Kit is exempt from REQ-119's primary-action rule (guidance line still required).
+- Status: open
