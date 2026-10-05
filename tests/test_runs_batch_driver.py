@@ -175,6 +175,21 @@ def test_apply_reruns_submit_verdict_tier_a_never_submits(settings, stop_at, tie
     assert out["selected"][0]["auto_submit"] is (want == "1")
 
 
+
+def test_tier_a_scored_after_create_is_capped_at_fill(settings):
+    allow_submit(settings)
+    settings.pipeline["runs"]["auto_submit"]["allow"] = ["tier_a", "tier_b"]
+    s = Store(settings)
+    jid = add_job(s, 1)  # found: no score.json at create, so no Tier A cap yet
+    b = batches.create(settings, [jid], "submit", now=NOW)
+    assert b["selected"][0]["stop_at"] == "submit" and "cap" not in b["selected"][0]
+    run = fake_run([], on_call=lambda n: n == 1 and put(s, jid, "scored", tier="A"))  # the score run: Tier A
+    r = batches.drive(settings, b["id"], run=run)["selected"][0]
+    assert [k for k, _, _ in run.calls] == ["score", "prepare", "apply"]
+    assert r["stop_at"] == "fill" and r["cap"].startswith("tier_a") and r["submit_reason"] == r["cap"]
+    assert r["auto_submit"] is False and run.calls[-1][2] != run.calls[0][2]  # apply ran with submit off
+
+
 def test_batch_lock_single_driver(settings):
     b = make(settings, 1)
     lk = locks.acquire(batches._lock_path(settings, b["id"]), owner="other", ttl_seconds=60, pid=None)

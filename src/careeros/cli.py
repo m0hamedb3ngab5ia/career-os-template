@@ -1565,9 +1565,12 @@ def cmd_batch_create(args: argparse.Namespace) -> int:
     from careeros.runs import batches
 
     try:
-        stops = dict(js.split("=", 1) for js in args.job_stop or [] if "=" in js)
-        if len(stops) != len(args.job_stop or []):
+        pairs = [js.split("=", 1) for js in args.job_stop or []]
+        if any(len(p) != 2 for p in pairs):
             raise ValueError("--job-stop takes JOB_ID=STAGE")
+        stops = dict(pairs)
+        if len(stops) != len(pairs):
+            raise ValueError("--job-stop: a job is given more than once")
         b = batches.create(_settings(args), args.job_ids, args.stop_at, name=args.name, dry_run=args.dry_run,
                            stops=stops)
     except ValueError as e:

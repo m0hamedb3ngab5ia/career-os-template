@@ -201,3 +201,5 @@ def test_cli_job_stop(data, tmp_path):
     assert json.loads(ok.stdout)["selected"][0]["stages"] == ["score", "prepare"]
     bad = cli("--job-stop", "nope")
     assert bad.returncode == 2 and "JOB_ID=STAGE" in bad.stderr
+    dup = cli("--job-stop", f"{jid}=prepare", "--job-stop", f"{jid}=fill")
+    assert dup.returncode == 2 and "more than once" in dup.stderr

@@ -185,6 +185,31 @@ def test_linkedin_submit_is_lowered_to_prepare(settings):
     assert r["stop_at"] == "prepare" and r["stages"] == ["score", "prepare"] and "LinkedIn" in r["cap"]
 
 
+
+@pytest.mark.parametrize("posting,want", [
+    ({"apply_url": "www.linkedin.com/jobs/view/1"}, True),  # scheme-less: must not fail open
+    ({"url": "linkedin.com/jobs/view/1"}, True),
+    ({"ats": "linkedin"}, True),  # no URL at all: the board is the only signal
+    ({"ats": "LinkedIn", "apply_url": "https://boards.greenhouse.io/x/jobs/1"}, False),
+    ({"apply_url": "boards.greenhouse.io/x/jobs/1"}, False),
+    ({"apply_url": "https://notlinkedin.com/x"}, False),
+])
+def test_is_linkedin(posting, want):
+    assert batches.is_linkedin(posting) is want
+
+
+def test_schemeless_linkedin_apply_url_is_capped(settings):
+    s = Store(settings)
+    li = add_job(s, 1, apply_url="www.linkedin.com/jobs/view/1")
+    r = batches.preview(settings, [li], "score", now=NOW, stops={li: "submit"})["selected"][0]
+    assert r["stop_at"] == "prepare" and "LinkedIn" in r["cap"]
+
+
+def test_kind_follows_the_highest_stop(settings):
+    s = Store(settings)
+    a, c = add_job(s, 1), add_job(s, 2, company="C2")
+    assert batches.preview(settings, [a, c], "prepare", now=NOW, stops={c: "fill"})["kind"] == "apply"
+
 @pytest.mark.readiness
 def test_readiness_open_caps_fill_and_submit_at_prepare(settings):
     s = Store(settings)  # the example root still has example data: readiness must-haves open

@@ -42,6 +42,9 @@ _ID = re.compile(r"[\w-]{1,80}")
 _HARD = ("not found", "pruned", "posting.json unreadable")
 
 
+_TIER_A_CAP = "tier_a: never auto-submitted, stops at fill"
+
+
 def _hard(reason: str) -> bool:
     return reason in _HARD or reason.startswith("filtered:")
 
@@ -52,7 +55,10 @@ def _dir(settings: Settings) -> Path:
 
 def is_linkedin(posting: dict[str, Any]) -> bool:
     """LinkedIn Easy Apply: keyed on the apply URL host (REQ-118), not the board the job was found on."""
-    host = urlparse(str(posting.get("apply_url") or posting.get("url") or "")).hostname or ""
+    u = str(posting.get("apply_url") or posting.get("url") or "").strip()
+    if not u:  # no URL at all: the board it was found on is the only signal
+        return str(posting.get("ats") or "").lower() == "linkedin"
+    host = urlparse(u if "//" in u else "//" + u).hostname or ""  # scheme-less URLs must not fail open
     return host == "linkedin.com" or host.endswith(".linkedin.com")
 
 
@@ -65,7 +71,7 @@ def _cap(settings: Settings, store: Store, jid: str, stop: str, ready) -> tuple[
     if not ready():
         return "prepare", "setup not finished (readiness must-haves open): stops at prepare"
     if stop == "submit" and is_tier_a((store._read(jid, "score.json") or {}).get("tier")):
-        return "fill", "tier_a: never auto-submitted, stops at fill"
+        return "fill", _TIER_A_CAP
     return stop, None
 
 
@@ -123,7 +129,8 @@ def preview(settings: Settings, job_ids: list[str], stop_at: str, now: datetime 
         else:
             ok, why = auto_submit_verdict(settings, store, cfg, r)
         r["auto_submit"], r["submit_reason"] = ok, why
-    return {"stop_at": stop_at, **({"stops": stops} if stops else {}), "kind": STOP_POINTS[stop_at][-1],
+    return {"stop_at": stop_at, **({"stops": stops} if stops else {}), "kind": STOP_POINTS[max(
+        [r["stop_at"] for r in selected] or [stop_at], key=list(STOP_POINTS).index)][-1],
             "selected": selected, "excluded": [{"job_id": j, "reason": excluded[j]} for j in ids if j in excluded]}
 
 
@@ -289,6 +296,8 @@ def _job_stages(settings: Settings, b: dict[str, Any], r: dict[str, Any], cfg: R
                     r["state"], r["reason"] = "needs_you", "LinkedIn: apply yourself on LinkedIn"
                     return None
                 at = r.get("stop_at") or b["stop_at"]  # per-job stop (REQ-118); old batches: the batch's
+                if at == "submit" and is_tier_a((store._read(jid, "score.json") or {}).get("tier")):
+                    at, r["stop_at"], r["cap"] = "fill", "fill", _TIER_A_CAP  # scored Tier A after create
                 ok, why = (auto_submit_verdict(settings, store, cfg, r) if at == "submit"
                            else (False, r.get("cap") or f"stop point {at}: never submits"))
                 r["auto_submit"], r["submit_reason"] = ok, why
