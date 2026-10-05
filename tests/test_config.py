@@ -218,6 +218,8 @@ def test_active_categories_and_keyword_helpers():
     ("targets.yaml", "thresholds: [70]\n", "targets.yaml: thresholds"),
     ("targets.yaml", "thresholds: {min_match: high}\n", r"thresholds.min_match must be a whole number 0-100"),
     ("targets.yaml", "thresholds: {min_match: 101}\n", r"thresholds.min_match must be a whole number 0-100"),
+    ("targets.yaml", "thresholds: {min_tweak_gain: abc}\n", r"thresholds.min_tweak_gain must be a whole number 0-100"),
+    ("targets.yaml", "thresholds: {min_tweak_gain: -1}\n", r"thresholds.min_tweak_gain must be a whole number 0-100"),
 ])
 def test_settings_load_rejects_wrong_shapes(tmp_path, fname, body, where):
     root = _root(tmp_path)

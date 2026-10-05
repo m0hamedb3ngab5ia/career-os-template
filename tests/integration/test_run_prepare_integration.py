@@ -210,3 +210,51 @@ def test_e2e_req_104_only_selected_jobs_are_prepared(root, env):
     assert r.returncode == 0, r.stdout + r.stderr
     assert status_of(root, c) == "queued"
     assert json.loads((root / "data" / "jobs" / c / "flags.json").read_text())["selected"] is True
+
+
+def test_e2e_011_01_similar_jobs_reuse_one_variant_with_no_tailor(root, env):
+    import shutil
+
+    from careeros import resumes
+
+    shutil.rmtree(root / "profile" / "resumes")  # personalize()'s stub master has no versions to score
+    rid = resumes.add(root, "cv.pdf", b"%PDF-1.4\nx\n", name="backend")["rid"]
+    resumes.add_text(root, rid, "Python APIs backend software engineer", author="user", source="edit")
+    jobs = [add_job(root, n) for n in range(1, 6)]
+    for j in jobs:
+        sp = root / "data" / "jobs" / j / "score.json"
+        sp.write_text(json.dumps({**json.loads(sp.read_text()), "required_skills": ["Python", "APIs"]}))
+    r = cli(root, env, "run", "prepare", "--max-jobs", "5")
+    assert r.returncode == 0, r.stdout + r.stderr
+    for j in jobs:
+        jd = root / "data" / "jobs" / j
+        choice = json.loads((jd / "resume_choice.json").read_text())
+        assert choice["action"] == "reuse" and choice["rid"] == rid, choice
+        assert not (jd / "tailor.called").exists()
+
+
+def test_resume_pick_cli_unscored_falls_back_to_tailor(root, env):
+    jid = add_job(root, 1)
+    r = cli(root, env, "resume", "pick", jid, "--json")
+    assert r.returncode == 0, r.stderr
+    assert json.loads(r.stdout)["action"] == "tailor"
+
+
+def test_resume_pick_cli_forced_reuse_drops_a_stale_tailored_pdf(root, env):
+    import shutil
+
+    from careeros import resumes
+
+    shutil.rmtree(root / "profile" / "resumes")
+    rid = resumes.add(root, "cv.pdf", b"%PDF-1.4\nx\n", name="backend")["rid"]
+    resumes.add_text(root, rid, "Python APIs backend software engineer", author="user", source="edit")  # no PDF
+    jid = add_job(root, 1)
+    jd = root / "data" / "jobs" / jid
+    sp = jd / "score.json"
+    sp.write_text(json.dumps({**json.loads(sp.read_text()), "required_skills": ["Python", "APIs"]}))
+    (jd / "resume.pdf").write_bytes(b"%PDF stale tailored")
+    r = cli(root, env, "resume", "pick", jid, "--json")
+    assert r.returncode == 0, r.stderr
+    c = json.loads(r.stdout)
+    assert c["action"] == "reuse" and c["text_sha256"]
+    assert not (jd / "resume.pdf").exists()

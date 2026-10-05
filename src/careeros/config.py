@@ -273,9 +273,10 @@ def _check_match(match: Any, thresholds: Any) -> None:
         for k, v in syn.items():
             if v is not None and not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
                 raise ConfigError(f"config/pipeline.yaml: match.synonyms.{k} must be a list of strings, got {v!r}")
-    mm = (thresholds or {}).get("min_match")
-    if mm is not None and not (_whole(mm, 0) and mm <= 100):
-        raise ConfigError(f"config/targets.yaml: thresholds.min_match must be a whole number 0-100, got {mm!r}")
+    for key in ("min_match", "min_tweak_gain"):
+        mm = (thresholds or {}).get(key)
+        if mm is not None and not (_whole(mm, 0) and mm <= 100):
+            raise ConfigError(f"config/targets.yaml: thresholds.{key} must be a whole number 0-100, got {mm!r}")
 
 
 def _check_volume(volume: Any) -> None:

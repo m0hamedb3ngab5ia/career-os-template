@@ -88,7 +88,20 @@ Hand off in `careeros jobs list --status queued --order urgent` order.
 
 ## Step 2: resume
 
-Follow `.claude/skills/tailor-resume/SKILL.md` with `JOB`. Store RESULT as `steps.resume`.
+Read `JOB/resume_choice.json` (written by `careeros run prepare` before this skill; REQ-112/113). If it is
+missing or has `"scored": false`, run `.venv/bin/careeros resume pick <job_id>` now (score.json exists after
+Step 1) and read it again. Then obey `action`, never override it:
+- `reuse`: `resume.txt` / `resume.json` (and `resume.pdf` when the résumé had one) are already in `JOB`. Do NOT
+  run tailor-resume and never edit the text. If `resume.pdf` is missing, `.venv/bin/careeros action add "export
+  résumé <rid> as PDF for <job_id>" --type laptop_required --needs laptop`.
+  `steps.resume = {"reused": rid, "version": version}`.
+- `tweak`: follow tailor-resume with `JOB`, but change at most 3 bullets: bring in exactly the master.yaml ids in
+  `add_bullet_ids` (swap out the weakest bullets), keep everything else as the base résumé
+  `profile/resumes/<rid>/v<version>/resume.json` has it. Only master.yaml bullets by id; numbers frozen. QA hard
+  check `tweak_cap` fails any other added id.
+- `tailor`: follow `.claude/skills/tailor-resume/SKILL.md` with `JOB` (full tailor from master).
+After a passing QA, `careeros run prepare` saves a tweak/tailor `resume.txt` as a `tailored` résumé for the job's
+category so later jobs reuse it. Store RESULT as `steps.resume`.
 If it reports `qa_hard_fails` non-empty after its own fix loop, continue (qa-review will judge).
 
 ## Step 3: cover letter (per tier rule)
@@ -111,6 +124,10 @@ Store RESULT as `steps.cover_letter`.
    - `regenerations += 1`; update `JOB/qa.json` field `regenerations`.
    - For each distinct `skill` in `regenerate[]` (order: tailor-resume, then write-cover-letter):
      follow that SKILL.md again with `JOB --suggestions "<its suggestions joined by '; '>"`.
+     Exception: if `resume_choice.json` has `action: reuse`, NEVER rerun tailor-resume (the reused résumé is the
+     candidate's own text); drop it from `regenerate[]` and, if the résumé itself fails, add the Action Item
+     `.venv/bin/careeros action add "reused résumé <rid> fails QA for <job_id>: <top fail_reason>" --type qa_fail
+     --needs laptop` instead.
    - Continue the loop (qa-review runs again).
 4. Else (fail after the allowed regeneration, or `next_action == "action_item"`): break with
    `action_items.append("qa_failed_twice: " + top 2 fail_reasons)`.

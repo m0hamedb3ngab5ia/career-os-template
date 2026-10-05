@@ -44,6 +44,7 @@ the `artifacts` map tells the caller what is missing.
 """
 from __future__ import annotations
 
+import hashlib
 import json
 import re
 import sys
@@ -470,6 +471,14 @@ class Checker:
         self.outreach, self.outreach_error = _parse_json(self.outreach_raw)
         self.contacts, _ = _parse_json(_read_text(job_dir / "contacts.json"))
         self.pdf_path = job_dir / "resume.pdf"
+        # DEC-007: a reused user-authored résumé has no bullet ids; skip bullet-trace checks on it, but only while
+        # resume.txt is still byte-for-byte the reused text (a regenerated résumé gets the full checks)
+        choice, _ = _parse_json(_read_text(job_dir / "resume_choice.json"))
+        self.choice = choice if isinstance(choice, dict) else {}
+        txt = job_dir / "resume.txt"
+        self.user_reuse = (self.choice.get("action") == "reuse" and self.choice.get("author") == "user"
+                           and txt.is_file() and bool(self.choice.get("text_sha256"))
+                           and hashlib.sha256(txt.read_bytes()).hexdigest() == self.choice["text_sha256"])
         self.artifacts = {
             "posting.json": self.posting is not None,
             "score.json": self.score is not None,
@@ -721,7 +730,7 @@ class Checker:
 
     def _cited_ids(self) -> dict[str, set[str]]:
         out: dict[str, set[str]] = {}
-        if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json:
+        if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json and not self.user_reuse:
             out["resume.json"] = collect_ids(self.resume_json)
         if self.cover_md is not None:
             out["cover_letter.md"] = cited_ids_cover_letter(self.cover_fm)
@@ -800,7 +809,7 @@ class Checker:
     def check_numbers(self) -> None:
         cited = self._cited_ids()
         ran = False
-        if self.resume_txt is not None:
+        if self.resume_txt is not None and not self.user_reuse:  # DEC-007
             ran = True
             ids = cited.get("resume.json", set())
             extra = self.profile.skills_text() + " " + self.profile.summary_text()
@@ -898,12 +907,33 @@ class Checker:
             out.extend(e for e in rj.get(section) or [] if isinstance(e, dict))
         return out
 
+    def check_tweak_cap(self) -> None:
+        """REQ-113: a tweak adds at most 3 bullets, only the ids `resume pick` chose (resume_choice add_bullet_ids)."""
+        c = self.choice
+        if c.get("action") != "tweak":
+            return
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        base = self.root / "profile" / "resumes" / str(c.get("rid")) / f"v{c.get('version')}" / "resume.json"
+        base_json, _ = _parse_json(_read_text(base))
+        if rj is None or not isinstance(base_json, dict):
+            self.add("tweak_cap", "hard", False, "tweak needs resume.json and the base version's resume.json")
+            return
+        allowed = set(c.get("add_bullet_ids") or [])
+        added = collect_ids(rj) - collect_ids(base_json)
+        bad = sorted(added - allowed)
+        ok = not bad and len(added) <= 3
+        self.add("tweak_cap", "hard", ok, f"added {sorted(added)} (allowed {sorted(allowed)}, max 3)" if ok else
+                 f"tweak added {sorted(added)}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
+
     def check_bullet_fidelity(self) -> None:
         """Each resume.json bullet's text is its master text / a variant (verb swap + trailing trim only);
         summary is a profile summary_variant verbatim or null."""
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         if rj is None:
             self.skip("bullet_fidelity", "hard", "resume.json missing")
+            return
+        if self.user_reuse:
+            self.skip("bullet_fidelity", "hard", "reused user-authored résumé (DEC-007)")
             return
         problems, n = [], 0
         for e in self._resume_entries():
@@ -1360,6 +1390,7 @@ class Checker:
         self.check_em_dashes()
         self.check_truth_trace()
         self.check_bullet_fidelity()
+        self.check_tweak_cap()
         self.check_entry_headers()
         self.check_skills_traced()
         self.check_section_order()
