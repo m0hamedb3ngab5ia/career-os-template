@@ -131,7 +131,8 @@ describe("Batch builder", () => {
     setup();
     const submit = await screen.findByRole("radio", { name: "Submit when allowed" }, opts);
     await waitFor(() => expect(submit).toBeDisabled());
-    expect(submit).toHaveAccessibleDescription(/Auto-submit is off in Settings/);
+    // disabled also while settings load (description is then "Checking..."), so wait for the reason
+    await waitFor(() => expect(submit).toHaveAccessibleDescription(/Auto-submit is off in Settings/));
   });
 
   it("enables Submit when allowed once auto-submit is on", { timeout: 20_000 }, async () => {
