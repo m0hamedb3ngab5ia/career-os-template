@@ -281,6 +281,7 @@ SECTIONS: tuple[Section, ...] = (
                   min=0, max=100, integer=True, unit="points", **UNUSED),
             _num(T, "thresholds.tier_a_min_fit", "Minimum fit for dream companies", 60, hi=100),
             _num(T, "thresholds.min_match", "Minimum résumé match to reuse a résumé", 70, hi=100),
+            _num(T, "thresholds.min_tweak_gain", "Points a small tweak must add to beat a full tailor", 5, hi=100),
         )),
     )),
     Section("autonomy", "Autonomy", (
