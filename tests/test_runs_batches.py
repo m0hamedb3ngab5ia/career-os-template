@@ -90,7 +90,8 @@ def test_fill_never_submits_even_when_allowed(settings):
     assert out["selected"][0]["auto_submit"] is False
 
 
-@pytest.mark.parametrize("extra", [{"ats": "linkedin"}, {"apply_url": "https://www.linkedin.com/jobs/view/1"}])
+@pytest.mark.parametrize("extra", [{"url": "https://www.linkedin.com/jobs/view/1"},
+                                   {"apply_url": "https://www.linkedin.com/jobs/view/1"}])
 def test_linkedin_excluded_from_fill_and_submit(settings, extra):
     s = Store(settings)
     li = put(s, add_job(s, 1, **extra), "prepared", tier="B", qa=True)
@@ -134,3 +135,92 @@ def test_refusals(settings):
         batches.create(settings, ["nope"], "score", now=NOW)
     assert batches.load(settings, "../../etc") is None
     assert batches.load(settings, "missing") is None
+
+
+# --- REQ-118: per-job stop points, capped server-side ------------------------------------------------------------
+def test_linkedin_found_with_ats_apply_url_is_not_capped(settings):
+    s = Store(settings)  # REQ-118 amends REQ-045: keyed on the apply URL host, not the board it was found on
+    jid = put(s, add_job(s, 1, ats="linkedin", url="https://www.linkedin.com/jobs/view/1",
+                         apply_url="https://boards.greenhouse.io/x/jobs/1"), "prepared", tier="B", qa=True)
+    r = batches.preview(settings, [jid], "fill", now=NOW)["selected"][0]
+    assert r["stages"] == ["apply"] and "cap" not in r
+
+
+def test_per_job_stops_override_the_default(settings):
+    s = Store(settings)
+    a, b, c = (add_job(s, n, company=f"C{n}") for n in range(3))
+    out = batches.preview(settings, [a, b, c], "fill", now=NOW, stops={b: "prepare", c: "submit"})
+    sel = by_id(out["selected"])
+    assert sel[a]["stop_at"] == "fill" and sel[a]["stages"] == ["score", "prepare", "apply"]
+    assert sel[b]["stop_at"] == "prepare" and sel[b]["stages"] == ["score", "prepare"]
+    assert sel[c]["stop_at"] == "submit" and sel[c]["submit_reason"] == "decided at apply"
+    assert sel[a]["submit_reason"] == "stop point fill: never submits"
+    assert out["stops"] == {b: "prepare", c: "submit"} and out["stop_at"] == "fill"
+    assert [r["kind"] for r in batches.job_runs(out) if r["job_id"] == b] == ["score", "prepare"]
+    assert "stops" not in batches.preview(settings, [a], "fill", now=NOW)  # no stops: the batch file as before
+
+
+def test_stops_reject_bad_input(settings):
+    s = Store(settings)
+    a = add_job(s, 1)
+    with pytest.raises(ValueError, match="stop_at must be"):
+        batches.preview(settings, [a], "fill", now=NOW, stops={a: "mass"})
+    with pytest.raises(ValueError, match="not picked"):
+        batches.preview(settings, [a], "fill", now=NOW, stops={"other": "fill"})
+
+
+def test_tier_a_submit_is_lowered_to_fill(settings):
+    allow_submit(settings)
+    s = Store(settings)
+    a = put(s, add_job(s, 1), "prepared", tier="A", qa=True)
+    r = batches.preview(settings, [a], "prepare", now=NOW, stops={a: "submit"})["selected"][0]
+    assert r["stop_at"] == "fill" and "tier_a" in r["cap"]
+    assert r["auto_submit"] is False and r["submit_reason"] == r["cap"]
+
+
+def test_linkedin_submit_is_lowered_to_prepare(settings):
+    s = Store(settings)
+    li = add_job(s, 1, apply_url="https://www.linkedin.com/jobs/view/1")
+    r = batches.preview(settings, [li], "score", now=NOW, stops={li: "submit"})["selected"][0]
+    assert r["stop_at"] == "prepare" and r["stages"] == ["score", "prepare"] and "LinkedIn" in r["cap"]
+
+
+
+@pytest.mark.parametrize("posting,want", [
+    ({"apply_url": "www.linkedin.com/jobs/view/1"}, True),  # scheme-less: must not fail open
+    ({"url": "linkedin.com/jobs/view/1"}, True),
+    ({"ats": "linkedin"}, True),  # no URL at all: the board is the only signal
+    ({"ats": "LinkedIn", "apply_url": "https://boards.greenhouse.io/x/jobs/1"}, False),
+    ({"apply_url": "boards.greenhouse.io/x/jobs/1"}, False),
+    ({"apply_url": "https://notlinkedin.com/x"}, False),
+])
+def test_is_linkedin(posting, want):
+    assert batches.is_linkedin(posting) is want
+
+
+def test_schemeless_linkedin_apply_url_is_capped(settings):
+    s = Store(settings)
+    li = add_job(s, 1, apply_url="www.linkedin.com/jobs/view/1")
+    r = batches.preview(settings, [li], "score", now=NOW, stops={li: "submit"})["selected"][0]
+    assert r["stop_at"] == "prepare" and "LinkedIn" in r["cap"]
+
+
+def test_kind_follows_the_highest_stop(settings):
+    s = Store(settings)
+    a, c = add_job(s, 1), add_job(s, 2, company="C2")
+    assert batches.preview(settings, [a, c], "prepare", now=NOW, stops={c: "fill"})["kind"] == "apply"
+
+@pytest.mark.readiness
+def test_readiness_open_caps_fill_and_submit_at_prepare(settings):
+    s = Store(settings)  # the example root still has example data: readiness must-haves open
+    a = add_job(s, 1)
+    r = batches.preview(settings, [a], "submit", now=NOW)["selected"][0]
+    assert r["stop_at"] == "prepare" and r["stages"] == ["score", "prepare"] and "readiness" in r["cap"]
+
+
+def test_flagged_posting_is_excluded_whatever_its_stop(settings):
+    s = Store(settings)
+    a = put(s, add_job(s, 1), "scored", tier="B")
+    (s.job_dir(a) / "flags.json").write_text(json.dumps({"injection_suspected": True}))
+    out = batches.preview(settings, [a], "prepare", now=NOW, stops={a: "submit"})
+    assert out["selected"] == [] and "injection" in out["excluded"][0]["reason"]

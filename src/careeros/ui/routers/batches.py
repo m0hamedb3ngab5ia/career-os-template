@@ -18,6 +18,7 @@ router = APIRouter(tags=["batches"])
 class CreateBody(BaseModel):
     job_ids: list[str] = Field(min_length=1, max_length=batches.MAX_JOBS)
     stop_at: Literal["score", "prepare", "fill", "submit"]
+    stops: dict[str, Literal["score", "prepare", "fill", "submit"]] | None = None  # per job; server caps them
     name: str | None = Field(default=None, max_length=120)
     dry_run: bool = False
 
@@ -33,6 +34,8 @@ class BatchJob(BaseModel):
     rank: int
     stage: str
     stages: list[str]
+    stop_at: str | None = None  # this job's stop point after the caps (absent in batches made before REQ-118)
+    cap: str | None = None  # why the requested stop point was lowered
     auto_submit: bool
     submit_reason: str
     state: str | None = None
@@ -52,6 +55,7 @@ class Batch(BaseModel):
     status: str | None = None
     dry_run: bool
     stop_at: str
+    stops: dict[str, str] | None = None
     kind: str
     selected: list[BatchJob]
     excluded: list[Excluded]
@@ -69,7 +73,7 @@ class RetryBody(BaseModel):
 def create(body: CreateBody, c=Depends(ctx)) -> Batch:
     try:
         return Batch.model_validate(batches.create(c.settings, body.job_ids, body.stop_at, name=body.name,
-                                                   dry_run=body.dry_run, now=c.now()))
+                                                   dry_run=body.dry_run, now=c.now(), stops=body.stops))
     except ValueError as e:
         raise HTTPException(422, str(e)) from None
 
