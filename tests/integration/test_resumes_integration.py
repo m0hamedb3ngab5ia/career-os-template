@@ -54,7 +54,7 @@ def test_resume_http_api(root: Path):
     ix.rebuild()
     app = create_app(s, index=ix, broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
     started = []
-    app.state.run_control = lambda settings: type("RC", (), {"start_step": lambda self, k: started.append(k)})()
+    app.state.run_control = lambda settings: type("RC", (), {"start_step": lambda self, k, **kw: k == "extract_master" and started.append(k)})()
     W = {"X-CareerOS": "1"}
     with TestClient(app) as c:
         r = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W)
@@ -74,6 +74,10 @@ def test_resume_http_api(root: Path):
         # E2E-003-02: marking B master launches extract-master; until a proposal is approved master.yaml is stale
         assert started == ["extract_master"]
         assert c.get("/api/profile/master/proposal", headers=W).json()["state"] == "stale"
+        # "Re-read" restarts extract-master when the first run failed or never started
+        assert c.post("/api/profile/master/proposal/refresh", headers=W).status_code == 202
+        assert started == ["extract_master", "extract_master"]
+        started.pop()
         ready = {i["id"]: i for i in c.get("/api/readiness", headers=W).json()["items"]}
         assert not ready["master_synced"]["done"]
         assert c.post(f"/api/profile/resumes/{b}/master", headers=W).status_code == 200 and len(started) == 1
@@ -149,7 +153,7 @@ def test_master_diff_cli_and_api(root: Path, tmp_path: Path):
         assert st["state"] == "pending" and "re-extracted" in st["diff"]
         assert master.read_text(encoding="utf-8") == before
         synced = lambda: next(i for i in c.get("/api/readiness", headers=W).json()["items"] if i["id"] == "master_synced")
-        assert not synced()["done"]
+        assert not synced()["done"] and synced()["fix_link"] == "/profile#master"  # TASK-022: links to the diff panel
         assert c.post("/api/profile/master/proposal/reject", headers=W).json()["state"] == "rejected"
         assert master.read_text(encoding="utf-8") == before and not synced()["done"]
         assert c.post("/api/profile/master/proposal/approve", headers=W).status_code == 404

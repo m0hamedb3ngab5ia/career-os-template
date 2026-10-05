@@ -70,3 +70,6 @@ Links: REQ-094 REQ-095 REQ-096 REQ-097 REQ-099 · Area: frontend · After: TASK-
 
 ### TASK-023 AI draft answers in fill plan (review gate)
 Links: REQ-105 UC-008 · Area: full · After: TASK-014 · Done when: `build_plan` reads the job's `answers.json` drafts for freetext fields with no saved answer (never legal/salary/EEO), source `ai_draft`, `reviewed: false`; `plan_problems` blocks fill on unreviewed drafts; approve endpoint + edit marks reviewed; carry_over keeps review state; Fill preview shows "AI draft" badge + Approve; save-to-profile off for drafts; CLI/scheduled one Action Item "review N drafts"; unit + integration tests (E2E-008-01 extended); before MVP
+
+### TASK-024 Résumé hand editor + applied-edit diff/undo UI
+Follow-up from TASK-022 review: Profile › Résumés hand editor with Save (`PUT /api/profile/resumes/{rid}/text`, REQ-097) and, after Apply, the new version's diff with undo = open the previous version (REQ-095). Status: todo.

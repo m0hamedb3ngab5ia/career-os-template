@@ -10,6 +10,7 @@ import {
 } from "./api";
 import styles from "./Profile.module.css";
 import { ReadinessCard } from "./ReadinessCard";
+import { MasterSyncPanel, ResumeFeedback } from "./ResumePanels";
 import { JustReadyNextStep } from "../today/NextStepCard";
 
 /** Loading / error (with Try again) / empty states shared by every section. */
@@ -100,7 +101,7 @@ const SCOPES: { scope: SavedAnswer["scope"]; title: string }[] = [
   { scope: "eeo", title: "EEO (voluntary)" },
 ];
 
-/** REQ-107 Profile page: Readiness, Résumés, Writing samples, Saved answers, Learned. */
+/** REQ-107 Profile page: Readiness, Résumés (+ feedback), master.yaml sync, Writing samples, Saved answers, Learned. */
 export function ProfilePage() {
   const resumes = useResumes();
   const samples = useSamples();
@@ -145,12 +146,14 @@ export function ProfilePage() {
                       <Button size="small" onClick={() => master.mutate(r.rid)}>Make master</Button>
                     )}
                     <DeleteButton label={r.name} onConfirm={() => delResume.mutate(r.rid)} />
+                    <ResumeFeedback rid={r.rid} />
                   </li>
                 ))}
               </ul>
             )}
           </Loaded>
         </Section>
+        <MasterSyncPanel />
         <Section id="samples" title="Writing samples" intro="Letters or emails you wrote (txt, md, eml, pdf or docx, up to 5 MB). Cover letters copy your style from them.">
           {learnInfo && !learnError ? <p role="status" className={styles.muted}>{learnInfo}</p> : null}
           {learnError ? (

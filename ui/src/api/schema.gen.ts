@@ -311,6 +311,13 @@ export interface paths {
     /** Approve Master Proposal */
     post: operations["approve_master_proposal_api_profile_master_proposal_approve_post"];
   };
+  "/api/profile/master/proposal/refresh": {
+    /**
+     * Refresh Master Proposal
+     * @description Re-run extract-master when the last run failed or never started (UI "Re-read").
+     */
+    post: operations["refresh_master_proposal_api_profile_master_proposal_refresh_post"];
+  };
   "/api/profile/master/proposal/reject": {
     /** Reject Master Proposal */
     post: operations["reject_master_proposal_api_profile_master_proposal_reject_post"];
@@ -4689,6 +4696,20 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["MasterProposal"];
+        };
+      };
+    };
+  };
+  /**
+   * Refresh Master Proposal
+   * @description Re-run extract-master when the last run failed or never started (UI "Re-read").
+   */
+  refresh_master_proposal_api_profile_master_proposal_refresh_post: {
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["Started"];
         };
       };
     };

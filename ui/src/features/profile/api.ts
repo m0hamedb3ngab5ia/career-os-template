@@ -2,7 +2,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
 import type { components } from "../../api/schema.gen";
 import { runKeys } from "../runs/api";
-import type { RunDetail } from "../runs/types";
+import type { HistoryPage, RunDetail } from "../runs/types";
 
 export type SavedAnswer = components["schemas"]["SavedAnswer"];
 export type SampleChange = components["schemas"]["SampleChange"];
@@ -82,3 +82,42 @@ export const useLearnRun = (id: string | null | undefined) =>
   });
 export const makeMaster = (rid: string) => apiSend<unknown>("POST", `/api/profile/resumes/${encodeURIComponent(rid)}/master`);
 export const deleteResume = (rid: string) => apiSend<void>("DELETE", `/api/profile/resumes/${encodeURIComponent(rid)}`);
+
+export type MasterProposal = components["schemas"]["MasterProposal"];
+export type Feedback = components["schemas"]["Feedback"];
+export type FeedbackItem = components["schemas"]["FeedbackItem"];
+const rp = (rid: string) => `/api/profile/resumes/${encodeURIComponent(rid)}`;
+/** REQ-099: the master.yaml diff. Polls while stale and extract-master is reading. */
+export const useMasterProposal = (reading: boolean) =>
+  useQuery({
+    queryKey: ["profile", "master"],
+    queryFn: () => apiFetch<MasterProposal>("/api/profile/master/proposal"),
+    refetchInterval: (q) => (q.state.data?.state === "stale" && reading ? 5000 : false),
+  });
+/** The latest extract-master run, only asked for while master.yaml is stale; polls while it runs. */
+export const useMasterRun = (stale: boolean) =>
+  useQuery({
+    queryKey: ["profile", "master", "run"],
+    queryFn: () => apiFetch<HistoryPage>("/api/runs?kind=extract_master&limit=1"),
+    enabled: stale,
+    refetchInterval: (q) => (q.state.data?.runs[0]?.state === "running" ? 5000 : false),
+  });
+export const refreshMaster = () => apiSend<Started>("POST", "/api/profile/master/proposal/refresh");
+export type Started = components["schemas"]["Started"];
+export const approveMaster = () => apiSend<MasterProposal>("POST", "/api/profile/master/proposal/approve");
+export const rejectMaster = () => apiSend<MasterProposal>("POST", "/api/profile/master/proposal/reject");
+/** REQ-094..096: a résumé's review feedback. Polls while the review or a redraft runs. */
+export const useFeedback = (rid: string) =>
+  useQuery({
+    queryKey: ["profile", "feedback", rid],
+    queryFn: () => apiFetch<Feedback>(`${rp(rid)}/feedback`),
+    refetchInterval: (q) =>
+      q.state.data?.review?.state === "running" || q.state.data?.items.some((i) => i.state === "redrafting") ? 2000 : false,
+  });
+export const applyFeedback = ({ rid, fid }: { rid: string; fid: string }) =>
+  apiSend<Started>("POST", `${rp(rid)}/feedback/${encodeURIComponent(fid)}/apply`);
+export const dismissFeedback = ({ rid, fid }: { rid: string; fid: string }) =>
+  apiSend<FeedbackItem>("POST", `${rp(rid)}/feedback/${encodeURIComponent(fid)}/dismiss`);
+export const commentFeedback = ({ rid, fid, text }: { rid: string; fid: string; text: string }) =>
+  apiSend<unknown>("POST", `${rp(rid)}/feedback/${encodeURIComponent(fid)}/comment`, { text });
+export const retryReview = (rid: string) => apiSend<unknown>("POST", `${rp(rid)}/review`);

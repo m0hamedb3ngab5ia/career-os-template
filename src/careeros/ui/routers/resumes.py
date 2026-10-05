@@ -290,6 +290,12 @@ def get_master_proposal(c=Depends(ctx)) -> MasterProposal:
     return MasterProposal(**master_sync.state(c.settings.root))
 
 
+@router.post("/profile/master/proposal/refresh", status_code=202)
+def refresh_master_proposal(request: Request, c=Depends(ctx)) -> Started:
+    """Re-run extract-master when the last run failed or never started (UI "Re-read")."""
+    return _start(request, c, "extract_master", None)  # type: ignore[arg-type]
+
+
 @router.post("/profile/master/proposal/approve")
 def approve_master_proposal(c=Depends(ctx)) -> MasterProposal:
     with _refusals():
