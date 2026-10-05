@@ -32,7 +32,7 @@ from careeros.ui.services.stream import parse_event
 
 BATCH_KINDS = ("score", "prepare")
 JOB_KINDS = ("score", "prepare", "apply")  # `--job <id>` runs: one explicit job, apply only this way
-STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master")
+STEP_KINDS = ("scout", "tracker", "prune", "inbox_sync", "qa", "extract_master", "review", "resume_edit")
 KEEP_OUTPUTS = 50  # launch output files kept under data/runs/ui/
 
 
@@ -105,7 +105,7 @@ def classify_argv(argv: list[str]) -> str | None:
             if mod == "careeros.ui.services.step":
                 while rest[:1] == ["--root"]:
                     rest = rest[2:]
-                return "step" if len(rest) == 1 and rest[0] in STEP_KINDS else None
+                return "step" if rest[:1] and rest[0] in STEP_KINDS else None
             return None
         if os.path.basename(t) == "careeros" and i <= 1:  # the entry point (possibly after its interpreter)
             return _cli_kind(argv[i + 1:])
@@ -298,7 +298,8 @@ class RunControl:
             return run["id"]
         return None
 
-    def start_step(self, kind: str, job_id: str | None = None) -> dict[str, Any]:
+    def start_step(self, kind: str, job_id: str | None = None, resume: str | None = None,
+                   item: str | None = None) -> dict[str, Any]:
         """Start scout | tracker | prune (--yes) | inbox_sync | qa (`job_id` required) as a recorded step run.
         Scout and qa get their run id here (returned as `run_id`), so the UI can watch and cancel exactly that run."""
         from careeros.ui.services.step import step_lock_path
@@ -318,6 +319,15 @@ class RunControl:
             self._check_can_start()  # a headless skill call: the runner lock and pause apply
         elif kind == "extract_master":
             self._check_can_start()
+        elif kind in ("review", "resume_edit"):  # REQ-094/095/096: headless skill on one résumé (+ item)
+            if not resume or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume) or (kind == "resume_edit") != bool(item) \
+                    or (item and not re.fullmatch(r"f\d+", item)):
+                raise ValueError(f"{kind} needs a résumé id" + (" and a feedback item" if kind == "resume_edit" else ""))
+            self._check_can_start()
+            rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
+            argv = ["careeros.ui.services.step", kind, "--resume", resume, *(["--item", item] if item else []),
+                    "--run-id", rid]
+            return {"kind": kind, **self.spawn(rid, argv), "run_id": rid}
         else:
             from careeros.ui.services.step import PIPELINE_STEPS
 

@@ -254,9 +254,43 @@ export interface paths {
     /** Patch Resume */
     patch: operations["patch_resume_api_profile_resumes__rid__patch"];
   };
+  "/api/profile/resumes/{rid}/feedback": {
+    /** Get Feedback */
+    get: operations["get_feedback_api_profile_resumes__rid__feedback_get"];
+  };
+  "/api/profile/resumes/{rid}/feedback/{fid}/apply": {
+    /** Apply Feedback */
+    post: operations["apply_feedback_api_profile_resumes__rid__feedback__fid__apply_post"];
+  };
+  "/api/profile/resumes/{rid}/feedback/{fid}/comment": {
+    /** Comment Feedback */
+    post: operations["comment_feedback_api_profile_resumes__rid__feedback__fid__comment_post"];
+  };
+  "/api/profile/resumes/{rid}/feedback/{fid}/dismiss": {
+    /** Dismiss Feedback */
+    post: operations["dismiss_feedback_api_profile_resumes__rid__feedback__fid__dismiss_post"];
+  };
+  "/api/profile/resumes/{rid}/feedback/{fid}/rewrite": {
+    /**
+     * Rewrite Feedback
+     * @description The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095).
+     */
+    put: operations["rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put"];
+  };
   "/api/profile/resumes/{rid}/master": {
     /** Set Master */
     post: operations["set_master_api_profile_resumes__rid__master_post"];
+  };
+  "/api/profile/resumes/{rid}/review": {
+    /** Start Review */
+    post: operations["start_review_api_profile_resumes__rid__review_post"];
+  };
+  "/api/profile/resumes/{rid}/text": {
+    /**
+     * Edit Resume
+     * @description REQ-097: hand edit -> new version author=user, no guard.
+     */
+    put: operations["edit_resume_api_profile_resumes__rid__text_put"];
   };
   "/api/profile/resumes/{rid}/versions/{n}": {
     /** Get Version */
@@ -803,6 +837,11 @@ export interface components {
       /** Statuses */
       statuses: string[];
     };
+    /** Comment */
+    Comment: {
+      /** Text */
+      text: string;
+    };
     /** ContactPolicy */
     ContactPolicy: {
       /** Detail */
@@ -1079,6 +1118,41 @@ export interface components {
       last_run: string | null;
       /** Max Attempts */
       max_attempts: number;
+    };
+    /** Feedback */
+    Feedback: {
+      /** Items */
+      items: components["schemas"]["FeedbackItem"][];
+      review?: components["schemas"]["ReviewState"] | null;
+    };
+    /** FeedbackItem */
+    FeedbackItem: {
+      /** Applied V */
+      applied_v?: number | null;
+      /**
+       * Comments
+       * @default []
+       */
+      comments?: {
+          [key: string]: string;
+        }[];
+      /** Id */
+      id: string;
+      /** Issue */
+      issue: string;
+      /** Reason */
+      reason?: string | null;
+      /** Section */
+      section: string;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "open" | "redrafting" | "applied" | "dismissed";
+      /** Suggestion */
+      suggestion: string;
+      /** V */
+      v: number;
     };
     /** FieldSchema */
     FieldSchema: {
@@ -1979,6 +2053,11 @@ export interface components {
        */
       type: "master" | "variant" | "other" | "tailored";
     };
+    /** ResumeText */
+    ResumeText: {
+      /** Text */
+      text: string;
+    };
     /** Resumes */
     Resumes: {
       /** Resumes */
@@ -1988,6 +2067,27 @@ export interface components {
     RetryBody: {
       /** Job Ids */
       job_ids?: string[] | null;
+    };
+    /** ReviewState */
+    ReviewState: {
+      /** At */
+      at: string;
+      /** Run */
+      run?: string | null;
+      /**
+       * State
+       * @enum {string}
+       */
+      state: "running" | "done" | "failed";
+      /** V */
+      v: number;
+    };
+    /** Rewrite */
+    Rewrite: {
+      /** Base */
+      base: number;
+      /** Text */
+      text: string;
     };
     /** RunBudget */
     RunBudget: {
@@ -2355,6 +2455,13 @@ export interface components {
       max_minutes?: number | null;
       /** Preset */
       preset?: string | null;
+    };
+    /** Started */
+    Started: {
+      /** Kind */
+      kind: string;
+      /** Run Id */
+      run_id?: string | null;
     };
     /** Status */
     Status: {
@@ -4042,11 +4149,190 @@ export interface operations {
       };
     };
   };
+  /** Get Feedback */
+  get_feedback_api_profile_resumes__rid__feedback_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Feedback"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Apply Feedback */
+  apply_feedback_api_profile_resumes__rid__feedback__fid__apply_post: {
+    parameters: {
+      path: {
+        rid: string;
+        fid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["Started"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Comment Feedback */
+  comment_feedback_api_profile_resumes__rid__feedback__fid__comment_post: {
+    parameters: {
+      path: {
+        rid: string;
+        fid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Comment"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["Started"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Dismiss Feedback */
+  dismiss_feedback_api_profile_resumes__rid__feedback__fid__dismiss_post: {
+    parameters: {
+      path: {
+        rid: string;
+        fid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["FeedbackItem"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Rewrite Feedback
+   * @description The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095).
+   */
+  rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put: {
+    parameters: {
+      path: {
+        rid: string;
+        fid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Rewrite"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
   /** Set Master */
   set_master_api_profile_resumes__rid__master_post: {
     parameters: {
       path: {
         rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Start Review */
+  start_review_api_profile_resumes__rid__review_post: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["Started"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Edit Resume
+   * @description REQ-097: hand edit -> new version author=user, no guard.
+   */
+  edit_resume_api_profile_resumes__rid__text_put: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ResumeText"];
       };
     };
     responses: {

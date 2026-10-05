@@ -11,7 +11,7 @@ import os
 import re
 import secrets
 import shutil
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Iterator
@@ -132,8 +132,19 @@ def add(root: Path, filename: str, data: bytes, *, name: str | None = None, type
 
 def add_version(root: Path, rid: str, filename: str, data: bytes, *, author: str, source: str) -> dict[str, Any]:
     """New version vN+1 (author user|ai; source upload|edit|<feedback id>)."""
-    ext = _check(filename, data)
-    with _locked(root):
+    return _append(root, rid, _check(filename, data), data, author, source)
+
+
+def add_text(root: Path, rid: str, text: str, *, author: str, source: str, lock: bool = True) -> dict[str, Any]:
+    """New version from edited/rewritten text (REQ-095 ai rewrite, REQ-097 hand edit): v<n>/original.txt.
+    lock=False: the caller already holds `_locked` (flock is not re-entrant)."""
+    if not text.strip():
+        raise ValueError("résumé text must not be empty")
+    return _append(root, rid, ".txt", text.encode("utf-8"), author, source, lock)
+
+
+def _append(root: Path, rid: str, ext: str, data: bytes, author: str, source: str, lock: bool = True) -> dict[str, Any]:
+    with _locked(root) if lock else nullcontext():
         d, meta = _dir(root, rid), get(root, rid)
         n = meta["versions"][-1]["n"] + 1
         _store(d, n, ext, data)
