@@ -68,7 +68,7 @@ function AnswerRow({ a }: { a: SavedAnswer }) {
       <span className={styles.grow}>
         <strong>{name}</strong>
         {draft === null ? <> · {a.answer ?? <em>not set</em>}</> : (
-          <TextInput aria-label={`Answer for ${name}`} value={draft} onChange={(e) => setDraft(e.target.value)} />
+          <TextInput aria-label={`Answer for ${name}`} value={draft} onValueChange={setDraft} />
         )}
         {save.isError ? <span role="alert"> Couldn’t save: {errorText(save.error)}</span> : null}
       </span>
