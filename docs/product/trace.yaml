@@ -125,7 +125,7 @@ requirements:
   REQ-120: {status: approved, provenance: confirmed, user_requirements: [USR-034, USR-036]}
   REQ-121: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-01]}
   REQ-122: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-02]}
-  REQ-123: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: []}
+  REQ-123: {status: approved, provenance: confirmed, user_requirements: [USR-014], tests: []}
   NFR-001: {status: proposed, provenance: observed}
   NFR-002: {status: proposed, provenance: observed}
   NFR-003: {status: proposed, provenance: observed}
