@@ -12476,6 +12476,28 @@
         ]
       }
     },
+    "/api/profile/master/proposal/refresh": {
+      "post": {
+        "description": "Re-run extract-master when the last run failed or never started (UI \"Re-read\").",
+        "operationId": "refresh_master_proposal_api_profile_master_proposal_refresh_post",
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Started"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Refresh Master Proposal",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
     "/api/profile/master/proposal/reject": {
       "post": {
         "operationId": "reject_master_proposal_api_profile_master_proposal_reject_post",
