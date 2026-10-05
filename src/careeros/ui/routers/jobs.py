@@ -145,6 +145,34 @@ def job_detail(job_id: str, c=Depends(ctx)) -> svc.JobDetail:
     return d
 
 
+class MatchRow(BaseModel):
+    rid: str
+    name: str
+    type: str
+    version: int
+    score: int
+    missing: list[str]
+    groups: dict[str, dict[str, list[str]]]
+
+
+class Matches(BaseModel):
+    job_id: str
+    threshold: int
+    best: str | None
+    resumes: list[MatchRow]
+
+
+@router.get("/jobs/{job_id}/matches")
+def job_matches(job_id: str, threshold: int | None = Query(default=None, ge=0, le=100), c=Depends(ctx)) -> Matches:
+    """Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003)."""
+    from careeros.match import matches
+
+    d = svc.job_dir_for(c.settings, job_id)
+    if d is None:
+        raise HTTPException(404, f"no job {job_id!r}")
+    return Matches(**matches(c.settings, d, threshold))
+
+
 @router.get("/jobs/{job_id}/files/{name:path}")
 def job_file(job_id: str, name: str, c=Depends(ctx)) -> FileResponse:
     with refusals():

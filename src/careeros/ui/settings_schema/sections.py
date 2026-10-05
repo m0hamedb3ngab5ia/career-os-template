@@ -280,6 +280,7 @@ SECTIONS: tuple[Section, ...] = (
             Field(T, "thresholds.boost_industry_bonus", "number", "Boost for preferred industries", default=5,
                   min=0, max=100, integer=True, unit="points", **UNUSED),
             _num(T, "thresholds.tier_a_min_fit", "Minimum fit for dream companies", 60, hi=100),
+            _num(T, "thresholds.min_match", "Minimum résumé match to reuse a résumé", 70, hi=100),
         )),
     )),
     Section("autonomy", "Autonomy", (
@@ -572,6 +573,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "llm.runner"): "Shown as a locked row: runs use the Claude Code subscription; the API is not enabled.",
     (P, "llm.headless_cmd"): "The exact claude command line; a wrong flag breaks every run.",
     (P, "resume_build.fallback"): "Only one fallback exists (markdown_to_pdf); nothing to choose.",
+    (P, "match.synonyms"): "Skill synonym table for the résumé match score; edit pipeline.yaml.",
     (Q, "resume.max_pages"): "Shown as a locked row: a one-page résumé is a hard rule.",
     (Q, "resume.hard"): "Hard truth and ATS rules the QA gate always enforces; not switches.",
     (Q, "cover_letter.hard.truth_trace"): "Hard truth rule the QA gate always enforces; not a switch.",
