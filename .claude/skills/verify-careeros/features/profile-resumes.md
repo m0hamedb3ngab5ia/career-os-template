@@ -31,7 +31,7 @@ Preconditions: baseline from `README.md`; no résumé stored (`curl -s 127.0.0.1
 
 ## Gotchas
 
-- `.txt`/`.md` pass the picker but the API answers 400 `only PDF or DOCX résumés are accepted`.
+- `.txt`/`.md` pass the picker but the API refuses with `only PDF or DOCX résumés are accepted`.
 - Uploading the first résumé makes it master and also triggers extract-master (`master.yaml sync` card shows "Couldn’t read your master résumé. Re-read" without `claude`).
 - Max 5 MB. Native file input cannot be filled by the browser MCP; use curl.
 - Tour popup covers the page on first load.
