@@ -11,13 +11,24 @@ Edit config (targets, autonomy, Claude, files, appearance) through forms with a 
 
 - Sidebar `Settings`, or `/settings/<section>`.
 
-## Driving it with browser MCP + curl
+## Driving it (user mode, Playwright)
 
 Preconditions: baseline from `README.md`.
 
 - **Open.** `navigate http://127.0.0.1:8799/settings/targets`; `find "Settings sections"`; heading `Settings`.
 - **Edit.** Change one field, press Save in the save bar, reload: value persists; `git diff --no-index examples/config config` or `rg` the key in `config/targets.yaml`. Not yet proven.
 - **Proof.** Page text before/after + the YAML line.
+
+## Driving it (dev mode, API)
+
+`curl -s 127.0.0.1:8799/api/settings/...` (routes: `src/careeros/ui/`); then `rg` the key in `config/targets.yaml`.
+
+## UX checks
+
+- One save action; save bar appears on change and says saved.
+- Unsaved change warns before leaving (errors prevented).
+- Invalid value shows a fix next to the field.
+- Section names match user words; few choices per screen.
 
 ## Gotchas
 

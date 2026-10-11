@@ -11,11 +11,22 @@ On a job page the user clicks `Fill application`; the app stages the ATS form in
 
 - `/jobs/<id>` page, Fill application card.
 
-## Driving it with browser MCP + curl
+## Driving it (user mode, Playwright)
 
 Preconditions: network, `pip install -e '.[fast-apply]'`, `playwright install chromium`, a prepared job. NOT PROVABLE in the isolated offline copy: document only. Report as "not proven" with the unmet precondition.
 
 - **If ever run.** `curl -s -X POST -H 'X-CareerOS: 1' 127.0.0.1:8799/api/jobs/<id>/application/open`, check `data/jobs/<id>/fill_summary.json` and the screenshot; verify nothing was submitted.
+
+## Driving it (dev mode, API)
+
+`curl -s -X POST -H 'X-CareerOS: 1' 127.0.0.1:8799/api/jobs/<id>/application/open`; check `data/jobs/<id>/fill_summary.json`. Not provable offline.
+
+## UX checks
+
+- One obvious next action on the Fill card (label matches state).
+- Wait shows progress while the form stages.
+- Failure says what to fix (`Retry fill`).
+- Nothing submitted without an explicit user step.
 
 ## Gotchas
 

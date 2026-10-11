@@ -34,17 +34,37 @@ curl -s 127.0.0.1:8799/api/health         # ok:true, config_error:null
 lsof -nP -iTCP:8799 -sTCP:LISTEN          # PID must equal $(cat $EV/pid); else not ours: stop, do not drive
 ```
 
-## Drive
+## Modes
 
-Browser: in-app browser MCP (`mcp__Claude_Browser__navigate`, `find`, `read_page`, `get_page_text`, `computer`). Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Sidebar nav: `aria-label="Sections"`. First visit shows a product tour dialog: click `Skip tour` first.
+- `user` (DEFAULT): act like a real user. Drive only the page (Playwright). API/disk only to seed data or check what was saved. Output: step/timing log + UX principle failures.
+- `dev`: straight to the API (`curl`, header `X-CareerOS: 1` on writes; reads open). Fast feedback on endpoints and side effects.
 
-API writes (curl) need header `X-CareerOS: 1`; reads do not. The MCP browser cannot fill a native file input, so uploads go through the same endpoint the `Upload résumé` button calls (`PUT /api/profile/resumes?filename=`), then the UI is checked for the result. Say so in the proof.
+Each `features/*.md` has both recipes. Data: fictional example (`careeros init`). Optionally point at your own private data dir (`careeros init --link <dir>` on a throwaway copy, never committed).
 
-Runs that need LLMs (review, extract-master, apply-edit, redraft, prepare, score) need `claude` headless. With `claude` off PATH, or example data still present, the run stops with `stop_reason: doctor_failed`: the UI then shows "The review failed. Retry review". Prove only deterministic parts; mark LLM steps "not proven (needs claude)".
+## Drive (user mode)
+
+Playwright Python (`pip install -e '.[ui]'`, `playwright install chromium`): own headless chromium, never the in-app browser, never port 8765. Helper `drive.py` opens the page, records video + trace + one screenshot per step, and logs `steps.jsonl` (step, name, `app_ms` = action until expected selector visible + network idle, running click count, url). Agent think time is not app time.
+
+```bash
+PYTHONPATH=.claude/skills/verify-careeros $PY/python - <<X
+from drive import session
+with session("$EV") as (page, step):
+    step("open", lambda: page.goto("http://127.0.0.1:8799/profile#resumes"), "text=Upload résumé")
+    step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample", click=True)
+X
+```
+
+`set_input_files` fills the real file input, so uploads go through the page. First visit may show a tour: `page.get_by_text("Skip tour").click()` when present. Prefer ARIA/visible text. Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Run the step script per feature recipe, then read `$EV/steps.jsonl`, apply the feature's `## UX checks`, and report slow steps and principle failures (cite P-ids from the UX checklist).
+
+## Drive (dev mode)
+
+`curl` the endpoints in each feature's dev recipe; check disk effects. Say so in the proof: dev mode skips the page.
+
+LLM runs (review, extract-master, apply-edit, redraft, prepare, score) need `claude` headless. With `claude` off PATH, or example data still present, the run stops `stop_reason: doctor_failed`; the UI shows "The review failed. Retry review". Prove only deterministic parts; mark LLM steps "not proven (needs claude)".
 
 ## Evidence
 
-Directory `$EV` (`$TMPDIR/verify-careeros/<timestamp>/`, outside the worktree, survives cleanup; `$EV/../latest` names it). Per proof save: `server.log`, curl request + response bodies (`*.json`), UI text from `get_page_text`/`read_page` pasted into `notes.md` with feature ID and entry point, and a screenshot (browser MCP screenshots land in the tool-results dir; copy to `$EV`, or note them, then `rm` scratch copies elsewhere).
+Directory `$EV` (`$TMPDIR/verify-careeros/<timestamp>/`, outside the worktree, survives cleanup; `$EV/../latest` names it). Per proof: `server.log`, `steps.jsonl`, screenshots, `video/`, `trace.zip` (user mode); curl bodies (`*.json`) (dev mode); `notes.md` with feature ID and entry point. Screenshots live only in `$EV`.
 
 Standards: exercise the real user path (UI route, real endpoint), not setters or test endpoints. Capture the action and the resulting state. Verify side effects on disk (e.g. `profile/resumes/<rid>/v1/{original.*,text.txt,ats.json}`) next to what the UI shows. Mocks only at production boundaries. `apply fill` is not a dry run: it opens Chromium and the network, so do not prove it here.
 
@@ -59,8 +79,8 @@ git status --short                                                   # expect cl
 ls $EV                                                               # evidence still there
 ```
 
-Run cleanup after every failed attempt too. Do not remove `$EV`. Leave the in-app browser tab alone (or navigate to `about:blank`).
+Run cleanup after every failed attempt too. Do not remove `$EV`. 
 
 ## Helpers
 
-None shipped; everything above is plain shell and the browser MCP.
+`drive.py` only (user mode). Everything else is plain shell.

@@ -12,13 +12,24 @@ The landing page: what needs the user now, running batches, the next step and re
 
 - Open `/` or sidebar `Today`.
 
-## Driving it with browser MCP + curl
+## Driving it (user mode, Playwright)
 
 Preconditions: baseline from `README.md`.
 
 - **Load.** `navigate http://127.0.0.1:8799/`, `Skip tour`, `get_page_text`: heading `Today`.
 - **Seed a task.** `.venv/bin/careeros action add "verify task" --type <t> --needs anytime` (types: `ACTION_TYPES` in `src/careeros/models.py`), reload; task appears; `Mark done` circle moves it; `.../careeros action list` agrees. Not yet proven.
 - **Proof.** Page text + `GET /api/today` body.
+
+## Driving it (dev mode, API)
+
+`curl -s 127.0.0.1:8799/api/today`; seed with `careeros action add ...`; compare `careeros action list`.
+
+## UX checks
+
+- One obvious next action on the screen (P: primary action obvious).
+- Empty state says what to do, not just `Nothing needs you`.
+- Mark-done feedback is immediate.
+- Steps from open to first value (TTV): count clicks in `steps.jsonl`.
 
 ## Gotchas
 

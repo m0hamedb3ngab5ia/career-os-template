@@ -13,13 +13,25 @@ Table of every tracked posting; user ticks jobs to prepare/apply and changes sta
 
 - Sidebar `Jobs`; header search `Search jobs and companies`.
 
-## Driving it with browser MCP + curl
+## Driving it (user mode, Playwright)
 
 Preconditions: baseline plus a seeded posting (scaffolding, removed by cleanup): `mkdir -p data/jobs/_example && cp tests/fixtures/example_posting.json data/jobs/_example/posting.json`, then restart the UI or run it with `--reindex`. Not yet proven; confirm the dir layout against `src/careeros/ui/services/jobs.py` `job_dir_for`.
 
 - **List.** `navigate /jobs`; row `Ledgerline` appears.
 - **Select.** Click checkbox `Select ...`; `POST /api/jobs/select`; read back with `careeros jobs list` or `GET /api/jobs`.
 - **Proof.** Page text + API row showing selected.
+
+## Driving it (dev mode, API)
+
+`curl -s 127.0.0.1:8799/api/jobs`; `curl -s -X POST -H 'X-CareerOS: 1' -H 'Content-Type: application/json' -d '{...}' 127.0.0.1:8799/api/jobs/select` (body shape: `src/careeros/ui/`); `careeros jobs list`.
+
+## UX checks
+
+- One obvious next action: tick, then prepare (primary action obvious).
+- Selection state visible; bulk select labelled.
+- Empty state `No jobs here yet` offers the fix (scout/seed).
+- Checkbox and row targets large enough, keyboard reachable.
+- Steps to first value (TTV).
 
 ## Gotchas
 
