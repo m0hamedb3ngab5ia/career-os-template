@@ -50,7 +50,7 @@ PYTHONPATH=.claude/skills/verify-careeros $PY/python - <<X
 from drive import session
 with session("$EV") as (page, step):
     step("open", lambda: page.goto("http://127.0.0.1:8799/profile#resumes"), "text=Upload résumé")
-    step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample", click=True)
+    step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample · master", click=True)
 X
 ```
 

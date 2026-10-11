@@ -14,8 +14,10 @@ from playwright.sync_api import sync_playwright
 @contextmanager
 def session(ev, headless=True):
     ev = Path(ev)
-    log = (ev / "steps.jsonl").open("a")
-    n = {"steps": 0, "clicks": 0}
+    f = ev / "steps.jsonl"
+    prev = [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
+    n = {"steps": len(prev), "clicks": prev[-1]["clicks"] if prev else 0}  # continue numbering across sessions
+    log = f.open("a")
     with sync_playwright() as p:
         b = p.chromium.launch(headless=headless)
         ctx = b.new_context(record_video_dir=str(ev / "video"), viewport={"width": 1280, "height": 800})
