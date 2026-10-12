@@ -79,12 +79,16 @@ def normalize_company(name: str) -> str:
     return " ".join(s.split())
 
 
+# libyaml's C parser when installed: same SafeLoader rules, ~10x faster; config is re-read on every load.
+_YamlLoader = getattr(yaml, "CSafeLoader", yaml.SafeLoader)
+
+
 def _load_yaml(path: Path) -> dict[str, Any]:
     if not path.exists():
         return {}
     try:
         with path.open("r", encoding="utf-8") as f:
-            data = yaml.safe_load(f)
+            data = yaml.load(f, Loader=_YamlLoader)
     except yaml.YAMLError as e:
         raise ConfigError(f"could not parse {path}: {str(e).splitlines()[0]}; fix the YAML and re-run") from None
     return data if isinstance(data, dict) else {"_items": data} if data else {}
