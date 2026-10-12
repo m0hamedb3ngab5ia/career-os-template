@@ -15,7 +15,8 @@ Isolation: the user's real instance may run on port 8765. Never drive, curl-writ
 W=$(git rev-parse --show-toplevel); cd $W
 PY=<path to a venv>/bin   # shared .venv, or: python3 -m venv .venv && .venv/bin/pip install -e ".[ui,test]" -q
 export PYTHONPATH=src CAREEROS_ROOT=$W      # worktree: shared .venv would import another checkout's src
-$PY/careeros init                            # idempotent, never overwrites
+for d in profile config data CLAUDE.local.md; do [ -e $d ] && { echo "$d exists: use a fresh worktree (cleanup deletes it)"; exit 1; }; done
+$PY/careeros init                            # fictional example into the empty checkout
 EV=${TMPDIR:-/tmp}/verify-careeros/$(date +%Y%m%d-%H%M%S); mkdir -p $EV; echo $EV > $EV/../latest
 # PATH without `claude`: uploads/reviews must never spawn a real LLM run
 (PATH=/usr/bin:/bin nohup $PY/python -m careeros.cli ui --port 8799 --no-open >$EV/server.log 2>&1 & echo $! > $EV/pid)
@@ -49,12 +50,12 @@ Playwright Python (`pip install -e '.[ui]'`, `playwright install chromium`): own
 PYTHONPATH=.claude/skills/verify-careeros $PY/python - <<X
 from drive import session
 with session("$EV") as (page, step):
-    step("open", lambda: page.goto("http://127.0.0.1:8799/profile#resumes"), "text=Upload résumé")
+    step("open", lambda: page.goto("/profile#resumes"), "text=Upload résumé")
     step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample · master", click=True)
 X
 ```
 
-`set_input_files` fills the real file input, so uploads go through the page. First visit may show a tour: `page.get_by_text("Skip tour").click()` when present. Prefer ARIA/visible text. Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Run the step script per feature recipe, then read `$EV/steps.jsonl`, apply the feature's `## UX checks`, and report slow steps and principle failures (cite P-ids from the UX checklist).
+`set_input_files` fills the real file input, so uploads go through the page. First visit may show a tour: `page.get_by_text("Skip tour").click()` when present. Prefer ARIA/visible text. `page.goto` takes root-relative paths (`base_url` is :8799). Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Run the step script per feature recipe, then read `$EV/steps.jsonl`, apply the feature's `## UX checks`, and report slow steps and principle failures (cite P-ids from the UX checklist).
 
 ## Drive (dev mode)
 
@@ -64,7 +65,7 @@ LLM runs (review, extract-master, apply-edit, redraft, prepare, score) need `cla
 
 ## Evidence
 
-Directory `$EV` (`$TMPDIR/verify-careeros/<timestamp>/`, outside the worktree, survives cleanup; `$EV/../latest` names it). Per proof: `server.log`, `steps.jsonl`, screenshots, `video/`, `trace.zip` (user mode); curl bodies (`*.json`) (dev mode); `notes.md` with feature ID and entry point. Screenshots live only in `$EV`.
+Directory `$EV` (`$TMPDIR/verify-careeros/<timestamp>/`, outside the worktree, survives cleanup; `$EV/../latest` names it). Per proof: `server.log`, `steps.jsonl`, screenshots, `video/`, `trace-NN.zip` (user mode, one per session); curl bodies (`*.json`) (dev mode); `notes.md` with feature ID and entry point. Screenshots live only in `$EV`.
 
 Standards: exercise the real user path (UI route, real endpoint), not setters or test endpoints. Capture the action and the resulting state. Verify side effects on disk (e.g. `profile/resumes/<rid>/v1/{original.*,text.txt,ats.json}`) next to what the UI shows. Mocks only at production boundaries. `apply fill` is not a dry run: it opens Chromium and the network, so do not prove it here.
 
@@ -74,7 +75,7 @@ Standards: exercise the real user path (UI route, real endpoint), not setters or
 PID=$(cat $EV/pid)
 lsof -nP -iTCP:8799 -sTCP:LISTEN | grep -q " $PID " && kill $PID    # only the PID we started; never pkill
 sleep 2; lsof -nP -iTCP:8799 -sTCP:LISTEN | wc -l                  # expect 0
-rm -rf profile config data CLAUDE.local.md                           # created by init in the checkout (all gitignored)
+rm -rf profile config data CLAUDE.local.md                           # created by init (Launch refused to start if they pre-existed)
 git status --short                                                   # expect clean (plus your intended edits)
 ls $EV                                                               # evidence still there
 ```

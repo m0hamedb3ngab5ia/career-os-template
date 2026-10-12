@@ -2,7 +2,7 @@
 Use: PYTHONPATH=<skill dir> python - <<'X'
 from drive import session
 with session(EV) as (page, step):
-    step("open", lambda: page.goto("http://127.0.0.1:8799/profile#resumes"), "text=Résumés")
+    step("open", lambda: page.goto("/profile#resumes"), "text=Résumés")
 X
 App time = action until expect selector is visible; agent think time is outside the timer."""
 import json, sys, time
@@ -12,7 +12,7 @@ from playwright.sync_api import sync_playwright
 
 
 @contextmanager
-def session(ev, headless=True):
+def session(ev, headless=True, base_url="http://127.0.0.1:8799"):
     ev = Path(ev)
     f = ev / "steps.jsonl"
     prev = [json.loads(l) for l in f.read_text().splitlines()] if f.exists() else []
@@ -20,7 +20,7 @@ def session(ev, headless=True):
     log = f.open("a")
     with sync_playwright() as p:
         b = p.chromium.launch(headless=headless)
-        ctx = b.new_context(record_video_dir=str(ev / "video"), viewport={"width": 1280, "height": 800})
+        ctx = b.new_context(base_url=base_url, record_video_dir=str(ev / "video"), viewport={"width": 1280, "height": 800})
         ctx.tracing.start(screenshots=True, snapshots=True)
         page = ctx.new_page()
 
@@ -42,5 +42,5 @@ def session(ev, headless=True):
         try:
             yield page, step
         finally:
-            ctx.tracing.stop(path=str(ev / "trace.zip"))
+            ctx.tracing.stop(path=str(ev / f"trace-{n['steps']:02d}.zip"))  # one per session
             ctx.close(); b.close(); log.close()

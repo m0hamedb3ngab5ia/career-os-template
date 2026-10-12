@@ -15,7 +15,7 @@ Table of every tracked posting; user ticks jobs to prepare/apply and changes sta
 
 ## Driving it (user mode, Playwright)
 
-Preconditions: baseline plus a seeded posting (scaffolding, removed by cleanup): `mkdir -p data/jobs/_example && cp tests/fixtures/example_posting.json data/jobs/_example/posting.json`, then restart the UI or run it with `--reindex`. Not yet proven; confirm the dir layout against `src/careeros/ui/services/jobs.py` `job_dir_for`.
+Preconditions: baseline plus a seeded posting (scaffolding, removed by cleanup): `mkdir -p data/jobs/example-1 && sed 's/"_example"/"example-1"/' tests/fixtures/example_posting.json > data/jobs/example-1/posting.json` (ids starting with `_` are hidden), then restart the UI or run it with `--reindex`. Not yet proven; confirm the dir layout against `src/careeros/ui/services/jobs.py` `job_dir_for`.
 
 - **List.** `page.goto("/jobs")`; row `Ledgerline` appears.
 - **Select.** Click checkbox `Select ...`; `POST /api/jobs/select`; read back with `careeros jobs list` or `GET /api/jobs`.
