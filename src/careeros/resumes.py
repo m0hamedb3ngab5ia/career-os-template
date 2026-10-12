@@ -350,8 +350,8 @@ def _check_origin(doc: dict[str, Any], prev: dict[str, Any] | None, author: str)
     if author not in ("user", "ai"):
         raise ValueError(f"author must be user or ai, not {author!r}")
 
-    def placed(d: dict[str, Any]) -> list[tuple[tuple[Any, ...], dict[str, Any]]]:
-        return [((sec, e.get("id"), b.get("id"), b.get("text")), b) for sec in ENTRY_SECTIONS
+    def placed(d: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:  # JSON key: ids/text may be any JSON
+        return [(json.dumps([sec, e.get("id"), b.get("id"), b.get("text")], sort_keys=True), b) for sec in ENTRY_SECTIONS
                 for e in d.get(sec) or [] if isinstance(e, dict) for b in e.get("bullets") or [] if isinstance(b, dict)]
 
     marked = [(k, b) for k, b in placed(doc) if "origin" in b]

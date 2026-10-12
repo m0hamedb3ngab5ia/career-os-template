@@ -109,6 +109,13 @@ def test_ai_may_not_move_a_marked_bullet_to_another_entry(tmp_path: Path):
     assert _draft_rev(tmp_path, rid) == 1
 
 
+def test_marked_bullet_with_non_string_text_does_not_wedge_the_draft(tmp_path: Path):
+    rid = _resume(tmp_path, TWO)
+    odd = json.loads(json.dumps(TWO))
+    odd["experience"][0]["bullets"].append({"id": "m", "text": ["x"], "origin": "user"})
+    resumes.put_draft(tmp_path, rid, odd, rev=0, author="user")
+    assert resumes.put_draft(tmp_path, rid, odd, rev=1, author="ai")["rev"] == 2
+
 def test_ai_write_ids_omitted_reordered_and_duplicated(tmp_path: Path):
     rid = _resume(tmp_path)
     mine = _with_origin(DOC, "Mine")
