@@ -7,6 +7,7 @@ import { WorkspacePage } from "./WorkspacePage";
 const routes = [
   { path: "/resumes/:rid", element: <WorkspacePage /> },
   { path: "/profile", element: <p>Profile page</p> },
+  { path: "/profile/answers", element: <p>Answers page</p> },
 ];
 const DOC = {
   schema_version: 1,
