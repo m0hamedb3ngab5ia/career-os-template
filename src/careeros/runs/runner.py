@@ -337,6 +337,7 @@ class _Loop:
         self.invoke, self.now, self.clock, self.cancel, self.echo = invoke, now, clock, cancel, echo
         self.after_attempt, self.pre_attempt, self.explicit = after_attempt, pre_attempt, explicit
         self.store = Store(settings)
+        self.force_tailor = False
         self.c = run["counters"]
         self.durations: list[float] = []
 
@@ -366,7 +367,7 @@ class _Loop:
         if self.kind == "prepare":  # REQ-112/113: reuse / tweak / tailor decided in code before the skill
             from careeros import match
             try:
-                c = match.pick(self.s, self.store.job_dir(jid))
+                c = match.pick(self.s, self.store.job_dir(jid), force_tailor=self.force_tailor)
                 self.echo(f"    résumé: {c['action']} ({c['reason']})")
             except Exception as e:  # noqa: BLE001  a broken résumé store must not block the existing flow
                 self.echo(f"    résumé pick failed ({e}); full tailor")
@@ -493,7 +494,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,
                 finalize: Callable[[dict[str, Any]], None] | None = None,
                 job_ids: list[str] | None = None, force: bool = False,
-                run_id: str | None = None) -> dict[str, Any]:
+                run_id: str | None = None, force_tailor: bool = False) -> dict[str, Any]:
     """Run one budgeted batch. Returns run.json (or, for a dry run, the would-be selection). RunBusy when
     another run holds the global lock. `finalize(run)` runs after run.json is saved, still under the lock.
     `job_ids` restricts the run to those jobs (JobNotRunnable when none is a candidate, or when the company gate
@@ -539,6 +540,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
         raise
     loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt,
                  explicit=job_ids is not None)
+    loop.force_tailor = force_tailor  # DEC-021: prepare tailors without the résumé pick
     loop.lock_token, loop.lock_ttl = glock.token, ttl
     status = "done"
     try:

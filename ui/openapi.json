@@ -15253,6 +15253,16 @@
               ],
               "title": "Job Id"
             }
+          },
+          {
+            "in": "query",
+            "name": "force_tailor",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Force Tailor",
+              "type": "boolean"
+            }
           }
         ],
         "responses": {

@@ -6098,6 +6098,7 @@ export interface operations {
     parameters: {
       query?: {
         job_id?: string | null;
+        force_tailor?: boolean;
       };
       path: {
         kind: string;

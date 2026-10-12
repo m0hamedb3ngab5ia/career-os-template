@@ -260,3 +260,11 @@ def test_dec_021_preflight_pass_reuses_and_caches(root):
     assert c["action"] == "reuse" and c["preflight"]["ok"] is True
     cached = json.loads((d / "preflight.json").read_text())
     assert cached["key"] == c["preflight"]["key"] and cached["ok"] is True
+
+
+def test_dec_021_force_tailor_skips_scoring_even_when_reuse_fits(root):
+    _resume(root, "Backend", "Python Kafka PostgreSQL React TypeScript backend engineer")
+    d = _job(root, "j1")
+    c = match.pick(Settings.load(root), d, force_tailor=True)
+    assert c["action"] == "tailor" and c["reason"] == "user chose tailor"
+    assert json.loads((d / "resume_choice.json").read_text()) == c and not (d / "resume.txt").exists()

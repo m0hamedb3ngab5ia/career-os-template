@@ -194,6 +194,10 @@ def test_steps_and_inbox_not_set_up(client, fakes):
     inbox = client.post("/api/runs/steps/inbox_sync", headers=W)
     assert inbox.status_code == 409 and "not set up" in inbox.json()["detail"]
     assert client.post("/api/runs/steps/apply", headers=W).status_code == 422
+    # DEC-021 force_tailor: only prepare with a job id; prepare without the flag is not a step
+    for url in ("/api/runs/steps/scout?force_tailor=true", "/api/runs/steps/prepare?force_tailor=true",
+                "/api/runs/steps/prepare?job_id=nw01", "/api/runs/steps/qa?job_id=nw01&force_tailor=true"):
+        assert client.post(url, headers=W).status_code == 422, url
 
 
 # --- cancel, catch-up, schedule --------------------------------------------------------------------------------

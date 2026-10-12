@@ -165,9 +165,14 @@ def _preflight(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> dic
     return res
 
 
-def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str, Any]:
+def pick(settings: Any, job_dir: Path, threshold: int | None = None, force_tailor: bool = False) -> dict[str, Any]:
     """reuse (best >= threshold) | tweak (<= 3 master bullets gain >= min_tweak_gain and reach it) | tailor.
-    Writes resume_choice.json; prepare-job obeys it. Unscored job -> tailor (the existing flow)."""
+    Writes resume_choice.json; prepare-job obeys it. Unscored job -> tailor (the existing flow). `force_tailor`
+    (DEC-021 "Tailor instead" after QA failed a reuse) -> tailor without scoring."""
+    if force_tailor:
+        c = {"job_id": job_dir.name, "action": "tailor", "reason": "user chose tailor"}
+        (job_dir / "resume_choice.json").write_text(json.dumps(c, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+        return c
     m = matches(settings, job_dir, threshold)
     thr = m["threshold"]
     c: dict[str, Any] = {"job_id": job_dir.name, "threshold": thr, "scored": m["scored"]}
