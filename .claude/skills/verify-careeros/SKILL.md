@@ -50,7 +50,7 @@ Playwright Python (`pip install -e '.[ui]'`, `playwright install chromium`): own
 PYTHONPATH=.claude/skills/verify-careeros $PY/python - <<X
 from drive import session
 with session("$EV") as (page, step):
-    step("open", lambda: page.goto("/profile#resumes"), "text=Upload résumé")
+    step("open", lambda: page.goto("/profile#resumes"), "text=Add résumé")
     step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample · master", click=True)
 X
 ```
