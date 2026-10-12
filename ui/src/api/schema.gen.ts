@@ -346,6 +346,20 @@ export interface paths {
      */
     put: operations["put_draft_api_profile_resumes__rid__draft_put"];
   };
+  "/api/profile/resumes/{rid}/draft/changes": {
+    /**
+     * Draft Changes
+     * @description History (DEC-015): draft.changes.jsonl, oldest first.
+     */
+    get: operations["draft_changes_api_profile_resumes__rid__draft_changes_get"];
+  };
+  "/api/profile/resumes/{rid}/draft/changes/{cid}/revert": {
+    /**
+     * Revert Change
+     * @description Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.
+     */
+    post: operations["revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post"];
+  };
   "/api/profile/resumes/{rid}/feedback": {
     /** Get Feedback */
     get: operations["get_feedback_api_profile_resumes__rid__feedback_get"];
@@ -4941,6 +4955,59 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["DraftIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Draft"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Draft Changes
+   * @description History (DEC-015): draft.changes.jsonl, oldest first.
+   */
+  draft_changes_api_profile_resumes__rid__draft_changes_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": {
+              [key: string]: unknown;
+            }[];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Revert Change
+   * @description Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.
+   */
+  revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post: {
+    parameters: {
+      path: {
+        rid: string;
+        cid: string;
       };
     };
     responses: {
