@@ -56,11 +56,17 @@ def _utcnow() -> datetime:
 
 def ps_cmdline(pid: int) -> list[str] | str:
     """The process's exact argv from /proc/<pid>/cmdline (Linux), else its command line from `ps -ww` (macOS; a
-    joined string, see classify_cmdline). Without -ww, procps cuts the line at 80 columns when not on a terminal."""
+    joined string, see classify_cmdline). Without -ww, procps cuts the line at 80 columns when not on a terminal.
+    A process mid-execve reads as empty until the kernel sets up its new argv (Popen has already returned by then),
+    so an empty read is retried briefly; a zombie stays empty and costs the full wait."""
     proc = Path(f"/proc/{pid}/cmdline")
     try:
         if proc.exists():
-            return [a.decode("utf-8", "replace") for a in proc.read_bytes().split(b"\0") if a]
+            for _ in range(20):
+                if raw := proc.read_bytes():
+                    return [a.decode("utf-8", "replace") for a in raw.split(b"\0") if a]
+                time.sleep(0.01)
+            return []
         return subprocess.run(["ps", "-ww", "-o", "command=", "-p", str(pid)], capture_output=True, text=True,
                               timeout=5).stdout.strip()
     except (OSError, subprocess.SubprocessError):
