@@ -21,9 +21,13 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 - Users can easily find a section in the app to upload their résumé.
 - While it uploads, users see a progress screen that shows the résumé review running in the background.
 - Users get clear feedback on their résumé when the review finishes.
-- Users can apply a piece of feedback with one click and the AI updates the résumé for them.
+- The résumé and its feedback open on their own page: the résumé on one side, the feedback beside it.
+- When users point at a piece of feedback, the part of the résumé it is about is highlighted, so they see what it refers to.
+- Users can accept a piece of feedback with one click. Like an accepted suggestion in Google Docs, the new text replaces the old text in place, and users watch it change. They can undo it.
 - Users can leave their own comments on the feedback instead.
-- Users can also edit the résumé by hand.
+- Users can also edit the résumé text by hand on the same page. They never edit LaTeX code.
+- Whatever file users upload, the app turns it into the app's own résumé layout so it is easy to edit. The uploaded file is kept, unchanged, as the first version.
+- When users save, everything they accepted and edited in that sitting becomes one new version. If they leave before saving, their changes wait for them.
 - Why: a strong résumé before any applications go out
 
 ### USR-003 See what hiring systems read from my résumé
@@ -36,6 +40,8 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 - Users can see a list of every résumé they have uploaded.
 - Users can see every version of a résumé, including who changed it: them or the AI.
 - Users can open any earlier version.
+- Users can compare two versions: removed text shown in red and struck through, added text in green.
+- When a new version is made, users can open it right away. The app never says a version was made without showing it.
 - Users can delete versions they no longer want.
 - Why: never lose good work and always know what changed
 

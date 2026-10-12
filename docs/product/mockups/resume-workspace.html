@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Résumé workspace wireframe</title>
+<!-- Wireframe for SCREEN-ResumeWorkspace (06_IA.md), REQ-124..126, DEC-012. Tokens from 08_DESIGN_SYSTEM.md. -->
+<style>
+:root{--bg:#fff;--group:#faf9f5;--card:#fff;--fill:#eeebe3;--sep:#e5e1d8;--label:#1d1d1f;--sec:#5e5e63;--accent:#0066cc;--focus:#0066cc;--selected:#dce7f5;
+--g:#1e7b34;--gb:#e3f4e7;--o:#a34700;--ob:#fdeedc;--r:#c4001a;--rb:#fce4e6;--b:#0058b0;--bb:#e1ecf9}
+@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--group:#161618;--card:#2c2c2e;--fill:#3a3a3c;--sep:#3a3a3c;--label:#f5f5f7;--sec:#aeaeb2;--accent:#0064d1;--focus:#4da3ff;--selected:#1e3a5f;
+--g:#4ade80;--gb:#16301f;--o:#ffb340;--ob:#3a2a12;--r:#ff6b61;--rb:#3d1a1a;--b:#7cb8ff;--bb:#18304d}}
+*{box-sizing:border-box}body{margin:0;background:var(--group);color:var(--label);font:14px/1.45 -apple-system,"SF Pro Text",system-ui}
+.wrap{max-width:1180px;margin:0 auto;padding:16px}
+h1{font-size:22px;margin:0}.sec{color:var(--sec)}
+.head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.head .sp{flex:1}
+.chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--fill)}
+select,button{font:inherit;border-radius:8px;border:1px solid var(--sep);background:var(--card);color:var(--label);padding:6px 10px}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:10px;margin-bottom:12px;background:var(--ob);color:var(--o);position:sticky;top:0}
+.bar .sp{flex:1}
+.tabs{display:flex;gap:16px;border-bottom:1px solid var(--sep);margin-bottom:12px}.tabs span{padding:6px 0}.tabs .on{border-bottom:2px solid var(--accent);font-weight:600}
+.grid{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--sep);border-radius:12px;padding:16px}
+.resume h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--sep);margin:16px 0 6px}
+.resume ul{margin:4px 0;padding-left:18px}
+mark{background:var(--bb);color:inherit;border-radius:3px}mark.on{background:var(--selected);outline:2px solid var(--focus)}
+del{background:var(--rb);color:var(--r)}ins{background:var(--gb);color:var(--g);text-decoration:none}
+.fb{margin-bottom:10px}.fb.on{outline:2px solid var(--focus);background:var(--selected)}
+.fb p{margin:4px 0}.fb .acts{display:flex;gap:6px;margin-top:8px}
+.done{display:flex;justify-content:space-between;align-items:center;color:var(--g)}
+.note{font-size:12px;color:var(--sec);margin-top:24px}
+</style></head><body><div class="wrap">
+
+<p class="sec">Profile › Résumés row (REQ-125): <b>Alex Example résumé</b> · <span class="chip">master</span> · 3 suggestions · <button class="primary">Review 3 suggestions</button></p>
+<hr>
+
+<div class="head">
+  <h1>Alex Example résumé</h1><span class="chip">master</span><span class="sp"></span>
+  <select aria-label="Version"><option>Draft (from v2)</option><option>v2 · converted · AI</option><option>v1 · original upload · read-only</option></select>
+  <select aria-label="Compare with"><option>Compare with…</option><option>v2</option><option>v1</option></select>
+  <button>Make master</button>
+</div>
+
+<div class="bar" role="status">Draft, not saved · 1 accepted, 1 edit<span class="sp"></span><button>Discard</button><button class="primary">Save as v3</button></div>
+
+<div class="tabs"><span class="on">Résumé</span><span>ATS view</span></div>
+
+<div class="grid">
+  <div class="card resume">
+    <b style="font-size:18px">Alex Example</b><div class="sec">alex@example.com · Springfield, NY</div>
+    <h2>Experience</h2>
+    <b>Software Engineer</b>, Example Corp <span class="sec">· Jan 2022 – Present</span>
+    <ul>
+      <li><mark class="on">Worked on the billing service and fixed bugs</mark></li>
+      <li><del>Helped with</del> <ins>Migrated</ins> the CI pipeline to GitHub Actions <span class="chip">AI</span></li>
+      <li>Wrote internal docs for onboarding <ins>new engineers</ins> <span class="chip">you</span></li>
+    </ul>
+    <h2>Education</h2>
+    <b>B.S. Computer Science</b>, State University <span class="sec">· May 2021</span>
+    <h2>Skills</h2>Python, TypeScript, SQL
+  </div>
+
+  <div>
+    <div class="card fb on">
+      <b>Experience · vague bullet</b>
+      <p class="sec">Say what you changed in the billing service.</p>
+      <p><del>Worked on the billing service and fixed bugs</del><br><ins>Fixed bugs in the billing service's invoice export</ins></p>
+      <div class="acts"><button class="primary">Accept</button><button>Comment</button><button>Dismiss</button></div>
+    </div>
+    <div class="card fb"><div class="done"><span>✓ Accepted: CI bullet</span><button>Undo</button></div></div>
+    <div class="card fb">
+      <b>Format · two columns</b><p class="sec">Fixed by our layout; nothing to do.</p>
+    </div>
+    <div class="card fb">
+      <b>Not carried over (1)</b>
+      <p class="sec">"References available on request"</p>
+      <div class="acts"><button>Restore</button></div>
+    </div>
+  </div>
+</div>
+
+<p class="note">Wireframe only. Hover/focus a card ↔ highlight its text (blue). Inline diff: red strikethrough removed, green added, chip = who changed it. Save makes one version; leaving keeps the draft. Toast after Save: "Saved v3 · Open".</p>
+</div></body></html>

@@ -197,6 +197,7 @@ All uploads + versions live under `profile/` (gitignored, REQ-003). One profile 
 Profile page has a Résumés section; accepts PDF or DOCX ≤5 MB (Q-009); stored with its original file.
 Given Profile page · When user drops `cv.pdf` · Then file stored under `profile/resumes/<rid>/`, v1 (author=user) listed, review starts (REQ-094).
 Failure: wrong type/too big → inline error, nothing stored. Corrupt/unreadable → stored, ATS view (REQ-098) warns "no text found".
+Changed 2026-10-12 (DEC-012): upload = v1 original file, read-only forever; then convert (REQ-124) → v2; review runs on v2. Upload lands in the workspace (REQ-125).
 
 ### REQ-094 Background résumé review with progress
 Upload starts one headless review run (skill, no API key); UI shows live progress; result = feedback items `{id, section, issue, suggestion}`.
@@ -204,8 +205,8 @@ Given upload done · When review runs · Then progress screen streams steps; on 
 Failure: `claude` missing/timeout → review state `failed` + Retry; upload kept. Events: run log like REQ-040.
 
 ### REQ-095 Apply feedback with one click
-Apply → AI rewrites only the targeted section → new version (author=ai), diff shown, undo = open previous version.
-Given feedback item · When Apply · Then new version vN+1 author=ai; item marked applied.
+Changed 2026-10-12 (DEC-012). Accept → AI rewrite of the item's `quote` replaces it in place in the draft (REQ-126), shown as inline diff; card collapses; Undo per card until Save. No version per accept.
+Given feedback item · When Accept · Then draft text changed in place, item `accepted` (draft), no new version until Save.
 Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version, nor stronger claims (scope, outcome, seniority verb e.g. supported → led) (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
 
 ### REQ-096 Comment on feedback
@@ -213,8 +214,8 @@ User comment on an item replaces one-click: AI re-drafts the suggestion using th
 Given item · When user comments "keep the Python line" · Then suggestion regenerated honoring comment; nothing written to résumé until Apply.
 
 ### REQ-097 Edit résumé by hand
-In-app text editor on the parsed résumé content; Save → new version author=user. No guard (user owns facts).
-Given v2 · When user edits a bullet + Save · Then v3 author=user, v2 unchanged.
+Changed 2026-10-12: edit text in place in the workspace (structured fields: bullets, headings, contact), never raw LaTeX. Edits join the draft (REQ-126), change tagged author=user. No guard (user owns facts).
+Given v2 · When user edits a bullet + Save · Then v3 holds the edit tagged user, v2 unchanged.
 
 ### REQ-098 ATS view
 Per version: plain text an ATS would read + parsed fields (contact, sections, roles+dates, skills) + warnings (images, tables, multi-column, missing contact, unreadable dates). Deterministic, no LLM.
@@ -228,6 +229,23 @@ Given 2 résumés · When mark B master · Then A becomes `variant`, master.yaml
 ### REQ-100 Résumé list + version history
 List all résumés (name, type, latest version, date). Per résumé: versions with author user|ai, time, source (upload/edit/feedback id). Open any version (view + ATS view). Delete non-latest versions; latest of master can't be deleted; deleting a whole résumé allowed unless master.
 Given master v1..v3 · When delete v1 · Then v2,v3 remain · When delete v3 · Then refused with reason.
+Added 2026-10-12: workspace version picker + "Compare with…" → inline diff (removed red strikethrough, added green), change colour/tag by author. Any "new version" toast links to that version; never a bare "Applied vN". v1 (original upload) never deletable.
+
+### REQ-124 Convert upload to structured résumé
+After upload, AI converts v1 text into structured résumé (`resume_schema.md` shape: identity, sections, roles, bullets) → v2 author=ai source=convert, rendered with `templates/resume/default.tex` (PDF when LaTeX present) and HTML (REQ-125).
+Guard: v2 may not add numbers, employers, titles, dates or tools absent from v1 text (REQ-095 guard). Dropped text (v1 lines not in v2) listed in a "Not carried over" panel; each line → Restore (adds to draft).
+Given 1-page PDF · When convert · Then v2 structured, guard passes, dropped list shown (may be empty).
+Failure: guard fails or no text → v2 not created, workspace shows v1 read-only + reason + Retry; review still runs on v1 text.
+
+### REQ-125 Résumé workspace page
+Route `/resumes/<rid>`, full page. Left: résumé HTML render of selected version/draft (our template look, no LaTeX needed). Right: feedback cards in margin order. Hover/focus card → its `quote` highlighted on résumé (and résumé highlight → card). Format-kind items (no quote) list at top. One primary action per state: review running → progress; open items → "Review N suggestions" (focus first card); draft → Save.
+Profile › Résumés keeps one row per résumé: name, role, status, one primary action linking to the workspace; errors inline banner + fix button. ATS view (REQ-098) = workspace tab.
+Given review done with 3 items · When open workspace + hover item 2 · Then item 2 quote highlighted, others not.
+
+### REQ-126 Review session draft, one version per Save
+Accepts, rejects, restores and hand edits collect in one draft per résumé (persisted server-side, survives leaving page/restart). Each change records author (ai|user) + feedback id. Undo per card. Save → one version vN+1 with per-change authors (label "you + AI" when mixed); feedback states final. Discard draft = explicit button, no confirm (undo via version history not needed: nothing written).
+Given draft with 2 accepts + 1 edit · When Save · Then exactly one new version, 3 changes tagged ai, ai, user; toast links to vN+1.
+Given unsaved draft · When user leaves and returns · Then draft restored with "Draft, not saved" bar.
 
 ### REQ-101 Writing samples
 Same Profile page: upload past cover letters / writing (txt, md, pdf, docx ≤5 MB) → `profile/voice/samples/`. List + remove. Any change re-runs `learn-voice` in background → `style_guide.md` Learned section. Cover letters use it; `voice_verified` true iff ≥1 sample.

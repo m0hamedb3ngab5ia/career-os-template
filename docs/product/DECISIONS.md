@@ -98,3 +98,9 @@ Fluff rules:
 
 Reason: user stated principle 2026-10-11. Reasoned by: human.
 Consequences: UI work (with DEC-009) is judged against these targets; a UI PR that adds a step/screen/wait before value needs justification.
+
+### DEC-012 Résumé workspace: one page, our format, one version per sitting
+Reasoned by: human (feedback 2026-10-11 §1, answers 2026-10-12)
+Decision: every upload converted into our structured résumé + LaTeX template; original file = v1 read-only. Own full-page workspace (`/resumes/<rid>`); Profile keeps a one-line row. Feedback = Google-Docs-style suggestions: hover highlights the quoted text, Accept replaces in place, Undo per card. One version per Save (per-change author ai|user, "you + AI"); unsaved draft kept server-side. Compare = inline diff (red strikethrough / green). Preview = HTML render (instant, no LaTeX); PDF via LaTeX when present. Conversion guarded (no new facts) + "Not carried over" list with Restore.
+Why: user could not see where feedback applies, what changed, or the new version ("Applied v8" with no v8). TTV/TTA (DEC-011): value visible in place, no hunting.
+Rejected: keep user's own layout (can't edit or diff reliably); version per accept (noise, 8 versions per sitting); side-by-side compare; live PDF preview (slow, needs LaTeX).

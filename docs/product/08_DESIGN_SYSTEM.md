@@ -163,11 +163,24 @@ Gaps (non-blocking, decide in TASK-013): shared breakpoint token (now 600/640/90
 Table (USR-036): keep current Jobs table as-is (Excel-like: header sort + filter menus, filter chips, Pager rows 10/25/50/100). Every list of jobs reuses it.
 Page header (USR-035): h1 + one-line `--sec` guidance + primary action, every screen.
 
+## Delta 2026-10-12 (résumé workspace, DEC-012)
+| need | build from | REQ |
+|---|---|---|
+| Two-pane workspace | page grid: résumé card (flex 1) + margin column 320px; <900px margin stacks under résumé | REQ-125 |
+| Quote highlight | `<mark>` bg = blue status bg, active card = `--selected` + 2px `--focus` outline on both mark and card | REQ-125 |
+| Inline diff | `<del>` red pair + line-through, `<ins>` green pair, no underline; author tag = small chip "you"/"AI" on hover | REQ-095 REQ-100 |
+| Feedback card | card + Button Accept (primary) / Comment / Dismiss; after accept: collapsed row + Undo | REQ-095 REQ-126 |
+| Draft bar | sticky top bar orange pair "Draft, not saved" + Button Save (primary) + Discard | REQ-126 |
+| Not carried over | collapsible card, rows w/ Restore | REQ-124 |
+| Version picker / Compare | native `<select>` ×2 | REQ-100 |
+Colour meaning (app-wide, Task 3 §4): orange = needs you, red = blocked/removed, green = done/added.
+
 ## Mockups
 Wireframes, minimal, existing tokens: https://claude.ai/artifact/LiWEdd7CnMgFChRLo4hCMt
 | artboard | FLOW / UC |
 |---|---|
 | Main.dc.html (Profile) | FLOW-001 UC-001..006 UC-009 |
+| `docs/product/mockups/resume-workspace.html` | FLOW-002 UC-001 UC-002 UC-004 |
 | CheckJob.dc.html | FLOW-003 UC-010 |
 | JobsSelect.dc.html | UC-007 UC-012 |
 | FillPreview.dc.html | UC-008 |

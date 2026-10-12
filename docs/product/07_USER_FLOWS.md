@@ -22,14 +22,18 @@ UCs: UC-002
 ```mermaid
 stateDiagram-v2
   [*] --> open
-  open --> applied: Apply (guard ok)
-  open --> open: Apply (guard fails, reason shown)
+  open --> accepted: Accept (guard ok, text replaced in draft)
+  open --> open: Accept (guard fails, reason shown)
+  accepted --> open: Undo
   open --> redrafting: Comment
   redrafting --> open: new suggestion
   open --> dismissed: Dismiss
+  dismissed --> open: Undo
+  accepted --> applied: Save
   applied --> [*]
   dismissed --> [*]
 ```
+What to notice: `accepted` lives only in the draft (REQ-126); Save turns every accepted card into `applied` in one version. Draft survives leaving the page.
 What to notice: nothing reaches the résumé except via `applied`, and only after the zero-fabrication guard.
 
 ### FLOW-003 Check a job
