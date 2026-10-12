@@ -40,7 +40,9 @@ function targetOrder(doc: Doc): string[] {
 }
 
 /** /resumes/:rid — the résumé draft: edit in place, act on suggestions, autosave, Done = one new version. */
-export function WorkspacePage() {
+export const WorkspacePage = () => <Workspace key={useParams().rid} />;  // new résumé = fresh state
+
+function Workspace() {
   const rid = useParams().rid ?? "";
   const meta = useResumeMeta(rid);
   const draft = useDraft(rid);
@@ -48,13 +50,14 @@ export function WorkspacePage() {
   const save = useAutosave(rid);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [active, setActive] = useState<string | null>(null);
+  const [locked, setLocked] = useState(false);  // read-only while an accept is in flight: its reply replaces the doc
   const key = useRef<string | null>(null);
   const qc = useQueryClient();
   const nav = useNavigate();
   const toast = useToast();
 
   useEffect(() => {
-    if (draft.data && !doc) {
+    if (draft.data && !draft.isFetching && !doc) {  // wait out the mount refetch: a cached draft has a stale rev
       setDoc(draft.data.resume);
       save.setRev(draft.data.rev);
     }
@@ -107,8 +110,8 @@ export function WorkspacePage() {
   };
   const field = (label: string, path: (string | number)[], value: unknown, multi = false) =>
     multi
-      ? <textarea aria-label={label} className={styles.field} rows={1} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />
-      : <input aria-label={label} className={styles.field} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />;
+      ? <textarea aria-label={label} readOnly={locked} className={styles.field} rows={1} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />
+      : <input aria-label={label} readOnly={locked} className={styles.field} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />;
 
   const identity = (doc.identity as Record<string, unknown> | undefined) ?? {};
   const status = save.state === "error"
@@ -134,7 +137,7 @@ export function WorkspacePage() {
               {t === "skills"
                 ? Object.entries(doc.skills as Record<string, string[]>).map(([k, v]) => (
                     <p key={k} className={styles.row}><span className={styles.muted}>{cap(k)}:</span>
-                      {field(`Skills ${k}`, ["skills", k], v.join(", "))}</p>
+                      <SkillsInput label={`Skills ${k}`} value={v} locked={locked} onChange={(a) => edit(["skills", k], a)} /></p>
                   ))
                 : (doc[t] as Entry[]).map((e, i) => (
                     <div key={e.id ?? i} className={styles.entry}>
@@ -154,7 +157,7 @@ export function WorkspacePage() {
           ))}
         </article>
         <Margin rid={rid} cards={cards} active={active} setActive={setActive}
-          onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; }} flush={save.flush}
+          onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; }} flush={save.flush} lock={setLocked}
           refresh={() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) })} />
       </div>
     </Page>
@@ -168,11 +171,19 @@ interface MarginProps {
   setActive: (id: string) => void;
   onAccepted: (d: { rev: number; resume: Doc }) => void;
   flush: () => Promise<boolean>;
+  lock: (b: boolean) => void;
   refresh: () => void;
 }
 
+/** Skills group: comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
+function SkillsInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {
+  const [text, setText] = useState(value.join(", "));
+  return <input aria-label={label} readOnly={locked} className={styles.field} value={text}
+    onChange={(e) => { setText(e.target.value); onChange(e.target.value.split(",").map((x) => x.trim()).filter(Boolean)); }} />;
+}
+
 /** Margin cards, each placed level with its target (pushed down to avoid overlap); stacked on narrow screens. */
-function Margin({ rid, cards, active, setActive, onAccepted, flush, refresh }: MarginProps) {
+function Margin({ rid, cards, active, setActive, onAccepted, flush, lock, refresh }: MarginProps) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const aside = ref.current;
@@ -190,19 +201,22 @@ function Margin({ rid, cards, active, setActive, onAccepted, flush, refresh }: M
   return (
     <aside ref={ref} className={styles.margin} aria-label="Suggestions">
       {cards.map((a) => <Card key={a.id} rid={rid} a={a} on={active === a.target_id} setActive={setActive}
-        onAccepted={onAccepted} flush={flush} refresh={refresh} />)}
+        onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh} />)}
     </aside>
   );
 }
 
-function Card({ rid, a, on, setActive, onAccepted, flush, refresh }: Omit<MarginProps, "cards" | "active"> & { a: Annotation; on: boolean }) {
+function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "active"> & { a: Annotation; on: boolean }) {
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
   const act = useMutation({
     mutationFn: async (what: "accept" | "reject" | "reply") => {
       if (what === "accept") {
-        if (!(await flush())) throw new Error("Save your changes first (Retry save).");
-        onAccepted(await accept(rid, a.id));
+        lock(true);  // typing during the request would be overwritten by the accepted doc
+        try {
+          if (!(await flush())) throw new Error("Save your changes first (Retry save).");
+          onAccepted(await accept(rid, a.id));
+        } finally { lock(false); }
       } else if (what === "reject") await reject(rid, a.id);
       else {
         await reply(rid, a.id, text.trim(), apply);
@@ -214,7 +228,7 @@ function Card({ rid, a, on, setActive, onAccepted, flush, refresh }: Omit<Margin
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim()) act.mutate("reply");
+    if (text.trim() && !act.isPending) act.mutate("reply");  // Enter bypasses the disabled button
   };
   const who = a.author === "ai" ? "Claude" : "You";
   const tid = `card-${a.id}`;

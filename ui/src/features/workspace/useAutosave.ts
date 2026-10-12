@@ -23,7 +23,7 @@ export function useAutosave(rid: string, delay = 600) {
   /** Send the pending edit now. Resolves true when nothing is left unsaved. */
   const flush = useCallback(async (keepalive = false): Promise<boolean> => {
     clearTimeout(timer.current);
-    if (inflight.current && !keepalive) await inflight.current;
+    while (inflight.current && !keepalive) await inflight.current;
     const doc = pending.current;
     if (!doc) return true;  // a failed save re-queues its doc, so nothing pending = nothing unsaved
     pending.current = null;

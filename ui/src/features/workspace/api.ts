@@ -15,7 +15,7 @@ export const draftUrl = (rid: string) => `${base(rid)}/draft`;
 export const wsKeys = { annotations: (rid: string) => ["workspace", rid, "annotations"] as const };
 
 export const useDraft = (rid: string) =>
-  useQuery({ queryKey: ["workspace", rid, "draft"], queryFn: () => apiFetch<Draft>(draftUrl(rid)), staleTime: Infinity, refetchOnWindowFocus: false });
+  useQuery({ queryKey: ["workspace", rid, "draft"], queryFn: () => apiFetch<Draft>(draftUrl(rid)), staleTime: Infinity, refetchOnMount: "always", refetchOnWindowFocus: false });
 export const useAnnotations = (rid: string) =>
   useQuery({ queryKey: wsKeys.annotations(rid), queryFn: () => apiFetch<Annotation[]>(`${base(rid)}/annotations`) });
 

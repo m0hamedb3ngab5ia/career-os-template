@@ -136,6 +136,30 @@ describe("WorkspacePage", () => {
     expect((puts(calls)[0]!.body as { rev: number }).rev).toBe(4);
   });
 
+  it("keeps skills groups as string[] when edited", async () => {
+    const calls = api({ "GET /api/profile/resumes/cv/draft": { rev: 3, resume: { ...DOC, sections: [{ id: "s", type: "skills", order: 1 }], skills: { languages: ["Python", "Go"] } }, draft: true } });
+    renderRoutes(routes, "/resumes/cv");
+    const box = await screen.findByRole("textbox", { name: "Skills languages" });
+    expect(box).toHaveValue("Python, Go");
+    fireEvent.change(box, { target: { value: "Python, Go, Rust, " } });
+    expect(box).toHaveValue("Python, Go, Rust, ");
+    await tick(800);
+    expect((puts(calls)[0]!.body as { resume: { skills: unknown } }).resume.skills).toEqual({ languages: ["Python", "Go", "Rust"] });
+  });
+
+  it("sends a reply once even when Enter is pressed twice while pending", async () => {
+    const calls = api({ "POST /api/profile/resumes/cv/annotations/a2/replies": () => new Promise(() => {}) });  // never answers: stays pending
+    renderRoutes(routes, "/resumes/cv");
+    const comment = await screen.findByRole("article", { name: /Name the stack/ });
+    fireEvent.change(within(comment).getByRole("textbox", { name: "Reply" }), { target: { value: "Use Python" } });
+    const form = within(comment).getByRole("textbox", { name: "Reply" }).closest("form")!;
+    fireEvent.submit(form);
+    await tick(0);
+    fireEvent.submit(form);
+    await tick(0);
+    expect(calls.filter((c) => c.url.endsWith("/replies"))).toHaveLength(1);
+  });
+
   it("Done flushes edits, then publishes; a retry reuses the idempotency key", async () => {
     let fail = true;
     const calls = api({ "POST /api/profile/resumes/cv/publish": () => fail
