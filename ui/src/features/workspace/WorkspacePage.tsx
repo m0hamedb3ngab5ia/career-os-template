@@ -20,7 +20,7 @@ function setAt(doc: Doc, path: (string | number)[], value: unknown): Doc {
   const out = structuredClone(doc);
   let node = out as Record<string | number, unknown>;
   for (const k of path.slice(0, -1)) node = node[k] as Record<string | number, unknown>;
-  node[path[path.length - 1]] = value;
+  node[path[path.length - 1]!] = value;
   return out;
 }
 

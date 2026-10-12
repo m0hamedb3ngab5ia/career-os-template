@@ -69,15 +69,15 @@ describe("WorkspacePage", () => {
     expect(puts(calls)).toHaveLength(0);
     await tick(500);
     expect(puts(calls)).toHaveLength(1);
-    const body = puts(calls)[0].body as { rev: number; author: string; resume: typeof DOC };
+    const body = puts(calls)[0]!.body as { rev: number; author: string; resume: typeof DOC };
     expect(body.rev).toBe(3);
     expect(body.author).toBe("user");
     expect(body.resume.summary).toBe("Backend engineer (Python)");
-    expect(body.resume.experience[0].bullets[1].text).toBe("Wrote onboarding docs");
+    expect(body.resume.experience[0]!.bullets[1]!.text).toBe("Wrote onboarding docs");
     expect(await screen.findByText("All changes saved")).toBeInTheDocument();
     fireEvent.change(b2, { target: { value: "Wrote docs again" } });
     await tick(800);
-    expect((puts(calls)[1].body as { rev: number }).rev).toBe(4);  // next save uses the rev the server returned
+    expect((puts(calls)[1]!.body as { rev: number }).rev).toBe(4);  // next save uses the rev the server returned
   });
 
   it("flushes a pending edit on in-app navigation and on pagehide (keepalive)", async () => {
@@ -91,7 +91,7 @@ describe("WorkspacePage", () => {
     fireEvent.change(screen.getByRole("textbox", { name: "Summary" }), { target: { value: "B" } });
     await act(() => router.navigate("/profile"));
     expect(puts(calls)).toHaveLength(2);
-    expect((puts(calls)[1].body as { resume: typeof DOC }).resume.summary).toBe("B");
+    expect((puts(calls)[1]!.body as { resume: typeof DOC }).resume.summary).toBe("B");
   });
 
   it("shows a save error with Retry instead of losing the edit", async () => {
@@ -110,7 +110,7 @@ describe("WorkspacePage", () => {
   });
 
   it("accepts, rejects and replies (Apply comment) on cards", async () => {
-    const accepted = { ...DOC, experience: [{ ...DOC.experience[0], bullets: [{ id: "experience-1.b1", text: "Fixed billing export bugs" }, DOC.experience[0].bullets[1]] }] };
+    const accepted = { ...DOC, experience: [{ ...DOC.experience[0], bullets: [{ id: "experience-1.b1", text: "Fixed billing export bugs" }, DOC.experience[0]!.bullets[1]!] }] };
     const calls = api({
       "POST /api/profile/resumes/cv/annotations/a1/accept": { rev: 4, resume: accepted, draft: true },
       "POST /api/profile/resumes/cv/annotations/a2/reject": { ...COMM, status: "rejected" },
@@ -129,11 +129,11 @@ describe("WorkspacePage", () => {
     await tick(0);
     const posts = calls.filter((c) => c.method === "POST");
     expect(posts.map((c) => c.url.replace("/api/profile/resumes/cv/annotations/", ""))).toEqual(["a1/accept", "a2/replies", "a2/reject"]);
-    expect(posts[1].body).toEqual({ text: "Use Python", apply: true });
+    expect(posts[1]!.body).toEqual({ text: "Use Python", apply: true });
     // the accepted draft's rev is the base for the next autosave
     fireEvent.change(screen.getByRole("textbox", { name: "Summary" }), { target: { value: "Y" } });
     await tick(800);
-    expect((puts(calls)[0].body as { rev: number }).rev).toBe(4);
+    expect((puts(calls)[0]!.body as { rev: number }).rev).toBe(4);
   });
 
   it("Done flushes edits, then publishes; a retry reuses the idempotency key", async () => {
