@@ -144,8 +144,10 @@ def test_block_company_during_a_companies_save_loses_neither_write(root, monkeyp
     read = settings_io.read_section(s, "companies")
     current = read["values"]["companies:blocklist.companies"] or []
     real_check = settings_io._check_changes
+    in_window = threading.Event()
 
-    def slow_check(*a, **kw):  # widen the version check -> write window
+    def slow_check(*a, **kw):  # runs under the lock, after the version check: widen the check -> write window
+        in_window.set()
         time.sleep(0.4)
         return real_check(*a, **kw)
 
@@ -162,7 +164,9 @@ def test_block_company_during_a_companies_save_loses_neither_write(root, monkeyp
 
     t = threading.Thread(target=save)
     t.start()
-    time.sleep(0.1)  # the save now holds the lock, between its version check and its write
+    # wait until the save holds the lock past its version check; a fixed sleep let block_company win the lock
+    # first on a loaded CI runner, so the save (correctly) saw a stale version
+    assert in_window.wait(10)
     svc.block_company(Settings.load(root), None, "a1")
     t.join(10)
     assert not errors, errors
