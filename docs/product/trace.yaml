@@ -152,9 +152,9 @@ flows:
   FLOW-003: {status: approved, use_cases: [UC-010]}
   FLOW-004: {status: draft, use_cases: [UC-007, UC-013]}
 tasks:
-  TASK-001: {status: todo, requirements: [REQ-108]}
-  TASK-002: {status: todo, requirements: [REQ-109], use_cases: [UC-012]}
-  TASK-003: {status: todo, requirements: [REQ-110], use_cases: [UC-012]}
+  TASK-001: {status: done, requirements: [REQ-108]}
+  TASK-002: {status: done, requirements: [REQ-109], use_cases: [UC-012]}
+  TASK-003: {status: done, requirements: [REQ-110], use_cases: [UC-012]}
   TASK-004: {status: done, requirements: [REQ-098]}
   TASK-005: {status: done, requirements: [REQ-102, REQ-103]}
   TASK-006: {status: done, requirements: [REQ-104]}

@@ -2,11 +2,10 @@
 
 ## Now
 - Lane: Feature — onboarding + profile (USR-002..004, 022..027) + injection guard, résumé reuse, check a job (USR-033, 031, 028)
-- Stage: Build (TASK-001 next). IA + UI approved 2026-10-04 (06_IA.md, 08_DESIGN_SYSTEM.md, mockups, DEC-009 minimal UI; Trim list decided at audit triage) Arch delta approved 2026-10-04 (09_ARCHITECTURE.md Delta, DEC-001..008, FLOW-003)
+- Stage: Build. TASK-001..023 and TASK-025 shipped (#115..#150); private UI ported to the template (#156). Specs/IA/arch approved 2026-10-04 (see Gates)
 - Done: REQ-093..116, UC-001..012, FLOW-001/002 approved (gates 2026-10-04)
-- Next: build 10_TASKS.md in order: USR-033 (REQ-108..110) first, then readiness/selected, profile store, match/reuse, check-a-job
-- Waiting on user: other USR triage. All Q answered 2026-10-04.
-- Approved 2026-10-04: REQ-108..110 (USR-033), REQ-111..113 (USR-031), REQ-114..116 (USR-028), UC-010..012. Later: Q-008 json, USR-029/030/032
+- Next: TASK-024 (résumé hand editor + applied-edit diff/undo UI; API `PUT .../text` exists), TASK-026 (Action Items in data/action_items.json)
+- Waiting on user: audit triage gate; other USR triage. Later: Q-008 json, USR-029/030/032
 
 ## Gates
 | gate | status | date |
@@ -26,7 +25,7 @@
 <!-- trace:status -->
 | REQ status | n |
 |---|---|
-| approved | 30 |
+| approved | 31 |
 | proposed | 61 |
 | rejected | 1 |
 
