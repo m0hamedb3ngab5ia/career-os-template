@@ -149,3 +149,58 @@ def test_new_feedback_items_still_show_after_annotations_exist(tmp_path: Path):
     ann.reject(tmp_path, rid, "f1")
     assert [(i["id"], i["status"]) for i in ann.list_items(tmp_path, rid)] == [("a1", "open"), ("f1", "rejected")]
     assert json.loads(p.read_text(encoding="utf-8")) == old  # never written
+
+
+def test_feedback_base_is_the_first_quote(tmp_path: Path):  # review items store `quotes`; `quote` is legacy
+    rid = _resume(tmp_path)
+    (tmp_path / "profile/resumes" / rid / "feedback.json").write_text(json.dumps({"review": None, "items": [
+        {"id": "f1", "section": "S", "issue": "i", "suggestion": "s", "quotes": ["Engineer", "x"], "state": "open",
+         "comments": [], "v": 1},
+        {"id": "f2", "section": "S", "issue": "i", "suggestion": "s", "state": "open", "comments": [], "v": 1}]}),
+        encoding="utf-8")
+    assert [i["base"] for i in ann.list_items(tmp_path, rid)] == ["Engineer", None]
+
+
+def _run(tmp_path: Path, kind: str, rid: str, item: str | None, fake) -> dict:
+    from careeros.ui.services.step import run_resume_skill
+    return run_resume_skill(type("S", (), {"root": tmp_path})(), kind, rid, item, run_skill=fake)
+
+
+def test_apply_comment_run_proposes_and_never_edits_the_draft(tmp_path: Path):  # DEC-016
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="experience-1.b1", text="shorter please")
+    before = resumes.get_draft(tmp_path, rid)
+
+    def skill(settings, stage, prompt, **kw):
+        assert (stage, prompt) == ("resume_edit", f"edit-resume {rid} {c['id']}")
+        ann.reply(tmp_path, rid, c["id"], "proposed a shorter line", author="ai")
+        ann.create(tmp_path, rid, kind="suggestion", target_id="experience-1.b1", proposed="Built billing",
+                   author="ai")
+        return {"id": "r1", "stop_reason": "completed"}
+
+    _run(tmp_path, "resume_edit", rid, c["id"], skill)
+    items = ann.list_items(tmp_path, rid)
+    assert [(i["kind"], i["author"], i["status"]) for i in items] == [("comment", "user", "open"),
+                                                                       ("suggestion", "ai", "open")]
+    assert items[0]["replies"][-1]["author"] == "ai"
+    assert resumes.get_draft(tmp_path, rid) == before and resumes.changes(tmp_path, rid) == []
+    assert len(resumes.get(tmp_path, rid)["versions"]) == 1
+
+
+def test_review_run_writing_annotations_is_done(tmp_path: Path):  # review-resume writes annotations, not feedback
+    rid = _resume(tmp_path)
+
+    def skill(*a, **kw):
+        ann.create(tmp_path, rid, kind="comment", target_id="summary", text="name the stack", author="ai")
+        return {"id": "r1", "stop_reason": "completed"}
+
+    _run(tmp_path, "review", rid, None, skill)
+    assert fb.load(tmp_path, rid)["review"]["state"] == "done"
+    _run(tmp_path, "review", rid, None, lambda *a, **kw: {"id": "r2", "stop_reason": "max_turns"})
+    assert fb.load(tmp_path, rid)["review"]["state"] == "failed"
+
+
+def test_review_and_edit_runs_cannot_write_files():  # DEC-016: annotations only via the CLI, no direct draft edit
+    from careeros.runs.config import KIND_ONLY_TOOLS
+    for kind in ("review", "resume_edit"):
+        assert KIND_ONLY_TOOLS[kind] == ["Read", "Bash(.venv/bin/careeros *)"]

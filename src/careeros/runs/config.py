@@ -53,6 +53,9 @@ KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"], "prep
 KIND_ONLY_TOOLS: dict[str, list[str]] = {
     "learn_voice": ["Read", "Glob", "Grep", "Edit(profile/voice/**)"],
     "extract_master": ["Read", "Write", "Bash(.venv/bin/careeros *)"],
+    # DEC-016: review/edit runs only read and write annotations through the CLI; no Write = no direct draft edit
+    "review": ["Read", "Bash(.venv/bin/careeros *)"],
+    "resume_edit": ["Read", "Bash(.venv/bin/careeros *)"],
 }
 # Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
 KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}

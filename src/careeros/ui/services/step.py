@@ -221,8 +221,11 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     if kind == "review":
         resume_feedback.set_review(root, rid, "running", run=run_id)
         rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id, lock=f"resume-{rid}")
-        if rec.get("stop_reason") != "completed" or (resume_feedback.load(root, rid)["review"] or {}).get("state") != "done":
+        state = (resume_feedback.load(root, rid)["review"] or {}).get("state")
+        if rec.get("stop_reason") != "completed" or state not in ("done", "running"):
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
+        elif state == "running":  # TASK-030: the skill writes annotations (`resume annotate`), not review-save
+            resume_feedback.set_review(root, rid, "done", run=rec.get("id"))
         return rec
     applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
     rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
