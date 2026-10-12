@@ -70,6 +70,8 @@ def test_resume_http_api(root: Path):
         assert c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=chunked, headers=W).status_code == 413
         assert len(c.get("/api/profile/resumes", headers=W).json()["resumes"]) == 1
         b = c.put("/api/profile/resumes", params={"filename": "b.pdf"}, content=PDF, headers=W).json()["rid"]
+        assert started == ["extract_master"]  # DEC-019: every upload runs the import (extract-master)
+        started.clear()
         rows = c.get("/api/profile/resumes", headers=W).json()["resumes"]
         assert {x["rid"]: x["type"] for x in rows} == {a["rid"]: "master", b: "variant"}
         assert c.post(f"/api/profile/resumes/{b}/master", headers=W).json()["type"] == "master"
@@ -186,7 +188,7 @@ def test_feedback_lifecycle_http_api(root: Path, caplog):  # TASK-008: E2E-001-0
     with TestClient(app) as c:
         up = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W).json()
         rid = up["rid"]
-        assert up["review_run"] == "run-1" and started == [("review", rid, None), ("extract_master", None, None)]  # REQ-094/099
+        assert up["review_run"] == "run-1" and started == [("review", rid, None), ("extract_master", rid, None)]  # REQ-094, DEC-019 import
         assert c.put(f"/api/profile/resumes/{rid}/text", json={"text": V1}, headers=W).json()["versions"][-1] == {
             **c.get(f"/api/profile/resumes/{rid}", headers=W).json()["versions"][-1], "n": 2, "author": "user"}
         assert started[-1] == ("extract_master", None, None)  # new master version -> extract-master (REQ-099)
@@ -256,3 +258,78 @@ def test_feedback_cli_and_edit_run_launches_extract(root: Path, tmp_path: Path):
     assert calls == ["resume_edit", "extract_master"]  # new master version -> extract-master (REQ-099)
     run_resume_skill(Settings.load(root), "review", rid, None, run_skill=lambda *a, **kw: {"id": "r", "stop_reason": "timeout"})
     assert resume_feedback.load(root, rid)["review"]["state"] == "failed"  # REQ-094: failed + Retry
+
+
+def test_import_guard_http_api(root: Path):  # TASK-032: E2E-001-03, E2E-001-04 over HTTP
+    from fastapi.testclient import TestClient
+
+    from careeros import resume_import, resumes
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
+    started: list = []
+    app.state.run_control = lambda settings: type("RC", (), {
+        "start_step": lambda self, k, **kw: started.append((k, kw.get("resume")))})()
+    W = {"X-CareerOS": "1"}
+    with TestClient(app) as c:
+        rid = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W).json()["rid"]
+        assert started == [("review", rid), ("extract_master", rid)]  # DEC-019: the import runs on every upload
+        (resumes._dir(root, rid) / "v1" / "text.txt").write_text(
+            "EXPERIENCE\nAcme — Dev 2020\n• Built the thing\nHobbies: chess\n", encoding="utf-8")
+        doc = {"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "dates": "2019",
+                                                    "bullets": [{"text": "Built the thing"}]}]}
+        resume_import.set_state(root, rid, "running", run="r1")  # the (faked) run's step process
+        with pytest.raises(resume_import.ImportRefused):  # E2E-001-03: a date absent from v1 -> no v2
+            resume_import.save(root, rid, doc)
+        assert resume_import.load(root, rid)["state"] == "running"  # open for the skill's one retry
+        resume_import.set_state(root, rid, "failed")  # the run ended without one (run_import); reason kept
+        st = c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()
+        assert st["state"] == "failed" and "2019" in st["reason"]
+        assert c.get(f"/api/profile/resumes/{rid}/draft", headers=W).status_code == 404  # no guessed résumé
+        assert c.post(f"/api/profile/resumes/{rid}/import", headers=W).status_code == 202  # Retry
+        assert started[-1] == ("extract_master", rid)
+        resume_import.set_state(root, rid, "running", run="r2")
+        assert c.post(f"/api/profile/resumes/{rid}/import", headers=W).status_code == 409  # Retry while running
+        assert resume_import.load(root, rid)["run"] == "r2" and started[-1] == ("extract_master", rid)
+        doc["experience"][0]["dates"] = "2020"
+        resume_import.save(root, rid, doc)
+        st = c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()
+        assert st["state"] == "done" and st["n"] == 2 and [d["text"] for d in st["dropped"]] == ["Hobbies: chess"]
+        r = c.post(f"/api/profile/resumes/{rid}/import/dropped/d1/restore", json={}, headers=W)  # E2E-001-04
+        assert r.status_code == 200 and r.json()["resume"]["experience"][0]["bullets"][-1]["text"] == "Hobbies: chess"
+        assert c.post(f"/api/profile/resumes/{rid}/import/dropped/d1/restore", json={}, headers=W).status_code == 409
+
+        def busy(self, k, **kw):
+            raise RuntimeError("runner busy")
+        app.state.run_control = lambda settings: type("RC", (), {"start_step": busy})()
+        assert c.post(f"/api/profile/resumes/{rid}/import", headers=W).status_code == 409
+        assert c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()["state"] == "failed"
+
+
+def test_import_save_cli(root: Path, tmp_path: Path):  # TASK-032: the extract-master run hands its resume.json here
+    from careeros import resume_import, resumes
+
+    rid = resumes.add_tailored(root, "Acme Dev\n• Built the thing\n", category="x", source="up")["rid"]
+    resume_import.set_state(root, rid, "running", run="r1")
+    f = tmp_path / "r.json"
+    f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "bullets": [
+        {"text": "Built the thing"}]}]}), encoding="utf-8")
+    r = _cli(root, "resume", "import-save", rid, str(f))  # review MUST: an AI résumé is never marked user text
+    assert r.returncode == 1 and "upload" in r.stderr and len(resumes.get(root, rid)["versions"]) == 1
+    rid = resumes.add(root, "cv.pdf", PDF)["rid"]
+    (resumes._dir(root, rid) / "v1" / "text.txt").write_text("Acme Dev\n• Built the thing\n", encoding="utf-8")
+    resume_import.set_state(root, rid, "running", run="r2")
+    f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "bullets": [
+        {"text": "Built 40 things"}]}]}), encoding="utf-8")
+    r = _cli(root, "resume", "import-save", rid, str(f))
+    assert r.returncode == 1 and "not in the uploaded text" in r.stderr
+    f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "bullets": [
+        {"text": "Built the thing"}]}]}), encoding="utf-8")
+    resume_import.set_state(root, rid, "running", run="r3")  # Retry
+    r = _cli(root, "resume", "import-save", rid, str(f))
+    assert r.returncode == 0, r.stderr
+    assert resume_import.load(root, rid)["state"] == "done" and "v2" in r.stdout

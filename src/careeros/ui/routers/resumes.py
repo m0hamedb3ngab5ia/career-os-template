@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from careeros import annotations as ann
 from careeros import master_sync
 from careeros import resume_feedback as fb
+from careeros import resume_import as imp
 from careeros import resumes as store
 from careeros.ui.routers import ctx
 
@@ -59,6 +60,26 @@ class Uploaded(BaseModel):
     rid: str
     n: int
     review_run: str | None = None
+    import_run: str | None = None
+
+
+class Dropped(BaseModel):
+    id: str
+    text: str
+    restored: bool
+
+
+class ImportState(BaseModel):  # DEC-019 import guard (TASK-032)
+    state: str | None = None  # running | done | failed; None = never imported
+    run: str | None = None
+    reason: str | None = None
+    at: str | None = None
+    n: int | None = None
+    dropped: list[Dropped] = []
+
+
+class RestoreIn(BaseModel):
+    entry: str | None = None  # entry id; default the first entry
 
 
 class VersionDetail(Version):
@@ -218,9 +239,11 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
     except HTTPException as e:
         fb.set_review(c.settings.root, m["rid"], "failed", reason=str(e.detail))
         review = None
-    if m["type"] == "master":  # the first résumé becomes the master -> extract-master too (REQ-099)
-        _extract_master(request, c)
-    return Uploaded(rid=m["rid"], n=1, review_run=review)
+    try:  # DEC-019: every upload -> the import run (extract-master on this résumé; master: + proposal, REQ-099)
+        imported = _import(request, c, m["rid"]).run_id
+    except HTTPException:
+        imported = None
+    return Uploaded(rid=m["rid"], n=1, review_run=review, import_run=imported)
 
 
 @router.get("/profile/resumes")
@@ -258,10 +281,44 @@ def _start(request: Request, c: Any, kind: str, rid: str, item: str | None = Non
     return Started(kind=kind, run_id=(out or {}).get("run_id"))
 
 
+def _import(request: Request, c: Any, rid: str) -> Started:
+    """Start the import run; can't start -> import.json failed (Retry: POST .../import) and 409."""
+    from careeros.ui.services.runs import RunControl
+
+    try:
+        out = (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step(
+            "extract_master", resume=rid)
+    except Exception as e:  # noqa: BLE001 - busy, paused, claude missing
+        imp.set_state(c.settings.root, rid, "failed", reason=f"import run not started: {e}"[:500])
+        raise HTTPException(409, f"import run not started: {e}") from None
+    return Started(kind="extract_master", run_id=(out or {}).get("run_id"))
+
+
 def _new_version(request: Request, c: Any, meta: dict[str, Any]) -> Resume:
     if meta["type"] == "master":  # REQ-099: each new master version -> extract-master
         _extract_master(request, c)
     return Resume(**meta)
+
+
+@router.get("/profile/resumes/{rid}/import")
+def get_import(rid: str, c=Depends(ctx)) -> ImportState:
+    with _refusals():
+        return ImportState(**imp.load(c.settings.root, rid))
+
+
+@router.post("/profile/resumes/{rid}/import", status_code=202)
+def retry_import(rid: str, request: Request, c=Depends(ctx)) -> Started:
+    with _refusals():
+        store.get(c.settings.root, rid)
+    if imp.load(c.settings.root, rid).get("state") == "running":  # never overwrite a live run's import.json
+        raise HTTPException(409, "the import is already running")
+    return _import(request, c, rid)
+
+
+@router.post("/profile/resumes/{rid}/import/dropped/{did}/restore")
+def restore_dropped(rid: str, did: str, body: RestoreIn, c=Depends(ctx)) -> Draft:
+    with _refusals():
+        return Draft(**imp.restore(c.settings.root, rid, did, body.entry))
 
 
 @router.post("/profile/resumes/{rid}/review", status_code=202)

@@ -330,7 +330,10 @@ class RunControl:
         elif kind in ("extract_master", "learn_voice"):  # run id here, so the UI can follow the run
             self._check_can_start()
             rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
-            return {"kind": kind, **self.spawn(rid, ["careeros.ui.services.step", kind, "--run-id", rid]), "run_id": rid}
+            if resume and (kind != "extract_master" or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume)):
+                raise ValueError(f"bad résumé id {resume!r} for {kind}")
+            argv = ["careeros.ui.services.step", kind, *(["--resume", resume] if resume else []), "--run-id", rid]
+            return {"kind": kind, **self.spawn(rid, argv), "run_id": rid}
         elif kind in ("review", "resume_edit"):  # REQ-094/095/096: headless skill on one résumé (+ item)
             if not resume or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume) or (kind == "resume_edit") != bool(item) \
                     or (item and not re.fullmatch(r"[fa]\d+", item)):

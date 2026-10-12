@@ -276,6 +276,32 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     return rec
 
 
+def run_import(settings: Settings, rid: str, run_skill: Any = None, run_id: str | None = None) -> dict[str, Any]:
+    """DEC-019: every upload -> one extract-master run on that résumé. Its resume.json lands as v2 only through the
+    guard (`careeros resume import-save`). A run that ends without a guarded save -> import failed + Action Item;
+    v1 kept; Retry = POST /api/profile/resumes/<rid>/import."""
+    from careeros import resume_import, tracker
+
+    if run_skill is None:
+        from careeros.runs.service import run_skill
+    resume_import.set_state(settings.root, rid, "running", run=run_id, pid=os.getpid())
+    try:
+        rec = run_skill(settings, "extract_master", f"extract-master {rid}", run_id=run_id)
+    except Exception as e:  # noqa: BLE001 - busy runner, claude missing: recorded as a failed import
+        rec = {"id": run_id, "stop_reason": "error", "detail": str(e)}
+    st = resume_import.load(settings.root, rid)
+    if st.get("run") != run_id:  # a later Retry took over import.json: that run reports, never this one
+        return rec
+    reason = st.get("reason") if st["state"] != "running" else st.get("reason") or \
+        f"import run ended without a guarded résumé ({rec.get('stop_reason')})"
+    st = resume_import.set_state(settings.root, rid, "failed" if st["state"] == "running" else st["state"],
+                                 run=rec.get("id"), reason=reason)
+    if st["state"] == "failed":
+        tracker.add_action(settings, f"Résumé import failed ({rid}): {st['reason']}"[:300] + "; Retry in Profile",
+                           "profile_gap", needs="laptop")
+    return rec
+
+
 def _raise_interrupt(*_: Any) -> None:
     raise KeyboardInterrupt
 
@@ -294,6 +320,8 @@ def main(argv: list[str] | None = None) -> int:
     settings = Settings.load(Path(args.root) if args.root else None)
     if args.kind == "inbox_sync":
         rec = run_inbox_sync(settings)
+    elif args.kind == "extract_master" and args.resume:  # DEC-019: import one uploaded résumé
+        rec = run_import(settings, args.resume, run_id=args.run_id)
     elif args.kind in ("extract_master", "learn_voice"):  # REQ-099 / REQ-101: headless skill, no job
         from careeros.runs.service import run_skill
 
