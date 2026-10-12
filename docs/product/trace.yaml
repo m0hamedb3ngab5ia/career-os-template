@@ -648,6 +648,7 @@ requirements:
     - USR-002
     tests:
     - E2E-002-01
+    - E2E-002-07
   REQ-126:
     status: approved
     provenance: confirmed
@@ -657,6 +658,7 @@ requirements:
     tests:
     - E2E-002-05
     - E2E-002-06
+    - E2E-002-07
   NFR-001:
     status: proposed
     provenance: observed

@@ -35,14 +35,15 @@ E2E-001-04: Given converter drops one v1 line When workspace opens Then "Not car
 
 ### UC-002 Improve résumé
 REQs: REQ-095, REQ-096, REQ-097 · Pre: UC-001 done · Trigger: Apply / Comment / Edit on a résumé
-Main: hover card → quote highlighted · Accept → guarded rewrite replaces quote in draft (inline diff) · Comment → re-draft → Accept or Dismiss · Edit in place → draft · Save → one vN+1, per-change authors (REQ-125, REQ-126)
+Main: hover card → quote highlighted · Accept → guarded rewrite replaces quote in draft (inline diff) · Reject · Revert from History · Edit in place → draft (autosaved) · Next/Done → one vN+1, per-change authors (REQ-125, REQ-126)
 Fail: guard finds new number/employer/tool → version not created, item shows reason
 Outcome: new version, provenance recorded
-E2E-002-01: Given item When Accept + Save Then one new version, change tagged ai, inline diff shown, item `applied`.
-E2E-002-05: Given 2 accepts + 1 edit When Save Then exactly one new version; undo of 1 accept before Save leaves its text unchanged.
-E2E-002-06: Given unsaved draft When page reloaded Then draft and "Draft, not saved" bar restored.
+E2E-002-01: Given item When Accept + Done Then one new version, change tagged ai, inline diff shown, item `applied`.
+E2E-002-05: Given 2 accepts + 1 edit When Done Then exactly one new version; Revert of 1 accept before Done leaves its text unchanged.
+E2E-002-06: Given draft When page reloaded or "← Résumés" Then Profile row shows "Draft"; reopen restores draft + History.
+E2E-002-07: Given 4 items, 2 handled When "Next: Saved answers" Then one version, résumé master, Saved answers opens, 2 items still open.
 E2E-002-02: Given AI rewrite adding "40%" absent from v1 When guard runs Then no v2, item open with reason.
-E2E-002-03: Given v2 When manual edit + Save Then v3 author=user.
+E2E-002-03: Given v2 When manual edit + Done Then v3 author=user.
 E2E-002-04: Given v1 "supported migration" When rewrite says "led migration" Then no v2, item open with reason.
 
 ### UC-003 Check ATS read, set master
@@ -58,7 +59,7 @@ REQs: REQ-100 · Trigger: open résumé
 Main: list résumés → versions (author, time, source) → open any → delete old version
 Fail: delete latest master version / master résumé → refused with reason
 E2E-004-01: Given v1..v3 When delete v2 Then v1,v3 remain; delete v3 of master refused; delete v1 (original) refused.
-E2E-004-02: Given v2,v3 When Compare v3 with v2 Then removed text red strikethrough, added green.
+E2E-004-02: Given v2,v3 When open v3 in version history + "Show changes" Then removed text struck through, added text in AI colour; "Restore this version" makes it the draft.
 
 ### UC-005 Writing samples
 REQs: REQ-101 · Trigger: upload/remove on Profile › Writing samples

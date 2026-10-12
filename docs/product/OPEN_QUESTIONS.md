@@ -136,3 +136,9 @@
 - Links: REQ-117, REQ-104, TASK-017
 - Answer (2026-10-05): "ticked" = rows selected in the Jobs table, not the persisted REQ-104 pick.
 - Status: answered
+
+### Q-023 Keep "Comment on feedback" in the workspace?
+- Links: REQ-096, REQ-125, SCREEN-ResumeWorkspace
+- Context: minimal wireframe (2026-10-12) dropped Comment; cards only ✓ / ✕, hand edit covers tweaks.
+- Recommended: defer REQ-096 (✕ + edit in place covers it); revisit after user test.
+- Status: open

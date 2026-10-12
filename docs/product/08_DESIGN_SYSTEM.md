@@ -168,11 +168,12 @@ Page header (USR-035): h1 + one-line `--sec` guidance + primary action, every sc
 |---|---|---|
 | Two-pane workspace | page grid: résumé card (flex 1) + margin column 320px; <900px margin stacks under résumé | REQ-125 |
 | Quote highlight | `<mark>` bg = blue status bg, active card = `--selected` + 2px `--focus` outline on both mark and card | REQ-125 |
-| Inline diff | `<del>` red pair + line-through, `<ins>` green pair, no underline; author tag = small chip "you"/"AI" on hover | REQ-095 REQ-100 |
-| Feedback card | card + Button Accept (primary) / Comment / Dismiss; after accept: collapsed row + Undo | REQ-095 REQ-126 |
-| Draft bar | sticky top bar orange pair "Draft, not saved" + Button Save (primary) + Discard | REQ-126 |
+| Inline suggestion | `<del>` line-through + `<ins>` in green (AI change colour), same for diff in "Show changes"; author chip "you"/"AI" on hover | REQ-095 REQ-100 |
+| Feedback card | margin card, one-line why + icon buttons ✓ accept / ✕ reject (comment: yellow, ✓ only); active = shifted left + shadow, level with its text; handled → History | REQ-095 REQ-125 |
+| Save status | text button "Saving…" / "All changes saved" → version history panel | REQ-126 REQ-100 |
+| History panel | replaces margin; rows verb + text + Revert link; Back | REQ-126 |
 | Not carried over | collapsible card, rows w/ Restore | REQ-124 |
-| Version picker / Compare | native `<select>` ×2 | REQ-100 |
+| Version history panel | list Current + vN…v1, "Show changes", "Restore this version" | REQ-100 |
 Colour meaning (app-wide, Task 3 §4): orange = needs you, red = blocked/removed, green = done/added.
 
 ## Mockups

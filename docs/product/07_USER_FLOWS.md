@@ -8,8 +8,9 @@ flowchart TD
   A[Open app] --> B{Readiness all must-haves?}
   B -- no --> C[Checklist: next open item + link]
   C --> D[Profile › Résumés: upload → Résumé workspace]
-  D --> E[Review progress] --> F[Feedback: apply / comment / edit]
-  F --> G[Make master → approve master.yaml diff]
+  D --> E[Review progress] --> F[Workspace: accept / reject / edit, autosaved]
+  F -- "← Résumés" --> K[Row shows Draft] --> C
+  F -- "Next: Saved answers, open items OK" --> G[Version + master → approve master.yaml diff]
   G --> H[Saved answers: work auth, salary]
   H --> I[Optional: writing samples]
   I --> B
@@ -24,16 +25,16 @@ stateDiagram-v2
   [*] --> open
   open --> accepted: Accept (guard ok, text replaced in draft)
   open --> open: Accept (guard fails, reason shown)
-  accepted --> open: Undo
+  accepted --> open: Revert (History) / ⌘Z
   open --> redrafting: Comment
   redrafting --> open: new suggestion
   open --> dismissed: Dismiss
-  dismissed --> open: Undo
-  accepted --> applied: Save
+  dismissed --> open: Revert (History) / ⌘Z
+  accepted --> applied: Next / Done
   applied --> [*]
   dismissed --> [*]
 ```
-What to notice: `accepted` lives only in the draft (REQ-126); Save turns every accepted card into `applied` in one version. Draft survives leaving the page.
+What to notice: `accepted` lives only in the autosaved draft (REQ-126); Next/Done turns every accepted card into `applied` in one version. `open` items survive Next, so partial review is fine.
 What to notice: nothing reaches the résumé except via `applied`, and only after the zero-fabrication guard.
 
 ### FLOW-003 Check a job
