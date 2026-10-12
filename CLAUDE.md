@@ -71,6 +71,7 @@ Personal context (who the candidate is, where their private files live) lives in
 - Bug fix = a test that reproduces the bug first.
 - Skill-only (SKILL.md) or docs-only PRs are exempt, but any Python a skill calls is not.
 - `.venv/bin/python -m pytest -q` (all), `-m unit`, `-m integration`. CI runs both on every PR.
+- Runs in parallel (`-n auto` in addopts); one test or a debugger: `.venv/bin/python -m pytest -n0 tests/x.py::t`.
 
 ## Git / PR workflow
 - Never push to `main`. One branch per change (`feat/…`, `fix/…`, `docs/…`), open a PR with `gh pr create`.
