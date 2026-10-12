@@ -116,6 +116,18 @@ class Rewrite(ResumeText):
     base: int  # the version the rewrite was written from; not the latest -> 422
 
 
+class DraftIn(BaseModel):
+    rev: int  # the rev this save was based on; not the current one -> 409 (DEC-014)
+    resume: dict[str, Any]
+    author: Literal["user", "ai"]  # only a user write may set bullet origin "user" (DEC-018)
+
+
+class Draft(BaseModel):
+    rev: int
+    resume: dict[str, Any]
+    draft: bool  # hash(draft) != hash(latest version)
+
+
 class ResumePatch(BaseModel):
     name: str | None = None
     type: ResumeType | None = None
@@ -267,6 +279,19 @@ def edit_resume(rid: str, body: ResumeText, request: Request, c=Depends(ctx)) ->
     with _refusals():
         meta = fb.edit(c.settings.root, rid, body.text)
     return _new_version(request, c, meta)
+
+
+@router.get("/profile/resumes/{rid}/draft")
+def get_draft(rid: str, c=Depends(ctx)) -> Draft:
+    with _refusals():
+        return Draft(**store.get_draft(c.settings.root, rid))
+
+
+@router.put("/profile/resumes/{rid}/draft")
+def put_draft(rid: str, body: DraftIn, c=Depends(ctx)) -> Draft:
+    """Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422."""
+    with _refusals():
+        return Draft(**store.put_draft(c.settings.root, rid, body.resume, rev=body.rev, author=body.author))
 
 
 @router.patch("/profile/resumes/{rid}")

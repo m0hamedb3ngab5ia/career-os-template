@@ -190,10 +190,7 @@ def strip_ai_origin(settings: Any, job_dir: Path) -> list[str]:
     that needs the DEC-019 import guard and DEC-020 changes.jsonl."""
     p = job_dir / "resume.json"
     doc, c = _json(p), _json(job_dir / "resume_choice.json")
-
-    def bullets(d: dict[str, Any]) -> list[dict[str, Any]]:
-        return [b for sec in resumes.ENTRY_SECTIONS for e in d.get(sec) or [] if isinstance(e, dict)
-                for b in e.get("bullets") or [] if isinstance(b, dict)]
+    bullets = resumes.bullets
     try:  # fail closed: a missing base keeps no mark
         base = (_json(_vdir(settings, str(c.get("rid")), c.get("version")) / "resume.json")
                 if c.get("action") in ("reuse", "tweak") else {})

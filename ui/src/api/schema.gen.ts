@@ -337,6 +337,15 @@ export interface paths {
     /** Patch Resume */
     patch: operations["patch_resume_api_profile_resumes__rid__patch"];
   };
+  "/api/profile/resumes/{rid}/draft": {
+    /** Get Draft */
+    get: operations["get_draft_api_profile_resumes__rid__draft_get"];
+    /**
+     * Put Draft
+     * @description Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422.
+     */
+    put: operations["put_draft_api_profile_resumes__rid__draft_put"];
+  };
   "/api/profile/resumes/{rid}/feedback": {
     /** Get Feedback */
     get: operations["get_feedback_api_profile_resumes__rid__feedback_get"];
@@ -1187,6 +1196,31 @@ export interface components {
       free_pct: number;
       /** Total */
       total: number;
+    };
+    /** Draft */
+    Draft: {
+      /** Draft */
+      draft: boolean;
+      /** Resume */
+      resume: {
+        [key: string]: unknown;
+      };
+      /** Rev */
+      rev: number;
+    };
+    /** DraftIn */
+    DraftIn: {
+      /**
+       * Author
+       * @enum {string}
+       */
+      author: "user" | "ai";
+      /** Resume */
+      resume: {
+        [key: string]: unknown;
+      };
+      /** Rev */
+      rev: number;
     };
     /** Due */
     Due: {
@@ -4862,6 +4896,58 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Draft */
+  get_draft_api_profile_resumes__rid__draft_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Draft"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Put Draft
+   * @description Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422.
+   */
+  put_draft_api_profile_resumes__rid__draft_put: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["DraftIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Draft"];
         };
       };
       /** @description Validation Error */

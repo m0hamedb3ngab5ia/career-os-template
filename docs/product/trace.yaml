@@ -947,7 +947,7 @@ tasks:
     requirements:
     - REQ-124
   TASK-028:
-    status: todo
+    status: done
     requirements:
     - REQ-126
     use_cases:
