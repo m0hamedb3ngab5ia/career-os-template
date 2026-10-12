@@ -972,7 +972,7 @@ tasks:
     use_cases:
     - UC-002
   TASK-032:
-    status: todo
+    status: done
     requirements:
     - REQ-124
     use_cases:
