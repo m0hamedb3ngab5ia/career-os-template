@@ -48,7 +48,7 @@ def test_guard_fails_on_date_absent_from_v1(tmp_path: Path):  # E2E-001-03
     with pytest.raises(imp.ImportRefused, match="2019"):
         imp.save(root, rid, doc)
     st = imp.load(root, rid)
-    assert st["state"] == "failed" and "2019" in st["reason"]
+    assert st["state"] == "running" and "2019" in st["reason"]  # run_import fails it if no retry lands
     assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]  # v1 kept, no guessed v2
 
 
@@ -61,7 +61,7 @@ def test_guard_fails_on_reworded_bullet_and_bad_json(tmp_path: Path):
     imp.set_state(root, rid, "running")
     with pytest.raises(imp.ImportRefused, match="schema_version"):
         imp.save(root, rid, {**DOC, "schema_version": 9})
-    assert imp.load(root, rid)["state"] == "failed"
+    assert "schema_version" in imp.load(root, rid)["reason"]
 
 
 def test_restore_adds_dropped_line_to_draft_once(tmp_path: Path):  # E2E-001-04 part 2
@@ -185,3 +185,38 @@ def test_run_import_loser_leaves_winner_and_dead_run_reads_failed(tmp_path: Path
     imp.set_state(root, rid, "running", run="dead", pid=2 ** 22 + 4321)  # its step process crashed
     assert imp.load(root, rid)["state"] == "failed"
 
+
+
+def test_guard_field_wrapped_across_v1_lines_passes(tmp_path: Path):  # review-2 MUST
+    root, rid = _v1(tmp_path, "Pat Doe\nSummary\nSenior engineer with ten years\nbuilding payment systems.\n")
+    doc = {"schema_version": 1, "identity": {"name": "Pat Doe"},
+           "summary": "Senior engineer with ten years building payment systems."}
+    assert imp.save(root, rid, doc)["state"] == "done"
+    root, rid = _v1(tmp_path / "b", "Pat Doe\nSummary\nSenior engineer with ten years\nbuilding payment systems.\n")
+    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):  # whole words still required
+        imp.save(root, rid, {"schema_version": 1, "summary": "engineer with ten years build"})
+
+
+@pytest.mark.parametrize("glyph", ["•", "▪", "◦", "●", "➢"])
+def test_guard_bullet_never_spans_a_new_bullet_glyph(tmp_path: Path, glyph: str):  # review-2 SHOULD-1
+    root, rid = _v1(tmp_path, f"Acme\n{glyph} Built the API\n{glyph} Cut costs 20%\n")
+    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):
+        imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Acme", "bullets": [
+            {"text": "Built the API Cut costs 20%"}]}]})
+
+
+def test_guard_refusal_keeps_run_open_for_one_retry(tmp_path: Path):  # review-2 SHOULD-2 (SKILL.md retry)
+    root, rid = _v1(tmp_path)
+    doc = copy.deepcopy(DOC)
+    doc["experience"][0]["dates"] = "2019 – 2023"
+    with pytest.raises(imp.ImportRefused):
+        imp.save(root, rid, doc)
+    st = imp.load(root, rid)
+    assert st["state"] == "running" and st["run"] == "r0" and "2019" in st["reason"]
+    assert imp.save(root, rid, copy.deepcopy(DOC))["state"] == "done"
+
+
+def test_guard_bullet_wrapped_onto_header_words_passes(tmp_path: Path):  # review-2 NIT
+    root, rid = _v1(tmp_path, "Acme\nSkills\n• Ran workshops on tooling\nand skills\n")
+    assert imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Acme", "bullets": [
+        {"text": "Ran workshops on tooling and skills"}]}]})["state"] == "done"

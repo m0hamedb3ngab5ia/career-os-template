@@ -291,7 +291,7 @@ def run_import(settings: Settings, rid: str, run_skill: Any = None, run_id: str 
     st = resume_import.load(settings.root, rid)
     if st.get("run") != run_id:  # a later Retry took over import.json: that run reports, never this one
         return rec
-    reason = st.get("reason") if st["state"] != "running" else \
+    reason = st.get("reason") if st["state"] != "running" else st.get("reason") or \
         f"import run ended without a guarded résumé ({rec.get('stop_reason')})"
     st = resume_import.set_state(settings.root, rid, "failed" if st["state"] == "running" else st["state"],
                                  run=rec.get("id"), reason=reason)

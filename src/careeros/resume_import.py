@@ -79,24 +79,28 @@ def _has(hay: str, needle: str) -> bool:
 
 
 def _header(line: str, doc: dict[str, Any]) -> bool:
-    words = re.findall(r"\w+", line)
-    return 0 < len(words) <= 4 and set(words) <= _HEAD | {k.casefold() for k in doc}
+    words = re.findall(r"\w+", line)  # a wrapped continuation ("and skills") starts with a joiner, never a header
+    return 0 < len(words) <= 4 and words[0] != "and" and set(words) <= _HEAD | {k.casefold() for k in doc}
 
 
 def _lines(text: str) -> list[tuple[str, bool]]:
-    """Normalised v1 lines without their bullet glyph, and whether they had one."""
-    return [(k.lstrip(_GLYPHS), k[0] in _GLYPHS.strip()) for k in map(_key, text.splitlines()) if k]
+    """Normalised v1 lines without their bullet glyph, and whether they had one (checked on the raw line:
+    normalising blanks most glyphs)."""
+    from careeros.qa_ext.pdf_fidelity import _BULLETS
+
+    return [(k, raw.lstrip()[:1] in _BULLETS + "*-") for raw in text.splitlines()
+            if (k := _key(raw).lstrip(_GLYPHS))]
 
 
 def _guard(doc: dict[str, Any], text: str) -> None:
     """A bullet = whole consecutive v1 lines (a wrapped bullet; never across a new bullet or a header); any other
-    field = word-bounded inside one v1 line."""
+    field = word-bounded inside such a span (a summary wraps too)."""
     lines = _lines(text)
     spans = {" ".join(x for x, _ in lines[i:j]) for i in range(len(lines)) for j in range(i + 1, min(i + 6, len(lines) + 1))
              if not any(g or _header(x, doc) for x, g in lines[i + 1:j])}
     for at, s in _leaves(doc):
         k = _key(s)
-        if not (k in spans if re.search(r"\.bullets\[\d+\](\.text)?$", at) else any(_has(x, k) for x, _ in lines)):
+        if not (k in spans if re.search(r"\.bullets\[\d+\](\.text)?$", at) else any(_has(x, k) for x in spans)):
             raise ImportRefused(f"{at} not in the uploaded text: {s!r}")
 
 
@@ -128,8 +132,9 @@ def save(root: Path, rid: str, doc: dict[str, Any]) -> dict[str, Any]:
     try:
         doc = store.migrate(doc)
         _guard(doc, text)
-    except (ValueError, TypeError, AttributeError) as e:
-        set_state(root, rid, "failed", reason=str(e)[:500])
+    except (ValueError, TypeError, AttributeError) as e:  # run stays open for the skill's one retry; run_import
+        set_state(root, rid, "running", **{k: v for k, v in load(root, rid).items() if k not in ("state", "at")}
+                  | {"reason": str(e)[:500]})  # fails it if none lands
         raise ImportRefused(str(e)) from None
     for _, b in store.placed_bullets(doc):
         b["origin"] = "user"  # verbatim in the candidate's upload (DEC-018 amendment); any AI mark is overwritten
