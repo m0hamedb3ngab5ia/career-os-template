@@ -27,6 +27,25 @@ function renderCard({ qa = d.qa, ...over }: Partial<Parameters<typeof DocumentsC
   return { api, ...utils };
 }
 
+describe("QaCard failure list", () => {
+  const reasons = ["Résumé is 4 pages", "Banned phrase: passionate", "Missing keyword: Kafka", "Em dash in cover letter", "Number unsourced"];
+
+  it("shows the top 2 issues and keeps the rest behind a disclosure", () => {
+    renderCard({ qa: { ...d.qa!, pass: false, fail_reasons: reasons } });
+    const card = screen.getByRole("region", { name: "QA" });
+    const visible = within(card).getAllByRole("listitem").filter((li) => li.closest("details") === null);
+    expect(visible.map((li) => li.textContent)).toEqual(reasons.slice(0, 2));
+    const more = within(card).getByText("Show all 5 issues").closest("details")!;
+    expect(more).not.toHaveAttribute("open");
+    expect(within(more).getAllByRole("listitem").map((li) => li.textContent)).toEqual(reasons);
+  });
+
+  it("shows no disclosure when there are 2 or fewer issues", () => {
+    renderCard({ qa: { ...d.qa!, pass: false, fail_reasons: reasons.slice(0, 2) } });
+    expect(screen.queryByText(/Show all/)).toBeNull();
+  });
+});
+
 describe("DocumentsCard", () => {
   it("shows the key documents in the server's order, each opening the file in a new tab", () => {
     renderCard();
