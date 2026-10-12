@@ -100,3 +100,41 @@ def test_change_log_and_revert_api(tmp_path: Path):
         assert c.get(f"{url}/changes").json()[-1]["reverts"] == hist[1]["id"]
         assert c.post(f"{url}/changes/nope/revert", headers=W).status_code == 404
         assert c.get("/api/profile/resumes/nope/draft/changes").status_code == 404
+
+
+def test_file_of_published_version_api(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    """PR #178: View / View PDF / download on a JSON-only published version render its PDF; older -> 409."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    def fake_compile(tex: Path) -> Path:
+        tex.with_suffix(".pdf").write_bytes(b"%PDF-fake")
+        return tex.with_suffix(".pdf")
+
+    monkeypatch.setattr(resumes._renderer(), "compile_tex", fake_compile)
+    root = make_temp_root(tmp_path / "repo")
+    src = tmp_path / "resume.json"
+    src.write_text(json.dumps(DOC), encoding="utf-8")
+    rid = resumes.add_tailored(root, "text", category="x", source="job-1", files={"resume.json": src})["rid"]
+    for i, text in enumerate(["Edit one", "Edit two"]):
+        d = resumes.get_draft(root, rid)
+        doc = json.loads(json.dumps(d["resume"]))
+        doc["experience"][0]["bullets"][0]["text"] = text
+        resumes.put_draft(root, rid, doc, rev=d["rev"], author="user")
+        resumes.publish(root, rid, key=f"k{i}")
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"},
+                     static_dir=root / "no-static")
+    with TestClient(app) as c:
+        r = c.get(f"/api/profile/resumes/{rid}/file")
+        assert r.status_code == 200 and r.content == b"%PDF-fake" and r.headers["content-type"] == "application/pdf"
+        r = c.get(f"/api/profile/resumes/{rid}/file?v=3&download=true")
+        assert r.headers["content-disposition"].startswith("attachment;") and "_Published.pdf" in r.headers["content-disposition"]
+        r = c.get(f"/api/profile/resumes/{rid}/file?v=2")
+        assert r.status_code == 409 and "latest" in r.json()["detail"]
+        assert c.get(f"/api/profile/resumes/{rid}/file?v=1").status_code == 200  # uploaded/tailored original

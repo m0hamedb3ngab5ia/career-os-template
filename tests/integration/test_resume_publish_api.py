@@ -45,7 +45,7 @@ def test_e2e_002_07_next_publishes_one_version_and_sets_master(tmp_path: Path):
         body = r.json()
         assert body["published"] is True and body["n"] == 2 and body["type"] == "master"
         again = c.post(f"{base}/publish", json={"key": "next-1", "master": True}, headers=W).json()
-        assert again["published"] is False and again["n"] == 2  # double click publishes once
+        assert again["published"] is True and again["n"] == 2  # double click: same answer, publishes once
         assert [v["n"] for v in c.get(base).json()["versions"]] == [1, 2]
         st = [a["status"] for a in c.get(f"{base}/annotations").json()]
         assert st == ["accepted", "rejected", "open", "open"]
