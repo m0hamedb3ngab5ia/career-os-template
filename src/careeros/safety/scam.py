@@ -125,6 +125,19 @@ POSTING_PATTERNS: list[tuple[str, Level, str, re.Pattern[str]]] = [
         r"\bno interview (required|needed)\b|\bhired (immediately|on the spot)\b", re.I)),
 ]
 
+# Employers' anti-scam notices quote scam phrases ("we will never ask you to deposit a check").
+# Only the match's own clause counts, so "not a scam, deposit the check" still trips.
+# ponytail: word heuristic; add an LLM judge if notices still false-positive.
+_NEGATION_RE = re.compile(r"\b(never|not|beware|fraud\w*|scam\w*)\b|n['’]t\b", re.I)
+_URGE_RE = re.compile(r"\b(worry|hesitate)\b", re.I)
+
+
+def _negated(text: str, start: int) -> bool:
+    """True when the clause before a match negates or warns about it ("we will never ask you to …")."""
+    clause = re.split(r"[.!?\n,;:]", text[max(0, start - 120):start])[-1]
+    return bool(_NEGATION_RE.search(clause)) and not _URGE_RE.search(clause)
+
+
 # Form fields. Remote access, payment and credentials for other accounts block at any stage; identity and
 # bank data block before an offer (onboarding paperwork after an offer is normal). Creating a password or
 # entering an emailed code on the ATS's own domain is normal account creation.
@@ -293,7 +306,7 @@ def check_posting(p: Posting, settings: Settings, registry: list[dict[str, Any]]
             break
     text = " ".join([p.title or "", p.description_text or ""])
     for code, level, label, rx in POSTING_PATTERNS:
-        m = rx.search(text)
+        m = next((m for m in rx.finditer(text) if not _negated(text, m.start())), None)
         if m:
             flags.append(Flag(code, level, f"{label}: \"{m.group(0)[:80]}\"", src))
 

@@ -245,7 +245,8 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
     try:
         run = rs.new_run(kind, trigger, {"preset": None, "max_jobs": 1, "max_minutes": timeout_s / 60}, start,
                          run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}", kind=kind),
-                         counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
+                         counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0},
+                         **({"lock": lock} if lock else {}))
     except BaseException:
         locks.release(lock_path, lk.token)
         raise
