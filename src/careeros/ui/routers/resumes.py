@@ -143,6 +143,8 @@ def _refusals() -> Iterator[None]:
         raise HTTPException(413, str(e)) from None
     except store.BadType as e:
         raise HTTPException(415, str(e)) from None
+    except store.Conflict as e:  # revert refused: show both texts (DEC-015)
+        raise HTTPException(409, {"message": str(e), "expected": e.expected, "current": e.current}) from None
     except store.Refused as e:
         raise HTTPException(409, str(e)) from None
     except (master_sync.Invalid, fb.Rejected) as e:
@@ -292,6 +294,20 @@ def put_draft(rid: str, body: DraftIn, c=Depends(ctx)) -> Draft:
     """Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422."""
     with _refusals():
         return Draft(**store.put_draft(c.settings.root, rid, body.resume, rev=body.rev, author=body.author))
+
+
+@router.get("/profile/resumes/{rid}/draft/changes")
+def draft_changes(rid: str, c=Depends(ctx)) -> list[dict[str, Any]]:
+    """History (DEC-015): draft.changes.jsonl, oldest first."""
+    with _refusals():
+        return store.changes(c.settings.root, rid)
+
+
+@router.post("/profile/resumes/{rid}/draft/changes/{cid}/revert")
+def revert_change(rid: str, cid: str, c=Depends(ctx)) -> Draft:
+    """Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}."""
+    with _refusals():
+        return Draft(**store.revert_change(c.settings.root, rid, cid))
 
 
 @router.patch("/profile/resumes/{rid}")

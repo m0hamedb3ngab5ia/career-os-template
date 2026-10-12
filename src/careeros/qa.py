@@ -1007,12 +1007,18 @@ class Checker:
                     problems.append(f"'{bid}' text differs from master text/variants: {str(b['text'])[:80]!r}")
         # DEC-018 amendment: an unsourced v1 bullet passes only when marked origin "user" (user-written, never
         # fact-verified, so listed apart); a missing `source` is never read as user-written
+        # DEC-020: the mark counts only when the base résumé's change log shows a user change last wrote that text
         user: list[str] = []
+        rid = self.choice.get("rid")
+        wrote = resumes.user_texts(self.root, rid) if isinstance(rid, str) and self.resume_v1 else set()
         for e in self._resume_entries(self.resume_doc) if self.resume_v1 else []:
             for b in e.get("bullets") or []:
                 if isinstance(b, dict) and not b.get("source"):
-                    if b.get("origin") == "user":
+                    if b.get("origin") == "user" and b.get("text") in wrote:
                         user.append(str(b.get("id")))
+                    elif b.get("origin") == "user":
+                        problems.append(f"'{b.get('id')}' is origin \"user\" but no user change in the résumé's "
+                                        "change log wrote this text")
                     else:
                         problems.append(f"'{b.get('id')}' has no source and is not origin \"user\": "
                                         "an AI bullet must cite a master.yaml bullet")

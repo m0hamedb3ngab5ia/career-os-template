@@ -9,7 +9,8 @@ from pathlib import Path
 
 import pytest
 import yaml
-from conftest import FIXTURES, PY, build_resume_json, personalize_identity, subprocess_env, tectonic_cache
+from conftest import (FIXTURES, PY, build_resume_json, log_user_bullet, personalize_identity, subprocess_env,
+                      tectonic_cache)
 from test_qa import COVER_LETTER
 
 pytestmark = pytest.mark.integration
@@ -238,6 +239,7 @@ def test_v1_qa_checks_only_bullets_with_source(temp_root: Path, home: Path, job_
     rj["experience"][0]["bullets"].append({"id": "experience-1.b9", "text": "Mentored new team members on code review",
                                            "origin": "user"})
     (job_dir / "resume.json").write_text(json.dumps(rj))
+    log_user_bullet(temp_root, job_dir, "Mentored new team members on code review")  # DEC-020
     assert _run(temp_root, home, "templates/resume/render.py", str(job_dir / "resume.json"), "--txt-only").returncode == 0
     checks = {c["check"]: c for c in _qa(temp_root, home, job_dir)[1]["checks"]}
     assert checks["bullet_fidelity"]["ok"], checks["bullet_fidelity"]

@@ -8,6 +8,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 import pytest
+from conftest import log_user_bullet
 
 from careeros.models import Posting
 from careeros.runs import locks
@@ -534,6 +535,7 @@ def test_apply_refuses_a_resume_with_an_unsourced_ai_bullet_even_when_prepare_sa
         _prepared(store, j)
     resume(bad, {"text": "Invented a claim"})
     resume(user, {"text": "Mentored new team members", "origin": "user"})
+    log_user_bullet(settings.root, store.job_dir(user), "Mentored new team members")  # DEC-020 change log
     ranked, _ = select_candidates(settings, "apply", cfg_of(settings), NOW)
     assert sorted(r["job_id"] for r in ranked) == sorted([user, legacy])
     ranked, excluded = select_candidates(settings, "apply", cfg_of(settings), NOW, job_ids=[bad])
