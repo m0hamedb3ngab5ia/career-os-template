@@ -214,3 +214,69 @@ Residual: WebSearch query strings in prepare can still carry data to a search pr
 | REQ-108 | fake skill prompt build: posting inside `<untrusted>`; score argv has no WebFetch | SEC-01 |
 | REQ-110 | letter with unknown URL/email → `untrusted_content` hard fail | E2E-012-02 |
 | REQ-103 | must-have open → every apply path exit 7 / 409 | ACCEPT-103 |
+
+## Delta 2026-10-12 — résumé workspace (structured store, draft, history, annotations)
+Scope: REQ-124..126, DEC-012. Decisions: DEC-013..019. Nothing below exists yet.
+
+### Components (new = bold)
+```mermaid
+flowchart LR
+  up[upload pdf/docx] --> extract[extract text, DEC-001] --> imp[**import run**: extract-master → resume.json + master proposal]
+  imp --> guard{**verbatim guard**} -->|ok| ver[(v1 resume.json)]
+  guard -->|fail| ai[Action Item, original kept]
+  ws[**/resumes/&lt;rid&gt; workspace**] -->|autosave rev| draft[**draft API**] --> files[(draft.json + draft.changes.jsonl)]
+  ws --> ann[**annotations API**] --> afile[(annotations.json)]
+  runs[review / Apply-comment run] -->|proposals + replies only| ann
+  ann -->|Accept: apply-edit base + fabrication guard| draft
+  ws -->|Next/Done + idem key| pub[**publish**] --> ver2[(v&lt;n+1&gt;/ resume.json, text.txt, ats.json)]
+  ver2 --> render[render.py PDF + HTML preview]
+```
+What to notice: AI never writes the draft; only the user's Accept does, through the same guard as `apply-edit`. One schema, one import, one renderer.
+
+### Storage layout (adds to 2026-10-04 table)
+| path | content | writer |
+|---|---|---|
+| `profile/resumes/<rid>/draft.json` | working résumé JSON (DEC-018) + `rev`, `base_version` | draft API, atomic |
+| `profile/resumes/<rid>/draft.changes.jsonl` | `{id, at, author, target_id, op, before, after, reverts?}` per line; reset on publish | draft API, append |
+| `profile/resumes/<rid>/annotations.json` | `{id, kind, target_id, base, author, status, proposed, text, replies[], at}` | annotations API, runs via CLI |
+| `profile/resumes/<rid>/v<n>/resume.json` | published, immutable; `text.txt` + `ats.json` derived from it | publish |
+| `profile/resumes/<rid>/import.json` | import state `running\|done\|failed`, run_id, guard failures | import run |
+
+### Data model delta
+```mermaid
+erDiagram
+  RESUME ||--|{ VERSION : "v1..vN immutable"
+  RESUME ||--o| DRAFT : "draft.json"
+  DRAFT ||--o{ CHANGE : "draft.changes.jsonl"
+  RESUME ||--o{ ANNOTATION : "annotations.json"
+  ANNOTATION ||--o{ REPLY : thread
+  VERSION ||--|{ SECTION : "local ids"
+  SECTION ||--|{ ENTRY : ""
+  ENTRY ||--|{ BULLET : "source? = master.yaml id"
+  ANNOTATION }o--|| BULLET : "target_id + base"
+```
+
+### Sequences
+Edit + publish:
+1. UI PUT draft `{rev, changes[]}` 500–800 ms after typing; server: rev ≠ current → 409; else apply, append changes, rev+1.
+2. Revert change c: target value == c.after → append inverse; else 409 with both texts.
+3. Accept suggestion s: target == s.base → fabrication guard → apply as change (author ai, accepted by user); else s → outdated.
+4. Next/Done `{idem_key}`: seen key → return earlier result; hash(draft) == hash(latest) → no-op; else temp dir → rename `v<n+1>` → meta.json (+ master on onboarding) → derive text/ats → draft reset, open annotations re-checked (missing target → outdated).
+
+### Failure + recovery
+| failure | effect | recovery |
+|---|---|---|
+| crash mid-publish | temp dir left, meta.json unchanged | startup removes stale temp dirs; draft still there |
+| tab closed before debounce | flush on `pagehide` (sendBeacon) | last ≤800 ms may be lost only on hard kill |
+| import guard fails | no JSON, `import.json` failed | Action Item; user retries or edits; original v1 kept |
+| two tabs | second save 409 | UI reloads draft, re-applies local undo stack where targets match |
+
+### Quality scenarios (invariants, DEC-017)
+| invariant | scenario | test |
+|---|---|---|
+| no lost edits | stale rev save → 409, draft unchanged | unit draft API |
+| no silent AI changes | review run output touches only annotations.json | integration run fixture |
+| no duplicate versions | double Next with same key / unchanged draft → one version | unit publish |
+| deterministic render | same JSON twice → identical `.tex` + `.txt`; PDF with `SOURCE_DATE_EPOCH` | integration render (skipif no LaTeX) |
+| auditable revert | revert appends inverse; conflicting revert refused | unit history |
+| import never invents | bullet not in text.txt → import failed | unit guard |

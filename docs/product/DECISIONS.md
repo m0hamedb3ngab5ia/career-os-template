@@ -105,3 +105,47 @@ Decision: every upload converted into our structured résumé + LaTeX template; 
 Why: user could not see where feedback applies, what changed, or the new version ("Applied v8" with no v8). TTV/TTA (DEC-011): value visible in place, no hunting.
 Amended 2026-10-12 (wireframe review, human): Save/Discard bar → autosave; per-card Undo → History + Revert; Compare dropped (not important); red/green → one AI colour.
 Rejected: keep user's own layout (can't edit or diff reliably); version per accept (noise, 8 versions per sitting); side-by-side compare; live PDF preview (slow, needs LaTeX).
+
+### DEC-013 Structured résumé is the source of truth, stored as files
+Reasoned by: human (2026-10-12; agent critique accepted: files not tables, text.txt derived)
+Decision: each résumé's canonical content = structured JSON (DEC-018 schema), stable ids for sections, entries, bullets. Published versions `v<n>/resume.json`; the working draft `<rid>/draft.json`. One rendering pipeline: PDF (`templates/resume/render.py`) and HTML preview read the JSON. `v<n>/text.txt` + `ats.json` are regenerated from the JSON on publish (match + extract-master keep reading text).
+Why: editing, diffing, suggestions and revert need addressable parts; free text can't target a bullet.
+Alternatives: SQLite tables (rejected: `data/careeros.db` is a disposable index, profile data lives in `profile/` and syncs to the private repo); phase out text.txt (rejected: match/ATS read it).
+Consequences: uploads must be converted (DEC-019); old text-only versions stay readable, get JSON on next import.
+
+### DEC-014 One autosaved draft per résumé; "Draft" = content differs
+Reasoned by: human (2026-10-12; agent critique accepted: label by hash)
+Decision: one `draft.json` per résumé. UI saves 500–800 ms after the last keystroke and flushes on navigation/unload. Every save carries the draft's `rev`; server rejects a stale `rev` (409, reload). Profile row shows "Draft" when hash(draft) ≠ hash(latest version), so edit-then-undo clears it.
+Why: no lost edits without a Save button (DEC-012); two tabs can't overwrite each other silently.
+Alternatives: label on any save (sticky false "Draft"); last-write-wins (loses edits).
+
+### DEC-015 History = append-only change log; revert is a new change
+Reasoned by: human (2026-10-12; agent critique accepted: no snapshots, conflict rule)
+Decision: `draft.changes.jsonl`, one line per change `{id, at, author ai|user, target_id, op, before, after, reverts?}`; starts at the draft's base version. ⌘Z = short-lived client undo stack, separate from History. History Revert appends an inverse change, never deletes; allowed only when the target still holds the change's `after`, else refused with both texts shown.
+Why: auditable reverts; revert must never wipe a later edit.
+Alternatives: periodic snapshots (not needed: résumé ~5 KB, each version is a full copy; add only if replay is slow); event sourcing / CRDTs (no multi-user requirement).
+
+### DEC-016 Suggestions and comments: one annotation model, AI only proposes
+Reasoned by: human (2026-10-12; agent critique accepted: `base` field, fabrication guard)
+Decision: `<rid>/annotations.json`, items `{id, kind suggestion|comment, target_id, base, author, status open|accepted|rejected|outdated, proposed, text, replies[], at}`. `base` = target text when made; target changed → `outdated`. AI (review-resume, Apply-comment run) reads the résumé + annotations and writes only proposals and replies. Accept = a user action that goes through the existing `apply-edit` base check and zero-fabrication guard, then logs a change (DEC-015).
+Why: no silent AI changes; replaces `review.json` items with one model.
+Alternatives: AI edits draft directly (violates hard rule: no unreviewed AI résumé changes).
+
+### DEC-017 Version on Next/Done: atomic, idempotent, nothing discarded
+Reasoned by: human (2026-10-12; agent critique accepted: no-op on unchanged hash, idempotency key)
+Decision: Next/Done publishes `v<n+1>` atomically (write to temp dir, rename, then update meta.json; onboarding also sets master), then the draft restarts from it with an empty log. Same hash as latest → no new version (no extra extract_master run). Request carries an idempotency key; a double click publishes once. Open annotations carry over if their target id still exists, else `outdated`; never deleted.
+Invariants (tested): no lost edits, no silent AI changes, no duplicate versions, deterministic render (`.tex`/`.txt` identical for same JSON; PDF with `SOURCE_DATE_EPOCH`), every revert auditable.
+Alternatives: version per accept (rejected in DEC-012).
+
+### DEC-018 One résumé schema for master, drafts and tailored
+Reasoned by: human (2026-10-12; agent critique accepted: local ids + `source`)
+Decision: extend `data/jobs/<id>/resume.json` (render.py shape) with `schema_version`, résumé-local stable ids on sections/entries/bullets, and optional `source` = master.yaml bullet/entry id. QA `bullet_fidelity` + consistency checks run only on bullets with `source`, only for tailored résumés. Annotations and history stay outside the schema (DEC-015/016). Old files migrate on read (no `schema_version` → v1, ids assigned).
+Why: one schema, one renderer; uploaded/hand-edited bullets aren't in master.yaml, so they can't be keyed by master ids.
+Alternatives: separate editor schema (two renderers, drift); master ids only (breaks for uploads/edits).
+
+### DEC-019 extract-master is the single import step, guarded
+Reasoned by: human (2026-10-12; agent critique accepted: verbatim guard, all uploads)
+Decision: every upload (master, variant, other) → existing text extraction (DEC-001) → one `extract-master` headless run producing `resume.json` (DEC-018) and, for the master, the pending master.yaml proposal. Deterministic guard: every bullet must appear verbatim (whitespace-normalised) in the upload's `text.txt` and the JSON must validate; fail → import marked failed, Action Item, original kept, no guessed résumé shown. Original file stays v1 read-only.
+Why: one import pipeline; import must never invent content.
+Alternatives: separate converter skill (second pipeline); trust the model (fabrication risk).
+Consequences: one AI run per upload = visible wait during onboarding (DEC-011 cost, accepted).
