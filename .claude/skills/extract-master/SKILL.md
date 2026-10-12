@@ -40,4 +40,6 @@ Write the whole file to a temp path (e.g. `/tmp/master.proposed.<pid>.yaml`).
 
 Never write `profile/master.yaml` directly; approve (UI or `POST /api/profile/master/proposal/approve`) does that.
 
-Print `RESULT: proposed | unchanged | refused` and the CLI's one-line summary.
+Print exactly one final line, valid JSON on one line (the runner parses it):
+`RESULT: {"skill":"extract-master","outcome":"proposed","summary":"<the CLI's one-line summary>"}`
+(`outcome`: `proposed` | `unchanged` | `refused`).

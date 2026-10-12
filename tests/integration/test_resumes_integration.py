@@ -61,6 +61,8 @@ def test_resume_http_api(root: Path):
         assert r.status_code == 201, r.text
         a = r.json()
         assert a["n"] == 1 and a["review_run"] is None
+        assert started == ["extract_master"]  # B1: the first upload is the master -> extract-master
+        started.clear()
         assert c.put("/api/profile/resumes", params={"filename": "cv.exe"}, content=PDF, headers=W).status_code == 415
         big = b"%PDF" + b"x" * (5 * 1024 * 1024)
         assert c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=big, headers=W).status_code == 413
@@ -165,7 +167,7 @@ def test_master_diff_cli_and_api(root: Path, tmp_path: Path):
 V1 = "Jane Doe\nExperience\nAcme Corp, Engineer 2021-2023\n- Supported migration of 12 services to Python\n"
 
 
-def test_feedback_lifecycle_http_api(root: Path):  # TASK-008: E2E-001-01, E2E-002-01..04
+def test_feedback_lifecycle_http_api(root: Path, caplog):  # TASK-008: E2E-001-01, E2E-002-01..04
     pytest.importorskip("fastapi")
     from fastapi.testclient import TestClient
 
@@ -184,7 +186,7 @@ def test_feedback_lifecycle_http_api(root: Path):  # TASK-008: E2E-001-01, E2E-0
     with TestClient(app) as c:
         up = c.put("/api/profile/resumes", params={"filename": "cv.pdf"}, content=PDF, headers=W).json()
         rid = up["rid"]
-        assert up["review_run"] == "run-1" and started == [("review", rid, None)]  # REQ-094: upload starts review
+        assert up["review_run"] == "run-1" and started == [("review", rid, None), ("extract_master", None, None)]  # REQ-094/099
         assert c.put(f"/api/profile/resumes/{rid}/text", json={"text": V1}, headers=W).json()["versions"][-1] == {
             **c.get(f"/api/profile/resumes/{rid}", headers=W).json()["versions"][-1], "n": 2, "author": "user"}
         assert started[-1] == ("extract_master", None, None)  # new master version -> extract-master (REQ-099)
@@ -218,6 +220,9 @@ def test_feedback_lifecycle_http_api(root: Path):  # TASK-008: E2E-001-01, E2E-0
         up2 = c.put("/api/profile/resumes", params={"filename": "cv2.pdf"}, content=PDF, headers=W).json()
         assert up2["review_run"] is None  # PR #127: start failure -> review failed (Retry), not null
         assert c.get(f"/api/profile/resumes/{up2['rid']}/feedback", headers=W).json()["review"]["state"] == "failed"
+        with caplog.at_level("WARNING"):  # B1: a set-master whose extract-master can't start is logged, not silent
+            assert c.post(f"/api/profile/resumes/{up2['rid']}/master", headers=W).status_code == 200
+        assert "extract_master run not started: runner busy" in caplog.text
 
 
 def test_feedback_cli_and_edit_run_launches_extract(root: Path, tmp_path: Path):

@@ -105,6 +105,8 @@ def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, k
         else:
             cmd += ["--append-system-prompt", rule]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
+    if not any(a.startswith("--setting-sources") for a in cmd):  # user-scope hooks (Stop) would eat the RESULT line
+        cmd += ["--setting-sources", "project,local"]
     if cfg.model and "--model" not in cmd:
         cmd += ["--model", cfg.model]
     if session_id and "--session-id" not in cmd:

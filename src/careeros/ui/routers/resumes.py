@@ -5,6 +5,7 @@ lands via PUT .../rewrite, 422 when the guard refuses), comment -> redraft, dism
 Any new master version launches extract-master (REQ-099)."""
 from __future__ import annotations
 
+import logging
 from contextlib import contextmanager
 from typing import Any, Iterator, Literal
 
@@ -158,6 +159,8 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
     except HTTPException as e:
         fb.set_review(c.settings.root, m["rid"], "failed", reason=str(e.detail))
         review = None
+    if m["type"] == "master":  # the first résumé becomes the master -> extract-master too (REQ-099)
+        _extract_master(request, c)
     return Uploaded(rid=m["rid"], n=1, review_run=review)
 
 
@@ -179,8 +182,8 @@ def _extract_master(request: Request, c: Any) -> None:
 
     try:
         (getattr(request.app.state, "run_control", None) or RunControl)(c.settings).start_step("extract_master")
-    except Exception:  # noqa: BLE001 - never fail set-master on the follow-up run
-        pass
+    except Exception as e:  # noqa: BLE001 - never fail set-master on the follow-up run; but say why it didn't start
+        logging.getLogger(__name__).warning("extract_master run not started: %s", e)
 
 
 def _start(request: Request, c: Any, kind: str, rid: str, item: str | None = None) -> Started:
