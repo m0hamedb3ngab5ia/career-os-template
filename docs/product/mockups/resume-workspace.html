@@ -13,7 +13,7 @@ button{font:inherit;color:inherit;border:0;background:none;border-radius:99px;pa
 button.primary{background:var(--accent);color:var(--bg)}button.ic{width:32px;height:32px;padding:0;font-size:16px}
 :focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 header{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:center;padding:8px 16px;background:var(--bg);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--sep)}
-header h1{font-size:18px;font-weight:400;margin:0}header .sp{flex:1}header button{white-space:nowrap}@media(max-width:600px){header h1{flex-basis:100%}}#open{color:var(--sec);font-size:13px}#st{color:var(--sec);font-size:13px}
+header h1{font-size:18px;font-weight:400;margin:0}header .sp{flex:1}header button{white-space:nowrap}@media(max-width:600px){header h1{flex-basis:100%}}#open{color:var(--sec);font-size:13px}#st{color:var(--sec);font-size:13px}[hidden]{display:none!important}#back{color:var(--sec);text-decoration:none;font-size:13px}
 .app{display:grid;grid-template-columns:120px minmax(0,1fr) 280px;gap:24px;max-width:1200px;margin:0 auto;padding:16px}
 nav button{display:block;width:100%;text-align:left;border-radius:0 99px 99px 0}nav .on{background:var(--sel);font-weight:600}
 .page{background:var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.15);padding:48px 56px;min-height:700px;outline:none;margin:0}
@@ -34,10 +34,11 @@ ins{text-decoration:none;color:var(--ai)}del{color:var(--ai)}
 @media(max-width:900px){.app{grid-template-columns:1fr}.page{padding:24px 16px}nav{display:flex}nav button{border-radius:99px}.cd{position:static;margin-bottom:8px}.cd.on{transform:none}}
 </style></head><body>
 
-<header><h1>Alex Example résumé</h1><button id="st" title="Version history">All changes saved</button><span class="sp"></span>
+<header><a id="back" href="#" title="Back to Profile › Résumés. Everything is already saved.">← Résumés</a><h1>Alex Example résumé</h1><button id="st" title="Version history">All changes saved</button><span class="sp"></span>
   <button id="binb" title="Accepted and rejected suggestions">↶ History</button>
   <span id="open"></span><button class="primary" id="next" title="Makes this your master résumé. Open suggestions stay here for later.">Next: Saved answers →</button></header>
 
+<main id="stub" hidden><p id="stubt"></p><a href="#" onclick="location.reload()">← Back to wireframe</a></main>
 <div class="app">
   <nav aria-label="Document tabs"><button class="on" data-t="doc">Résumé</button><button data-t="ats">ATS view</button></nav>
   <div>
@@ -135,7 +136,10 @@ document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.query
  B.dataset.tab=b.dataset.t;if(b.dataset.t==='ats'){const c=doc.cloneNode(true);c.querySelectorAll('ins').forEach(x=>x.remove());$('#ats').textContent=c.innerText}else layout()});
 $('#binb').onclick=()=>B.dataset.bin=1;$('#binx').onclick=()=>{delete B.dataset.bin;layout()};
 $('#bins').addEventListener('click',e=>{const b=e.target.closest('[data-i]');if(b)revert(+b.dataset.i)});
-$('#next').onclick=e=>{e.target.textContent='✓ Saved as master';saved()};
+// wireframe stub: real app routes to these screens (FLOW-001)
+function go(t){$('header').hidden=$('.app').hidden=true;$('#stub').hidden=false;$('#stubt').textContent=t}
+$('#back').onclick=e=>{e.preventDefault();go('→ Profile › Résumés. This résumé shows "Draft", or "Master" after Next. Nothing lost: edits autosave.')};
+$('#next').onclick=()=>go('✓ Saved as master. → Saved answers (next onboarding step). Open suggestions stay on the résumé for later.')
 let vsel;
 function showV(v){vsel=v;document.querySelectorAll('#vh .v').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('#vdoc').innerHTML=v==='cur'?doc.innerHTML:VER[v];$('#rst').hidden=v==='cur'}
 $('#st').onclick=()=>{B.dataset.vh=1;showV('cur')};$('#vhx').onclick=()=>{delete B.dataset.vh;layout()};
