@@ -141,4 +141,5 @@
 - Links: REQ-096, REQ-125, SCREEN-ResumeWorkspace
 - Context: minimal wireframe (2026-10-12) dropped Comment; cards only ✓ / ✕, hand edit covers tweaks.
 - Recommended: defer REQ-096 (✕ + edit in place covers it); revisit after user test.
-- Status: open
+- Answer (2026-10-12): keep. Reply thread under every card; "Apply comment" checkbox sends the reply to AI as feedback (like Claude Design's send-to-Claude). REQ-096 rewritten.
+- Status: answered

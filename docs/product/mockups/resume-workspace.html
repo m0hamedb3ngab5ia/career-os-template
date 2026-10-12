@@ -27,6 +27,7 @@ ins{text-decoration:none;color:var(--ai)}del{color:var(--ai)}
 .hd{display:flex;align-items:flex-start;gap:4px}.hd>div{flex:1}.cd p{margin:4px 0;color:var(--sec)}
 .cd:not(.on) p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.cd:not(.on) .ic{display:none}
 .lnk{color:var(--accent);padding:2px 0}
+.rp{border-top:1px solid var(--sep);padding-top:4px}.rp b{color:var(--label)}.cd:not(.on) .rf{display:none}.rf{display:flex;flex-direction:column;gap:4px;margin-top:6px}.rf input[type=text]{border:1px solid var(--sep);border-radius:6px;padding:6px;background:var(--bg);color:var(--label)}.rf label{font-size:12px;color:var(--sec)}
 #vh,#vdoc,#ats,#bin{display:none}[data-bin] #bin{display:block}[data-bin] #margin{display:none}#bin .e{background:var(--card);border-radius:8px;padding:8px 12px;margin-bottom:8px}#bin small{color:var(--sec)}[data-vh] #vh,[data-vh] #vdoc{display:block}[data-vh] #margin,[data-vh] #doc,[data-vh] nav{display:none}
 #vh .v{display:block;width:100%;text-align:left;border-radius:8px;padding:8px 12px}#vh .v.on{background:var(--sel)}#vh small{display:block;color:var(--sec)}
 #vdoc:not(.chg) del{display:none}#vdoc:not(.chg) ins{color:inherit}
@@ -90,7 +91,9 @@ const anchor=id=>doc.querySelector(`[data-id="${id}"]`);
 function cardHTML(id){const el=anchor(id),m=meta[id],sg=el.classList.contains('sg');let head='';
  if(sg){const g=t=>esc([...el.querySelectorAll(t)].map(x=>x.textContent).join('')),d=g('del'),i=g('ins');
   head=d&&i?`<b>Replace:</b> "${d}" <b>with</b> "${i}"`:i?`<b>Add:</b> "${i}"`:`<b>Delete:</b> "${d}"`}
- return `<div class="hd"><div>${head}<p>${esc(m.why)}</p>${m.restore?'<button class="lnk rs">Restore</button>':''}</div>`+
+ return `<div class="hd"><div>${head}<p>${esc(m.why)}</p>${m.restore?'<button class="lnk rs">Restore</button>':''}`+
+  (m.replies||[]).map(r=>`<p class="rp"><b>${r.ai?'Claude':'You'}:</b> ${esc(r.t)}</p>`).join('')+
+  `<form class="rf"><input type="text" placeholder="Reply…" aria-label="Reply"><label><input type="checkbox"> Apply comment (Claude revises this)</label></form></div>`+
   (sg?'<button class="ic ok" title="Accept" aria-label="Accept">✓</button><button class="ic no" title="Reject" aria-label="Reject">✕</button>':'<button class="ic ok" title="Resolve" aria-label="Resolve">✓</button>')+'</div>'}
 function render(){margin.innerHTML='';
  for(const id in meta){if(!anchor(id))continue;const c=document.createElement('div');c.className='cd'+(id===active?' on':'');c.dataset.for=id;c.tabIndex=0;c.innerHTML=cardHTML(id);margin.append(c)}
@@ -122,6 +125,11 @@ function settle(id,drop,verb){push();const el=anchor(id),orig=el.outerHTML,text=
 function revert(i){push();const b=bin.splice(i,1)[0];doc.querySelectorAll(`[data-extra="${b.id}"]`).forEach(x=>x.remove());
  const w=doc.querySelector(`[data-was="${b.id}"]`);if(w)w.outerHTML=b.orig;meta[b.id]=b.m;render();saved()}
 
+// reply under any card; "Apply comment" sends it to Claude as feedback (REQ-096). Wireframe fakes the redraft.
+margin.addEventListener('submit',e=>{e.preventDefault();const f=e.target,id=f.closest('.cd').dataset.for,t=f.querySelector('[type=text]').value.trim();if(!t)return;
+ push();const m=meta[id],ap=f.querySelector('[type=checkbox]').checked;(m.replies||=[]).push({t});
+ if(ap)m.replies.push({ai:1,t:anchor(id).classList.contains('sg')?'Revised the suggestion using your comment.':'Turned your comment into a suggestion.'});
+ render();saved()});
 doc.addEventListener('beforeinput',()=>{push(1);saved()});
 doc.addEventListener('input',layout);
 doc.addEventListener('click',e=>{const a=e.target.closest('[data-id]');activate(a&&meta[a.dataset.id]?a.dataset.id:null)});

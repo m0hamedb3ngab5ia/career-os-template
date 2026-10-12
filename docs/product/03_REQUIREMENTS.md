@@ -209,9 +209,10 @@ Changed 2026-10-12 (DEC-012, wireframe). Accept (✓) → AI rewrite of the item
 Given feedback item · When Accept · Then draft text changed in place, item `accepted` (draft), entry in History, no new version until Next/Done.
 Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version, nor stronger claims (scope, outcome, seniority verb e.g. supported → led) (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
 
-### REQ-096 Comment on feedback
-User comment on an item replaces one-click: AI re-drafts the suggestion using the comment (Q-010); user then Applies or Dismisses. Comments kept on the item.
-Given item · When user comments "keep the Python line" · Then suggestion regenerated honoring comment; nothing written to résumé until Apply.
+### REQ-096 Reply on feedback, optional Apply comment
+Changed 2026-10-12 (Q-023): any card (suggestion or comment) has a reply thread, Google-Docs style. Reply box has checkbox "Apply comment": checked → reply sent to AI as feedback; it re-drafts the suggestion (or turns a comment into a suggestion) and posts a short reply. Unchecked → reply kept as a note, no AI run. Replies kept on the item, join the draft (REQ-126). Re-draft still a suggestion: nothing changes in the résumé until ✓.
+Given suggestion · When user replies "keep the Python line" with Apply comment checked · Then suggestion re-drafted honoring it, thread shows reply + AI reply; résumé text unchanged until ✓.
+Given card · When user replies with Apply comment unchecked · Then reply saved on card; no AI run.
 
 ### REQ-097 Edit résumé by hand
 Changed 2026-10-12: edit text in place in the workspace (structured fields: bullets, headings, contact), never raw LaTeX. Edits join the draft (REQ-126), change tagged author=user. No guard (user owns facts).
