@@ -3,6 +3,7 @@ import { Inbox, KanbanSquare, Search, Settings, Sun, Table2, UserRound, Zap } fr
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
+import { useMeta } from "../api/meta";
 import { useStatus } from "../api/queries";
 import type { StatusSummary } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
@@ -161,6 +162,12 @@ export function AppShell() {
   const { data: status } = useStatus();
   const main = useRef<HTMLElement>(null);
   const routeMessage = useRouteFocus(main);
+  // Settings > ui.theme: light/dark force a palette on <html>; system (or unknown) drops it so tokens.css follows the OS.
+  const theme = useMeta().data?.ui.theme;
+  useEffect(() => {
+    if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
+    else delete document.documentElement.dataset.theme;
+  }, [theme]);
 
   return (
     <div className={styles.shell}>

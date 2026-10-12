@@ -36,6 +36,13 @@ async function fieldRows() {
 const byLabel = (rows: HTMLElement[], label: string) => rows.find((r) => within(r).getByRole("rowheader").textContent === label)!;
 
 describe("FillPlanCard", () => {
+  it("explains inline, with no Preview fill button, when the posting's ATS can't be filled", async () => {
+    stubFetch({ plan: null, problems: [] });
+    renderWithProviders(<FillPlanCard jobId="nw01" ats="ashby" />);
+    expect(await screen.findByText(/only Greenhouse postings/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Preview fill" })).toBeNull();
+  });
+
   it("offers Preview fill before there is a plan", async () => {
     stubFetch({ plan: null, problems: [] });
     renderWithProviders(<FillPlanCard jobId="nw01" />);
