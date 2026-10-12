@@ -165,8 +165,10 @@ export function AppShell() {
   // Settings > ui.theme: light/dark force a palette on <html>; system (or unknown) drops it so tokens.css follows the OS.
   const theme = useMeta().data?.ui.theme;
   useEffect(() => {
+    if (!theme) return; // meta not loaded yet: keep what index.html applied before first paint
     if (theme === "light" || theme === "dark") document.documentElement.dataset.theme = theme;
     else delete document.documentElement.dataset.theme;
+    try { localStorage.setItem("careeros.theme", theme); } catch { /* storage blocked: only the early paint is lost */ }
   }, [theme]);
 
   return (

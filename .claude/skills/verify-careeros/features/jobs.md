@@ -17,7 +17,7 @@ Table of every tracked posting; user ticks jobs to prepare/apply and changes sta
 
 Preconditions: baseline plus a seeded posting (scaffolding, removed by cleanup): `mkdir -p data/jobs/example-1 && sed 's/"_example"/"example-1"/' tests/fixtures/example_posting.json > data/jobs/example-1/posting.json` (ids starting with `_` are hidden), then restart the UI or run it with `--reindex`. Not yet proven; confirm the dir layout against `src/careeros/ui/services/jobs.py` `job_dir_for`.
 
-- **List.** `page.goto("/jobs")`; row `Ledgerline` appears.
+- **List.** `page.goto("/jobs")`; row `Ledgerline` appears. With a large table (~700+ rows) never target rows by position (`nth`, first row) or wait on the full list: fill `Search jobs and companies` with the company name first, then `get_by_role("checkbox", name="Select Ledgerline")` (accessible name) and `scroll_into_view_if_needed()`. (Unverified at 748 rows.)
 - **Select.** Click checkbox `Select ...`; `POST /api/jobs/select`; read back with `careeros jobs list` or `GET /api/jobs`.
 - **Proof.** Page text + API row showing selected.
 

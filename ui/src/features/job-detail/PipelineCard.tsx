@@ -4,6 +4,7 @@ import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
+import { endMessage } from "../runs/labels";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
 import { type ActionKey, help } from "./actionHelp";
@@ -82,6 +83,9 @@ function Box({ children }: { children: ReactNode }) {
   );
 }
 
+/** A retry cannot fix these: the user changes Settings or logs in first. */
+const NO_RETRY = new Set(["permission_denied", "auth_required"]);
+
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
@@ -93,6 +97,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const startedKind = useRef<string | null>(null);
   // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
   const [lastEnd, setLastEnd] = useState<string | null>(null);
+  const [lastStop, setLastStop] = useState<string | null>(null);
   const pipeline = usePipeline(jobId, started !== null);
   const tasks = useJobTasks(jobId);
   const appTab = useApplicationTab(jobId).data?.tab;
@@ -119,6 +124,14 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const startedMissing = started !== null && startedRun.data == null &&
     (refused || startedRun.errorUpdateCount >= MAX_MISSING_POLLS);
 
+  // After a denied tool / missing login the user fixes Settings or logs in elsewhere: coming back retries.
+  useEffect(() => {
+    if (!NO_RETRY.has(lastStop ?? "")) return;
+    const back = () => { if (document.visibilityState !== "hidden") setLastStop(null); };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => { window.removeEventListener("focus", back); document.removeEventListener("visibilitychange", back); };
+  }, [lastStop]);
   useEffect(() => {
     if (state?.active_run_id && started && state.active_run_id !== started) setStarted(null); // another run took the job
   }, [state?.active_run_id, started]);
@@ -126,7 +139,8 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     if (!stream.ended && !startedEnded && !startedMissing) return;
     if (started && !stream.ended) {
       const d = startedRun.data;
-      setLastEnd(d ? `Run ${d.id} ended: ${d.stop_reason ?? d.status}${d.detail ? ` — ${d.detail}` : ""}`
+      setLastStop(d?.stop_reason ?? null);
+      setLastEnd(d ? endMessage(d)
                    : refused ? startRefusal
                    : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
     }
@@ -190,6 +204,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     if (!state?.next_action) return;
     const kind = state.next_kind;
     setLastEnd(null);
+    setLastStop(null);
     start.mutate(
       { action: state.next_action },
       {
@@ -205,7 +220,12 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   return (
     <Box>
       <NextStepSummary state={state} tasks={tasks} tab={appTab} />
-      {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
+      {lastEnd && !runId ? (
+        <p className={styles.alert}>
+          {lastEnd}
+          {NO_RETRY.has(lastStop ?? "") ? <> <Button size="small" onClick={() => setLastStop(null)}>Dismiss</Button></> : null}
+        </p>
+      ) : null}
       {!runId ? <FillApplicationError jobId={jobId} stage={state.stage} /> : null}
       {runId ? (
         <>
@@ -226,7 +246,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           </div>
           <LogPane label="Live run output" lines={lines} empty="Waiting for output…" live />
         </>
-      ) : state.next_action && !state.failures?.excluded ? (
+      ) : state.next_action && !state.failures?.excluded && !NO_RETRY.has(lastStop ?? "") ? (
         <div className={styles.buttons}>
           <Button
             variant="primary"

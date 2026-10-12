@@ -39,8 +39,22 @@ describe("FillPlanCard", () => {
   it("explains inline, with no Preview fill button, when the posting's ATS can't be filled", async () => {
     stubFetch({ plan: null, problems: [] });
     renderWithProviders(<FillPlanCard jobId="nw01" ats="ashby" />);
-    expect(await screen.findByText(/only Greenhouse postings/)).toBeInTheDocument();
+    expect(await screen.findByText(/only Greenhouse postings; this one is on Ashby/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Preview fill" })).toBeNull();
+  });
+
+  it("disables Preview fill with a reason when the posting lacks its board or job id", async () => {
+    stubFetch({ plan: null, problems: [] });
+    renderWithProviders(<FillPlanCard jobId="nw01" ats="greenhouse" canPlan={false} />);
+    expect(await screen.findByRole("button", { name: "Preview fill" })).toBeDisabled();
+    expect(screen.getByText(/missing its board or job id/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview fill" })).toHaveAccessibleDescription(/missing its board or job id/);
+  });
+
+  it("shows the disabled reason with a plan too", async () => {
+    stubFetch({ plan, problems: [] });
+    renderWithProviders(<FillPlanCard jobId="nw01" ats="greenhouse" canPlan={false} />);
+    expect(await screen.findByRole("button", { name: "Rebuild preview" })).toHaveAccessibleDescription(/missing its board or job id/);
   });
 
   it("offers Preview fill before there is a plan", async () => {

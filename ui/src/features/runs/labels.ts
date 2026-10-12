@@ -124,3 +124,11 @@ export function cadence(job: ScheduleJob, locale?: string): string {
   const preset = job.preset ? `${humanize(job.preset)} budget` : "";
   return [when, preset, extra].filter(Boolean).join(" · ");
 }
+
+/** Cause + fix for a finished run: the kit label and the runs page's fix text (the raw code if unknown). */
+export function endMessage(d: { id: string; stop_reason: string | null; status: string; detail?: string | null }): string {
+  const code = d.stop_reason ?? d.status;
+  const fix = STOP_FIX[code];
+  const label = d.stop_reason ? describeCode(STOP_REASONS, code).label : code;
+  return `Run ${d.id} ended: ${label}${d.detail ? ` — ${d.detail}` : ""}${fix ? ` ${fix}` : ""}`;
+}
