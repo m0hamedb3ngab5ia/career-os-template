@@ -63,7 +63,10 @@ Decision: users have limited time, patience, attention. Every screen, interactio
 - TTV (Time to Value) = intent -> first useful visible result.
 - TTA (Time to Action) = time and effort to identify and take the next meaningful action in an interface. Not "time to apply".
 - Targets are design targets, not guarantees. Meaningful results over arbitrary speed. No promises dependent on external sites, AI processing or job availability. Validate with real users; measure TTV/TTA.
-- Review gate: every UI PR answers "does this add a step, screen or wait before value?" (`docs/CODE_REVIEW_PROMPT.md`).
+- Review gate: every UI PR answers "does this add a step, screen, decision or wait before value?" (`docs/CODE_REVIEW_PROMPT.md`). Yes = justify and weigh simpler options; added friction is acceptable only when it improves accuracy, safety, clarity or user control. Every added interaction must earn its place.
+- Decision rule between designs, in order: value sooner; less user effort; clearer next action; accuracy, transparency and control preserved. Fewer clicks alone is not better UX.
+- Applies at every stage: requirements (outcome + TTV/TTA target), design, build, test (measure real TTV/TTA, recovery, understanding), review (gate), iteration (cut observed friction).
+- North star: CareerOS does the work so the user focuses on getting hired, not operating the software.
 
 TTV targets (aggressive, but optimize for meaningful value, not fewer clicks):
 

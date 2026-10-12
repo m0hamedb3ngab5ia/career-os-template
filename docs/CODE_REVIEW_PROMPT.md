@@ -110,10 +110,11 @@ This repo requires tests with code (`CLAUDE.md` → Testing). For every PR that 
 
 ## UI time to value
 
-Every UI PR must answer: "does this add a step, screen or wait before value?" (DEC-011 in
+Every UI PR must answer: "does this add a step, screen, decision or wait before value?" (DEC-011 in
 `docs/product/DECISIONS.md`).
 
-- **SHOULD-FIX:** a PR that adds a step, screen or wait before value without a stated justification.
+- **SHOULD-FIX:** a PR that adds a step, screen, decision or wait before value without a stated justification
+  (acceptable only when it improves accuracy, safety, clarity or user control).
 
 ## Path-specific scrutiny
 
