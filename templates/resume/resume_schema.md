@@ -12,8 +12,9 @@ One schema for tailored, master and draft résumés. Current: `"schema_version":
   résumé, unique within it. It never changes once written, so annotations and history can target it.
 - Optional `source` on entries and bullets = the `profile/master.yaml` entry/bullet id the content came from.
   Uploaded or hand-written bullets have no `source`.
-- QA `bullet_fidelity`, `entry_headers` and the consistency checks run only on bullets/entries with `source`
-  (job-dir résumés, i.e. tailored ones); v1 bullets without `source` are counted in the detail, not traced.
+- QA `bullet_fidelity` and the consistency checks run only on bullets with `source` (job-dir résumés, i.e.
+  tailored ones); v1 bullets without `source` are counted in the detail, not traced. `entry_headers` still needs
+  every entry to name a profile entry: a v1 entry without `source` fails it.
 - Old files (no `schema_version`) are migrated on read, in memory only (`careeros.resumes.read_resume_json` /
   `migrate`): each `id` was a master.yaml id, so it moves to `source`, and ids are assigned from position:
   `sec-<type>`, `<section>-<n>` (1-based), `<entry id>.b<n>`. Same file → same ids on every read. In an old file a

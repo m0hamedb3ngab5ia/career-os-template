@@ -279,10 +279,11 @@ def migrate(doc: dict[str, Any]) -> dict[str, Any]:
 
     No `schema_version` = pre-v1: each entry/bullet `id` was a profile/master.yaml id, so it moves to `source`.
     Missing ids are assigned from position (`sec-<type>`, `<section>-<n>`, `<entry id>.b<n>`), so the same file
-    gets the same ids on every read; an id already in use gets a `-<k>` suffix."""
+    gets the same ids on every read; an id already in use gets a `-<k>` suffix. A repeated id keeps its first
+    occurrence; later ones are reassigned the same way."""
     doc = copy.deepcopy(doc)
     version = doc.get("schema_version")
-    if version not in (None, SCHEMA_VERSION):
+    if version is not None and not (type(version) is int and version == SCHEMA_VERSION):
         raise ValueError(f"unknown resume.json schema_version {version!r} (supported: {SCHEMA_VERSION})")
     old = version is None
     nodes: list[tuple[dict[str, Any], str]] = []  # (node, positional id), parents before their bullets
@@ -310,12 +311,18 @@ def migrate(doc: dict[str, Any]) -> dict[str, Any]:
         used.add(nid)
         return nid
 
+    seen: set[str] = set()
+
+    def assign(node: dict[str, Any], want: str) -> None:
+        if not node.get("id") or str(node["id"]) in seen:
+            node["id"] = fresh(want)
+        seen.add(str(node["id"]))
+
     for n, want in nodes:
-        if not n.get("id"):
-            n["id"] = fresh(want)
+        assign(n, want)
         for j, b in enumerate(n.get("bullets") or [], 1):
-            if isinstance(b, dict) and not b.get("id"):
-                b["id"] = fresh(f"{n['id']}.b{j}")
+            if isinstance(b, dict):
+                assign(b, f"{n['id']}.b{j}")
     doc["schema_version"] = SCHEMA_VERSION
     return doc
 

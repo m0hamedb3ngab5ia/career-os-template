@@ -397,7 +397,7 @@ def _resume_views(raw: Any) -> tuple[Any, Any, int]:
         doc = resumes.migrate(raw)
     except ValueError as e:
         return {"__parse_error__": str(e)}, {"__parse_error__": str(e)}, 0
-    view, unsourced, pre_v1 = json.loads(json.dumps(doc)), 0, "schema_version" not in raw
+    view, unsourced, pre_v1 = json.loads(json.dumps(doc)), 0, raw.get("schema_version") is None
     for section in resumes.ENTRY_SECTIONS:
         for e in view.get(section) or []:
             if not isinstance(e, dict):
@@ -931,8 +931,9 @@ class Checker:
                  "all capitalised terms traced to profile" if not unknown
                  else f"not in profile skills/cited bullets: {', '.join(unknown)}")
 
-    def _resume_entries(self) -> list[dict[str, Any]]:
-        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else {}
+    def _resume_entries(self, doc: Any = None) -> list[dict[str, Any]]:
+        doc = self.resume_json if doc is None else doc
+        rj = doc if isinstance(doc, dict) and "__parse_error__" not in doc else {}
         out = []
         for section in ("experience", "projects", "leadership"):
             out.extend(e for e in rj.get(section) or [] if isinstance(e, dict))
@@ -945,16 +946,24 @@ class Checker:
             return
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         base = self.root / "profile" / "resumes" / str(c.get("rid")) / f"v{c.get('version')}" / "resume.json"
-        base_json, _ = _parse_json(_read_text(base))
-        if rj is None or not isinstance(base_json, dict):
+        base_doc, base_view, _ = _resume_views(_parse_json(_read_text(base))[0])
+        if rj is None or not isinstance(base_view, dict) or "__parse_error__" in base_view:
             self.add("tweak_cap", "hard", False, "tweak needs resume.json and the base version's resume.json")
             return
         allowed = set(c.get("add_bullet_ids") or [])
-        added = collect_ids(rj) - collect_ids(base_json)
+        # sourced bullets compare by master id (both sides migrated, DEC-018); bullets without `source` are not in
+        # the trace view, so count those by résumé-local id against the base's local ids
+        added = collect_ids(rj) - collect_ids(base_view)
+        base_local = collect_ids(base_doc)
+        unsourced = sorted(str(b["id"]) for e in self._resume_entries(self.resume_doc) for b in e.get("bullets") or []
+                           if isinstance(b, dict) and b.get("id") and not b.get("source")
+                           and str(b["id"]) not in base_local)
         bad = sorted(added - allowed)
-        ok = not bad and len(added) <= 3
-        self.add("tweak_cap", "hard", ok, f"added {sorted(added)} (allowed {sorted(allowed)}, max 3)" if ok else
-                 f"tweak added {sorted(added)}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
+        n = len(added) + len(unsourced)
+        shown = sorted(added) + [f"{i} (no source)" for i in unsourced]
+        ok = not bad and n <= 3
+        self.add("tweak_cap", "hard", ok, f"added {shown} (allowed {sorted(allowed)}, max 3)" if ok else
+                 f"tweak added {shown}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
 
     def check_bullet_fidelity(self) -> None:
         """Each resume.json bullet's text is its master text / a variant (verb swap + trailing trim only);

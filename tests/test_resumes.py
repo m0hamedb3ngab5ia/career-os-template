@@ -174,13 +174,30 @@ def test_migrate_ids_stable_across_reads(tmp_path: Path):
 
 def test_migrate_v1_keeps_ids_and_fills_missing_without_collision():
     doc = {"schema_version": 1, "experience": [
-        {"id": "x", "bullets": [{"id": "experience-1.b2", "text": "kept"}, {"text": "hand-written"}]}]}
+        {"id": "experience-2", "bullets": [{"id": "experience-2.b2", "text": "kept"}, {"text": "hand-written"}]},
+        {"bullets": [{"text": "b"}]}]}
     v1 = resumes.migrate(doc)
-    e = v1["experience"][0]
-    assert e["id"] == "x" and "source" not in e
-    ids = [b["id"] for b in e["bullets"]]
-    assert ids[0] == "experience-1.b2" and ids[1] != ids[0] and "source" not in e["bullets"][1]
+    e1, e2 = v1["experience"]
+    assert e1["id"] == "experience-2" and "source" not in e1
+    assert [b["id"] for b in e1["bullets"]] == ["experience-2.b2", "experience-2.b2-2"]  # positional .b2 clashed
+    assert e2["id"] == "experience-2-2" and e2["bullets"][0]["id"] == "experience-2-2.b1"
+    assert "source" not in e1["bullets"][1]
     assert resumes.migrate(v1) == v1
+
+
+def test_migrate_v1_reassigns_duplicate_ids():
+    doc = {"schema_version": 1, "experience": [
+        {"id": "x", "bullets": [{"id": "d", "text": "a"}, {"id": "d", "text": "b"}]}, {"id": "x"}]}
+    v1 = resumes.migrate(doc)
+    assert [e["id"] for e in v1["experience"]] == ["x", "experience-2"]
+    assert [b["id"] for b in v1["experience"][0]["bullets"]] == ["d", "x.b2"]
+    assert resumes.migrate(v1) == v1
+
+
+@pytest.mark.parametrize("v", [True, "1", 1.0])
+def test_migrate_rejects_non_int_schema_version(v):
+    with pytest.raises(ValueError, match="schema_version"):
+        resumes.migrate({"schema_version": v})
 
 
 def test_migrate_rejects_unknown_schema_version():
