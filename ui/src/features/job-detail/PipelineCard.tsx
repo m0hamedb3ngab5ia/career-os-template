@@ -3,9 +3,8 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
-import { STOP_REASONS, describeCode } from "../../kit/labels";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
-import { STOP_FIX } from "../runs/labels";
+import { endMessage } from "../runs/labels";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
 import { type ActionKey, help } from "./actionHelp";
@@ -87,14 +86,6 @@ function Box({ children }: { children: ReactNode }) {
 /** A retry cannot fix these: the user changes Settings or logs in first. */
 const NO_RETRY = new Set(["permission_denied", "auth_required"]);
 
-/** Cause + fix for a finished run: the kit label and the runs page's fix text (the raw code if unknown). */
-export function endMessage(d: { id: string; stop_reason: string | null; status: string; detail?: string | null }): string {
-  const code = d.stop_reason ?? d.status;
-  const fix = STOP_FIX[code];
-  const label = d.stop_reason ? describeCode(STOP_REASONS, code).label : code;
-  return `Run ${d.id} ended: ${label}${d.detail ? ` — ${d.detail}` : ""}${fix ? ` ${fix}` : ""}`;
-}
-
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
@@ -133,6 +124,14 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const startedMissing = started !== null && startedRun.data == null &&
     (refused || startedRun.errorUpdateCount >= MAX_MISSING_POLLS);
 
+  // After a denied tool / missing login the user fixes Settings or logs in elsewhere: coming back retries.
+  useEffect(() => {
+    if (!NO_RETRY.has(lastStop ?? "")) return;
+    const back = () => { if (document.visibilityState !== "hidden") setLastStop(null); };
+    window.addEventListener("focus", back);
+    document.addEventListener("visibilitychange", back);
+    return () => { window.removeEventListener("focus", back); document.removeEventListener("visibilitychange", back); };
+  }, [lastStop]);
   useEffect(() => {
     if (state?.active_run_id && started && state.active_run_id !== started) setStarted(null); // another run took the job
   }, [state?.active_run_id, started]);
@@ -221,7 +220,12 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   return (
     <Box>
       <NextStepSummary state={state} tasks={tasks} tab={appTab} />
-      {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
+      {lastEnd && !runId ? (
+        <p className={styles.alert}>
+          {lastEnd}
+          {NO_RETRY.has(lastStop ?? "") ? <> <Button size="small" onClick={() => setLastStop(null)}>Dismiss</Button></> : null}
+        </p>
+      ) : null}
       {!runId ? <FillApplicationError jobId={jobId} stage={state.stage} /> : null}
       {runId ? (
         <>

@@ -338,6 +338,16 @@ def test_extract_master_with_denied_tool_is_not_ok():
     assert classify(r, CFG, "extract_master", "")[0] == "permission_denied"
 
 
+def test_extract_master_recovered_after_denial_stays_ok():
+    for outcome in ("proposed", "unchanged"):
+        r = _res(result_text='RESULT: {"skill":"extract-master","outcome":"%s","summary":"s"}' % outcome,
+                 permission_denials=[{"tool_name": "Write"}])
+        assert classify(r, CFG, "extract_master", "")[0] == "ok"
+    r = _res(result_text='RESULT: {"skill":"extract-master","outcome":"refused"}',
+             permission_denials=[{"tool_name": "Write"}])
+    assert classify(r, CFG, "extract_master", "")[0] == "permission_denied"
+
+
 def test_extract_master_refusal_and_missing_cli_are_not_ok():
     assert classify(_res(result_text="I can't help"), CFG, "extract_master", "")[0] != "ok"
     missing = HeadlessResult(exit_code=127, stderr_tail="claude: not found")

@@ -140,8 +140,11 @@ export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; at
   // Native <details>: toggle the DOM attribute directly, no per-section state.
   const setAll = (open: boolean) => sectionsRef.current?.querySelectorAll("details").forEach((d) => (d.open = open));
   const problems = q.data?.problems ?? [];
+  const why = !canPlan ? (
+    <span id="fill-preview-why"> This posting is missing its board or job id, so a preview isn't possible. Apply on the posting's own page.</span>
+  ) : null;
   const preview = (
-    <Button disabled={make.isPending || !canPlan} onClick={() => make.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) })}>
+    <Button disabled={make.isPending || !canPlan} aria-describedby={!canPlan ? "fill-preview-why" : undefined} onClick={() => make.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) })}>
       {make.isPending ? "Building preview…" : plan ? "Rebuild preview" : "Preview fill"}
     </Button>
   );
@@ -156,7 +159,7 @@ export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; at
       {!plan && ats && ats !== "greenhouse" ? (
         <p>career-os can preview and fill only Greenhouse postings; this one is on {optionLabel(ats)}. Apply on the posting's own page.</p>
       ) : !plan ? (
-        <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}{!canPlan ? <> This posting is missing its board or job id, so a preview isn't possible. Apply on the posting's own page.</> : null}</p>
+        <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}{why}</p>
       ) : (
         <>
           <div role="status" aria-live="polite">
@@ -197,7 +200,7 @@ export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; at
             );
           })}
           </div>
-          {preview}
+          {preview}{why ? <p>{why}</p> : null}
         </>
       )}
     </Card>

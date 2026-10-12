@@ -48,6 +48,13 @@ describe("FillPlanCard", () => {
     renderWithProviders(<FillPlanCard jobId="nw01" ats="greenhouse" canPlan={false} />);
     expect(await screen.findByRole("button", { name: "Preview fill" })).toBeDisabled();
     expect(screen.getByText(/missing its board or job id/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Preview fill" })).toHaveAccessibleDescription(/missing its board or job id/);
+  });
+
+  it("shows the disabled reason with a plan too", async () => {
+    stubFetch({ plan, problems: [] });
+    renderWithProviders(<FillPlanCard jobId="nw01" ats="greenhouse" canPlan={false} />);
+    expect(await screen.findByRole("button", { name: "Rebuild preview" })).toHaveAccessibleDescription(/missing its board or job id/);
   });
 
   it("offers Preview fill before there is a plan", async () => {

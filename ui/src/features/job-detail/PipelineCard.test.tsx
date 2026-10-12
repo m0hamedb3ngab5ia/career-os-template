@@ -297,6 +297,42 @@ describe("PipelineCard", () => {
     expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
   });
 
+  it("Continue returns after the window regains focus following a permission_denied end", async () => {
+    mockApi({
+      "GET /api/jobs/j1/pipeline": () => ({ ...base, stage: "apply", next_action: "continue", next_kind: "apply" }),
+      "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-den", kind: "apply" }),
+      "GET /api/runs/run-den": () => ({
+        id: "run-den", kind: "apply", trigger: "manual", status: "failed", state: "finished",
+        stop_reason: "permission_denied", detail: "tool(s) denied: Write", started_at: "2026-09-27T10:00:00Z",
+        ended_at: "2026-09-27T10:00:01Z", attempts: [], budget: {}, counters: {},
+      }),
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    await screen.findByText(/Tool not allowed/);
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
+    window.dispatchEvent(new Event("focus"));
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+  });
+
+  it("Continue returns after dismissing a permission_denied message", async () => {
+    mockApi({
+      "GET /api/jobs/j1/pipeline": () => ({ ...base, stage: "apply", next_action: "continue", next_kind: "apply" }),
+      "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-den", kind: "apply" }),
+      "GET /api/runs/run-den": () => ({
+        id: "run-den", kind: "apply", trigger: "manual", status: "failed", state: "finished",
+        stop_reason: "permission_denied", detail: "tool(s) denied: Write", started_at: "2026-09-27T10:00:00Z",
+        ended_at: "2026-09-27T10:00:01Z", attempts: [], budget: {}, counters: {},
+      }),
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    await screen.findByText(/Tool not allowed/);
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeEnabled();
+  });
+
   it("streams the returned run even before the pipeline reports it as active", async () => {
     const api = setup({ stage: "apply", next_action: "continue", next_kind: "apply" }, {
       "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-late", kind: "apply" }),
