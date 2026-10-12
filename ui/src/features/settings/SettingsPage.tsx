@@ -11,7 +11,6 @@ import {
   Shield,
   SlidersHorizontal,
   Users,
-  Zap,
 } from "lucide-react";
 import { Link, Navigate, useParams } from "react-router";
 import { Page } from "../../app/PageHeader";
@@ -20,7 +19,6 @@ import { EmptyState } from "../../kit/EmptyState";
 import { useSection, useSectionList } from "./api";
 import { BudgetGroup } from "./custom/BudgetGroup";
 import { RankingGroup } from "./custom/RankingGroup";
-import { TierCards } from "./custom/TierCards";
 import { SettingsFormProvider } from "./form";
 import { GroupCard } from "./GroupCard";
 import { SaveBar } from "./SaveBar";
@@ -35,7 +33,6 @@ export const DEFAULT_SECTION = "general";
 const ICONS: Record<string, LucideIcon> = {
   general: Settings,
   targets: Filter,
-  autonomy: Zap,
   safety: Shield,
   scout: Search,
   companies: Folder,
@@ -50,8 +47,7 @@ const ICONS: Record<string, LucideIcon> = {
 const SUBTITLES: Record<string, string> = {
   general: "General · appearance, reminders and résumé builds",
   targets: "Targets · who you are and which roles to look for",
-  autonomy: "Autonomy and outreach · how much career-os does without asking",
-  safety: "Safety · what stops an auto-submit",
+  safety: "Applying · how much CareerOS does on its own",
   scout: "Scout · where new postings come from and what gets filtered out",
   companies: "Companies · dream list, never-apply list, domains and job boards",
   outreach: "Outreach · who gets a message and who you contact yourself",
@@ -108,20 +104,17 @@ function SectionNav({ current }: { current: string }) {
 function Groups({ data }: { data: SectionData }) {
   const id = data.section.id;
   const groups = data.section.groups;
-  const tiers = id === "autonomy" ? groups.filter((g) => /^tier_[a-z]$/.test(g.id)) : [];
   const render = (g: GroupSchema) => {
     if (id === "runs" && g.id === "budget") return <BudgetGroup key={g.id} group={g} />;
     if (id === "runs" && g.id === "ranking") return <RankingGroup key={g.id} group={g} />;
     return <GroupCard key={g.id} group={g} />;
   };
-  const rest = groups.filter((g) => !tiers.includes(g));
   const files = data.section.files.map((f) => data.files[f] ?? `config/${f}.yaml`);
   return (
     <>
-      {tiers.length ? <TierCards groups={tiers} /> : null}
-      {rest.filter((g) => !g.advanced).map(render)}
+      {groups.filter((g) => !g.advanced).map(render)}
       <Details summary="Advanced">
-        {rest.filter((g) => g.advanced).map(render)}
+        {groups.filter((g) => g.advanced).map(render)}
         <p className={styles.hint}>
           Where this is saved:{" "}
           {files.map((f, i) => (

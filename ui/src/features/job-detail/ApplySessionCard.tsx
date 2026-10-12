@@ -1,24 +1,11 @@
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { useState, type KeyboardEvent } from "react";
 import { Button } from "../../kit/Button";
-import { Chip } from "../../kit/chips";
-import { Details } from "../../kit/Details";
 import { Dialog } from "../../kit/Dialog";
-import { describeCode, type CodeTable } from "../../kit/labels";
-import { formatDateTime } from "../../lib/format";
 import { fileUrl } from "./api";
-import { Card, Muted } from "./Card";
+import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
-import type { ApplySession, FileEntry } from "./types";
-
-// careeros/apply/session.py OUTCOMES
-const OUTCOMES: CodeTable = {
-  submitted: { label: "Submitted", tone: "green" },
-  needs_review: { label: "Needs review", tone: "orange" },
-  staged: { label: "Staged", tone: "orange" },
-  blocked: { label: "Blocked", tone: "red" },
-  failed: { label: "Failed", tone: "red" },
-};
+import type { FileEntry } from "./types";
 
 const THUMB_W = 120;
 const THUMB_H = 72;
@@ -91,61 +78,18 @@ function ScreenshotViewer({
 
 export function ApplySessionCard({
   jobId,
-  session,
   screenshots,
-  fieldsLeft = [],
 }: {
   jobId: string;
-  session: ApplySession | null;
   screenshots: FileEntry[];
-  fieldsLeft?: string[];
 }) {
   const [open, setOpen] = useState<number | null>(null);
-  const steps = session?.steps ?? [];
-  const outcome = session ? (session.outcome ? describeCode(OUTCOMES, session.outcome) : { label: "In progress", tone: "blue" as const }) : null;
-  const started = formatDateTime(session?.started);
-
+  // Only the screenshots are unique here: outcome/reason repeat Next step, steps are run internals (Runs page has
+  // the log), fields left are answered in Fill preview.
+  if (!screenshots.length) return null;
   return (
-    <Card
-      title="Apply session"
-      aside={
-        session ? (
-          <span className={styles.qaVerdict}>
-            {outcome ? <Chip tone={outcome.tone}>{outcome.label}</Chip> : null}
-            {started ? <span className={styles.caption}>{started}</span> : null}
-          </span>
-        ) : undefined
-      }
-    >
-      {!session ? <Muted>No apply session yet. Apply runs stop before submit for you to check.</Muted> : null}
-      {steps.length ? (
-        <ol className={styles.steps}>
-          {steps.map((s, i) => (
-            <li key={i} data-step>
-              <span>
-                <span aria-hidden="true">{s.ok ? "✓" : "✗"}</span> <span className="sr-only">{s.ok ? "Done: " : "Stopped: "}</span>
-                {s.action}
-              </span>
-              {s.note ? <Details summary="Details">{s.note}</Details> : null}
-            </li>
-          ))}
-        </ol>
-      ) : session ? (
-        <Muted>No steps recorded.</Muted>
-      ) : null}
-      {session?.reason ? <Muted>{session.reason}</Muted> : null}
-      {fieldsLeft.length ? (
-        <ul className={styles.steps} aria-label="Questions left for you">
-          {fieldsLeft.map((f) => (
-            <li key={f}>
-              <label>
-                <input type="checkbox" /> {f}
-              </label>
-            </li>
-          ))}
-        </ul>
-      ) : null}
-      {screenshots.length ? (
+    <Card title="Screenshots">
+      {(
         <ul className={styles.thumbs} aria-label="Screenshots">
           {screenshots.map((f, i) => (
             <li key={f.name}>
@@ -167,7 +111,7 @@ export function ApplySessionCard({
             </li>
           ))}
         </ul>
-      ) : null}
+      )}
       <ScreenshotViewer jobId={jobId} shots={screenshots} index={open} onIndex={setOpen} onClose={() => setOpen(null)} />
     </Card>
   );

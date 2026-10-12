@@ -1,4 +1,4 @@
-import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
+import { Download, FileSearch, RotateCw, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
@@ -15,6 +15,7 @@ import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useOpenTracker,
 import { COLUMNS } from "./cells";
 import { JobsTable } from "./JobsTable";
 import { StartPipeline } from "./StartPipeline";
+import { useStepRun } from "../runs/useStepRun";
 import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
@@ -54,8 +55,19 @@ function HeaderActions() {
   const sync = useSyncTracker();
   const open = useOpenTracker();
   const [checking, setChecking] = useState(false);
+  const scout = useStepRun("scout", undefined, (run) => {
+    if (run.stop_reason !== "cancelled") toast.show({ message: run.stop_reason === "completed" ? "Finished looking for jobs." : `Job search stopped: ${run.detail || run.stop_reason}` });
+  });
   return (
     <>
+      <Button
+        icon={<RotateCw size={14} strokeWidth={1.7} aria-hidden="true" />}
+        pending={scout.start.isPending || scout.running}
+        pendingLabel="Finding jobs…"
+        onClick={() => scout.start.mutate(undefined, { onError: (e) => toast.show({ message: `Couldn’t start the job search: ${errorText(e)}` }) })}
+      >
+        Find jobs now
+      </Button>
       <Button variant="primary" icon={<FileSearch size={14} strokeWidth={1.7} aria-hidden="true" />} onClick={() => setChecking(true)}>
         Check a job
       </Button>

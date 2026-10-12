@@ -1,19 +1,17 @@
 import { useQuery } from "@tanstack/react-query";
-import { Workflow } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
-import { Details } from "../../kit/Details";
 import { useToast } from "../../kit/Toast";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
 import { type ActionKey, help } from "./actionHelp";
-import { errorText, usePipeline, useResetFailures, useStartPipeline } from "./api";
-import { Card, Muted } from "./Card";
+import { errorText, useApplicationTab, usePipeline, useResetFailures, useStartPipeline } from "./api";
+import { Muted } from "./Card";
 import styles from "./JobDetail.module.css";
 import { FillApplicationButton, FillApplicationError } from "./FillApplication";
-import { NextStepSummary, ReasonDetails, useJobTasks } from "./NextStep";
+import { NextStepSummary, useJobTasks } from "./NextStep";
 import type { PipelineState } from "./types";
 
 const NEXT_ACTION_HELP_KEY: Record<string, ActionKey> = {
@@ -75,6 +73,15 @@ const MAX_MISSING_POLLS = 15;
  * prepare run chains on into apply (fill & stage the form for review, never submit), so one click takes a job to
  * a staged form. Chaining stops at a blocked state or at the review gate (Approve & continue is always a human
  * click); "Stop after this stage" turns it off. */
+/** Next step lives inside the Posting card at the top of Job detail: a labelled region, not a card of its own. */
+function Box({ children }: { children: ReactNode }) {
+  return (
+    <div role="region" aria-label="Next step" className={styles.nextStep}>
+      {children}
+    </div>
+  );
+}
+
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
@@ -88,6 +95,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const [lastEnd, setLastEnd] = useState<string | null>(null);
   const pipeline = usePipeline(jobId, started !== null);
   const tasks = useJobTasks(jobId);
+  const appTab = useApplicationTab(jobId).data?.tab;
   const state = pipeline.data;
   // Stream the run we started even before the pipeline reports it (it may end before the first 1s poll).
   const runId = state?.active_run_id ?? started;
@@ -155,20 +163,19 @@ export function PipelineCard({ jobId }: { jobId: string }) {
 
   if (pipeline.error) {
     return (
-      <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
+      <Box>
         <p className={styles.alert}>{errorText(pipeline.error)}</p>
-      </Card>
+      </Box>
     );
   }
   if (!state) {
     return (
-      <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
+      <Box>
         <Muted>Loading…</Muted>
-      </Card>
+      </Box>
     );
   }
 
-  const current = STAGES.findIndex((s) => s.id === state.stage);
   const busy = start.isPending || started !== null || runId !== null;
   const label = state.next_label ?? "Continue pipeline";
   const stageHelp = kindHelp(state);
@@ -196,19 +203,8 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   }
 
   return (
-    <Card title="Next step" icon={<Workflow size={16} strokeWidth={1.7} aria-hidden="true" />}>
-      <NextStepSummary state={state} tasks={tasks} />
-      <ol className={`${styles.stepper} ${styles.progressLine}`} aria-label="Pipeline stages">
-        {STAGES.map((s, i) => {
-          const st = i < current ? "done" : i === current ? "current" : "upcoming";
-          return (
-            <li key={s.id} data-state={st} aria-current={st === "current" ? "step" : undefined}>
-              <span className={styles.stepBar} />
-              <span className={st === "current" ? styles.stepLabel : "sr-only"}>{s.label}</span>
-            </li>
-          );
-        })}
-      </ol>
+    <Box>
+      <NextStepSummary state={state} tasks={tasks} tab={appTab} />
       {lastEnd && !runId ? <p className={styles.alert}>{lastEnd}</p> : null}
       {!runId ? <FillApplicationError jobId={jobId} stage={state.stage} /> : null}
       {runId ? (
@@ -242,7 +238,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
                 ? NEXT_ACTION_HELP_KEY.approve_continue
                 : state.note != null ? "stageReview"
                 : state.next_action ? NEXT_ACTION_HELP_KEY[state.next_action] : undefined;
-              return key ? help(key).title : label;
+              return key ? help(key).title : stageHelp || label;
             })()}
             disabled={busy}
             onClick={run}
@@ -256,9 +252,6 @@ export function PipelineCard({ jobId }: { jobId: string }) {
         </div>
       ) : (
         <div className={styles.buttons}>
-          <Button variant="primary" title={state.blocked_reason ?? label} disabled>
-            {label}
-          </Button>
           <FillApplicationButton jobId={jobId} stage={state.stage} />
           {state.failures?.excluded ? (
             <Button
@@ -288,11 +281,6 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           Stop after this stage
         </label>
       ) : null}
-      <Details summary="Details">
-        {stageHelp ? <p className={styles.caption}>{stageHelp}</p> : null}
-        {runId ? <p className={styles.caption}>Run {runId}</p> : null}
-        <ReasonDetails reasons={state.review_reasons} />
-      </Details>
-    </Card>
+    </Box>
   );
 }

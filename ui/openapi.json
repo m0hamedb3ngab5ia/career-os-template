@@ -2781,6 +2781,34 @@
             "title": "Issue",
             "type": "string"
           },
+          "kind": {
+            "default": "content",
+            "enum": [
+              "content",
+              "format"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "quotes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Quotes",
+            "type": "array"
+          },
           "reason": {
             "anyOf": [
               {
@@ -2813,6 +2841,11 @@
           "v": {
             "title": "V",
             "type": "integer"
+          },
+          "whole": {
+            "default": false,
+            "title": "Whole",
+            "type": "boolean"
           }
         },
         "required": [
@@ -6077,6 +6110,17 @@
             "title": "At",
             "type": "string"
           },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
           "run": {
             "anyOf": [
               {
@@ -8296,6 +8340,11 @@
             "title": "Author",
             "type": "string"
           },
+          "label": {
+            "default": "",
+            "title": "Label",
+            "type": "string"
+          },
           "n": {
             "title": "N",
             "type": "integer"
@@ -8327,6 +8376,11 @@
           },
           "author": {
             "title": "Author",
+            "type": "string"
+          },
+          "label": {
+            "default": "",
+            "title": "Label",
             "type": "string"
           },
           "n": {
@@ -12994,6 +13048,68 @@
           }
         },
         "summary": "Rewrite Feedback",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/file": {
+      "get": {
+        "description": "A version's file (default the latest), inline (UI \"View\") or as a download named 01_Name_Original.pdf.",
+        "operationId": "resume_file_api_profile_resumes__rid__file_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "v",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "V"
+            }
+          },
+          {
+            "in": "query",
+            "name": "download",
+            "required": false,
+            "schema": {
+              "default": false,
+              "title": "Download",
+              "type": "boolean"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Resume File",
         "tags": [
           "resumes"
         ]

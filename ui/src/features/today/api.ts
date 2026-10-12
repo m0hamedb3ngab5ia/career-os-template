@@ -1,6 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
-import type { ActionItem, CatchUpResult, RunStarted, TodayData, TodayStatus } from "./types";
+import type { ActionItem, CatchUpResult, TodayData, TodayStatus } from "./types";
 
 /** The server's `detail` (ApiError carries it as the message) or the error's own message. */
 export const errorText = (e: unknown) => (e instanceof Error ? e.message : String(e));
@@ -89,15 +89,6 @@ export function useReopen() {
     onError: (_e, _item, ctx) => {
       if (ctx?.before) qc.setQueryData(["today"], ctx.before);
     },
-    onSettled: refresh,
-  });
-}
-
-export function usePrepareQueued() {
-  const refresh = useRefreshToday();
-  return useMutation({
-    mutationFn: (preset: string | undefined) =>
-      apiSend<RunStarted>("POST", "/api/runs", preset ? { kind: "prepare", preset } : { kind: "prepare" }),
     onSettled: refresh,
   });
 }

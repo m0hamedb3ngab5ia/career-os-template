@@ -9,30 +9,8 @@ import { renderWithProviders } from "./testUtils";
 const d = detail();
 
 describe("ApplySessionCard", () => {
-  it("one short check line per step, raw detail behind a click, and the outcome", () => {
-    renderWithProviders(<ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={d.screenshots} />);
-    const card = screen.getByRole("region", { name: "Apply session" });
-    const steps = within(card).getAllByRole("listitem").filter((li) => li.dataset.step);
-    expect(steps.map((s) => s.firstChild?.textContent)).toEqual([
-      "✓ Done: Opened form",
-      "✓ Done: Uploaded resume.pdf",
-      "✗ Stopped: Stopped before submit (Tier A)",
-    ]);
-    const note = within(steps[1]!).getByText("1 file");
-    expect(note.closest("details")).not.toHaveAttribute("open");
-    expect(within(card).getByText("Needs review")).toHaveAttribute("data-tone", "orange");
-  });
-
-  it("lists fields left as a checklist of remaining questions", () => {
-    renderWithProviders(
-      <ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={[]} fieldsLeft={["Visa status", "Start date"]} />,
-    );
-    const list = screen.getByRole("list", { name: "Questions left for you" });
-    expect(within(list).getAllByRole("checkbox").map((c) => c.closest("label")?.textContent?.trim())).toEqual(["Visa status", "Start date"]);
-  });
-
   it("thumbnails have alt text, a size and lazy loading", () => {
-    renderWithProviders(<ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={d.screenshots} />);
+    renderWithProviders(<ApplySessionCard jobId="nw01" screenshots={d.screenshots} />);
     const img = screen.getByAltText("Screenshot 1: 01 form");
     expect(img).toHaveAttribute("src", "/api/jobs/nw01/files/screenshots/01_form.png");
     expect(img).toHaveAttribute("loading", "lazy");
@@ -42,7 +20,7 @@ describe("ApplySessionCard", () => {
 
   it("the viewer opens from the keyboard, arrows move, Escape returns focus to the thumbnail", async () => {
     const user = userEvent.setup();
-    renderWithProviders(<ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={d.screenshots} />);
+    renderWithProviders(<ApplySessionCard jobId="nw01" screenshots={d.screenshots} />);
     const thumb = screen.getByRole("button", { name: "Open screenshot 2 of 2: 02 review" });
     thumb.focus();
     await user.keyboard("{Enter}");
@@ -57,15 +35,15 @@ describe("ApplySessionCard", () => {
     expect(thumb).toHaveFocus();
   });
 
-  it("empty state without a session", () => {
-    renderWithProviders(<ApplySessionCard jobId="nw01" session={null} screenshots={[]} />);
-    expect(screen.getByText(/No apply session yet/)).toBeInTheDocument();
+  it("renders nothing without screenshots", () => {
+    renderWithProviders(<ApplySessionCard jobId="nw01" screenshots={[]} />);
+    expect(screen.queryByRole("region")).not.toBeInTheDocument();
   });
 
   it("has no axe violations (card and open viewer)", { timeout: 20_000 }, async () => {
     const user = userEvent.setup();
     const { container } = renderWithProviders(
-      <ApplySessionCard jobId="nw01" session={d.apply_session} screenshots={d.screenshots} />,
+      <ApplySessionCard jobId="nw01" screenshots={d.screenshots} />,
     );
     expect(await axeViolations(container)).toEqual([]);
     await user.click(screen.getByRole("button", { name: /Open screenshot 1/ }));

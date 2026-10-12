@@ -28,6 +28,8 @@ export const useAnswers = () =>
 export const useSamples = () => useQuery({ queryKey: ["profile", "samples"], queryFn: () => apiFetch<Samples>("/api/profile/samples") });
 export const useLessons = () =>
   useQuery({ queryKey: ["profile", "lessons"], queryFn: () => apiFetch<{ lessons: Lesson[] }>("/api/learning/lessons") });
+export const useResumeMeta = (rid: string) =>
+  useQuery({ queryKey: ["profile", "resumeMeta", rid], queryFn: () => apiFetch<components["schemas"]["Resume"]>(`/api/profile/resumes/${encodeURIComponent(rid)}`) });
 export const useResumes = () =>
   useQuery({ queryKey: ["profile", "resumes"], queryFn: () => apiFetch<{ resumes: ResumeRow[] }>("/api/profile/resumes") });
 
@@ -114,6 +116,9 @@ export const useFeedback = (rid: string) =>
     refetchInterval: (q) =>
       q.state.data?.review?.state === "running" || q.state.data?.items.some((i) => i.state === "redrafting") ? 2000 : false,
   });
+export type VersionDetail = components["schemas"]["VersionDetail"];
+export const useResumeVersion = (rid: string, n: number, enabled = true) =>
+  useQuery({ queryKey: ["profile", "resume", rid, n], queryFn: () => apiFetch<VersionDetail>(`${rp(rid)}/versions/${n}`), enabled });
 export const applyFeedback = ({ rid, fid }: { rid: string; fid: string }) =>
   apiSend<Started>("POST", `${rp(rid)}/feedback/${encodeURIComponent(fid)}/apply`);
 export const dismissFeedback = ({ rid, fid }: { rid: string; fid: string }) =>

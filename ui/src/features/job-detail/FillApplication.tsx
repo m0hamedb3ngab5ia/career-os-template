@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { Button } from "../../kit/Button";
+import { ApiError } from "../../api/client";
+import { Button, ButtonLink } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
 import { useToast } from "../../kit/Toast";
@@ -9,6 +10,14 @@ import styles from "./JobDetail.module.css";
 // The browser behind the fill is not reachable (refused up front, or the detached fill could not attach).
 const CHROME_DOWN = /^chrome not connected|connect_over_cdp|ECONNREFUSED/i;
 const CONNECT = "Connect Chrome extension, then retry";
+
+// A 409 not_ready (readiness.py) lists the setup items that block filling, each with the page that fixes it.
+type NotReady = { id: string; label: string; fix_link?: string };
+const NOT_READY_TEXT: Record<string, string> = { master_resume: "Set your master résumé first" };
+function notReadyItems(e: unknown): NotReady[] | null {
+  const d = e instanceof ApiError ? (e.body as { detail?: { code?: string; items?: NotReady[] } })?.detail : null;
+  return d?.code === "not_ready" && d.items?.length ? d.items : null;
+}
 
 // Offered once there is something to fill or reopen: saved answers, a recorded tab, a failed fill, or a job at
 // review/apply (the fill plans first when it has no answers yet).
@@ -28,6 +37,7 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
   const toast = useToast();
   // Chrome (paths.apply_cdp) didn't answer: a plain connect-and-retry state; the recorded tab is kept for the retry.
   const [notConnected, setNotConnected] = useState<{ refill?: boolean } | null>(null);
+  const [notReady, setNotReady] = useState<NotReady[] | null>(null);
   const wasFilling = useRef(false);
   useEffect(() => {
     if (!tab) return;
@@ -45,15 +55,30 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
     openApp.mutate(refill ? { refill: true } : undefined, {
       onSuccess: (r) => {
         setNotConnected(null);
+        setNotReady(null);
         toast.show({
           message: r.action === "focused" ? "Switched to the filled tab" : "Filling the form in a new browser tab; it stops before submit",
         });
       },
       onError: (e) => {
-        if (CHROME_DOWN.test(errorText(e))) setNotConnected({ refill });
+        const items = notReadyItems(e);
+        if (items) setNotReady(items);
+        else if (CHROME_DOWN.test(errorText(e))) setNotConnected({ refill });
         else toast.show({ message: errorText(e) });
       },
     });
+  }
+  if (notReady) {
+    return (
+      <>
+        {notReady.map((i) => (
+          <span key={i.id} className={styles.buttons}>
+            <span className={styles.alert} role="status">{NOT_READY_TEXT[i.id] ?? `Needed first: ${i.label}`}</span>
+            {i.fix_link ? <ButtonLink variant="primary" to={i.fix_link}>Fix it</ButtonLink> : null}
+          </span>
+        ))}
+      </>
+    );
   }
   if (notConnected) {
     return (
@@ -70,7 +95,7 @@ export function FillApplicationButton({ jobId, stage }: { jobId: string; stage: 
   return (
     <>
       <Button
-        variant={live ? "primary" : undefined}
+        variant={live || (tab.tab === "needs_refill" && !blocked) ? "primary" : undefined}
         disabled={openApp.isPending || (blocked && !live)}
         title={
           live

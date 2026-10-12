@@ -360,6 +360,13 @@ export interface paths {
      */
     put: operations["rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put"];
   };
+  "/api/profile/resumes/{rid}/file": {
+    /**
+     * Resume File
+     * @description A version's file (default the latest), inline (UI "View") or as a download named 01_Name_Original.pdf.
+     */
+    get: operations["resume_file_api_profile_resumes__rid__file_get"];
+  };
   "/api/profile/resumes/{rid}/master": {
     /** Set Master */
     post: operations["set_master_api_profile_resumes__rid__master_post"];
@@ -1318,6 +1325,19 @@ export interface components {
       id: string;
       /** Issue */
       issue: string;
+      /**
+       * Kind
+       * @default content
+       * @enum {string}
+       */
+      kind?: "content" | "format";
+      /** Quote */
+      quote?: string | null;
+      /**
+       * Quotes
+       * @default []
+       */
+      quotes?: string[];
       /** Reason */
       reason?: string | null;
       /** Section */
@@ -1331,6 +1351,11 @@ export interface components {
       suggestion: string;
       /** V */
       v: number;
+      /**
+       * Whole
+       * @default false
+       */
+      whole?: boolean;
     };
     /** FieldSchema */
     FieldSchema: {
@@ -2318,6 +2343,8 @@ export interface components {
     ReviewState: {
       /** At */
       at: string;
+      /** Reason */
+      reason?: string | null;
       /** Run */
       run?: string | null;
       /**
@@ -2988,6 +3015,11 @@ export interface components {
       at: string;
       /** Author */
       author: string;
+      /**
+       * Label
+       * @default
+       */
+      label?: string;
       /** N */
       n: number;
       /** Source */
@@ -3003,6 +3035,11 @@ export interface components {
       };
       /** Author */
       author: string;
+      /**
+       * Label
+       * @default
+       */
+      label?: string;
       /** N */
       n: number;
       /** Rid */
@@ -4953,6 +4990,33 @@ export interface operations {
         content: {
           "application/json": components["schemas"]["Resume"];
         };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Resume File
+   * @description A version's file (default the latest), inline (UI "View") or as a download named 01_Name_Original.pdf.
+   */
+  resume_file_api_profile_resumes__rid__file_get: {
+    parameters: {
+      query?: {
+        v?: number | null;
+        download?: boolean;
+      };
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: never;
       };
       /** @description Validation Error */
       422: {

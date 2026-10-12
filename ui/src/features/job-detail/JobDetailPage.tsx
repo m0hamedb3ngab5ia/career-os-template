@@ -8,14 +8,13 @@ import { ConfirmPanel } from "../../kit/ConfirmPanel";
 import { EmptyState } from "../../kit/EmptyState";
 import { STATUSES, describeCode } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
-import { ActivityCard } from "./ActivityCard";
-import { errorText, useApplicationTab, useJob, useSetStatus, useWithdraw } from "./api";
+import { errorText, useJob, useSetStatus, useWithdraw } from "./api";
 import { ApplySessionCard } from "./ApplySessionCard";
 import { FillPlanCard } from "./FillPlanCard";
 import { InjectionCard } from "./InjectionCard";
-import { MatchesCard } from "./MatchesCard";
 import { ContactsCard } from "./ContactsCard";
-import { DocumentsCard } from "./DocumentsCard";
+import { Card } from "./Card";
+import { DocumentsCard, QaCard } from "./DocumentsCard";
 import { OverrideMenu, StatusMenu, WithdrawButton } from "./HeaderActions";
 import styles from "./JobDetail.module.css";
 import { PipelineCard } from "./PipelineCard";
@@ -39,7 +38,6 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
   const meta = useMeta();
   const withdraw = useWithdraw(jobId);
   const restore = useSetStatus(jobId);
-  const fieldsLeft = useApplicationTab(jobId).data?.fields_left;
   const [confirmWithdraw, setConfirmWithdraw] = useState(false);
   const withdrawRef = useRef<HTMLButtonElement>(null);
 
@@ -112,24 +110,30 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
           />
         ) : null}
         {detail.job?.injection ? <InjectionCard jobId={jobId} reasons={detail.job.injection} /> : null}
-        <PipelineCard jobId={jobId} />
-        {/* Supporting sections, in the design doc's order, as dividers not cards; screenshots sit under Documents. */}
+        <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline}>
+          <PipelineCard jobId={jobId} />
+        </PostingCard>
+        {/* Work column (act on it) beside a reference sidebar; each column stacks, so cards never leave grid gaps. */}
         <div className={styles.supporting}>
-          <DocumentsCard
-            jobId={jobId}
-            documents={detail.documents}
-            otherFiles={detail.other_files}
-            submitted={detail.submitted}
-            qa={detail.qa}
-          />
-          <FillPlanCard jobId={jobId} />
-          <ApplySessionCard jobId={jobId} session={detail.apply_session} screenshots={detail.screenshots} fieldsLeft={fieldsLeft} />
-          <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} />
-          <ScoreCard score={detail.score} />
-          <MatchesCard jobId={jobId} />
-          <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
-          <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
-          <ActivityCard activity={detail.activity ?? []} history={detail.history} />
+          <div className={styles.col}>
+            <DocumentsCard
+              jobId={jobId}
+              documents={detail.documents}
+              otherFiles={detail.other_files}
+              submitted={detail.submitted}
+            />
+            <FillPlanCard jobId={jobId} />
+          </div>
+          <div className={styles.col}>
+            <ScoreCard jobId={jobId} score={detail.score} />
+            {/* QA and Safety are both pass/fail gates, checked only when one fails: one card. */}
+            <Card title="Checks">
+              <QaCard jobId={jobId} qa={detail.qa} nested />
+              <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} nested />
+            </Card>
+            <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
+            <ApplySessionCard jobId={jobId} screenshots={detail.screenshots} />
+          </div>
         </div>
       </div>
     </Page>

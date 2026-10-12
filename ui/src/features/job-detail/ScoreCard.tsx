@@ -1,7 +1,8 @@
-import { Chip, TierBadge } from "../../kit/chips";
+import { TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
 import { formatCount } from "../../lib/format";
 import { Card, Muted } from "./Card";
+import { MatchesSection } from "./MatchesCard";
 import styles from "./JobDetail.module.css";
 import type { Score } from "./types";
 
@@ -30,33 +31,27 @@ function SubScores({ scores }: { scores: Record<string, number> }) {
   );
 }
 
-function Skills({ items, tone }: { items: string[]; tone: "green" | "gray" }) {
-  return (
-    <ul className={styles.chips}>
-      {items.map((s) => (
-        <li key={s}>
-          <Chip tone={tone}>{s}</Chip>
-        </li>
-      ))}
-    </ul>
+/** Fit: the job score plus every résumé's match (was two cards; skills lived in both). */
+export function ScoreCard({ jobId, score }: { jobId: string; score: Score | null }) {
+  const matches = (
+    <>
+      <h3 className={styles.h3}>Résumé match</h3>
+      <MatchesSection jobId={jobId} />
+    </>
   );
-}
-
-export function ScoreCard({ score }: { score: Score | null }) {
   if (!score) {
     return (
-      <Card title="Score">
+      <Card title="Fit">
         <Muted>Not scored yet. Scoring runs after scout finds the job.</Muted>
+        {matches}
       </Card>
     );
   }
   const fails = score.hard_filter_fails ?? [];
   const reasons = score.reasons ?? [];
-  const matched = score.matched_skills ?? [];
-  const missing = score.missing_skills ?? [];
   return (
     <Card
-      title="Score"
+      title="Fit"
       aside={
         <span className={styles.bigNumber}>
           <span className="sr-only">Fit </span>
@@ -93,18 +88,7 @@ export function ScoreCard({ score }: { score: Score | null }) {
           </ul>
         </>
       ) : null}
-      {matched.length ? (
-        <>
-          <h3 className={styles.h3}>Matched skills</h3>
-          <Skills items={matched} tone="green" />
-        </>
-      ) : null}
-      {missing.length ? (
-        <>
-          <h3 className={styles.h3}>Missing skills</h3>
-          <Skills items={missing} tone="gray" />
-        </>
-      ) : null}
+      {matches}
     </Card>
   );
 }

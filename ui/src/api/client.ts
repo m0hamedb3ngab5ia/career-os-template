@@ -15,7 +15,10 @@ export class ApiError extends Error {
 function detailOf(body: unknown, status: number): string {
   if (body && typeof body === "object" && "detail" in body) {
     const d = (body as { detail: unknown }).detail;
-    return typeof d === "string" ? d : JSON.stringify(d);
+    if (typeof d === "string") return d;
+    // Structured detail ({code, message, ...}, e.g. not_ready): show its sentence, never the raw JSON.
+    const m = d && typeof d === "object" && "message" in d ? (d as { message: unknown }).message : null;
+    return typeof m === "string" ? m : JSON.stringify(d);
   }
   return `Request failed (${status})`;
 }

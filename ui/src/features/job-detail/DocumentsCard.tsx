@@ -14,30 +14,42 @@ import styles from "./JobDetail.module.css";
 import { DOCUMENTS, RUBRIC_LABELS } from "./labels";
 import type { FileEntry, Qa, QaRun } from "./types";
 
-function describe(f: FileEntry): { title: string; open: string } {
-  const known = DOCUMENTS.find((d) => d.match.test(f.name));
-  return known ?? { title: f.name, open: "Open" };
+// One row per document; every format of it (resume.pdf, resume.txt) is a link on that row.
+type DocGroup = { title: string; order: number; files: FileEntry[] };
+
+function group(files: FileEntry[]): DocGroup[] {
+  const out = new Map<string, DocGroup>();
+  for (const f of files) {
+    const stem = f.name.replace(/\.[^.]+$/, "");
+    const i = DOCUMENTS.findIndex((d) => d.match.test(f.name));
+    const g = out.get(stem) ?? { title: DOCUMENTS[i]?.title ?? stem, order: i < 0 ? DOCUMENTS.length : i, files: [] };
+    g.files.push(f);
+    out.set(stem, g);
+  }
+  const fmt = (f: FileEntry) => ["pdf", "md", "txt"].indexOf(f.name.split(".").pop() ?? "");
+  return [...out.values()]
+    .map((g) => ({ ...g, files: g.files.toSorted((a, b) => fmt(a) - fmt(b)) }))
+    .toSorted((a, b) => a.order - b.order || a.title.localeCompare(b.title));
 }
 
-function order(f: FileEntry): number {
-  const i = DOCUMENTS.findIndex((d) => d.match.test(f.name));
-  return i < 0 ? DOCUMENTS.length : i;
-}
-
-function DocRow({ jobId, file }: { jobId: string; file: FileEntry }) {
-  const { title, open } = describe(file);
-  const when = formatDate(file.modified);
+function DocRow({ jobId, doc }: { jobId: string; doc: DocGroup }) {
+  const newest = doc.files.reduce((a, b) => ((b.modified ?? "") > (a.modified ?? "") ? b : a));
+  const when = formatDate(newest.modified);
   return (
-    <li>
-      <Details summary={title}>
-        <div className={styles.caption}>
-          <span translate="no">{file.name}</span> · {formatBytes(file.size)}
-          {when ? ` · ${when}` : ""}
-        </div>
-        <a className={styles.buttonLink} href={fileUrl(jobId, file.name)} target="_blank" rel="noopener noreferrer">
-          {open} <span className="sr-only">({file.name}, opens in a new tab)</span>
-        </a>
-      </Details>
+    <li className={styles.docRow}>
+      <FileText size={18} strokeWidth={1.6} aria-hidden="true" className={styles.sec} />
+      <div className={styles.grow}>
+        <div className={styles.strong}>{doc.title}</div>
+        {when ? <div className={styles.caption}>Updated {when}</div> : null}
+      </div>
+      <div className={styles.buttons} role="group" aria-label={`Open ${doc.title}`}>
+        {doc.files.map((f) => (
+          <a key={f.name} className={styles.buttonLink} href={fileUrl(jobId, f.name)} target="_blank" rel="noopener noreferrer" title={`${f.name} · ${formatBytes(f.size)}`}>
+            {(f.name.split(".").pop() ?? "").toUpperCase()}
+            <span className="sr-only"> ({f.name}, opens in a new tab)</span>
+          </a>
+        ))}
+      </div>
     </li>
   );
 }
@@ -61,7 +73,7 @@ function QaSummary({ run }: { run: QaRun }) {
   );
 }
 
-function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
+export function QaCard({ jobId, qa, nested }: { jobId: string; qa: Qa | null; nested?: boolean }) {
   const toast = useToast();
   const [result, setResult] = useState<QaRun | null>(null);
   const rerun = useStepRun("qa", jobId, (run) => {
@@ -82,11 +94,7 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
     .join(" · ");
 
   return (
-    <div className={styles.qa}>
-      <div className={styles.qaHead}>
-        <h3 className={styles.h3}>QA</h3>
-        <span className={styles.qaVerdict}>{verdict}</span>
-      </div>
+    <Card id="qa" title="QA" nested={nested} aside={<span className={styles.qaVerdict}>{verdict}</span>}>
       {qa?.fail_reasons?.length ? (
         <ul className={styles.bullets}>
           {qa.fail_reasons.map((r) => (
@@ -135,7 +143,7 @@ function QaSection({ jobId, qa }: { jobId: string; qa: Qa | null }) {
       <div role="status" aria-live="polite">
         {result ? <QaSummary run={result} /> : null}
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -144,18 +152,16 @@ export function DocumentsCard({
   documents,
   otherFiles = [],
   submitted,
-  qa,
 }: {
   jobId: string;
   documents: FileEntry[];
   otherFiles?: FileEntry[];
   submitted: string[];
-  qa: Qa | null;
 }) {
   const toast = useToast();
   const folder = useOpenFolder(jobId);
   const reasonId = useId();
-  const docs = documents.toSorted((a, b) => order(a) - order(b) || a.name.localeCompare(b.name));
+  const docs = group(documents);
   const openFolder = () =>
     folder.mutate(undefined, {
       onSuccess: () => toast.show({ message: "Opened the job folder" }),
@@ -181,7 +187,7 @@ export function DocumentsCard({
     >
       <ul className={styles.list}>
         {docs.map((f) => (
-          <DocRow key={f.name} jobId={jobId} file={f} />
+          <DocRow key={f.title} jobId={jobId} doc={f} />
         ))}
         {docs.length === 0 ? <li className={styles.muted}>No documents yet. Prepare writes them.</li> : null}
         <li className={styles.docRow}>
@@ -222,7 +228,6 @@ export function DocumentsCard({
           </ul>
         </Details>
       ) : null}
-      <QaSection jobId={jobId} qa={qa} />
     </Card>
   );
 }

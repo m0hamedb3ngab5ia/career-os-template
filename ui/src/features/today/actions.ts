@@ -1,4 +1,5 @@
 import { parseTime } from "../../lib/dates";
+import { brief } from "../actions/ActionRow";
 import type { ActionItem } from "./types";
 
 // Grouping, order and link handling for the "Needs you" list. Pure, so the screen and the tests share them.
@@ -36,26 +37,44 @@ export function groupByJob(items: readonly ActionItem[]): JobGroup[] {
   return [...groups.values()].sort((a, b) => (a.jobId === null ? 1 : 0) - (b.jobId === null ? 1 : 0));
 }
 
-/** The job's single next step, from its open tasks (no job status on /api/today). */
-export function jobCta(items: readonly ActionItem[]): string {
-  const types = new Set(items.map((a) => a.type));
-  if (types.has("question") || types.has("salary")) return "Answer questions";
-  if (types.has("qa_fail") || types.has("review")) return "Review documents";
-  return "Continue application";
+/** Open tasks in priority order (blocked → priority → due). */
+export const sortTasks = (items: readonly ActionItem[]): ActionItem[] => items.toSorted(byOrder);
+
+// Kinds whose completion the system notices (the workflow finishing closes them): no Mark done.
+const DETECTED = new Set(["question", "salary", "qa_fail", "review", "profile_gap", "captcha", "bot_detection"]);
+
+export interface TaskRow {
+  title: string;
+  why: string;
+  cta: string;
+  href: string;
+  detected: boolean;
 }
 
-export type LinkInfo = { kind: "web"; href: string; label: string } | { kind: "text"; text: string };
+/** Strip file paths and CLI commands: the row speaks plain language only. */
+const plain = (t: string) =>
+  t.replace(/`?careeros [^`.;]*`?/gi, "").replace(/\S*\.(ya?ml|json)\b/g, "").replace(/\s+([.,;:])/g, "$1").replace(/\s{2,}/g, " ").trim();
 
-/** Web links open in a new tab, labelled by host; a path or any other scheme is shown as plain text. */
-export function linkInfo(link: string | null | undefined): LinkInfo | null {
-  const v = link?.trim();
-  if (!v) return null;
-  if (!/^https?:\/\//i.test(v)) return { kind: "text", text: v };
-  let host = "";
-  try {
-    host = new URL(v).hostname.replace(/^www\./, "");
-  } catch {
-    return { kind: "text", text: v };
+/** One "Needs your attention" row: a one-sentence title (company inside), optional why/blocker line, one short CTA. */
+export function taskRow(a: ActionItem): TaskRow {
+  const job = a.job_id ? `/jobs/${encodeURIComponent(a.job_id)}` : null;
+  const profile = a.type === "profile_gap";
+  const detected = DETECTED.has(a.type);
+  const row = (title: string, why: string, cta: string, href: string) => ({ title, why, cta, href, detected });
+  const co = a.company ? `${a.company} ` : "";
+  if (/chrome/i.test(a.what)) return row("Connect CareerOS to Chrome", "Required to continue browser-based applications.", "Connect", "/settings");
+  if (a.type === "review") return row(`Review ${co}application`, "Approval required before submission.", "Review", job ?? "/actions");
+  if (a.type === "qa_fail") return row(`Review ${co}résumé and cover letter`, "", "Review", job ?? "/actions");
+  if (a.type === "question" || a.type === "salary")
+    return row(`Answer ${co}application questions`, "The application can’t continue without your answers.", "Answer", job ?? "/actions");
+  if (a.type === "captcha" || a.type === "bot_detection")
+    return row("Solve a verification check", "The job site asked to confirm you’re a person.", "Open", job ?? "/actions");
+  const b = brief(a);
+  const bullet = /\badd real (\w+?)(?:_\w+)? bullets/i.exec(b.head);
+  if (bullet || (profile && /placeholder/i.test(a.what))) {
+    const emp = bullet?.[1] ?? (a.company && !a.job_id ? a.company : "");
+    return row(`Add ${emp ? `${emp.replace(/^./, (c) => c.toUpperCase())} ` : ""}experience to your profile`, "", "Open", "/profile");
   }
-  return { kind: "web", href: v, label: host ? `Open ${host}` : "Open link" };
+  if (profile) return row(plain(b.head) || "Fill a gap in your profile", "", "Open", "/profile");
+  return row(plain(b.head) || "Finish a task", plain(b.more[0] ?? a.detail ?? ""), "Open", job ?? "/actions");
 }

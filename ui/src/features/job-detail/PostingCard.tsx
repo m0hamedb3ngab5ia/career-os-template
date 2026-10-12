@@ -1,5 +1,5 @@
 import { Check } from "lucide-react";
-import { useRef, useState } from "react";
+import { type ReactNode, useRef, useState } from "react";
 import type { Meta } from "../../api/meta";
 import { Button } from "../../kit/Button";
 import { StatusChip } from "../../kit/chips";
@@ -15,7 +15,8 @@ import type { JobDetail } from "./types";
 // Statuses where "Mark submitted" makes sense: the job is not applied yet and not closed.
 const BEFORE_APPLY = new Set(["found", "scored", "queued", "prepared", "needs_review"]);
 
-export function PostingCard({ jobId, detail, pipeline }: { jobId: string; detail: JobDetail; pipeline?: Meta["pipeline"] }) {
+/** Top of Job detail: what the job is (title, status, links) and, as `children`, what to do next (PipelineCard). */
+export function PostingCard({ jobId, detail, pipeline, children }: { jobId: string; detail: JobDetail; pipeline?: Meta["pipeline"]; children?: ReactNode }) {
   const toast = useToast();
   const submit = useMarkSubmitted(jobId);
   const [confirming, setConfirming] = useState(false);
@@ -93,6 +94,7 @@ export function PostingCard({ jobId, detail, pipeline }: { jobId: string; detail
           />
         </div>
       ) : null}
+      {children}
       {pipeline ? <StatusStepper steps={buildSteps(detail.status, detail.history, pipeline)} /> : null}
     </section>
   );

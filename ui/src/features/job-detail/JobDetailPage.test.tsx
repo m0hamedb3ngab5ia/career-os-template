@@ -44,7 +44,7 @@ describe("Job detail screen", () => {
     expect(within(posting).getByText("nw01")).toBeInTheDocument();
     const progress = await screen.findByRole("list", { name: "Application progress" });
     expect(within(progress).getByText("Needs review").closest("li")).toHaveAttribute("aria-current", "step");
-    for (const name of ["Safety", "Score", "Documents", "Contacts & outreach", "Apply session", "Activity"]) {
+    for (const name of ["Safety", "Fit", "Checks", "Documents", "Contacts & outreach", "Screenshots"]) {
       expect(screen.getByRole("region", { name })).toBeInTheDocument();
     }
     expect(document.title).toBe("Northwind Labs · career-os");
@@ -58,9 +58,9 @@ describe("Job detail screen", () => {
     expect(await screen.findByText("· Software Engineer, Infrastructure", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("· Springfield")).toBeInTheDocument();
     const next = screen.getByRole("region", { name: "Next step" });
-    expect(await within(next).findByText("Needs your review: 1 thing needs attention.")).toBeInTheDocument();
+    expect(await within(next).findByText("Ready for the next step: Approve & continue.")).toBeInTheDocument();
     expect(within(next).getByRole("button", { name: "Approve & continue" })).toBeEnabled();
-    const order = ["Next step", "Documents", "Apply session", "Safety", "Score", "Posting", "Contacts & outreach", "Activity"]
+    const order = ["Posting", "Next step", "Documents", "Fit", "Checks", "Contacts & outreach", "Screenshots"]
       .map((name) => screen.getByRole("region", { name }));
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

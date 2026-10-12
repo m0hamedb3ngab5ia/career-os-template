@@ -8,17 +8,14 @@ import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
 import { useBatch } from "../pipeline/batch/api";
 import { errorText, useToday, useTodayStatus } from "./api";
-import { HeaderActions } from "./HeaderActions";
 import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
-import { NextStepCard } from "./NextStepCard";
-import { NextScheduled } from "./NextScheduled";
 import { PausedBanner } from "./PausedBanner";
-import { PipelineChart } from "./PipelineChart";
-import { RecentRuns } from "./RecentRuns";
-import { ReadinessCard } from "../profile/ReadinessCard";
+import { useReadiness } from "../profile/api";
+import { ButtonLink } from "../../kit/Button";
+import { formatWhen } from "../../lib/dates";
 import styles from "./Today.module.css";
-import type { ActionItem } from "./types";
+import type { ActionItem, PipelineColumn, RunRow } from "./types";
 
 /** Route `/` (docs/UI.md "Today"; mockup Main / TodayDark). */
 export function TodayPage() {
@@ -34,7 +31,7 @@ export function TodayPage() {
   const subtitle = today.data ? `${formatLongDate(now)} · ${headline(today.data.actions ?? [])}` : formatLongDate(now);
 
   return (
-    <Page title="Today" subtitle={subtitle} actions={<HeaderActions queue={today.data?.prepare_queue ?? (today.data ? { total: null, error: null } : undefined)} paused={!!s?.paused} />}>
+    <Page title="Today" subtitle={subtitle}>
       <div className={styles.stack}>
         {s?.paused ? <PausedBanner paused={s.paused} now={now} /> : null}
         {status.isError ? (
@@ -51,29 +48,19 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        <div className={styles.columns}>
-          <div className={styles.main}>
-            <NextStepCard />
-            {batchId ? (
-              <p className={styles.batchNote}>
-                Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}
-                <Link to="/">Show all</Link>
-                {batch.isError ? (
-                  <span role="status"> · {batchMissing ? "Batch not found" : `Couldn’t load the batch: ${errorText(batch.error)}`}, showing all tasks</span>
-                ) : null}
-              </p>
+        <SetupBanner />
+        {batchId ? (
+          <p className={styles.batchNote}>
+            Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}
+            <Link to="/">Show all</Link>
+            {batch.isError ? (
+              <span role="status"> · {batchMissing ? "Batch not found" : `Couldn’t load the batch: ${errorText(batch.error)}`}, showing all tasks</span>
             ) : null}
-            {batchId && batch.isPending ? null : <NeedsYou jobIds={jobIds} />}
-          </div>
-          {s ? (
-            <aside className={styles.side} aria-label="Runs and pipeline">
-              <ReadinessCard />
-              <RecentRuns runs={s.recent_runs ?? []} now={now} />
-              <NextScheduled schedule={s.schedule ?? {}} catchUp={s.catch_up} now={now} />
-              <PipelineChart columns={s.pipeline?.columns ?? []} />
-            </aside>
-          ) : null}
-        </div>
+          </p>
+        ) : null}
+        {batchId && batch.isPending ? null : <NeedsYou jobIds={jobIds} />}
+        {s ? <RecentActivity runs={s.recent_runs ?? []} now={now} /> : null}
+        {s ? <JobSearch columns={s.pipeline?.columns ?? []} /> : null}
       </div>
     </Page>
   );
@@ -89,4 +76,79 @@ function headline(actions: ActionItem[]): string {
     other ? `${formatCount(other)} other ${other === 1 ? "task" : "tasks"}` : null,
   ].filter(Boolean);
   return parts.length ? parts.join(" · ") : "nothing needs you";
+}
+
+const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
+
+/** "Finish setup: N required items remaining", only while setup blocks runs. */
+function SetupBanner() {
+  const left = useReadiness().data?.items?.filter((i) => i.must && !i.done).length ?? 0;
+  if (!left) return null;
+  return (
+    <div className={`${styles.panel} ${styles.oneLine}`} role="status">
+      <span>Finish setup: {plural(left, "required item")} remaining</span>
+      <ButtonLink to="/profile" variant="primary">Finish setup</ButtonLink>
+    </div>
+  );
+}
+
+/** Outcome of a finished run in plain words; null = not worth showing (running, housekeeping). */
+export function outcome(r: RunRow): string | null {
+  if (r.status === "running" || !r.kind) return null;
+  const n = r.ok ?? 0;
+  const found = /(\d+) new/.exec(r.detail ?? "")?.[1];
+  const text: Record<string, string> = {
+    scout: found ? `Found ${plural(Number(found), "new matching job")}` : "Found new jobs",
+    prepare: n ? `Prepared ${plural(n, "application")}` : "Prepared applications",
+    apply: n ? `Filled ${plural(n, "application")}` : "Filled applications",
+    score: n ? `Checked ${plural(n, "job")}` : "Checked new jobs",
+  };
+  const t = text[r.kind];
+  if (!t) return null;
+  return r.status === "failed" || r.status === "error" ? `${t}, stopped early` : t;
+}
+
+function RecentActivity({ runs, now }: { runs: RunRow[]; now: Date }) {
+  const rows = runs.flatMap((r) => {
+    const t = outcome(r);
+    return t ? [{ id: r.id, t, when: formatWhen(r.ended_at ?? r.started_at, now) }] : [];
+  }).slice(0, 3);
+  return (
+    <section className={styles.panel} aria-labelledby="activity-title">
+      <div className={styles.panelHead}>
+        <h2 id="activity-title" className={styles.h2}>Recent activity</h2>
+        <Link to="/runs" className={styles.headLink}>View all activity</Link>
+      </div>
+      {rows.length ? (
+        <ul className={styles.plainList}>
+          {rows.map((r) => (
+            <li key={r.id} className={styles.oneLine}>
+              <span>{r.t}</span>
+              {r.when ? <span className={styles.caption}>{r.when}</span> : null}
+            </li>
+          ))}
+        </ul>
+      ) : (
+        <p className={styles.caption}>Nothing yet</p>
+      )}
+    </section>
+  );
+}
+
+const sumOf = (cols: PipelineColumn[], statuses: string[]) =>
+  cols.filter((c) => c.statuses.some((x) => statuses.includes(x))).reduce((t, c) => t + c.count, 0);
+
+function JobSearch({ columns }: { columns: PipelineColumn[] }) {
+  const line = [
+    `${formatCount(sumOf(columns, ["found", "scored"]))} new matches`,
+    `${formatCount(sumOf(columns, ["needs_review"]))} need review`,
+    `${plural(sumOf(columns, ["applied", "screening", "interview"]), "application")} active`,
+  ].join(" · ");
+  return (
+    <section className={`${styles.panel} ${styles.oneLine}`} aria-labelledby="search-title">
+      <h2 id="search-title" className="sr-only">Job search</h2>
+      <span>{line}</span>
+      <Link to="/pipeline" className={styles.headLink}>View pipeline</Link>
+    </section>
+  );
 }

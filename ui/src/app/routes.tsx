@@ -24,6 +24,8 @@ export const routes: RouteObject[] = [
       { path: "runs", loader: ({ request }) => redirect(`/automation${new URL(request.url).search}`) },
       { path: "runs/:runId", loader: ({ request, params }) => redirect(`/automation/runs/${encodeURIComponent(params.runId!)}${new URL(request.url).search}`) },
       { path: "profile", lazy: () => import("../features/profile/ProfilePage").then((m) => ({ Component: m.ProfilePage })) },
+      { path: "profile/answers", lazy: () => import("../features/profile/AnswersPage").then((m) => ({ Component: m.AnswersPage })) },
+      { path: "profile/resumes/:rid", lazy: () => import("../features/profile/ResumePage").then((m) => ({ Component: m.ResumePage })) },
       { path: "settings/:section?", lazy: () => import("../features/settings/SettingsPage").then((m) => ({ Component: m.SettingsPage })) },
       { path: "kit", lazy: () => import("../features/kit/KitPage").then((m) => ({ Component: m.KitPage })) },
       { path: "*", element: <NotFoundPage /> },

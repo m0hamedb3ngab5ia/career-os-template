@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { NeedsYou } from "./NeedsYou";
-import { actionItem, defaultRoutes, json, mockApi, NOW, renderWithApp, today, type Routes } from "./testing";
+import { defaultRoutes, json, mockApi, NOW, renderWithApp, today, type Routes } from "./testing";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -19,82 +19,30 @@ function setup(path = "/", routes: Routes = {}) {
   const r = renderWithApp(<NeedsYou />, { path });
   return { ...r, calls };
 }
-const rowNames = () =>
-  screen
-    .getAllByRole("listitem")
-    .map((li) => li.querySelector("[data-company]")?.textContent)
-    .filter(Boolean);
+const rowTitles = () => screen.getAllByRole("listitem").map((li) => li.querySelector("[class*=rowTitle]")?.textContent).filter(Boolean);
+
+const G = "Interview invite: pick a slot";
 
 describe("NeedsYou", () => {
-  it("lists every open item with company, role, what, due line, link, type, priority and needs", async () => {
+  it("shows ordered rows: one-sentence title with the company, no category line, one short CTA; no priority labels", async () => {
     setup();
-    const acme = (await screen.findByText("Acme Robotics")).closest("li")!;
-    const row = within(acme);
-    expect(row.getByText("Software Engineer, Platform")).toBeInTheDocument();
-    expect(row.getByText(/Tier A: review/)).toBeInTheDocument();
-    expect(row.getByText("Sat, Oct 3 · posting closes")).toHaveAttribute("data-level", "later");
-    expect(row.getByRole("link", { name: /Open jobs\.example\.com/ })).toHaveAttribute("href", "https://jobs.example.com/acme/123");
-    expect(row.getByRole("link", { name: /Open jobs\.example\.com/ })).toHaveAttribute("target", "_blank");
-    expect(row.getByText("Review")).toBeInTheDocument();
-    expect(row.getByText("High")).toBeInTheDocument();
-    expect(row.getByText("Laptop")).toBeInTheDocument();
-    expect(screen.getByRole("heading", { name: "Needs you 4" })).toBeInTheDocument();
+    await screen.findByText(G);
+    expect(screen.getByRole("heading", { name: /^Needs your attention/ })).toBeInTheDocument();
+    expect(rowTitles()[1]).toBe(G);
+    expect(rowTitles()).toContain("Review Acme Robotics application");
+    expect(screen.queryByText(/APPLICATION ·|PROFILE|Needs a decision from you/)).not.toBeInTheDocument();
+    const acme = screen.getByText("Review Acme Robotics application").closest("li")!;
+    expect(within(acme).getByText("Approval required before submission.")).toBeInTheDocument();
+    expect(within(acme).getByRole("link", { name: "Review" })).toHaveAttribute("href", "/jobs/j-acme");
+    expect(screen.queryByText(/^(High|Medium|Low)$/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/master\.yaml/)).not.toBeInTheDocument();
   });
 
-  it("colours the due line: red overdue, orange within 48 h, nothing when missing", async () => {
+  it("offers Mark done only for tasks the system can't detect as finished", async () => {
     setup();
-    const hooli = within((await screen.findByText("Hooli")).closest("li")!);
-    expect(hooli.getByText("Overdue by 1 day · note was due")).toHaveAttribute("data-level", "overdue");
-    const globex = within(screen.getByText("Globex").closest("li")!);
-    expect(globex.getByText("Tomorrow, 3:00 PM · reply within 48 hours")).toHaveAttribute("data-level", "soon");
-    const initech = within(screen.getByText("Initech").closest("li")!);
-    expect(initech.queryByText("No date")).not.toBeInTheDocument();
-    expect(initech.queryByText("Anytime")).not.toBeInTheDocument();
-  });
-
-  it("shows plain task text and hides the empty 'Other' type", async () => {
-    setup("/", {
-      "GET /api/today": { ...today, actions: [actionItem({ id: "9", company: "Umbrella", job_id: "u1", what: "tier_a_review", type: "other" })] },
-    });
-    const row = within((await screen.findByText("Umbrella")).closest("li")!);
-    expect(row.getByText("Review resume + cover letter")).toBeInTheDocument();
-    expect(row.queryByText("Other")).not.toBeInTheDocument();
-  });
-
-  it("shows a non-web link as text, not an anchor; no link at all shows nothing", async () => {
-    setup();
-    const initech = within((await screen.findByText("Initech")).closest("li")!);
-    expect(initech.getByText("profile/master.yaml").closest("a")).toBeNull();
-    const hooli = within(screen.getByText("Hooli").closest("li")!);
-    expect(hooli.queryByRole("link", { name: /^Open/ })).not.toBeInTheDocument();
-  });
-
-  it("groups tasks by job, blocked first, with one CTA per job to the job page", async () => {
-    setup("/", {
-      "GET /api/today": {
-        ...today,
-        actions: [
-          ...today.actions!,
-          actionItem({ id: "15", job_id: "j-acme", company: "Acme Robotics", role: "Software Engineer, Platform",
-            what: "Answer 2 application questions", type: "question", priority: "M",
-            detail: "careeros run: /apply-job stopped at question 4" }),
-          actionItem({ id: "16", company: "", what: "Update your LinkedIn headline", priority: "L" }),
-        ],
-      },
-    });
-    const acme = within((await screen.findByText("Acme Robotics")).closest("li")!);
-    expect(acme.getByText("2 things need attention")).toBeInTheDocument();
-    expect(acme.getByRole("link", { name: "Answer questions" })).toHaveAttribute("href", "/jobs/j-acme");
-    // The blocking question comes before the High-priority review; its raw detail sits behind Details.
-    const tasks = acme.getAllByRole("checkbox").map((c) => c.getAttribute("aria-label"));
-    expect(tasks[0]).toMatch(/Answer 2 application questions/);
-    expect(acme.getByText("careeros run: /apply-job stopped at question 4").closest("details")).not.toBeNull();
-    expect(rowNames()[0]).toBe("Acme Robotics");
-    const other = within(screen.getByRole("heading", { name: "Other tasks" }).closest("li")!);
-    expect(other.getByText("Update your LinkedIn headline")).toBeInTheDocument();
-    expect(other.queryByRole("link", { name: /Continue|Review|Answer/ })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "View all tasks" })).toHaveAttribute("href", "/actions");
-    expect(screen.queryByRole("radiogroup")).not.toBeInTheDocument();
+    await screen.findByText(G);
+    expect(screen.queryByRole("checkbox")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /^Mark done/ }).map((b) => b.getAttribute("aria-label"))).toEqual(["Mark done: Globex", "Mark done: Hooli"]);
   });
 
   it("has its own empty state when nothing is open", async () => {
@@ -117,22 +65,22 @@ describe("NeedsYou", () => {
         return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
-    await screen.findByText("Globex");
-    await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: Interview invite/ }));
-    await waitFor(() => expect(screen.queryByText("Globex")).not.toBeInTheDocument());
+    await screen.findByText(G);
+    await user.click(screen.getByRole("button", { name: "Mark done: Globex" }));
+    await waitFor(() => expect(screen.queryByText(G)).not.toBeInTheDocument());
     const toast = await screen.findByText("Marked Globex done.");
     expect(toast.closest("[aria-live]")).toHaveAttribute("aria-live", "polite");
     const done = calls.find((c) => c.method === "POST" && c.path === "/api/actions/12/done");
     expect(done?.headers.get("X-CareerOS")).toBe("1");
 
     await user.click(screen.getByRole("button", { name: "Undo" }));
-    expect(await screen.findByText("Globex")).toBeInTheDocument();
+    expect(await screen.findByText(G)).toBeInTheDocument();
     await waitFor(() =>
       expect(calls.some((c) => c.method === "POST" && c.path === "/api/actions/12/reopen")).toBe(true),
     );
   });
 
-  it("after mark done, focus moves to the next row's mark-done control", async () => {
+  it("after mark done, focus moves to the next row's Mark done, else its CTA", async () => {
     const user = userEvent.setup();
     let open = today.actions!;
     setup("/", {
@@ -142,13 +90,10 @@ describe("NeedsYou", () => {
         return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
-    await screen.findByText("Globex");
-    const names = rowNames();
-    const i = names.indexOf("Globex");
-    const next = names[i + 1] ?? names[i - 1];
-    await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: / }));
-    await waitFor(() => expect(screen.queryByText("Globex")).not.toBeInTheDocument());
-    await waitFor(() => expect(screen.getByRole("checkbox", { name: new RegExp(`^Mark ${next}: `) })).toHaveFocus());
+    await screen.findByText(G);
+    await user.click(screen.getByRole("button", { name: "Mark done: Globex" }));
+    await waitFor(() => expect(screen.queryByText(G)).not.toBeInTheDocument());
+    await waitFor(() => expect(screen.getByRole("link", { name: "Review" })).toHaveFocus());
   });
 
   it("after mark done on the last row, focus moves to the list heading", async () => {
@@ -161,24 +106,24 @@ describe("NeedsYou", () => {
         return json({ ok: ["12"], queued: [], missing: [] });
       },
     });
-    await user.click(await screen.findByRole("checkbox", { name: /^Mark Globex: / }));
-    await waitFor(() => expect(screen.getByRole("heading", { name: /^Needs you/ })).toHaveFocus());
+    await user.click(await screen.findByRole("button", { name: "Mark done: Globex" }));
+    await waitFor(() => expect(screen.getByRole("heading", { name: /^Needs your attention/ })).toHaveFocus());
   });
 
   it("puts the row back and shows the server's reason when mark done fails", async () => {
     const user = userEvent.setup();
     setup("/", { "POST /api/actions/12/done": { $status: 409, body: { detail: "Tracker is busy" } } });
-    await screen.findByText("Globex");
-    await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: Interview invite/ }));
+    await screen.findByText(G);
+    await user.click(screen.getByRole("button", { name: "Mark done: Globex" }));
     expect(await screen.findByText(/Tracker is busy/)).toBeInTheDocument();
-    expect(screen.getByText("Globex")).toBeInTheDocument();
+    expect(screen.getByText(G)).toBeInTheDocument();
   });
 
   it("says when the change is queued behind an open tracker", async () => {
     const user = userEvent.setup();
     setup("/", { "POST /api/actions/12/done": () => json({ ok: [], queued: ["12"], missing: [] }) });
-    await screen.findByText("Globex");
-    await user.click(screen.getByRole("checkbox", { name: /^Mark Globex: Interview invite/ }));
+    await screen.findByText(G);
+    await user.click(screen.getByRole("button", { name: "Mark done: Globex" }));
     expect(await screen.findByText(/Marked Globex done\. .*queued/)).toBeInTheDocument();
   });
 
@@ -193,7 +138,7 @@ describe("NeedsYou", () => {
 
   it("has no axe violations", async () => {
     const { container } = setup();
-    await screen.findByText("Globex");
+    await screen.findByText(G);
     expect(await axeViolations(container)).toEqual([]);
   });
 });

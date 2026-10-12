@@ -1,16 +1,21 @@
-import { taskText } from "../../kit/labels";
+import { Link } from "react-router";
+import { Details } from "../../kit/Details";
 import { groupByJob } from "../today/actions";
 import { useToday } from "../today/api";
 import type { ActionItem } from "../today/types";
 import styles from "./JobDetail.module.css";
 import type { PipelineState } from "./types";
 
-// The Job detail "Next step" block (design doc 3 "Job detail"): one state sentence, what needs you on this job
-// (pipeline review reasons + this job's open tasks), and the raw reasons for Details.
+// The Job detail "Next step" block (design doc 3 "Job detail"): one state sentence, then one line of counts that
+// link to the cards owning the detail (QA, Action Items). The detail itself is never repeated here.
 
 /** One plain sentence for the job's pipeline state; `n` is the deduped count of what needs you (default: review reasons). */
-export function stateSentence(s: PipelineState, n = s.review_reasons.length): string {
+export function stateSentence(s: PipelineState, n = s.review_reasons.length, tab?: string): string {
   if (s.active_run_id) return "Working on it: a run is in progress for this job.";
+  // The server only knows the form was staged; the live tab check (GET .../application, polled) knows if it's gone.
+  if (s.blocked_reason?.startsWith("Application staged") && tab && tab !== "open") {
+    return "The browser tab with this application is closed: refill it, then review and submit.";
+  }
   if (s.blocked_reason) return s.blocked_reason; // already a sentence from the server
   if (n > 0) return `Needs your review: ${n} ${n === 1 ? "thing needs" : "things need"} attention.`;
   if (!s.next_action) return "Nothing left to run for this job.";
@@ -23,30 +28,43 @@ export function useJobTasks(jobId: string): ActionItem[] {
   return groupByJob(today.data?.actions ?? []).find((g) => g.jobId === jobId)?.items ?? [];
 }
 
-/** The state sentence and the human list of what needs you; no codes (those live in ReasonDetails). */
-export function NextStepSummary({ state, tasks }: { state: PipelineState; tasks: readonly ActionItem[] }) {
+/** The state sentence and one line linking to what needs you: QA checks (#qa), this job's tasks (Action Items),
+ * and any other review reason by its text. QA/task/staged reasons are not repeated: their cards own them. */
+export function NextStepSummary({ state, tasks, tab }: { state: PipelineState; tasks: readonly ActionItem[]; tab?: string }) {
   const rs = state.review_reasons;
-  // A QA warning repeats a failed check's finding: show it only when no check failed.
-  const shown = rs.filter((r) => r.code !== "qa_warning" || !rs.some((o) => o.code.startsWith("qa_") && o.code !== "qa_warning"));
-  const needs = [...new Set([
-    ...shown.map((r) => r.text),
-    ...tasks.map((t) => taskText(t.type, t.what)),
-  ])];
+  const failedQa = rs.filter((r) => r.code.startsWith("qa_") && r.code !== "qa_warning");
+  const warnedQa = rs.filter((r) => r.code === "qa_warning");
+  const failed = failedQa.length;
+  const warned = warnedQa.length;
+  // Fail reasons carry the sentence in detail; checks carry "check_id: detail", so drop the id.
+  const qaLines = (failed ? failedQa : warnedQa).map((r) =>
+    r.code === "qa_fail" || r.code === "qa_warning" ? (r.detail ?? r.text) : r.detail ? `${r.text}: ${r.detail.replace(/^[^:]+: /, "")}` : r.text);
+  // prepare_action is the task the prepare run left: the task count already covers it.
+  const other = [...new Set(rs.filter((r) =>
+    !r.code.startsWith("qa_") && !r.code.startsWith("action_") && r.code !== "apply_staged" &&
+    !(r.code === "prepare_action" && tasks.length)).map((r) => r.text))];
+  const qa = failed ? `${failed} QA check${failed === 1 ? "" : "s"} failed` : warned ? `${warned} QA warning${warned === 1 ? "" : "s"}` : "";
+  const n = failed + tasks.length + other.length;
   return (
     <div className={styles.reviewReasons}>
-      <p className={styles.strong}>{stateSentence(state, needs.length)}</p>
-      {needs.length ? (
-        <ul className={styles.bullets} aria-label="Needs you">
-          {needs.map((t, i) => (
-            <li key={`${i}:${t}`}>{t}</li>
-          ))}
-        </ul>
+      <p className={styles.strong}>{stateSentence(state, n, tab)}</p>
+      {qa ? (
+        <Details summary={qa}>
+          <ul className={styles.bullets}>
+            {[...new Set(qaLines)].map((l) => <li key={l}>{l}</li>)}
+          </ul>
+        </Details>
+      ) : null}
+      {tasks.length || other.length ? (
+        <p className={styles.caption}>
+          {tasks.length ? <Link to="/actions">{tasks.length} task{tasks.length === 1 ? "" : "s"}</Link> : null}
+          {other.length ? `${tasks.length ? " · " : ""}${other.join(" · ")}` : null}
+        </p>
       ) : null}
     </div>
   );
 }
 
-/** Raw review reasons (code + detail) for the collapsed Details. */
 export function ReasonDetails({ reasons }: { reasons: PipelineState["review_reasons"] }) {
   if (!reasons.length) return null;
   return (

@@ -54,9 +54,7 @@ describe("PipelineCard", () => {
     setup({ stage: "score", next_action: "start", next_label: "Start pipeline", next_kind: "score" });
     const btn = await screen.findByRole("button", { name: "Start pipeline" });
     expect(btn).toBeEnabled();
-    const steps = within(screen.getByRole("list", { name: "Pipeline stages" })).getAllByRole("listitem");
-    expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["current", "upcoming", "upcoming", "upcoming", "upcoming"]);
-    expect(steps[0]).toHaveAttribute("aria-current", "step");
+    expect(screen.getByText("Ready for the next step: Start pipeline.")).toBeInTheDocument();
   });
 
   it("lists the review reasons with Approve & continue for a needs_review job", async () => {
@@ -74,15 +72,11 @@ describe("PipelineCard", () => {
       "title",
       "Approves the current documents and lets the pipeline continue to the next step.",
     );
-    expect(screen.getByText("Needs your review: 2 things need attention.")).toBeInTheDocument();
-    const needs = screen.getByRole("list", { name: "Needs you" });
-    expect(within(needs).getByText("Review and submit the application")).toBeInTheDocument();
-    expect(within(needs).queryByText(/long letter/)).not.toBeInTheDocument(); // codes/details only in Details
-    const details = screen.getByText("Details").closest("details")!;
+    // QA warnings sit behind a click; the action_* reason is owned by the Action Items task, so it is not counted.
+    expect(screen.getByText("Ready for the next step: Approve & continue.")).toBeInTheDocument();
+    const details = screen.getByText("1 QA warning").closest("details")!;
     expect(details).not.toHaveAttribute("open");
-    expect(within(details).getByText(/long letter/)).toBeInTheDocument();
-    const steps = within(screen.getByRole("list", { name: "Pipeline stages" })).getAllByRole("listitem");
-    expect(steps.map((s) => s.getAttribute("data-state"))).toEqual(["done", "done", "done", "current", "upcoming"]);
+    expect(within(details).getByText("long letter")).toBeInTheDocument();
   });
 
   it("keeps the Approve & continue tooltip for a Tier B job even though auto_submit is off (STAGE_NOTE set)", async () => {
@@ -106,19 +100,17 @@ describe("PipelineCard", () => {
     expect(screen.getByText("Tier A: the run fills and stages the form; you review and submit.")).toBeInTheDocument();
   });
 
-  it("disables the button with the blocked reason as its title", async () => {
+  it("shows the blocked reason and offers no button", async () => {
     setup({ stage: "apply", next_action: null, next_label: null, next_kind: null,
             blocked_reason: "A run is working on this job" });
-    const btn = await screen.findByRole("button", { name: "Continue pipeline" });
-    expect(btn).toBeDisabled();
-    expect(btn).toHaveAttribute("title", "A run is working on this job");
-    expect(screen.getByText("A run is working on this job")).toBeInTheDocument();
+    expect(await screen.findByText("A run is working on this job")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
   });
 
   it("says there is nothing to run for an applied job", async () => {
     setup({ stage: "apply", next_action: null, next_label: null, next_kind: null });
     expect(await screen.findByText("Nothing left to run for this job.")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
   });
 
   it("starts the run, streams its output with Cancel, and refreshes when the stream ends", async () => {
@@ -307,7 +299,7 @@ describe("PipelineCard", () => {
             queued_in_run: "20260927-090000-prepare-11aa" });
     expect(await screen.findByText("Queued in batch run 20260927-090000-prepare-11aa")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Cancel" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeDisabled();
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
   });
 
   it("shows the server's refusal as a toast", async () => {
@@ -319,15 +311,15 @@ describe("PipelineCard", () => {
     expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeEnabled();
   });
 
-  it("disables the button for a job out of retries and resets its failures", async () => {
+  it("offers no run button for a job out of retries and resets its failures", async () => {
     const failures = { kind: "apply", count: 2, max_attempts: 2, last_outcome: "invalid_result", last_detail: "bad",
       last_run: "r2", excluded: true };
     const reason = "Failed 2 times (last: invalid_result): runs skip this job until you reset its failures";
     const api = setup({ next_kind: "apply", blocked_reason: reason, failures }, {
       "POST /api/jobs/j1/failures/reset": { job_id: "j1", cleared: ["apply"], resolved: ["A1"] },
     });
-    expect(await screen.findByRole("button", { name: "Continue pipeline" })).toBeDisabled();
-    expect(screen.getByText(reason)).toBeInTheDocument();
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Reset failures" }));
     await waitFor(() => expect(api.callsTo("POST /api/jobs/j1/failures/reset").length).toBe(1));
   });

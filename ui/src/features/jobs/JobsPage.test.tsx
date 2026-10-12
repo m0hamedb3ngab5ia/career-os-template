@@ -257,6 +257,14 @@ describe("Jobs screen", () => {
     expect(await screen.findByText("Index is rebuilding")).toBeInTheDocument();
   });
 
+  it("Find jobs now starts a job search; a refusal shows the server's reason", async () => {
+    const { api } = setup("/jobs", { "POST /api/runs/steps/scout": { status: 409, body: { detail: "Another run is in progress" } } });
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: "Find jobs now" }));
+    expect(await screen.findByText(/Another run is in progress/)).toBeInTheDocument();
+    expect(api.callsTo("POST /api/runs/steps/scout")).toHaveLength(1);
+  });
+
   it("Sync tracker posts and reports the count; a pending sync says why", async () => {
     let pending = 0;
     const { api } = setup("/jobs", {
@@ -343,9 +351,10 @@ describe("Jobs screen", () => {
       await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.getAll("status")).toEqual(["queued", "applied"]));
       await waitFor(() => expect(api.callsTo("GET /api/jobs/tabs").at(-1)!.search.getAll("status")).toEqual(["queued", "applied"]));
       expect(trigger).toHaveAttribute("data-active", "true");
-      // The chip row names the filter; × removes it.
+      // The chip row names the column only (values live in the filter menu); × removes it.
       const chips = screen.getByLabelText("Active filters");
-      expect(chips).toHaveTextContent("Status: Queued, Applied");
+      expect(chips).toHaveTextContent("Status");
+      expect(chips).not.toHaveTextContent("Queued");
       await user.click(within(chips).getByRole("button", { name: "Remove filter Status" }));
       expect(router.state.location.search).toBe("");
       expect(screen.queryByLabelText("Active filters")).not.toBeInTheDocument();
@@ -380,7 +389,7 @@ describe("Jobs screen", () => {
       await user.click(within(menu).getByRole("button", { name: "Apply" }));
       expect(new URLSearchParams(router.state.location.search).get("f.fit")).toBe("80..");
       await waitFor(() => expect(api.callsTo("GET /api/jobs").at(-1)!.search.get("fit_min")).toBe("80"));
-      expect(screen.getByLabelText("Active filters")).toHaveTextContent("Fit: ≥ 80");
+      expect(screen.getByLabelText("Active filters")).toHaveTextContent("Fit");
       await user.click(within(table).getByRole("button", { name: "Filter Found" }));
       const found = await screen.findByRole("dialog", { name: "Filter Found" });
       expect(within(found).getByLabelText("From")).toHaveAttribute("type", "date");

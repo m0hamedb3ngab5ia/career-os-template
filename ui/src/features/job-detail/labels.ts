@@ -59,7 +59,7 @@ export const OVERRIDE_LABELS: Record<string, string> = {
 
 // Known documents in a job folder, in display order.
 export const DOCUMENTS: { match: RegExp; title: string; open: string }[] = [
-  { match: /^resume\.pdf$/, title: "Résumé", open: "View résumé" },
+  { match: /^resume\.(pdf|txt)$/, title: "Résumé", open: "View résumé" },
   { match: /^cover_letter\.(md|pdf|txt)$/, title: "Cover letter", open: "View cover letter" },
   { match: /^answers\.json$/, title: "Answers", open: "Review answers" },
   { match: /^outreach\.json$/, title: "Outreach drafts", open: "View drafts" },
