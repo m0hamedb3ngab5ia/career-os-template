@@ -14,6 +14,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
+from careeros import annotations as ann
 from careeros import master_sync
 from careeros import resume_feedback as fb
 from careeros import resumes as store
@@ -126,6 +127,35 @@ class Draft(BaseModel):
     rev: int
     resume: dict[str, Any]
     draft: bool  # hash(draft) != hash(latest version)
+
+
+Author = Literal["user", "ai"]
+
+
+class AnnotationIn(BaseModel):
+    kind: Literal["suggestion", "comment"]
+    target_id: str | None = None  # a draft bullet id or top-level text field
+    text: str = ""
+    proposed: str | None = None  # suggestion: the replacement text
+    author: Author = "user"
+
+
+class Reply(BaseModel):
+    text: str
+    author: Author = "user"
+
+
+class Annotation(BaseModel):  # DEC-016
+    id: str
+    kind: Literal["suggestion", "comment"]
+    target_id: str | None = None
+    base: str | None = None
+    author: Author
+    status: Literal["open", "accepted", "rejected", "outdated"]
+    proposed: str | None = None
+    text: str = ""
+    replies: list[dict[str, Any]] = []
+    at: str | None = None
 
 
 class ResumePatch(BaseModel):
@@ -308,6 +338,40 @@ def revert_change(rid: str, cid: str, c=Depends(ctx)) -> Draft:
     """Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}."""
     with _refusals():
         return Draft(**store.revert_change(c.settings.root, rid, cid))
+
+
+@router.get("/profile/resumes/{rid}/annotations")
+def list_annotations(rid: str, c=Depends(ctx)) -> list[Annotation]:
+    """DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`."""
+    with _refusals():
+        store.get(c.settings.root, rid)
+        return [Annotation(**i) for i in ann.list_items(c.settings.root, rid)]
+
+
+@router.post("/profile/resumes/{rid}/annotations", status_code=201)
+def create_annotation(rid: str, body: AnnotationIn, c=Depends(ctx)) -> Annotation:
+    with _refusals():
+        return Annotation(**ann.create(c.settings.root, rid, **body.model_dump()))
+
+
+@router.post("/profile/resumes/{rid}/annotations/{aid}/replies")
+def reply_annotation(rid: str, aid: str, body: Reply, c=Depends(ctx)) -> Annotation:
+    with _refusals():
+        return Annotation(**ann.reply(c.settings.root, rid, aid, body.text, author=body.author))
+
+
+@router.post("/profile/resumes/{rid}/annotations/{aid}/accept")
+def accept_annotation(rid: str, aid: str, c=Depends(ctx)) -> Draft:
+    """User accept: target changed -> 409 {message, expected, current}; zero-fabrication guard refuses -> 422 with
+    the reasons; else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment)."""
+    with _refusals():
+        return Draft(**ann.accept(c.settings.root, rid, aid))
+
+
+@router.post("/profile/resumes/{rid}/annotations/{aid}/reject")
+def reject_annotation(rid: str, aid: str, c=Depends(ctx)) -> Annotation:
+    with _refusals():
+        return Annotation(**ann.reject(c.settings.root, rid, aid))
 
 
 @router.patch("/profile/resumes/{rid}")
