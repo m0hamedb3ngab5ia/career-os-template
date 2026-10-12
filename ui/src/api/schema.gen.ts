@@ -360,7 +360,11 @@ export interface paths {
     post: operations["reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post"];
   };
   "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
-    /** Reply Annotation */
+    /**
+     * Reply Annotation
+     * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
+     * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+     */
     post: operations["reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post"];
   };
   "/api/profile/resumes/{rid}/draft": {
@@ -2420,8 +2424,55 @@ export interface components {
         [key: string]: unknown;
       } | null;
     };
+    /** Replied */
+    Replied: {
+      /** At */
+      at?: string | null;
+      /**
+       * Author
+       * @enum {string}
+       */
+      author: "user" | "ai";
+      /** Base */
+      base?: string | null;
+      /** Id */
+      id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "suggestion" | "comment";
+      /** Proposed */
+      proposed?: string | null;
+      /**
+       * Replies
+       * @default []
+       */
+      replies?: {
+          [key: string]: unknown;
+        }[];
+      /** Run Id */
+      run_id?: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "open" | "accepted" | "rejected" | "outdated";
+      /** Target Id */
+      target_id?: string | null;
+      /**
+       * Text
+       * @default
+       */
+      text?: string;
+    };
     /** Reply */
     Reply: {
+      /**
+       * Apply
+       * @default false
+       */
+      apply?: boolean;
       /** Text */
       text: string;
     };
@@ -5148,7 +5199,11 @@ export interface operations {
       };
     };
   };
-  /** Reply Annotation */
+  /**
+   * Reply Annotation
+   * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
+   * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+   */
   reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post: {
     parameters: {
       path: {
@@ -5165,7 +5220,7 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: {
-          "application/json": components["schemas"]["Annotation"];
+          "application/json": components["schemas"]["Replied"];
         };
       };
       /** @description Validation Error */

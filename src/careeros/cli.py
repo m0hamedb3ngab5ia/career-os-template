@@ -961,6 +961,28 @@ def cmd_resume_feedback(args: argparse.Namespace) -> int:
         return 1
     print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
+def cmd_resume_annotate(args: argparse.Namespace) -> int:
+    """review-resume / edit-resume (DEC-016, TASK-030): read the draft + annotations, write AI suggestions, comments
+    and replies (author=ai). The AI only proposes: accepting one is the user's action in the UI."""
+    from careeros import annotations as ann
+    from careeros import resumes as store
+
+    root, c = _settings(args).root, args.resume_cmd
+    try:
+        if c == "annotations":
+            out = {**store.get_draft(root, args.rid), "items": ann.list_items(root, args.rid)}
+        elif c == "annotate":
+            if args.kind == "comment" and args.proposed is not None:
+                raise ValueError("a comment takes --text, not --proposed")
+            out = ann.create(root, args.rid, kind=args.kind, target_id=args.target, text=args.text or "",
+                             proposed=args.proposed, author="ai")
+        else:
+            out = ann.reply(root, args.rid, args.aid, args.text, author="ai")
+    except (OSError, ValueError, LookupError, store.Refused) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
 # --- end résumé store ---------------------------------------------------------------------------------------------
 
 
@@ -2029,6 +2051,22 @@ def build_parser() -> argparse.ArgumentParser:
         for a in extra:
             sp.add_argument(a)
         sp.set_defaults(fn=cmd_resume_feedback)
+    sp = rss.add_parser("annotations", help="draft {rev, resume, draft} + its annotations as items (JSON)")
+    sp.add_argument("rid")
+    sp.set_defaults(fn=cmd_resume_annotate)
+    sp = rss.add_parser("annotate", help="AI suggestion/comment on a draft bullet id or text field (author=ai, "
+                        "status open; never edits the draft)")
+    sp.add_argument("rid")
+    sp.add_argument("kind", choices=("suggestion", "comment"))
+    sp.add_argument("--target", help="bullet id or top-level text field (required for a suggestion)")
+    sp.add_argument("--proposed", help="suggestion: the replacement text")
+    sp.add_argument("--text", help="comment text / a suggestion's reason")
+    sp.set_defaults(fn=cmd_resume_annotate)
+    sp = rss.add_parser("annotate-reply", help="AI reply on an annotation (author=ai)")
+    sp.add_argument("rid")
+    sp.add_argument("aid")
+    sp.add_argument("text")
+    sp.set_defaults(fn=cmd_resume_annotate)
     lls = lrs.add_parser("list", help="lessons that apply: general + this ATS + this company")
     lls.add_argument("--ats")
     lls.add_argument("--company")
