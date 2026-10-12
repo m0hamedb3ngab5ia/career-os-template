@@ -5,6 +5,11 @@ on:
   push:
     branches: [main]
 
+# A new push to the same PR/branch cancels its stale run.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   changes:
     # Which jobs this change needs. Jobs are skipped with `if` (not trigger-level `paths:`), so the required
@@ -51,9 +56,12 @@ jobs:
       - name: Install
         if: steps.has_pkg.outputs.present == 'yes'
         run: pip install -e ".[test,ui,fast-apply]" && python -m playwright install chromium-headless-shell
+      - name: Everything  # parallel via addopts; coverage (1.8x slower) only on main pushes
+        if: steps.has_pkg.outputs.present == 'yes' && github.event_name != 'push'
+        run: pytest -q
       - name: Everything + coverage
-        if: steps.has_pkg.outputs.present == 'yes'
-        run: pytest -q -n auto --cov=careeros --cov-report=term-missing
+        if: steps.has_pkg.outputs.present == 'yes' && github.event_name == 'push'
+        run: pytest -q --cov=careeros --cov-report=term-missing
 
   ui:
     # CI runs only in the public template: private copies have a small Actions quota, so their syncs are

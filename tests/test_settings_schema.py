@@ -246,15 +246,28 @@ def test_schedule_help_does_not_contradict_the_scout_quiet_hours_and_missed_runs
 
 def test_every_editable_field_has_a_reader():
     """A setting nothing reads is a lie in the UI: it must be read-only with a "Not used yet" note."""
-    import subprocess
+    import os
+    import re
 
     repo = Path(__file__).resolve().parents[1]
     dirs = [d for d in ("src", ".claude", "templates", "scripts") if (repo / d).is_dir()]
+    # Read every file once (was `grep -rlw` twice per field): same dirs and exclusions, binary files skipped.
+    words = {}
+    for d in dirs:
+        for root, sub, names in os.walk(repo / d):
+            sub[:] = [s for s in sub if s != "__pycache__" and not s.endswith(".egg-info")]
+            for n in names:
+                path = Path(root, n)
+                rel = path.relative_to(repo).as_posix()
+                if path.is_symlink() or "settings_schema" in rel or "ui/services/settings_io" in rel:
+                    continue
+                data = path.read_bytes()
+                if b"\0" not in data[:32768]:
+                    words[rel] = set(re.findall(r"[A-Za-z0-9_]+", data.decode("utf-8", "replace")))
 
-    def files_with(word: str) -> set[str]:
-        out = subprocess.run(["grep", "-rlw", "--exclude-dir=__pycache__", "--exclude-dir=*.egg-info", word, *dirs],
-                             capture_output=True, text=True, cwd=repo).stdout.split()
-        return {f for f in out if "settings_schema" not in f and "ui/services/settings_io" not in f}
+    def files_with(word: str) -> set[str]:  # grep -w: no word char [A-Za-z0-9_] on either side
+        assert re.fullmatch(r"[A-Za-z0-9_]+", word), word  # a key part with other chars needs a real regex
+        return {f for f, ws in words.items() if word in ws}
 
     unread = []
     for _, f in _fields():
