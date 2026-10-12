@@ -417,6 +417,16 @@ def _resume_views(raw: Any) -> tuple[Any, Any, int]:
 # --------------------------------------------------------------------------- #
 
 
+def _all_bullets(obj: Any) -> list[dict[str, Any]]:
+    """Every bullet dict (inside any `bullets` list) of a resume.json-like structure, in order."""
+    if isinstance(obj, list):
+        return [b for o in obj for b in _all_bullets(o)]
+    if not isinstance(obj, dict):
+        return []
+    return [b for k, v in obj.items() for b in
+            ([x for x in v if isinstance(x, dict)] if k == "bullets" and isinstance(v, list) else _all_bullets(v))]
+
+
 def collect_ids(obj: Any) -> set[str]:
     """Collect bullet/narrative ids from a resume.json-like structure.
 
@@ -953,16 +963,18 @@ class Checker:
             self.add("tweak_cap", "hard", False, "tweak needs resume.json and the base version's resume.json")
             return
         allowed = set(c.get("add_bullet_ids") or [])
-        # sourced bullets compare by master id (both sides migrated, DEC-018); bullets without `source` are not in
-        # the trace view, so count those by résumé-local id against the base's local ids
-        added = collect_ids(rj) - collect_ids(base_view)
+        # sourced bullets compare by master id (both sides migrated, DEC-018), counted per bullet so several new
+        # bullets sharing one allowed source each count; bullets without `source` are not in the trace view, so
+        # count those by résumé-local id against the base's local ids
+        new_src = collect_ids(rj) - collect_ids(base_view)
+        added = sorted(str(b["id"]) for b in _all_bullets(rj) if b.get("id") in new_src)
         base_local = collect_ids(base_doc)
         unsourced = sorted(str(b["id"]) for e in self._resume_entries(self.resume_doc) for b in e.get("bullets") or []
                            if isinstance(b, dict) and b.get("id") and not b.get("source")
                            and str(b["id"]) not in base_local)
-        bad = sorted(added - allowed)
+        bad = sorted(new_src - allowed)
         n = len(added) + len(unsourced)
-        shown = sorted(added) + [f"{i} (no source)" for i in unsourced]
+        shown = added + [f"{i} (no source)" for i in unsourced]
         ok = not bad and n <= 3
         self.add("tweak_cap", "hard", ok, f"added {shown} (allowed {sorted(allowed)}, max 3)" if ok else
                  f"tweak added {shown}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
@@ -1499,7 +1511,12 @@ def bullet_provenance(job_dir: str | Path, root: str | Path) -> dict[str, Any]:
     rather than trust the skill-written prepare.json `qa_pass`."""
     ck = Checker(Path(job_dir), Path(root))
     ck.check_bullet_fidelity()
-    return ck.checks[-1]
+    rec = ck.checks[-1]
+    # fail closed: a skip (malformed / unsupported-schema resume.json) is not a pass; only a reused user-authored
+    # résumé (DEC-007) may skip
+    if rec.get("skipped") and not ck.user_reuse:
+        return {**rec, "ok": False}
+    return rec
 
 
 def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> dict[str, Any]:

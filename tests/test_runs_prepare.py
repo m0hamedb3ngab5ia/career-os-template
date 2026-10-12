@@ -314,3 +314,13 @@ def test_run_apply_needs_a_job_id(settings):
         run_batch(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
                   invoke=Fake(settings), now=lambda: NOW)
     assert not any((settings.paths["jobs_dir"].parent / "runs").glob("2*"))
+
+
+@pytest.mark.parametrize("text", ["{not json", json.dumps({"schema_version": 2, "experience": []})])
+def test_apply_gate_fails_closed_on_unreadable_resume(settings, store, text):
+    """A malformed or unsupported-schema resume.json skips bullet_fidelity; apply must not treat that as a pass."""
+    from careeros.runs.runner import prepared_ok
+    jid = add_job(store, 1)
+    (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True}))
+    (store.job_dir(jid) / "resume.json").write_text(text)
+    assert prepared_ok(settings, store, jid, "apply") is False

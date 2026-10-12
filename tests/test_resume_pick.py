@@ -204,3 +204,11 @@ def test_must_tweak_cap_counts_unsourced_added_bullets(root):
     ck = _v1_tweak(root, V1_BASE, tweak, [])
     assert not ck.checks[-1]["ok"] and ck.checks[-1]["level"] == "hard", ck.checks[-1]
     assert "new3" in ck.checks[-1]["detail"] and "acme.1" not in ck.checks[-1]["detail"]
+
+
+def test_must_tweak_cap_counts_added_bullets_sharing_one_source(root):
+    tweak = json.loads(json.dumps(V1_BASE))
+    tweak["experience"][0]["bullets"] += [{"id": f"experience-1.n{i}", "source": "acme.2", "text": "y"}
+                                          for i in range(4)]
+    ck = _v1_tweak(root, V1_BASE, tweak, ["acme.2"])
+    assert not ck.checks[-1]["ok"] and ck.checks[-1]["level"] == "hard", ck.checks[-1]
