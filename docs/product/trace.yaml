@@ -977,7 +977,14 @@ tasks:
     - REQ-124
     use_cases:
     - UC-001
-  TASK-033:
+  TASK-033a:
+    status: todo
+    requirements:
+    - REQ-125
+    - REQ-126
+    use_cases:
+    - UC-002
+  TASK-033b:
     status: todo
     requirements:
     - REQ-125
