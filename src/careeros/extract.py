@@ -42,7 +42,8 @@ def pdf_page_text(page: Any) -> str:
     contents = page.get_contents()
     if contents is not None:
         # ponytail: byte regex, not a content parser (pypdf's ContentStream re-encodes Identity-H strings
-        # wrongly); misses Form XObjects and a literal string holding ") 12 (". Parse properly if those bite.
+        # wrongly); misses Form XObjects; strips a number between unescaped parens in a literal string, e.g. ((1) 2 (3)).
+        # Parse properly if those bite.
         fixed = DecodedStreamObject()
         fixed.set_data(KERN_RE.sub(b"", contents.get_data()))
         page[NameObject("/Contents")] = fixed
