@@ -275,7 +275,7 @@ describe("PipelineCard", () => {
     });
     renderWithProviders(<PipelineCard jobId="j1" />);
     await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
-    expect(await screen.findByText(/Run run-fast ended: doctor — careeros doctor failed/)).toBeInTheDocument();
+    expect(await screen.findByText(/Run run-fast ended: Doctor — careeros doctor failed/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Continue pipeline" })).toBeEnabled();
     expect(screen.getByText("Document preparation flagged something to check")).toBeInTheDocument();
     expect(api.callsTo("GET /api/runs/run-fast").length).toBeGreaterThan(0);
