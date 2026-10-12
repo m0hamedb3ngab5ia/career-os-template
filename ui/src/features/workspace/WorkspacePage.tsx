@@ -105,7 +105,7 @@ function Workspace() {
       const mod = e.metaKey || e.ctrlKey;
       const z = e.key.toLowerCase() === "z", y = e.key.toLowerCase() === "y" && e.ctrlKey;
       const t = e.target;  // a margin comment/reply field keeps its native undo
-      if (t instanceof Element && t !== document.body && !editor.current?.contains(t)) return;
+      if (t instanceof HTMLElement && t.matches("input,textarea,select,[contenteditable]") && !editor.current?.contains(t)) return;
       if (!mod || e.altKey || !(z || y) || tab !== "doc" || locked) return;
       const u = undo.current, cur = docRef.current;
       const redo = y || e.shiftKey;
@@ -187,14 +187,15 @@ function Workspace() {
       <div role="tablist" aria-label="Document tabs" className={styles.tabs}>
         {([["doc", "Résumé"], ["ats", "ATS view"]] as const).map(([t, l]) => {
           const go = async (to: "doc" | "ats") => {
-            if (to === "ats" && !(await save.flush())) return;  // a failed save keeps the current tab; its error is already shown
+            if (to === "ats" && !(await save.flush())) return false;  // a failed save keeps the current tab; its error is already shown
             setTab(to);
+            return true;
           };
           const onKeyDown = (e: ReactKeyEvent) => {
             if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
             e.preventDefault();
             const to = t === "doc" ? "ats" : "doc";
-            void go(to).then(() => document.getElementById(`tab-${to}`)?.focus());
+            void go(to).then((ok) => ok && document.getElementById(`tab-${to}`)?.focus());
           };
           return (
             <Button key={t} id={`tab-${t}`} role="tab" aria-selected={tab === t} aria-controls={`tabpanel-${t}`} tabIndex={tab === t ? 0 : -1}
@@ -203,8 +204,8 @@ function Workspace() {
         })}
       </div>
       {tab === "ats" ? (ats.isError
-        ? <p role="alert" className={styles.alert}>Couldn’t load the ATS view: {errorText(ats.error)}</p>
-        : <pre id="tabpanel-ats" role="tabpanel" aria-labelledby="tab-ats" className={styles.ats} aria-label="ATS view" tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
+        ? <p id="tabpanel-ats" role="alert" className={styles.alert}>Couldn’t load the ATS view: {errorText(ats.error)}</p>
+        : <pre id="tabpanel-ats" role="tabpanel" aria-labelledby="tab-ats" className={styles.ats} tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
       <div id="tabpanel-doc" role="tabpanel" aria-labelledby="tab-doc" className={styles.app}>
         <article ref={editor} className={styles.page} aria-label="Résumé draft">
           <div className={styles.name}>{field("Name", ["identity", "name"], identity.name)}</div>

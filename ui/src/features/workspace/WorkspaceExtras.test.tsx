@@ -124,6 +124,15 @@ describe("Workspace extras", () => {
     expect(sum).toHaveValue("Changed");
   });
 
+  it("Cmd+Z with focus on a button still undoes", async () => {
+    api();
+    renderRoutes(routes, "/resumes/cv");
+    const sum = await screen.findByRole("textbox", { name: "Summary" });
+    fireEvent.change(sum, { target: { value: "Changed" } });
+    fireEvent.keyDown(screen.getByRole("tab", { name: "Résumé" }), { key: "z", metaKey: true });
+    expect(sum).toHaveValue("Backend engineer");
+  });
+
   it("does not refetch annotations on re-render after an Apply run ended", async () => {
     const calls = api({
       "GET /api/profile/resumes/cv/annotations": [{ ...SUGG, id: "a2", kind: "comment", author: "user", proposed: null, text: "Name the stack" }],
