@@ -190,17 +190,16 @@ def strip_ai_origin(settings: Any, job_dir: Path) -> list[str]:
     that needs the DEC-019 import guard and DEC-020 changes.jsonl."""
     p = job_dir / "resume.json"
     doc, c = _json(p), _json(job_dir / "resume_choice.json")
-    bullets = resumes.bullets
     try:  # fail closed: a missing base keeps no mark
         base = (_json(_vdir(settings, str(c.get("rid")), c.get("version")) / "resume.json")
                 if c.get("action") in ("reuse", "tweak") else {})
     except LookupError:
         base = {}
-    kept = {(b.get("id"), b.get("text"), b.get("origin")) for b in bullets(base) if "origin" in b}
-    stripped = [str(b.get("id")) for b in bullets(doc) if "origin" in b
+    kept = {(b.get("id"), b.get("text"), b.get("origin")) for b in resumes.bullets(base) if "origin" in b}
+    stripped = [str(b.get("id")) for b in resumes.bullets(doc) if "origin" in b
                 and (b.get("id"), b.get("text"), b.get("origin")) not in kept]
     if stripped:
-        for b in bullets(doc):
+        for b in resumes.bullets(doc):
             if "origin" in b and (b.get("id"), b.get("text"), b.get("origin")) not in kept:
                 del b["origin"]
         p.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

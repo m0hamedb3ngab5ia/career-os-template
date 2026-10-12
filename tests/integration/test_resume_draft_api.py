@@ -52,3 +52,8 @@ def test_draft_api(tmp_path: Path):
         assert r.status_code == 422 and "origin" in r.json()["detail"]
         assert c.get(url).json()["rev"] == 1
         assert c.get("/api/profile/resumes/nope/draft").status_code == 404
+        assert c.get("/api/profile/resumes/Bad/draft").status_code == 404
+        assert c.put("/api/profile/resumes/Bad/draft", json={"rev": 0, "resume": DOC, "author": "user"},
+                     headers=W).status_code == 404
+        r = c.put(url, json={"rev": 1, "resume": {"experience": [{"bullets": 5}]}, "author": "user"}, headers=W)
+        assert r.status_code == 422

@@ -124,7 +124,7 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
     from careeros import resumes as resume_store
-    resume_store.cleanup_tmp(settings.root)  # temp files/dirs a crashed draft/publish write left (TASK-028)
+    resume_store.cleanup_tmp(settings.root)  # temp files a crashed draft write left (TASK-028)
     hosts = frozenset(allowed_hosts)
 
     @app.middleware("http")

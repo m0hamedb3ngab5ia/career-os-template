@@ -346,14 +346,19 @@ def bullets(doc: dict[str, Any]) -> list[dict[str, Any]]:
 
 def _check_origin(doc: dict[str, Any], prev: dict[str, Any] | None, author: str) -> None:
     """DEC-018 amendment: only a user-authored write may mark a bullet `origin: "user"`; an AI write may only keep
-    a mark the previous draft already carried on the same id and text."""
+    a mark the previous draft already carried on the same id and text under the same section entry."""
     if author not in ("user", "ai"):
         raise ValueError(f"author must be user or ai, not {author!r}")
-    marked = [b for b in bullets(doc) if "origin" in b]
-    if any(b["origin"] != "user" for b in marked):
+
+    def placed(d: dict[str, Any]) -> list[tuple[tuple[Any, ...], dict[str, Any]]]:
+        return [((sec, e.get("id"), b.get("id"), b.get("text")), b) for sec in ENTRY_SECTIONS
+                for e in d.get(sec) or [] if isinstance(e, dict) for b in e.get("bullets") or [] if isinstance(b, dict)]
+
+    marked = [(k, b) for k, b in placed(doc) if "origin" in b]
+    if any(b["origin"] != "user" for _, b in marked):
         raise ValueError('bullet origin may only be "user"')
-    kept = {(b.get("id"), b.get("text")) for b in bullets(prev or {}) if b.get("origin") == "user"}
-    if author == "ai" and any((b.get("id"), b.get("text")) not in kept for b in marked):
+    kept = {k for k, b in placed(prev or {}) if b.get("origin") == "user"}
+    if author == "ai" and any(k not in kept for k, _ in marked):
         raise ValueError('an AI write may not set bullet origin "user"')
 
 
@@ -367,6 +372,9 @@ def _hash(doc: dict[str, Any] | None) -> str | None:
         json.dumps(doc, sort_keys=True, ensure_ascii=False, separators=(",", ":")).encode("utf-8")).hexdigest()
 
 
+_NO_BASE = "résumé {!r} has no structured version to draft from"
+
+
 def get_draft(root: Path, rid: str) -> dict[str, Any]:
     """`draft.json` {rev, resume} (DEC-014); no draft yet = the latest version's resume.json at rev 0.
     `draft` = hash(draft) != hash(latest), so an edit undone by hand clears it."""
@@ -377,31 +385,38 @@ def get_draft(root: Path, rid: str) -> dict[str, Any]:
     elif latest is not None:
         rev, doc = 0, latest
     else:
-        raise LookupError(f"résumé {rid!r} has no structured version to draft from")
+        raise LookupError(_NO_BASE.format(rid))
     return {"rev": rev, "resume": doc, "draft": _hash(doc) != _hash(latest)}
 
 
 def put_draft(root: Path, rid: str, doc: dict[str, Any], *, rev: int, author: str) -> dict[str, Any]:
-    """Autosave (DEC-014): replace the draft atomically if `rev` is current, else Stale. Returns get_draft."""
+    """Autosave (DEC-014): replace the draft atomically if `rev` is current, else Stale. Returns what it wrote, in
+    get_draft's shape. A corrupt draft.json is a ValueError (422); no recovery beyond a manual delete."""
     from careeros.runs.atomic import write_json
 
-    doc = migrate(doc)
+    try:
+        doc = migrate(doc)
+    except (TypeError, AttributeError) as e:  # odd shapes, e.g. "bullets": 5
+        raise ValueError(f"malformed résumé: {e}") from None
     with _locked(root):
-        p = _dir(root, rid) / "draft.json"
-        prev = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {"rev": 0, "resume": _latest_json(root, rid)}
+        p, latest = _dir(root, rid) / "draft.json", _latest_json(root, rid)
+        if not p.is_file() and latest is None:
+            raise LookupError(_NO_BASE.format(rid))
+        prev = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {"rev": 0, "resume": latest}
         cur = prev["rev"]
         if rev != cur:
             raise Stale(f"draft changed since rev {rev} (now rev {cur}); reload")
         _check_origin(doc, prev["resume"] and migrate(prev["resume"]), author)
         write_json(p, {"rev": cur + 1, "resume": doc}, ensure_ascii=False)
-    return get_draft(root, rid)
+        return {"rev": cur + 1, "resume": doc, "draft": _hash(doc) != _hash(latest)}
 
 
 def cleanup_tmp(root: Path, max_age: float = 600) -> int:
-    """Remove temp files/dirs (`*.tmp`) a crashed write left in résumé dirs; run on UI startup. Younger than
+    """Remove temp files (`*.tmp`; never dirs or symlinks) a crashed write left in résumé dirs; run on UI startup. Younger than
     `max_age` seconds = maybe a write in flight from another process (CLI, runner): kept. Returns the count."""
     old = time.time() - max_age
-    stale = [p for p in _base(root).glob("*/*.tmp") if p.lstat().st_mtime < old]
+    stale = [p for p in _base(root).glob("*/*.tmp")
+             if not p.is_symlink() and p.is_file() and p.lstat().st_mtime < old]
     for p in stale:
-        shutil.rmtree(p, ignore_errors=True) if p.is_dir() else p.unlink(missing_ok=True)
+        p.unlink(missing_ok=True)
     return len(stale)
