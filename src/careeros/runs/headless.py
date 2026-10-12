@@ -97,10 +97,10 @@ def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, k
     tools = allowed_tools_for(cfg, kind, extra_tools)
     if tools:
         cmd += ["--allowedTools", ",".join(tools)]
-    if tools:  # skills say it too, but models still chain under dontAsk; a configured prompt is kept, rule appended
+        # skills say it too, but models still chain under dontAsk; a configured prompt is kept, the rule appended
         rule = SHELL_RULE + ", ".join(tools)
-        if "--append-system-prompt" in cmd and cmd.index("--append-system-prompt") + 1 < len(cmd):
-            i = cmd.index("--append-system-prompt") + 1
+        i = cmd.index("--append-system-prompt") + 1 if "--append-system-prompt" in cmd else len(cmd)
+        if i < len(cmd):
             cmd[i] = f"{cmd[i]}\n\n{rule}"
         else:
             cmd += ["--append-system-prompt", rule]
