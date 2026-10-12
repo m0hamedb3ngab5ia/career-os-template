@@ -281,6 +281,22 @@ describe("PipelineCard", () => {
     expect(api.callsTo("GET /api/runs/run-fast").length).toBeGreaterThan(0);
   });
 
+  it("a permission_denied end shows cause + fix and drops the retry button", async () => {
+    mockApi({
+      "GET /api/jobs/j1/pipeline": () => ({ ...base, stage: "apply", next_action: "continue", next_kind: "apply" }),
+      "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-den", kind: "apply" }),
+      "GET /api/runs/run-den": () => ({
+        id: "run-den", kind: "apply", trigger: "manual", status: "failed", state: "finished",
+        stop_reason: "permission_denied", detail: "tool(s) denied: Write", started_at: "2026-09-27T10:00:00Z",
+        ended_at: "2026-09-27T10:00:01Z", attempts: [], budget: {}, counters: {},
+      }),
+    });
+    renderWithProviders(<PipelineCard jobId="j1" />);
+    await userEvent.click(await screen.findByRole("button", { name: "Continue pipeline" }));
+    expect(await screen.findByText(/Tool not allowed.*tool\(s\) denied: Write.*isn't allowed in Settings/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Continue pipeline" })).not.toBeInTheDocument();
+  });
+
   it("streams the returned run even before the pipeline reports it as active", async () => {
     const api = setup({ stage: "apply", next_action: "continue", next_kind: "apply" }, {
       "POST /api/jobs/j1/pipeline": () => ({ run_id: "run-late", kind: "apply" }),

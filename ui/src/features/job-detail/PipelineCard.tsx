@@ -3,7 +3,9 @@ import { type ReactNode, useEffect, useRef, useState } from "react";
 import { apiFetch } from "../../api/client";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
+import { STOP_REASONS, describeCode } from "../../kit/labels";
 import { runKeys, useCancelRun, useRunStream } from "../runs/api";
+import { STOP_FIX } from "../runs/labels";
 import { LogPane, type LogLine } from "../runs/LogPane";
 import type { RunDetail } from "../runs/types";
 import { type ActionKey, help } from "./actionHelp";
@@ -82,6 +84,17 @@ function Box({ children }: { children: ReactNode }) {
   );
 }
 
+/** A retry cannot fix these: the user changes Settings or logs in first. */
+const NO_RETRY = new Set(["permission_denied", "auth_required"]);
+
+/** Cause + fix for a finished run: the kit label and the runs page's fix text (the raw code if unknown). */
+export function endMessage(d: { id: string; stop_reason: string | null; status: string; detail?: string | null }): string {
+  const code = d.stop_reason ?? d.status;
+  const fix = STOP_FIX[code];
+  const label = d.stop_reason ? describeCode(STOP_REASONS, code).label : code;
+  return `Run ${d.id} ended: ${label}${d.detail ? ` — ${d.detail}` : ""}${fix ? ` ${fix}` : ""}`;
+}
+
 export function PipelineCard({ jobId }: { jobId: string }) {
   const toast = useToast();
   // The run id a start returned, kept until the run record shows up as active_run_id (polled), then until it ends.
@@ -93,6 +106,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
   const startedKind = useRef<string | null>(null);
   // How the last run this card started ended ("Run <id> ended: <stop reason>"), until the next start.
   const [lastEnd, setLastEnd] = useState<string | null>(null);
+  const [lastStop, setLastStop] = useState<string | null>(null);
   const pipeline = usePipeline(jobId, started !== null);
   const tasks = useJobTasks(jobId);
   const appTab = useApplicationTab(jobId).data?.tab;
@@ -126,7 +140,8 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     if (!stream.ended && !startedEnded && !startedMissing) return;
     if (started && !stream.ended) {
       const d = startedRun.data;
-      setLastEnd(d ? `Run ${d.id} ended: ${d.stop_reason ?? d.status}${d.detail ? ` — ${d.detail}` : ""}`
+      setLastStop(d?.stop_reason ?? null);
+      setLastEnd(d ? endMessage(d)
                    : refused ? startRefusal
                    : `Run ${started} did not start (no run record after ${MAX_MISSING_POLLS}s)`);
     }
@@ -190,6 +205,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
     if (!state?.next_action) return;
     const kind = state.next_kind;
     setLastEnd(null);
+    setLastStop(null);
     start.mutate(
       { action: state.next_action },
       {
@@ -226,7 +242,7 @@ export function PipelineCard({ jobId }: { jobId: string }) {
           </div>
           <LogPane label="Live run output" lines={lines} empty="Waiting for output…" live />
         </>
-      ) : state.next_action && !state.failures?.excluded ? (
+      ) : state.next_action && !state.failures?.excluded && !NO_RETRY.has(lastStop ?? "") ? (
         <div className={styles.buttons}>
           <Button
             variant="primary"
