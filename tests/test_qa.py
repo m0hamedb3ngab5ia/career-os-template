@@ -641,9 +641,16 @@ def _v1(job: Path, *bullets: dict) -> Path:
         {"id": "experience-1", "source": "acme", "bullets": list(bullets)}])
 
 
-def test_v1_user_origin_bullet_is_not_traced_but_bold_still_checked(tmp_path: Path) -> None:
+def _user_wrote(job: Path, monkeypatch, *texts: str) -> Path:
+    """DEC-020: the base résumé's change log (faked) shows a user change last wrote `texts`."""
+    (job / "resume_choice.json").write_text(json.dumps({"action": "tweak", "rid": "base-1", "version": 1}))
+    monkeypatch.setattr("careeros.resumes.user_texts", lambda root, rid: set(texts) if rid == "base-1" else set())
+    return job
+
+
+def test_v1_user_origin_bullet_is_not_traced_but_bold_still_checked(tmp_path: Path, monkeypatch) -> None:
     """DEC-018: in a schema v1 résumé, only bullets with `source` are traced to master.yaml."""
-    res = run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "text": "Managed **hiring", "origin": "user"}))
+    res = run(_v1(_user_wrote(make_job(tmp_path), monkeypatch, "Managed **hiring"), {"id": "experience-1.b1", "text": "Managed **hiring", "origin": "user"}))
     assert by_name(res, "bullet_fidelity")["ok"] is True
     assert by_name(res, "bold_markup")["ok"] is False  # the full résumé, not the trace view
 
@@ -668,12 +675,21 @@ def test_v1_sourced_bullet_with_drifted_text_fails(tmp_path: Path) -> None:
     assert c["ok"] is False and "acme.1" in c["detail"]
 
 
-def test_v1_user_origin_bullet_passes_and_is_reported_unverified(tmp_path: Path) -> None:
-    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "source": "acme.1", "text": ACME_1},
+def test_v1_user_origin_bullet_passes_and_is_reported_unverified(tmp_path: Path, monkeypatch) -> None:
+    c = by_name(run(_v1(_user_wrote(make_job(tmp_path), monkeypatch, "Mentored new team members"), {"id": "experience-1.b1", "source": "acme.1", "text": ACME_1},
                         {"id": "experience-1.b2", "text": "Mentored new team members", "origin": "user"})),
                 "bullet_fidelity")
     assert c["ok"] is True, c["detail"]
     assert c["detail"].startswith("1 bullets match") and "user-written, unverified: ['experience-1.b2']" in c["detail"]
+
+
+@pytest.mark.parametrize("logged", [(), ("Mentored new team members, embellished",)])
+def test_v1_user_origin_without_a_logged_user_change_fails(tmp_path: Path, monkeypatch, logged) -> None:
+    """DEC-020: `origin: "user"` counts only when the change log shows a user change last wrote that text."""
+    job = _user_wrote(make_job(tmp_path), monkeypatch, *logged)
+    c = by_name(run(_v1(job, {"id": "experience-1.b2", "text": "Mentored new team members", "origin": "user"})),
+                "bullet_fidelity")
+    assert c["ok"] is False and "experience-1.b2" in c["detail"] and "change log" in c["detail"]
 
 
 def test_v1_origin_other_than_user_is_not_user_written(tmp_path: Path) -> None:

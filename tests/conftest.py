@@ -268,3 +268,18 @@ def pytest_collection_modifyitems(config, items):
         (keep if zlib.crc32(item.nodeid.encode()) % total == shard else drop).append(item)
     config.hook.pytest_deselected(items=drop)
     items[:] = keep
+
+
+def log_user_bullet(root: Path, job_dir: Path, text: str) -> str:
+    """DEC-020: a base résumé whose draft change log shows a user wrote `text`; the job's resume_choice.json names
+    it, so an `origin: "user"` bullet with that text counts in QA. Returns the rid."""
+    from careeros import resumes
+
+    src = job_dir / ".base_resume.json"
+    src.write_text(json.dumps({"schema_version": 1, "experience": [{"id": "e", "bullets": []}]}), encoding="utf-8")
+    rid = resumes.add_tailored(root, "text", category="x", source="test", files={"resume.json": src})["rid"]
+    src.unlink()
+    resumes.put_draft(root, rid, {"schema_version": 1, "experience": [{"id": "e", "bullets": [
+        {"id": "u", "text": text, "origin": "user"}]}]}, rev=0, author="user")
+    (job_dir / "resume_choice.json").write_text(json.dumps({"rid": rid}), encoding="utf-8")
+    return rid

@@ -388,23 +388,195 @@ def get_draft(root: Path, rid: str) -> dict[str, Any]:
 def put_draft(root: Path, rid: str, doc: dict[str, Any], *, rev: int, author: str) -> dict[str, Any]:
     """Autosave (DEC-014): replace the draft atomically if `rev` is current, else Stale. Returns what it wrote, in
     get_draft's shape. A corrupt draft.json is a ValueError (422); no recovery beyond a manual delete."""
-    from careeros.runs.atomic import write_json
-
     try:
         doc = migrate(doc)
     except (TypeError, AttributeError) as e:  # odd shapes, e.g. "bullets": 5
         raise ValueError(f"malformed résumé: {e}") from None
     with _locked(root):
-        p, latest = _dir(root, rid) / "draft.json", _latest_json(root, rid)
-        if not p.is_file() and latest is None:
-            raise LookupError(_NO_BASE.format(rid))
-        prev = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {"rev": 0, "resume": latest}
-        cur = prev["rev"]
-        if rev != cur:
-            raise Stale(f"draft changed since rev {rev} (now rev {cur}); reload")
-        _check_origin(doc, prev["resume"] and migrate(prev["resume"]), author)
-        write_json(p, {"rev": cur + 1, "resume": doc}, ensure_ascii=False)
-        return {"rev": cur + 1, "resume": doc, "draft": _hash(doc) != _hash(latest)}
+        d, prev, latest = _draft_state(root, rid)
+        if rev != prev["rev"]:
+            raise Stale(f"draft changed since rev {rev} (now rev {prev['rev']}); reload")
+        return _commit(d, prev, doc, latest, author)
+
+
+def _draft_state(root: Path, rid: str) -> tuple[Path, dict[str, Any], dict[str, Any] | None]:
+    p, latest = _dir(root, rid) / "draft.json", _latest_json(root, rid)
+    if not p.is_file() and latest is None:
+        raise LookupError(_NO_BASE.format(rid))
+    prev = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else {"rev": 0, "resume": latest}
+    return p.parent, prev, latest
+
+
+def _commit(d: Path, prev: dict[str, Any], doc: dict[str, Any], latest: dict[str, Any] | None, author: str,
+            reverts: str | None = None) -> dict[str, Any]:
+    """Under `_locked`: write draft.json, then append its changes to draft.changes.jsonl (DEC-015). A crash between
+    the two loses log lines, never invents them, so DEC-020 provenance fails closed."""
+    from careeros.runs.atomic import write_json
+
+    old = prev["resume"] and migrate(prev["resume"])
+    _check_origin(doc, old, author)
+    rev = prev["rev"] + 1
+    write_json(d / "draft.json", {"rev": rev, "resume": doc}, ensure_ascii=False)
+    lines = [{"id": f"{rev}.{k}", "at": _now(), "author": author, **c, **({"reverts": reverts} if reverts else {})}
+             for k, c in enumerate(_diff(old or {}, doc), 1)]
+    if lines:
+        log = d / "draft.changes.jsonl"
+        torn = log.is_file() and log.stat().st_size and _last_byte(log) != b"\n"
+        with open(log, "a", encoding="utf-8") as f:
+            f.write("\n" if torn else "")  # a crash-truncated last line stays its own (skipped) line
+            f.writelines(json.dumps(c, ensure_ascii=False) + "\n" for c in lines)
+            f.flush()
+            os.fsync(f.fileno())
+    return {"rev": rev, "resume": doc, "draft": _hash(doc) != _hash(latest)}
+
+
+def _flat(doc: dict[str, Any]) -> dict[tuple[str, str], tuple[Any, dict[str, Any] | None]]:
+    """(kind, target_id) -> (value, where): a bullet, an entry without its bullets, or any other top-level field.
+    Order-only moves are not changes."""
+    out: dict[tuple[str, str], tuple[Any, dict[str, Any] | None]] = {}
+    for k, v in doc.items():
+        if k not in ENTRY_SECTIONS or not isinstance(v, list):
+            out[("field", k)] = (v, None)
+    for sec in ENTRY_SECTIONS:
+        entries = doc.get(sec)
+        for i, e in enumerate(entries if isinstance(entries, list) else []):
+            if not isinstance(e, dict):
+                continue
+            out[("entry", str(e["id"]))] = ({k: v for k, v in e.items() if k != "bullets"}, {"section": sec, "index": i})
+            for j, b in enumerate(e.get("bullets") or []):
+                if isinstance(b, dict):
+                    out[("bullet", str(b["id"]))] = (b, {"section": sec, "entry": str(e["id"]), "index": j})
+    return out
+
+
+def _diff(old: dict[str, Any], new: dict[str, Any]) -> list[dict[str, Any]]:
+    a, b = _flat(old), _flat(new)
+    out = []
+    for key in [*a, *(k for k in b if k not in a)]:
+        before, after = a.get(key, (None, None)), b.get(key, (None, None))
+        if before[0] != after[0]:
+            op = "add" if key not in a else "delete" if key not in b else "edit"
+            out.append({"kind": key[0], "target_id": key[1], "op": op, "before": before[0], "after": after[0],
+                        "where": after[1] or before[1]})
+    return out
+
+
+def _put_node(doc: dict[str, Any], kind: str, tid: str, value: Any, where: dict[str, Any] | None) -> None:
+    """Make target `tid` hold `value` (None = remove): in place if present, else inserted at `where`."""
+    if kind == "field":
+        doc.pop(tid, None) if value is None else doc.__setitem__(tid, value)
+        return
+    for sec in ENTRY_SECTIONS:
+        entries = doc.get(sec)
+        for e in entries if isinstance(entries, list) else []:
+            if not isinstance(e, dict):
+                continue
+            if kind == "entry" and str(e.get("id")) == tid:
+                if value is None:
+                    entries.remove(e)
+                else:
+                    kept = e.get("bullets")
+                    e.clear()
+                    e.update(value, **({"bullets": kept} if kept is not None else {}))
+                return
+            bl = e.get("bullets") if kind == "bullet" else None
+            for i, b in enumerate(bl or []):
+                if isinstance(b, dict) and str(b.get("id")) == tid:
+                    bl.pop(i) if value is None else bl.__setitem__(i, value)
+                    return
+    if value is None:
+        return
+    entries = doc.setdefault(where["section"], [])
+    if kind == "entry":
+        entries.insert(where["index"], {**value, "bullets": []})
+        return
+    e = next((e for e in entries if isinstance(e, dict) and str(e.get("id")) == where["entry"]), None)
+    if e is None:
+        raise Refused(f"entry {where['entry']!r} no longer exists; revert its removal first")
+    e.setdefault("bullets", []).insert(where["index"], value)
+
+
+class Conflict(Refused):
+    """Revert refused: the target no longer holds the change's `after` (DEC-015) -> 409 with both texts."""
+
+    def __init__(self, msg: str, expected: Any, current: Any) -> None:
+        super().__init__(msg)
+        self.expected, self.current = expected, current
+
+
+def _text(v: Any) -> Any:
+    return v.get("text", v) if isinstance(v, dict) else v
+
+
+def _last_byte(p: Path) -> bytes:
+    with open(p, "rb") as f:
+        f.seek(-1, 2)
+        return f.read(1)
+
+
+def _read_log(p: Path) -> list[dict[str, Any]]:
+    """Parsed log lines; an unparsable (e.g. crash-truncated) line is skipped, which only loses provenance (fails closed)."""
+    out = []
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines() if p.is_file() else []:
+        try:
+            c = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(c, dict):
+            out.append(c)
+    return out
+
+
+def changes(root: Path, rid: str) -> list[dict[str, Any]]:
+    """The draft's change log, oldest first (History, DEC-015)."""
+    return _read_log(_dir(root, rid) / "draft.changes.jsonl")
+
+
+def revert_change(root: Path, rid: str, cid: str) -> dict[str, Any]:
+    """History Revert (DEC-015): a new user change putting `before` back, only while the target still holds the
+    change's `after`; else Conflict. Returns get_draft's shape."""
+    with _locked(root):
+        d, prev, latest = _draft_state(root, rid)
+        c = next((c for c in reversed(_read_log(d / "draft.changes.jsonl")) if c.get("id") == cid), None)
+        if c is None:
+            raise LookupError(f"no change {cid!r}")
+        doc = migrate(prev["resume"])
+        now = _flat(doc).get((c["kind"], c["target_id"]), (None, None))[0]
+        if now != c["after"]:
+            raise Conflict(f"{c['target_id']!r} changed since: expected {_text(c['after'])!r}, now {_text(now)!r}",
+                           _text(c["after"]), _text(now))
+        _put_node(doc, c["kind"], c["target_id"], copy.deepcopy(c["before"]), c.get("where"))
+        return _commit(d, prev, migrate(doc), latest, "user", reverts=cid)
+
+
+def user_texts(root: Path, rid: str) -> set[str]:
+    """DEC-020: bullet texts a user wrote, replaying the logs (published versions' changes.jsonl, then the draft's).
+    Per bullet, the current text's author is the last line that changed the text (an add, or before.text !=
+    after.text); a line leaving the text as is keeps the previous author; a revert line inherits whoever wrote the
+    text it restores, not its actor. Only user-authored texts make `origin: "user"` count."""
+    try:
+        d = _dir(root, rid)
+    except LookupError:
+        return set()
+    logs = sorted(d.glob("v*/changes.jsonl"), key=lambda p: int(p.parent.name[1:]) if p.parent.name[1:].isdigit() else 0)
+    cur: dict[str, tuple[Any, str | None]] = {}  # bullet id -> (text, its author)
+    for p in [*logs, d / "draft.changes.jsonl"]:
+        prior: dict[str, str | None] = {}  # line id -> author of the text it replaced (newest line per id wins)
+        for c in _read_log(p):
+            if c.get("kind") != "bullet":
+                continue
+            bid = str(c.get("target_id"))
+            was = cur.get(bid, (None, None))
+            prior[str(c.get("id"))] = was[1]
+            text = _text(c.get("after"))
+            if c.get("reverts") is not None:
+                who = prior.get(str(c["reverts"]))
+            elif c.get("op") == "add" or _text(c.get("before")) != text:
+                who = c.get("author")
+            else:
+                who = was[1]
+            cur[bid] = (text, who)
+    return {t for t, who in cur.values() if who == "user" and isinstance(t, str)}
 
 
 def cleanup_tmp(root: Path, max_age: float = 600) -> int:

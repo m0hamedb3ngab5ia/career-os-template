@@ -12931,6 +12931,106 @@
         ]
       }
     },
+    "/api/profile/resumes/{rid}/draft/changes": {
+      "get": {
+        "description": "History (DEC-015): draft.changes.jsonl, oldest first.",
+        "operationId": "draft_changes_api_profile_resumes__rid__draft_changes_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "additionalProperties": true,
+                    "type": "object"
+                  },
+                  "title": "Response Draft Changes Api Profile Resumes  Rid  Draft Changes Get",
+                  "type": "array"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Draft Changes",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/draft/changes/{cid}/revert": {
+      "post": {
+        "description": "Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.",
+        "operationId": "revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "cid",
+            "required": true,
+            "schema": {
+              "title": "Cid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Revert Change",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
     "/api/profile/resumes/{rid}/feedback": {
       "get": {
         "operationId": "get_feedback_api_profile_resumes__rid__feedback_get",

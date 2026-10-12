@@ -524,7 +524,8 @@ def test_batch_apply_skips_tier_b_needs_review_and_staged_jobs_even_with_auto_su
     assert [r["job_id"] for r in ranked] == [ready]
 
 
-def test_apply_refuses_a_resume_with_an_unsourced_ai_bullet_even_when_prepare_says_qa_pass(settings, store):
+def test_apply_refuses_a_resume_with_an_unsourced_ai_bullet_even_when_prepare_says_qa_pass(settings, store,
+                                                                                            monkeypatch):
     """DEC-018 amendment: the apply gate re-runs bullet_fidelity in code instead of trusting prepare.json."""
     def resume(jid, bullet):
         (store.job_dir(jid) / "resume.json").write_text(json.dumps({"schema_version": 1, "experience": [
@@ -534,6 +535,9 @@ def test_apply_refuses_a_resume_with_an_unsourced_ai_bullet_even_when_prepare_sa
         _prepared(store, j)
     resume(bad, {"text": "Invented a claim"})
     resume(user, {"text": "Mentored new team members", "origin": "user"})
+    # DEC-020: the base résumé's change log (faked; settings.root is the shared examples repo) shows the user wrote it
+    (store.job_dir(user) / "resume_choice.json").write_text(json.dumps({"rid": "base-1"}))
+    monkeypatch.setattr("careeros.resumes.user_texts", lambda root, rid: {"Mentored new team members"})
     ranked, _ = select_candidates(settings, "apply", cfg_of(settings), NOW)
     assert sorted(r["job_id"] for r in ranked) == sorted([user, legacy])
     ranked, excluded = select_candidates(settings, "apply", cfg_of(settings), NOW, job_ids=[bad])
