@@ -3,13 +3,13 @@ user_requirements:
     status: proposed
     provenance: observed
   USR-002:
-    status: proposed
+    status: approved
     provenance: confirmed
   USR-003:
     status: approved
     provenance: confirmed
   USR-004:
-    status: proposed
+    status: approved
     provenance: confirmed
   USR-005:
     status: proposed
@@ -398,7 +398,7 @@ requirements:
     user_requirements:
     - USR-020
   REQ-093:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -416,7 +416,7 @@ requirements:
     - E2E-001-01
     - E2E-001-02
   REQ-095:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -437,7 +437,7 @@ requirements:
     - E2E-002-02
     - E2E-002-03
   REQ-097:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -463,7 +463,7 @@ requirements:
     - E2E-003-01
     - E2E-003-02
   REQ-100:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-004
@@ -634,7 +634,7 @@ requirements:
     - USR-014
     tests: []
   REQ-124:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -642,14 +642,14 @@ requirements:
     - E2E-001-03
     - E2E-001-04
   REQ-125:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
     tests:
     - E2E-002-01
   REQ-126:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -674,14 +674,14 @@ requirements:
     provenance: inferred
 use_cases:
   UC-001:
-    status: needs-review
+    status: approved
     requirements:
     - REQ-093
     - REQ-094
     - REQ-124
     - REQ-125
   UC-002:
-    status: needs-review
+    status: approved
     requirements:
     - REQ-095
     - REQ-096
@@ -694,7 +694,7 @@ use_cases:
     - REQ-098
     - REQ-099
   UC-004:
-    status: needs-review
+    status: approved
     requirements:
     - REQ-100
   UC-005:
@@ -751,7 +751,7 @@ use_cases:
     - REQ-122
 flows:
   FLOW-001:
-    status: needs-review
+    status: approved
     use_cases:
     - UC-001
     - UC-002
@@ -759,7 +759,7 @@ flows:
     - UC-005
     - UC-006
   FLOW-002:
-    status: needs-review
+    status: approved
     use_cases:
     - UC-002
   FLOW-003:
@@ -802,7 +802,7 @@ tasks:
     requirements:
     - REQ-104
   TASK-007:
-    status: needs-review
+    status: done
     requirements:
     - REQ-093
     - REQ-099
@@ -810,7 +810,7 @@ tasks:
     use_cases:
     - UC-001
   TASK-008:
-    status: needs-review
+    status: done
     requirements:
     - REQ-094
     - REQ-095
@@ -848,7 +848,7 @@ tasks:
     flows:
     - FLOW-003
   TASK-013:
-    status: needs-review
+    status: done
     requirements:
     - REQ-107
     - REQ-101
@@ -907,7 +907,7 @@ tasks:
     requirements:
     - REQ-101
   TASK-022:
-    status: needs-review
+    status: done
     requirements:
     - REQ-094
     - REQ-095

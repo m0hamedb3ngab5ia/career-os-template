@@ -7,7 +7,7 @@ UCs: UC-001, UC-002, UC-003, UC-005, UC-006
 flowchart TD
   A[Open app] --> B{Readiness all must-haves?}
   B -- no --> C[Checklist: next open item + link]
-  C --> D[Profile › Résumés: upload]
+  C --> D[Profile › Résumés: upload → Résumé workspace]
   D --> E[Review progress] --> F[Feedback: apply / comment / edit]
   F --> G[Make master → approve master.yaml diff]
   G --> H[Saved answers: work auth, salary]
