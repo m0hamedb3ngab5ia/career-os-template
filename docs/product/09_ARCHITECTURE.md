@@ -228,8 +228,8 @@ flowchart LR
   ws --> ann[**annotations API**] --> afile[(annotations.json)]
   runs[review / Apply-comment run] -->|proposals + replies only| ann
   ann -->|Accept: apply-edit base + fabrication guard| draft
-  ws -->|Next/Done + idem key| pub[**publish**] --> ver2[(v&lt;n+1&gt;/ resume.json, text.txt, ats.json)]
-  ver2 --> render[render.py PDF + HTML preview]
+  ws -->|Next/Done + idem key| pub[**publish**] --> ver2[(v&lt;n+1&gt;/ resume.json + changes.jsonl)]
+  ver2 --> render[on demand: text, ATS, HTML, .tex; PDF cached for latest only, DEC-020]
 ```
 What to notice: AI never writes the draft; only the user's Accept does, through the same guard as `apply-edit`. One schema, one import, one renderer.
 
@@ -239,7 +239,8 @@ What to notice: AI never writes the draft; only the user's Accept does, through 
 | `profile/resumes/<rid>/draft.json` | working résumé JSON (DEC-018) + `rev`, `base_version` | draft API, atomic |
 | `profile/resumes/<rid>/draft.changes.jsonl` | `{id, at, author, target_id, op, before, after, reverts?}` per line; reset on publish | draft API, append |
 | `profile/resumes/<rid>/annotations.json` | `{id, kind, target_id, base, author, status, proposed, text, replies[], at}` | annotations API, runs via CLI |
-| `profile/resumes/<rid>/v<n>/resume.json` | published, immutable; `text.txt` + `ats.json` derived from it | publish |
+| `profile/resumes/<rid>/v<n>/resume.json` | published, immutable; with `changes.jsonl` (authors, DEC-017) the only files per version; text/ATS/.tex/PDF rendered on demand (DEC-020) | publish |
+| `profile/resumes/<rid>/cache/` | one PDF for the latest version, keyed by hash(resume.json) + renderer version; disposable | render |
 | `profile/resumes/<rid>/import.json` | import state `running\|done\|failed`, run_id, guard failures | import run |
 
 ### Data model delta
@@ -261,7 +262,7 @@ Edit + publish:
 1. UI PUT draft `{rev, changes[]}` 500–800 ms after typing; server: rev ≠ current → 409; else apply, append changes, rev+1.
 2. Revert change c: target value == c.after → append inverse; else 409 with both texts.
 3. Accept suggestion s: target == s.base → fabrication guard → apply as change (author ai, accepted by user); else s → outdated.
-4. Next/Done `{idem_key}`: seen key → return earlier result; hash(draft) == hash(latest) → no-op; else temp dir → rename `v<n+1>` → meta.json (+ master on onboarding) → derive text/ats → draft reset, open annotations re-checked (missing target → outdated).
+4. Next/Done `{idem_key}`: seen key → return earlier result; hash(draft) == hash(latest) → no-op; else temp dir → rename `v<n+1>` → meta.json (+ master on onboarding) → move `draft.changes.jsonl` to `v<n+1>/changes.jsonl` → draft reset, open annotations re-checked (missing target → outdated).
 
 ### Failure + recovery
 | failure | effect | recovery |
@@ -277,6 +278,6 @@ Edit + publish:
 | no lost edits | stale rev save → 409, draft unchanged | unit draft API |
 | no silent AI changes | review run output touches only annotations.json | integration run fixture |
 | no duplicate versions | double Next with same key / unchanged draft → one version | unit publish |
-| deterministic render | same JSON twice → identical `.tex` + `.txt`; PDF with `SOURCE_DATE_EPOCH` | integration render (skipif no LaTeX) |
+| deterministic render | same JSON twice → identical text, ATS and `.tex` (on-demand output must be stable) | integration render (skipif no LaTeX) |
 | auditable revert | revert appends inverse; conflicting revert refused | unit history |
 | import never invents | bullet not in text.txt → import failed | unit guard |
