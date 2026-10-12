@@ -253,6 +253,15 @@ def test_job_detail_reads_the_files(data, idx):
     assert [h["status"] for h in d["history"]][-1] == "interview"
     assert "status -> interview" in d["log"]
     assert d["apply_session"] is None and d["screenshots"] == []
+    assert d["resume_choice"] is None
+
+
+def test_job_detail_carries_the_resume_choice(data, idx):  # DEC-021: the UI offers "Tailor instead" on reuse
+    from careeros.store import Store
+    jid = data["jobs"]["interview"]
+    (Store(data["settings"]).job_dir(jid) / "resume_choice.json").write_text(
+        json.dumps({"action": "reuse", "reason": "fit 91 >= 85"}))
+    assert jobs_svc.job_detail(data["settings"], idx, jid)["resume_choice"]["action"] == "reuse"
 
 
 def test_job_detail_unknown_or_unsafe_id(data, idx):
