@@ -120,6 +120,19 @@ def test_reply_with_apply_queues_an_ai_redraft_run(tmp_path: Path):  # "Apply co
         assert c.post(f"{url}/zz/replies", json={"text": "x", "apply": True}, headers=W).status_code == 404
         assert len(started) == 1
 
+        def busy(self, kind, **kw):
+            raise RuntimeError("runner busy")
+        RC.start_step = busy
+        r = c.post(f"{url}/{aid}/replies", json={"text": "try again", "apply": True}, headers=W)
+        assert r.status_code == 409 and "reply saved" in r.json()["detail"]
+        assert ann.list_items(root, rid)[0]["replies"][-1]["text"] == "try again"  # the reply is kept
+
+        def bad(self, kind, **kw):
+            raise ValueError("bad item")
+        RC.start_step = bad
+        assert c.post(f"{url}/{aid}/replies", json={"text": "again", "apply": True}, headers=W).status_code == 422
+        assert ann.list_items(root, rid)[0]["replies"][-1]["text"] == "again"
+
 
 def test_cli_writes_annotations_as_ai(tmp_path: Path, capsys):  # review-resume / edit-resume path
     from careeros import cli
@@ -140,6 +153,8 @@ def test_cli_writes_annotations_as_ai(tmp_path: Path, capsys):  # review-resume 
     assert [i["id"] for i in out["items"]] == [s["id"]] and out["resume"]["experience"][0]["id"] == "experience-1"
     assert cli.main([*r, "annotate", rid, "suggestion", "--target", "experience-1.b1"]) == 1  # no proposed text
     assert cli.main([*r, "annotate", rid, "comment", "--target", "nope", "--text", "x"]) == 1
+    assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
+                     "--proposed", "y"]) == 1  # a comment proposes nothing
     assert "error:" in capsys.readouterr().err
 
 

@@ -972,6 +972,8 @@ def cmd_resume_annotate(args: argparse.Namespace) -> int:
         if c == "annotations":
             out = {**store.get_draft(root, args.rid), "items": ann.list_items(root, args.rid)}
         elif c == "annotate":
+            if args.kind == "comment" and args.proposed is not None:
+                raise ValueError("a comment takes --text, not --proposed")
             out = ann.create(root, args.rid, kind=args.kind, target_id=args.target, text=args.text or "",
                              proposed=args.proposed, author="ai")
         else:

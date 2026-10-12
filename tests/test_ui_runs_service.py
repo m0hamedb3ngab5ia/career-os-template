@@ -1003,3 +1003,10 @@ def test_resume_steps_start_while_another_run_holds_the_runner_lock(rc, kind, it
     hold_runner(RunStore(rc.settings), "20260926-110000-score-abcd")
     out = rc.start_step(kind, resume="cv", item=item)
     assert len(FakePopen.calls) == 1 and out["run_id"]
+
+
+def test_resume_edit_accepts_an_annotation_item(rc):  # TASK-030 "Apply comment" passes an annotation id (a<n>)
+    out = rc.start_step("resume_edit", resume="r1", item="a3")
+    assert out["kind"] == "resume_edit" and out["run_id"]
+    with pytest.raises(ValueError):
+        rc.start_step("resume_edit", resume="r1", item="x1")

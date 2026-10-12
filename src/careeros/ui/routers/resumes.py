@@ -365,7 +365,10 @@ def reply_annotation(rid: str, aid: str, body: Reply, request: Request, c=Depend
     with _refusals():
         out = Replied(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
     if body.apply:
-        out.run_id = _start(request, c, "resume_edit", rid, aid).run_id
+        try:
+            out.run_id = _start(request, c, "resume_edit", rid, aid).run_id
+        except HTTPException as e:
+            raise HTTPException(e.status_code, f"reply saved; {e.detail}") from None
     return out
 
 

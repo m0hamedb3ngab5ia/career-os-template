@@ -327,7 +327,7 @@ class RunControl:
             return {"kind": kind, **self.spawn(rid, ["careeros.ui.services.step", kind, "--run-id", rid]), "run_id": rid}
         elif kind in ("review", "resume_edit"):  # REQ-094/095/096: headless skill on one résumé (+ item)
             if not resume or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume) or (kind == "resume_edit") != bool(item) \
-                    or (item and not re.fullmatch(r"f\d+", item)):
+                    or (item and not re.fullmatch(r"[fa]\d+", item)):
                 raise ValueError(f"{kind} needs a résumé id" + (" and a feedback item" if kind == "resume_edit" else ""))
             if self.rs.pause_state(self.now()):  # own résumé lock (step.run_resume_skill): no runner-lock check
                 raise Paused("runs are paused; resume them first")
