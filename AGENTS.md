@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Guidance for Codex and other non-Claude agents. `CLAUDE.md` is canonical for project rules;
-read it first, then `ARCHITECTURE.md`.
+read it first; it says which `ARCHITECTURE.md` sections to read.
 
 - Reviews: `$review <PR>` (`.agents/skills/review/SKILL.md`) follows `docs/CODE_REVIEW_PROMPT.md`.
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -e ".[test]" && .venv/bin/careeros init`.
