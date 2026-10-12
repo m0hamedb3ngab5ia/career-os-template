@@ -132,6 +132,18 @@ def test_legit_mentions_do_not_trip(example_settings, text):
     assert check_posting(_p(description_text=text), example_settings) == []
 
 
+@pytest.mark.parametrize("text", [
+    # negation in another clause must not excuse the scam ask
+    "Don't worry, deposit the check and keep the rest.",
+    "This is not a scam, simply deposit the check.",
+    "No fraud here, buy gift cards for the team.",
+    "If you are not local, cash the check we mail you.",
+    "Don't hesitate to buy gift cards for onboarding.",
+])
+def test_negation_outside_clause_still_trips(example_settings, text):
+    assert verdict(check_posting(_p(description_text=text), example_settings)) == "block"
+
+
 def test_salary_far_above_market_is_review(example_settings):
     floor = example_settings.targets["candidate"]["min_base_usd"]
     flags = check_posting(_p(salary_min=floor * 4, salary_max=floor * 5), example_settings)

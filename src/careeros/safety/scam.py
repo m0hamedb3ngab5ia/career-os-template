@@ -126,14 +126,16 @@ POSTING_PATTERNS: list[tuple[str, Level, str, re.Pattern[str]]] = [
 ]
 
 # Employers' anti-scam notices quote scam phrases ("we will never ask you to deposit a check").
-# ponytail: word heuristic over the same sentence; a scammer's "don't worry, deposit the check" slips through.
-_NEGATION_RE = re.compile(r"\b(never|not|beware|fraud\w*|scam\w*)\b|n't\b", re.I)
+# Only the match's own clause counts, so "not a scam, deposit the check" still trips.
+# ponytail: word heuristic; add an LLM judge if notices still false-positive.
+_NEGATION_RE = re.compile(r"\b(never|not|beware|fraud\w*|scam\w*)\b|n['’]t\b", re.I)
+_URGE_RE = re.compile(r"\b(worry|hesitate)\b", re.I)
 
 
 def _negated(text: str, start: int) -> bool:
-    """True when the sentence before a match negates or warns about it."""
-    sentence = re.split(r"[.!?\n]", text[max(0, start - 120):start])[-1]
-    return bool(_NEGATION_RE.search(sentence))
+    """True when the clause before a match negates or warns about it ("we will never ask you to …")."""
+    clause = re.split(r"[.!?\n,;:]", text[max(0, start - 120):start])[-1]
+    return bool(_NEGATION_RE.search(clause)) and not _URGE_RE.search(clause)
 
 
 # Form fields. Remote access, payment and credentials for other accounts block at any stage; identity and
