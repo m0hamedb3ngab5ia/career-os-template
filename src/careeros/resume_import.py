@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from careeros import resumes as store
+from careeros.qa_ext.pdf_fidelity import _BULLETS
 
 _TOP = {"schema_version", "sections"}  # layout, not résumé content
 _ITEM = {"id", "source", "origin"}  # ids/provenance on entries and bullets
@@ -86,8 +87,6 @@ def _header(line: str, doc: dict[str, Any]) -> bool:
 def _lines(text: str) -> list[tuple[str, bool]]:
     """Normalised v1 lines without their bullet glyph, and whether they had one (checked on the raw line:
     normalising blanks most glyphs)."""
-    from careeros.qa_ext.pdf_fidelity import _BULLETS
-
     return [(k, raw.lstrip()[:1] in _BULLETS + "*-") for raw in text.splitlines()
             if (k := _key(raw).lstrip(_GLYPHS))]
 
@@ -96,11 +95,13 @@ def _guard(doc: dict[str, Any], text: str) -> None:
     """A bullet = whole consecutive v1 lines (a wrapped bullet; never across a new bullet or a header); any other
     field = word-bounded inside such a span (a summary wraps too)."""
     lines = _lines(text)
-    spans = {" ".join(x for x, _ in lines[i:j]) for i in range(len(lines)) for j in range(i + 1, min(i + 6, len(lines) + 1))
-             if not any(g or _header(x, doc) for x, g in lines[i + 1:j])}
+    runs = [(" ".join(x for x, _ in lines[i:j]), any(_header(x, doc) for x, _ in lines[i + 1:j]))
+            for i in range(len(lines)) for j in range(i + 1, min(i + 6, len(lines) + 1))
+            if not any(g for _, g in lines[i + 1:j])]
+    bullets = {x for x, h in runs if not h}  # a summary may wrap onto header words ("...professional\nexperience")
     for at, s in _leaves(doc):
         k = _key(s)
-        if not (k in spans if re.search(r"\.bullets\[\d+\](\.text)?$", at) else any(_has(x, k) for x in spans)):
+        if not (k in bullets if re.search(r"\.bullets\[\d+\](\.text)?$", at) else any(_has(x, k) for x, _ in runs)):
             raise ImportRefused(f"{at} not in the uploaded text: {s!r}")
 
 

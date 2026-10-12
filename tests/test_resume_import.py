@@ -122,8 +122,8 @@ def test_guard_bullet_is_whole_v1_lines(tmp_path: Path, v1: str, bullet: str):  
 
 def test_guard_field_within_one_line_case_insensitive(tmp_path: Path):
     root, rid = _v1(tmp_path)
-    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):
-        imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Doe EXPERIENCE"}]})
+    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):  # fields may cross a header (review-3)
+        imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Doe Experienced"}]})
     imp.set_state(root, rid, "running")
     doc = copy.deepcopy(DOC)
     doc["experience"][0]["bullets"][0]["text"] = "built THE thing for customers"
@@ -220,3 +220,28 @@ def test_guard_bullet_wrapped_onto_header_words_passes(tmp_path: Path):  # revie
     root, rid = _v1(tmp_path, "Acme\nSkills\n• Ran workshops on tooling\nand skills\n")
     assert imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Acme", "bullets": [
         {"text": "Ran workshops on tooling and skills"}]}]})["state"] == "done"
+
+
+def test_guard_field_wrapped_onto_header_words_passes(tmp_path: Path):  # review-3 SHOULD: only bullets break on headers
+    root, rid = _v1(tmp_path, "Pat Doe\nSummary\nEngineer with ten years of professional\nexperience\n")
+    assert imp.save(root, rid, {"schema_version": 1, "summary": "Engineer with ten years of professional experience"}
+                    )["state"] == "done"
+
+
+def test_run_import_guard_refusal_fails_with_guard_reason(tmp_path: Path, monkeypatch):  # review-3 NIT: end to end
+    from careeros.ui.services import step
+
+    root, rid = _v1(tmp_path)
+    added = []
+    monkeypatch.setattr("careeros.tracker.add_action", lambda s, what, type, **kw: added.append(what))
+
+    def refused(s, kind, prompt, **kw):  # the skill's save is refused, its one retry too, then the run ends
+        for _ in range(2):
+            with pytest.raises(imp.ImportRefused):
+                imp.save(root, rid, {"schema_version": 1, "summary": "Invented award winner"})
+        return {"id": "r1", "stop_reason": "completed"}
+    step.run_import(type("S", (), {"root": root})(), rid, run_skill=refused, run_id="r1")
+    st = imp.load(root, rid)
+    assert st["state"] == "failed" and st["reason"].startswith("summary not in the uploaded text")
+    assert len(added) == 1 and "summary not in the uploaded text" in added[0]
+    assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]
