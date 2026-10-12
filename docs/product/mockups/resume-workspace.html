@@ -1,81 +1,136 @@
 <!doctype html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Résumé workspace wireframe</title>
-<!-- Wireframe for SCREEN-ResumeWorkspace (06_IA.md), REQ-124..126, DEC-012. Tokens from 08_DESIGN_SYSTEM.md. -->
+<!-- Interactive wireframe for SCREEN-ResumeWorkspace (06_IA.md), REQ-124..126, DEC-012.
+     Suggestion behaviour copies Google Docs. Minimal: only what the flow needs. -->
 <style>
-:root{--bg:#fff;--group:#faf9f5;--card:#fff;--fill:#eeebe3;--sep:#e5e1d8;--label:#1d1d1f;--sec:#5e5e63;--accent:#0066cc;--focus:#0066cc;--selected:#dce7f5;
---g:#1e7b34;--gb:#e3f4e7;--o:#a34700;--ob:#fdeedc;--r:#c4001a;--rb:#fce4e6;--b:#0058b0;--bb:#e1ecf9}
-@media (prefers-color-scheme:dark){:root{--bg:#1c1c1e;--group:#161618;--card:#2c2c2e;--fill:#3a3a3c;--sep:#3a3a3c;--label:#f5f5f7;--sec:#aeaeb2;--accent:#0064d1;--focus:#4da3ff;--selected:#1e3a5f;
---g:#4ade80;--gb:#16301f;--o:#ffb340;--ob:#3a2a12;--r:#ff6b61;--rb:#3d1a1a;--b:#7cb8ff;--bb:#18304d}}
-*{box-sizing:border-box}body{margin:0;background:var(--group);color:var(--label);font:14px/1.45 -apple-system,"SF Pro Text",system-ui}
-.wrap{max-width:1180px;margin:0 auto;padding:16px}
-h1{font-size:22px;margin:0}.sec{color:var(--sec)}
-.head{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:12px}.head .sp{flex:1}
-.chip{font-size:12px;padding:2px 8px;border-radius:99px;background:var(--fill)}
-select,button{font:inherit;border-radius:8px;border:1px solid var(--sep);background:var(--card);color:var(--label);padding:6px 10px}
-button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
-.bar{display:flex;gap:8px;align-items:center;padding:8px 12px;border-radius:10px;margin-bottom:12px;background:var(--ob);color:var(--o);position:sticky;top:0}
-.bar .sp{flex:1}
-.tabs{display:flex;gap:16px;border-bottom:1px solid var(--sep);margin-bottom:12px}.tabs span{padding:6px 0}.tabs .on{border-bottom:2px solid var(--accent);font-weight:600}
-.grid{display:grid;grid-template-columns:1fr 320px;gap:16px}@media(max-width:900px){.grid{grid-template-columns:1fr}}
-.card{background:var(--card);border:1px solid var(--sep);border-radius:12px;padding:16px}
-.resume h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--sep);margin:16px 0 6px}
-.resume ul{margin:4px 0;padding-left:18px}
-mark{background:var(--bb);color:inherit;border-radius:3px}mark.on{background:var(--selected);outline:2px solid var(--focus)}
-del{background:var(--rb);color:var(--r)}ins{background:var(--gb);color:var(--g);text-decoration:none}
-.fb{margin-bottom:10px}.fb.on{outline:2px solid var(--focus);background:var(--selected)}
-.fb p{margin:4px 0}.fb .acts{display:flex;gap:6px;margin-top:8px}
-.done{display:flex;justify-content:space-between;align-items:center;color:var(--g)}
-.note{font-size:12px;color:var(--sec);margin-top:24px}
-</style></head><body><div class="wrap">
+:root{--bg:#fff;--group:#f0f2f5;--card:#fff;--fill:#eeebe3;--sep:#dadce0;--label:#1d1d1f;--sec:#5f6368;--accent:#0b57d0;--focus:#0b57d0;--sel:#d3e3fd;
+--ai:#188038;--aib:#e6f4ea;--cm:#fef0c3;--cmon:#fad165;--shadow:0 1px 3px rgba(60,64,67,.3),0 4px 8px 3px rgba(60,64,67,.15)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1f1f1f;--group:#131314;--card:#2d2e30;--fill:#3c4043;--sep:#444746;--label:#e3e3e3;--sec:#a8abaf;--accent:#a8c7fa;--focus:#a8c7fa;--sel:#0842a0;
+--ai:#6dd58c;--aib:#0f3a1f;--cm:#5c4a12;--cmon:#8a6d0f;--shadow:0 1px 3px #000,0 4px 8px 3px rgba(0,0,0,.5)}}
+*{box-sizing:border-box}body{margin:0;background:var(--group);color:var(--label);font:14px/1.5 -apple-system,"SF Pro Text",system-ui}
+button{font:inherit;color:inherit;border:0;background:none;border-radius:99px;padding:6px 12px;cursor:pointer}button:hover{background:var(--fill)}
+button.primary{background:var(--accent);color:var(--bg)}button.ic{width:32px;height:32px;padding:0;font-size:16px}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+header{display:flex;gap:8px;align-items:center;padding:8px 16px;background:var(--bg);position:sticky;top:0;z-index:5;border-bottom:1px solid var(--sep)}
+header h1{font-size:18px;font-weight:400;margin:0}#st{color:var(--sec);font-size:13px}
+.app{display:grid;grid-template-columns:120px minmax(0,1fr) 280px;gap:24px;max-width:1200px;margin:0 auto;padding:16px}
+nav button{display:block;width:100%;text-align:left;border-radius:0 99px 99px 0}nav .on{background:var(--sel);font-weight:600}
+.page{background:var(--bg);box-shadow:0 1px 3px rgba(0,0,0,.15);padding:48px 56px;min-height:700px;outline:none;margin:0}
+.page h1{font-size:22px;margin:0}.page h2{font-size:13px;letter-spacing:.06em;text-transform:uppercase;border-bottom:1px solid var(--sep);margin:20px 0 6px}
+.page p{margin:4px 0}.page ul{margin:4px 0;padding-left:20px}
+ins{text-decoration:none;color:var(--ai)}del{color:var(--ai)}
+.sg.act,.sg.hov{background:var(--aib)}.cm{background:var(--cm)}.cm.act,.cm.hov{background:var(--cmon)}
+#margin{position:relative}
+.cd{position:absolute;left:0;right:0;background:var(--card);border-radius:8px;padding:8px 12px;box-shadow:0 1px 2px rgba(60,64,67,.3);transition:top .2s,transform .2s;cursor:pointer}
+.cd.on{box-shadow:var(--shadow);transform:translateX(-16px);z-index:2}
+.hd{display:flex;align-items:flex-start;gap:4px}.hd>div{flex:1}.cd p{margin:4px 0;color:var(--sec)}
+.cd:not(.on) p{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}.cd:not(.on) .ic{display:none}
+.lnk{color:var(--accent);padding:2px 0}
+#vh,#vdoc,#ats{display:none}[data-vh] #vh,[data-vh] #vdoc{display:block}[data-vh] #margin,[data-vh] #doc,[data-vh] nav{display:none}
+#vh .v{display:block;width:100%;text-align:left;border-radius:8px;padding:8px 12px}#vh .v.on{background:var(--sel)}#vh small{display:block;color:var(--sec)}
+#vdoc:not(.chg) del{display:none}#vdoc:not(.chg) ins{color:inherit}
+#ats{white-space:pre-wrap;font:13px/1.5 ui-monospace,Menlo,monospace}[data-tab=ats] #ats{display:block}[data-tab=ats] #doc,[data-tab=ats] #margin{display:none}
+@media(max-width:900px){.app{grid-template-columns:1fr}.page{padding:24px 16px}nav{display:flex}nav button{border-radius:99px}.cd{position:static;margin-bottom:8px}.cd.on{transform:none}}
+</style></head><body>
 
-<p class="sec">Profile › Résumés row (REQ-125): <b>Alex Example résumé</b> · <span class="chip">master</span> · 3 suggestions · <button class="primary">Review 3 suggestions</button></p>
-<hr>
+<header><h1>Alex Example résumé</h1><button id="st" title="Version history">All changes saved</button></header>
 
-<div class="head">
-  <h1>Alex Example résumé</h1><span class="chip">master</span><span class="sp"></span>
-  <select aria-label="Version"><option>Draft (from v2)</option><option>v2 · converted · AI</option><option>v1 · original upload · read-only</option></select>
-  <select aria-label="Compare with"><option>Compare with…</option><option>v2</option><option>v1</option></select>
-  <button>Make master</button>
-</div>
-
-<div class="bar" role="status">Draft, not saved · 1 accepted, 1 edit<span class="sp"></span><button>Discard</button><button class="primary">Save as v3</button></div>
-
-<div class="tabs"><span class="on">Résumé</span><span>ATS view</span></div>
-
-<div class="grid">
-  <div class="card resume">
-    <b style="font-size:18px">Alex Example</b><div class="sec">alex@example.com · Springfield, NY</div>
-    <h2>Experience</h2>
-    <b>Software Engineer</b>, Example Corp <span class="sec">· Jan 2022 – Present</span>
-    <ul>
-      <li><mark class="on">Worked on the billing service and fixed bugs</mark></li>
-      <li><del>Helped with</del> <ins>Migrated</ins> the CI pipeline to GitHub Actions <span class="chip">AI</span></li>
-      <li>Wrote internal docs for onboarding <ins>new engineers</ins> <span class="chip">you</span></li>
-    </ul>
-    <h2>Education</h2>
-    <b>B.S. Computer Science</b>, State University <span class="sec">· May 2021</span>
-    <h2>Skills</h2>Python, TypeScript, SQL
-  </div>
-
+<div class="app">
+  <nav aria-label="Document tabs"><button class="on" data-t="doc">Résumé</button><button data-t="ats">ATS view</button></nav>
   <div>
-    <div class="card fb on">
-      <b>Experience · vague bullet</b>
-      <p class="sec">Say what you changed in the billing service.</p>
-      <p><del>Worked on the billing service and fixed bugs</del><br><ins>Fixed bugs in the billing service's invoice export</ins></p>
-      <div class="acts"><button class="primary">Accept</button><button>Comment</button><button>Dismiss</button></div>
-    </div>
-    <div class="card fb"><div class="done"><span>✓ Accepted: CI bullet</span><button>Undo</button></div></div>
-    <div class="card fb">
-      <b>Format · two columns</b><p class="sec">Fixed by our layout; nothing to do.</p>
-    </div>
-    <div class="card fb">
-      <b>Not carried over (1)</b>
-      <p class="sec">"References available on request"</p>
-      <div class="acts"><button>Restore</button></div>
-    </div>
+    <article id="doc" class="page" contenteditable="true" spellcheck="false">
+      <h1>Alex Example</h1><p>alex@example.com · Springfield, NY</p>
+      <h2>Experience</h2>
+      <p><b>Software Engineer</b>, Example Corp · Jan 2022 – Present</p>
+      <ul>
+        <li><span class="sg" data-id="s1"><del>Worked on the billing service and fixed bugs</del><ins>Fixed bugs in the billing service's invoice export</ins></span></li>
+        <li><span class="sg" data-id="s2"><del>Helped with</del><ins>Contributed to</ins></span> the CI pipeline move to GitHub Actions</li>
+        <li>Wrote <span class="cm" data-id="c1">internal docs for onboarding</span></li>
+      </ul>
+      <h2>Education</h2>
+      <p><b>B.S. Computer Science</b>, State University · May 2021</p>
+      <h2><span class="cm" data-id="c2">Skills</span></h2>
+      <p>Python, TypeScript, SQL</p>
+    </article>
+    <article id="vdoc" class="page chg"></article>
+    <pre id="ats" class="page"></pre>
   </div>
+  <aside id="margin" aria-label="Suggestions"></aside>
+  <aside id="vh" aria-label="Version history">
+    <button id="vhx">← Back</button>
+    <button class="v on" data-v="cur">Current<small>Today, 2:41 PM</small></button>
+    <button class="v" data-v="v2">v2 · Converted<small>Today, 2:12 PM</small></button>
+    <button class="v" data-v="v1">v1 · Original upload<small>Today, 2:11 PM</small></button>
+    <p><label><input type="checkbox" id="chg" checked> Show changes</label></p>
+    <button class="primary" id="rst" hidden>Restore this version</button>
+  </aside>
 </div>
 
-<p class="note">Wireframe only. Hover/focus a card ↔ highlight its text (blue). Inline diff: red strikethrough removed, green added, chip = who changed it. Save makes one version; leaving keeps the draft. Toast after Save: "Saved v3 · Open".</p>
-</div></body></html>
+<script>
+// Click text or card to pair them; hover card highlights text. ✓ accept/resolve, ✕ reject. ⌘Z/⌘⇧Z undo/redo. Typing edits directly; autosaves.
+const $=s=>document.querySelector(s),doc=$('#doc'),margin=$('#margin'),B=document.body;
+const esc=s=>s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const meta={
+ s1:{why:'Vague. Says what you changed, using only what your upload says.'},
+ s2:{why:'"Helped with" hides your part.'},
+ c1:{why:'Who used these docs? Add the audience if you know it.'},
+ c2:{why:'Not carried over from your upload: "References available on request".',restore:'References available on request'}};
+const VER={
+ v1:`<h1>Alex Example</h1><p>alex@example.com · Springfield, NY</p><h2>Experience</h2><p><b>Software Engineer</b>, Example Corp · Jan 2022 – Present</p><ul><li>Worked on the billing service and fixed bugs</li><li>Helped with the CI pipeline move to GitHub Actions</li><li>Wrote internal docs for onboarding</li></ul><h2>Education</h2><p><b>B.S. Computer Science</b>, State University · May 2021</p><h2>Skills</h2><ul><li>Python</li><li>TypeScript</li><li>SQL</li></ul><p>References available on request</p>`,
+ v2:`<h1>Alex Example</h1><p>alex@example.com · Springfield, NY</p><h2>Experience</h2><p><b>Software Engineer</b>, Example Corp · Jan 2022 – Present</p><ul><li>Worked on the billing service and fixed bugs</li><li>Helped with the CI pipeline move to GitHub Actions</li><li>Wrote internal docs for onboarding</li></ul><h2>Education</h2><p><b>B.S. Computer Science</b>, State University · May 2021</p><h2>Skills</h2><p><del>Python / TypeScript / SQL (two columns)</del><ins>Python, TypeScript, SQL</ins></p><p><del>References available on request</del></p>`};
+let active=null;
+
+const anchor=id=>doc.querySelector(`[data-id="${id}"]`);
+function cardHTML(id){const el=anchor(id),m=meta[id],sg=el.classList.contains('sg');let head='';
+ if(sg){const g=t=>esc([...el.querySelectorAll(t)].map(x=>x.textContent).join('')),d=g('del'),i=g('ins');
+  head=d&&i?`<b>Replace:</b> "${d}" <b>with</b> "${i}"`:i?`<b>Add:</b> "${i}"`:`<b>Delete:</b> "${d}"`}
+ return `<div class="hd"><div>${head}<p>${esc(m.why)}</p>${m.restore?'<button class="lnk rs">Restore</button>':''}</div>`+
+  (sg?'<button class="ic ok" title="Accept" aria-label="Accept">✓</button><button class="ic no" title="Reject" aria-label="Reject">✕</button>':'<button class="ic ok" title="Resolve" aria-label="Resolve">✓</button>')+'</div>'}
+function render(){margin.innerHTML='';
+ for(const id in meta){if(!anchor(id))continue;const c=document.createElement('div');c.className='cd'+(id===active?' on':'');c.dataset.for=id;c.tabIndex=0;c.innerHTML=cardHTML(id);margin.append(c)}
+ layout()}
+// Google layout: active card level with its text; others stack above/below without overlap.
+function layout(){if(matchMedia('(max-width:900px)').matches)return;
+ const base=margin.getBoundingClientRect().top,G=8;
+ const cs=[...margin.children].map(c=>({c,y:anchor(c.dataset.for).getBoundingClientRect().top-base,h:c.offsetHeight})).sort((p,q)=>p.y-q.y);
+ const k=cs.findIndex(x=>x.c.dataset.for===active),s=Math.max(k,0);
+ let b=-Infinity;for(let i=s;i<cs.length;i++){cs[i].t=Math.max(cs[i].y,b);b=cs[i].t+cs[i].h+G}
+ let t=k<0?0:cs[k].t;for(let i=s-1;i>=0;i--){cs[i].t=Math.min(cs[i].y,t-cs[i].h-G);t=cs[i].t}
+ for(const x of cs)x.c.style.top=x.t+'px'}
+function activate(id){active=id||null;
+ doc.querySelectorAll('.act').forEach(e=>e.classList.remove('act'));if(active)anchor(active).classList.add('act');
+ [...margin.children].forEach(c=>c.classList.toggle('on',c.dataset.for===active));layout()}
+
+// undo: one snapshot per action, typing coalesced per second
+const undo=[],redo=[];let last=0,st;
+const snap=()=>({h:doc.innerHTML,m:JSON.stringify(meta)});
+function push(co){const n=Date.now();if(co&&n-last<1000){last=n;return}last=co?n:0;undo.push(snap());redo.length=0}
+function restore(s){doc.innerHTML=s.h;for(const k in meta)delete meta[k];Object.assign(meta,JSON.parse(s.m));active=null;render();activate(null);saved()}
+function saved(){$('#st').textContent='Saving…';clearTimeout(st);st=setTimeout(()=>$('#st').textContent='All changes saved',700)}
+const unwrap=el=>el.replaceWith(...el.childNodes);
+function settle(id,drop){push();const el=anchor(id);el.querySelectorAll(drop).forEach(x=>x.remove());el.querySelectorAll('ins,del').forEach(unwrap);unwrap(el);delete meta[id];active=null;render();saved()}
+
+doc.addEventListener('beforeinput',()=>{push(1);saved()});
+doc.addEventListener('input',layout);
+doc.addEventListener('click',e=>{const a=e.target.closest('[data-id]');activate(a&&meta[a.dataset.id]?a.dataset.id:null)});
+margin.addEventListener('click',e=>{const c=e.target.closest('.cd');if(!c)return;const id=c.dataset.for,b=e.target.closest('button');
+ if(!b)return activate(id);
+ if(b.matches('.rs')){const p=document.createElement('p');p.textContent=meta[id].restore;doc.append(p)}
+ settle(id,b.matches('.no')?'ins':'del')});
+margin.addEventListener('keydown',e=>{if(e.target.matches('.cd')&&e.key==='Enter')activate(e.target.dataset.for)});
+margin.addEventListener('mouseover',e=>{const c=e.target.closest('.cd');doc.querySelectorAll('.hov').forEach(x=>x.classList.remove('hov'));if(c)anchor(c.dataset.for).classList.add('hov')});
+margin.addEventListener('mouseleave',()=>doc.querySelectorAll('.hov').forEach(x=>x.classList.remove('hov')));
+document.querySelectorAll('nav button').forEach(b=>b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.toggle('on',x===b));
+ B.dataset.tab=b.dataset.t;if(b.dataset.t==='ats'){const c=doc.cloneNode(true);c.querySelectorAll('ins').forEach(x=>x.remove());$('#ats').textContent=c.innerText}else layout()});
+let vsel;
+function showV(v){vsel=v;document.querySelectorAll('#vh .v').forEach(b=>b.classList.toggle('on',b.dataset.v===v));$('#vdoc').innerHTML=v==='cur'?doc.innerHTML:VER[v];$('#rst').hidden=v==='cur'}
+$('#st').onclick=()=>{B.dataset.vh=1;showV('cur')};$('#vhx').onclick=()=>{delete B.dataset.vh;layout()};
+$('#vh').addEventListener('click',e=>{const b=e.target.closest('.v');if(b)showV(b.dataset.v)});
+$('#chg').onchange=e=>$('#vdoc').classList.toggle('chg',e.target.checked);
+$('#rst').onclick=()=>{push();const t=document.createElement('div');t.innerHTML=VER[vsel];t.querySelectorAll('del').forEach(x=>x.remove());t.querySelectorAll('ins').forEach(unwrap);
+ doc.innerHTML=t.innerHTML;for(const k in meta)delete meta[k];delete B.dataset.vh;active=null;render();saved()};
+addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.code==='KeyZ'){e.preventDefault();const [a,b]=e.shiftKey?[redo,undo]:[undo,redo];if(a.length){b.push(snap());restore(a.pop())}}
+ if(e.key==='Escape')activate(null)});
+addEventListener('resize',layout);render();
+</script></body></html>
