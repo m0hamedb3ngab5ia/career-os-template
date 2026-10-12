@@ -51,6 +51,7 @@ class ResumeRow(BaseModel):
     latest: int
     at: str
     status: Literal["reviewing", "draft", "ready", "failed"]  # TASK-033b, see _row_status
+    failed_step: Literal["import", "review"] | None = None  # which step failed (import wins); None unless failed
 
 
 class Resumes(BaseModel):
@@ -251,7 +252,14 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
 @router.get("/profile/resumes")
 def list_resumes(c=Depends(ctx)) -> Resumes:
     root = c.settings.root
-    return Resumes(resumes=[ResumeRow(**r, status=_row_status(root, r["rid"])) for r in store.list_resumes(root)])
+    return Resumes(resumes=[ResumeRow(**r, status=_row_status(root, r["rid"]), failed_step=_failed_step(root, r["rid"]))
+                            for r in store.list_resumes(root)])
+
+
+def _failed_step(root: Any, rid: str) -> str | None:
+    if imp.load(root, rid).get("state") == "failed":
+        return "import"
+    return "review" if (fb.load(root, rid).get("review") or {}).get("state") == "failed" else None
 
 
 def _row_status(root: Any, rid: str) -> str:

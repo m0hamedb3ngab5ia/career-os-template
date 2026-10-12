@@ -2590,6 +2590,8 @@ export interface components {
       at: string;
       /** Category */
       category?: string | null;
+      /** Failed Step */
+      failed_step?: ("import" | "review") | null;
       /** Latest */
       latest: number;
       /** Name */

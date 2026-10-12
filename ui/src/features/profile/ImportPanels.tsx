@@ -47,7 +47,7 @@ export function NotCarriedOver({ rid, flush, onRestored }: { rid: string; flush?
           <li key={d.id} className={styles.row}>
             <span className={styles.grow}>{d.text}</span>
             {d.restored ? <Chip tone="green">Restored</Chip> : (
-              <Button size="small" aria-label={`Restore ${d.text}`} pending={restore.isPending && restore.variables?.did === d.id}
+              <Button size="small" aria-label={`Restore ${d.text}`} disabled={restore.isPending} pending={restore.isPending && restore.variables?.did === d.id}
                 pendingLabel="Restoring…" onClick={async () => {
                   if (flush && !(await flush())) return;  // the workspace saves its pending edits first, then reloads the draft
                   restore.mutate({ rid, did: d.id }, { onSuccess: onRestored });

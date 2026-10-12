@@ -6554,6 +6554,21 @@
             ],
             "title": "Category"
           },
+          "failed_step": {
+            "anyOf": [
+              {
+                "enum": [
+                  "import",
+                  "review"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Failed Step"
+          },
           "latest": {
             "title": "Latest",
             "type": "integer"

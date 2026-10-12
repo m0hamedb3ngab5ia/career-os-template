@@ -43,6 +43,9 @@ def test_row_status(tmp_path: Path):
         def status() -> str:
             return {r["rid"]: r["status"] for r in c.get("/api/profile/resumes").json()["resumes"]}[rid]
 
+        def step():
+            return {r["rid"]: r["failed_step"] for r in c.get("/api/profile/resumes").json()["resumes"]}[rid]
+
         assert status() == "ready"
         d = resumes.get_draft(root, rid)
         d["resume"]["summary"] = "Engineer"
@@ -51,10 +54,12 @@ def test_row_status(tmp_path: Path):
         fb.set_review(root, rid, "running", run="r1")
         assert status() == "reviewing"
         imp.set_state(root, rid, "failed", reason="guard")
-        assert status() == "failed"
+        assert status() == "failed" and step() == "import"
         imp.set_state(root, rid, "done")
         fb.set_review(root, rid, "failed", run="r1")
-        assert status() == "failed"
+        assert status() == "failed" and step() == "review"
+        fb.set_review(root, rid, "running", run="r2")
+        assert step() is None
 
 
 def test_annotations_by_run_and_cli_stamp(tmp_path: Path, capsys, monkeypatch):
