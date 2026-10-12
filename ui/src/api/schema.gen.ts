@@ -337,6 +337,36 @@ export interface paths {
     /** Patch Resume */
     patch: operations["patch_resume_api_profile_resumes__rid__patch"];
   };
+  "/api/profile/resumes/{rid}/annotations": {
+    /**
+     * List Annotations
+     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+     */
+    get: operations["list_annotations_api_profile_resumes__rid__annotations_get"];
+    /** Create Annotation */
+    post: operations["create_annotation_api_profile_resumes__rid__annotations_post"];
+  };
+  "/api/profile/resumes/{rid}/annotations/{aid}/accept": {
+    /**
+     * Accept Annotation
+     * @description User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard
+     * refuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).
+     * User suggestion: no guard, one draft change author=user.
+     */
+    post: operations["accept_annotation_api_profile_resumes__rid__annotations__aid__accept_post"];
+  };
+  "/api/profile/resumes/{rid}/annotations/{aid}/reject": {
+    /** Reject Annotation */
+    post: operations["reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post"];
+  };
+  "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
+    /**
+     * Reply Annotation
+     * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
+     * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+     */
+    post: operations["reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post"];
+  };
   "/api/profile/resumes/{rid}/draft": {
     /** Get Draft */
     get: operations["get_draft_api_profile_resumes__rid__draft_get"];
@@ -713,6 +743,63 @@ export interface components {
       usage_limit_stops: number;
       /** Window Days */
       window_days: number;
+    };
+    /** Annotation */
+    Annotation: {
+      /** At */
+      at?: string | null;
+      /**
+       * Author
+       * @enum {string}
+       */
+      author: "user" | "ai";
+      /** Base */
+      base?: string | null;
+      /** Id */
+      id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "suggestion" | "comment";
+      /** Proposed */
+      proposed?: string | null;
+      /**
+       * Replies
+       * @default []
+       */
+      replies?: {
+          [key: string]: unknown;
+        }[];
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "open" | "accepted" | "rejected" | "outdated";
+      /** Target Id */
+      target_id?: string | null;
+      /**
+       * Text
+       * @default
+       */
+      text?: string;
+    };
+    /** AnnotationIn */
+    AnnotationIn: {
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "suggestion" | "comment";
+      /** Proposed */
+      proposed?: string | null;
+      /** Target Id */
+      target_id?: string | null;
+      /**
+       * Text
+       * @default
+       */
+      text?: string;
     };
     /** Answer */
     Answer: {
@@ -2299,6 +2386,58 @@ export interface components {
       verified: {
         [key: string]: unknown;
       } | null;
+    };
+    /** Replied */
+    Replied: {
+      /** At */
+      at?: string | null;
+      /**
+       * Author
+       * @enum {string}
+       */
+      author: "user" | "ai";
+      /** Base */
+      base?: string | null;
+      /** Id */
+      id: string;
+      /**
+       * Kind
+       * @enum {string}
+       */
+      kind: "suggestion" | "comment";
+      /** Proposed */
+      proposed?: string | null;
+      /**
+       * Replies
+       * @default []
+       */
+      replies?: {
+          [key: string]: unknown;
+        }[];
+      /** Run Id */
+      run_id?: string | null;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "open" | "accepted" | "rejected" | "outdated";
+      /** Target Id */
+      target_id?: string | null;
+      /**
+       * Text
+       * @default
+       */
+      text?: string;
+    };
+    /** Reply */
+    Reply: {
+      /**
+       * Apply
+       * @default false
+       */
+      apply?: boolean;
+      /** Text */
+      text: string;
     };
     /** ResetFailuresBody */
     ResetFailuresBody: {
@@ -4910,6 +5049,141 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * List Annotations
+   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+   */
+  list_annotations_api_profile_resumes__rid__annotations_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Annotation"][];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Create Annotation */
+  create_annotation_api_profile_resumes__rid__annotations_post: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["AnnotationIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      201: {
+        content: {
+          "application/json": components["schemas"]["Annotation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Accept Annotation
+   * @description User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard
+   * refuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).
+   * User suggestion: no guard, one draft change author=user.
+   */
+  accept_annotation_api_profile_resumes__rid__annotations__aid__accept_post: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Draft"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Reject Annotation */
+  reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Annotation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Reply Annotation
+   * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
+   * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+   */
+  reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["Reply"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Replied"];
         };
       };
       /** @description Validation Error */
