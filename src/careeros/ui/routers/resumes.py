@@ -50,6 +50,7 @@ class ResumeRow(BaseModel):
     category: str | None = None
     latest: int
     at: str
+    status: Literal["reviewing", "draft", "ready", "failed"]  # TASK-033b, see _row_status
 
 
 class Resumes(BaseModel):
@@ -248,7 +249,22 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
 
 @router.get("/profile/resumes")
 def list_resumes(c=Depends(ctx)) -> Resumes:
-    return Resumes(resumes=[ResumeRow(**r) for r in store.list_resumes(c.settings.root)])
+    root = c.settings.root
+    return Resumes(resumes=[ResumeRow(**r, status=_row_status(root, r["rid"])) for r in store.list_resumes(root)])
+
+
+def _row_status(root: Any, rid: str) -> str:
+    """Profile › Résumés row status (REQ-125, TASK-033b), first match wins: import or review failed -> failed (Retry);
+    either running -> reviewing; unpublished draft or no structured version yet -> draft; else ready."""
+    states = (imp.load(root, rid).get("state"), (fb.load(root, rid).get("review") or {}).get("state"))
+    if "failed" in states:
+        return "failed"
+    if "running" in states:
+        return "reviewing"
+    try:
+        return "draft" if store.get_draft(root, rid)["draft"] else "ready"
+    except (LookupError, ValueError):  # no resume.json yet, or a corrupt draft: the workspace is where to fix it
+        return "draft"
 
 
 @router.get("/profile/resumes/{rid}")

@@ -6544,6 +6544,16 @@
             "title": "Rid",
             "type": "string"
           },
+          "status": {
+            "enum": [
+              "reviewing",
+              "draft",
+              "ready",
+              "failed"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
           "type": {
             "enum": [
               "master",
@@ -6560,7 +6570,8 @@
           "name",
           "type",
           "latest",
-          "at"
+          "at",
+          "status"
         ],
         "title": "ResumeRow",
         "type": "object"

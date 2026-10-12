@@ -2585,6 +2585,11 @@ export interface components {
       /** Rid */
       rid: string;
       /**
+       * Status
+       * @enum {string}
+       */
+      status: "reviewing" | "draft" | "ready" | "failed";
+      /**
        * Type
        * @enum {string}
        */
