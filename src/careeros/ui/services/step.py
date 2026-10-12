@@ -244,13 +244,19 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     root = settings.root
     before = resumes.get(root, rid)["versions"][-1]["n"]
     ai_before = _ai_annotations(root, rid, item)
+
+    def proposed_nothing(only_item: str | None) -> bool:  # TASK-033b: by run id, so a concurrent run's writes don't count
+        if run_id:
+            from careeros import annotations as ann
+            return ann.run_count(root, rid, run_id) == 0
+        return _ai_annotations(root, rid, only_item) <= ai_before
     if kind == "review":
         resume_feedback.set_review(root, rid, "running", run=run_id)
         rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id, lock=f"resume-{rid}")
         state = (resume_feedback.load(root, rid)["review"] or {}).get("state")
         if rec.get("stop_reason") != "completed" or state not in ("done", "running"):
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
-        elif state == "running" and _ai_annotations(root, rid) <= ai_before:  # finished but proposed nothing
+        elif state == "running" and proposed_nothing(None):  # finished but proposed nothing
             rec = _fail_run(settings, rec, NO_ANNOTATIONS)
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"), reason=NO_ANNOTATIONS)
         elif state == "running":  # TASK-030: the skill writes annotations (`resume annotate`), not review-save
@@ -259,7 +265,7 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
     rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
     if item and item.startswith("a") and rec.get("stop_reason") == "completed" \
-            and _ai_annotations(root, rid, item) <= ai_before:  # Apply comment: no new annotation and no reply
+            and proposed_nothing(item):  # Apply comment: no new annotation and no reply
         rec = _fail_run(settings, rec, NO_ANNOTATIONS)
     if not (item and item.startswith("a")):  # DEC-017: annotation runs only propose/reply, a version is the user's (Done)
         resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land

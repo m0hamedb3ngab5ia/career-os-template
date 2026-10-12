@@ -640,6 +640,17 @@
             "title": "Replies",
             "type": "array"
           },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run"
+          },
           "status": {
             "enum": [
               "open",
@@ -6239,6 +6250,17 @@
             },
             "title": "Replies",
             "type": "array"
+          },
+          "run": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run"
           },
           "run_id": {
             "anyOf": [
@@ -13320,7 +13342,7 @@
     },
     "/api/profile/resumes/{rid}/annotations": {
       "get": {
-        "description": "DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.",
+        "description": "DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those\nthat run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).",
         "operationId": "list_annotations_api_profile_resumes__rid__annotations_get",
         "parameters": [
           {
@@ -13330,6 +13352,22 @@
             "schema": {
               "title": "Rid",
               "type": "string"
+            }
+          },
+          {
+            "in": "query",
+            "name": "run",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Run"
             }
           }
         ],
