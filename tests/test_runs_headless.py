@@ -49,18 +49,21 @@ def test_build_command_appends_allowed_tools_session_and_prompt():
 def test_build_command_tells_the_model_the_shell_rule():
     # runs died permission_denied on `sed ...; grep ... | head` and `careeros ... | python3 -c`: dontAsk denies
     # the whole chain, so every run gets the one-command-per-call rule and its allowlist up front
-    cmd = build_command(CFG, "/review-resume r1", session_id="u", kind="extract_master")
+    cmd = build_command(CFG, "/extract-master r1", session_id="u", kind="extract_master")
     rule = cmd[cmd.index("--append-system-prompt") + 1]
     assert "one command per Bash call" in rule and "Bash(.venv/bin/careeros *)" in rule
     assert "Bash(.venv/bin/python *)" not in rule  # the kind's own list, not llm.allowed_tools
-    assert cmd[-1] == "/review-resume r1"
+    assert "ends the run" not in rule  # dontAsk refuses the call; the model can go on
+    assert cmd[-1] == "/extract-master r1"
 
 
 def test_build_command_keeps_a_configured_system_prompt():
     cfg = load_runs_config(type("S", (), {"pipeline": {"llm": {"headless_cmd": [
         "claude", "-p", "--append-system-prompt", "mine"]}}})())
     cmd = build_command(cfg, "/x", session_id="u")
-    assert cmd.count("--append-system-prompt") == 1 and "mine" in cmd
+    assert cmd.count("--append-system-prompt") == 1
+    prompt = cmd[cmd.index("--append-system-prompt") + 1]
+    assert prompt.startswith("mine") and "one command per Bash call" in prompt
 
 
 def test_build_command_adds_model_when_set():
