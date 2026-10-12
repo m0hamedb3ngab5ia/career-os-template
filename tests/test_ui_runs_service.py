@@ -782,6 +782,26 @@ def test_ps_cmdline_of_this_process_is_not_truncated():
     assert marker in (" ".join(got) if isinstance(got, list) else got)
 
 
+
+def test_ps_cmdline_waits_out_the_empty_proc_cmdline_of_a_process_mid_exec(monkeypatch):
+    from careeros.ui.services import runs
+
+    # Linux: Popen returns once exec has closed the CLOEXEC pipe, but the kernel fills in the new argv a moment
+    # later; a read in that window gets b"" (the flaky CI failure). Two empty reads, then the real argv.
+    reads = [b"", b"", b"python\0-c\0probe\0"]
+
+    class Proc:
+        def exists(self):
+            return True
+
+        def read_bytes(self):
+            return reads.pop(0)
+
+    monkeypatch.setattr(runs, "Path", lambda _: Proc())
+    monkeypatch.setattr(runs.time, "sleep", lambda s: None)
+    assert runs.ps_cmdline(123) == ["python", "-c", "probe"]
+
+
 # --- review round 2 ------------------------------------------------------------------------------------------
 
 SPACED = "/Users/a/My Jobs/career-os"
