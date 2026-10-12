@@ -105,3 +105,47 @@ def test_feedback_items_migrate_on_read_idempotently(tmp_path: Path):
     ann.reply(tmp_path, rid, "f2", "hi")
     assert [i["id"] for i in ann.list_items(tmp_path, rid)] == ["f1", "f2"]  # persisted once, not re-migrated
     assert json.loads(p.read_text(encoding="utf-8")) == old  # old file kept readable, untouched
+
+
+def test_ai_text_and_ai_replies_do_not_widen_the_guard(tmp_path: Path):
+    rid = _resume(tmp_path)
+    rust = "Built the billing service in Rust"
+    s = ann.create(tmp_path, rid, kind="suggestion", target_id="experience-1.b1", proposed=rust,
+                   text="name the language: Rust", author="ai")
+    ann.reply(tmp_path, rid, s["id"], "it was Rust, right?", author="ai")
+    with pytest.raises(fb.Rejected, match="rust"):  # AI words never widen the guard
+        ann.accept(tmp_path, rid, s["id"])
+    ann.reply(tmp_path, rid, s["id"], "yes, Rust")  # the user's own words do
+    out = ann.accept(tmp_path, rid, s["id"])
+    assert _bullet(out["resume"], "experience-1.b1")["text"] == rust
+
+
+def test_user_suggestion_accept_is_a_user_change_without_guard(tmp_path: Path):
+    rid = _resume(tmp_path)
+    s = ann.create(tmp_path, rid, kind="suggestion", target_id="mine", proposed="Ran billing for 40 people")
+    out = ann.accept(tmp_path, rid, s["id"])
+    b = _bullet(out["resume"], "mine")
+    assert b["text"] == "Ran billing for 40 people" and b["origin"] == "user"  # as put_draft: origin untouched
+    assert resumes.changes(tmp_path, rid)[-1]["author"] == "user"
+
+
+def test_new_ids_follow_max_suffix(tmp_path: Path):
+    rid = _resume(tmp_path)
+    p = tmp_path / "profile/resumes" / rid / "annotations.json"
+    p.write_text(json.dumps({"items": [{"id": "a5", "kind": "comment", "target_id": None, "base": None,
+                                        "author": "user", "status": "open", "proposed": None, "text": "x",
+                                        "replies": [], "at": None}]}), encoding="utf-8")
+    assert ann.create(tmp_path, rid, kind="comment", target_id=None, text="y")["id"] == "a6"
+
+
+def test_new_feedback_items_still_show_after_annotations_exist(tmp_path: Path):
+    rid = _resume(tmp_path)
+    ann.create(tmp_path, rid, kind="comment", target_id="summary", text="first")  # annotations.json now exists
+    p = tmp_path / "profile/resumes" / rid / "feedback.json"
+    old = {"review": None, "items": [{"id": "f1", "section": "S", "issue": "i", "suggestion": "s", "quote": None,
+                                      "state": "open", "comments": [], "reason": None, "v": 1}]}
+    p.write_text(json.dumps(old), encoding="utf-8")
+    assert [i["id"] for i in ann.list_items(tmp_path, rid)] == ["a1", "f1"]
+    ann.reject(tmp_path, rid, "f1")
+    assert [(i["id"], i["status"]) for i in ann.list_items(tmp_path, rid)] == [("a1", "open"), ("f1", "rejected")]
+    assert json.loads(p.read_text(encoding="utf-8")) == old  # never written

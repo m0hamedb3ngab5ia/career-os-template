@@ -4,9 +4,10 @@ profile/resumes/<rid>/annotations.json  {items: [{id, kind: suggestion|comment, 
 status: open|accepted|rejected|outdated, proposed, text, replies: [{text, author, at}], at}]}
 `target_id` = a draft bullet id or a top-level text field (e.g. summary); `base` = its text when made. `outdated` is
 computed on read (open item whose target no longer holds `base`), never stored. Accept = a user action: base check
-(409, both texts) + the zero-fabrication guard (422), then one draft change author=ai via the TASK-029 write path;
-accepting clears the bullet's `origin` (DEC-018 amendment: an AI text is never user-written).
-No annotations.json yet: feedback.json items (the old review items) are read as comments; saved on the first write.
+(409, both texts), then one draft change via the TASK-029 write path. AI suggestion: zero-fabrication guard (422),
+change author=ai, bullet `origin` cleared (DEC-018 amendment: an AI text is never user-written). User suggestion:
+no guard, change author=user. feedback.json items (the old review items) not yet stored are read as comments
+(feedback.json is never written); they're saved on the next write.
 """
 from __future__ import annotations
 
@@ -36,8 +37,17 @@ def _from_feedback(root: Path, rid: str) -> list[dict[str, Any]]:
 
 
 def _load(root: Path, rid: str) -> list[dict[str, Any]]:
+    """Stored items + feedback.json items whose ids aren't stored yet (read-only: the review-save flow still writes
+    feedback.json, so new review items stay visible; they're persisted here on the next write)."""
     p = _path(root, rid)
-    return json.loads(p.read_text(encoding="utf-8"))["items"] if p.is_file() else _from_feedback(root, rid)
+    items = json.loads(p.read_text(encoding="utf-8"))["items"] if p.is_file() else []
+    have = {i["id"] for i in items}
+    return items + [i for i in _from_feedback(root, rid) if i["id"] not in have]
+
+
+def _next_id(items: list[dict[str, Any]]) -> str:
+    nums = [int(i["id"][1:]) for i in items if i["id"][:1] == "a" and i["id"][1:].isdigit()]
+    return f"a{max(nums, default=0) + 1}"
 
 
 def _save(root: Path, rid: str, items: list[dict[str, Any]]) -> None:
@@ -90,7 +100,7 @@ def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str 
     with store._locked(root):
         base = None if target_id is None else _target(store.get_draft(root, rid)["resume"], target_id)[0]
         items = _load(root, rid)
-        it = {"id": f"a{len(items) + 1}", "kind": kind, "target_id": target_id, "base": base, "author": author,
+        it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "author": author,
               "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
               "text": text.strip(), "replies": [], "at": store._now()}
         _save(root, rid, [*items, it])
@@ -120,7 +130,9 @@ def reject(root: Path, rid: str, aid: str) -> dict[str, Any]:
 
 
 def accept(root: Path, rid: str, aid: str) -> dict[str, Any]:
-    """Apply an open suggestion to the draft as a change author=ai. Returns get_draft's shape.
+    """Apply an open suggestion to the draft as one change by its author. Returns get_draft's shape.
+    AI suggestion: zero-fabrication guard, change author=ai, bullet `origin` cleared. User suggestion: the user's
+    own words, so no guard and a change author=user with `origin` left as is (as put_draft, the user-edit path).
     One lock for check + write, so a concurrent draft save can't slip in between."""
     with store._locked(root):
         items = _load(root, rid)
@@ -136,16 +148,18 @@ def accept(root: Path, rid: str, aid: str) -> dict[str, Any]:
         if cur != it["base"]:
             raise store.Conflict(f"{it['target_id']!r} changed since the suggestion: expected {it['base']!r}, "
                                  f"now {cur!r}", it["base"], cur)
-        # allowed words: the annotation's own text + the user's replies (as apply's suggestion + comments)
-        allowed = " ".join([it.get("text") or "", *(r["text"] for r in it["replies"] if r.get("author") == "user")])
-        if reasons := fb.guard(it["base"], it["proposed"], allowed):
-            raise fb.Rejected("; ".join(reasons))
+        ai = it["author"] != "user"
+        if ai:  # allowed words: the user's replies only (an AI annotation's own text never widens the guard)
+            allowed = " ".join(r["text"] for r in it["replies"] if r.get("author") == "user")
+            if reasons := fb.guard(it["base"] or "", it["proposed"], allowed):
+                raise fb.Rejected("; ".join(reasons))
         if bullet is None:
             doc[it["target_id"]] = it["proposed"]
         else:
             bullet["text"] = it["proposed"]
-            bullet.pop("origin", None)
-        out = store._commit(d, prev, doc, latest, "ai")
+            if ai:
+                bullet.pop("origin", None)
+        out = store._commit(d, prev, doc, latest, "ai" if ai else "user")
         it["status"] = "accepted"
         _save(root, rid, items)
         return out
