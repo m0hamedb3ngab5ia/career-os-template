@@ -285,6 +285,8 @@ def test_import_guard_http_api(root: Path):  # TASK-032: E2E-001-03, E2E-001-04 
         resume_import.set_state(root, rid, "running", run="r1")  # the (faked) run's step process
         with pytest.raises(resume_import.ImportRefused):  # E2E-001-03: a date absent from v1 -> no v2
             resume_import.save(root, rid, doc)
+        assert resume_import.load(root, rid)["state"] == "running"  # open for the skill's one retry
+        resume_import.set_state(root, rid, "failed")  # the run ended without one (run_import); reason kept
         st = c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()
         assert st["state"] == "failed" and "2019" in st["reason"]
         assert c.get(f"/api/profile/resumes/{rid}/draft", headers=W).status_code == 404  # no guessed résumé
