@@ -4,8 +4,8 @@
 - Lane: Feature — onboarding + profile (USR-002..004, 022..027) + injection guard, résumé reuse, check a job (USR-033, 031, 028)
 - Stage: Build. TASK-001..023 and TASK-025 shipped (#115..#150); private UI ported to the template (#156). Specs/IA/arch approved 2026-10-04 (see Gates)
 - Done: REQ-093..116, UC-001..012, FLOW-001/002 approved (gates 2026-10-04)
-- Next: résumé workspace (REQ-124..126, DEC-012; supersedes TASK-024) → Arch delta + tasks; stream ttv-user-test, TASK-026 (Action Items in data/action_items.json)
-- Waiting on user: audit triage gate; other USR triage. Later: Q-008 json, USR-029/030/032
+- Next: résumé workspace (REQ-124..126, DEC-012; supersedes TASK-024): spec + wireframe synced on #166 (2026-10-12) → merge → Arch delta + tasks; stream ttv-user-test, TASK-026 (Action Items in data/action_items.json)
+- Waiting on user: audit triage gate; other USR triage. Q-023 (REQ-096 comments in workspace). Later: Q-008 json, USR-029/030/032
 
 ## Gates
 | gate | status | date |
