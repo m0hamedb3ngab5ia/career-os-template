@@ -40,8 +40,6 @@ def test_explicit_null_is_a_value_not_a_missing_key():
 
 
 def test_changes_grouped_by_file():
-    sec = get_section("autonomy")
-    by = settings_io.changes_by_file(sec, {"targets:volume.max_applications_per_day": 9,
-                                           "pipeline:outreach.manual_if_mutuals": False})
-    assert by == {"targets": [("volume.max_applications_per_day", 9)],
-                  "pipeline": [("outreach.manual_if_mutuals", False)]}
+    sec = get_section("safety")
+    by = settings_io.changes_by_file(sec, {"targets:volume.max_applications_per_day": 9})
+    assert by == {"targets": [("volume.max_applications_per_day", 9)]}

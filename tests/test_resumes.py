@@ -114,3 +114,25 @@ def test_concurrent_adds_make_one_master(tmp_path: Path, monkeypatch):
     for t in ts:
         t.join()
     assert sorted(r["type"] for r in resumes.list_resumes(tmp_path)) == ["master", "variant"]
+
+
+@pytest.mark.unit
+def test_version_labels_and_download_names(tmp_path: Path):  # 01_X_Original, 02_X_FeedbackApplied, never overwritten
+    m = resumes.add(tmp_path, "cv.pdf", b"%PDF-1.4\n", name="Master Resume")
+    resumes.add_text(tmp_path, m["rid"], "Jane\nExperience\n", author="ai", source="f1")
+    meta = resumes.add_text(tmp_path, m["rid"], "Jane\nExperience 2\n", author="user", source="edit")
+    assert [v["label"] for v in meta["versions"]] == ["Original", "Feedback applied", "Edited"]
+    names = [resumes.download_name(tmp_path, m["rid"], n)[1] for n in (1, 2, 3)]
+    assert names == ["01_MasterResume_Original.pdf", "02_MasterResume_FeedbackApplied.txt", "03_MasterResume_Edited.txt"]
+    assert (resumes._dir(tmp_path, m["rid"]) / "v1" / "original.pdf").exists()  # the original stays
+
+
+@pytest.mark.unit
+def test_old_meta_without_labels_gets_defaults(tmp_path: Path):
+    m = resumes.add(tmp_path, "cv.pdf", b"%PDF-1.4\n")
+    d = resumes._dir(tmp_path, m["rid"])
+    raw = json.loads((d / "meta.json").read_text())
+    for v in raw["versions"]:
+        v.pop("label", None)
+    (d / "meta.json").write_text(json.dumps(raw))
+    assert resumes.get(tmp_path, m["rid"])["versions"][0]["label"] == "Original"

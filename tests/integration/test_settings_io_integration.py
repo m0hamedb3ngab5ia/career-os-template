@@ -89,7 +89,7 @@ def test_unknown_locked_and_readonly_fields_are_refused(root):
     assert "can't be changed" in e.value.fields["pipeline:runs.auto_submit.enabled"]
     assert "pipeline:nope" in e.value.fields
     with pytest.raises(SettingsInvalid):
-        settings_io.save_section(_s(root), "autonomy", {"targets:tiers.A.auto_submit": True})
+        settings_io.save_section(_s(root), "safety", {"targets:tiers.A.auto_submit": True})
 
 
 def test_cross_field_check_names_the_field(root):
@@ -129,14 +129,12 @@ def test_multi_file_section_rolls_back_both_files(root, monkeypatch):
 
     monkeypatch.setattr(settings_io, "validate_root", boom)
     with pytest.raises(SettingsInvalid) as e:
-        settings_io.save_section(_s(root), "autonomy", {"targets:volume.max_applications_per_day": 9,
-                                                        "pipeline:outreach.manual_if_mutuals": False})
+        settings_io.save_section(_s(root), "safety", {"targets:volume.max_applications_per_day": 9})
     assert "targets:volume.max_applications_per_day" in e.value.fields
     assert t.read_text() == tb and p.read_text() == pb
     monkeypatch.undo()
-    settings_io.save_section(_s(root), "autonomy", {"targets:volume.max_applications_per_day": 9,
-                                                    "pipeline:outreach.manual_if_mutuals": False})
-    assert "max_applications_per_day: 9" in t.read_text() and "manual_if_mutuals: false" in p.read_text()
+    settings_io.save_section(_s(root), "safety", {"targets:volume.max_applications_per_day": 9})
+    assert "max_applications_per_day: 9" in t.read_text() 
 
 
 def test_writes_go_through_a_symlinked_config(root, tmp_path):

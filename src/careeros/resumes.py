@@ -68,8 +68,30 @@ def _write(d: Path, meta: dict[str, Any]) -> None:
     tmp.replace(d / "meta.json")
 
 
+def label(v: dict[str, Any]) -> str:
+    """Plain name of a version: the upload is the Original, an AI rewrite applied review feedback, a hand edit."""
+    return v.get("label") or ("Original" if v["n"] == 1 else "Edited" if v["source"] == "edit"
+                              else "Feedback applied" if v["author"] == "ai" else "Uploaded")
+
+
 def get(root: Path, rid: str) -> dict[str, Any]:
-    return json.loads((_dir(root, rid) / "meta.json").read_text(encoding="utf-8"))
+    meta = json.loads((_dir(root, rid) / "meta.json").read_text(encoding="utf-8"))
+    for v in meta["versions"]:  # older meta.json has no labels
+        v["label"] = label(v)
+    return meta
+
+
+def download_name(root: Path, rid: str, n: int) -> tuple[Path, str]:
+    """Version n's stored file and its download name `{NN}_{Name}_{Label}.{ext}`, spaces removed."""
+    meta = get(root, rid)
+    v = next((v for v in meta["versions"] if v["n"] == n), None)
+    files = list((_dir(root, rid) / f"v{n}").glob("original.*")) if v else []
+    if not files:
+        raise LookupError(f"résumé {rid!r} has no v{n}")
+    stem = Path(meta["name"]).stem if Path(meta["name"]).suffix.lower() in (*MAGIC, ".txt") else meta["name"]
+    def camel(t: str) -> str:
+        return "".join(w[:1].upper() + w[1:] for w in t.split())
+    return files[0], f"{n:02d}_{camel(stem)}_{camel(v['label'])}{files[0].suffix}"
 
 
 def _all(root: Path) -> list[dict[str, Any]]:
@@ -183,7 +205,8 @@ def _append(root: Path, rid: str, ext: str, data: bytes, author: str, source: st
         d, meta = _dir(root, rid), get(root, rid)
         n = meta["versions"][-1]["n"] + 1
         _store(d, n, ext, data)
-        meta["versions"].append({"n": n, "author": author, "source": source, "at": _now()})
+        entry = {"n": n, "author": author, "source": source, "at": _now()}
+        meta["versions"].append({**entry, "label": label(entry)})
         _write(d, meta)
         return meta
 

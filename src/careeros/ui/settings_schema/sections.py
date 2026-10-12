@@ -184,7 +184,7 @@ def _tier(t: str, desc: str, auto: bool, cover: str, outreach: str, review: list
               options=("always", "if_contact_found", "never")),
         Field(T, f"tiers.{t}.review_required", "tags", "You review", default=review, options=REVIEW_ARTIFACTS,
               help="Documents you check before anything is submitted. Empty = only QA failures reach you."),
-    ))
+    ), advanced=True)
 
 
 SECTIONS: tuple[Section, ...] = (
@@ -284,29 +284,13 @@ SECTIONS: tuple[Section, ...] = (
             _num(T, "thresholds.min_tweak_gain", "Points a small tweak must add to beat a full tailor", 5, hi=100),
         )),
     )),
-    Section("autonomy", "Autonomy", (
-        _tier("A", "dream firms — full prep, the candidate submits", False, "always", "always",
-              ["resume", "cover_letter", "answers", "form"]),
-        _tier("B", "strong fit — auto-submit after QA", True, "always", "if_contact_found", []),
-        _tier("C", "volume", True, "if_required", "never", []),
-        Group("tier_rules", "Tier rules", (
-            Field(T, "tier_rules", "rule_list", "Rules", check=_tier_rules,
-                  default=[{"if": "company_in dream_list", "tier": "A"}, {"if": "fit >= 85", "tier": "B"},
-                           {"if": "fit >= 70", "tier": "C"}],
-                  help="First match wins."),
+    Section("safety", "Applying", (
+        Group("applying", "How much CareerOS does on its own", (
+            _switch(T, "safety.pause_auto_submit", "I submit every application myself", False,
+                    "On: CareerOS fills the form and stops so you press submit. Off: strong matches are submitted "
+                    "for you after every check passes. Dream companies always wait for you."),
+            _num(T, "volume.max_applications_per_day", "Most applications per day", 15, lo=1),
         )),
-        Group("volume", "Volume", (
-            _num(T, "volume.max_applications_per_day", "Applications per day", 15, lo=1),
-            _num(T, "volume.max_per_company_per_90_days", "Applications per company in 90 days", 2, lo=1),
-            _num(T, "volume.same_company_cooldown_days", "Cooldown after a rejection", 30, unit="days"),
-            _num(T, "volume.deadline_cluster_days", "Apply together when deadlines are within", 7, unit="days"),
-            Field(T, "volume.season_multiplier", "key_value", "Busy-month multiplier", check=_season,
-                  default={"9": 2.0, "10": 1.5, "1": 2.0, "2": 1.5},
-                  help="Month (1–12) → multiplier on applications per day."),
-        )),
-        Group("outreach", "Outreach", (LINKEDIN, *OUTREACH_FIELDS, THANK_YOU)),
-    )),
-    Section("safety", "Safety", (
         Group("ats", "Where auto-submit is allowed", (
             _tags(T, "safety.auto_submit_ats", "Auto-submit on", ["greenhouse", "lever", "ashby"],
                   options=ATS_FAMILIES, strict=True),
@@ -314,13 +298,11 @@ SECTIONS: tuple[Section, ...] = (
                   ["workday", "icims", "taleo", "smartrecruiters", "jobvite", "successfactors", "custom"],
                   options=ATS_FAMILIES, strict=True),
             _tags(T, "safety.pause_on", "Always stop and ask on", list(PAUSE_TRIGGERS), options=PAUSE_TRIGGERS),
-            _switch(T, "safety.pause_auto_submit", "Pause all auto-submit", False,
-                    "Everything stops at Prepared until you turn this off: Apply fills the form and you submit."),
-        )),
+        ), advanced=True),
         Group("scam", "Scam checks", (
             _num(T, "safety.scam.salary_max_multiple", "Review salaries above", 3, lo=1, integer=False,
                  unit="× your minimum", step=0.5),
-        )),
+        ), advanced=True),
         Group("ghost", "Ghost jobs", (
             _num(T, "safety.ghost.old_post_days", "Old post", G["old_post_days"], lo=1, unit="days",
                  help="Older lowers confidence only."),
@@ -336,11 +318,29 @@ SECTIONS: tuple[Section, ...] = (
             _num(T, "safety.ghost.layoff_window_days", "Layoffs count for", G["layoff_window_days"], lo=1,
                  unit="days"),
             DREAM_FLAG_ONLY,
-        )),
+        ), advanced=True),
         Group("levels", "Check levels", (
             Field(T, "safety.levels", "reason_levels", "Change a check's level", default={}, options=SAFETY_CODES,
                   help="Block, skip, review, info or off per check. Empty = each check's built-in level."),
-        )),
+        ), advanced=True),
+        _tier("A", "dream firms — full prep, the candidate submits", False, "always", "always",
+              ["resume", "cover_letter", "answers", "form"]),
+        _tier("B", "strong fit — auto-submit after QA", True, "always", "if_contact_found", []),
+        _tier("C", "volume", True, "if_required", "never", []),
+        Group("tier_rules", "Tier rules", (
+            Field(T, "tier_rules", "rule_list", "Rules", check=_tier_rules,
+                  default=[{"if": "company_in dream_list", "tier": "A"}, {"if": "fit >= 85", "tier": "B"},
+                           {"if": "fit >= 70", "tier": "C"}],
+                  help="First match wins."),
+        ), advanced=True),
+        Group("volume", "Volume", (
+            _num(T, "volume.max_per_company_per_90_days", "Applications per company in 90 days", 2, lo=1),
+            _num(T, "volume.same_company_cooldown_days", "Cooldown after a rejection", 30, unit="days"),
+            _num(T, "volume.deadline_cluster_days", "Apply together when deadlines are within", 7, unit="days"),
+            Field(T, "volume.season_multiplier", "key_value", "Busy-month multiplier", check=_season,
+                  default={"9": 2.0, "10": 1.5, "1": 2.0, "2": 1.5},
+                  help="Month (1–12) → multiplier on applications per day."),
+        ), advanced=True),
     ), checks=(_greater("targets:safety.ghost.old_post_days", "targets:safety.ghost.very_old_post_days",
                         "Old post"),)),
     Section("scout", "Scout", (

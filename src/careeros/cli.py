@@ -2020,7 +2020,7 @@ def build_parser() -> argparse.ArgumentParser:
     rsp.set_defaults(fn=cmd_resume_propose_master)
     for name, hlp, extra in (
             ("feedback", "review state + feedback items (JSON)", ()),
-            ("review-save", "save a review's items from a JSON list of {section, issue, suggestion}", ("file",)),
+            ("review-save", "save a review's items from a JSON list of {section, issue, suggestion, quote?, kind? content|format}", ("file",)),
             ("apply-edit", "guarded AI rewrite of one item, written from version <base> -> new version "
              "(exit 1 + reasons if refused or <base> is not the latest)", ("item", "base", "file")),
             ("redraft", "replace a commented item's suggestion", ("item", "suggestion"))):

@@ -8,3 +8,8 @@ read it first, then `ARCHITECTURE.md`.
 - Tests: `.venv/bin/python -m pytest -q` (they use `examples/` only; no `profile/` or `config/` needed).
 - Never commit `profile/`, `config/`, `CLAUDE.local.md`, `data/`, `.reviews/`, or anything with credentials.
 - Learning: `.agent/LESSONS.md` (evidence) and `.agent/DECISIONS.md` (design decisions); promoted rules live in CLAUDE.md.
+
+## Work docs
+Workstreams: `docs/work/<slug>/README.md` (Brief + Status) + `handoffs/YYYY-MM-DD-NN.md` (versioned, never deleted).
+Fresh agent: read only your stream's README + newest handoff. Global map of all work: `~/Code/WORK.md` (`/docs`).
+Requirements stay in `docs/product/` (link IDs, don't copy). Branch name `work/<slug>` ties a branch to its stream.

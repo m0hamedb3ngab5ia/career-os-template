@@ -14,7 +14,7 @@ from careeros.ui.settings_schema import (CONTROLS, NOT_IN_UI, SECTIONS, Field, P
 pytestmark = pytest.mark.unit
 
 EXAMPLES = Path(__file__).resolve().parents[1] / "examples" / "config"
-EXPECTED_SECTIONS = ("general", "targets", "autonomy", "safety", "scout", "companies", "outreach", "notifications",
+EXPECTED_SECTIONS = ("general", "targets", "safety", "scout", "companies", "outreach", "notifications",
                      "runs", "storage", "qa")
 
 
@@ -290,7 +290,8 @@ def test_system_settings_sit_behind_advanced():
     assert adv == {"storage", "qa"}
     adv_groups = {(s.id, g.id) for s in SECTIONS for g in s.groups if g.advanced}
     assert adv_groups == {("general", "files"), ("general", "app"), ("general", "claude"),
-                          ("runs", "timeouts"), ("runs", "ranking"), ("runs", "retry")}
+                          ("runs", "timeouts"), ("runs", "ranking"), ("runs", "retry")} | {
+        ("safety", g) for g in ("ats", "scam", "ghost", "levels", "tier_a", "tier_b", "tier_c", "tier_rules", "volume")}
     app = get_section("general").group("app")
     assert {f.key for f in app.fields()} == {"ui.port", "ui.host", "ui.open_browser", "ui.watch_debounce_ms"}
     assert get_section("general").group("appearance").fields()[0].key == "ui.theme"

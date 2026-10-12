@@ -329,7 +329,8 @@ class RunControl:
             if not resume or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume) or (kind == "resume_edit") != bool(item) \
                     or (item and not re.fullmatch(r"f\d+", item)):
                 raise ValueError(f"{kind} needs a résumé id" + (" and a feedback item" if kind == "resume_edit" else ""))
-            self._check_can_start()
+            if self.rs.pause_state(self.now()):  # own résumé lock (step.run_resume_skill): no runner-lock check
+                raise Paused("runs are paused; resume them first")
             rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
             argv = ["careeros.ui.services.step", kind, "--resume", resume, *(["--item", item] if item else []),
                     "--run-id", rid]
