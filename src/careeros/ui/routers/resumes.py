@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from typing import Any, Iterator, Literal
+from urllib.parse import quote
 
 import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -157,6 +158,16 @@ class Annotation(BaseModel):  # DEC-016
     at: str | None = None
 
 
+class PublishIn(BaseModel):  # DEC-017
+    key: str
+    master: bool = False
+
+
+class Published(Resume):
+    published: bool
+    n: int
+
+
 class ResumePatch(BaseModel):
     name: str | None = None
     type: ResumeType | None = None
@@ -265,7 +276,11 @@ def resume_file(rid: str, v: int | None = None, download: bool = False, c=Depend
     with _refusals():
         n = v or store.get(c.settings.root, rid)["versions"][-1]["n"]
         path, name = store.download_name(c.settings.root, rid, n)
-    return FileResponse(path, filename=name, content_disposition_type="attachment" if download else "inline")
+    disposition = "attachment" if download else "inline"
+    if isinstance(path, bytes):  # latest published version: rendered PDF (DEC-020)
+        return Response(path, media_type="application/pdf",
+                        headers={"Content-Disposition": f"{disposition}; filename*=utf-8''{quote(name)}"})
+    return FileResponse(path, filename=name, content_disposition_type=disposition)
 
 
 @router.get("/profile/resumes/{rid}/feedback")
@@ -372,6 +387,17 @@ def accept_annotation(rid: str, aid: str, c=Depends(ctx)) -> Draft:
 def reject_annotation(rid: str, aid: str, c=Depends(ctx)) -> Annotation:
     with _refusals():
         return Annotation(**ann.reject(c.settings.root, rid, aid))
+
+
+@router.post("/profile/resumes/{rid}/publish")
+def publish_resume(rid: str, body: PublishIn, request: Request, c=Depends(ctx)) -> Published:
+    """Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version."""
+    with _refusals():
+        was = store.get(c.settings.root, rid)["type"]
+        out = Published(**store.publish(c.settings.root, rid, key=body.key, master=body.master))
+    if body.master and was != "master":
+        _extract_master(request, c)
+    return out
 
 
 @router.patch("/profile/resumes/{rid}")

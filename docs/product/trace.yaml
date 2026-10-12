@@ -966,7 +966,7 @@ tasks:
     use_cases:
     - UC-002
   TASK-031:
-    status: todo
+    status: done
     requirements:
     - REQ-126
     use_cases:

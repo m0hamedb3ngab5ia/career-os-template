@@ -420,6 +420,13 @@ export interface paths {
     /** Set Master */
     post: operations["set_master_api_profile_resumes__rid__master_post"];
   };
+  "/api/profile/resumes/{rid}/publish": {
+    /**
+     * Publish Resume
+     * @description Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version.
+     */
+    post: operations["publish_resume_api_profile_resumes__rid__publish_post"];
+  };
   "/api/profile/resumes/{rid}/review": {
     /** Start Review */
     post: operations["start_review_api_profile_resumes__rid__review_post"];
@@ -2318,6 +2325,36 @@ export interface components {
        * @default true
        */
       dry_run?: boolean;
+    };
+    /** PublishIn */
+    PublishIn: {
+      /** Key */
+      key: string;
+      /**
+       * Master
+       * @default false
+       */
+      master?: boolean;
+    };
+    /** Published */
+    Published: {
+      /** Category */
+      category?: string | null;
+      /** N */
+      n: number;
+      /** Name */
+      name: string;
+      /** Published */
+      published: boolean;
+      /** Rid */
+      rid: string;
+      /**
+       * Type
+       * @enum {string}
+       */
+      type: "master" | "variant" | "other" | "tailored";
+      /** Versions */
+      versions: components["schemas"]["Version"][];
     };
     /** QaFailedHint */
     QaFailedHint: {
@@ -5410,6 +5447,36 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Resume"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Publish Resume
+   * @description Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version.
+   */
+  publish_resume_api_profile_resumes__rid__publish_post: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["PublishIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Published"];
         };
       };
       /** @description Validation Error */

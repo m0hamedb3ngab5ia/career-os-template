@@ -225,6 +225,11 @@ class CompileError(RuntimeError):
     """A LaTeX engine is installed but did not produce the PDF."""
 
 
+def _latex_env() -> dict[str, str]:
+    """DEC-017: fixed timestamps so the same .tex gives the same PDF bytes (pdflatex also needs FORCE_SOURCE_DATE)."""
+    return {**os.environ, "SOURCE_DATE_EPOCH": "0", "FORCE_SOURCE_DATE": "1"}
+
+
 def compile_tex(tex_path: Path) -> Path | None:
     """Compile tex -> pdf. None only when no engine is installed (a warning). Raises CompileError on failure.
     Any older PDF is removed first, so a PDF next to the .tex is always built from it."""
@@ -238,7 +243,7 @@ def compile_tex(tex_path: Path) -> Path | None:
     workdir = tex_path.parent
     runs = 2 if name == "pdflatex" else 1
     for _ in range(runs):
-        proc = subprocess.run(cmd + [tex_path.name], cwd=workdir, capture_output=True, text=True)
+        proc = subprocess.run(cmd + [tex_path.name], cwd=workdir, capture_output=True, text=True, env=_latex_env())
         if proc.returncode != 0:
             log_tail = (proc.stdout + proc.stderr)[-3000:]
             pdf.unlink(missing_ok=True)
