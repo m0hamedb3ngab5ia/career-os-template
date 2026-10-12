@@ -2335,6 +2335,58 @@
         "title": "DiskUsage",
         "type": "object"
       },
+      "Draft": {
+        "properties": {
+          "draft": {
+            "title": "Draft",
+            "type": "boolean"
+          },
+          "resume": {
+            "additionalProperties": true,
+            "title": "Resume",
+            "type": "object"
+          },
+          "rev": {
+            "title": "Rev",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rev",
+          "resume",
+          "draft"
+        ],
+        "title": "Draft",
+        "type": "object"
+      },
+      "DraftIn": {
+        "properties": {
+          "author": {
+            "enum": [
+              "user",
+              "ai"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "resume": {
+            "additionalProperties": true,
+            "title": "Resume",
+            "type": "object"
+          },
+          "rev": {
+            "title": "Rev",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rev",
+          "resume",
+          "author"
+        ],
+        "title": "DraftIn",
+        "type": "object"
+      },
       "Due": {
         "properties": {
           "due": {
@@ -12781,6 +12833,99 @@
           }
         },
         "summary": "Patch Resume",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/draft": {
+      "get": {
+        "operationId": "get_draft_api_profile_resumes__rid__draft_get",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Get Draft",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "put": {
+        "description": "Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422.",
+        "operationId": "put_draft_api_profile_resumes__rid__draft_put",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/DraftIn"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Draft"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Put Draft",
         "tags": [
           "resumes"
         ]
