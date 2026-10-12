@@ -150,6 +150,21 @@ def _link(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> str:
     return _sha(text)
 
 
+def _preflight(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> dict[str, Any]:
+    """DEC-021: deterministic QA checks on the reuse candidate; result cached in job_dir/preflight.json by input key
+    (final QA and reruns read it instead of recomputing)."""
+    from careeros import qa
+
+    vd = _vdir(settings, rid, v["n"])
+    pdf = next((p for p in (vd / "resume.pdf", vd / "original.pdf") if p.exists()), None)
+    res = qa.preflight_resume(settings.qa or {}, v["text"].rstrip() + "\n", pdf)
+    cache = _json(job_dir / "preflight.json")
+    if cache.get("key") == res["key"]:
+        return cache
+    (job_dir / "preflight.json").write_text(json.dumps(res, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    return res
+
+
 def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str, Any]:
     """reuse (best >= threshold) | tweak (<= 3 master bullets gain >= min_tweak_gain and reach it) | tailor.
     Writes resume_choice.json; prepare-job obeys it. Unscored job -> tailor (the existing flow)."""
@@ -164,8 +179,13 @@ def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str
         b = m["resumes"][0]
         v = resumes.version(settings.root, b["rid"], b["version"])
         c.update(rid=b["rid"], version=b["version"], name=b["name"], author=v.get("author"), score=b["score"])
-        if b["score"] >= thr:
-            c.update(action="reuse", reason=f"best résumé {b['name']!r} scores {b['score']} >= {thr}")
+        pre = _preflight(settings, job_dir, b["rid"], v) if b["score"] >= thr else None
+        if pre is not None and not pre["ok"]:  # DEC-021: QA would fail this résumé; tailor from the start
+            why = "; ".join(i["detail"] for i in pre["issues"])
+            c.update(action="tailor", preflight=pre,
+                     reason=f"best résumé {b['name']!r} scores {b['score']} >= {thr} but fails QA preflight ({why}): full tailor")
+        elif b["score"] >= thr:
+            c.update(action="reuse", reason=f"best résumé {b['name']!r} scores {b['score']} >= {thr}", preflight=pre)
             c["text_sha256"] = _link(settings, job_dir, b["rid"], v)
         else:
             sc, posting = _json(job_dir / "score.json"), _json(job_dir / "posting.json")

@@ -160,3 +160,9 @@ Decision: a published version is `resume.json` (DEC-018) + `changes.jsonl` (auth
 Why: measured per version ~10 KB JSON vs ~65 KB of derivable text/ATS/.tex/PDF; storage grows by the source only.
 Alternatives: store all outputs per version (~7x storage); content-addressed blobs (saves only on non-adjacent identical versions, adds indirection); retention policy (deletes history, not needed at ~10 KB/version).
 Consequences: an old version re-rendered after a template change looks new, not as published; PDFs actually sent to employers live in the job folder, unaffected. Readers of `text.txt`/`ats.json` for v2+ go through the helper.
+
+### DEC-021 QA preflight before reuse; short failure display
+Reasoned by: human (2026-10-12)
+Decision: `resume pick` runs the deterministic QA checks (banned phrases, PDF page count; no LLM, no render) on a reuse candidate before choosing `reuse`. Fail: `action=tailor`, reason records the issues. Pass: existing choice logic. Result cached in `JOB/preflight.json` keyed by sha256(text, pdf, banned list, max_pages). If QA still fails, the UI shows the top 2 issues in plain language and a "Tailor instead" action, full details expandable. Regenerate only when inputs or strategy change.
+Why: a reused résumé that fails QA could never be fixed (prepare-job never re-tailors a reuse); a runner re-run with identical inputs fails identically at double cost.
+Alternatives: rerun the whole prepare (rejected: same inputs, same failure).
