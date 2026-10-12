@@ -51,3 +51,10 @@ Reason: lets `careeros ui` run for users without Node installed, while still cat
 Scope: repo
 Relevant: pyproject.toml (package-data), .github/workflows/tests.yml (ui job: "Committed bundle is up to date")
 Date: 2026-09-26
+
+## Test speed: parallel local, sharded CI, coverage on main only
+Decision: `-n auto` in addopts; YAML via `CSafeLoader` (falls back to `SafeLoader`); CI PR runs split into hash shards (`tests/conftest.py`) behind one aggregator job named `pytest` (the required check); `--cov` only on main pushes (whole suite, one job). pytest-testmon was tried and dropped: no win over path / `-k` selection.
+Reason: full local suite 4m55s -> ~80s; PR check ~5.5 min -> ~2 min with 4 shards, same tests (shard union = full suite). Coverage under xdist costs ~1.8x, so PRs skip it.
+Scope: repo
+Relevant: pyproject.toml (addopts), tests/conftest.py (pytest_collection_modifyitems), .github/workflows/tests.yml, CLAUDE.md#Testing
+Date: 2026-10-11
