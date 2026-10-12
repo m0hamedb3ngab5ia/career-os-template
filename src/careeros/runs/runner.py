@@ -308,6 +308,11 @@ def company_fetch_tools(settings: Settings, posting: dict[str, Any]) -> list[str
     return [f"WebFetch(domain:{p}{d})" for d in sorted(doms) for p in ("", "*.")]
 
 
+def _qa_failed(res: Any) -> bool:
+    r = parse_result_line(res.result_text) if res.saw_result else None
+    return bool(r) and r.get("qa_pass") is False
+
+
 def _job_arg(root: Path, job_dir: Path) -> str:
     try:
         return str(job_dir.resolve().relative_to(root.resolve()))
@@ -376,6 +381,12 @@ class _Loop:
             self.echo(f"    auto-submit {'on' if submit['allowed'] else 'off (assisted)'}: {submit['reason']}")
         try:
             res = self.invoke(cmd, str(self.s.root), env, timeout_s, stream_path)
+            if self.kind == "prepare" and _qa_failed(res):  # a failed document QA regenerates once, then surfaces
+                self.echo("    qa failed: regenerating once")
+                cmd = build_command(self.cfg, prompt.replace("\n\n", " --force\n\n", 1) if "\n\n" in prompt
+                                    else prompt + " --force", session_id=str(uuid.uuid4()), kind=self.kind,
+                                    extra_tools=extra)
+                res = self.invoke(cmd, str(self.s.root), env, timeout_s, stream_path)
         finally:
             locks.release(self.rs.job_lock_path(jid), lock.token)
         took = self.clock() - t0

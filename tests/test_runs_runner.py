@@ -783,3 +783,44 @@ def test_sec01_unknown_company_never_gets_webfetch_to_a_posting_chosen_domain(se
     tools = _tools(_capture_run(settings, store, "prepare", company="Exfilco", url="https://exfilco.com/jobs/1",
                                 apply_url="https://exfilco.com/x?leak=1"))
     assert not [t for t in tools if "exfilco" in t]
+
+
+# --- fluff #18: a failed document QA regenerates once before the failure surfaces --------------------------
+
+def _qa_prepare(settings, store, qa_passes: list[bool]):
+    jid = add_job(store, 1)
+    (store.job_dir(jid) / "score.json").write_text(json.dumps({"decision": "prepare", "fit": 80, "tier": "B"}))
+    store.set_status(jid, "scored", "test")
+    cmds: list = []
+
+    def invoke(cmd, cwd, env, timeout_s, stream_path):
+        cmds.append(cmd)
+        Path(stream_path).write_text("{}")
+        ok = qa_passes[min(len(cmds), len(qa_passes)) - 1]
+        st = "queued" if ok else "needs_review"
+        store.set_status(jid, st, "fake prepare")
+        return parse_stream(events(jid, {"job_id": jid, "status": st, "qa_pass": ok}))
+
+    cfg = cfg_of(settings, preflight_doctor=False)
+    run_ = execute_run(settings, "prepare", budget_for(cfg, "prepare", max_jobs=1, max_minutes=30), cfg=cfg,
+                       invoke=invoke, now=lambda: NOW, clock=Clock(), job_ids=[jid])
+    rid = run_["id"] if isinstance(run_, dict) else run_.id
+    atts = RunStore(settings).load_attempts(rid)
+    return cmds, atts
+
+
+def test_qa_fail_then_pass_regenerates_once_and_succeeds(settings, store):
+    cmds, atts = _qa_prepare(settings, store, [False, True])
+    assert len(cmds) == 2 and "--force" in cmds[1][-1] and "--force" not in cmds[0][-1]
+    assert atts[-1]["result"]["qa_pass"] is True and atts[-1]["outcome"] == "ok"
+
+
+def test_qa_fail_twice_surfaces_the_failure_after_one_regeneration(settings, store):
+    cmds, atts = _qa_prepare(settings, store, [False, False])
+    assert len(cmds) == 2
+    assert atts[-1]["result"]["qa_pass"] is False
+
+
+def test_qa_pass_first_time_does_not_regenerate(settings, store):
+    cmds, _ = _qa_prepare(settings, store, [True])
+    assert len(cmds) == 1
