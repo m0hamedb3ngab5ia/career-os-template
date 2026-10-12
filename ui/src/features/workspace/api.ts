@@ -24,3 +24,13 @@ export const reject = (rid: string, aid: string) => apiSend<Annotation>("POST", 
 export const reply = (rid: string, aid: string, text: string, apply: boolean) =>
   apiSend<Annotation>("POST", `${ann(rid, aid)}/replies`, { text, apply });
 export const publish = (rid: string, key: string) => apiSend<Published>("POST", `${base(rid)}/publish`, { key });
+
+/** One line of draft.changes.jsonl (DEC-015): `before`/`after` are nodes (bullet {id,text,..}) or plain values. */
+export interface Change {
+  id: string; at?: string | null; author: "ai" | "user"; target_id: string; kind?: string; op: "add" | "edit" | "delete";
+  before?: unknown; after?: unknown; reverts?: string | null;
+}
+export const changesKey = (rid: string) => ["workspace", rid, "changes"] as const;
+export const useChanges = (rid: string, enabled: boolean) =>
+  useQuery({ queryKey: changesKey(rid), enabled, refetchOnMount: "always", queryFn: () => apiFetch<Change[]>(`${base(rid)}/draft/changes`) });
+export const revertChange = (rid: string, cid: string) => apiSend<Draft>("POST", `${base(rid)}/draft/changes/${encodeURIComponent(cid)}/revert`);
