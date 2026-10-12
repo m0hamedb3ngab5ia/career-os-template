@@ -202,5 +202,25 @@ def test_review_run_writing_annotations_is_done(tmp_path: Path):  # review-resum
 
 def test_review_and_edit_runs_cannot_write_files():  # DEC-016: annotations only via the CLI, no direct draft edit
     from careeros.runs.config import KIND_ONLY_TOOLS
+    narrow = ["Read", "Bash(.venv/bin/careeros resume annotations *)", "Bash(.venv/bin/careeros resume annotate *)",
+              "Bash(.venv/bin/careeros resume annotate-reply *)"]  # not every careeros command (e.g. apply-edit)
     for kind in ("review", "resume_edit"):
-        assert KIND_ONLY_TOOLS[kind] == ["Read", "Bash(.venv/bin/careeros *)"]
+        assert KIND_ONLY_TOOLS[kind] == narrow
+
+
+def test_completed_runs_without_new_ai_annotations_fail(tmp_path: Path):  # a "done" run must have proposed something
+    rid = _resume(tmp_path)
+    old = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="earlier", author="ai")  # not this run's
+    u = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="shorter")
+    rec = _run(tmp_path, "review", rid, None, lambda *a, **kw: {"id": "r1", "stop_reason": "completed"})
+    review = fb.load(tmp_path, rid)["review"]
+    assert review["state"] == "failed" and "no annotations" in review["reason"]
+    assert rec["stop_reason"] == "failed" and "no annotations" in rec["detail"]
+
+    def reply_only(*a, **kw):
+        ann.reply(tmp_path, rid, u["id"], "noted", author="user")
+        return {"id": "r2", "stop_reason": "completed"}
+
+    rec = _run(tmp_path, "resume_edit", rid, u["id"], reply_only)
+    assert rec["stop_reason"] == "failed" and "no annotations" in rec["detail"]
+    assert old["author"] == "ai"

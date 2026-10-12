@@ -207,6 +207,28 @@ def run_inbox_sync(settings: Settings) -> dict[str, Any]:
         signal.signal(signal.SIGTERM, old)
 
 
+NO_ANNOTATIONS = "the run finished but wrote no annotations"
+
+
+def _ai_annotations(root: Path, rid: str) -> int:
+    from careeros import annotations as ann
+    return sum(i["author"] == "ai" for i in ann.list_items(root, rid))
+
+
+def _fail_run(settings: Settings, rec: dict[str, Any], reason: str) -> dict[str, Any]:
+    """A completed run that proposed nothing counts as failed, in its record too (best effort)."""
+    rec = {**rec, "stop_reason": "failed", "detail": reason}
+    try:
+        from careeros.runs.store import RunStore
+        rs = RunStore(settings)
+        if (run := rs.load_run(rec["id"])) is not None:
+            rs.save_run({**run, "stop_reason": "failed", "detail": reason})
+            rs.log(rec["id"], f"failed: {reason}")
+    except Exception:  # noqa: BLE001 - the returned record and the review state still say failed
+        pass
+    return rec
+
+
 def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, run_skill: Any = None,
                      run_id: str | None = None) -> dict[str, Any]:
     """review-resume (REQ-094) or edit-resume (REQ-095/096) on one résumé. A new master version afterwards launches
@@ -218,17 +240,24 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
         from careeros.runs.service import run_skill
     root = settings.root
     before = resumes.get(root, rid)["versions"][-1]["n"]
+    ai_before = _ai_annotations(root, rid)
     if kind == "review":
         resume_feedback.set_review(root, rid, "running", run=run_id)
         rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id, lock=f"resume-{rid}")
         state = (resume_feedback.load(root, rid)["review"] or {}).get("state")
         if rec.get("stop_reason") != "completed" or state not in ("done", "running"):
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
+        elif state == "running" and _ai_annotations(root, rid) <= ai_before:  # finished but proposed nothing
+            rec = _fail_run(settings, rec, NO_ANNOTATIONS)
+            resume_feedback.set_review(root, rid, "failed", run=rec.get("id"), reason=NO_ANNOTATIONS)
         elif state == "running":  # TASK-030: the skill writes annotations (`resume annotate`), not review-save
             resume_feedback.set_review(root, rid, "done", run=rec.get("id"))
         return rec
     applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
     rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
+    if item and item.startswith("a") and rec.get("stop_reason") == "completed" \
+            and _ai_annotations(root, rid) <= ai_before:  # Apply comment: completed but proposed nothing
+        rec = _fail_run(settings, rec, NO_ANNOTATIONS)
     resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
     resume_feedback.reopen(root, rid, item, f"re-draft run ended without a new suggestion ({rec.get('stop_reason')})")
     if applying:  # Apply run denied/failed: say so instead of a silent open item (a re-draft ends open too)
