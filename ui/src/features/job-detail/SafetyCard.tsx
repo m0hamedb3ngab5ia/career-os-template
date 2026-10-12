@@ -54,7 +54,7 @@ function runsCount(runs: Safety["runs"]): number | null {
   return Array.isArray(runs) ? runs.length : null;
 }
 
-export function SafetyCard({ jobId, company, tier, safety, registry }: Props) {
+export function SafetyCard({ jobId, company, tier, safety, registry, nested }: Props & { nested?: boolean }) {
   const toast = useToast();
   const clear = useClearFlag(jobId);
   const [evidenceFor, setEvidenceFor] = useState<SafetyFlag | null>(null);
@@ -74,6 +74,7 @@ export function SafetyCard({ jobId, company, tier, safety, registry }: Props) {
   return (
     <Card
       title="Safety"
+      nested={nested}
       icon={<ShieldCheck size={16} strokeWidth={1.7} aria-hidden="true" />}
       aside={safety ? <SafetyChip verdict={safety.verdict} /> : <Chip tone="gray">Not checked</Chip>}
     >

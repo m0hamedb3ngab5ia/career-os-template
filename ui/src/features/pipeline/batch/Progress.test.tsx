@@ -135,21 +135,21 @@ describe("Batch progress", () => {
     expect(await screen.findByText("staged: review and submit it yourself", {}, opts)).toBeInTheDocument();
     await userEvent.click(screen.getByRole("link", { name: "Review 1 in Today" }));
     expect(await screen.findByText(/Only jobs in/, {}, opts)).toBeInTheDocument();
-    expect(await screen.findByText("Acme Robotics", {}, opts)).toBeInTheDocument();
-    expect(screen.queryByText("Globex")).toBeNull();
+    expect(await screen.findByText("Review Acme Robotics application", {}, opts)).toBeInTheDocument();
+    expect(screen.queryByText("Interview invite: pick a slot")).toBeNull();
   });
 
   it("Today ?batch= while the batch loads: no false 'Nothing needs you'", async () => {
     setup(batch("running"), "/?batch=b-1", { "GET /api/today": today, "GET /api/batches/b-1": () => new Promise(() => {}) });
     expect(await screen.findByText(/Only jobs in/, {}, opts)).toBeInTheDocument();
     expect(screen.queryByText("Nothing needs you")).toBeNull();
-    expect(screen.queryByText("Acme Robotics")).toBeNull();
+    expect(screen.queryByText("Review Acme Robotics application")).toBeNull();
   });
 
   it("Today ?batch= unknown: says so and shows all tasks", async () => {
     setup(batch("running"), "/?batch=nope", { "GET /api/today": today });
     expect(await screen.findByText(/Batch not found/, {}, opts)).toBeInTheDocument();
-    expect(await screen.findByText("Globex", {}, opts)).toBeInTheDocument();
+    expect(await screen.findByText("Interview invite: pick a slot", {}, opts)).toBeInTheDocument();
     expect(screen.queryByText("Nothing needs you")).toBeNull();
   });
 

@@ -271,3 +271,5 @@
   margin: 0;
   color: var(--sec);
 }
+
+.bullets { margin: var(--space-1) 0 0; padding-left: 1.1em; font-size: 0.85rem; color: var(--sec) }

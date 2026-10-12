@@ -21,21 +21,11 @@
     {
       "advanced": false,
       "files": [
-        "pipeline",
         "targets"
       ],
       "help": "",
       "id": "<id>",
-      "title": "Autonomy"
-    },
-    {
-      "advanced": false,
-      "files": [
-        "targets"
-      ],
-      "help": "",
-      "id": "<id>",
-      "title": "Safety"
+      "title": "Applying"
     },
     {
       "advanced": false,

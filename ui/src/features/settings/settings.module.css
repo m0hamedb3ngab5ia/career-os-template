@@ -1,5 +1,5 @@
 /* Settings artboards (Settings, SettingsSafety, SettingsRuns, SettingsStorage): secondary nav, grouped inset lists,
-   tier cards, preset cards, sticky save bar. Values follow the mockup's inline styles on the 8 pt grid. */
+   preset cards, sticky save bar. Values follow the mockup's inline styles on the 8 pt grid. */
 
 .layout {
   display: flex;
@@ -252,46 +252,6 @@
   width: auto;
 }
 
-/* Tier cards */
-.tierGrid {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 12px;
-  align-items: start;
-}
-.tierCard {
-  background: var(--card);
-  border: 1px solid var(--sep);
-  border-radius: var(--r-card);
-  padding: 16px;
-  box-shadow: var(--shadow-card);
-}
-.tierHead {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 4px 10px;
-  margin-bottom: 10px;
-}
-.tierName {
-  margin: 0;
-  font-size: var(--fs-body);
-  font-weight: 600;
-}
-.tierLine {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 6px 0;
-}
-.tierFoot {
-  display: flex;
-  justify-content: space-between;
-  gap: 8px;
-  padding-top: 8px;
-}
-
 /* Budget preset cards */
 .presetGrid {
   display: grid;
@@ -506,9 +466,6 @@
 }
 
 @media (max-width: 1100px) {
-  .tierGrid {
-    grid-template-columns: minmax(0, 1fr);
-  }
   .ranking {
     flex-direction: column;
   }
@@ -575,7 +532,6 @@
 .nowrap {
   flex-wrap: nowrap;
 }
-.tierCard .row,
 .weights .row {
   padding: 6px 0;
   border-bottom: 0;
@@ -583,9 +539,6 @@
 .row[data-layout="stack"] .rowText {
   flex: none;
   width: 100%;
-}
-.tierCard .rowText {
-  flex: 1 1 auto;
 }
 /* keep focused fields clear of the sticky save bar */
 :global(html):has(.saveBar) {
@@ -603,8 +556,7 @@
     justify-content: flex-start;
   }
 }
-.groupHead,
-.tierFoot {
+.groupHead {
   flex-wrap: wrap;
 }
 .resetConfirm {

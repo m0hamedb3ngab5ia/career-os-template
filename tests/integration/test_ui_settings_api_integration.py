@@ -50,18 +50,18 @@ def client(data, tmp_path):
 def test_section_list_in_schema_order(client):
     out = client.get("/api/settings").json()
     ids = [s["id"] for s in out["sections"]]
-    assert ids[:10] == ["general", "targets", "autonomy", "safety", "scout", "companies", "outreach",
-                        "notifications", "runs", "storage"]
+    assert ids[:9] == ["general", "targets", "safety", "scout", "companies", "outreach",
+                        "notifications", "runs", "storage"][:9]
     runs = next(s for s in out["sections"] if s["id"] == "runs")
     assert runs["title"] == "Runs & schedule" and runs["files"] == ["pipeline"]
 
 
 def test_read_section_has_schema_values_defaults_and_relative_files(client, data):
-    out = client.get("/api/settings/autonomy").json()
-    assert out["section"]["id"] == "autonomy"
+    out = client.get("/api/settings/safety").json()
+    assert out["section"]["id"] == "safety"
     assert out["values"]["targets:tiers.A.auto_submit"] is False
     assert out["defaults"]["targets:volume.max_applications_per_day"] == 15
-    assert out["files"] == {"pipeline": "config/pipeline.yaml", "targets": "config/targets.yaml"}
+    assert out["files"] == {"targets": "config/targets.yaml"}
     assert out["version"]
     assert client.get("/api/settings/nope").status_code == 404
 

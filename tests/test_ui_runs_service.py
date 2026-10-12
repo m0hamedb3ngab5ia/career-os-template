@@ -982,3 +982,10 @@ def test_start_error_reads_the_refusal_the_spawned_run_wrote(rc, settings):
     Path(out["output"]).write_text("Traceback ...\n")
     assert rc.start_error(out["run_id"]) is None
     assert rc.start_error("../etc") is None and rc.start_error("nope") is None
+
+
+@pytest.mark.parametrize("kind,item", [("resume_edit", "f1"), ("review", None)])
+def test_resume_steps_start_while_another_run_holds_the_runner_lock(rc, kind, item):
+    hold_runner(RunStore(rc.settings), "20260926-110000-score-abcd")
+    out = rc.start_step(kind, resume="cv", item=item)
+    assert len(FakePopen.calls) == 1 and out["run_id"]

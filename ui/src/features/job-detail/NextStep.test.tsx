@@ -2,6 +2,7 @@ import { render, screen, within } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { ActionItem } from "../today/types";
 import { NextStepSummary, ReasonDetails, stateSentence } from "./NextStep";
+import { renderWithProviders } from "./testUtils";
 import type { PipelineState } from "./types";
 
 const base: PipelineState = {
@@ -36,24 +37,18 @@ describe("stateSentence", () => {
 });
 
 describe("NextStepSummary", () => {
-  it("lists review reasons and this job's tasks in words, without codes or details", () => {
-    render(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[task]} />);
-    expect(screen.getByText("Needs your review: 3 things need attention.")).toBeInTheDocument();
-    const items = within(screen.getByRole("list", { name: "Needs you" })).getAllByRole("listitem");
-    expect(items.map((li) => li.textContent)).toEqual([
-      "A document check left a warning",
-      "Review and submit the application",
-      "Answer 4 application questions",
-    ]);
+  it("states the count and links this job's tasks; QA warnings sit behind a click; no codes", () => {
+    renderWithProviders(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[task]} />);
+    expect(screen.getByText("Needs your review: 1 thing needs attention.")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "1 task" })).toHaveAttribute("href", "/actions");
+    expect(screen.getByText("1 QA warning")).toBeInTheDocument();
     expect(screen.queryByText(/qa_warning/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/long letter/)).not.toBeInTheDocument();
   });
 
-  it("lists an item once when a review reason and a task say the same thing", () => {
-    const dup = { ...task, what: "Review and submit the application" } as ActionItem;
-    render(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[dup]} />);
-    const items = within(screen.getByRole("list", { name: "Needs you" })).getAllByRole("listitem");
-    expect(items.map((li) => li.textContent)).toEqual(["A document check left a warning", "Review and submit the application"]);
+  it("without tasks, review-action reasons do not count and the job is ready", () => {
+    renderWithProviders(<NextStepSummary state={{ ...base, review_reasons: reasons }} tasks={[]} />);
+    expect(screen.getByText("Ready for the next step: Continue pipeline.")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).not.toBeInTheDocument();
   });
 
   it("shows no list when nothing needs you", () => {

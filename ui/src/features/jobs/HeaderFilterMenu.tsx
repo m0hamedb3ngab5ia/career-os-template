@@ -17,14 +17,7 @@ export function facetLabel(field: FilterField, value: string): string {
   return CODE_FIELDS.has(field) ? humanize(value) : value;
 }
 
-/** "queued, applied", "≥ 80", "80–90", "2026-01-01 – 2026-02-01". */
-export function filterSummary(field: FilterField, f: ColumnFilter): string {
-  if (f.kind === "values") return f.values.map((v) => facetLabel(field, v)).join(", ");
-  if (f.min && f.max) return `${f.min} – ${f.max}`;
-  return f.min ? `≥ ${f.min}` : `≤ ${f.max}`;
-}
-
-/** Active column filters as removable chips, plus Clear all. */
+/** Active column filters as removable chips (column name only; the values live in its filter menu), plus Clear all. */
 export function FilterChips({ filters, onFilter, onClearAll }: {
   filters: Filters;
   onFilter: (field: FilterField, f: ColumnFilter | null) => void;
@@ -34,13 +27,11 @@ export function FilterChips({ filters, onFilter, onClearAll }: {
   if (!active.length) return null;
   return (
     <div className={styles.chips} aria-label="Active filters">
-      {active.map(([field, f]) => {
+      {active.map(([field]) => {
         const label = COLUMNS.find((c) => c.filter === field)?.label ?? field;
         return (
           <span key={field} className={styles.chip}>
-            <span>
-              {label}: {filterSummary(field, f)}
-            </span>
+            <span>{label}</span>
             <button type="button" className={styles.chipRemove} aria-label={`Remove filter ${label}`} onClick={() => onFilter(field, null)}>
               <X size={12} strokeWidth={2} aria-hidden="true" />
             </button>

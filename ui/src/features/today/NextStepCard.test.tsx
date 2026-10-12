@@ -2,7 +2,6 @@ import { act, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { JustReadyNextStep, NextStepCard } from "./NextStepCard";
-import { TodayPage } from "./TodayPage";
 import { defaultRoutes, mockApi, renderWithApp } from "./testing";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -12,7 +11,7 @@ const step = (key: string, label: string, href: string | null) => ({ "GET /api/n
 describe("NextStepCard (REQ-122)", () => {
   it("E2E-014-02: readiness done and 0 ticked jobs -> Today card says Pick jobs and links to the Jobs list", async () => {
     mockApi({ ...defaultRoutes(), ...step("pick_jobs", "Pick jobs", "/jobs") });
-    renderWithApp(<TodayPage />);
+    renderWithApp(<NextStepCard />);
     expect(await screen.findByRole("heading", { name: "Next step" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Pick jobs" })).toHaveAttribute("href", "/jobs");
   });

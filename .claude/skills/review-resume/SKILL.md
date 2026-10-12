@@ -1,6 +1,6 @@
 ---
 name: review-resume
-description: Review one stored résumé (REQ-094). Reads the latest version's extracted text, writes feedback items {section, issue, suggestion} and saves them with `careeros resume review-save`. Never rewrites the résumé. Input `<rid>`.
+description: Review one stored résumé (REQ-094). Reads the latest version's extracted text, writes feedback items {section, issue, suggestion, quotes, whole, kind} and saves them with `careeros resume review-save`. Never rewrites the résumé. Input `<rid>`.
 ---
 
 # review-resume `<rid>`
@@ -22,6 +22,11 @@ contact), typo. Each item:
 
 - `section`: the résumé heading it belongs to (`Experience`, `Skills`, …), as written in the text.
 - `issue`: what is wrong, one sentence.
+- `quotes`: a list of every line or bullet the item is about, each copied character for character from `text.txt`
+  (not the whole section); the review popup shows them as "Before". An item naming a line must quote it.
+- `whole`: `true` only for an item about the whole résumé (layout, overall length); then omit `quotes`.
+- `kind`: `format` for a PDF/ATS parsing problem a text rewrite can't fix (words broken by the extractor, odd
+  fonts, ligatures, columns/tables); its `suggestion` says how to fix the file. Otherwise `content` (default).
 - `suggestion`: how to fix it, using only facts already in the résumé. Never suggest adding a number, employer,
   title, date or tool that is not in the text, nor a stronger claim (supported → led): the apply guard refuses it.
 

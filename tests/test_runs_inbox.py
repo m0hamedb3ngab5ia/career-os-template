@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import json
+import os
+import threading
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -123,3 +125,19 @@ def test_run_skill_pause_hook_raising_does_not_mask_the_invoke_error(settings, m
     with pytest.raises(RuntimeError, match="invoke exploded"):
         go(settings, boom)
     assert not RunStore(settings).runner_lock_path.exists()
+
+
+def test_own_lock_runs_beside_the_runner_lock(settings):  # résumé review/edit: not blocked by a batch
+    locks.acquire(RunStore(settings).runner_lock_path, owner="run:x", ttl_seconds=600, now=NOW)
+    rec = go(settings, Fake([init(), result({"skill": "inbox-sync"})]), lock="resume-cv")
+    assert rec["stop_reason"] == "completed"
+    assert not (RunStore(settings).dir / "resume-cv.lock").exists()  # released
+
+
+def test_own_lock_waits_for_its_holder(settings):
+    path = RunStore(settings).dir / "resume-cv.lock"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    lk = locks.acquire(path, owner="run:first", ttl_seconds=600, pid=os.getpid())
+    threading.Timer(0.3, locks.release, (path, lk.token)).start()  # the first edit ends while this one waits
+    rec = go(settings, Fake([init(), result({"skill": "inbox-sync"})]), lock="resume-cv")
+    assert rec["stop_reason"] == "completed"

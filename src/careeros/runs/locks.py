@@ -64,6 +64,13 @@ def _now() -> datetime:
 
 
 def pid_alive(pid: int) -> bool:
+    # A child we spawned (UI runs via Popen, never waited on) that exited is a zombie until reaped, and
+    # os.kill(pid, 0) succeeds on zombies: reap it so its stale lock frees. Not our child -> ChildProcessError.
+    try:
+        if os.waitpid(pid, os.WNOHANG)[0] == pid:
+            return False
+    except OSError:
+        pass
     try:
         os.kill(pid, 0)
     except ProcessLookupError:

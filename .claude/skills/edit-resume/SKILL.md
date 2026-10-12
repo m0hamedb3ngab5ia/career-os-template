@@ -7,6 +7,10 @@ description: Act on one résumé feedback item (REQ-095, REQ-096). Open item →
 
 ## 1. Read
 
+Run each command on its own: no pipes, `&&`, `;` or `python -c`. Anything else is denied and the run stops
+without a new version. Read JSON output yourself; write files with Write.
+
+
 - `.venv/bin/careeros resume feedback <rid>` → the item `<item>` (`state`, `section`, `issue`, `suggestion`,
   `comments`).
 - `.venv/bin/careeros resume list --json` → `latest` for `<rid>`; read `profile/resumes/<rid>/v<latest>/text.txt`.

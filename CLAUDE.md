@@ -104,3 +104,8 @@ This repo uses `/product` (docs + how-to: `docs/product/README.md`). Any agent, 
 - Any UI work: apply `~/.claude/skills/product/UI_UX_PRINCIPLES.md` (global UX heuristics, P1–P20, verification checklist).
 - Missing requirement / UX / design detail → add to `docs/product/OPEN_QUESTIONS.md` and ask; don't invent.
 - PR body: `Implements: REQ-… UC-…` / `Verification: E2E-…`. Status `verified` only via `/product verify`.
+
+## Work docs
+Workstreams: `docs/work/<slug>/README.md` (Brief + Status) + `handoffs/YYYY-MM-DD-NN.md` (versioned, never deleted).
+Fresh agent: read only your stream's README + newest handoff. Global map of all work: `~/Code/WORK.md` (`/docs`).
+Requirements stay in `docs/product/` (link IDs, don't copy). Branch name `work/<slug>` ties a branch to its stream.

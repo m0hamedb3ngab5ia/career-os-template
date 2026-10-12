@@ -210,7 +210,8 @@ def run_inbox_sync(settings: Settings) -> dict[str, Any]:
 def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, run_skill: Any = None,
                      run_id: str | None = None) -> dict[str, Any]:
     """review-resume (REQ-094) or edit-resume (REQ-095/096) on one résumé. A new master version afterwards launches
-    extract-master (REQ-099: each new master version), here because the edit run holds the runner lock."""
+    extract-master (REQ-099: each new master version). Both hold the résumé's own lock (resume-<rid>), not the runner
+    lock: they run beside a batch, and a second edit of the same résumé waits for the first."""
     from careeros import resume_feedback, resumes
 
     if run_skill is None:
@@ -219,16 +220,23 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     before = resumes.get(root, rid)["versions"][-1]["n"]
     if kind == "review":
         resume_feedback.set_review(root, rid, "running", run=run_id)
-        rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id)
+        rec = run_skill(settings, "review", f"review-resume {rid}", run_id=run_id, lock=f"resume-{rid}")
         if rec.get("stop_reason") != "completed" or (resume_feedback.load(root, rid)["review"] or {}).get("state") != "done":
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
         return rec
-    rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id)
+    applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
+    rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
     resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
     resume_feedback.reopen(root, rid, item, f"re-draft run ended without a new suggestion ({rec.get('stop_reason')})")
+    if applying:  # Apply run denied/failed: say so instead of a silent open item (a re-draft ends open too)
+        resume_feedback.reopen(root, rid, item, "the assistant stopped before saving the change; try Accept again",
+                               unexplained=True)
     meta = resumes.get(root, rid)
     if meta["type"] == "master" and meta["versions"][-1]["n"] > before:
-        run_skill(settings, "extract_master", "extract-master")
+        try:
+            run_skill(settings, "extract_master", "extract-master")
+        except Exception:  # noqa: BLE001 - a batch holds the runner lock: the master shows stale, Re-read later
+            pass
     return rec
 
 

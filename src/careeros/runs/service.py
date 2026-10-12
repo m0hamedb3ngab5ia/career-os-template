@@ -205,10 +205,12 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
 def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[str] | None = None,
               allowed_tools_extra: list[str] | None = None, trigger: str = "manual", invoke=None, doctor=None,
               now: Callable[[], datetime] = _utcnow, cancel=None,
-              echo: Callable[[str], None] = lambda s: None, run_id: str | None = None) -> dict[str, Any]:
+              echo: Callable[[str], None] = lambda s: None, run_id: str | None = None,
+              lock: str | None = None) -> dict[str, Any]:
     """One headless call of a skill that is not about a single job (the scheduled inbox_sync). Same runner lock,
     pause, doctor preflight and run records as a batch; `mcp_servers` must be logged in (auth_required if not).
-    Stop reason: completed, a hard stop (usage_limit, auth_required, permission_denied, timeout, cancelled),
+    `lock` = an own lock (data/runs/<lock>.lock) instead of the runner lock: runs beside a batch, waits its turn
+    behind a holder of the same lock (résumé review/edit). Stop reason: completed, a hard stop (usage_limit, auth_required, permission_denied, timeout, cancelled),
     paused, doctor_failed, or error (the call failed any other way)."""
     import os
     import uuid
@@ -232,9 +234,12 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
     start = now()
     timeout_s = float(cfg.job_timeout_minutes.get(kind, 20)) * 60
     rid = run_id or f"{start.astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{uuid.uuid4().hex[:4]}"
+    lock_path = rs.dir / f"{lock}.lock" if lock else rs.runner_lock_path
+    lock_path.parent.mkdir(parents=True, exist_ok=True)
     try:
-        lk = locks.acquire(rs.runner_lock_path, owner=f"run:{rid}", ttl_seconds=timeout_s + 600, pid=os.getpid(),
-                           now=start, note=f"{kind} ({trigger})")
+        lk = locks.acquire_waiting(lock_path, owner=f"run:{rid}", ttl_seconds=timeout_s + 600,
+                                   wait_s=timeout_s + 600 if lock else 0, pid=os.getpid(), now=start,
+                                   note=f"{kind} ({trigger})")
     except locks.LockBusy as e:
         raise RunBusy(e.holder) from None
     try:
@@ -242,7 +247,7 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
                          run_id=rid, dry_run=False, cmd=build_command(cfg, f"/{skill}", kind=kind),
                          counters={"candidates": 1, "attempted": 0, "ok": 0, "failed": 0, "locked": 0, "gated": 0})
     except BaseException:
-        locks.release(rs.runner_lock_path, lk.token)
+        locks.release(lock_path, lk.token)
         raise
     status, stop, detail = "done", "completed", ""
     try:
@@ -283,5 +288,5 @@ def run_skill(settings: Settings, kind: str, skill: str, *, mcp_servers: list[st
                    duration_s=round((end - start).total_seconds(), 1))
         # under the lock: no run starts unpaused in between
         close_run(rs, run, lambda r: pause_after_usage_limit(settings, cfg, r, now()),
-                  lambda: locks.release(rs.runner_lock_path, lk.token))
+                  lambda: locks.release(lock_path, lk.token))
     return run

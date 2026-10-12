@@ -32,49 +32,27 @@ export function field(p: Partial<FieldSchema> & Pick<FieldSchema, "file" | "key"
 
 export const SECTIONS = [
   { id: "general", title: "General", help: "", files: ["pipeline"], advanced: false },
-  { id: "autonomy", title: "Autonomy", help: "", files: ["pipeline", "targets"], advanced: false },
-  { id: "safety", title: "Safety", help: "", files: ["targets"], advanced: false },
+  { id: "safety", title: "Applying", help: "", files: ["targets"], advanced: false },
   { id: "runs", title: "Runs & schedule", help: "", files: ["pipeline"], advanced: false },
   { id: "storage", title: "Storage & efficiency", help: "", files: ["pipeline"], advanced: true },
 ];
 
-function tier(letter: string, auto: boolean) {
-  return {
-    id: `tier_${letter.toLowerCase()}`,
-    title: `Tier ${letter}`,
-    help: "", advanced: false,
-    items: [
-      field({ file: "targets", key: `tiers.${letter}.description`, control: "text", label: "Description", default: `tier ${letter}` }),
-      field({
-        file: "targets",
-        key: `tiers.${letter}.auto_submit`,
-        control: "switch",
-        label: "Auto-submit when you run Apply",
-        default: auto,
-        locked: letter === "A",
-        note: letter === "A" ? "Tier A is never auto-submitted, whatever the file says." : "",
-      }),
-      field({
-        file: "targets",
-        key: `tiers.${letter}.cover_letter`,
-        control: "select",
-        label: "Cover letter",
-        default: "always",
-        options: ["always", "if_required"],
-      }),
-    ],
-  };
-}
-
-export function autonomyData(): SectionData {
+export function appliedData(): SectionData {
   const volume = field({
     file: "targets",
     key: "volume.max_applications_per_day",
     control: "number",
-    label: "Applications per day",
+    label: "Most applications per day",
     default: 15,
     min: 1,
     integer: true,
+  });
+  const pause = field({
+    file: "targets",
+    key: "safety.pause_auto_submit",
+    control: "switch",
+    label: "I submit every application myself",
+    default: false,
   });
   const cooldown = field({
     file: "targets",
@@ -94,15 +72,18 @@ export function autonomyData(): SectionData {
   });
   return {
     section: {
-      id: "autonomy",
-      title: "Autonomy",
+      id: "safety",
+      title: "Applying",
       help: "", advanced: false,
       files: ["pipeline", "targets"],
       groups: [
-        tier("A", false),
-        tier("B", true),
-        tier("C", true),
-        { id: "volume", title: "Volume", help: "", advanced: false, items: [volume, cooldown] },
+        {
+          id: "applying",
+          title: "How much CareerOS does on its own",
+          help: "", advanced: false,
+          items: [pause, volume],
+        },
+        { id: "volume", title: "Volume", help: "", advanced: true, items: [cooldown] },
         {
           id: "outreach",
           title: "Outreach",
@@ -115,15 +96,7 @@ export function autonomyData(): SectionData {
       ],
     },
     values: {
-      "targets:tiers.A.description": "tier A",
-      "targets:tiers.A.auto_submit": false,
-      "targets:tiers.A.cover_letter": "always",
-      "targets:tiers.B.description": "tier B",
-      "targets:tiers.B.auto_submit": false,
-      "targets:tiers.B.cover_letter": "always",
-      "targets:tiers.C.description": "tier C",
-      "targets:tiers.C.auto_submit": true,
-      "targets:tiers.C.cover_letter": "if_required",
+      "targets:safety.pause_auto_submit": false,
       "targets:volume.max_applications_per_day": 12,
       "targets:volume.same_company_cooldown_days": 30,
       "pipeline:outreach.manual_if_connected": true,

@@ -3,35 +3,34 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it } from "vitest";
 import { vi } from "vitest";
 import { axeViolations } from "../../test/axe";
-import { type Call, SECTIONS, autonomyData, mockApi, renderSettings, route, runsData, safetyData, sectionRoutes } from "./testing";
+import { type Call, SECTIONS, appliedData, mockApi, renderSettings, route, runsData, safetyData, sectionRoutes } from "./testing";
 
 afterEach(() => vi.unstubAllGlobals());
 
-async function openAutonomy() {
-  const calls = mockApi(...sectionRoutes(autonomyData()));
-  const utils = renderSettings("/settings/autonomy");
-  await screen.findByRole("heading", { name: "Volume" }, { timeout: 5000 });
+async function openApplying() {
+  const calls = mockApi(...sectionRoutes(appliedData()));
+  const utils = renderSettings("/settings/safety");
+  await screen.findByRole("heading", { name: "How much CareerOS does on its own" }, { timeout: 5000 });
   return { calls, ...utils };
 }
 
 describe("Settings navigation", () => {
   it("lists the sections in schema order and marks the current one", async () => {
-    await openAutonomy();
+    await openApplying();
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
     const links = within(nav).getAllByRole("link");
     await waitFor(() => expect(links.length).toBeGreaterThan(0));
     expect(within(nav).getAllByRole("link").map((l) => l.textContent)).toEqual([
       "General",
-      "Autonomy",
-      "Safety",
+      "Applying",
       "Runs & schedule",
       "Storage & efficiency",
     ]);
-    expect(within(nav).getByRole("link", { name: "Autonomy" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Applying" })).toHaveAttribute("aria-current", "page");
   });
 
   it("folds system sections under a collapsed Advanced group, open when one is current", async () => {
-    await openAutonomy();
+    await openApplying();
     const nav = screen.getByRole("navigation", { name: "Settings sections" });
     const storage = await within(nav).findByRole("link", { name: "Storage & efficiency" });
     expect(storage.closest("details")).not.toHaveAttribute("open");
@@ -67,24 +66,27 @@ describe("Advanced groups", () => {
 });
 
 describe("generic form", () => {
+  it("Applying page leads with plain controls; tiers stay inside Advanced", async () => {
+    await openApplying();
+    expect(screen.getByRole("switch", { name: "I submit every application myself" })).toBeInTheDocument();
+    expect(screen.getByRole("textbox", { name: "Most applications per day" })).toBeInTheDocument();
+    expect(screen.queryByText(/Tier/, { selector: "h2, h3, label" })).not.toBeInTheDocument();
+  });
+
   it("renders controls with (Recommended) notes, policy rows and locked rows", async () => {
-    await openAutonomy();
-    const perDay = screen.getByRole("textbox", { name: "Applications per day" });
+    await openApplying();
+    const perDay = screen.getByRole("textbox", { name: "Most applications per day" });
     expect(perDay).toHaveValue("12");
     expect(within(perDay.closest("[data-field]") as HTMLElement).getByText("Recommended: 15")).toBeInTheDocument();
     const cooldown = screen.getByRole("textbox", { name: "Cooldown after a rejection" });
     expect(within(cooldown.closest("[data-field]") as HTMLElement).getByText("Recommended")).toBeInTheDocument();
     expect(screen.getByText("Draft only")).toBeInTheDocument();
-    const tierA = screen.getByRole("switch", { name: "Tier A: Auto-submit when you run Apply" });
-    expect(tierA).toBeDisabled();
-    expect(screen.getByText(/Tier A is never auto-submitted/)).toBeInTheDocument();
-    expect(screen.getAllByRole("option", { name: "Always (Recommended)" }).length).toBeGreaterThan(0);
   });
 
   it("counts unsaved changes and discards them after a confirm", async () => {
     const user = userEvent.setup();
-    await openAutonomy();
-    const perDay = screen.getByRole("textbox", { name: "Applications per day" });
+    await openApplying();
+    const perDay = screen.getByRole("textbox", { name: "Most applications per day" });
     await user.clear(perDay);
     await user.type(perDay, "20");
     await user.click(screen.getByRole("switch", { name: "Tailor by hand when you're already connected" }));
@@ -100,11 +102,11 @@ describe("generic form", () => {
   it("saves every change at once with the version and the write header", async () => {
     const user = userEvent.setup();
     const calls = mockApi(
-      ...sectionRoutes(autonomyData()),
-      route("PUT", "/api/settings/autonomy", { old: {}, version: "v2" }),
+      ...sectionRoutes(appliedData()),
+      route("PUT", "/api/settings/safety", { old: {}, version: "v2" }),
     );
-    renderSettings("/settings/autonomy");
-    const perDay = await screen.findByRole("textbox", { name: "Applications per day" });
+    renderSettings("/settings/safety");
+    const perDay = await screen.findByRole("textbox", { name: "Most applications per day" });
     await user.clear(perDay);
     await user.type(perDay, "20");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
@@ -121,10 +123,10 @@ describe("generic form", () => {
   it("on 422 shows the error under the field, focuses it and says how many to fix", async () => {
     const user = userEvent.setup();
     mockApi(
-      ...sectionRoutes(autonomyData()),
+      ...sectionRoutes(appliedData()),
       route(
         "PUT",
-        "/api/settings/autonomy",
+        "/api/settings/safety",
         {
           detail: "Fix 1 error to save.",
           fields: { "targets:volume.same_company_cooldown_days": "Must be at least 0." },
@@ -133,7 +135,7 @@ describe("generic form", () => {
         422,
       ),
     );
-    renderSettings("/settings/autonomy");
+    renderSettings("/settings/safety");
     const cooldown = await screen.findByRole("textbox", { name: "Cooldown after a rejection" });
     await user.clear(cooldown);
     await user.type(cooldown, "-3");
@@ -149,8 +151,8 @@ describe("generic form", () => {
 
   it("checks an empty number in the browser without a request", async () => {
     const user = userEvent.setup();
-    const { calls } = await openAutonomy();
-    const perDay = screen.getByRole("textbox", { name: "Applications per day" });
+    const { calls } = await openApplying();
+    const perDay = screen.getByRole("textbox", { name: "Most applications per day" });
     await user.clear(perDay);
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     expect(await screen.findByText("A value is required.")).toBeInTheDocument();
@@ -161,30 +163,30 @@ describe("generic form", () => {
   it("Reset to recommended fills the group's recommended values as unsaved edits", async () => {
     const user = userEvent.setup();
     const calls = mockApi(
-      ...sectionRoutes(autonomyData()),
-      route("POST", "/api/settings/autonomy/reset/volume", {
-        changes: { "targets:volume.max_applications_per_day": 15, "targets:volume.same_company_cooldown_days": 30 },
+      ...sectionRoutes(appliedData()),
+      route("POST", "/api/settings/safety/reset/applying", {
+        changes: { "targets:volume.max_applications_per_day": 15 },
       }),
     );
-    renderSettings("/settings/autonomy");
-    await screen.findByRole("heading", { name: "Volume" });
-    await user.click(screen.getByRole("button", { name: "Reset to recommended: Volume" }));
-    await waitFor(() => expect(screen.getByRole("textbox", { name: "Applications per day" })).toHaveValue("15"));
+    renderSettings("/settings/safety");
+    await screen.findByRole("heading", { name: "How much CareerOS does on its own" });
+    await user.click(screen.getByRole("button", { name: "Reset to recommended: How much CareerOS does on its own" }));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Most applications per day" })).toHaveValue("15"));
     expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
-    expect(calls.find((c) => c.url.endsWith("/reset/volume"))?.headers.get("X-CareerOS")).toBe("1");
+    expect(calls.find((c) => c.url.endsWith("/reset/applying"))?.headers.get("X-CareerOS")).toBe("1");
     expect(screen.getByRole("button", { name: "Reset to recommended: Outreach" })).toBeDisabled();
   });
 
   it("Show diff opens a sheet with the file's diff", async () => {
     const user = userEvent.setup();
     mockApi(
-      ...sectionRoutes(autonomyData()),
-      route("POST", "/api/settings/autonomy/diff", {
+      ...sectionRoutes(appliedData()),
+      route("POST", "/api/settings/safety/diff", {
         diffs: { targets: "--- a\n+++ b\n@@ -1 +1 @@\n-  max_applications_per_day: 12\n+  max_applications_per_day: 20" },
       }),
     );
-    renderSettings("/settings/autonomy");
-    const perDay = await screen.findByRole("textbox", { name: "Applications per day" });
+    renderSettings("/settings/safety");
+    const perDay = await screen.findByRole("textbox", { name: "Most applications per day" });
     await user.clear(perDay);
     await user.type(perDay, "20");
     await user.click(screen.getByRole("button", { name: "Show diff" }));
@@ -195,31 +197,14 @@ describe("generic form", () => {
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 
-  it("turning on auto-submit asks first; Cancel keeps it off", async () => {
-    const user = userEvent.setup();
-    await openAutonomy();
-    const b = screen.getByRole("switch", { name: "Tier B: Auto-submit when you run Apply" });
-    await user.click(b);
-    const ask = screen.getByRole("alertdialog", { name: "Turn on auto-submit for Tier B?" });
-    await user.click(within(ask).getByRole("button", { name: "Cancel" }));
-    expect(b).toHaveAttribute("aria-checked", "false");
-    await user.click(b);
-    await user.click(screen.getByRole("button", { name: "Turn on" }));
-    expect(b).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
-    // turning off needs no confirm
-    await user.click(screen.getByRole("switch", { name: "Tier C: Auto-submit when you run Apply" }));
-    expect(screen.queryByRole("alertdialog")).not.toBeInTheDocument();
-  });
-
   it("guards leaving with unsaved changes", async () => {
     const user = userEvent.setup();
-    const { router } = await openAutonomy();
+    const { router } = await openApplying();
     await user.click(screen.getByRole("switch", { name: "Tailor by hand when you're already connected" }));
     await act(() => router.navigate("/runs"));
     const guard = await screen.findByRole("alertdialog", { name: /Leave without saving\? 1 unsaved change/ });
     await user.click(within(guard).getByRole("button", { name: "Keep editing" }));
-    expect(router.state.location.pathname).toBe("/settings/autonomy");
+    expect(router.state.location.pathname).toBe("/settings/safety");
     await act(() => router.navigate("/runs"));
     await user.click(await screen.findByRole("button", { name: "Leave" }));
     expect(await screen.findByText("Runs page")).toBeInTheDocument();
@@ -230,16 +215,16 @@ describe("generic form", () => {
     let version = "v1";
     const calls = mockApi(
       route("GET", "/api/settings", { sections: SECTIONS }),
-      route("GET", "/api/settings/autonomy", () => ({ ...autonomyData(), version })),
-      route("PUT", "/api/settings/autonomy", { detail: "The settings files changed since this page was opened; reload to see them." }, 409),
+      route("GET", "/api/settings/safety", () => ({ ...appliedData(), version })),
+      route("PUT", "/api/settings/safety", { detail: "The settings files changed since this page was opened; reload to see them." }, 409),
     );
-    const { qc } = renderSettings("/settings/autonomy");
-    const perDay = await screen.findByRole("textbox", { name: "Applications per day" });
+    const { qc } = renderSettings("/settings/safety");
+    const perDay = await screen.findByRole("textbox", { name: "Most applications per day" });
     await user.clear(perDay);
     await user.type(perDay, "20");
     version = "v2";
     await act(() => qc.invalidateQueries({ queryKey: ["settings"] }));
-    await waitFor(() => expect(calls.filter((c) => c.url === "/api/settings/autonomy").length).toBe(2));
+    await waitFor(() => expect(calls.filter((c) => c.url === "/api/settings/safety").length).toBe(2));
     expect(perDay).toHaveValue("20");
     await user.click(screen.getByRole("button", { name: "Save changes" }));
     const put = await waitFor(() => calls.find((c) => c.method === "PUT")!);
@@ -254,30 +239,8 @@ describe("generic form", () => {
     expect((calls.filter((c) => c.method === "PUT")[1]!.body as { version: string }).version).toBe("v2");
   });
 
-  it("Reset to recommended asks before it turns auto-submit on; Cancel applies the other keys only", async () => {
-    const user = userEvent.setup();
-    mockApi(
-      ...sectionRoutes(autonomyData()),
-      route("POST", "/api/settings/autonomy/reset/tier_b", {
-        changes: { "targets:tiers.B.auto_submit": true, "targets:tiers.B.cover_letter": "if_required" },
-      }),
-    );
-    renderSettings("/settings/autonomy");
-    const b = await screen.findByRole("switch", { name: "Tier B: Auto-submit when you run Apply" });
-    await user.click(screen.getByRole("button", { name: "Reset to recommended: Tier B" }));
-    const ask = await screen.findByRole("alertdialog", { name: "Turn on auto-submit for Tier B?" });
-    await user.click(within(ask).getByRole("button", { name: "Cancel" }));
-    expect(b).toHaveAttribute("aria-checked", "false");
-    expect(screen.getByRole("combobox", { name: "Tier B: Cover letter" })).toHaveValue("if_required");
-    expect(screen.getByText(/1 unsaved change/)).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Reset to recommended: Tier B" }));
-    await user.click(await screen.findByRole("button", { name: "Turn on" }));
-    expect(b).toHaveAttribute("aria-checked", "true");
-    expect(screen.getByText(/2 unsaved changes/)).toBeInTheDocument();
-  });
-
   it("has no axe violations", async () => {
-    const { container } = await openAutonomy();
+    const { container } = await openApplying();
     expect(await axeViolations(container)).toEqual([]);
   });
 });

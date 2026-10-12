@@ -1,4 +1,4 @@
-import { screen, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
@@ -28,6 +28,7 @@ const BASE = {
   "GET /api/learning/lessons": { lessons: [{ id: "abc12345", text: "Workday needs a login", ats: "workday", company: null, job_id: null, added: null, tags: [] }] },
   "GET /api/profile/master/proposal": { state: "synced", diff: "" },
   "GET /api/profile/resumes/cv/feedback": { review: null, items: [] },
+  "GET /api/profile/resumes/cv/versions/2": { rid: "cv", n: 2, text: "Experience\n- Supported migration of 12 services\n", ats: {} },
 };
 
 afterEach(() => vi.unstubAllGlobals());
@@ -36,30 +37,26 @@ describe("ProfilePage", () => {
   it("shows every section, the checklist and explains disabled controls", async () => {
     mockApi(BASE);
     const { container } = renderRoutes(routes, "/profile");
+    expect(await screen.findByText("1 setup item remaining")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Review" }));
     expect(await screen.findByRole("heading", { name: "Before you apply: 1 must-have left" })).toBeInTheDocument();
-    for (const h of ["Résumés", "Writing samples", "Saved answers", "Learned"]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
-    expect(await screen.findByText("- short sentences")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Fix" })).toHaveAttribute("href", "/profile#resumes");
-    expect(screen.queryByRole("button", { name: "Make master" })).toBeNull();
-    expect(screen.getByText("Master")).toBeInTheDocument();
-    await screen.findByText("Workday needs a login");
+    for (const h of ["Résumés", "Writing style", "Application answers"]) expect(screen.getByRole("heading", { name: h })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Lessons" })).toBeNull();
+    expect(screen.getByText("1 sample")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Fix it" })).toHaveAttribute("href", "/profile#resumes");
+    expect(screen.queryByRole("menuitem", { name: "Make master" })).toBeNull();
+    expect(screen.getByText("Master résumé")).toBeInTheDocument();
     expect(unexplainedDisabled(container)).toEqual([]);
     expect(await axeViolations(container)).toEqual([]);
   });
 
-  it("edits and deletes a saved answer through the API", async () => {
-    const calls = mockApi({ ...BASE, "PUT /api/profile/answers/why_us": {}, "DELETE /api/profile/answers/gender": {} });
+  it("summarises answers by group with a Manage answers link", async () => {
+    mockApi(BASE);
     renderRoutes(routes, "/profile");
-    await userEvent.click(await screen.findByRole("button", { name: "Edit why_us (Acme)" }));
-    const box = screen.getByRole("textbox", { name: "Answer for why_us (Acme)" });
-    await userEvent.clear(box);
-    expect(screen.getByRole("button", { name: "Save" })).toHaveAccessibleDescription("Type an answer first");
-    await userEvent.type(box, "Space.");
-    await userEvent.click(screen.getByRole("button", { name: "Save" }));
-    expect(calls.find((c) => c.method === "PUT")?.body).toEqual({ answer: "Space.", company: "Acme", eeo: false });
-    await userEvent.click(screen.getByRole("button", { name: "Delete gender" }));
-    await userEvent.click(within(screen.getByRole("group", { name: "Delete gender?" })).getByRole("button", { name: "Yes, delete" }));
-    expect(calls.find((c) => c.method === "DELETE")?.url).toBe("/api/profile/answers/gender?eeo=true");
+    expect(await screen.findByText("Job preferences · 1")).toBeInTheDocument();
+    expect(screen.getByText("Company-specific · 1")).toBeInTheDocument();
+    expect(screen.getByText("EEO (voluntary) · 1")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Manage answers" })).toHaveAttribute("href", "/profile/answers");
   });
 
   it("removing a sample that can't re-learn shows a banner with Retry", async () => {
@@ -69,6 +66,7 @@ describe("ProfilePage", () => {
       "POST /api/profile/samples/learn": { samples: [], learn_run: "r1", learn_error: null },
     });
     renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Manage samples" }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete letter.md" }));
     await userEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
     expect(await screen.findByRole("alert")).toHaveTextContent("learn-voice not started: busy");
@@ -86,6 +84,7 @@ describe("ProfilePage", () => {
     });
     renderRoutes(routes, "/profile");
     const files = ["a.md", "b.txt"].map((n) => new File(["hi"], n, { type: "text/plain" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Manage samples" }));
     await userEvent.upload(await screen.findByLabelText("Add samples"), files);
     expect(await screen.findByRole("alert")).toHaveTextContent("Voice update failed: timed out");
     const puts = calls.filter((c) => c.method === "PUT").map((c) => c.url);
@@ -94,20 +93,17 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("button", { name: "Retry" })).toBeInTheDocument();
   });
 
-  it("an already running voice update is info, and a failed answer delete says so", async () => {
+  it("an already running voice update is info", async () => {
     mockApi({
       ...BASE,
       "POST /api/profile/samples/learn": { samples: [], learn_run: null, learn_error: null, learn_info: "voice update already running; new samples are used next run" },
       "PUT /api/profile/samples": {},
-      "DELETE /api/profile/answers/relocate": new Response(JSON.stringify({ detail: "disk full" }), { status: 500 }),
     });
     renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Manage samples" }));
     await userEvent.upload(await screen.findByLabelText("Add samples"), new File(["hi"], "c.md"));
     expect(await screen.findByText(/already running; new samples are used next run/)).toBeInTheDocument();
     expect(screen.queryByRole("alert")).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Delete relocate" }));
-    await userEvent.click(screen.getByRole("button", { name: "Yes, delete" }));
-    expect(await screen.findByText(/Couldn’t delete relocate: disk full/)).toBeInTheDocument();
   });
 
   it("failed loads offer Try again", async () => {
@@ -127,12 +123,15 @@ describe("ProfilePage", () => {
       "POST /api/profile/master/proposal/approve": () => { synced = true; return { state: "synced", diff: "" }; },
     });
     const { container } = renderRoutes(routes, "/profile");
-    expect(await screen.findByRole("link", { name: "Fix" })).toHaveAttribute("href", "/profile#master");
-    expect(await screen.findByLabelText("Proposed master.yaml changes")).toHaveTextContent("+name: new");
+    await userEvent.click(await screen.findByRole("button", { name: "Review" }));
+    expect(await screen.findByRole("link", { name: "Fix it" })).toHaveAttribute("href", "/profile#master");
+    expect(await screen.findByText("CareerOS read new details from this version")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Review new details" }));
+    expect(await screen.findByLabelText("Proposed profile fact changes")).toHaveTextContent("+name: new");
     expect(await axeViolations(container)).toEqual([]);
     await userEvent.click(screen.getByRole("button", { name: "Approve changes" }));
     expect(calls.some((c) => c.method === "POST" && c.url === "/api/profile/master/proposal/approve")).toBe(true);
-    expect(await screen.findByText("In sync with your master résumé.")).toBeInTheDocument();
+    await vi.waitFor(() => expect(screen.queryByText("CareerOS read new details from this version")).toBeNull());
     expect(await screen.findByRole("heading", { name: "Ready to apply" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve changes" })).toBeNull();
   });
@@ -145,13 +144,15 @@ describe("ProfilePage", () => {
       "POST /api/profile/master/proposal/reject": () => { rejected = true; return { state: "rejected", diff: "+x: 1\n" }; },
     });
     renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Review new details" }));
     await userEvent.click(await screen.findByRole("button", { name: "Reject" }));
     expect(await screen.findByText(/You rejected the last proposal/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve changes" })).toBeNull();
   });
 
   it("TASK-022: résumé feedback apply, comment and dismiss call the endpoints", async () => {
-    const item = (id: string, state = "open") => ({ id, section: "Experience", issue: `Issue ${id}`, suggestion: "Add a number", state, comments: [] });
+    const item = (id: string, state = "open") => ({ id, section: "Experience", issue: `Issue ${id}`, suggestion: "Add a number", state, comments: [],
+      quote: "Supported migration of 12 services" });
     const calls = mockApi({
       ...BASE,
       "GET /api/profile/resumes/cv/feedback": { review: { state: "done", run: "r1", v: 2, at: "2026-10-01" }, items: [item("f1"), item("f2", "applied")] },
@@ -161,17 +162,47 @@ describe("ProfilePage", () => {
       "POST /api/profile/resumes/cv/feedback/f1/dismiss": item("f1", "dismissed"),
     });
     const { container } = renderRoutes(routes, "/profile");
-    await userEvent.click(await screen.findByText("Feedback: 1 open of 2"));
-    expect(container).toHaveTextContent("Experience · Issue f2");
-    expect(unexplainedDisabled(container)).toEqual([]);
-    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    expect(await screen.findByText(/1 suggestion to review/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Review suggestions" }));
+    const dialog = screen.getByRole("dialog", { name: "Résumé review" });
+    expect(dialog).toHaveTextContent("CareerOS found 2 possible improvements");
+    expect(dialog).toHaveTextContent("Suggestion 1 of 2");
+    expect(dialog).toHaveTextContent("Experience: Issue f1");
+    expect(within(dialog).queryByLabelText("Résumé text")).toBeNull(); // only the passage, not the full text
+    const mark = await within(dialog).findByText((_, el) => el?.tagName === "MARK");
+    expect(mark).toHaveTextContent("Supported migration of 12 services");
+    expect(mark.parentElement?.textContent).toBe("Experience\n- Supported migration of 12 services"); // neighbouring line kept
+    expect(unexplainedDisabled(dialog)).toEqual([]);
+    await userEvent.click(screen.getByRole("button", { name: "Suggest different wording" }));
     await userEvent.type(screen.getByRole("textbox", { name: "Comment on Experience" }), "Use 12 services");
     await userEvent.click(screen.getByRole("button", { name: "Send" }));
-    await userEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+    await userEvent.click(screen.getByRole("button", { name: "Ignore" }));
+    expect(await screen.findByText("Suggestion 2 of 2")).toBeInTheDocument(); // Ignore -> next item
+    expect(screen.getByRole("dialog", { name: "Résumé review" })).toHaveTextContent(/Applied/);
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    await userEvent.click(await screen.findByRole("button", { name: "Accept" }));
+    expect(await screen.findByText("Suggestion 2 of 2")).toBeInTheDocument(); // Accept -> next item
     const posts = calls.filter((c) => c.method === "POST").map((c) => c.url);
-    expect(posts).toEqual(["/api/profile/resumes/cv/feedback/f1/apply", "/api/profile/resumes/cv/feedback/f1/comment", "/api/profile/resumes/cv/feedback/f1/dismiss"]);
+    expect(posts).toEqual(["/api/profile/resumes/cv/feedback/f1/comment", "/api/profile/resumes/cv/feedback/f1/dismiss", "/api/profile/resumes/cv/feedback/f1/apply"]);
     expect(calls.find((c) => c.url.endsWith("/comment"))?.body).toEqual({ text: "Use 12 services" });
     expect(await axeViolations(container)).toEqual([]);
+  });
+
+  it("review: a format item has How to fix + Mark as fixed (dismiss), no Accept; no quote = whole résumé", async () => {
+    const calls = mockApi({
+      ...BASE,
+      "GET /api/profile/resumes/cv/feedback": { review: { state: "done", run: "r1", v: 2, at: "2026-10-01" },
+        items: [{ id: "f1", section: "Layout", issue: "Broken words", suggestion: "Export with embedded fonts", kind: "format", whole: true, state: "open", comments: [], v: 2 }] },
+      "POST /api/profile/resumes/cv/feedback/f1/dismiss": { id: "f1", state: "dismissed" },
+    });
+    renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Review suggestions" }));
+    const dialog = screen.getByRole("dialog", { name: "Résumé review" });
+    expect(dialog).toHaveTextContent("How to fix");
+    expect(dialog).toHaveTextContent("This affects the whole résumé, not one line.");
+    expect(within(dialog).queryByRole("button", { name: "Accept" })).toBeNull();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Mark as fixed" }));
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.url)).toEqual(["/api/profile/resumes/cv/feedback/f1/dismiss"]);
   });
 
   it("TASK-022 review: Apply follows its run, then shows the item's outcome (reason)", async () => {
@@ -185,16 +216,90 @@ describe("ProfilePage", () => {
       "GET /api/runs/r2": () => ({ id: "r2", state: done ? "done" : "running" }),
     });
     renderRoutes(routes, "/profile");
-    await userEvent.click(await screen.findByText("Feedback: 1 open of 1"));
+    await userEvent.click(await screen.findByRole("button", { name: "Review suggestions" }));
     expect(screen.getByText(/keep it short/)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: "Apply" }));
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
     expect(await screen.findByRole("button", { name: "Applying…" })).toBeDisabled();
     done = true;
     expect(await screen.findByText(/Not applied: résumé changed since v2/, {}, { timeout: 3000 })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Apply" })).toBeEnabled();
+    expect(screen.getByRole("button", { name: "Accept" })).toBeEnabled();
   });
 
-  it("TASK-022 review: stale master with no running extract-master offers Re-read", async () => {
+  it("review: Accept while another apply runs waits, then starts when it ends; Before vs Suggested change", async () => {
+    let done = false;
+    const item = (id: string) => ({ id, section: "Experience", issue: `Issue ${id}`, suggestion: `Say ${id}`, quote: "Supported migration", state: "open", comments: [], v: 2 });
+    const calls = mockApi({
+      ...BASE,
+      "GET /api/profile/resumes/cv/feedback": { review: { state: "done", run: "r1", v: 2, at: "2026-10-01" }, items: [item("f1"), item("f2")] },
+      "POST /api/profile/resumes/cv/feedback/f1/apply": { kind: "resume_edit", run_id: "r2" },
+      "POST /api/profile/resumes/cv/feedback/f2/apply": { kind: "resume_edit", run_id: "r3" },
+      "GET /api/runs/r2": () => ({ id: "r2", state: done ? "done" : "running" }),
+      "GET /api/runs/r3": { id: "r3", state: "running" },
+    });
+    renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Review suggestions" }));
+    const dialog = screen.getByRole("dialog", { name: "Résumé review" });
+    expect(within(dialog).getByRole("heading", { name: "Before" })).toBeInTheDocument();
+    expect(within(dialog).getByRole("heading", { name: "Suggested change" })).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(await screen.findByText("Suggestion 2 of 2")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Accept" }));
+    expect(await screen.findByRole("button", { name: "Waiting…" })).toBeDisabled();
+    expect(dialog).not.toHaveTextContent(/another run|pid/);
+    const applies = () => calls.filter((c) => c.method === "POST").map((c) => c.url);
+    expect(applies()).toEqual(["/api/profile/resumes/cv/feedback/f1/apply"]);
+    done = true;
+    expect(await screen.findByRole("button", { name: "Applying…" }, { timeout: 3000 })).toBeDisabled();
+    expect(applies()).toEqual(["/api/profile/resumes/cv/feedback/f1/apply", "/api/profile/resumes/cv/feedback/f2/apply"]);
+  });
+
+  it("review: Before shows the first 2 quoted lines, See more / Collapse; no quote + not whole = retry hint", async () => {
+    const base = { section: "Experience", issue: "Opens with Member of", suggestion: "Lead with the outcome", state: "open", comments: [], v: 2 };
+    const calls = mockApi({
+      ...BASE,
+      "GET /api/profile/resumes/cv/feedback": { review: { state: "done", run: "r1", v: 2, at: "2026-10-01" },
+        items: [{ ...base, id: "f1", quotes: ["Line A", "Line B", "Line C"] }, { ...base, id: "f2" }] },
+      "POST /api/profile/resumes/cv/feedback/f1/dismiss": { ...base, id: "f1", state: "dismissed" },
+      "POST /api/profile/resumes/cv/review": { run_id: "r2" },
+    });
+    renderRoutes(routes, "/profile");
+    await userEvent.click(await screen.findByRole("button", { name: "Review suggestions" }));
+    const dialog = screen.getByRole("dialog", { name: "Résumé review" });
+    expect(dialog).toHaveTextContent("Line A");
+    expect(dialog).toHaveTextContent("Line B");
+    expect(dialog).not.toHaveTextContent("Line C");
+    await userEvent.click(within(dialog).getByRole("button", { name: "See more (1)" }));
+    expect(dialog).toHaveTextContent("Line C");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Collapse" }));
+    expect(dialog).not.toHaveTextContent("Line C");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Ignore" }));
+    expect(await screen.findByText("Suggestion 2 of 2")).toBeInTheDocument();
+    expect(dialog).toHaveTextContent("Review again to see the exact lines.");
+    expect(dialog).not.toHaveTextContent("whole résumé");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Review again" }));
+    expect(calls.some((c) => c.method === "POST" && c.url === "/api/profile/resumes/cv/review")).toBe(true);
+  });
+
+  it("one failure state: failed review + failed read show one message and one Retry that runs both", async () => {
+    const calls = mockApi({
+      ...BASE,
+      "GET /api/profile/resumes/cv/feedback": { review: { state: "failed", run: null, v: 1, at: "2026-10-01" }, items: [] },
+      "GET /api/profile/master/proposal": { state: "stale", diff: "" },
+      "GET /api/runs": { runs: [{ id: "x1", kind: "extract_master", state: "failed" }], next_cursor: null },
+      "POST /api/profile/master/proposal/refresh": { kind: "extract_master", run_id: "x2" },
+      "POST /api/profile/resumes/cv/review": { kind: "review", run_id: "r9" },
+    });
+    renderRoutes(routes, "/profile");
+    await screen.findAllByText(/We couldn’t process this résumé/);
+    await waitFor(() => expect(calls.filter((c) => c.url.startsWith("/api/runs"))).toHaveLength(1));
+    await new Promise((r) => setTimeout(r, 50)); // let the master read state settle
+    expect(screen.getAllByText(/We couldn’t process this résumé/)).toHaveLength(1);
+    expect(screen.queryByText(/Retry review|Re-read|review failed/i)).toBeNull();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    await waitFor(() => expect(calls.filter((c) => c.method === "POST").map((c) => c.url).sort()).toEqual(
+      ["/api/profile/master/proposal/refresh", "/api/profile/resumes/cv/review"]));
+  });
+  it("TASK-022 review: stale master with no running extract-master offers one Retry", async () => {
     const calls = mockApi({
       ...BASE,
       "GET /api/profile/master/proposal": { state: "stale", diff: "" },
@@ -202,9 +307,9 @@ describe("ProfilePage", () => {
       "POST /api/profile/master/proposal/refresh": { kind: "extract_master", run_id: "x2" },
     });
     renderRoutes(routes, "/profile");
-    expect(await screen.findByText(/Couldn’t read your master résumé/)).toBeInTheDocument();
+    expect(await screen.findByText(/We couldn’t process this résumé/)).toBeInTheDocument();
     expect(screen.queryByText(/Reading your master résumé/)).toBeNull();
-    await userEvent.click(screen.getByRole("button", { name: "Re-read" }));
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(calls.some((c) => c.method === "POST" && c.url === "/api/profile/master/proposal/refresh")).toBe(true);
   });
 });

@@ -6,21 +6,36 @@ export function Card({
   title,
   icon,
   aside,
+  wide,
+  id: anchor,
+  nested,
   children,
 }: {
   title: string;
   icon?: ReactNode;
   aside?: ReactNode;
+  /** Spans the full row of the Job detail grid. */
+  wide?: boolean;
+  /** Page anchor (e.g. `qa`) so other cards can link here. */
+  id?: string;
+  /** A section inside another card (e.g. QA and Safety in Checks): no border, h3. */
+  nested?: boolean;
   children: ReactNode;
 }) {
   const id = useId();
+  const H = nested ? "h3" : "h2";
   return (
-    <section aria-labelledby={id} className={styles.card}>
+    <section
+      id={anchor}
+      aria-labelledby={id}
+      className={nested ? styles.subCard : styles.card}
+      data-wide={wide || undefined}
+    >
       <div className={styles.cardHead}>
-        <h2 id={id} className={styles.h2}>
+        <H id={id} className={styles.h2}>
           {icon}
           {title}
-        </h2>
+        </H>
         {aside}
       </div>
       {children}

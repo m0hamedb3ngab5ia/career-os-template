@@ -36,19 +36,21 @@
   box-shadow: var(--shadow-card);
   min-width: 0;
 }
-/* Job detail supporting sections: dividers and spacing, not cards (design doc §3). */
+/* Job detail: work column + reference sidebar, one column on narrow screens. */
 .supporting {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(300px, 380px);
+  gap: var(--space-4);
+  align-items: start;
+}
+@media (max-width: 900px) {
+  .supporting { grid-template-columns: minmax(0, 1fr); }
+}
+.col {
   display: flex;
   flex-direction: column;
-}
-.supporting > .card[data-size],
-.supporting > .card {
-  padding: var(--space-4) 0;
-  border: 0;
-  border-top: 1px solid var(--sep);
-  border-radius: 0;
-  background: none;
-  box-shadow: none;
+  gap: var(--space-4);
+  min-width: 0;
 }
 .card[data-size="large"] {
   padding: 20px;
@@ -591,13 +593,21 @@
 .planWrap {
   overflow-x: auto;
 }
+.planTable th[scope="row"] {
+  width: 35%;
+  font-weight: 500;
+}
+.planTable td:last-child {
+  white-space: nowrap;
+}
 .planTable {
   width: 100%;
   border-collapse: collapse;
 }
 .planTable th,
 .planTable td {
-  padding: 6px 8px;
+  padding: 2px 6px;
+  font-size: var(--text-sm, 13px);
   text-align: left;
   vertical-align: middle;
   border-bottom: 1px solid var(--sep);
@@ -606,3 +616,12 @@
 .matches { width: 100%; border-collapse: collapse; font-size: var(--text-sm, 13px); }
 .matches th, .matches td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--border, #e5e5e5); vertical-align: top; }
 .matches tr[data-best] th, .matches tr[data-best] td { font-weight: 600; }
+/* Zebra rows: accent tint alternates with a neutral fill, readable in light and dark. */
+.planTable tbody tr:nth-child(odd) { background: color-mix(in srgb, var(--accent) 9%, transparent); }
+.planTable tbody tr:nth-child(even) { background: var(--fill); }
+.planBar { display: inline-flex; gap: var(--space-2); align-items: center; flex-wrap: wrap; }
+/* Next step inside the Posting card: separated from the job header by a rule. */
+.nextStep { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px solid var(--sep); }
+.stepDate { display: block; font-size: 0.75rem; color: var(--sec); }
+.subCard { padding-top: var(--space-3); margin-top: var(--space-3); border-top: 1px solid var(--sep); }
+.subCard:first-of-type { margin-top: 0; padding-top: 0; border-top: 0; }

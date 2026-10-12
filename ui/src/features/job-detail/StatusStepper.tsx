@@ -1,5 +1,6 @@
 import { STATUSES, describeCode } from "../../kit/labels";
 import type { Meta } from "../../api/meta";
+import { formatDateTime } from "../../lib/format";
 import styles from "./JobDetail.module.css";
 import type { HistoryEntry } from "./types";
 
@@ -8,6 +9,8 @@ export interface Step {
   status: string;
   state: StepState;
   terminal?: boolean;
+  /** Latest history entry for this status: its date shows under the label, its note on hover. */
+  entry?: HistoryEntry;
 }
 
 /**
@@ -16,6 +19,11 @@ export interface Step {
  * reached, from its history.
  */
 export function buildSteps(status: string | null, history: HistoryEntry[], pipeline: Meta["pipeline"]): Step[] {
+  const last = new Map(history.map((h) => [h.status, h]));
+  return pathSteps(status, history, pipeline).map((s) => (last.has(s.status) ? { ...s, entry: last.get(s.status) } : s));
+}
+
+function pathSteps(status: string | null, history: HistoryEntry[], pipeline: Meta["pipeline"]): Step[] {
   const path = [...new Set(pipeline.columns.flatMap((c) => c.statuses))];
   const at = status ? path.indexOf(status) : -1;
   if (at >= 0 || !status) {
@@ -38,7 +46,7 @@ export function StatusStepper({ steps }: { steps: Step[] }) {
   return (
     <ol aria-label="Application progress" className={styles.stepper}>
       {steps.map((s) => (
-        <li key={s.status} aria-current={s.state === "current" ? "step" : undefined} data-state={s.state}>
+        <li key={s.status} title={s.entry?.note || undefined} aria-current={s.state === "current" ? "step" : undefined} data-state={s.state}>
           <span
             aria-hidden="true"
             className={styles.stepBar}
@@ -48,6 +56,7 @@ export function StatusStepper({ steps }: { steps: Step[] }) {
             <span className="sr-only">{SR[s.state]}</span>
             {describeCode(STATUSES, s.status).label}
           </span>
+          {s.entry ? <span className={styles.stepDate}>{formatDateTime(s.entry.at) ?? s.entry.at}</span> : null}
         </li>
       ))}
     </ol>

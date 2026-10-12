@@ -28,6 +28,13 @@ function stubFetch(reply: unknown) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+// Fields are grouped into one table per section; flatten to the field rows in page order.
+async function fieldRows() {
+  const tables = await screen.findAllByRole("table");
+  return tables.flatMap((t) => within(t).queryAllByRole("rowheader").map((h) => h.closest("tr")!));
+}
+const byLabel = (rows: HTMLElement[], label: string) => rows.find((r) => within(r).getByRole("rowheader").textContent === label)!;
+
 describe("FillPlanCard", () => {
   it("offers Preview fill before there is a plan", async () => {
     stubFetch({ plan: null, problems: [] });
@@ -38,9 +45,9 @@ describe("FillPlanCard", () => {
   it("shows label, value, source and required; blocks on required unknowns; saves an edit to the profile", async () => {
     const calls = stubFetch({ plan, problems: ["unanswered (pause:legal): Sponsorship?", "needs input (required): Notice period"] });
     renderWithProviders(<FillPlanCard jobId="nw01" />);
-    const table = await screen.findByRole("table");
-    const rows = within(table).getAllByRole("row").slice(1);
-    expect(rows.map((r) => within(r).getByRole("rowheader").textContent)).toEqual(["Email", "Notice period", "Editor", "Sponsorship?"]);
+    const all = await fieldRows();
+    expect(all.map((r) => within(r).getByRole("rowheader").textContent).toSorted()).toEqual(["Editor", "Email", "Notice period", "Sponsorship?"]);
+    const rows = ["Email", "Notice period", "Editor", "Sponsorship?"].map((l) => byLabel(all, l));
     expect(within(rows[0]!).getByText("Résumé / profile")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("Needs input")).toBeInTheDocument();
     expect(within(rows[3]!).getByText("Your answer needed (legal)")).toBeInTheDocument();
@@ -67,7 +74,8 @@ describe("FillPlanCard", () => {
       problems: [],
     });
     renderWithProviders(<FillPlanCard jobId="nw01" />);
-    const rows = within(await screen.findByRole("table")).getAllByRole("row").slice(1);
+    const all = await fieldRows();
+    const rows = [byLabel(all, "Gender"), byLabel(all, "Desired salary")];
     expect(within(rows[0]!).queryByRole("checkbox", { name: "Save to profile" })).toBeNull();
     expect(within(rows[1]!).getByRole("checkbox", { name: "Save to profile" })).not.toBeChecked();
     await userEvent.type(within(rows[0]!).getByRole("textbox", { name: "Gender" }), "y");
@@ -88,7 +96,8 @@ describe("FillPlanCard", () => {
       problems: ["unreviewed AI draft: Why us?"],
     });
     renderWithProviders(<FillPlanCard jobId="nw01" />);
-    const rows = within(await screen.findByRole("table")).getAllByRole("row").slice(1);
+    const all = await fieldRows();
+    const rows = ["Why us?", "Hard bug", "Hobby"].map((l) => byLabel(all, l));
     expect(within(rows[0]!).getByText("AI draft")).toBeInTheDocument();
     expect(within(rows[1]!).getByText("AI draft, approved")).toBeInTheDocument();
     expect(within(rows[1]!).queryByRole("button", { name: "Approve" })).toBeNull();

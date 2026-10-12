@@ -133,6 +133,7 @@ def test_edit_run_quarantines_unguarded_versions(tmp_path: Path, rid: str):  # P
     fb.comment(tmp_path, rid, fid, "keep Python")
 
     def sneaky(settings, kind, skill, **kw):  # the skill bypasses apply-edit and writes a user version
+        assert kw["lock"] == f"resume-{rid}"  # its own lock: never blocked by a batch or another résumé
         resumes.add_text(tmp_path, rid, V1.replace("Supported", "Led"), author="user", source="edit")
         return {"id": "r1", "stop_reason": "completed"}
 
@@ -141,3 +142,76 @@ def test_edit_run_quarantines_unguarded_versions(tmp_path: Path, rid: str):  # P
     assert (resumes._dir(tmp_path, rid) / "rejected-v3").is_dir()  # kept aside, not lost
     it = fb.load(tmp_path, rid)["items"][0]
     assert it["state"] == "open" and it["reason"]  # redrafting item reopened (finding 4)
+
+
+def test_review_keeps_quote_only_when_verbatim(tmp_path: Path, rid: str):  # review popup highlights the quote
+    out = fb.save_review(tmp_path, rid, [
+        {"section": "Experience", "issue": "weak verb", "suggestion": "say what moved",
+         "quote": " Supported migration of 12 services "},
+        {"section": "Experience", "issue": "x", "suggestion": "y", "quote": "not in the résumé"},
+        {"section": "Skills", "issue": "x", "suggestion": "y"},
+    ])
+    assert [i.get("quote") for i in out["items"]] == ["Supported migration of 12 services", None, None]
+
+
+def test_review_keeps_every_verbatim_quote_and_the_whole_resume_flag(tmp_path: Path, rid: str):
+    out = fb.save_review(tmp_path, rid, [
+        {"section": "Experience", "issue": "x", "suggestion": "y",
+         "quotes": ["Supported migration of 12 services", "not in the résumé", "Experience"]},
+        {"section": "Layout", "issue": "x", "suggestion": "y", "whole": True},
+        {"section": "Skills", "issue": "x", "suggestion": "y"},
+    ])
+    items = out["items"]
+    assert items[0]["quotes"] == ["Supported migration of 12 services", "Experience"]
+    assert items[0]["quote"] == "Supported migration of 12 services"  # old single field still readable
+    assert [i["whole"] for i in items] == [False, True, False]
+    assert items[2]["quotes"] == [] and items[2]["quote"] is None
+
+
+@pytest.mark.unit
+def test_review_keeps_kind_default_content(tmp_path: Path, rid: str):  # format = PDF/ATS issue text edits can't fix
+    out = fb.save_review(tmp_path, rid, [
+        {"section": "Experience", "issue": "x", "suggestion": "y", "kind": "format"},
+        {"section": "Experience", "issue": "x", "suggestion": "y", "kind": "bogus"},
+        {"section": "Experience", "issue": "x", "suggestion": "y"},
+    ])
+    assert [i["kind"] for i in out["items"]] == ["format", "content", "content"]
+
+
+def test_apply_run_that_stops_early_tells_why(tmp_path: Path, rid: str):  # Apply-all bug: denied run ended silently
+    from careeros.ui.services.step import run_resume_skill
+
+    fid = _item(tmp_path, rid)
+    run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid,
+                     run_skill=lambda *a, **kw: {"id": "r1", "stop_reason": "permission_denied"})
+    it = fb.load(tmp_path, rid)["items"][0]
+    assert it["state"] == "open" and "stopped before saving" in it["reason"]
+
+
+def test_apply_run_keeps_guard_reason(tmp_path: Path, rid: str):  # a refusal's reasons are not overwritten
+    from careeros.ui.services.step import run_resume_skill
+
+    fid = _item(tmp_path, rid)
+
+    def refused(*a, **kw):
+        with pytest.raises(fb.Rejected):
+            fb.apply(tmp_path, rid, fid, V1.replace("12", "40"), base=2)
+        return {"id": "r1", "stop_reason": "completed"}
+
+    run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid, run_skill=refused)
+    assert "numbers" in fb.load(tmp_path, rid)["items"][0]["reason"]
+
+
+def test_successful_redraft_keeps_no_reason(tmp_path: Path, rid: str):  # re-draft run ok: no "stopped" reason
+    from careeros.ui.services.step import run_resume_skill
+
+    fid = _item(tmp_path, rid)
+    fb.comment(tmp_path, rid, fid, "shorter please")
+
+    def ok(*a, **kw):
+        fb.redraft(tmp_path, rid, fid, "say it shorter")
+        return {"id": "r1", "stop_reason": "completed"}
+
+    run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid, run_skill=ok)
+    it = fb.load(tmp_path, rid)["items"][0]
+    assert it["state"] == "open" and it["reason"] is None

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -117,3 +118,23 @@ def test_config_lock_times_out_with_lock_busy_and_frees_on_exit(tmp_path):
                 pass
     with lk.config_lock(tmp_path, timeout=0.1):  # released: taken at once
         assert lk.config_lock_path(tmp_path).exists()
+
+
+def test_pid_alive_false_for_finished_unreaped_child():
+    """A UI-spawned run that exited but was never waited on is a zombie: os.kill(pid, 0) still succeeds."""
+    import subprocess
+    import sys
+    import time
+
+    proc = subprocess.Popen([sys.executable, "-c", "pass"])
+    deadline = time.time() + 5
+    while time.time() < deadline:
+        try:
+            if os.waitid(os.P_PID, proc.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT):
+                break  # exited, still a zombie (not reaped)
+        except AttributeError:  # pragma: no cover - no waitid
+            time.sleep(0.5)
+            break
+        time.sleep(0.01)
+    assert locks.pid_alive(proc.pid) is False
+    assert locks.pid_alive(os.getpid()) is True

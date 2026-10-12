@@ -5,21 +5,24 @@ import { mockApi } from "../../test/apiMock";
 import { axeViolations } from "../../test/axe";
 import { formatDecimal } from "../../lib/format";
 import { ACTION_HELP } from "./actionHelp";
-import { DocumentsCard } from "./DocumentsCard";
+import { DocumentsCard, QaCard } from "./DocumentsCard";
 import { detail } from "./fixtures";
 import { renderWithProviders } from "./testUtils";
 
 const d = detail();
 afterEach(() => vi.unstubAllGlobals());
 
-function renderCard(over: Partial<Parameters<typeof DocumentsCard>[0]> = {}, routes = {}) {
+function renderCard({ qa = d.qa, ...over }: Partial<Parameters<typeof DocumentsCard>[0] & Parameters<typeof QaCard>[0]> = {}, routes = {}) {
   const api = mockApi({
     "POST /api/jobs/nw01/qa": { pass: false, summary: { hard_fail: 1, soft_fail: 2 }, fail_reasons: ["Résumé over one page"] },
     "POST /api/jobs/nw01/open-folder": { opened: true },
     ...routes,
   });
   const utils = renderWithProviders(
-    <DocumentsCard jobId="nw01" documents={d.documents} otherFiles={d.other_files} submitted={d.submitted} qa={d.qa} {...over} />,
+    <>
+      <DocumentsCard jobId="nw01" documents={d.documents} otherFiles={d.other_files} submitted={d.submitted} {...over} />
+      <QaCard jobId="nw01" qa={qa} />
+    </>,
   );
   return { api, ...utils };
 }
@@ -36,18 +39,16 @@ describe("DocumentsCard", () => {
       "/api/jobs/nw01/files/notes.txt",
       "/api/jobs/nw01/files/resume.json",
     ]);
-    expect(links[0]).toHaveAccessibleName("View résumé (resume.pdf, opens in a new tab)");
+    expect(links[0]).toHaveAccessibleName("PDF(resume.pdf, opens in a new tab)");
     expect(links[0]).toHaveAttribute("target", "_blank");
     expect(links[0]).toHaveAttribute("rel", "noopener noreferrer");
   });
 
-  it("shows each document as a closed title that expands to its details", async () => {
+  it("shows each document as a titled row with one link per format", () => {
     renderCard();
-    const title = screen.getByText("Résumé");
-    expect(title.closest("details")).not.toHaveAttribute("open");
-    expect(screen.getAllByText("resume.pdf")[0]!).not.toBeVisible();
-    await userEvent.setup().click(title);
-    expect(screen.getAllByText("resume.pdf")[0]!).toBeVisible();
+    const row = screen.getByText("Résumé").closest("li")!;
+    expect(within(row).getAllByRole("link").map((a) => a.getAttribute("href"))).toEqual(["/api/jobs/nw01/files/resume.pdf"]);
+    expect(within(screen.getByRole("group", { name: "Open Résumé" })).getByText("PDF")).toBeInTheDocument();
   });
 
   it("folds every other file under a closed All files (N) toggle, sorted by name", async () => {

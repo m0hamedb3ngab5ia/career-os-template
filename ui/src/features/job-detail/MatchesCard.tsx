@@ -9,13 +9,23 @@ type Matches = components["schemas"]["Matches"];
 
 /** REQ-115: every résumé's match for this job (REQ-111), best first, best marked, threshold, missing skills. */
 export function MatchesCard({ jobId }: { jobId: string }) {
+  return (
+    <Card title="Résumé match">
+      <MatchesSection jobId={jobId} />
+    </Card>
+  );
+}
+
+/** Match body without a card: Score folds it in, since both answer "how well do I fit". */
+export function MatchesSection({ jobId }: { jobId: string }) {
   const q = useQuery({
     queryKey: ["job", jobId, "matches"],
     queryFn: () => apiFetch<Matches>(`/api/jobs/${encodeURIComponent(jobId)}/matches`),
   });
   const m = q.data;
   return (
-    <Card title="Résumé match" aside={m?.scored ? <Muted>Threshold {m.threshold}</Muted> : null}>
+    <>
+      {m?.scored ? <Muted>Threshold {m.threshold}</Muted> : null}
       {!m ? (
         <Muted>{q.isError ? "Could not load résumé matches." : "Loading…"}</Muted>
       ) : !m.scored ? (
@@ -26,7 +36,7 @@ export function MatchesCard({ jobId }: { jobId: string }) {
         <MatchesTable m={m} />
       )}
       {m?.scored && m.hint ? <Muted>{m.hint}</Muted> : null}
-    </Card>
+    </>
   );
 }
 

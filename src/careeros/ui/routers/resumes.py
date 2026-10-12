@@ -10,6 +10,7 @@ from typing import Any, Iterator, Literal
 
 import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 
 from careeros import master_sync
@@ -27,6 +28,7 @@ class Version(BaseModel):
     author: str
     source: str
     at: str
+    label: str = ""
 
 
 class Resume(BaseModel):
@@ -76,6 +78,10 @@ class FeedbackItem(BaseModel):
     section: str
     issue: str
     suggestion: str
+    quote: str | None = None
+    quotes: list[str] = []
+    whole: bool = False
+    kind: Literal["content", "format"] = "content"
     state: Literal["open", "redrafting", "applied", "dismissed"]
     comments: list[dict[str, str]] = []
     reason: str | None = None
@@ -88,6 +94,7 @@ class ReviewState(BaseModel):
     run: str | None = None
     v: int
     at: str
+    reason: str | None = None
 
 
 class Feedback(BaseModel):
@@ -148,8 +155,8 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
         m = await anyio.to_thread.run_sync(lambda: store.add(c.settings.root, filename, bytes(data), name=name))
     try:  # REQ-094: upload starts the review; if it can't start now: failed + Retry (POST .../review)
         review = _start(request, c, "review", m["rid"]).run_id
-    except HTTPException:
-        fb.set_review(c.settings.root, m["rid"], "failed")
+    except HTTPException as e:
+        fb.set_review(c.settings.root, m["rid"], "failed", reason=str(e.detail))
         review = None
     return Uploaded(rid=m["rid"], n=1, review_run=review)
 
@@ -199,7 +206,20 @@ def _new_version(request: Request, c: Any, meta: dict[str, Any]) -> Resume:
 def start_review(rid: str, request: Request, c=Depends(ctx)) -> Started:
     with _refusals():
         store.get(c.settings.root, rid)
-    return _start(request, c, "review", rid)
+    try:
+        return _start(request, c, "review", rid)
+    except HTTPException as e:
+        fb.set_review(c.settings.root, rid, "failed", reason=str(e.detail))
+        raise
+
+
+@router.get("/profile/resumes/{rid}/file", response_class=FileResponse)
+def resume_file(rid: str, v: int | None = None, download: bool = False, c=Depends(ctx)):
+    """A version's file (default the latest), inline (UI "View") or as a download named 01_Name_Original.pdf."""
+    with _refusals():
+        n = v or store.get(c.settings.root, rid)["versions"][-1]["n"]
+        path, name = store.download_name(c.settings.root, rid, n)
+    return FileResponse(path, filename=name, content_disposition_type="attachment" if download else "inline")
 
 
 @router.get("/profile/resumes/{rid}/feedback")

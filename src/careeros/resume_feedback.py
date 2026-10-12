@@ -1,7 +1,9 @@
 """Résumé review feedback lifecycle (REQ-094..097, UC-002, FLOW-002).
 
 profile/resumes/<rid>/feedback.json  {review: {state: running|done|failed, run, v, at}, items: [{id, section, issue,
-suggestion, state: open|redrafting|applied|dismissed, comments: [{text, at}], reason, v}]}
+suggestion, quote, kind, state: open|redrafting|applied|dismissed, comments: [{text, at}], reason, v}]}
+`quote` = the exact résumé passage an item is about (the review popup highlights it); kept only if verbatim, else None.
+`kind` = content (rewrite the text) | format (PDF/ATS parsing issue a text edit can't fix); unknown -> content.
 The review-resume skill saves items (`careeros resume review-save`); edit-resume rewrites one item's section
 (`resume apply-edit`, guarded -> new version author=ai) or re-drafts a commented item (`resume redraft`).
 A hand edit (UI only, PUT .../text) is a new version author=user with no guard (the user owns the facts).
@@ -58,10 +60,10 @@ def _latest(root: Path, rid: str) -> int:
     return store.get(root, rid)["versions"][-1]["n"]
 
 
-def set_review(root: Path, rid: str, state: str, run: str | None = None) -> dict[str, Any]:
+def set_review(root: Path, rid: str, state: str, run: str | None = None, reason: str | None = None) -> dict[str, Any]:
     with store._locked(root):
         fb = load(root, rid)
-        fb["review"] = {"state": state, "run": run, "v": _latest(root, rid), "at": store._now()}
+        fb["review"] = {"state": state, "run": run, "v": _latest(root, rid), "at": store._now(), "reason": reason}
         return _save(root, rid, fb)
 
 
@@ -72,8 +74,16 @@ def save_review(root: Path, rid: str, items: list[dict[str, Any]]) -> dict[str, 
         raise ValueError(f"feedback items need non-empty {', '.join(ITEM_KEYS)}")
     with store._locked(root):
         fb, v = load(root, rid), _latest(root, rid)
-        fb["items"] = [{"id": f"f{n}", **{k: i[k].strip() for k in ITEM_KEYS}, "state": "open", "comments": [],
-                        "reason": None, "v": v} for n, i in enumerate(items, 1)]
+        text = store.version(root, rid, v)["text"]
+
+        def quotes(i: dict[str, Any]) -> list[str]:  # every affected line, verbatim only; old items: one `quote`
+            qs = i.get("quotes") if isinstance(i.get("quotes"), list) else [i.get("quote")]
+            return [q.strip() for q in qs if isinstance(q, str) and q.strip() and q.strip() in text]
+
+        fb["items"] = [{"id": f"f{n}", **{k: i[k].strip() for k in ITEM_KEYS}, "quotes": (qs := quotes(i)),
+                        "quote": qs[0] if qs else None, "whole": i.get("whole") is True,
+                        "kind": "format" if i.get("kind") == "format" else "content", "state": "open",
+                        "comments": [], "reason": None, "v": v} for n, i in enumerate(items, 1)]
         fb["review"] = {**(fb.get("review") or {}), "state": "done", "v": v, "at": store._now()}
         return _save(root, rid, fb)
 
@@ -166,12 +176,13 @@ def apply(root: Path, rid: str, fid: str, text: str, *, base: int) -> dict[str, 
         return meta
 
 
-def reopen(root: Path, rid: str, fid: str, reason: str) -> None:
-    """A redrafting item whose run never started or ended without a redraft goes back to open (FLOW-002)."""
+def reopen(root: Path, rid: str, fid: str, reason: str, *, unexplained: bool = False) -> None:
+    """A redrafting item whose run never started or ended without a redraft goes back to open (FLOW-002).
+    unexplained=True: also give an open item with no reason this one (an Apply run that stopped early)."""
     with store._locked(root):
         fb = load(root, rid)
         for it in fb["items"]:
-            if it["id"] == fid and it["state"] == "redrafting":
+            if it["id"] == fid and (it["state"] == "redrafting" or unexplained and it["state"] == "open" and not it.get("reason")):
                 it.update(state="open", reason=reason)
                 _save(root, rid, fb)
 

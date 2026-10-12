@@ -1,27 +1,18 @@
 import { useEffect, useRef, useState } from "react";
 import { Link } from "react-router";
-import { Button } from "../../kit/Button";
-import { ActionTypeLabel, NeedsLabel, PriorityChip } from "../../kit/chips";
-import { taskText } from "../../kit/labels";
-import { Details } from "../../kit/Details";
+import { Button, ButtonLink } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
-import { ExternalLink } from "../../kit/ExternalLink";
-import { MarkDoneCircle } from "../../kit/MarkDoneCircle";
 import { useToast } from "../../kit/Toast";
-import { dueInfo, type DueLevel } from "../../lib/dates";
-import { formatDue } from "../../lib/format";
 import { formatCount } from "../../lib/format";
-import { useNow } from "../../lib/useNow";
-import { groupByJob, jobCta, linkInfo, type JobGroup } from "./actions";
+import { sortTasks, taskRow } from "./actions";
 import { errorText, useMarkDone, useMeta, useReopen, useToday } from "./api";
 import type { ActionItem } from "./types";
 import styles from "./Today.module.css";
 
-/** The "Needs you" list: every open Action Item, grouped by job with one next step each (design doc 3 "Today"). */
+/** "Needs your attention": every open Action Item in priority order, one plain row and one CTA each (Today, locked). */
 export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
   const today = useToday();
   const meta = useMeta();
-  const now = useNow(60_000);
   const toast = useToast();
   const markDone = useMarkDone();
   const reopen = useReopen();
@@ -53,16 +44,12 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
   }
 
   // `jobIds`: only these jobs' tasks (Today filtered by batch, docs/design/ui-redesign.md §4.2 Review queue).
-  const all = (today.data?.actions ?? []).filter((a) => !jobIds || jobIds.includes(a.job_id ?? ""));
-  const groups = groupByJob(all);
-  const shown = groups.flatMap((g) => g.items);
+  const shown = sortTasks((today.data?.actions ?? []).filter((a) => !jobIds || jobIds.includes(a.job_id ?? "")));
   useEffect(() => {
     if (!refocus || shown.some((a) => String(a.id) === refocus.done)) return;
     setRefocus(null);
-    const target =
-      refocus.next === null
-        ? null
-        : listRef.current?.querySelector<HTMLElement>(`[data-action-id="${CSS.escape(refocus.next)}"] [role="checkbox"]`);
+    const row = refocus.next === null ? null : listRef.current?.querySelector(`[data-action-id="${CSS.escape(refocus.next)}"]`);
+    const target = row?.querySelector<HTMLElement>("[data-mark-done]") ?? row?.querySelector<HTMLElement>("a");
     (target ?? headingRef.current)?.focus();
   });
 
@@ -70,7 +57,7 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
     <section className={styles.list} aria-labelledby="needs-you-title" aria-busy={today.isPending || undefined}>
       <div className={styles.listHead}>
         <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className={styles.h2}>
-          Needs you {today.data ? <span className={`${styles.count} tabular`}>{formatCount(all.length)}</span> : null}
+          Needs your attention {today.data ? <span className={`${styles.count} tabular`}>{formatCount(shown.length)}</span> : null}
         </h2>
         <Link to="/actions" className={styles.headLink}>
           View all tasks
@@ -90,14 +77,14 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
         >
           {errorText(today.error)}
         </EmptyState>
-      ) : all.length === 0 ? (
+      ) : shown.length === 0 ? (
         <EmptyState title="Nothing needs you" headingLevel={3}>
           New tasks appear here when a run needs a decision from you.
         </EmptyState>
       ) : (
-        <ul ref={listRef} className={styles.groups}>
-          {groups.map((g) => (
-            <JobTasks key={g.jobId ?? ""} group={g} now={now} onDone={onDone} />
+        <ul ref={listRef} className={styles.rows}>
+          {shown.map((item) => (
+            <TaskRowItem key={item.id} item={item} onDone={onDone} />
           ))}
         </ul>
       )}
@@ -105,81 +92,21 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
   );
 }
 
-function JobTasks({ group, now, onDone }: { group: JobGroup; now: Date; onDone: (item: ActionItem) => void }) {
-  const n = group.items.length;
-  return (
-    <li className={styles.group}>
-      <div className={styles.groupHead}>
-        <div className={styles.rowMain}>
-          {group.jobId ? (
-            <h3 className={styles.rowTitle}>
-              <span className={styles.strong} data-company translate="no">
-                {group.company}
-              </span>
-              {group.role ? <span className={styles.rowRole}>{group.role}</span> : null}
-            </h3>
-          ) : (
-            <h3 className={`${styles.rowTitle} ${styles.strong}`}>Other tasks</h3>
-          )}
-          <div className={styles.rowWhat}>{n === 1 ? "1 thing needs attention" : `${formatCount(n)} things need attention`}</div>
-        </div>
-        {group.jobId ? (
-          <Link to={`/jobs/${encodeURIComponent(group.jobId)}`} className={styles.headLink}>
-            {jobCta(group.items)}
-          </Link>
-        ) : null}
-      </div>
-      <ul className={styles.rows}>
-        {group.items.map((item) => (
-          <ActionRow key={item.id} item={item} now={now} onDone={onDone} showCompany={!group.jobId} />
-        ))}
-      </ul>
-    </li>
-  );
-}
-
-function ActionRow({ item, now, onDone, showCompany }: { item: ActionItem; now: Date; onDone: (item: ActionItem) => void; showCompany: boolean }) {
-  const info = dueInfo(item.due, now);
-  // Same fields as /api/actions: a date-only deadline has no time of day; the server's level wins when present.
-  const due = info && {
-    text: item.due_date_only ? (formatDue(item.due, true, now) ?? info.text) : info.text,
-    level: (item.level as DueLevel | undefined) ?? info.level,
-  };
-  const link = linkInfo(item.link);
+function TaskRowItem({ item, onDone }: { item: ActionItem; onDone: (item: ActionItem) => void }) {
+  const r = taskRow(item);
   return (
     <li className={styles.row} data-action-id={String(item.id)}>
-      <span className={styles.rowDone}>
-        <MarkDoneCircle done={false} onDoneChange={() => onDone(item)} itemName={item.company ? `${item.company}: ${item.what}` : item.what} />
-      </span>
       <div className={styles.rowMain}>
-        {showCompany && item.company ? (
-          <div className={styles.rowTitle}>
-            <span className={styles.strong} translate="no">
-              {item.company}
-            </span>
-          </div>
-        ) : null}
-        <div className={styles.rowWhat}>{taskText(item.type, item.what)}</div>
-        {item.detail ? <Details summary="Details">{item.detail}</Details> : null}
-        {due ? (
-          <div className={styles.due} data-level={due.level}>
-            {item.due_reason ? `${due.text} · ${item.due_reason}` : due.text}
-          </div>
-        ) : null}
-        <div className={styles.rowMeta}>
-          {link?.kind === "web" ? (
-            <ExternalLink href={link.href}>{link.label}</ExternalLink>
-          ) : link?.kind === "text" ? (
-            <span className={styles.linkText} translate="no">
-              {link.text}
-            </span>
-          ) : null}
-          {item.type && item.type !== "other" ? <ActionTypeLabel type={item.type} /> : null}
-        </div>
+        <div className={`${styles.rowTitle} ${styles.strong}`}>{r.title}</div>
+        {r.why ? <div className={styles.rowWhat}>{r.why}</div> : null}
       </div>
       <div className={styles.rowSide}>
-        <PriorityChip priority={item.priority} />
-        {item.needs && item.needs !== "anytime" ? <NeedsLabel needs={item.needs} /> : null}
+        {r.detected ? null : (
+          <button type="button" className={styles.textButton} data-mark-done aria-label={`Mark done: ${item.company || r.title}`} onClick={() => onDone(item)}>
+            Mark done
+          </button>
+        )}
+        <ButtonLink to={r.href}>{r.cta}</ButtonLink>
       </div>
     </li>
   );

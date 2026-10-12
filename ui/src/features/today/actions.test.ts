@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { groupByJob, jobCta, linkInfo } from "./actions";
+import { groupByJob, taskRow } from "./actions";
 import { actionItem } from "./testing";
 import type { ActionItem } from "./types";
 
@@ -44,28 +44,30 @@ describe("groupByJob", () => {
   });
 });
 
-describe("jobCta", () => {
-  it("names the one next step from the job's tasks", () => {
-    const cta = (...types: string[]) => jobCta(types.map((type, i) => actionItem({ id: String(i), company: "A", what: "x", type })));
-    expect(cta("send_email", "question")).toBe("Answer questions");
-    expect(cta("salary")).toBe("Answer questions");
-    expect(cta("qa_fail")).toBe("Review documents");
-    expect(cta("review")).toBe("Review documents");
-    expect(cta("captcha")).toBe("Continue application");
+describe("taskRow", () => {
+  const row = (over: Partial<ActionItem>) => taskRow(actionItem({ id: "1", company: "Globex", what: "x", ...over }));
+  it("has no category line; the company sits inside the title", () => {
+    expect(row({ job_id: "j1", type: "review" })).not.toHaveProperty("category");
+    expect(row({ job_id: "j1", type: "review" }).title).toBe("Review Globex application");
+    expect(row({ job_id: "j1", type: "qa_fail" }).title).toBe("Review Globex résumé and cover letter");
   });
-});
-
-describe("linkInfo", () => {
-  it("labels web links by host", () => {
-    expect(linkInfo("https://www.example.com/jobs/123")).toEqual({ kind: "web", href: "https://www.example.com/jobs/123", label: "Open example.com" });
-    expect(linkInfo("http://jobs.example.org")).toEqual({ kind: "web", href: "http://jobs.example.org", label: "Open jobs.example.org" });
+  it("placeholder-bullet action names the employer from the bullet id, no helper line", () => {
+    expect(row({ job_id: "j1", type: "other", what: "Add real acme_ft bullets to your profile" })).toMatchObject({
+      title: "Add Acme experience to your profile", why: "", cta: "Open", href: "/profile" });
   });
-  it("shows anything that isn't http(s) as text, never as a broken anchor", () => {
-    expect(linkInfo("profile/master.yaml")).toEqual({ kind: "text", text: "profile/master.yaml" });
-    expect(linkInfo("javascript:alert(1)")).toEqual({ kind: "text", text: "javascript:alert(1)" });
+  it("maps known kinds to plain title, why and one CTA", () => {
+    expect(row({ job_id: "j1", type: "review", what: "Tier A: review then submit" })).toMatchObject({
+      title: "Review Globex application", why: "Approval required before submission.", cta: "Review", href: "/jobs/j1", detected: true });
+    expect(row({ job_id: "j1", type: "qa_fail" })).toMatchObject({ title: "Review Globex résumé and cover letter", why: "", cta: "Review", detected: true });
+    expect(row({ type: "other", company: "", what: "Connect the Claude-in-Chrome extension" })).toMatchObject({
+      title: "Connect CareerOS to Chrome", why: "Required to continue browser-based applications.", cta: "Connect", href: "/settings" });
+    expect(row({ company: "Initech", type: "profile_gap", what: "Bullet b3 is a placeholder" })).toMatchObject({
+      title: "Add Initech experience to your profile", why: "", cta: "Open", href: "/profile" });
+    expect(row({ job_id: "j1", type: "question" })).toMatchObject({ title: "Answer Globex application questions", cta: "Answer", detected: true });
   });
-  it("has nothing for an empty link", () => {
-    expect(linkInfo("")).toBeNull();
-    expect(linkInfo(null)).toBeNull();
+  it("falls back to plain task text, never file paths or commands; undetectable kinds can be marked done", () => {
+    const r = row({ job_id: "j1", type: "send_email", what: "Run `careeros learn answer` and edit profile/master.yaml" });
+    expect(r.detected).toBe(false);
+    expect(`${r.title} ${r.why}`).not.toMatch(/master\.yaml|careeros /);
   });
 });
