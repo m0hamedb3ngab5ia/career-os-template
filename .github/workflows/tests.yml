@@ -46,11 +46,11 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # PRs split the suite 4 ways (tests/conftest.py); main pushes run it whole for one coverage report.
-        shard: ${{ fromJSON(github.event_name == 'push' && '[0]' || '[0, 1, 2, 3]') }}
+        # PRs split the suite 6 ways (tests/conftest.py); main pushes run it whole for one coverage report.
+        shard: ${{ fromJSON(github.event_name == 'push' && '[0]' || '[0, 1, 2, 3, 4, 5]') }}
     env:
       CAREEROS_TEST_SHARD: ${{ matrix.shard }}
-      CAREEROS_TEST_SHARDS: ${{ github.event_name == 'push' && '1' || '4' }}
+      CAREEROS_TEST_SHARDS: ${{ github.event_name == 'push' && '1' || '6' }}
       PLAYWRIGHT_BROWSERS_PATH: ${{ github.workspace }}/.pw-browsers  # tests swap HOME; keep browsers findable
     steps:
       - uses: actions/checkout@v4
