@@ -31,7 +31,9 @@ export function useAutosave(rid: string, delay = 600) {
       method: "PUT",
       keepalive,
       headers: { "X-CareerOS": "1", "Content-Type": "application/json" },
-      body: JSON.stringify({ rev: rev.current, resume: doc, author: "user" }),
+      // ponytail: unload can't await the in-flight save, so a keepalive PUT sent beside one assumes it commits first
+      // (rev+1). Lost only if it commits second or fails; the older edit is never lost. No client-only fix exists.
+      body: JSON.stringify({ rev: rev.current + (keepalive && inflight.current ? 1 : 0), resume: doc, author: "user" }),
     }).then(
       (d) => {
         rev.current = d.rev;

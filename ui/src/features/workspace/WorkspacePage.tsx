@@ -65,7 +65,10 @@ function Workspace() {
 
   const edit = (path: (string | number)[], value: unknown) => {
     if (!doc) return;
-    const next = setAt(doc, path, value);
+    let next = setAt(doc, path, value);
+    if (path.length === 5 && path[2] === "bullets" && path[4] === "text") {  // DEC-018: an edited bullet is the user's own
+      next = setAt(setAt(next, [...path.slice(0, 4), "source"], undefined), [...path.slice(0, 4), "origin"], "user");
+    }
     setDoc(next);
     key.current = null;  // the draft changed since the last Done attempt: a new attempt, a new key
     save.schedule(next);
@@ -73,10 +76,12 @@ function Workspace() {
 
   const done = useMutation({
     mutationFn: async () => {
+      setLocked(true);  // no edit may land between the flush and the publish: it would 409 later and be lost
       if (!(await save.flush())) throw new Error("Save your changes first (Retry save).");
       key.current ??= crypto.randomUUID();
       return publish(rid, key.current);
     },
+    onError: () => setLocked(false),
     onSuccess: (p) => {
       key.current = null;
       toast.show({ message: `Saved as version ${p.n}` });

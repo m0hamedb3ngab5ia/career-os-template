@@ -261,7 +261,8 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     if item and item.startswith("a") and rec.get("stop_reason") == "completed" \
             and _ai_annotations(root, rid, item) <= ai_before:  # Apply comment: no new annotation and no reply
         rec = _fail_run(settings, rec, NO_ANNOTATIONS)
-    resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
+    if not (item and item.startswith("a")):  # DEC-017: annotation runs only propose/reply, a version is the user's (Done)
+        resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
     resume_feedback.reopen(root, rid, item, f"re-draft run ended without a new suggestion ({rec.get('stop_reason')})")
     if applying:  # Apply run denied/failed: say so instead of a silent open item (a re-draft ends open too)
         resume_feedback.reopen(root, rid, item, "the assistant stopped before saving the change; try Accept again",

@@ -187,6 +187,21 @@ def test_apply_comment_run_proposes_and_never_edits_the_draft(tmp_path: Path):  
     assert len(resumes.get(tmp_path, rid)["versions"]) == 1
 
 
+def test_apply_comment_run_keeps_a_version_the_user_published_meanwhile(tmp_path: Path):  # Done during the run
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="shorter")
+    n = len(resumes.get(tmp_path, rid)["versions"])
+
+    def skill(*a, **kw):
+        fb.edit(tmp_path, rid, "Hand edit published by the user")
+        ann.reply(tmp_path, rid, c["id"], "ok", author="ai")
+        return {"id": "r1", "stop_reason": "completed"}
+
+    _run(tmp_path, "resume_edit", rid, c["id"], skill)
+    assert len(resumes.get(tmp_path, rid)["versions"]) == n + 1
+    assert not list((tmp_path / "profile/resumes" / rid).glob("rejected-v*"))
+
+
 def test_review_run_writing_annotations_is_done(tmp_path: Path):  # review-resume writes annotations, not feedback
     rid = _resume(tmp_path)
 

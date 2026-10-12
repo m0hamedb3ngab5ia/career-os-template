@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { type Call, mockApi, renderRoutes } from "../../test/mockApi";
@@ -178,5 +178,24 @@ describe("WorkspacePage", () => {
     expect(keys).toHaveLength(2);
     expect(keys[0]).toBeTruthy();
     expect(keys[1]).toBe(keys[0]);
+  });
+
+  it("editing a sourced bullet drops its source and marks it user-written (DEC-018)", async () => {
+    const doc = { ...DOC, experience: [{ ...DOC.experience[0], bullets: [{ id: "experience-1.b1", source: "m.1", text: "Worked on billing" }] }] };
+    const calls = api({ "GET /api/profile/resumes/cv/draft": { rev: 3, resume: doc, draft: true } });
+    renderRoutes(routes, "/resumes/cv");
+    fireEvent.change(await screen.findByRole("textbox", { name: "Experience 1 bullet 1" }), { target: { value: "Ran billing" } });
+    await tick(700);
+    const sent = (puts(calls)[0]!.body as { resume: typeof DOC }).resume.experience[0]!.bullets[0]!;
+    expect(sent).toEqual({ id: "experience-1.b1", origin: "user", text: "Ran billing" });
+  });
+
+  it("Done locks editing so no edit lands after the flush", async () => {
+    api({ "POST /api/profile/resumes/cv/publish": () => ({ ...META, published: true, n: 4 }) });
+    renderRoutes(routes, "/resumes/cv");
+    const box = await screen.findByRole("textbox", { name: "Summary" });
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
+    await waitFor(() => expect(box).toHaveAttribute("readonly"));
+    expect(await screen.findByText("Profile page")).toBeInTheDocument();
   });
 });
