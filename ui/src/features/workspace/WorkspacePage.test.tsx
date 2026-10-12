@@ -191,11 +191,103 @@ describe("WorkspacePage", () => {
   });
 
   it("Done locks editing so no edit lands after the flush", async () => {
-    api({ "POST /api/profile/resumes/cv/publish": () => ({ ...META, published: true, n: 4 }) });
+    api({ "POST /api/profile/resumes/cv/publish": () => new Promise(() => {}) });
     renderRoutes(routes, "/resumes/cv");
     const box = await screen.findByRole("textbox", { name: "Summary" });
     fireEvent.click(screen.getByRole("button", { name: "Done" }));
     await waitFor(() => expect(box).toHaveAttribute("readonly"));
+  });
+
+  it("409 on autosave offers Reload / Overwrite; Overwrite re-PUTs with the server's rev and Done works", async () => {
+    let conflict = true;
+    const calls = api({
+      "PUT /api/profile/resumes/cv/draft": (c: Call) => conflict
+        ? new Response(JSON.stringify({ detail: "stale rev" }), { status: 409 })
+        : { rev: (c.body as { rev: number }).rev + 1, resume: (c.body as { resume: unknown }).resume, draft: true },
+      "GET /api/profile/resumes/cv/draft": () => ({ rev: calls.filter((x) => x.method === "PUT").length ? 9 : 3, resume: DOC, draft: true }),
+      "POST /api/profile/resumes/cv/publish": { ...META, published: true, n: 4 },
+    });
+    renderRoutes(routes, "/resumes/cv");
+    fireEvent.change(await screen.findByRole("textbox", { name: "Summary" }), { target: { value: "Mine" } });
+    await tick(800);
+    expect(await screen.findByRole("button", { name: "Reload" })).toBeInTheDocument();
+    conflict = false;
+    fireEvent.click(screen.getByRole("button", { name: "Overwrite" }));
+    expect(await screen.findByText("All changes saved")).toBeInTheDocument();
+    const last = puts(calls).at(-1)!.body as { rev: number; resume: typeof DOC };
+    expect(last.rev).toBe(9);
+    expect(last.resume.summary).toBe("Mine");
+    fireEvent.click(screen.getByRole("button", { name: "Done" }));
     expect(await screen.findByText("Profile page")).toBeInTheDocument();
+  });
+
+  it("409 then Reload takes the server draft and drops local edits", async () => {
+    const server = { ...DOC, summary: "Server copy" };
+    const calls = api({
+      "PUT /api/profile/resumes/cv/draft": () => new Response(JSON.stringify({ detail: "stale rev" }), { status: 409 }),
+      "GET /api/profile/resumes/cv/draft": () => (puts(calls).length ? { rev: 7, resume: server, draft: true } : { rev: 3, resume: DOC, draft: true }),
+    });
+    renderRoutes(routes, "/resumes/cv");
+    fireEvent.change(await screen.findByRole("textbox", { name: "Summary" }), { target: { value: "Mine" } });
+    await tick(800);
+    fireEvent.click(await screen.findByRole("button", { name: "Reload" }));
+    await waitFor(() => expect(screen.getByRole("textbox", { name: "Summary" })).toHaveValue("Server copy"));
+    expect(await screen.findByText("All changes saved")).toBeInTheDocument();
+  });
+
+  it("asks before closing the tab while unsaved", async () => {
+    api();
+    renderRoutes(routes, "/resumes/cv");
+    const ev = () => { const e = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(e); return e.defaultPrevented; };
+    fireEvent.change(await screen.findByRole("textbox", { name: "Summary" }), { target: { value: "A" } });
+    expect(ev()).toBe(true);
+    await tick(800);
+    await screen.findByText("All changes saved");
+    expect(ev()).toBe(false);
+  });
+
+  it("blocks in-app navigation while a save is failing; Stay keeps the page, Leave anyway goes", async () => {
+    api({ "PUT /api/profile/resumes/cv/draft": () => new Response(JSON.stringify({ detail: "disk full" }), { status: 500 }) });
+    const { router } = renderRoutes(routes, "/resumes/cv");
+    fireEvent.change(await screen.findByRole("textbox", { name: "Summary" }), { target: { value: "X" } });
+    await tick(800);
+    await screen.findByText(/Couldn’t save/);
+    await act(() => router.navigate("/profile"));
+    expect(await screen.findByText(/aren’t saved/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Stay" }));
+    expect(screen.queryByText(/aren’t saved/)).toBeNull();
+    await act(() => router.navigate("/profile"));
+    fireEvent.click(await screen.findByRole("button", { name: "Leave anyway" }));
+    expect(await screen.findByText("Profile page")).toBeInTheDocument();
+  });
+
+  it("locks fields while publishing and disables Done while an accept is in flight", async () => {
+    api({
+      "POST /api/profile/resumes/cv/publish": () => new Promise(() => {}),
+      "POST /api/profile/resumes/cv/annotations/a1/accept": () => new Promise(() => {}),
+    });
+    renderRoutes(routes, "/resumes/cv");
+    const box = await screen.findByRole("textbox", { name: "Summary" });
+    const card = screen.getByRole("article", { name: /Shows impact/ });
+    fireEvent.click(within(card).getByRole("button", { name: "Accept" }));
+    await waitFor(() => expect(screen.getByRole("button", { name: "Done" })).toBeDisabled());
+    expect(box).toHaveAttribute("readonly");
+  });
+
+  it("after a failed Apply-comment send, keeps the text but blocks resend until edited", async () => {
+    const calls = api({ "POST /api/profile/resumes/cv/annotations/a2/replies": () => new Response(JSON.stringify({ detail: "no run" }), { status: 500 }) });
+    renderRoutes(routes, "/resumes/cv");
+    const comment = await screen.findByRole("article", { name: /Name the stack/ });
+    const input = within(comment).getByRole("textbox", { name: "Reply" });
+    fireEvent.change(input, { target: { value: "Use Python" } });
+    fireEvent.click(within(comment).getByRole("button", { name: "Send" }));
+    await within(comment).findByText("no run");
+    expect(input).toHaveValue("Use Python");
+    expect(within(comment).getByRole("button", { name: "Send" })).toBeDisabled();
+    fireEvent.submit(input.closest("form")!);
+    await tick(0);
+    expect(calls.filter((c) => c.url.endsWith("/replies"))).toHaveLength(1);
+    fireEvent.change(input, { target: { value: "Use Python 3" } });
+    expect(within(comment).getByRole("button", { name: "Send" })).toBeEnabled();
   });
 });

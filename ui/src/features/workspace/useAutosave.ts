@@ -1,9 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { apiFetch } from "../../api/client";
+import { ApiError, apiFetch } from "../../api/client";
 import { errorText } from "../today/api";
 import { draftUrl, type Doc, type Draft } from "./api";
 
-export type SaveState = "saved" | "saving" | "error";
+export type SaveState = "saved" | "saving" | "error" | "conflict";  // conflict = 409: the server draft moved under us
 
 /**
  * Draft autosave (TASK-033a): edits are debounced into one PUT carrying the last known `rev`; saves run one at a
@@ -43,7 +43,7 @@ export function useAutosave(rid: string, delay = 600) {
       (e: unknown) => {
         pending.current ??= doc;
         setError(errorText(e));
-        setState("error");
+        setState(e instanceof ApiError && e.status === 409 ? "conflict" : "error");
         return false;
       },
     );
@@ -76,5 +76,29 @@ export function useAutosave(rid: string, delay = 600) {
   /** The server's draft moved (initial load, an accepted suggestion): later saves build on its rev. */
   const setRev = useCallback((n: number) => { rev.current = n; }, []);
 
-  return { state, error, schedule, flush, setRev };
+  /** After a 409: take the server's draft (drops local edits). Resolves to it so the page can show it. */
+  const reload = useCallback(async (): Promise<Draft> => {
+    clearTimeout(timer.current);
+    const d = await apiFetch<Draft>(url);
+    pending.current = null;
+    rev.current = d.rev;
+    setState("saved");
+    return d;
+  }, [url]);
+
+  /** After a 409: keep the local edit, adopt the server's rev, save again. */
+  const overwrite = useCallback(async (): Promise<boolean> => {
+    rev.current = (await apiFetch<Draft>(url)).rev;
+    return flush();
+  }, [url, flush]);
+
+  // Closing the tab with an unsaved or failed edit: ask first (pagehide's keepalive PUT is best effort).
+  useEffect(() => {
+    if (state === "saved") return;
+    const warn = (e: BeforeUnloadEvent) => { e.preventDefault(); };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [state]);
+
+  return { state, error, schedule, flush, setRev, reload, overwrite };
 }

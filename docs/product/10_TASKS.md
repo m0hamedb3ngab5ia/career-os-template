@@ -101,6 +101,14 @@ Links: REQ-124 UC-001 · Area: backend · After: TASK-027 · Done when: every up
 
 ### TASK-033a Workspace UI `/resumes/<rid>`: render, edit, autosave, publish
 Links: REQ-125 REQ-126 UC-002 · Area: frontend · After: TASK-028..031 · Done when: page per `mockups/resume-workspace.html`: HTML render with inline suggestions, aligned margin cards, reply threads, in-place edit of structured fields, autosave (500–800 ms debounce, flush on navigation, pagehide sendBeacon), "Saving…/All changes saved", Next/Done → publish; ships TASK-030 part B; UI_UX_PRINCIPLES applied; vitest + UI bundle rebuilt; E2E-002-01 green
+Deferred from 033a:
+- ATS view tab.
+- Open-suggestions count.
+- Onboarding "Next" (PublishIn.master).
+- Apply-comment run_id + annotation polling (DEC-011/P10).
+- Render all schema fields (stack/links/coursework/activities, skill_groups).
+- Per-run annotation count in step.py (needs run_id via `resume annotate`).
+- Firefox/Safari field-sizing fallback.
 Note: split from TASK-033 (user, 2026-10-12) so the page ships in parallel with TASK-032. pagehide uses `fetch(..., {keepalive: true})` PUT, not sendBeacon: sendBeacon can only POST and cannot send the `X-CareerOS` write header (403). E2E-002-01: backend half covered by TASK-030/031 tests; no browser E2E harness for the UI half yet.
 
 ### TASK-033b Workspace history, undo, résumé row statuses
