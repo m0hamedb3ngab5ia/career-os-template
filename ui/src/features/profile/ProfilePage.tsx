@@ -91,6 +91,7 @@ function ResumeCard({ r, blurb }: { r: Row; blurb: string }) {
         <strong>{r.type === "master" ? "Master résumé" : r.name}</strong>
         <span className={styles.muted}> · {r.type === "master" ? "" : `${blurb} · `}{ago(r.at)}</span>
       </span>
+      <Link to={`/resumes/${encodeURIComponent(r.rid)}`}>Edit</Link>
       <a href={`/api/profile/resumes/${encodeURIComponent(r.rid)}/file`} target="_blank" rel="noreferrer">View</a>
       <Menu size="small" label={`More for ${r.name}`} items={items}>•••</Menu>
       {failed ? <p role="alert" className={styles.banner}>{errorText(failed.error)}</p> : null}

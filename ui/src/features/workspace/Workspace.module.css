@@ -1,0 +1,39 @@
+/* Résumé workspace (mockups/resume-workspace.html): paper page + margin of cards aligned to their targets. */
+.app { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: var(--space-5); align-items: start; }
+.page { background: var(--bg); box-shadow: var(--shadow-card); border-radius: var(--r-card); padding: var(--space-6); }
+.name .field { font-size: var(--fs-title); font-weight: 600; }
+.contact { display: flex; flex-wrap: wrap; gap: var(--space-2); color: var(--sec); }
+.h2 { font-size: var(--fs-caption); letter-spacing: 0.06em; text-transform: uppercase; border-bottom: 1px solid var(--sep); margin: var(--space-4) 0 var(--space-2); }
+.entry { margin-bottom: var(--space-3); }
+.row { display: flex; flex-wrap: wrap; gap: var(--space-2); align-items: baseline; margin: 0; }
+.bullets { margin: var(--space-1) 0; padding-left: var(--space-5); }
+/* Fields read as document text; the border shows only on hover/focus. */
+.field { font: inherit; color: var(--label); background: transparent; border: 1px solid transparent; border-radius: var(--r-control);
+  padding: 2px 4px; width: 100%; resize: none; field-sizing: content; min-width: 4ch; }
+.row .field, .contact .field { width: auto; }
+.field:hover { border-color: var(--sep); }
+.field:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
+.target { border-radius: var(--r-control); }
+.target[data-marked] { background: color-mix(in srgb, var(--orange) 15%, transparent); }
+.target[data-on] { background: var(--selected); }
+.sugg { margin: 0 4px; font-size: var(--fs-caption); }
+.sugg del { color: var(--red); }
+.sugg ins { color: var(--green); text-decoration: none; }
+.margin { position: relative; }
+.card { position: absolute; left: 0; right: 0; background: var(--card); border-radius: var(--r-card); box-shadow: var(--shadow-card);
+  padding: var(--space-2) var(--space-3); transition: top 0.2s; }
+.card[data-on] { outline: 2px solid var(--accent); }
+.card p { margin: var(--space-1) 0; }
+.reply { border-top: 1px solid var(--sep); padding-top: var(--space-1); }
+.replyForm { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
+.input { font: inherit; border: 1px solid var(--sep); border-radius: var(--r-control); padding: 4px 6px; background: var(--bg); color: var(--label); }
+.actions { display: flex; gap: var(--space-1); align-items: center; }
+.grow { flex: 1; }
+.muted { color: var(--sec); }
+.alert { color: var(--red); }
+@media (max-width: 900px) {
+  .app { grid-template-columns: 1fr; }
+  .page { padding: var(--space-4); }
+  .margin { position: static; }
+  .card { position: static; margin-bottom: var(--space-2); }
+}

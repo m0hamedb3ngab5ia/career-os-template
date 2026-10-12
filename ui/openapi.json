@@ -6084,8 +6084,124 @@
         "title": "Registry",
         "type": "object"
       },
+      "Replied": {
+        "properties": {
+          "at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "At"
+          },
+          "author": {
+            "enum": [
+              "user",
+              "ai"
+            ],
+            "title": "Author",
+            "type": "string"
+          },
+          "base": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Base"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "kind": {
+            "enum": [
+              "suggestion",
+              "comment"
+            ],
+            "title": "Kind",
+            "type": "string"
+          },
+          "proposed": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Proposed"
+          },
+          "replies": {
+            "default": [],
+            "items": {
+              "additionalProperties": true,
+              "type": "object"
+            },
+            "title": "Replies",
+            "type": "array"
+          },
+          "run_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Run Id"
+          },
+          "status": {
+            "enum": [
+              "open",
+              "accepted",
+              "rejected",
+              "outdated"
+            ],
+            "title": "Status",
+            "type": "string"
+          },
+          "target_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Target Id"
+          },
+          "text": {
+            "default": "",
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "author",
+          "status"
+        ],
+        "title": "Replied",
+        "type": "object"
+      },
       "Reply": {
         "properties": {
+          "apply": {
+            "default": false,
+            "title": "Apply",
+            "type": "boolean"
+          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -13273,6 +13389,7 @@
     },
     "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
       "post": {
+        "description": "User reply. `apply` = \"Apply comment\": queue a resume_edit run (409/422 if it can't start; the reply is kept).\nThe run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.",
         "operationId": "reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post",
         "parameters": [
           {
@@ -13309,7 +13426,7 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "$ref": "#/components/schemas/Annotation"
+                  "$ref": "#/components/schemas/Replied"
                 }
               }
             },

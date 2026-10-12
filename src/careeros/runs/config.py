@@ -50,9 +50,16 @@ WEB_TOOLS = ("WebSearch", "WebFetch")
 KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"], "prepare": ["WebSearch"]}
 # Kinds whose skill needs less than llm.allowed_tools get exactly this list instead (samples and résumés can carry
 # third-party text, so no python and no writes outside what the skill produces).
+ANNOTATION_TOOLS = ["Read", "Bash(.venv/bin/careeros resume annotations *)",
+                    "Bash(.venv/bin/careeros resume annotate *)", "Bash(.venv/bin/careeros resume annotate-reply *)",
+                    "Bash(.venv/bin/careeros resume list *)"]  # list: review-resume's no-structured-draft fallback
 KIND_ONLY_TOOLS: dict[str, list[str]] = {
     "learn_voice": ["Read", "Glob", "Grep", "Edit(profile/voice/**)"],
     "extract_master": ["Read", "Write", "Bash(.venv/bin/careeros *)"],
+    # DEC-016: review/edit runs only read and write annotations through the CLI; no Write = no direct draft edit
+    # (`annotate *` needs the space, so it does not match `annotate-reply`; chained commands are refused under dontAsk)
+    "review": ANNOTATION_TOOLS,
+    "resume_edit": ANNOTATION_TOOLS,
 }
 # Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
 KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}

@@ -46,6 +46,7 @@ describe("ProfilePage", () => {
     expect(screen.getByRole("link", { name: "Fix it" })).toHaveAttribute("href", "/profile#resumes");
     expect(screen.queryByRole("menuitem", { name: "Make master" })).toBeNull();
     expect(screen.getByText("Master résumé")).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Edit" })).toHaveAttribute("href", "/resumes/cv");  // TASK-033a workspace
     expect(unexplainedDisabled(container)).toEqual([]);
     expect(await axeViolations(container)).toEqual([]);
   });

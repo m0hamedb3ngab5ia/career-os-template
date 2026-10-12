@@ -29,7 +29,7 @@ def _path(root: Path, rid: str) -> Path:
 
 
 def _from_feedback(root: Path, rid: str) -> list[dict[str, Any]]:
-    return [{"id": i["id"], "kind": "comment", "target_id": None, "base": i.get("quote"), "author": "ai",
+    return [{"id": i["id"], "kind": "comment", "target_id": None, "base": (i.get("quotes") or [None])[0], "author": "ai",
              "status": _OLD_STATE.get(i.get("state"), "open"), "proposed": None,
              "text": f"{i['section']}: {i['issue']} {i['suggestion']}",
              "replies": [{"text": c["text"], "author": "user", "at": c.get("at")} for c in i.get("comments") or []],

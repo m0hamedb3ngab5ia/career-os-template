@@ -59,7 +59,7 @@ def test_build_command_tells_the_model_the_shell_rule():
 
 def test_build_command_skips_user_settings_so_user_hooks_cannot_eat_the_result():
     # B3: a user-scope Stop hook forced an extra final message, so the result event lost its RESULT line
-    cmd = build_command(CFG, "/extract-master r1", kind="extract_master")
+    cmd = build_command(CFG, "/extract-master r1", kind="prepare")  # KIND_ONLY kinds: project only (below)
     assert cmd[cmd.index("--setting-sources") + 1] == "project,local"
     own = type(CFG)(**{**CFG.__dict__, "headless_cmd": [*CFG.headless_cmd, "--setting-sources", "project"]})
     assert build_command(own, "x").count("--setting-sources") == 1  # a configured choice wins
@@ -305,3 +305,25 @@ def test_extract_master_skill_result_line_is_the_json_the_runner_parses():
     text = (Path(__file__).parents[1] / ".claude/skills/extract-master/SKILL.md").read_text()
     lines = [ln.strip("`") for ln in text.splitlines() if ln.startswith("`RESULT: {")]
     assert lines and all(parse_result_line(ln) for ln in lines)
+
+
+def test_kind_only_runs_load_project_settings_only():
+    # local settings allow-rules would widen KIND_ONLY_TOOLS (probed: settings.local.json "Write" is honoured under
+    # dontAsk with --setting-sources project,local, ignored with project); project skills need the project source
+    for kind in ("review", "resume_edit", "learn_voice", "extract_master"):
+        cmd = build_command(CFG, "/x", kind=kind)
+        assert cmd[cmd.index("--setting-sources") + 1] == "project" and cmd.count("--setting-sources") == 1
+    own = type(CFG)(**{**CFG.__dict__, "headless_cmd": [*CFG.headless_cmd, "--setting-sources=project,local"]})
+    cmd = build_command(own, "/x", kind="review")
+    assert [a for a in cmd if a.startswith("--setting-sources")] == ["--setting-sources"]
+    assert cmd[cmd.index("--setting-sources") + 1] == "project"
+    cmd = build_command(CFG, "/x", kind="prepare")
+    assert cmd[cmd.index("--setting-sources") + 1] == "project,local"
+
+
+def test_tracked_project_settings_grant_no_tools():  # the project source stays loaded for KIND_ONLY kinds
+    import json
+    from pathlib import Path
+    f = Path(__file__).resolve().parents[1] / ".claude" / "settings.json"
+    if f.exists():
+        assert not json.loads(f.read_text(encoding="utf-8")).get("permissions", {}).get("allow")

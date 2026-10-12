@@ -26,6 +26,7 @@ export const routes: RouteObject[] = [
       { path: "profile", lazy: () => import("../features/profile/ProfilePage").then((m) => ({ Component: m.ProfilePage })) },
       { path: "profile/answers", lazy: () => import("../features/profile/AnswersPage").then((m) => ({ Component: m.AnswersPage })) },
       { path: "profile/resumes/:rid", lazy: () => import("../features/profile/ResumePage").then((m) => ({ Component: m.ResumePage })) },
+      { path: "resumes/:rid", lazy: () => import("../features/workspace/WorkspacePage").then((m) => ({ Component: m.WorkspacePage })) },
       { path: "settings/:section?", lazy: () => import("../features/settings/SettingsPage").then((m) => ({ Component: m.SettingsPage })) },
       { path: "kit", lazy: () => import("../features/kit/KitPage").then((m) => ({ Component: m.KitPage })) },
       { path: "*", element: <NotFoundPage /> },

@@ -143,6 +143,7 @@ class AnnotationIn(BaseModel):
 
 class Reply(BaseModel):
     text: str
+    apply: bool = False  # "Apply comment": also queue an AI re-draft run (edit-resume) that only proposes/replies
 
 
 class Annotation(BaseModel):  # DEC-016
@@ -166,6 +167,10 @@ class PublishIn(BaseModel):  # DEC-017
 class Published(Resume):
     published: bool
     n: int
+
+
+class Replied(Annotation):
+    run_id: str | None = None  # the queued re-draft run (`apply`), else None
 
 
 class ResumePatch(BaseModel):
@@ -369,9 +374,17 @@ def create_annotation(rid: str, body: AnnotationIn, c=Depends(ctx)) -> Annotatio
 
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/replies")
-def reply_annotation(rid: str, aid: str, body: Reply, c=Depends(ctx)) -> Annotation:
+def reply_annotation(rid: str, aid: str, body: Reply, request: Request, c=Depends(ctx)) -> Replied:
+    """User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
+    The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action."""
     with _refusals():
-        return Annotation(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
+        out = Replied(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
+    if body.apply:
+        try:
+            out.run_id = _start(request, c, "resume_edit", rid, aid).run_id
+        except HTTPException as e:
+            raise HTTPException(e.status_code, f"reply saved; {e.detail}") from None
+    return out
 
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/accept")

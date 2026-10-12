@@ -61,7 +61,7 @@ X
 
 `curl` the endpoints in each feature's dev recipe; check disk effects. Say so in the proof: dev mode skips the page.
 
-LLM runs (review, extract-master, apply-edit, redraft, prepare, score) need `claude` headless. With `claude` off PATH, or example data still present, the run stops `stop_reason: doctor_failed`; the UI shows "The review failed. Retry review". Prove only deterministic parts; mark LLM steps "not proven (needs claude)".
+LLM runs (review, extract-master, edit-resume / Apply comment, prepare, score) need `claude` headless. With `claude` off PATH, or example data still present, the run stops `stop_reason: doctor_failed`; the UI shows "The review failed. Retry review". Prove only deterministic parts; mark LLM steps "not proven (needs claude)".
 
 ## Evidence
 

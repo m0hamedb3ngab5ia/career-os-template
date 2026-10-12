@@ -146,6 +146,8 @@ Writes `pipeline.yaml: runs`, `schedule` and `llm.allowed_tools`.
 | Schedule jobs | one row per job with an enable switch and either an interval or times of day: scout every 3 h (Recommended: 2 to 3), inbox sync at 08:00 and 18:00 (off (Recommended) until the inbox-sync skill is finished; shows "needs Gmail login" when its MCP is not authenticated), score nightly at 01:00 (Recommended), prepare nightly at 02:00 (Recommended), prune weekly (Recommended); score and prepare rows take an optional preset override. Tick every 15 min (Recommended); missed after 60 min (Recommended) |
 | Scheduler | Install / Uninstall buttons (`careeros schedule install`, `careeros schedule uninstall`) and the agent state from `careeros schedule status` (installed, loaded, last tick) |
 
+`learn_voice`, `extract_master`, `review` and `resume_edit` ignore this list: each has its own fixed tool list and loads project settings only (`--setting-sources project`), so `.claude/settings.local.json` does not apply to them.
+
 ### Settings › Storage & efficiency
 
 Reads `careeros storage --json` and `careeros advise --json`; writes `pipeline.yaml: retention`, `storage`, `advisor`.
