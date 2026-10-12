@@ -1,3 +1,4 @@
+import { useMutation } from "@tanstack/react-query";
 import { FileText, FolderOpen } from "lucide-react";
 import { useId, useState } from "react";
 import { Button } from "../../kit/Button";
@@ -7,6 +8,7 @@ import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatBytes, formatCount, formatDate, formatDecimal } from "../../lib/format";
 import { help } from "./actionHelp";
+import { apiSend } from "../../api/client";
 import { useStepRun } from "../runs/useStepRun";
 import { errorText, fileUrl, useOpenFolder } from "./api";
 import { Card } from "./Card";
@@ -73,8 +75,54 @@ function QaSummary({ run }: { run: QaRun }) {
   );
 }
 
-export function QaCard({ jobId, qa, nested }: { jobId: string; qa: Qa | null; nested?: boolean }) {
+/** Plain language for the hard check ids careeros.qa writes as "<id>: <detail>"; unknown ids show raw. */
+const QA_REASONS: Record<string, (detail: string) => string> = {
+  pdf_page_count: (d) => {
+    const m = d.match(/(\d+) page.*?max (\d+)/);
+    return m ? `Résumé is ${m[1]} pages; limit is ${m[2]}. Tailor to shorten it.` : "Résumé is too long. Tailor to shorten it.";
+  },
+  banned_phrases: (d) => {
+    const m = d.match(/'([^']+)'/);
+    return m ? `Uses '${m[1]}'; remove or tailor.` : "Uses a banned phrase; remove or tailor.";
+  },
+  pdf: () => "The résumé PDF is missing or could not be read.",
+  resume_present: () => "No résumé was produced.",
+  section_order: () => "Résumé sections are out of order.",
+  entry_headers: () => "A résumé entry is missing its header.",
+  bullet_fidelity: () => "A résumé bullet does not match its source in your master résumé.",
+  truth_trace: () => "A claim could not be traced to your profile.",
+  skills_traced: () => "A listed skill is not backed by your experience.",
+  tweak_cap: () => "Too many changes for a tweak. Tailor instead.",
+  cover_letter_word_count: () => "The cover letter length is outside the limit.",
+  cover_letter_names_company: () => "The cover letter does not name the company.",
+  cover_letter_names_role: () => "The cover letter does not name the role.",
+  cover_letter_cites_ids: () => "Cover letter claims are not linked to your résumé.",
+  cover_letter_company_facts: () => "The cover letter states company facts not found in the posting.",
+  standard_answers: () => "A standard application answer is missing or differs from your saved one.",
+  answers_within_char_limit: () => "An application answer is over its character limit.",
+  tool_audit: () => "Preparation used a tool it is not allowed to.",
+  job_dir_exists: () => "The job folder is missing.",
+};
+
+export function plainQaReason(reason: string): string {
+  const i = reason.indexOf(": ");
+  const fn = i > 0 ? QA_REASONS[reason.slice(0, i)] : undefined;
+  return fn ? fn(reason.slice(i + 2)) : reason;
+}
+
+export function QaCard({ jobId, qa, nested, resumeChoice }: { jobId: string; qa: Qa | null; nested?: boolean; resumeChoice?: string | null }) {
   const toast = useToast();
+  const [tailoring, setTailoring] = useState(false);
+  // DEC-021: QA failed a reused résumé; rerun prepare with a full tailor
+  const tailor = useMutation({
+    mutationFn: () =>
+      apiSend<{ run_id: string }>("POST", `/api/runs/steps/prepare?job_id=${encodeURIComponent(jobId)}&force_tailor=true`),
+    onSuccess: () => {
+      setTailoring(true);
+      toast.show({ message: "Tailoring started. QA runs again when it finishes." });
+    },
+    onError: (e) => toast.show({ message: errorText(e) }),
+  });
   const [result, setResult] = useState<QaRun | null>(null);
   const rerun = useStepRun("qa", jobId, (run) => {
     if (run.stop_reason === "completed" && run.result) setResult(run.result as unknown as QaRun);
@@ -99,7 +147,7 @@ export function QaCard({ jobId, qa, nested }: { jobId: string; qa: Qa | null; ne
         <>
           <ul className={styles.bullets}>
             {qa.fail_reasons.slice(0, 2).map((r) => (
-              <li key={r}>{r}</li>
+              <li key={r}>{plainQaReason(r)}</li>
             ))}
           </ul>
           {qa.fail_reasons.length > 2 ? (
@@ -129,6 +177,11 @@ export function QaCard({ jobId, qa, nested }: { jobId: string; qa: Qa | null; ne
         </Details>
       ) : null}
       <div className={styles.buttons}>
+        {qa && !qa.pass && resumeChoice === "reuse" && !tailoring ? (
+          <Button size="small" pending={tailor.isPending} pendingLabel="Starting…" onClick={() => tailor.mutate()}>
+            Tailor instead
+          </Button>
+        ) : null}
         {rerun.running ? (
           <>
             <span className={styles.caption}>Running QA…</span>

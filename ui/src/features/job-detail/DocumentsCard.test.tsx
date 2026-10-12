@@ -16,12 +16,13 @@ function renderCard({ qa = d.qa, ...over }: Partial<Parameters<typeof DocumentsC
   const api = mockApi({
     "POST /api/jobs/nw01/qa": { pass: false, summary: { hard_fail: 1, soft_fail: 2 }, fail_reasons: ["Résumé over one page"] },
     "POST /api/jobs/nw01/open-folder": { opened: true },
+    "POST /api/runs/steps/prepare": { kind: "prepare", run_id: "r-tailor" },
     ...routes,
   });
   const utils = renderWithProviders(
     <>
       <DocumentsCard jobId="nw01" documents={d.documents} otherFiles={d.other_files} submitted={d.submitted} {...over} />
-      <QaCard jobId="nw01" qa={qa} />
+      <QaCard jobId="nw01" qa={qa} resumeChoice={over.resumeChoice} />
     </>,
   );
   return { api, ...utils };
@@ -43,6 +44,49 @@ describe("QaCard failure list", () => {
   it("shows no disclosure when there are 2 or fewer issues", () => {
     renderCard({ qa: { ...d.qa!, pass: false, fail_reasons: reasons.slice(0, 2) } });
     expect(screen.queryByText(/Show all/)).toBeNull();
+  });
+});
+
+describe("QaCard plain-language reasons", () => {
+  it("rewrites known hard check ids in the top 2 and keeps raw details behind the disclosure", () => {
+    const raw = ["pdf_page_count: 3 page(s) (max 2)", "banned_phrases: contains 'passionate'", "truth_trace: x", "zzz_new: odd detail"];
+    renderCard({ qa: { ...d.qa!, pass: false, fail_reasons: raw } });
+    const card = screen.getByRole("region", { name: "QA" });
+    const visible = within(card).getAllByRole("listitem").filter((li) => li.closest("details") === null);
+    expect(visible.map((li) => li.textContent)).toEqual([
+      "Résumé is 3 pages; limit is 2. Tailor to shorten it.",
+      "Uses 'passionate'; remove or tailor.",
+    ]);
+    const more = within(card).getByText("Show all 4 issues").closest("details")!;
+    expect(within(more).getAllByRole("listitem").map((li) => li.textContent)).toEqual(raw);
+  });
+
+  it("shows an unknown check id as its raw text", () => {
+    renderCard({ qa: { ...d.qa!, pass: false, fail_reasons: ["zzz_new: odd detail"] } });
+    expect(screen.getByText("zzz_new: odd detail")).toBeInTheDocument();
+  });
+});
+
+describe("QaCard Tailor instead", () => {
+  const failed = { ...d.qa!, pass: false, fail_reasons: ["pdf_page_count: 3 page(s) (max 2)"] };
+
+  it.each([
+    ["QA passed", { ...d.qa!, pass: true }, "reuse"],
+    ["résumé was tailored", failed, "tailor"],
+    ["no choice", failed, undefined],
+  ])("is hidden when %s", (_, qa, choice) => {
+    renderCard({ qa, resumeChoice: choice });
+    expect(screen.queryByRole("button", { name: "Tailor instead" })).toBeNull();
+  });
+
+  it("on fail + reuse starts a forced-tailor prepare, then hides", async () => {
+    const { api } = renderCard({ qa: failed, resumeChoice: "reuse" });
+    await userEvent.click(screen.getByRole("button", { name: "Tailor instead" }));
+    const call = api.callsTo("POST /api/runs/steps/prepare")[0]!;
+    expect(call.search.get("job_id")).toBe("nw01");
+    expect(call.search.get("force_tailor")).toBe("true");
+    expect(await screen.findByText(/Tailoring started/)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Tailor instead" })).toBeNull();
   });
 });
 

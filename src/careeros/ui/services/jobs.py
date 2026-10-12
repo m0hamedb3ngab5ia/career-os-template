@@ -387,6 +387,7 @@ def job_detail(settings: Any, ix: Any, job_id: str) -> JobDetail | None:
         "score": score,
         "safety": _obj(d / "safety.json"),
         "qa": qa,                                        # the qa-review skill's qa.json as written
+        "resume_choice": _obj(d / "resume_choice.json"),  # match.pick: reuse | tweak | tailor (DEC-021 Tailor instead)
         "documents": [by_name[n] for n in KEY_DOCUMENTS if n in by_name],
         "other_files": [f for f in files if f["name"] not in KEY_DOCUMENTS],
         "submitted": sorted(p.name for p in submitted.iterdir() if p.is_dir()) if submitted.is_dir() else [],

@@ -128,7 +128,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
             <ScoreCard jobId={jobId} score={detail.score} />
             {/* QA and Safety are both pass/fail gates, checked only when one fails: one card. */}
             <Card title="Checks">
-              <QaCard jobId={jobId} qa={detail.qa} nested />
+              <QaCard jobId={jobId} qa={detail.qa} resumeChoice={detail.resume_choice?.action} nested />
               <SafetyCard jobId={jobId} company={company} tier={tier} safety={detail.safety} registry={detail.registry} nested />
             </Card>
             <ContactsCard contacts={detail.contacts} policy={detail.contacts_policy ?? []} outreach={detail.outreach} />
