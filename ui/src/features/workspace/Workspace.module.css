@@ -37,3 +37,13 @@
   .margin { position: static; }
   .card { position: static; margin-bottom: var(--space-2); }
 }
+/* Tabs, ATS view, History (mockups/resume-workspace.html) */
+.tabs { display: flex; gap: var(--space-1); margin-bottom: var(--space-3); }
+.tab[aria-selected="true"] { background: var(--selected); }
+.ats { background: var(--bg); box-shadow: var(--shadow-card); border-radius: var(--r-card); padding: var(--space-6); white-space: pre-wrap; font: 13px/1.5 ui-monospace, Menlo, monospace; margin: 0; }
+.history { display: flex; flex-direction: column; gap: var(--space-2); }
+.changes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: var(--space-2); }
+.change { background: var(--card); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: var(--space-2) var(--space-3); }
+.change p { margin: var(--space-1) 0; }
+.change del { color: var(--red); }
+.change ins { color: var(--green); text-decoration: none; }

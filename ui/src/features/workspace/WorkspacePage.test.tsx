@@ -7,6 +7,7 @@ import { WorkspacePage } from "./WorkspacePage";
 const routes = [
   { path: "/resumes/:rid", element: <WorkspacePage /> },
   { path: "/profile", element: <p>Profile page</p> },
+  { path: "/profile/answers", element: <p>Answers page</p> },
 ];
 const DOC = {
   schema_version: 1,
@@ -289,5 +290,70 @@ describe("WorkspacePage", () => {
     expect(calls.filter((c) => c.url.endsWith("/replies"))).toHaveLength(1);
     fireEvent.change(input, { target: { value: "Use Python 3" } });
     expect(within(comment).getByRole("button", { name: "Send" })).toBeEnabled();
+  });
+
+  const applyAndSend = async (extra: Record<string, unknown>) => {
+    api({ "POST /api/profile/resumes/cv/annotations/a2/replies": { ...COMM, run_id: "r1" }, ...extra });
+    renderRoutes(routes, "/resumes/cv");
+    const comment = await screen.findByRole("article", { name: /Name the stack/ });
+    fireEvent.change(within(comment).getByRole("textbox", { name: "Reply" }), { target: { value: "Use Python" } });
+    fireEvent.click(within(comment).getByRole("checkbox", { name: /Apply comment/ }));
+    fireEvent.click(within(comment).getByRole("button", { name: "Send" }));
+    await tick(0);
+    return comment;
+  };
+
+  it("Apply comment follows the run, then lists what it wrote", async () => {
+    let n = 0;
+    const comment = await applyAndSend({
+      "GET /api/runs/r1": () => (++n < 2 ? { state: "running" } : { state: "done", stop_reason: "completed" }),
+      "GET /api/profile/resumes/cv/annotations": [COMM, SUGG],
+    });
+    expect(within(comment).getByText("Claude is revising…")).toBeInTheDocument();
+    await tick(2500);
+    expect(await within(comment).findByText(/Claude added/)).toBeInTheDocument();
+  });
+
+  it("Apply comment: a failed run shows an error", async () => {
+    const comment = await applyAndSend({ "GET /api/runs/r1": { state: "failed", stop_reason: "error", detail: "no suggestion written" } });
+    await tick(1500);
+    expect(await within(comment).findByRole("alert")).toHaveTextContent("no suggestion written");
+  });
+
+  it("Apply comment: a done run that stopped as failed shows an error, not 0 responses", async () => {
+    const comment = await applyAndSend({ "GET /api/runs/r1": { state: "done", stop_reason: "failed", detail: "proposed nothing" } });
+    await tick(1500);
+    expect(await within(comment).findByRole("alert")).toHaveTextContent("proposed nothing");
+    expect(within(comment).queryByText(/Claude added/)).toBeNull();
+  });
+
+  it("onboarding: Next replaces Done and publishes as master", async () => {
+    const calls = api({ "POST /api/profile/resumes/cv/publish": { n: 1 } });
+    renderRoutes(routes, "/resumes/cv?onboarding=1");
+    expect(await screen.findByRole("button", { name: /Next: Saved answers/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Done" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: /Next: Saved answers/ }));
+    await tick(300);
+    expect(calls.find((c) => c.url.endsWith("/publish"))!.body).toMatchObject({ master: true });
+  });
+
+  it("onboarding: a draft master shows Next without the URL flag", async () => {
+    api({ "GET /api/profile/resumes": { resumes: [{ rid: "cv", type: "master", status: "draft" }] } });
+    renderRoutes(routes, "/resumes/cv");
+    expect(await screen.findByRole("button", { name: /Next: Saved answers/ })).toBeInTheDocument();
+  });
+
+  it("onboarding: a ready master keeps Done", async () => {
+    api({ "GET /api/profile/resumes": { resumes: [{ rid: "cv", type: "master", status: "ready" }] } });
+    renderRoutes(routes, "/resumes/cv");
+    expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
+    await tick(300);
+    expect(screen.queryByRole("button", { name: /Next: Saved answers/ })).toBeNull();
+  });
+
+  it("shows Not carried over lines from the import", async () => {
+    api({ "GET /api/profile/resumes/cv/import": { state: "done", dropped: [{ id: "d1", text: "Hobby: chess", restored: false }] } });
+    renderRoutes(routes, "/resumes/cv");
+    expect(await screen.findByText("Hobby: chess")).toBeInTheDocument();
   });
 });

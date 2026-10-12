@@ -138,3 +138,53 @@ def test_file_of_published_version_api(tmp_path: Path, monkeypatch: pytest.Monke
         r = c.get(f"/api/profile/resumes/{rid}/file?v=2")
         assert r.status_code == 409 and "latest" in r.json()["detail"]
         assert c.get(f"/api/profile/resumes/{rid}/file?v=1").status_code == 200  # uploaded/tailored original
+
+
+def test_draft_text_is_the_rendered_draft(tmp_path: Path):
+    """GET .../draft/text = resume.txt as rendered from the current (unpublished) draft (DEC-020), exact."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    root = make_temp_root(tmp_path / "repo")
+    src = tmp_path / "resume.json"
+    src.write_text(json.dumps(DOC), encoding="utf-8")
+    rid = resumes.add_tailored(root, "text", category="x", source="job-1", files={"resume.json": src})["rid"]
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"},
+                     static_dir=root / "no-static")
+    url = f"/api/profile/resumes/{rid}/draft"
+    with TestClient(app) as c:
+        r = c.get(url + "/text")
+        assert r.status_code == 200 and "Built the thing" in r.text and "Mine" not in r.text
+        edited = json.loads(json.dumps(DOC))
+        edited["experience"][0]["bullets"].append({"id": "x", "text": "Mine", "origin": "user"})
+        assert c.put(url, json={"rev": 0, "resume": edited, "author": "user"}, headers={"X-CareerOS": "1"}).status_code == 200
+        r = c.get(url + "/text")
+        assert "Mine" in r.text and r.headers["content-type"].startswith("text/plain")
+        assert c.get("/api/profile/resumes/nope/draft/text").status_code == 404
+
+
+def test_import_state_without_import_json_is_empty_200(tmp_path: Path):
+    """A résumé that was never imported: GET .../import is 200 {state: null, dropped: []}, not 404."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    root = make_temp_root(tmp_path / "repo")
+    src = tmp_path / "resume.json"
+    src.write_text(json.dumps(DOC), encoding="utf-8")
+    rid = resumes.add_tailored(root, "text", category="x", source="job-1", files={"resume.json": src})["rid"]
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
+    with TestClient(app) as c:
+        r = c.get(f"/api/profile/resumes/{rid}/import")
+        assert r.status_code == 200 and r.json()["dropped"] == []

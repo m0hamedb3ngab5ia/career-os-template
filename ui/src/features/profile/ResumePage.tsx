@@ -2,6 +2,7 @@ import { Link, useParams } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { errorText } from "../today/api";
 import { useResumeMeta } from "./api";
+import { NotCarriedOver } from "./ImportPanels";
 import styles from "./Profile.module.css";
 import { ResumeFeedback } from "./ResumePanels";
 
@@ -22,6 +23,7 @@ export function ResumePage() {
           <h2 id="sugg-h" className={styles.h2}>Suggestions</h2>
           <ResumeFeedback rid={rid} latest={latest} />
         </section>
+        <NotCarriedOver rid={rid} />
         <section id="versions" className={styles.card} aria-labelledby="ver-h">
           <h2 id="ver-h" className={styles.h2}>Versions</h2>
           {/* Every version is kept; the newest is the one in use. */}

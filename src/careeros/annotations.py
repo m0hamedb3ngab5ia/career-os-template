@@ -1,7 +1,8 @@
 """Résumé annotations (DEC-016, TASK-030): one model for AI/user suggestions and comments on a draft.
 
 profile/resumes/<rid>/annotations.json  {items: [{id, kind: suggestion|comment, target_id, base, author: user|ai,
-status: open|accepted|rejected|outdated, proposed, text, replies: [{text, author, at}], at}]}
+status: open|accepted|rejected|outdated, proposed, text, replies: [{text, author, at, run?}], at, run?}]}
+`run` = the writing run's id (CLI under CAREEROS_RUN_ID), absent for user/HTTP writes.
 `target_id` = a draft bullet id or a top-level text field (e.g. summary); `base` = its text when made. `outdated` is
 computed on read (open item whose target no longer holds `base`), never stored. Accept = a user action: base check
 (409, both texts), then one draft change via the TASK-029 write path. AI suggestion: zero-fabrication guard (422),
@@ -72,8 +73,21 @@ def _get(items: list[dict[str, Any]], aid: str) -> dict[str, Any]:
     return it
 
 
-def list_items(root: Path, rid: str) -> list[dict[str, Any]]:
+def _by_run(it: dict[str, Any], run: str) -> bool:
+    return it.get("run") == run or any(r.get("run") == run for r in it.get("replies") or [])
+
+
+def run_count(root: Path, rid: str, run: str) -> int:
+    """Annotations + replies written by one run (`run` = its CAREEROS_RUN_ID; TASK-033b)."""
     items = _load(root, rid)
+    return sum(i.get("run") == run for i in items) + sum(r.get("run") == run for i in items for r in i["replies"])
+
+
+def list_items(root: Path, rid: str, run: str | None = None) -> list[dict[str, Any]]:
+    """`run`: only the annotations that run created or replied to (Apply-comment polling, TASK-033b)."""
+    items = _load(root, rid)
+    if run is not None:
+        items = [i for i in items if _by_run(i, run)]
     try:
         doc = store.get_draft(root, rid)["resume"]
     except LookupError:  # no structured version: nothing to compare against
@@ -90,7 +104,7 @@ def list_items(root: Path, rid: str) -> list[dict[str, Any]]:
 
 
 def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str = "", proposed: str | None = None,
-           author: str = "user") -> dict[str, Any]:
+           author: str = "user", run: str | None = None) -> dict[str, Any]:
     if kind not in KINDS or author not in ("user", "ai"):
         raise ValueError("kind must be suggestion|comment and author user|ai")
     if kind == "suggestion" and (not isinstance(proposed, str) or not proposed.strip() or target_id is None):
@@ -102,18 +116,18 @@ def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str 
         items = _load(root, rid)
         it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "author": author,
               "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
-              "text": text.strip(), "replies": [], "at": store._now()}
+              "text": text.strip(), "replies": [], "at": store._now(), **({"run": run} if run else {})}
         _save(root, rid, [*items, it])
         return it
 
 
-def reply(root: Path, rid: str, aid: str, text: str, *, author: str = "user") -> dict[str, Any]:
+def reply(root: Path, rid: str, aid: str, text: str, *, author: str = "user", run: str | None = None) -> dict[str, Any]:
     if not text.strip() or author not in ("user", "ai"):
         raise ValueError("a reply needs text and author user|ai")
     with store._locked(root):
         items = _load(root, rid)
         it = _get(items, aid)
-        it["replies"].append({"text": text.strip(), "author": author, "at": store._now()})
+        it["replies"].append({"text": text.strip(), "author": author, "at": store._now(), **({"run": run} if run else {})})
         _save(root, rid, items)
         return it
 

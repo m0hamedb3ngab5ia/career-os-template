@@ -50,6 +50,8 @@ class ResumeRow(BaseModel):
     category: str | None = None
     latest: int
     at: str
+    status: Literal["reviewing", "draft", "ready", "failed"]  # TASK-033b, see _row_status
+    failed_step: Literal["import", "review"] | None = None  # which step failed (import wins); None unless failed
 
 
 class Resumes(BaseModel):
@@ -178,6 +180,7 @@ class Annotation(BaseModel):  # DEC-016
     text: str = ""
     replies: list[dict[str, Any]] = []
     at: str | None = None
+    run: str | None = None  # the run that wrote it (TASK-033b); replies carry their own `run`
 
 
 class PublishIn(BaseModel):  # DEC-017
@@ -248,7 +251,29 @@ async def upload(request: Request, filename: str, name: str | None = None, c=Dep
 
 @router.get("/profile/resumes")
 def list_resumes(c=Depends(ctx)) -> Resumes:
-    return Resumes(resumes=[ResumeRow(**r) for r in store.list_resumes(c.settings.root)])
+    root = c.settings.root
+    return Resumes(resumes=[ResumeRow(**r, status=_row_status(root, r["rid"]), failed_step=_failed_step(root, r["rid"]))
+                            for r in store.list_resumes(root)])
+
+
+def _failed_step(root: Any, rid: str) -> str | None:
+    if imp.load(root, rid).get("state") == "failed":
+        return "import"
+    return "review" if (fb.load(root, rid).get("review") or {}).get("state") == "failed" else None
+
+
+def _row_status(root: Any, rid: str) -> str:
+    """Profile › Résumés row status (REQ-125, TASK-033b), first match wins: import or review failed -> failed (Retry);
+    either running -> reviewing; unpublished draft or no structured version yet -> draft; else ready."""
+    states = (imp.load(root, rid).get("state"), (fb.load(root, rid).get("review") or {}).get("state"))
+    if "failed" in states:
+        return "failed"
+    if "running" in states:
+        return "reviewing"
+    try:
+        return "draft" if store.get_draft(root, rid)["draft"] else "ready"
+    except (LookupError, ValueError):  # no resume.json yet, or a corrupt draft: the workspace is where to fix it
+        return "draft"
 
 
 @router.get("/profile/resumes/{rid}")
@@ -395,6 +420,13 @@ def get_draft(rid: str, c=Depends(ctx)) -> Draft:
         return Draft(**store.get_draft(c.settings.root, rid))
 
 
+@router.get("/profile/resumes/{rid}/draft/text")
+def get_draft_text(rid: str, c=Depends(ctx)) -> Response:
+    """The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020)."""
+    with _refusals():
+        return Response(store.rendered_draft_txt(c.settings.root, rid), media_type="text/plain; charset=utf-8")
+
+
 @router.put("/profile/resumes/{rid}/draft")
 def put_draft(rid: str, body: DraftIn, c=Depends(ctx)) -> Draft:
     """Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422."""
@@ -417,11 +449,12 @@ def revert_change(rid: str, cid: str, c=Depends(ctx)) -> Draft:
 
 
 @router.get("/profile/resumes/{rid}/annotations")
-def list_annotations(rid: str, c=Depends(ctx)) -> list[Annotation]:
-    """DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`."""
+def list_annotations(rid: str, run: str | None = None, c=Depends(ctx)) -> list[Annotation]:
+    """DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
+    that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b)."""
     with _refusals():
         store.get(c.settings.root, rid)
-        return [Annotation(**i) for i in ann.list_items(c.settings.root, rid)]
+        return [Annotation(**i) for i in ann.list_items(c.settings.root, rid, run=run)]
 
 
 @router.post("/profile/resumes/{rid}/annotations", status_code=201)

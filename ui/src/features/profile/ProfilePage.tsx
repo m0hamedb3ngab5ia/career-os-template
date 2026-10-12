@@ -6,6 +6,7 @@ import { ConfirmPanel } from "../../kit/ConfirmPanel";
 import { Dialog } from "../../kit/Dialog";
 import { Menu } from "../../kit/Menu";
 import { useToast } from "../../kit/Toast";
+import { RetryImport, StatusBadge } from "./ImportPanels";
 import { errorText } from "../today/api";
 import {
   deleteResume, makeMaster, relearn, removeSample, upload, uploadSamples,
@@ -88,9 +89,10 @@ function ResumeCard({ r, blurb }: { r: Row; blurb: string }) {
   return (
     <li className={styles.row}>
       <span className={styles.grow}>
-        <strong>{r.type === "master" ? "Master résumé" : r.name}</strong>
+        <strong>{r.type === "master" ? "Master résumé" : r.name}</strong> <StatusBadge status={r.status} />
         <span className={styles.muted}> · {r.type === "master" ? "" : `${blurb} · `}{ago(r.at)}</span>
       </span>
+      {r.status === "failed" && r.failed_step !== "review" ? <RetryImport rid={r.rid} /> : null}
       <Link to={`/resumes/${encodeURIComponent(r.rid)}`}>Edit</Link>
       <a href={`/api/profile/resumes/${encodeURIComponent(r.rid)}/file`} target="_blank" rel="noreferrer">View</a>
       <Menu size="small" label={`More for ${r.name}`} items={items}>•••</Menu>

@@ -340,7 +340,8 @@ export interface paths {
   "/api/profile/resumes/{rid}/annotations": {
     /**
      * List Annotations
-     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
+     * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
      */
     get: operations["list_annotations_api_profile_resumes__rid__annotations_get"];
     /** Create Annotation */
@@ -389,6 +390,13 @@ export interface paths {
      * @description Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.
      */
     post: operations["revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post"];
+  };
+  "/api/profile/resumes/{rid}/draft/text": {
+    /**
+     * Get Draft Text
+     * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
+     */
+    get: operations["get_draft_text_api_profile_resumes__rid__draft_text_get"];
   };
   "/api/profile/resumes/{rid}/feedback": {
     /** Get Feedback */
@@ -788,6 +796,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Run */
+      run?: string | null;
       /**
        * Status
        * @enum {string}
@@ -2488,6 +2498,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Run */
+      run?: string | null;
       /** Run Id */
       run_id?: string | null;
       /**
@@ -2578,12 +2590,19 @@ export interface components {
       at: string;
       /** Category */
       category?: string | null;
+      /** Failed Step */
+      failed_step?: ("import" | "review") | null;
       /** Latest */
       latest: number;
       /** Name */
       name: string;
       /** Rid */
       rid: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "reviewing" | "draft" | "ready" | "failed";
       /**
        * Type
        * @enum {string}
@@ -5142,10 +5161,14 @@ export interface operations {
   };
   /**
    * List Annotations
-   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
+   * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
    */
   list_annotations_api_profile_resumes__rid__annotations_get: {
     parameters: {
+      query?: {
+        run?: string | null;
+      };
       path: {
         rid: string;
       };
@@ -5370,6 +5393,31 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Draft"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Draft Text
+   * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
+   */
+  get_draft_text_api_profile_resumes__rid__draft_text_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

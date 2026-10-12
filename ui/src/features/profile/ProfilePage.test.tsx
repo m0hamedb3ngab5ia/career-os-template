@@ -313,4 +313,32 @@ describe("ProfilePage", () => {
     await userEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(calls.some((c) => c.method === "POST" && c.url === "/api/profile/master/proposal/refresh")).toBe(true);
   });
+
+  it("shows each résumé's status and Retry on a failed import", async () => {
+    const calls = mockApi({
+      ...BASE,
+      "GET /api/profile/resumes": { resumes: [
+        { rid: "cv", name: "cv.pdf", type: "master", category: null, latest: 2, at: "2026-10-01", status: "draft" },
+        { rid: "alt", name: "alt.pdf", type: "other", category: null, latest: 1, at: "2026-10-01", status: "failed", failed_step: "import" },
+      ] },
+      "POST /api/profile/resumes/alt/import": {},
+    });
+    renderRoutes(routes, "/profile");
+    expect(await screen.findByText("Draft")).toBeInTheDocument();
+    expect(screen.getByText("Failed")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry import" }));
+    await vi.waitFor(() => expect(calls.some((c) => c.method === "POST" && c.url === "/api/profile/resumes/alt/import")).toBe(true));
+  });
+
+  it("a failed review does not offer Retry import", async () => {
+    mockApi({
+      ...BASE,
+      "GET /api/profile/resumes": { resumes: [
+        { rid: "alt", name: "alt.pdf", type: "other", category: null, latest: 1, at: "2026-10-01", status: "failed", failed_step: "review" },
+      ] },
+    });
+    renderRoutes(routes, "/profile");
+    expect(await screen.findByText("Failed")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Retry import" })).toBeNull();
+  });
 });

@@ -9,6 +9,8 @@ export type SampleChange = components["schemas"]["SampleChange"];
 type Samples = components["schemas"]["Samples"];
 type Lesson = components["schemas"]["Lesson"];
 type ResumeRow = components["schemas"]["ResumeRow"];
+export type ResumeStatus = ResumeRow["status"];
+export type ImportState = components["schemas"]["ImportState"];
 
 export interface ReadinessItem {
   id: string;
@@ -126,3 +128,11 @@ export const dismissFeedback = ({ rid, fid }: { rid: string; fid: string }) =>
 export const commentFeedback = ({ rid, fid, text }: { rid: string; fid: string; text: string }) =>
   apiSend<unknown>("POST", `${rp(rid)}/feedback/${encodeURIComponent(fid)}/comment`, { text });
 export const retryReview = (rid: string) => apiSend<unknown>("POST", `${rp(rid)}/review`);
+
+const imp = (rid: string) => `/api/profile/resumes/${encodeURIComponent(rid)}/import`;
+/** DEC-019: the upload import's state and its "Not carried over" list. */
+export const useImport = (rid: string) =>
+  useQuery({ queryKey: ["profile", "import", rid], queryFn: () => apiFetch<ImportState>(imp(rid)) });
+export const retryImport = (rid: string) => apiSend<unknown>("POST", imp(rid));
+export const restoreDropped = ({ rid, did }: { rid: string; did: string }) =>
+  apiSend<unknown>("POST", `${imp(rid)}/dropped/${encodeURIComponent(did)}/restore`);

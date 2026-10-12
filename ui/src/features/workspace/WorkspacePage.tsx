@@ -1,43 +1,18 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { type FormEvent, type KeyboardEvent as ReactKeyEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
-import { useResumeMeta } from "../profile/api";
-import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useDraft, wsKeys } from "./api";
+import { useResumeMeta, useResumes } from "../profile/api";
+import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
+import { Field, ListInput } from "./fields";
+import { History } from "./History";
+import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
+import { cap, type Entry, SKIP, sectionOrder, setAt, targetOrder } from "./doc";
 import styles from "./Workspace.module.css";
-
-const ENTRY_SECTIONS = ["experience", "projects", "leadership", "education"];
-const SKIP = new Set(["id", "source", "origin"]);
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-type Entry = Record<string, unknown> & { id?: string; bullets?: { id?: string; text?: string }[] };
-
-/** Copy of `doc` with the value at `path` replaced. */
-function setAt(doc: Doc, path: (string | number)[], value: unknown): Doc {
-  const out = structuredClone(doc);
-  let node = out as Record<string | number, unknown>;
-  for (const k of path.slice(0, -1)) node = node[k] as Record<string | number, unknown>;
-  node[path[path.length - 1]!] = value;
-  return out;
-}
-
-/** Section types in the résumé's own order (`sections[].order`), entry sections and skills only. */
-function sectionOrder(doc: Doc): string[] {
-  const secs = ((doc.sections as { type: string; order?: number }[] | undefined) ?? []).slice().sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
-  const types = secs.map((s) => s.type);
-  for (const t of [...ENTRY_SECTIONS, "skills"]) if (doc[t] && !types.includes(t)) types.push(t);
-  return types.filter((t) => [...ENTRY_SECTIONS, "skills"].includes(t) && doc[t]);
-}
-
-/** Annotation targets in document order: summary, then every bullet. Cards follow this order. */
-function targetOrder(doc: Doc): string[] {
-  const ids = ["summary"];
-  for (const t of sectionOrder(doc)) for (const e of (ENTRY_SECTIONS.includes(t) ? (doc[t] as Entry[]) : [])) for (const b of e.bullets ?? []) if (b.id) ids.push(b.id);
-  return ids;
-}
 
 /** /resumes/:rid — the résumé draft: edit in place, act on suggestions, autosave, Done = one new version. */
 export const WorkspacePage = () => <Workspace key={useParams().rid} />;  // new résumé = fresh state
@@ -50,9 +25,20 @@ function Workspace() {
   const save = useAutosave(rid);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [active, setActive] = useState<string | null>(null);
+  const [tab, setTab] = useState<"doc" | "ats">("doc");
+  const [history, setHistory] = useState(false);
+  // FLOW-001: Next replaces Done while the master is still a draft; ?onboarding=1 forces the first-run flow for testing.
+  const row = useResumes().data?.resumes.find((r) => r.rid === rid);
+  const onboarding = useSearchParams()[0].get("onboarding") === "1" || (row?.type === "master" && row.status === "draft");
+  const ats = useAtsText(rid, tab === "ats");
+  const undo = useRef<{ past: Doc[]; future: Doc[]; path: string; at: number }>({ past: [], future: [], path: "", at: 0 });
+  const docRef = useRef<Doc | null>(null);
+  docRef.current = doc;
   const [accepting, setAccepting] = useState(false);  // an accept is in flight: its reply replaces the doc
   const key = useRef<string | null>(null);
   const qc = useQueryClient();
+  const refresh = useCallback(() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) }), [qc, rid]);
+  const editor = useRef<HTMLElement>(null);
   const nav = useNavigate();
   const toast = useToast();
   // The unmount flush covers a pending edit; a failed/conflicting one would be lost silently, so ask first.
@@ -68,6 +54,9 @@ function Workspace() {
 
   const edit = (path: (string | number)[], value: unknown) => {
     if (!doc) return;
+    const u = undo.current, k = path.join("/"), now = Date.now();
+    if (k !== u.path || now - u.at > 1000) { u.past.push(doc); if (u.past.length > 100) u.past.shift(); }  // one undo step per burst of typing in one field
+    u.path = k; u.at = now; u.future = [];
     let next = setAt(doc, path, value);
     if (path.length === 5 && path[2] === "bullets" && path[4] === "text") {  // DEC-018: an edited bullet is the user's own
       next = setAt(setAt(next, [...path.slice(0, 4), "source"], undefined), [...path.slice(0, 4), "origin"], "user");
@@ -76,6 +65,9 @@ function Workspace() {
     key.current = null;  // the draft changed since the last Done attempt: a new attempt, a new key
     save.schedule(next);
   };
+
+  /** The server's draft replaced ours (accept, reload, revert): local undo steps no longer apply. */
+  const resetUndo = () => { undo.current = { past: [], future: [], path: "", at: 0 }; };
 
   const done = useMutation({
     mutationFn: async () => {
@@ -96,9 +88,40 @@ function Workspace() {
       const d = await save.reload();
       setDoc(d.resume);
       key.current = null;
+      resetUndo();
     },
   });
   const locked = accepting || done.isPending || retake.isPending;  // no edit may land between the flush and the publish (it would 409 later and be lost) or during an accept
+
+  /*
+   * ⌘Z / Ctrl+Z: client-side undo of the user's own edits (DEC-015: a short-lived stack, separate from History).
+   * Decision: we handle it everywhere on the page, including inside a focused field. The fields are controlled and
+   * autosaved, so the browser's native per-field undo would diverge from the document (it can't restore a value we
+   * already saved, and it doesn't reach other fields); one page-wide stack is the consistent behaviour. Native undo
+   * is left alone when our stack is empty. Ctrl/⌘+Shift+Z (and Ctrl+Y) redo.
+   */
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      const mod = e.metaKey || e.ctrlKey;
+      const z = e.key.toLowerCase() === "z", y = e.key.toLowerCase() === "y" && e.ctrlKey;
+      const t = e.target;  // a margin comment/reply field keeps its native undo
+      if (t instanceof HTMLElement && t.matches("input,textarea,select,[contenteditable]") && !editor.current?.contains(t)) return;
+      if (!mod || e.altKey || !(z || y) || tab !== "doc" || locked) return;
+      const u = undo.current, cur = docRef.current;
+      const redo = y || e.shiftKey;
+      const from = redo ? u.future : u.past, to = redo ? u.past : u.future;
+      const next = from.pop();
+      if (!next || !cur) return;
+      e.preventDefault();
+      to.push(cur);
+      u.path = ""; u.at = 0;
+      key.current = null;
+      setDoc(next);
+      save.schedule(next);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [tab, locked, save]);
 
   const back = <Link to="/profile#resumes">Back to Profile</Link>;
   const title = meta.data?.name ?? "Résumé";
@@ -125,9 +148,20 @@ function Workspace() {
     );
   };
   const field = (label: string, path: (string | number)[], value: unknown, multi = false) =>
-    multi
-      ? <textarea aria-label={label} readOnly={locked} className={styles.field} rows={1} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />
-      : <input aria-label={label} readOnly={locked} className={styles.field} value={String(value ?? "")} onChange={(e) => edit(path, e.target.value)} />;
+    <Field label={label} locked={locked} multi={multi} value={String(value ?? "")} onChange={(v) => edit(path, v)} />;
+
+  /** One entry key: text, string list (stack, coursework, activities) or links [{label, url}]. */
+  const entryField = (t: string, i: number, k: string, v: unknown): ReactNode => {
+    const label = `${cap(t)} ${i + 1} ${k}`;
+    if (typeof v === "string") return <span key={k}>{field(label, [t, i, k], v)}</span>;
+    if (Array.isArray(v) && v.every((x) => typeof x === "string"))
+      return <span key={k}><ListInput label={label} value={v as string[]} locked={locked} onChange={(a) => edit([t, i, k], a)} /></span>;
+    if (k === "links" && Array.isArray(v))
+      return (v as { label?: string; url?: string }[]).map((l, n) => (
+        <span key={`${k}${n}`}>{field(`${cap(t)} ${i + 1} link ${n + 1} label`, [t, i, k, n, "label"], l.label)}{field(`${cap(t)} ${i + 1} link ${n + 1} url`, [t, i, k, n, "url"], l.url)}</span>
+      ));
+    return null;
+  };
 
   const identity = (doc.identity as Record<string, unknown> | undefined) ?? {};
   const status = save.state === "conflict"
@@ -140,16 +174,40 @@ function Workspace() {
     : <span className={styles.muted} aria-live="polite">{save.state === "saving" ? "Saving…" : "All changes saved"}</span>;
 
   return (
-    <Page title={title} subtitle={<>{back} · {status}</>}
-      actions={<Button variant="primary" pending={done.isPending} pendingLabel="Saving…" disabled={accepting} onClick={() => done.mutate()}>Done</Button>}>
+    <Page title={title} subtitle={<>{back} · {status} · <span className={styles.muted}>{open.length ? `${open.length} open suggestion${open.length === 1 ? "" : "s"}` : "All handled"}</span></>}
+      actions={<><Button disabled={tab !== "doc"} onClick={() => setHistory((h) => !h)} aria-pressed={history}>↶ History</Button>{" "}{onboarding
+        ? <NextButton rid={rid} flush={save.flush} onDone={() => void nav("/profile/answers")} />
+        : <Button variant="primary" pending={done.isPending} pendingLabel="Saving…" disabled={accepting} onClick={() => done.mutate()}>Done</Button>}</>}>
       {blocker.state === "blocked" ? (
         <p role="alert" className={styles.alert}>Your latest edits aren’t saved. Leave anyway?{" "}
           <Button size="small" onClick={() => blocker.proceed()}>Leave anyway</Button>{" "}
           <Button size="small" onClick={() => blocker.reset()}>Stay</Button></p>
       ) : null}
       {done.isError ? <p role="alert" className={styles.alert}>Couldn’t finish: {errorText(done.error)}. Press Done to try again.</p> : null}
-      <div className={styles.app}>
-        <article className={styles.page} aria-label="Résumé draft">
+      <div role="tablist" aria-label="Document tabs" className={styles.tabs}>
+        {([["doc", "Résumé"], ["ats", "ATS view"]] as const).map(([t, l]) => {
+          const go = async (to: "doc" | "ats") => {
+            if (to === "ats" && !(await save.flush())) return false;  // a failed save keeps the current tab; its error is already shown
+            setTab(to);
+            return true;
+          };
+          const onKeyDown = (e: ReactKeyEvent) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            const to = t === "doc" ? "ats" : "doc";
+            void go(to).then((ok) => ok && document.getElementById(`tab-${to}`)?.focus());
+          };
+          return (
+            <Button key={t} id={`tab-${t}`} role="tab" aria-selected={tab === t} aria-controls={`tabpanel-${t}`} tabIndex={tab === t ? 0 : -1}
+              className={styles.tab} onKeyDown={onKeyDown} onClick={() => void go(t)}>{l}</Button>
+          );
+        })}
+      </div>
+      {tab === "ats" ? (ats.isError
+        ? <p id="tabpanel-ats" role="alert" className={styles.alert}>Couldn’t load the ATS view: {errorText(ats.error)}</p>
+        : <pre id="tabpanel-ats" role="tabpanel" aria-labelledby="tab-ats" className={styles.ats} tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
+      <div id="tabpanel-doc" role="tabpanel" aria-labelledby="tab-doc" className={styles.app}>
+        <article ref={editor} className={styles.page} aria-label="Résumé draft">
           <div className={styles.name}>{field("Name", ["identity", "name"], identity.name)}</div>
           <div className={styles.contact}>
             {Object.entries(identity).filter(([k, v]) => k !== "name" && typeof v === "string").map(([k, v]) => (
@@ -161,16 +219,14 @@ function Workspace() {
             <section key={t} aria-labelledby={`h-${t}`}>
               <h2 id={`h-${t}`} className={styles.h2}>{cap(t)}</h2>
               {t === "skills"
-                ? Object.entries(doc.skills as Record<string, string[]>).map(([k, v]) => (
-                    <p key={k} className={styles.row}><span className={styles.muted}>{cap(k)}:</span>
-                      <SkillsInput label={`Skills ${k}`} value={v} locked={locked} onChange={(a) => edit(["skills", k], a)} /></p>
+                ? skillRows(doc).map(({ label, path, items }) => (
+                    <p key={label} className={styles.row}><span className={styles.muted}>{cap(label)}:</span>
+                      <ListInput label={`Skills ${label}`} value={items} locked={locked} onChange={(a) => edit(path, a)} /></p>
                   ))
                 : (doc[t] as Entry[]).map((e, i) => (
                     <div key={e.id ?? i} className={styles.entry}>
                       <div className={styles.row}>
-                        {Object.entries(e).filter(([k, v]) => !SKIP.has(k) && typeof v === "string").map(([k, v]) => (
-                          <span key={k}>{field(`${cap(t)} ${i + 1} ${k}`, [t, i, k], v)}</span>
-                        ))}
+                        {Object.entries(e).filter(([k]) => !SKIP.has(k)).map(([k, v]) => entryField(t, i, k, v))}
                       </div>
                       <ul className={styles.bullets}>
                         {(e.bullets ?? []).map((b, j) => (
@@ -182,10 +238,14 @@ function Workspace() {
             </section>
           ))}
         </article>
-        <Margin rid={rid} cards={cards} active={active} setActive={setActive}
-          onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; }} flush={save.flush} lock={setAccepting}
-          refresh={() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) })} />
-      </div>
+        {history
+          ? <History rid={rid} flush={save.flush} lock={setAccepting} onClose={() => setHistory(false)}
+              onReverted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} />
+          : <Margin rid={rid} cards={cards} active={active} setActive={setActive}
+              onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} flush={save.flush} lock={setAccepting}
+              refresh={refresh} />}
+      </div>)}
+      <NotCarriedOver rid={rid} flush={save.flush} onRestored={() => retake.mutate("reload")} />
     </Page>
   );
 }
@@ -199,15 +259,6 @@ interface MarginProps {
   flush: () => Promise<boolean>;
   lock: (b: boolean) => void;
   refresh: () => void;
-}
-
-/** Skills group: comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
-function SkillsInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {
-  const [text, setText] = useState(value.join(", "));
-  const parse = (t: string) => t.split(",").map((x) => x.trim()).filter(Boolean);
-  if (parse(text).join("\n") !== value.join("\n")) setText(value.join(", "));  // doc replaced (accept): resync
-  return <input aria-label={label} readOnly={locked} className={styles.field} value={text}
-    onChange={(e) => { setText(e.target.value); onChange(parse(e.target.value)); }} />;
 }
 
 /** Margin cards, each placed level with its target (pushed down to avoid overlap); stacked on narrow screens. */
@@ -238,6 +289,9 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
   const [failed, setFailed] = useState("");
+  const [runId, setRunId] = useState<string | null>(null);  // the Apply-comment re-draft run being followed
+  const follow = useApplyRun(rid, runId);
+  useEffect(() => { if (follow.ended) refresh(); }, [follow.ended, refresh]);  // its suggestions/replies show up
   const sent = useRef("");  // the text actually submitted: the input may change while the send is pending  // reply text whose send failed: the reply may exist server-side, so no resend until edited
   const act = useMutation({
     mutationFn: async (what: "accept" | "reject" | "reply") => {
@@ -249,7 +303,8 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
         } finally { lock(false); }
       } else if (what === "reject") await reject(rid, a.id);
       else {
-        await reply(rid, a.id, text.trim(), apply);
+        const r = await reply(rid, a.id, text.trim(), apply);
+        if (r.run_id) setRunId(r.run_id);
         setText("");
         setApply(false);
       }
@@ -271,6 +326,9 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
       {(a.replies ?? []).map((r, i) => (
         <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>
       ))}
+      {runId && !follow.ended ? <p className={styles.muted} role="status">Claude is revising…</p> : null}
+      {runId && follow.ended && follow.failed ? <p role="alert" className={styles.alert}>Claude couldn’t revise this: {follow.error}. Your comment is saved.</p> : null}
+      {runId && follow.ended && !follow.failed && follow.written ? <p className={styles.muted} role="status">Claude added {follow.written.length} {follow.written.length === 1 ? "response" : "responses"}.</p> : null}
       <form className={styles.replyForm} onSubmit={submit}>
         <input aria-label="Reply" placeholder="Reply…" className={styles.input} value={text} onChange={(e) => setText(e.target.value)} />
         <label className={styles.muted}><input type="checkbox" checked={apply} onChange={(e) => setApply(e.target.checked)} /> Apply comment (Claude revises this)</label>
@@ -288,4 +346,11 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
       {act.isError ? <p role="alert" className={styles.alert}>{errorText(act.error)}</p> : null}
     </article>
   );
+}
+
+/** Skills rows: `skill_groups` [{label, items}] replaces the `skills` map when present (schema). */
+function skillRows(doc: Doc): { label: string; path: (string | number)[]; items: string[] }[] {
+  const groups = doc.skill_groups as { label?: string; items?: string[] }[] | undefined;
+  if (groups?.length) return groups.map((g, i) => ({ label: g.label ?? `group ${i + 1}`, path: ["skill_groups", i, "items"], items: g.items ?? [] }));
+  return Object.entries((doc.skills as Record<string, string[]>) ?? {}).map(([k, v]) => ({ label: k, path: ["skills", k], items: v }));
 }
