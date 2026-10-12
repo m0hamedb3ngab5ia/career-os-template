@@ -178,8 +178,10 @@ interface MarginProps {
 /** Skills group: comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
 function SkillsInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {
   const [text, setText] = useState(value.join(", "));
+  const parse = (t: string) => t.split(",").map((x) => x.trim()).filter(Boolean);
+  if (parse(text).join("\n") !== value.join("\n")) setText(value.join(", "));  // doc replaced (accept): resync
   return <input aria-label={label} readOnly={locked} className={styles.field} value={text}
-    onChange={(e) => { setText(e.target.value); onChange(e.target.value.split(",").map((x) => x.trim()).filter(Boolean)); }} />;
+    onChange={(e) => { setText(e.target.value); onChange(parse(e.target.value)); }} />;
 }
 
 /** Margin cards, each placed level with its target (pushed down to avoid overlap); stacked on narrow screens. */
