@@ -327,3 +327,18 @@ def test_tracked_project_settings_grant_no_tools():  # the project source stays 
     f = Path(__file__).resolve().parents[1] / ".claude" / "settings.json"
     if f.exists():
         assert not json.loads(f.read_text(encoding="utf-8")).get("permissions", {}).get("allow")
+
+
+def _res(**kw):
+    return HeadlessResult(**{"exit_code": 0, "saw_result": True, "saw_init": True, **kw})
+
+
+def test_extract_master_with_denied_tool_is_not_ok():
+    r = _res(result_text='RESULT: {"resume": "x"}', permission_denials=[{"tool_name": "Write"}])
+    assert classify(r, CFG, "extract_master", "")[0] == "permission_denied"
+
+
+def test_extract_master_refusal_and_missing_cli_are_not_ok():
+    assert classify(_res(result_text="I can't help"), CFG, "extract_master", "")[0] != "ok"
+    missing = HeadlessResult(exit_code=127, stderr_tail="claude: not found")
+    assert classify(missing, CFG, "extract_master", "")[0] == "error"

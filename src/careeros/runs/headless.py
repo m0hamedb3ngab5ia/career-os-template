@@ -241,6 +241,8 @@ def classify(r: HeadlessResult, cfg: RunsConfig, stage: str, job_id: str) -> tup
         if r.permission_denials:
             return "permission_denied", _denied(r)
         return "invalid_result", "no RESULT line in the skill output"
+    if stage == "extract_master" and r.permission_denials and "error" not in res:
+        return "permission_denied", _denied(r)  # a refused tool call is not a completed import
     probs = validate_result(stage, job_id, res)
     if probs:
         if r.permission_denials:  # the denial made the skill stop early: a setup error, not the job's fault
