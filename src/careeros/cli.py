@@ -940,6 +940,19 @@ def cmd_resume_propose_master(args: argparse.Namespace) -> int:
     print(st["diff"] or "no change from profile/master.yaml")
     print("proposal pending: approve or reject it in Profile › Résumés")
     return 0
+def cmd_resume_import_save(args: argparse.Namespace) -> int:
+    """extract-master hands an uploaded résumé's resume.json here (DEC-019): guarded, then v2; refused -> failed."""
+    from careeros import resume_import
+
+    try:
+        st = resume_import.save(_settings(args).root, args.rid, json.loads(Path(args.file).read_text(encoding="utf-8")))
+    except (OSError, ValueError, LookupError) as e:  # ImportRefused is a ValueError: the guard's reason
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"imported as v{st['n']}; not carried over: {len(st['dropped'])} line(s)")
+    return 0
+
+
 def cmd_resume_feedback(args: argparse.Namespace) -> int:
     """review/edit skills (REQ-094..097): feedback | review-save | apply-edit | redraft. No hand edit here: the
     edit-resume run may call this CLI, and a hand edit is unguarded (UI PUT .../text only)."""
@@ -2040,6 +2053,11 @@ def build_parser() -> argparse.ArgumentParser:
                          "(pending until approved; used by the extract-master skill)")
     rsp.add_argument("file")
     rsp.set_defaults(fn=cmd_resume_propose_master)
+    rsp = rss.add_parser("import-save", help="guard an uploaded résumé's structured resume.json -> v2 (DEC-019; "
+                         "used by the extract-master skill)")
+    rsp.add_argument("rid")
+    rsp.add_argument("file")
+    rsp.set_defaults(fn=cmd_resume_import_save)
     for name, hlp, extra in (
             ("feedback", "review state + feedback items (JSON)", ()),
             ("review-save", "save a review's items from a JSON list of {section, issue, suggestion, quote?, kind? content|format}", ("file",)),

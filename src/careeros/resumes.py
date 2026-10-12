@@ -650,12 +650,12 @@ def _recover(d: Path, meta: dict[str, Any]) -> None:
     (v / MARK).unlink(missing_ok=True)
 
 
-def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str, Any]:
+def publish(root: Path, rid: str, *, key: str, master: bool = False, source: str = "publish") -> dict[str, Any]:
     """Next/Done (DEC-017, DEC-020): the draft becomes v<n+1> = resume.json + changes.jsonl only. Steps: write
     `.v<n+1>.tmp/resume.json`, rename to v<n+1>, move draft.changes.jsonl in, write meta.json (the commit point),
     restart the draft from it (rev kept monotonic so change ids stay unique). Unchanged hash or an already-seen
     `key` = no new version. A crash after the rename is rolled forward on the next call. `master` sets the
-    résumé master (onboarding). Returns meta + {published, n}."""
+    résumé master (onboarding); `source` = import for the import guard (DEC-019). Returns meta + {published, n}."""
     from careeros.runs.atomic import write_json
 
     if not key.strip():
@@ -678,7 +678,7 @@ def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str
                 write_json(tmp / MARK, {"offset": log.stat().st_size if log.exists() else 0, "key": key})
                 tmp.rename(d / f"v{n}")
                 _move_log(d, d / f"v{n}", json.loads((d / f"v{n}" / MARK).read_text(encoding="utf-8"))["offset"])
-                entry = {"n": n, "author": "user", "source": "publish", "at": _now(), "key": key}
+                entry = {"n": n, "author": "user", "source": source, "at": _now(), "key": key}
                 meta["versions"].append({**entry, "label": label(entry)})
                 _write(d, meta)
                 (d / f"v{n}" / MARK).unlink()

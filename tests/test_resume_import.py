@@ -1,0 +1,92 @@
+"""Import run + verbatim guard (TASK-032, DEC-019, DEC-018 amendment): extract-master's resume.json becomes v2
+only if every bullet and field is in v1 text.txt; else import.json failed, v1 kept, Retry."""
+from __future__ import annotations
+
+import copy
+import json
+from pathlib import Path
+
+import pytest
+
+from careeros import resume_import as imp
+from careeros import resumes
+
+TEXT = ("Pat Doe\nEXPERIENCE\nAcme — Dev   2020 – 2023\n• Built the   thing\nfor customers\n"
+        "• Shipped the other thing\nHobbies: chess\n")
+DOC = {"schema_version": 1, "identity": {"name": "Pat Doe"},
+       "experience": [{"id": "e1", "company": "Acme", "title": "Dev", "dates": "2020 – 2023", "bullets": [
+           {"id": "b1", "text": "Built the thing for customers"},
+           {"id": "b2", "text": "Shipped the other thing", "origin": "user"}]}]}
+
+
+def _v1(tmp_path: Path) -> tuple[Path, str]:
+    root = tmp_path / "repo"
+    return root, resumes.add_tailored(root, TEXT, category="x", source="up")["rid"]
+
+
+def test_guard_pass_publishes_v2_with_user_origin_and_not_carried_list(tmp_path: Path):  # E2E-001-04 part 1
+    root, rid = _v1(tmp_path)
+    out = imp.save(root, rid, copy.deepcopy(DOC))
+    assert out["state"] == "done" and out["n"] == 2
+    meta = resumes.get(root, rid)
+    assert [(v["n"], v["source"]) for v in meta["versions"]] == [(1, "up"), (2, "import")]
+    v2 = resumes.read_resume_json(resumes._dir(root, rid) / "v2" / "resume.json")
+    assert {b["origin"] for b in v2["experience"][0]["bullets"]} == {"user"}  # the guard is what sets origin
+    assert resumes.user_texts(root, rid) == {"Built the thing for customers", "Shipped the other thing"}
+    assert [d["text"] for d in imp.load(root, rid)["dropped"]] == ["Hobbies: chess"]
+    assert (resumes._dir(root, rid) / "v1" / "text.txt").read_text(encoding="utf-8").startswith("Pat Doe")
+
+
+def test_guard_fails_on_date_absent_from_v1(tmp_path: Path):  # E2E-001-03
+    root, rid = _v1(tmp_path)
+    doc = copy.deepcopy(DOC)
+    doc["experience"][0]["dates"] = "2019 – 2023"
+    with pytest.raises(imp.ImportRefused, match="2019"):
+        imp.save(root, rid, doc)
+    st = imp.load(root, rid)
+    assert st["state"] == "failed" and "2019" in st["reason"]
+    assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]  # v1 kept, no guessed v2
+
+
+def test_guard_fails_on_reworded_bullet_and_bad_json(tmp_path: Path):
+    root, rid = _v1(tmp_path)
+    doc = copy.deepcopy(DOC)
+    doc["experience"][0]["bullets"][0]["text"] = "Built the thing for 40 customers"
+    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):
+        imp.save(root, rid, doc)
+    with pytest.raises(imp.ImportRefused, match="schema_version"):
+        imp.save(root, rid, {**DOC, "schema_version": 9})
+    assert imp.load(root, rid)["state"] == "failed"
+
+
+def test_restore_adds_dropped_line_to_draft_once(tmp_path: Path):  # E2E-001-04 part 2
+    root, rid = _v1(tmp_path)
+    imp.save(root, rid, copy.deepcopy(DOC))
+    did = imp.load(root, rid)["dropped"][0]["id"]
+    d = imp.restore(root, rid, did)
+    b = d["resume"]["experience"][0]["bullets"][-1]
+    assert b["text"] == "Hobbies: chess" and b["origin"] == "user" and d["draft"] is True
+    assert resumes.changes(root, rid)[-1]["author"] == "user"
+    assert imp.load(root, rid)["dropped"][0]["restored"] is True
+    with pytest.raises(resumes.Refused):
+        imp.restore(root, rid, did)
+
+
+def test_run_import_failed_run_marks_failed_and_adds_action(tmp_path: Path, monkeypatch):
+    from careeros.ui.services import step
+
+    root, rid = _v1(tmp_path)
+    added = []
+    monkeypatch.setattr("careeros.tracker.add_action", lambda s, what, type, **kw: added.append((what, type)))
+    settings = type("S", (), {"root": root})()
+    step.run_import(settings, rid, run_skill=lambda *a, **kw: {"id": "r1", "stop_reason": "error"})
+    assert imp.load(root, rid)["state"] == "failed" and len(added) == 1 and added[0][1] == "profile_gap"
+
+    def ok(s, kind, prompt, **kw):
+        assert kind == "extract_master" and prompt == f"extract-master {rid}"
+        imp.save(root, rid, copy.deepcopy(DOC))
+        return {"id": "r2", "stop_reason": "completed"}
+    added.clear()
+    step.run_import(settings, rid, run_skill=ok)  # Retry
+    assert imp.load(root, rid)["state"] == "done" and added == []
+    assert json.loads((resumes._dir(root, rid) / "import.json").read_text(encoding="utf-8"))["run"] == "r2"
