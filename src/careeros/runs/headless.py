@@ -80,6 +80,12 @@ def untrusted(text: Any, source: str) -> str:
     return f'<untrusted source="{source}">\n{body}\n</untrusted>'
 
 
+SHELL_RULE = ("Headless run, --permission-mode dontAsk: a tool call outside the allowlist is refused. "
+              "Shell: one command per Bash call, no `;`, `&&`, `|`, `2>&1 |`, `python -c` or `echo $?`; read files "
+              "with the file tools listed below (Read, Grep when listed), not sed/cat/grep; read the exit code from "
+              "the tool result. Allowed tools: ")
+
+
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
                   extra_tools: list[str] | tuple = ()) -> list[str]:
     cmd, it = [], iter(cfg.headless_cmd)
@@ -91,6 +97,13 @@ def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, k
     tools = allowed_tools_for(cfg, kind, extra_tools)
     if tools:
         cmd += ["--allowedTools", ",".join(tools)]
+        # skills say it too, but models still chain under dontAsk; a configured prompt is kept, the rule appended
+        rule = SHELL_RULE + ", ".join(tools)
+        i = cmd.index("--append-system-prompt") + 1 if "--append-system-prompt" in cmd else len(cmd)
+        if i < len(cmd):
+            cmd[i] = f"{cmd[i]}\n\n{rule}"
+        else:
+            cmd += ["--append-system-prompt", rule]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
     if cfg.model and "--model" not in cmd:
         cmd += ["--model", cfg.model]
