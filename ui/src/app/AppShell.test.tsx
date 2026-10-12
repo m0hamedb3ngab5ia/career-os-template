@@ -9,14 +9,17 @@ import { ToastProvider } from "../kit/Toast";
 import { axeViolations } from "../test/axe";
 import { routes } from "./routes";
 
-function renderAt(path: string, status: unknown = {}) {
+function renderAt(path: string, status: unknown = {}, meta?: unknown) {
+  const json = (body: unknown) => new Response(JSON.stringify(body), { headers: { "content-type": "application/json" } });
   vi.stubGlobal(
     "fetch",
-    // Only /api/status answers; screens that load their own data see a 404 and must still render their frame.
+    // Only /api/status (and /api/meta when given) answer; screens that load their own data see a 404 and must still render their frame.
     vi.fn(async (url: string) =>
       String(url).startsWith("/api/status")
-        ? new Response(JSON.stringify(status), { headers: { "content-type": "application/json" } })
-        : new Response(JSON.stringify({ detail: "not in this test" }), { status: 404 }),
+        ? json(status)
+        : meta && String(url).startsWith("/api/meta")
+          ? json(meta)
+          : new Response(JSON.stringify({ detail: "not in this test" }), { status: 404 }),
     ),
   );
   const router = createMemoryRouter(routes, { initialEntries: [path] });
@@ -41,6 +44,15 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
+  it("applies the saved ui.theme to <html>; system follows the OS", async () => {
+    const meta = (theme: string) => ({ ui: { theme, undo_seconds: 8, page_size: 50 } });
+    const { unmount } = renderAt("/", {}, meta("light"));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBe("light"));
+    unmount();
+    renderAt("/", {}, meta("system"));
+    await waitFor(() => expect(document.documentElement.dataset.theme).toBeUndefined());
+  });
+
   it("lists the sections in the mockup's order and groups", () => {
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: "Sections" });
