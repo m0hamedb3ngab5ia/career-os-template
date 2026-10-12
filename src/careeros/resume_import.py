@@ -120,6 +120,24 @@ def _dropped(doc: dict[str, Any], text: str) -> list[dict[str, Any]]:
     return out
 
 
+def _shape(doc: Any) -> None:
+    """The skill's JSON is untrusted: wrong container types would publish a v2 that readers crash on."""
+    def bad(at: str) -> None:
+        raise ValueError(f"malformed resume.json: {at}")
+    if not isinstance(doc, dict):
+        bad("not an object")
+    if not isinstance(doc.get("identity", {}), dict):
+        bad("identity is not an object")
+    for sec in (*store.ENTRY_SECTIONS, "sections"):
+        items = doc.get(sec, [])
+        if not isinstance(items, list) or not all(isinstance(e, dict) for e in items):
+            bad(f"{sec} is not a list of objects")
+        for i, e in enumerate(items):
+            bs = e.get("bullets", [])
+            if not isinstance(bs, list) or not all(isinstance(b, dict) for b in bs):
+                bad(f"{sec}[{i}].bullets is not a list of objects")
+
+
 def save(root: Path, rid: str, doc: dict[str, Any]) -> dict[str, Any]:
     """The import run's result: guard, then publish v<n+1> (author user, source import). Refused -> import.json
     failed with the reason, nothing published (v1 kept). Only a running import of a user upload may save, so AI
@@ -131,6 +149,7 @@ def save(root: Path, rid: str, doc: dict[str, Any]) -> dict[str, Any]:
         raise ImportRefused(f"no import run is running for {rid!r}; Retry starts one")
     text = (store._dir(root, rid) / "v1" / "text.txt").read_text(encoding="utf-8")
     try:
+        _shape(doc)
         doc = store.migrate(doc)
         _guard(doc, text)
     except (ValueError, TypeError, AttributeError) as e:  # run stays open for the skill's one retry; run_import

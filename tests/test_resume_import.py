@@ -254,3 +254,11 @@ def test_run_import_guard_refusal_fails_with_guard_reason(tmp_path: Path, monkey
     assert st["state"] == "failed" and st["reason"].startswith("summary not in the uploaded text")
     assert len(added) == 1 and "summary not in the uploaded text" in added[0]
     assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]
+
+
+@pytest.mark.parametrize("bad", [{"identity": "Pat Doe"}, {"experience": "Pat Doe"}, {"experience": [{"bullets": "x"}]}])
+def test_save_refuses_malformed_shape(tmp_path: Path, bad):  # Codex MUST: shape is checked before publish
+    root, rid = _v1(tmp_path)
+    with pytest.raises(imp.ImportRefused, match="malformed"):
+        imp.save(root, rid, {"schema_version": 1, **bad})
+    assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]
