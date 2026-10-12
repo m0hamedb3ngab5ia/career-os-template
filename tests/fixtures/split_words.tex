@@ -1,0 +1,12 @@
+% Fictional résumé fixture for tests/test_extract.py. pypdf turns tight kerns into spaces ("A WS",
+% "T ableau") and macOS Helvetica's ToUnicode maps ligature glyphs to U+FB0x (ﬁ ﬂ).
+% Rebuild on macOS: tectonic split_words.tex
+\documentclass{article}
+\usepackage{fontspec}
+\pagestyle{empty}
+\begin{document}
+Jane Example\\
+Skills: AWS, Python, Docker\\
+{\fontspec{Helvetica}Tools: Tableau, Terraform\\
+Built offline workflows for financial staff.}
+\end{document}

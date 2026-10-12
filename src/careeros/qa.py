@@ -53,6 +53,7 @@ from typing import Any, Iterable
 
 import yaml
 
+from careeros.extract import pdf_page_text
 from careeros.markup import MARKER, strip_bold, validate_bold, has_markdown_bold
 from careeros.terms import term_hit, term_in_text as _term_in_text
 
@@ -1142,7 +1143,7 @@ class Checker:
         try:
             from pypdf import PdfReader  # type: ignore
 
-            return "\n".join((p.extract_text() or "") for p in PdfReader(str(self.pdf_path)).pages)
+            return "\n".join(pdf_page_text(p) for p in PdfReader(str(self.pdf_path)).pages)
         except Exception:  # noqa: BLE001 - check_pdf reports unreadable PDFs
             return None
 
@@ -1158,7 +1159,7 @@ class Checker:
         try:
             reader = PdfReader(str(self.pdf_path))
             pages = len(reader.pages)
-            text = "\n".join((p.extract_text() or "") for p in reader.pages)
+            text = "\n".join(pdf_page_text(p) for p in reader.pages)
         except Exception as e:  # pragma: no cover
             self.add("pdf", "hard", False, f"cannot read resume.pdf: {e}")
             return

@@ -33,6 +33,8 @@ import unicodedata
 from collections import Counter
 from typing import Any
 
+from careeros.extract import pdf_page_text
+
 CHECKS = ("pdf_links_clickable", "pdf_text_matches_resume", "pdf_fonts_embedded", "pdf_metadata")
 LEVELS = {"pdf_links_clickable": "hard", "pdf_text_matches_resume": "hard", "pdf_fonts_embedded": "soft",
           "pdf_metadata": "soft"}
@@ -391,7 +393,7 @@ def check_pdf_fidelity(ck: Any) -> None:
         return
     try:
         reader = PdfReader(str(ck.pdf_path))
-        pdf_text = "\n".join((p.extract_text() or "") for p in reader.pages)
+        pdf_text = "\n".join(pdf_page_text(p) for p in reader.pages)
     except Exception as e:  # noqa: BLE001 - Checker.check_pdf already hard-fails `pdf` on this
         skip_all(f"resume.pdf unreadable (see check `pdf`): {type(e).__name__}")
         return
