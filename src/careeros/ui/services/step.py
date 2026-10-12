@@ -224,11 +224,13 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
         if rec.get("stop_reason") != "completed" or (resume_feedback.load(root, rid)["review"] or {}).get("state") != "done":
             resume_feedback.set_review(root, rid, "failed", run=rec.get("id"))  # REQ-094: failed + Retry, file kept
         return rec
+    applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
     rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
     resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land
     resume_feedback.reopen(root, rid, item, f"re-draft run ended without a new suggestion ({rec.get('stop_reason')})")
-    resume_feedback.reopen(root, rid, item, "the assistant stopped before saving the change; try Accept again",
-                           unexplained=True)  # Apply run denied/failed: say so instead of a silent open item
+    if applying:  # Apply run denied/failed: say so instead of a silent open item (a re-draft ends open too)
+        resume_feedback.reopen(root, rid, item, "the assistant stopped before saving the change; try Accept again",
+                               unexplained=True)
     meta = resumes.get(root, rid)
     if meta["type"] == "master" and meta["versions"][-1]["n"] > before:
         try:

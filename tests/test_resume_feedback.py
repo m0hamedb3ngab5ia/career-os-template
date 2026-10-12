@@ -200,3 +200,18 @@ def test_apply_run_keeps_guard_reason(tmp_path: Path, rid: str):  # a refusal's 
 
     run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid, run_skill=refused)
     assert "numbers" in fb.load(tmp_path, rid)["items"][0]["reason"]
+
+
+def test_successful_redraft_keeps_no_reason(tmp_path: Path, rid: str):  # re-draft run ok: no "stopped" reason
+    from careeros.ui.services.step import run_resume_skill
+
+    fid = _item(tmp_path, rid)
+    fb.comment(tmp_path, rid, fid, "shorter please")
+
+    def ok(*a, **kw):
+        fb.redraft(tmp_path, rid, fid, "say it shorter")
+        return {"id": "r1", "stop_reason": "completed"}
+
+    run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid, run_skill=ok)
+    it = fb.load(tmp_path, rid)["items"][0]
+    assert it["state"] == "open" and it["reason"] is None
