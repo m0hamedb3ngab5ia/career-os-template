@@ -94,17 +94,29 @@ def get(root: Path, rid: str) -> dict[str, Any]:
     return meta
 
 
-def download_name(root: Path, rid: str, n: int) -> tuple[Path, str]:
-    """Version n's stored file and its download name `{NN}_{Name}_{Label}.{ext}`, spaces removed."""
+def download_name(root: Path, rid: str, n: int) -> tuple[Path | bytes, str]:
+    """Version n's file and its download name `{NN}_{Name}_{Label}.{ext}`, spaces removed. Uploaded versions:
+    the stored original.*; the latest published version: its rendered PDF bytes (DEC-020); an older published
+    version or no LaTeX engine: Refused."""
     meta = get(root, rid)
     v = next((v for v in meta["versions"] if v["n"] == n), None)
     files = list((_dir(root, rid) / f"v{n}").glob("original.*")) if v else []
-    if not files:
+    data: Path | bytes
+    if files:
+        data, ext = files[0], files[0].suffix
+    elif v and v["source"] == "publish":
+        if n != meta["versions"][-1]["n"]:
+            raise Refused(f"v{n} is an older published version: only the latest version has a PDF; open it in the editor")
+        pdf = render_pdf(root, rid, n)
+        if pdf is None:
+            raise Refused("no LaTeX engine installed (`brew install tectonic`), so no PDF")
+        data, ext = pdf, ".pdf"
+    else:
         raise LookupError(f"résumé {rid!r} has no v{n}")
     stem = Path(meta["name"]).stem if Path(meta["name"]).suffix.lower() in (*MAGIC, ".txt") else meta["name"]
     def camel(t: str) -> str:
         return "".join(w[:1].upper() + w[1:] for w in t.split())
-    return files[0], f"{n:02d}_{camel(stem)}_{camel(v['label'])}{files[0].suffix}"
+    return data, f"{n:02d}_{camel(stem)}_{camel(v['label'])}{ext}"
 
 
 def _all(root: Path) -> list[dict[str, Any]]:
@@ -216,6 +228,7 @@ def add_text(root: Path, rid: str, text: str, *, author: str, source: str, lock:
 def _append(root: Path, rid: str, ext: str, data: bytes, author: str, source: str, lock: bool = True) -> dict[str, Any]:
     with _locked(root) if lock else nullcontext():
         d, meta = _dir(root, rid), get(root, rid)
+        _recover(d, meta)
         n = meta["versions"][-1]["n"] + 1
         _store(d, n, ext, data)
         entry = {"n": n, "author": author, "source": source, "at": _now()}
@@ -286,6 +299,8 @@ def delete_version(root: Path, rid: str, n: int) -> dict[str, Any]:
             raise LookupError(f"résumé {rid!r} has no v{n}")
         if n == meta["versions"][-1]["n"]:
             raise Refused(f"v{n} is the latest version" + (" of the master résumé" if meta["type"] == "master" else ""))
+        if next(v for v in meta["versions"] if v["n"] == n)["source"] == "publish":
+            raise Refused(f"v{n} is a published version; published versions are kept (DEC-020)")
         meta["versions"] = [v for v in meta["versions"] if v["n"] != n]
         _write(d, meta)
         shutil.rmtree(d / f"v{n}", ignore_errors=True)
@@ -591,18 +606,45 @@ def user_texts(root: Path, rid: str) -> set[str]:
     return {t for t, who in cur.values() if who == "user" and isinstance(t, str)}
 
 
-def _orphan(d: Path, meta: dict[str, Any]) -> None:
-    """Under `_locked`: finish a publish that crashed after its rename (DEC-017 roll-forward). v<n+1>/resume.json
-    exists but meta.json doesn't list it: move the draft log in if it's still there, then list the version."""
+MARK = ".publish.json"  # in .v<n>.tmp: the draft log's byte length at publish + the key (crash recovery)
+
+
+def _move_log(d: Path, v: Path, offset: int) -> None:
+    """Move the draft log's first `offset` bytes (the published changes) to v/changes.jsonl; later lines (edits
+    made after a crash) stay in the draft log."""
+    log = d / "draft.changes.jsonl"
+    if offset and log.exists():
+        data = log.read_bytes()
+        tmp = v / "changes.jsonl.tmp"
+        tmp.write_bytes(data[:offset])
+        tmp.replace(v / "changes.jsonl")
+        if data[offset:]:
+            rest = d / f"draft.changes.jsonl.{os.getpid()}.tmp"
+            rest.write_bytes(data[offset:])
+            rest.replace(log)
+        else:
+            log.unlink()
+
+
+def _recover(d: Path, meta: dict[str, Any]) -> None:
+    """Under `_locked`, before any new version: v<n+1> exists but meta.json (the commit point) doesn't list it.
+    A publish (resume.json, renamed in whole) is rolled forward (DEC-017): its log moved, it gets listed with its
+    key. Anything else is an upload that never committed: discarded."""
+    (d / f"v{meta['versions'][-1]['n']}" / MARK).unlink(missing_ok=True)  # crash after the commit
     n = meta["versions"][-1]["n"] + 1
     v = d / f"v{n}"
-    if not (v / "resume.json").is_file():
+    if not v.is_dir():
         return
-    if not (v / "changes.jsonl").exists() and (d / "draft.changes.jsonl").exists():
-        os.replace(d / "draft.changes.jsonl", v / "changes.jsonl")
-    entry = {"n": n, "author": "user", "source": "publish", "at": _now()}
+    if not (v / "resume.json").is_file():
+        shutil.rmtree(v)
+        return
+    mark = json.loads((v / MARK).read_text(encoding="utf-8")) if (v / MARK).is_file() else {"offset": 0}
+    if not (v / "changes.jsonl").exists():
+        _move_log(d, v, mark["offset"])
+    entry = {"n": n, "author": "user", "source": "publish", "at": _now(), **({"key": mark["key"]} if "key" in mark else {})}
     meta["versions"].append({**entry, "label": label(entry)})
     _write(d, meta)
+    (v / MARK).unlink(missing_ok=True)
 
 
 def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str, Any]:
@@ -617,9 +659,10 @@ def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str
         raise ValueError("publish needs an idempotency key")
     with _locked(root):
         d, meta = _dir(root, rid), get(root, rid)
-        _orphan(d, meta)
-        published = False
-        if not any(v.get("key") == key for v in meta["versions"]):
+        _recover(d, meta)
+        seen = next((v for v in meta["versions"] if v.get("key") == key), None)
+        published = seen is not None  # a retry with the same key gets the same answer (NIT: idempotent)
+        if seen is None:
             _, prev, latest = _draft_state(root, rid)
             doc = migrate(prev["resume"])
             if _hash(doc) != _hash(latest):
@@ -628,17 +671,19 @@ def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str
                 shutil.rmtree(tmp, ignore_errors=True)  # left by a crash before the rename
                 tmp.mkdir()
                 write_json(tmp / "resume.json", doc, ensure_ascii=False)
+                log = d / "draft.changes.jsonl"
+                write_json(tmp / MARK, {"offset": log.stat().st_size if log.exists() else 0, "key": key})
                 tmp.rename(d / f"v{n}")
-                if (d / "draft.changes.jsonl").exists():
-                    os.replace(d / "draft.changes.jsonl", d / f"v{n}" / "changes.jsonl")
+                _move_log(d, d / f"v{n}", json.loads((d / f"v{n}" / MARK).read_text(encoding="utf-8"))["offset"])
                 entry = {"n": n, "author": "user", "source": "publish", "at": _now(), "key": key}
                 meta["versions"].append({**entry, "label": label(entry)})
                 _write(d, meta)
+                (d / f"v{n}" / MARK).unlink()
                 write_json(d / "draft.json", {"rev": prev["rev"] + 1, "resume": doc}, ensure_ascii=False)
                 published = True
         if master and meta["type"] != "master":
             meta = _update(root, rid, type="master")
-        return {**get(root, rid), "published": published, "n": meta["versions"][-1]["n"]}
+        return {**get(root, rid), "published": published, "n": seen["n"] if seen else meta["versions"][-1]["n"]}
 
 
 def _renderer() -> Any:
@@ -697,9 +742,10 @@ def rendered(root: Path, rid: str, n: int, kind: str) -> str:
         return (_render_into(src, Path(t)) / f"resume.{kind}").read_text(encoding="utf-8")
 
 
-def render_pdf(root: Path, rid: str, n: int) -> Path | None:
-    """Latest version's PDF, cached as cache/<hash(resume.json)>-<renderer_version>.pdf (DEC-020; older entries
-    removed, disposable). None = no LaTeX engine. Older versions have no PDF: LookupError."""
+def render_pdf(root: Path, rid: str, n: int) -> bytes | None:
+    """Latest version's PDF bytes, cached as cache/<hash(resume.json)>-<renderer_version>.pdf (DEC-020; older
+    entries removed, disposable). Bytes, not a path: a concurrent eviction can't pull a file from under a caller.
+    None = no LaTeX engine. Older versions have no PDF: LookupError."""
     import tempfile
 
     if n != get(root, rid)["versions"][-1]["n"]:
@@ -707,19 +753,22 @@ def render_pdf(root: Path, rid: str, n: int) -> Path | None:
     src = _published_json(root, rid, n)
     cache = _dir(root, rid) / "cache"
     want = cache / f"{_hash(read_resume_json(src))}-{renderer_version()}.pdf"
-    if want.is_file():
-        return want
+    try:
+        return want.read_bytes()
+    except FileNotFoundError:
+        pass
     with tempfile.TemporaryDirectory() as t:
         pdf = _render_into(src, Path(t), pdf=True) / "resume.pdf"
         if not pdf.is_file():
             return None
-        cache.mkdir(exist_ok=True)
-        for old in cache.glob("*.pdf"):
-            old.unlink()
-        tmp = cache / f"{want.name}.{os.getpid()}.tmp"
-        shutil.copyfile(pdf, tmp)
-        tmp.replace(want)
-    return want
+        data = pdf.read_bytes()
+    cache.mkdir(exist_ok=True)
+    for old in cache.glob("*.pdf"):
+        old.unlink(missing_ok=True)
+    tmp = cache / f"{want.name}.{os.getpid()}.tmp"
+    tmp.write_bytes(data)
+    tmp.replace(want)
+    return data
 
 
 def cleanup_tmp(root: Path, max_age: float = 600) -> int:

@@ -140,6 +140,10 @@ def _link(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> str:
     pdf = next((p for p in (vd / "resume.pdf", vd / "original.pdf") if p.exists()), None)
     if pdf:
         shutil.copyfile(pdf, job_dir / "resume.pdf")
+    elif v.get("source") == "publish" and v["n"] == resumes.get(settings.root, rid)["versions"][-1]["n"]:
+        data = resumes.render_pdf(settings.root, rid, v["n"])  # JSON-only version (DEC-020): render on demand
+        if data:
+            (job_dir / "resume.pdf").write_bytes(data)
     return _sha(text)
 
 

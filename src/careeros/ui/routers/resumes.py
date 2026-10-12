@@ -8,6 +8,7 @@ from __future__ import annotations
 import logging
 from contextlib import contextmanager
 from typing import Any, Iterator, Literal
+from urllib.parse import quote
 
 import anyio.to_thread
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
@@ -275,7 +276,11 @@ def resume_file(rid: str, v: int | None = None, download: bool = False, c=Depend
     with _refusals():
         n = v or store.get(c.settings.root, rid)["versions"][-1]["n"]
         path, name = store.download_name(c.settings.root, rid, n)
-    return FileResponse(path, filename=name, content_disposition_type="attachment" if download else "inline")
+    disposition = "attachment" if download else "inline"
+    if isinstance(path, bytes):  # latest published version: rendered PDF (DEC-020)
+        return Response(path, media_type="application/pdf",
+                        headers={"Content-Disposition": f"{disposition}; filename*=utf-8''{quote(name)}"})
+    return FileResponse(path, filename=name, content_disposition_type=disposition)
 
 
 @router.get("/profile/resumes/{rid}/feedback")

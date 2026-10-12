@@ -58,8 +58,8 @@ def test_unchanged_hash_is_noop_and_key_is_idempotent(tmp_path: Path):
     _edit(root, rid)
     assert resumes.publish(root, rid, key="k2")["published"] is True
     _edit(root, rid, "Another edit")
-    again = resumes.publish(root, rid, key="k2")  # double click / retry with the same key
-    assert again["published"] is False and again["n"] == 2
+    again = resumes.publish(root, rid, key="k2")  # double click / retry with the same key: same answer
+    assert again["published"] is True and again["n"] == 2
     assert len(resumes.get(root, rid)["versions"]) == 2
 
 
@@ -90,14 +90,15 @@ def test_pdf_cached_for_latest_only(tmp_path: Path, monkeypatch: pytest.MonkeyPa
 
     monkeypatch.setattr(mod, "compile_tex", fake_compile)
     pdf = resumes.render_pdf(root, rid, 2)
-    assert pdf and pdf.read_bytes().startswith(b"%PDF")
+    assert pdf and pdf.startswith(b"%PDF")
     h = resumes._hash(resumes.read_resume_json(resumes._dir(root, rid) / "v2" / "resume.json"))
-    assert pdf.parent == resumes._dir(root, rid) / "cache" and pdf.name == f"{h}-{resumes.renderer_version()}.pdf"
+    cache = resumes._dir(root, rid) / "cache"
+    assert [p.name for p in cache.iterdir()] == [f"{h}-{resumes.renderer_version()}.pdf"]
     assert resumes.render_pdf(root, rid, 2) == pdf and len(calls) == 1  # cache hit
     _edit(root, rid, "Third")
     resumes.publish(root, rid, key="k2")
-    new = resumes.render_pdf(root, rid, 3)
-    assert [p.name for p in (resumes._dir(root, rid) / "cache").iterdir()] == [new.name]  # latest only
+    resumes.render_pdf(root, rid, 3)
+    assert len(list(cache.iterdir())) == 1 and len(calls) == 2  # latest only
     with pytest.raises(LookupError):
         resumes.render_pdf(root, rid, 2)  # older versions: no cached PDF (DEC-020)
 
@@ -133,6 +134,142 @@ def test_crash_between_steps_recovers_on_retry(tmp_path: Path, monkeypatch: pyte
     assert len(resumes.get(root, rid)["versions"]) == 1  # not published yet: meta.json is the commit point
     assert "Built the better thing" in resumes.user_texts(root, rid)  # no lost edits or provenance meanwhile
     out = resumes.publish(root, rid, key="k1")
-    assert out["n"] == 2 and len(resumes.get(root, rid)["versions"]) == 2
+    assert out["n"] == 2 and out["published"] is True and len(resumes.get(root, rid)["versions"]) == 2
     assert [c["target_id"] for c in resumes._read_log(d / "v2" / "changes.jsonl")] == ["b1"]
     assert not (d / ".v2.tmp").exists() and resumes.get_draft(root, rid)["draft"] is False
+
+
+def _fake_pdf(monkeypatch: pytest.MonkeyPatch) -> None:
+    def fake_compile(tex: Path) -> Path:
+        pdf = tex.with_suffix(".pdf")
+        pdf.write_bytes(b"%PDF-fake " + tex.read_bytes()[:20])
+        return pdf
+
+    monkeypatch.setattr(resumes._renderer(), "compile_tex", fake_compile)
+
+
+def test_file_of_published_versions(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root, rid = _rid(tmp_path)
+    _fake_pdf(monkeypatch)
+    assert isinstance(resumes.download_name(root, rid, 1)[0], Path)  # uploaded/tailored: original.* as is
+    _edit(root, rid)
+    resumes.publish(root, rid, key="k1")
+    data, name = resumes.download_name(root, rid, 2)  # latest published: rendered PDF (View / View PDF)
+    assert isinstance(data, bytes) and data.startswith(b"%PDF") and name.endswith("_Published.pdf")
+    assert resumes.render_pdf(root, rid, 2) == data
+    _edit(root, rid, "Third")
+    resumes.publish(root, rid, key="k2")
+    with pytest.raises(resumes.Refused, match="latest"):
+        resumes.download_name(root, rid, 2)  # older published: clear refusal, not a 404
+
+
+def test_published_version_never_deleted(tmp_path: Path):
+    root, rid = _rid(tmp_path)
+    _edit(root, rid)
+    resumes.publish(root, rid, key="k1")
+    _edit(root, rid, "Third")
+    resumes.publish(root, rid, key="k2")
+    with pytest.raises(resumes.Refused, match="published"):
+        resumes.delete_version(root, rid, 2)  # DEC-020
+    assert [v["n"] for v in resumes.delete_version(root, rid, 1)["versions"]] == [2, 3]
+
+
+def test_crashed_upload_or_publish_recovered_by_either_path(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root, rid = _rid(tmp_path)
+    d = resumes._dir(root, rid)
+    real = resumes._write
+
+    def boom(dd: Path, meta: dict) -> None:
+        raise OSError("crash before meta.json")
+
+    monkeypatch.setattr(resumes, "_write", boom)
+    with pytest.raises(OSError):
+        resumes.add_text(root, rid, "uploaded text", author="user", source="upload")  # v2 without meta entry
+    monkeypatch.setattr(resumes, "_write", real)
+    _edit(root, rid)
+    assert resumes.publish(root, rid, key="k1")["n"] == 2  # uncommitted upload dir discarded, not ENOTEMPTY
+    assert (d / "v2" / "resume.json").is_file()
+    _edit(root, rid, "Third")
+    monkeypatch.setattr(resumes, "_write", boom)
+    with pytest.raises(OSError):
+        resumes.publish(root, rid, key="k2")  # crash after the rename
+    monkeypatch.setattr(resumes, "_write", real)
+    meta = resumes.add_text(root, rid, "later upload", author="user", source="upload")  # no FileExistsError
+    assert [(v["n"], v["source"]) for v in meta["versions"]] == [(1, meta["versions"][0]["source"]), (2, "publish"),
+                                                                (3, "publish"), (4, "upload")]
+    assert [c["target_id"] for c in resumes._read_log(d / "v3" / "changes.jsonl")] == ["b1"]
+
+
+def test_crash_before_log_move_keeps_later_edits_in_draft(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root, rid = _rid(tmp_path)
+    d = resumes._dir(root, rid)
+    _edit(root, rid)
+    real = resumes._move_log
+
+    def boom(*a: object) -> None:
+        raise OSError("crash before log move")
+
+    monkeypatch.setattr(resumes, "_move_log", boom)
+    with pytest.raises(OSError):
+        resumes.publish(root, rid, key="k1")
+    monkeypatch.setattr(resumes, "_move_log", real)
+    _edit(root, rid, "Later edit")  # lands in the draft log after the boundary
+    out = resumes.publish(root, rid, key="k1")
+    assert out["published"] is True and out["n"] == 2
+    assert [c["after"]["text"] for c in resumes._read_log(d / "v2" / "changes.jsonl")] == ["Built the better thing"]
+    assert [c["after"]["text"] for c in resumes.changes(root, rid)] == ["Later edit"]
+    assert sorted(p.name for p in (d / "v2").iterdir()) == ["changes.jsonl", "resume.json"]
+
+
+def test_reuse_of_latest_published_version_gets_pdf(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    from types import SimpleNamespace
+
+    from careeros import match
+
+    root, rid = _rid(tmp_path)
+    _fake_pdf(monkeypatch)
+    _edit(root, rid)
+    resumes.publish(root, rid, key="k1")
+    job = tmp_path / "job"
+    job.mkdir()
+    match._link(SimpleNamespace(root=root), job, rid, resumes.version(root, rid, 2))
+    assert (job / "resume.pdf").read_bytes().startswith(b"%PDF")
+
+
+def test_same_json_same_pdf_bytes(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    import tempfile
+
+    if resumes._renderer().find_engine() is None:
+        pytest.skip("no LaTeX engine")
+    monkeypatch.setenv("CAREEROS_LATEX_OFFLINE", "1")
+    root, rid = _rid(tmp_path)
+    _edit(root, rid)
+    resumes.publish(root, rid, key="k1")
+    src = resumes._published_json(root, rid, 2)
+    out = []
+    for _ in range(2):
+        with tempfile.TemporaryDirectory() as t:
+            try:
+                pdf = resumes._render_into(src, Path(t), pdf=True) / "resume.pdf"
+            except resumes._renderer().CompileError:
+                pytest.skip("LaTeX bundle not cached offline")
+            if not pdf.is_file():
+                pytest.skip("no PDF produced")
+            out.append(pdf.read_bytes())
+    assert out[0] == out[1]  # DEC-017: SOURCE_DATE_EPOCH fixed
+
+
+def test_latex_runs_with_fixed_source_date(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    mod = resumes._renderer()
+    seen = {}
+
+    def fake_run(cmd: list, **kw: object):
+        seen.update(kw["env"])  # type: ignore[arg-type]
+        (tmp_path / "x.pdf").write_bytes(b"%PDF")
+        return type("P", (), {"returncode": 0, "stdout": "", "stderr": ""})()
+
+    monkeypatch.setattr(mod, "find_engine", lambda: ("tectonic", ["tectonic"]))
+    monkeypatch.setattr(mod.subprocess, "run", fake_run)
+    (tmp_path / "x.tex").write_text("x", encoding="utf-8")
+    mod.compile_tex(tmp_path / "x.tex")
+    assert seen["SOURCE_DATE_EPOCH"] == "0" and seen["FORCE_SOURCE_DATE"] == "1"
