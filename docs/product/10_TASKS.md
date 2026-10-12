@@ -91,6 +91,7 @@ Links: REQ-126 UC-002 · Area: backend · After: TASK-028 · Done when: every dr
 
 ### TASK-030 Annotations: suggestions, comments, replies, accept
 Links: REQ-095 REQ-126 UC-002 · Area: backend · After: TASK-029 · Done when: `annotations.json` replaces review.json items (migrate); statuses open/accepted/rejected/outdated; accept runs the apply-edit base check + zero-fabrication guard, then a draft change author=ai; reply with "Apply comment" queues an AI re-draft run, AI only proposes/replies (DEC-016); `review-resume`/`edit-resume` skills write annotations; unit + integration tests; E2E-002-05 green; DEC-018 amendment: accepting an AI suggestion clears `origin` (the bullet then needs a valid `source`)
+Note: accept does not check `source` (uploaded base bullets carry none); QA `bullet_fidelity` enforces it for tailored résumés.
 
 ### TASK-031 Publish: one version per Next/Done
 Links: REQ-126 UC-002 · Area: backend · After: TASK-030 · Done when: `POST .../publish` (idempotency key) writes `v<n+1>/resume.json` in a temp dir → rename → meta.json; unchanged hash = no-op; `draft.changes.jsonl` moved to `v<n+1>/changes.jsonl` (DEC-017); no text/ATS/.tex/PDF stored per version: store helper renders them on demand and existing readers (match, review) use it; PDF cached for latest only, keyed by hash + renderer version (DEC-020); same JSON → identical text/.tex; annotations carried or `outdated`; crash-between-steps integration test; E2E-002-07 green
