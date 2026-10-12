@@ -306,7 +306,7 @@ describe("WorkspacePage", () => {
   it("Apply comment follows the run, then lists what it wrote", async () => {
     let n = 0;
     const comment = await applyAndSend({
-      "GET /api/runs/r1": () => (++n < 2 ? { state: "running" } : { state: "done" }),
+      "GET /api/runs/r1": () => (++n < 2 ? { state: "running" } : { state: "done", stop_reason: "completed" }),
       "GET /api/profile/resumes/cv/annotations": [COMM, SUGG],
     });
     expect(within(comment).getByText("Claude is revising…")).toBeInTheDocument();
@@ -315,9 +315,16 @@ describe("WorkspacePage", () => {
   });
 
   it("Apply comment: a failed run shows an error", async () => {
-    const comment = await applyAndSend({ "GET /api/runs/r1": { state: "failed", reason: "no suggestion written" } });
+    const comment = await applyAndSend({ "GET /api/runs/r1": { state: "failed", stop_reason: "error", detail: "no suggestion written" } });
     await tick(1500);
     expect(await within(comment).findByRole("alert")).toHaveTextContent("no suggestion written");
+  });
+
+  it("Apply comment: a done run that stopped as failed shows an error, not 0 responses", async () => {
+    const comment = await applyAndSend({ "GET /api/runs/r1": { state: "done", stop_reason: "failed", detail: "proposed nothing" } });
+    await tick(1500);
+    expect(await within(comment).findByRole("alert")).toHaveTextContent("proposed nothing");
+    expect(within(comment).queryByText(/Claude added/)).toBeNull();
   });
 
   it("onboarding: Next replaces Done and publishes as master", async () => {

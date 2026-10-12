@@ -111,4 +111,47 @@ describe("Workspace extras", () => {
     await tick(1000);
     expect(calls.filter((c) => c.method === "PUT").at(-1)!.body).toMatchObject({ resume: { summary: "Backend engineer" } });
   });
+
+  it("Cmd+Z inside a margin comment field is left to the browser", async () => {
+    api();
+    renderRoutes(routes, "/resumes/cv");
+    const sum = await screen.findByRole("textbox", { name: "Summary" });
+    fireEvent.change(sum, { target: { value: "Changed" } });
+    const reply = await screen.findByRole("textbox", { name: "Reply" });
+    const ev = new KeyboardEvent("keydown", { key: "z", metaKey: true, bubbles: true, cancelable: true });
+    reply.dispatchEvent(ev);
+    expect(ev.defaultPrevented).toBe(false);
+    expect(sum).toHaveValue("Changed");
+  });
+
+  it("does not refetch annotations on re-render after an Apply run ended", async () => {
+    const calls = api({
+      "GET /api/profile/resumes/cv/annotations": [{ ...SUGG, id: "a2", kind: "comment", author: "user", proposed: null, text: "Name the stack" }],
+      "POST /api/profile/resumes/cv/annotations/a2/replies": { id: "a2", run_id: "r1", replies: [] },
+      "GET /api/runs/r1": { state: "done", stop_reason: "completed" },
+    });
+    renderRoutes(routes, "/resumes/cv");
+    const reply = await screen.findByRole("textbox", { name: "Reply" });
+    fireEvent.change(reply, { target: { value: "Use Python" } });
+    fireEvent.click(screen.getByRole("checkbox", { name: /Apply comment/ }));
+    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    await tick(2500);
+    const n = () => calls.filter((c) => c.method === "GET" && c.url.endsWith("/annotations")).length;
+    const before = n();
+    fireEvent.change(await screen.findByRole("textbox", { name: "Summary" }), { target: { value: "Changed" } });
+    await tick(300);
+    expect(n()).toBe(before);
+  });
+
+  it("tabs are wired to panels and switch with the arrow keys", async () => {
+    api({ "GET /api/profile/resumes/cv/draft/text": "Alex Example\n" });
+    renderRoutes(routes, "/resumes/cv");
+    const doc = await screen.findByRole("tab", { name: "Résumé" });
+    expect(doc).toHaveAttribute("aria-controls", "tabpanel-doc");
+    expect(screen.getByRole("tabpanel")).toHaveAttribute("aria-labelledby", doc.id);
+    fireEvent.keyDown(doc, { key: "ArrowRight" });
+    expect(await screen.findByLabelText("ATS view")).toHaveAttribute("role", "tabpanel");
+    fireEvent.keyDown(screen.getByRole("tab", { name: "ATS view" }), { key: "ArrowLeft" });
+    expect(await screen.findByLabelText("Résumé draft")).toBeInTheDocument();
+  });
 });

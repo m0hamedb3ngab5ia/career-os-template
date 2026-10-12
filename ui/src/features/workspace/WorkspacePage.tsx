@@ -1,5 +1,5 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
+import { type FormEvent, type KeyboardEvent as ReactKeyEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
@@ -37,6 +37,8 @@ function Workspace() {
   const [accepting, setAccepting] = useState(false);  // an accept is in flight: its reply replaces the doc
   const key = useRef<string | null>(null);
   const qc = useQueryClient();
+  const refresh = useCallback(() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) }), [qc, rid]);
+  const editor = useRef<HTMLElement>(null);
   const nav = useNavigate();
   const toast = useToast();
   // The unmount flush covers a pending edit; a failed/conflicting one would be lost silently, so ask first.
@@ -102,6 +104,8 @@ function Workspace() {
     const onKey = (e: KeyboardEvent) => {
       const mod = e.metaKey || e.ctrlKey;
       const z = e.key.toLowerCase() === "z", y = e.key.toLowerCase() === "y" && e.ctrlKey;
+      const t = e.target;  // a margin comment/reply field keeps its native undo
+      if (t instanceof Element && t !== document.body && !editor.current?.contains(t)) return;
       if (!mod || e.altKey || !(z || y) || tab !== "doc" || locked) return;
       const u = undo.current, cur = docRef.current;
       const redo = y || e.shiftKey;
@@ -181,15 +185,28 @@ function Workspace() {
       ) : null}
       {done.isError ? <p role="alert" className={styles.alert}>Couldn’t finish: {errorText(done.error)}. Press Done to try again.</p> : null}
       <div role="tablist" aria-label="Document tabs" className={styles.tabs}>
-        {([["doc", "Résumé"], ["ats", "ATS view"]] as const).map(([t, l]) => (
-          <Button key={t} role="tab" aria-selected={tab === t} className={styles.tab} onClick={() => { if (t === "ats") void save.flush().then(() => setTab(t)); else setTab(t); }}>{l}</Button>
-        ))}
+        {([["doc", "Résumé"], ["ats", "ATS view"]] as const).map(([t, l]) => {
+          const go = async (to: "doc" | "ats") => {
+            if (to === "ats" && !(await save.flush())) return;  // a failed save keeps the current tab; its error is already shown
+            setTab(to);
+          };
+          const onKeyDown = (e: ReactKeyEvent) => {
+            if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+            e.preventDefault();
+            const to = t === "doc" ? "ats" : "doc";
+            void go(to).then(() => document.getElementById(`tab-${to}`)?.focus());
+          };
+          return (
+            <Button key={t} id={`tab-${t}`} role="tab" aria-selected={tab === t} aria-controls={`tabpanel-${t}`} tabIndex={tab === t ? 0 : -1}
+              className={styles.tab} onKeyDown={onKeyDown} onClick={() => void go(t)}>{l}</Button>
+          );
+        })}
       </div>
       {tab === "ats" ? (ats.isError
         ? <p role="alert" className={styles.alert}>Couldn’t load the ATS view: {errorText(ats.error)}</p>
-        : <pre className={styles.ats} aria-label="ATS view" tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
-      <div className={styles.app}>
-        <article className={styles.page} aria-label="Résumé draft">
+        : <pre id="tabpanel-ats" role="tabpanel" aria-labelledby="tab-ats" className={styles.ats} aria-label="ATS view" tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
+      <div id="tabpanel-doc" role="tabpanel" aria-labelledby="tab-doc" className={styles.app}>
+        <article ref={editor} className={styles.page} aria-label="Résumé draft">
           <div className={styles.name}>{field("Name", ["identity", "name"], identity.name)}</div>
           <div className={styles.contact}>
             {Object.entries(identity).filter(([k, v]) => k !== "name" && typeof v === "string").map(([k, v]) => (
@@ -225,7 +242,7 @@ function Workspace() {
               onReverted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} />
           : <Margin rid={rid} cards={cards} active={active} setActive={setActive}
               onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} flush={save.flush} lock={setAccepting}
-              refresh={() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) })} />}
+              refresh={refresh} />}
       </div>)}
       <NotCarriedOver rid={rid} flush={save.flush} onRestored={() => retake.mutate("reload")} />
     </Page>
