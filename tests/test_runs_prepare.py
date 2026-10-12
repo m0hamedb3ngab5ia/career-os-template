@@ -61,6 +61,18 @@ class Fake:
         if mode == "lie_prepared":  # wrote a passing prepare.json but left status.json at scored
             (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True, "status": "queued"}))
             return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued"}))
+        if mode == "origin":  # the AI marks its own bullet user-written (DEC-018 amendment: never allowed)
+            store.set_status(jid, "queued", "fake prepare")
+            (store.job_dir(jid) / "resume.json").write_text(json.dumps({"schema_version": 1, "experience": [
+                {"id": "experience-1", "source": "acme", "bullets": [
+                    {"id": "experience-1.b1", "text": "Invented a claim", "origin": "user"}]}]}))
+            return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued", "qa_pass": True}))
+        if mode == "origin_lie":  # marks origin, writes a passing prepare.json, but RESULT disagrees with status.json
+            (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True, "status": "queued"}))
+            (store.job_dir(jid) / "resume.json").write_text(json.dumps({"schema_version": 1, "experience": [
+                {"id": "experience-1", "source": "acme", "bullets": [
+                    {"id": "experience-1.b1", "text": "Invented a claim", "origin": "user"}]}]}))
+            return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued", "qa_pass": True}))
         if mode == "garbage":
             return parse_stream(events(None))
         if mode == "usage_limit":
@@ -130,6 +142,62 @@ def test_result_that_disagrees_with_status_json_is_invalid(settings, store):
     (att,) = RunStore(settings).load_attempts(RunStore(settings).list_runs()[0]["id"])
     assert att["outcome"] == "invalid_result" and "status.json" in att["detail"]
     assert jid
+
+
+def test_ai_prepare_cannot_mark_bullets_user_written(settings, store):
+    """DEC-018 amendment: the tailor path strips `origin` from the AI's résumé and fails the attempt, so the
+    bullet reads as unsourced (hard QA fail) and never ships as user-written."""
+    jid = add_job(store, 1)
+    batch(settings, "prepare", Fake(settings, default="origin"))
+    (att,) = RunStore(settings).load_attempts(RunStore(settings).list_runs()[0]["id"])
+    assert att["outcome"] == "invalid_result" and "origin" in att["detail"] and "experience-1.b1" in att["detail"]
+    rj = json.loads((store.job_dir(jid) / "resume.json").read_text())
+    assert "origin" not in rj["experience"][0]["bullets"][0]
+
+
+def test_failed_prepare_still_strips_ai_origin_so_apply_refuses(settings, store):
+    """A prepare that fails for another reason (here a RESULT/status mismatch) must not leave an AI origin mark
+    behind for the apply gate to accept."""
+    from careeros.runs.runner import prepared_ok
+    jid = add_job(store, 1)
+    batch(settings, "prepare", Fake(settings, default="origin_lie"))
+    (att,) = RunStore(settings).load_attempts(RunStore(settings).list_runs()[0]["id"])
+    assert att["outcome"] == "invalid_result" and "status.json" in att["detail"]
+    rj = json.loads((store.job_dir(jid) / "resume.json").read_text())
+    assert "origin" not in rj["experience"][0]["bullets"][0]
+    assert prepared_ok(settings, store, jid, "apply") is False
+
+
+def _base_and_job(tmp_path, store, job_text):
+    from types import SimpleNamespace
+
+    from careeros import match
+    jid = add_job(store, 1)
+    jd, root = store.job_dir(jid), SimpleNamespace(root=tmp_path)  # the base résumé lives in tmp, not examples/
+    rdir = tmp_path / "profile" / "resumes" / "r1"
+    (rdir / "v1").mkdir(parents=True)
+    (rdir / "meta.json").write_text("{}")
+    base = match._vdir(root, "r1", 1)
+    bullet = {"id": "experience-1.b1", "text": "Mentored new team members", "origin": "user"}
+    (base / "resume.json").write_text(json.dumps({"experience": [{"id": "experience-1", "bullets": [bullet]}]}))
+    (jd / "resume_choice.json").write_text(json.dumps({"action": "tweak", "rid": "r1", "version": 1}))
+    (jd / "resume.json").write_text(json.dumps({"experience": [{"id": "experience-1", "bullets": [
+        {**bullet, "text": job_text}]}]}))
+    return match, jd, root
+
+
+@pytest.mark.parametrize("action", ["reuse", "tweak"])
+def test_strip_ai_origin_keeps_the_base_versions_user_mark(tmp_path, store, action):
+    match, jd, root = _base_and_job(tmp_path, store, "Mentored new team members")
+    (jd / "resume_choice.json").write_text(json.dumps({"action": action, "rid": "r1", "version": 1}))
+    assert match.strip_ai_origin(root, jd) == []
+    assert json.loads((jd / "resume.json").read_text())["experience"][0]["bullets"][0]["origin"] == "user"
+
+
+def test_strip_ai_origin_drops_the_mark_when_the_ai_edited_the_text(tmp_path, store):
+    match, jd, root = _base_and_job(tmp_path, store, "Mentored and managed the whole org")
+    assert match.strip_ai_origin(root, jd) == ["experience-1.b1"]
+    assert "origin" not in json.loads((jd / "resume.json").read_text())["experience"][0]["bullets"][0]
 
 
 def test_failed_job_is_retried_once_then_becomes_an_action_item(settings, store):
@@ -246,3 +314,13 @@ def test_run_apply_needs_a_job_id(settings):
         run_batch(settings, "apply", budget_for(cfg, "apply", max_jobs=1, max_minutes=30), cfg=cfg,
                   invoke=Fake(settings), now=lambda: NOW)
     assert not any((settings.paths["jobs_dir"].parent / "runs").glob("2*"))
+
+
+@pytest.mark.parametrize("text", ["{not json", json.dumps({"schema_version": 2, "experience": []})])
+def test_apply_gate_fails_closed_on_unreadable_resume(settings, store, text):
+    """A malformed or unsupported-schema resume.json skips bullet_fidelity; apply must not treat that as a pass."""
+    from careeros.runs.runner import prepared_ok
+    jid = add_job(store, 1)
+    (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True}))
+    (store.job_dir(jid) / "resume.json").write_text(text)
+    assert prepared_ok(settings, store, jid, "apply") is False

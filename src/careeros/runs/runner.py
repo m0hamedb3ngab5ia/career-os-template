@@ -71,6 +71,17 @@ class JobBusy(RunBusy):
                                     f"until {holder.get('expires_at')}); not started")
 
 
+def prepared_ok(settings: Settings, store: Store, jid: str, kind: str) -> bool:
+    """prepare.json `qa_pass` (skill-written); for apply, also the job résumé's bullet provenance re-checked in code
+    (DEC-018 amendment: an unsourced AI bullet never ships). No resume.json: QA's artifact check covers it."""
+    if not (store._read(jid, "prepare.json") or {}).get("qa_pass"):
+        return False
+    if kind != "apply" or not (store.job_dir(jid) / "resume.json").exists():
+        return True
+    from careeros.qa import bullet_provenance
+    return bool(bullet_provenance(store.job_dir(jid), settings.root)["ok"])
+
+
 def auto_submit_verdict(settings: Settings, store: Store, cfg: RunsConfig, item: dict[str, Any],
                         ) -> tuple[bool, str]:
     """The runner's submit decision for one apply attempt: `runs.auto_submit` applied to score.json (tier, fit,
@@ -202,7 +213,7 @@ def select_candidates(settings: Settings, kind: str, cfg: RunsConfig, now: datet
             yield CandidateRecord(
                 job_id=jid, status=store.get_status(jid) or "found", score=score,
                 has_score=bool(score) or (store.job_dir(jid) / "score.json").exists(),
-                prepared_ok=bool((store._read(jid, "prepare.json") or {}).get("qa_pass")),
+                prepared_ok=prepared_ok(settings, store, jid, kind),
                 posting=partial(_posting_dict, store, jid),
                 apply_session=(store._read(jid, "apply_session.json") or {}) if kind == "apply" else None,
                 injection=untrusted.blocked(store.load_flags(jid)), selected=ticked or store.is_selected(jid))
@@ -379,6 +390,11 @@ class _Loop:
             st = self.store.get_status(jid)
             if st != result.get("status"):
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
+        if self.kind == "prepare" and (self.store.job_dir(jid) / "resume.json").exists():
+            from careeros import match  # DEC-018 amendment: the AI never marks bullets user-written, on any outcome
+            stripped = match.strip_ai_origin(self.s, self.store.job_dir(jid))
+            if stripped and outcome == "ok":
+                outcome, detail = "invalid_result", f"AI résumé marked bullets origin (user-only; stripped): {stripped}"
         if outcome == "ok" and self.kind == "prepare" and result and result.get("qa_pass"):
             from careeros import check, match
             try:

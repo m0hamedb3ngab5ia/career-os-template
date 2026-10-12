@@ -53,6 +53,7 @@ from typing import Any, Iterable
 
 import yaml
 
+from careeros import resumes
 from careeros.extract import pdf_page_text
 from careeros.markup import MARKER, strip_bold, validate_bold, has_markdown_bold
 from careeros.terms import term_hit, term_in_text as _term_in_text
@@ -383,9 +384,47 @@ class ProfileIndex:
         return ""
 
 
+def _resume_views(raw: Any) -> tuple[Any, Any, int]:
+    """resume.json as read -> (migrated v1 doc, trace view, number of bullets without `source`) (DEC-018).
+
+    The trace view is what the truth checks read: each entry/bullet `id` is its master.yaml `source`, and
+    v1 bullets without `source` (uploaded or hand-written) are left out, so bullet_fidelity and the consistency
+    checks run only on sourced bullets. A pre-v1 file required master ids on every bullet, so there an id-less
+    bullet stays in the view (id None) and still fails. An unknown schema_version reads as a parse error."""
+    if not isinstance(raw, dict) or "__parse_error__" in raw:
+        return raw, raw, 0
+    try:
+        doc = resumes.migrate(raw)
+    except ValueError as e:
+        return {"__parse_error__": str(e)}, {"__parse_error__": str(e)}, 0
+    view, unsourced, pre_v1 = json.loads(json.dumps(doc)), 0, raw.get("schema_version") is None
+    for section in resumes.ENTRY_SECTIONS:
+        for e in view.get(section) or []:
+            if not isinstance(e, dict):
+                continue
+            e["id"] = e.get("source")
+            bullets = e.get("bullets") or []
+            kept = [dict(b, id=b.get("source")) if isinstance(b, dict) else b for b in bullets
+                    if pre_v1 or not isinstance(b, dict) or b.get("source")]
+            unsourced += len(bullets) - len(kept)
+            if "bullets" in e:
+                e["bullets"] = kept
+    return doc, view, unsourced
+
+
 # --------------------------------------------------------------------------- #
 # id extraction from artifacts
 # --------------------------------------------------------------------------- #
+
+
+def _all_bullets(obj: Any) -> list[dict[str, Any]]:
+    """Every bullet dict (inside any `bullets` list) of a resume.json-like structure, in order."""
+    if isinstance(obj, list):
+        return [b for o in obj for b in _all_bullets(o)]
+    if not isinstance(obj, dict):
+        return []
+    return [b for k, v in obj.items() for b in
+            ([x for x in v if isinstance(x, dict)] if k == "bullets" and isinstance(v, list) else _all_bullets(v))]
 
 
 def collect_ids(obj: Any) -> set[str]:
@@ -462,7 +501,10 @@ class Checker:
         # artifacts
         self.posting = _read_json(job_dir / "posting.json")
         self.score = _read_json(job_dir / "score.json")
-        self.resume_json = _read_json(job_dir / "resume.json")
+        # DEC-018: resume_doc = the migrated résumé; resume_json = its trace view (ids = master.yaml sources)
+        raw_resume = _read_json(job_dir / "resume.json")
+        self.resume_v1 = isinstance(raw_resume, dict) and raw_resume.get("schema_version") is not None
+        self.resume_doc, self.resume_json, self.unsourced_bullets = _resume_views(raw_resume)
         self.resume_txt = _read_text(job_dir / "resume.txt")
         self.cover_md = _read_text(job_dir / "cover_letter.md")
         self.answers = _read_json(job_dir / "answers.json")
@@ -901,8 +943,9 @@ class Checker:
                  "all capitalised terms traced to profile" if not unknown
                  else f"not in profile skills/cited bullets: {', '.join(unknown)}")
 
-    def _resume_entries(self) -> list[dict[str, Any]]:
-        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else {}
+    def _resume_entries(self, doc: Any = None) -> list[dict[str, Any]]:
+        doc = self.resume_json if doc is None else doc
+        rj = doc if isinstance(doc, dict) and "__parse_error__" not in doc else {}
         out = []
         for section in ("experience", "projects", "leadership"):
             out.extend(e for e in rj.get(section) or [] if isinstance(e, dict))
@@ -915,16 +958,26 @@ class Checker:
             return
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         base = self.root / "profile" / "resumes" / str(c.get("rid")) / f"v{c.get('version')}" / "resume.json"
-        base_json, _ = _parse_json(_read_text(base))
-        if rj is None or not isinstance(base_json, dict):
+        base_doc, base_view, _ = _resume_views(_parse_json(_read_text(base))[0])
+        if rj is None or not isinstance(base_view, dict) or "__parse_error__" in base_view:
             self.add("tweak_cap", "hard", False, "tweak needs resume.json and the base version's resume.json")
             return
         allowed = set(c.get("add_bullet_ids") or [])
-        added = collect_ids(rj) - collect_ids(base_json)
-        bad = sorted(added - allowed)
-        ok = not bad and len(added) <= 3
-        self.add("tweak_cap", "hard", ok, f"added {sorted(added)} (allowed {sorted(allowed)}, max 3)" if ok else
-                 f"tweak added {sorted(added)}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
+        # sourced bullets compare by master id (both sides migrated, DEC-018), counted per bullet so several new
+        # bullets sharing one allowed source each count; bullets without `source` are not in the trace view, so
+        # count those by résumé-local id against the base's local ids
+        new_src = collect_ids(rj) - collect_ids(base_view)
+        added = sorted(str(b["id"]) for b in _all_bullets(rj) if b.get("id") in new_src)
+        base_local = collect_ids(base_doc)
+        unsourced = sorted(str(b["id"]) for e in self._resume_entries(self.resume_doc) for b in e.get("bullets") or []
+                           if isinstance(b, dict) and b.get("id") and not b.get("source")
+                           and str(b["id"]) not in base_local)
+        bad = sorted(new_src - allowed)
+        n = len(added) + len(unsourced)
+        shown = added + [f"{i} (no source)" for i in unsourced]
+        ok = not bad and n <= 3
+        self.add("tweak_cap", "hard", ok, f"added {shown} (allowed {sorted(allowed)}, max 3)" if ok else
+                 f"tweak added {shown}; only {sorted(allowed)} (max 3) allowed" + (f", not {bad}" if bad else ""))
 
     def check_bullet_fidelity(self) -> None:
         """Each resume.json bullet's text is its master text / a variant (verb swap + trailing trim only);
@@ -948,15 +1001,29 @@ class Checker:
                 n += 1
                 bid = str(b["id"])
                 sources = self.profile.bullet_sources(bid)
-                if sources and not bullet_text_allowed(strip_bold(b["text"]), sources):
+                if not sources and self.resume_v1:  # DEC-018 amendment: `source` must name a master.yaml bullet
+                    problems.append(f"source '{bid}' is not a master.yaml bullet")
+                elif sources and not bullet_text_allowed(strip_bold(b["text"]), sources):
                     problems.append(f"'{bid}' text differs from master text/variants: {str(b['text'])[:80]!r}")
+        # DEC-018 amendment: an unsourced v1 bullet passes only when marked origin "user" (user-written, never
+        # fact-verified, so listed apart); a missing `source` is never read as user-written
+        user: list[str] = []
+        for e in self._resume_entries(self.resume_doc) if self.resume_v1 else []:
+            for b in e.get("bullets") or []:
+                if isinstance(b, dict) and not b.get("source"):
+                    if b.get("origin") == "user":
+                        user.append(str(b.get("id")))
+                    else:
+                        problems.append(f"'{b.get('id')}' has no source and is not origin \"user\": "
+                                        "an AI bullet must cite a master.yaml bullet")
         summary = rj.get("summary")
         if summary:
             variants = [strip_bold(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
             if strip_bold(summary).strip() not in variants:
                 problems.append("summary is not one of profile.summary_variants")
+        skipped = f"; {len(user)} user-written, unverified: {user}" if user else ""
         self.add("bullet_fidelity", "hard", not problems,
-                 f"{n} bullets match master text/variants" if not problems else "; ".join(problems))
+                 (f"{n} bullets match master text/variants" if not problems else "; ".join(problems)) + skipped)
 
     def check_entry_headers(self) -> None:
         """Every experience/project/leadership/education entry names a profile entry by `id`, and its
@@ -1301,7 +1368,7 @@ class Checker:
         """Hard: resume.json `**bold**` markup is valid (paired, non-empty, not nested) and appears only in bullet
         text and the summary (render.py fails otherwise); resume.txt carries no markers (render strips them)."""
         name = "bold_markup"
-        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        rj = self.resume_doc if isinstance(self.resume_doc, dict) and "__parse_error__" not in self.resume_doc else None
         if rj is None:
             self.skip(name, "hard", "resume.json missing")
             return
@@ -1437,6 +1504,19 @@ class Checker:
             "outreach_policy": self.extras.get("outreach_policy", {}),
             "pdf_fidelity": self.extras.get("pdf_fidelity", {}),
         }
+
+
+def bullet_provenance(job_dir: str | Path, root: str | Path) -> dict[str, Any]:
+    """The bullet_fidelity check alone for one job dir (DEC-018 amendment): the apply gate re-runs it in code
+    rather than trust the skill-written prepare.json `qa_pass`."""
+    ck = Checker(Path(job_dir), Path(root))
+    ck.check_bullet_fidelity()
+    rec = ck.checks[-1]
+    # fail closed: a skip (malformed / unsupported-schema resume.json) is not a pass; only a reused user-authored
+    # résumé (DEC-007) may skip
+    if rec.get("skipped") and not ck.user_reuse:
+        return {**rec, "ok": False}
+    return rec
 
 
 def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> dict[str, Any]:

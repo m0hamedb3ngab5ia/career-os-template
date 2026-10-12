@@ -71,13 +71,12 @@ def gate_check(settings: Settings, warnings: list[str] | None = None,
 
 def _selectable(settings: Settings, kind: str, job_id: str) -> bool:
     from careeros import untrusted
-    from careeros.runs.runner import eligibility
+    from careeros.runs.runner import eligibility, prepared_ok
 
     store = Store(settings)
     score = store._read(job_id, "score.json") or {}
-    prep = store._read(job_id, "prepare.json") or {}
     return eligibility(kind, store.get_status(job_id) or "found", (store.job_dir(job_id) / "score.json").exists(),
-                       score, bool(prep.get("qa_pass")), injection=untrusted.blocked(store.load_flags(job_id)),
+                       score, prepared_ok(settings, store, job_id, kind), injection=untrusted.blocked(store.load_flags(job_id)),
                        selected=store.is_selected(job_id)) is None
 
 

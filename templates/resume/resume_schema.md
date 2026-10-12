@@ -2,11 +2,31 @@
 
 `tailor-resume` writes `data/jobs/<job_id>/resume.json`. `templates/resume/render.py` turns it into
 `resume.tex` (+ `resume.pdf` when a LaTeX engine exists) and `resume.txt`. QA (`qa-review`) reads the
-same file to trace every bullet back to `profile/master.yaml` by `id`.
+same file to trace every bullet back to `profile/master.yaml` by `source`.
+
+## Schema version (DEC-018)
+
+One schema for tailored, master and draft résumés. Current: `"schema_version": 1`.
+
+- Every section, entry (`experience`, `projects`, `leadership`, `education`) and bullet has an `id` local to the
+  résumé, unique within it. It never changes once written, so annotations and history can target it.
+- Optional `source` on entries and bullets = the `profile/master.yaml` entry/bullet id the content came from.
+  Uploaded or hand-written bullets have no `source`.
+- Optional bullet `origin: "user"` marks a user-written bullet (DEC-018 amendment). Only the user sets it; the AI
+  tailor path strips it. It is metadata only: render output is unchanged.
+- QA `bullet_fidelity` and the consistency checks are traced on sourced bullets (job-dir résumés, i.e.
+  tailored ones). In v1 a `source` must be a master.yaml bullet; a bullet without `source` passes only with
+  `origin: "user"` and is listed as "user-written, unverified"; any other unsourced bullet is a hard fail. `entry_headers` still needs
+  every entry to name a profile entry: a v1 entry without `source` fails it.
+- Old files (no `schema_version`) are migrated on read, in memory only (`careeros.resumes.read_resume_json` /
+  `migrate`): each `id` was a master.yaml id, so it moves to `source`, and ids are assigned from position:
+  `sec-<type>`, `<section>-<n>` (1-based), `<entry id>.b<n>`. Same file → same ids on every read. In an old file a
+  bullet without `id` still fails `bullet_fidelity` (the old schema required master ids). An unknown
+  `schema_version` fails QA `json_valid`. `render.py` ignores ids and renders v1 and old files identically.
 
 Rules:
 
-- Every bullet `id` must exist in `profile/master.yaml`. Text may be a verbatim bullet or one of its
+- Every bullet `source` (in an old file: `id`) must exist in `profile/master.yaml`. Text may be a verbatim bullet or one of its
   `variants`; numbers are frozen.
 - No placeholder bullets (`placeholder: true` in master, or text containing `[FILL IN` / `[OPEN:`).
 - Text is plain: no LaTeX, no Markdown, with one exception: bullet `text` and `summary` may carry
@@ -20,6 +40,7 @@ Rules:
 
 ```json
 {
+  "schema_version": 1,
   "identity": {
     "name": "Alex Example",
     "email": "alex@example.com",
@@ -31,37 +52,40 @@ Rules:
   },
   "summary": "string or null",
   "sections": [
-    {"type": "experience", "order": 1},
-    {"type": "projects",   "order": 2},
-    {"type": "education",  "order": 3},
-    {"type": "skills",     "order": 4}
+    {"id": "sec-experience", "type": "experience", "order": 1},
+    {"id": "sec-projects",   "type": "projects",   "order": 2},
+    {"id": "sec-education",  "type": "education",  "order": 3},
+    {"id": "sec-skills",     "type": "skills",     "order": 4}
   ],
   "experience": [
     {
-      "id": "initech_intern",
+      "id": "experience-1",
+      "source": "initech_intern",
       "company": "Initech",
       "title": "Data Engineering Intern",
       "team": "Reporting",
       "location": "Boston, MA",
       "start": "Jun 2025",
       "end": "Aug 2025",
-      "bullets": [{"id": "initech_intern.1", "text": "..."}]
+      "bullets": [{"id": "experience-1.b1", "source": "initech_intern.1", "text": "..."}]
     }
   ],
   "projects": [
     {
-      "id": "widgetizer",
+      "id": "projects-1",
+      "source": "widgetizer",
       "name": "Widgetizer",
       "date": "Nov 2025",
       "stack": ["Swift", "SwiftUI", "Supabase"],
       "link": "https://example.com/widgetizer",
       "links": [{"label": "App Store", "url": "https://example.com/widgetizer/app"}],
-      "bullets": [{"id": "widgetizer.1", "text": "..."}]
+      "bullets": [{"id": "projects-1.b1", "source": "widgetizer.1", "text": "..."}]
     }
   ],
   "education": [
     {
-      "id": "state_u",
+      "id": "education-1",
+      "source": "state_u",
       "school": "Springfield State University",
       "degree": "Bachelor of Science, Computer Science",
       "gpa": "3.6",
@@ -92,6 +116,10 @@ Rules:
 
 | Field | Required | Notes |
 |---|---|---|
+| `schema_version` | v1 files | Absent = old file, migrated on read (see "Schema version"). |
+| `*.id` | v1 files | Résumé-local, stable, unique. |
+| `*.source` | no | master.yaml entry/bullet id; traced by QA. |
+| `bullets[].origin` | no | `"user"` = user-written, unverified; the only way a v1 bullet may omit `source`. Never set by the AI. |
 | `identity.*` | name, email, phone, location | `website`, `linkedin`, `github` may be null; the header omits them. |
 | `summary` | no | 2 to 3 sentences from `summary_variants`, or null. |
 | `sections` | yes | Unknown `type` values are ignored. Missing sections are skipped. |

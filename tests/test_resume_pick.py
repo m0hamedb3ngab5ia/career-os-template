@@ -170,3 +170,45 @@ def test_should_re_prepare_replaces_jobs_tailored_version(root):
     m2 = match.save_tailored(s, d)
     assert m1["rid"] == m2["rid"] and [v["n"] for v in m2["versions"]] == [1, 2]
     assert len([r for r in resumes.list_resumes(root) if r["type"] == "tailored"]) == 1
+
+
+def _v1_tweak(root: Path, base: dict, tweak: dict, add: list[str]) -> Checker:
+    """Base version v1 of résumé `r1` + a job tweaking it; returns the Checker after check_tweak_cap."""
+    vdir = root / "profile" / "resumes" / "r1" / "v1"
+    vdir.mkdir(parents=True)
+    (vdir / "resume.json").write_text(json.dumps(base))
+    d = _job(root, "j1")
+    (d / "resume_choice.json").write_text(json.dumps({"action": "tweak", "rid": "r1", "version": 1,
+                                                      "add_bullet_ids": add}))
+    (d / "resume.json").write_text(json.dumps(tweak))
+    ck = Checker(d, root)
+    ck.check_tweak_cap()
+    return ck
+
+
+V1_BASE = {"schema_version": 1, "experience": [{"id": "experience-1", "source": "acme", "bullets": [
+    {"id": "experience-1.b1", "source": "acme.1", "text": "x"},
+    {"id": "experience-1.b2", "text": "hand-written"}]}]}
+
+
+def test_should_tweak_cap_v1_base_and_v1_tweak_with_one_change_passes(root):
+    tweak = json.loads(json.dumps(V1_BASE))
+    tweak["experience"][0]["bullets"].append({"id": "experience-1.b3", "source": "acme.2", "text": "y"})
+    ck = _v1_tweak(root, V1_BASE, tweak, ["acme.2"])
+    assert ck.checks[-1]["ok"], ck.checks[-1]
+
+
+def test_must_tweak_cap_counts_unsourced_added_bullets(root):
+    tweak = json.loads(json.dumps(V1_BASE))
+    tweak["experience"][0]["bullets"] += [{"id": f"new{i}", "text": f"made up {i}"} for i in range(4)]
+    ck = _v1_tweak(root, V1_BASE, tweak, [])
+    assert not ck.checks[-1]["ok"] and ck.checks[-1]["level"] == "hard", ck.checks[-1]
+    assert "new3" in ck.checks[-1]["detail"] and "acme.1" not in ck.checks[-1]["detail"]
+
+
+def test_must_tweak_cap_counts_added_bullets_sharing_one_source(root):
+    tweak = json.loads(json.dumps(V1_BASE))
+    tweak["experience"][0]["bullets"] += [{"id": f"experience-1.n{i}", "source": "acme.2", "text": "y"}
+                                          for i in range(4)]
+    ck = _v1_tweak(root, V1_BASE, tweak, ["acme.2"])
+    assert not ck.checks[-1]["ok"] and ck.checks[-1]["level"] == "hard", ck.checks[-1]

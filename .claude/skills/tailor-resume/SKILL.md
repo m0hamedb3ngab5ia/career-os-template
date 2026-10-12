@@ -114,7 +114,8 @@ Exactly the shape in `templates/resume/resume_schema.md`: `identity` (copied fro
 `summary`, `sections[{type, order}]`, `experience[]` (id, company, title, team, location, start, end,
 `bullets[{id, text}]`), `projects[]` (id, name, date, stack (subset of profile stack), link, `links` copied
 from the profile when present, `bullets[{id, text}]`), `education[]`, `skills{}`, and `meta`. When an entry
-has `title_display` in the profile, that is the `title` verbatim (never the HR title, never reworded):
+has `title_display` in the profile, that is the `title` verbatim (never the HR title, never reworded).
+Never set bullet `origin`; every bullet cites a master.yaml bullet:
 
 ```json
 "meta": {

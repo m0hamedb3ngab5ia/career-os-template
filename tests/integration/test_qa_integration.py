@@ -208,3 +208,48 @@ def test_unknown_url_in_tailored_letter_fails_untrusted_content(temp_root: Path,
     assert code == 1 and res["pass"] is False
     assert res["untrusted_hits"] == ["cover_letter.md: url 'exfil.example.org/r'"]
     assert any(r.startswith("untrusted_content: ") for r in res["fail_reasons"])
+
+
+# --- DEC-018: schema v1 résumés (TASK-027) ---------------------------------------------------------------
+
+def _to_v1(job_dir: Path) -> dict:
+    from careeros import resumes
+    rj = resumes.migrate(json.loads((job_dir / "resume.json").read_text()))
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    return rj
+
+
+def test_v1_resume_renders_identically_and_passes_qa(temp_root: Path, home: Path, job_dir: Path):
+    render = ["templates/resume/render.py", str(job_dir / "resume.json"), "--no-pdf"]
+    assert _run(temp_root, home, *render).returncode == 0
+    old_txt, old_tex = (job_dir / "resume.txt").read_text(), (job_dir / "resume.tex").read_text()
+    rj = _to_v1(job_dir)
+    assert rj["schema_version"] == 1 and rj["experience"][0]["bullets"][0]["source"] == "acme.1"
+    r = _run(temp_root, home, *render)
+    assert r.returncode == 0, r.stderr
+    assert (job_dir / "resume.txt").read_text() == old_txt and (job_dir / "resume.tex").read_text() == old_tex
+    code, res = _qa(temp_root, home, job_dir, "--strict")
+    assert res["fail_reasons"] == [] and code == 0, res["fail_reasons"]
+
+
+def test_v1_qa_checks_only_bullets_with_source(temp_root: Path, home: Path, job_dir: Path):
+    rj = _to_v1(job_dir)
+    # a user-written bullet (origin "user", no source) is not traced to master.yaml, but stays visible
+    rj["experience"][0]["bullets"].append({"id": "experience-1.b9", "text": "Mentored new team members on code review",
+                                           "origin": "user"})
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    assert _run(temp_root, home, "templates/resume/render.py", str(job_dir / "resume.json"), "--txt-only").returncode == 0
+    checks = {c["check"]: c for c in _qa(temp_root, home, job_dir)[1]["checks"]}
+    assert checks["bullet_fidelity"]["ok"], checks["bullet_fidelity"]
+    assert "user-written, unverified: ['experience-1.b9']" in checks["bullet_fidelity"]["detail"]
+    # without origin "user" the same unsourced bullet is an AI claim with no source: hard fail
+    del rj["experience"][0]["bullets"][-1]["origin"]
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    checks = {c["check"]: c for c in _qa(temp_root, home, job_dir)[1]["checks"]}
+    assert not checks["bullet_fidelity"]["ok"] and "experience-1.b9" in checks["bullet_fidelity"]["detail"]
+    rj["experience"][0]["bullets"].pop()
+    # a sourced bullet whose text drifts from master still fails
+    rj["experience"][0]["bullets"][0]["text"] = "Led company-wide hiring strategy and managed executive stakeholders"
+    (job_dir / "resume.json").write_text(json.dumps(rj))
+    checks = {c["check"]: c for c in _qa(temp_root, home, job_dir)[1]["checks"]}
+    assert not checks["bullet_fidelity"]["ok"] and "acme.1" in checks["bullet_fidelity"]["detail"]

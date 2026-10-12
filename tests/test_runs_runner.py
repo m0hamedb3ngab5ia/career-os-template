@@ -524,6 +524,22 @@ def test_batch_apply_skips_tier_b_needs_review_and_staged_jobs_even_with_auto_su
     assert [r["job_id"] for r in ranked] == [ready]
 
 
+def test_apply_refuses_a_resume_with_an_unsourced_ai_bullet_even_when_prepare_says_qa_pass(settings, store):
+    """DEC-018 amendment: the apply gate re-runs bullet_fidelity in code instead of trusting prepare.json."""
+    def resume(jid, bullet):
+        (store.job_dir(jid) / "resume.json").write_text(json.dumps({"schema_version": 1, "experience": [
+            {"id": "experience-1", "source": "acme", "bullets": [{"id": "experience-1.b1", **bullet}]}]}))
+    bad, user, legacy = add_job(store, 1), add_job(store, 2), add_job(store, 3)
+    for j in (bad, user, legacy):
+        _prepared(store, j)
+    resume(bad, {"text": "Invented a claim"})
+    resume(user, {"text": "Mentored new team members", "origin": "user"})
+    ranked, _ = select_candidates(settings, "apply", cfg_of(settings), NOW)
+    assert sorted(r["job_id"] for r in ranked) == sorted([user, legacy])
+    ranked, excluded = select_candidates(settings, "apply", cfg_of(settings), NOW, job_ids=[bad])
+    assert ranked == [] and "qa not passed" in str(excluded)
+
+
 @pytest.mark.parametrize("status", ["queued", "needs_review"])
 def test_apply_run_stages_tier_a_with_auto_submit_0_even_when_config_allows(settings, store, status):
     """Tier A is never refused and never auto-submitted: the attempt runs assisted (CAREEROS_AUTO_SUBMIT=0,

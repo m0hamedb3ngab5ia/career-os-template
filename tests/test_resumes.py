@@ -136,3 +136,70 @@ def test_old_meta_without_labels_gets_defaults(tmp_path: Path):
         v.pop("label", None)
     (d / "meta.json").write_text(json.dumps(raw))
     assert resumes.get(tmp_path, m["rid"])["versions"][0]["label"] == "Original"
+
+
+# --- DEC-018: resume.json schema v1, migrated on read (TASK-027) ------------------------------------------
+
+OLD_RESUME = {
+    "identity": {"name": "Alex Example"},
+    "sections": [{"type": "experience", "order": 1}, {"type": "projects", "order": 2},
+                 {"type": "education", "order": 3}, {"type": "skills", "order": 4}],
+    "experience": [{"id": "acme", "company": "Acme", "bullets": [{"id": "acme.1", "text": "a"},
+                                                                {"id": "acme.2", "text": "b"}]}],
+    "projects": [{"id": "widgetizer", "name": "W", "bullets": [{"id": "widgetizer.1", "text": "c"}]}],
+    "education": [{"id": "state_u", "school": "S"}],
+    "skills": {"programming": ["Python"]},
+}
+
+
+def test_migrate_old_file_to_v1_moves_master_ids_to_source():
+    v1 = resumes.migrate(OLD_RESUME)
+    assert v1["schema_version"] == resumes.SCHEMA_VERSION == 1
+    exp = v1["experience"][0]
+    assert exp["source"] == "acme" and exp["id"] == "experience-1"
+    assert [(b["id"], b["source"]) for b in exp["bullets"]] == [("experience-1.b1", "acme.1"), ("experience-1.b2", "acme.2")]
+    assert v1["projects"][0]["bullets"][0] == {"id": "projects-1.b1", "source": "widgetizer.1", "text": "c"}
+    assert v1["education"][0]["source"] == "state_u" and v1["education"][0]["id"] == "education-1"
+    assert [s["id"] for s in v1["sections"]] == ["sec-experience", "sec-projects", "sec-education", "sec-skills"]
+    assert OLD_RESUME["experience"][0]["id"] == "acme"  # input not mutated
+
+
+def test_migrate_ids_stable_across_reads(tmp_path: Path):
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(OLD_RESUME))
+    first = resumes.read_resume_json(p)
+    assert first == resumes.read_resume_json(p) == resumes.migrate(first)  # v1 is a fixed point
+    assert json.loads(p.read_text()) == OLD_RESUME  # migration is in memory only
+
+
+def test_migrate_v1_keeps_ids_and_fills_missing_without_collision():
+    doc = {"schema_version": 1, "experience": [
+        {"id": "experience-2", "bullets": [{"id": "experience-2.b2", "text": "kept"}, {"text": "hand-written"}]},
+        {"bullets": [{"text": "b"}]}]}
+    v1 = resumes.migrate(doc)
+    e1, e2 = v1["experience"]
+    assert e1["id"] == "experience-2" and "source" not in e1
+    assert [b["id"] for b in e1["bullets"]] == ["experience-2.b2", "experience-2.b2-2"]  # positional .b2 clashed
+    assert e2["id"] == "experience-2-2" and e2["bullets"][0]["id"] == "experience-2-2.b1"
+    assert "source" not in e1["bullets"][1]
+    assert resumes.migrate(v1) == v1
+
+
+def test_migrate_v1_reassigns_duplicate_ids():
+    doc = {"schema_version": 1, "experience": [
+        {"id": "x", "bullets": [{"id": "d", "text": "a"}, {"id": "d", "text": "b"}]}, {"id": "x"}]}
+    v1 = resumes.migrate(doc)
+    assert [e["id"] for e in v1["experience"]] == ["x", "experience-2"]
+    assert [b["id"] for b in v1["experience"][0]["bullets"]] == ["d", "x.b2"]
+    assert resumes.migrate(v1) == v1
+
+
+@pytest.mark.parametrize("v", [True, "1", 1.0])
+def test_migrate_rejects_non_int_schema_version(v):
+    with pytest.raises(ValueError, match="schema_version"):
+        resumes.migrate({"schema_version": v})
+
+
+def test_migrate_rejects_unknown_schema_version():
+    with pytest.raises(ValueError, match="schema_version"):
+        resumes.migrate({"schema_version": 99})
