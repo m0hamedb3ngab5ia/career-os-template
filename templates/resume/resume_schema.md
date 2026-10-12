@@ -12,8 +12,11 @@ One schema for tailored, master and draft résumés. Current: `"schema_version":
   résumé, unique within it. It never changes once written, so annotations and history can target it.
 - Optional `source` on entries and bullets = the `profile/master.yaml` entry/bullet id the content came from.
   Uploaded or hand-written bullets have no `source`.
+- Optional bullet `origin: "user"` marks a user-written bullet (DEC-018 amendment). Only the user sets it; the AI
+  tailor path strips it. It is metadata only: render output is unchanged.
 - QA `bullet_fidelity` and the consistency checks run only on bullets with `source` (job-dir résumés, i.e.
-  tailored ones); v1 bullets without `source` are counted in the detail, not traced. `entry_headers` still needs
+  tailored ones). In v1 a `source` must be a master.yaml bullet; a bullet without `source` passes only with
+  `origin: "user"` and is listed as "user-written, unverified"; any other unsourced bullet is a hard fail. `entry_headers` still needs
   every entry to name a profile entry: a v1 entry without `source` fails it.
 - Old files (no `schema_version`) are migrated on read, in memory only (`careeros.resumes.read_resume_json` /
   `migrate`): each `id` was a master.yaml id, so it moves to `source`, and ids are assigned from position:
@@ -116,6 +119,7 @@ Rules:
 | `schema_version` | v1 files | Absent = old file, migrated on read (see "Schema version"). |
 | `*.id` | v1 files | Résumé-local, stable, unique. |
 | `*.source` | no | master.yaml entry/bullet id; traced by QA. |
+| `bullets[].origin` | no | `"user"` = user-written, unverified; the only way a v1 bullet may omit `source`. Never set by the AI. |
 | `identity.*` | name, email, phone, location | `website`, `linkedin`, `github` may be null; the header omits them. |
 | `summary` | no | 2 to 3 sentences from `summary_variants`, or null. |
 | `sections` | yes | Unknown `type` values are ignored. Missing sections are skipped. |
