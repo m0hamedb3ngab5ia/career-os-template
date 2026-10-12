@@ -749,6 +749,19 @@ def rendered(root: Path, rid: str, n: int, kind: str) -> str:
         return (_render_into(src, Path(t)) / f"resume.{kind}").read_text(encoding="utf-8")
 
 
+def rendered_draft_txt(root: Path, rid: str) -> str:
+    """resume.txt rendered on demand from the current draft (unpublished edits included); same renderer as `rendered`."""
+    import tempfile
+
+    doc = get_draft(root, rid)["resume"]
+    with tempfile.TemporaryDirectory() as t:
+        src = Path(t) / "draft.json"
+        out = Path(t) / "out"
+        out.mkdir()
+        src.write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
+        return (_render_into(src, out) / "resume.txt").read_text(encoding="utf-8")
+
+
 def render_pdf(root: Path, rid: str, n: int) -> bytes | None:
     """Latest version's PDF bytes, cached as cache/<hash(resume.json)>-<renderer_version>.pdf (DEC-020; older
     entries removed, disposable). Bytes, not a path: a concurrent eviction can't pull a file from under a caller.

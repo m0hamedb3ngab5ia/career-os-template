@@ -391,6 +391,13 @@ export interface paths {
      */
     post: operations["revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post"];
   };
+  "/api/profile/resumes/{rid}/draft/text": {
+    /**
+     * Get Draft Text
+     * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
+     */
+    get: operations["get_draft_text_api_profile_resumes__rid__draft_text_get"];
+  };
   "/api/profile/resumes/{rid}/feedback": {
     /** Get Feedback */
     get: operations["get_feedback_api_profile_resumes__rid__feedback_get"];
@@ -5384,6 +5391,31 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Draft"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Get Draft Text
+   * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
+   */
+  get_draft_text_api_profile_resumes__rid__draft_text_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": unknown;
         };
       };
       /** @description Validation Error */

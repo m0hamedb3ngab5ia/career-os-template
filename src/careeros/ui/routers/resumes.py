@@ -412,6 +412,13 @@ def get_draft(rid: str, c=Depends(ctx)) -> Draft:
         return Draft(**store.get_draft(c.settings.root, rid))
 
 
+@router.get("/profile/resumes/{rid}/draft/text")
+def get_draft_text(rid: str, c=Depends(ctx)) -> Response:
+    """The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020)."""
+    with _refusals():
+        return Response(store.rendered_draft_txt(c.settings.root, rid), media_type="text/plain; charset=utf-8")
+
+
 @router.put("/profile/resumes/{rid}/draft")
 def put_draft(rid: str, body: DraftIn, c=Depends(ctx)) -> Draft:
     """Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422."""
