@@ -200,6 +200,15 @@ def test_strip_ai_origin_drops_the_mark_when_the_ai_edited_the_text(tmp_path, st
     assert "origin" not in json.loads((jd / "resume.json").read_text())["experience"][0]["bullets"][0]
 
 
+def test_strip_ai_origin_drops_the_mark_when_the_ai_moved_the_bullet_to_another_entry(tmp_path, store):
+    match, jd, root = _base_and_job(tmp_path, store, "Mentored new team members")
+    doc = json.loads((jd / "resume.json").read_text())
+    doc["experience"][0]["id"] = "experience-2"  # same bullet id + text, different parent entry
+    (jd / "resume.json").write_text(json.dumps(doc))
+    assert match.strip_ai_origin(root, jd) == ["experience-1.b1"]
+    assert "origin" not in json.loads((jd / "resume.json").read_text())["experience"][0]["bullets"][0]
+
+
 def test_failed_job_is_retried_once_then_becomes_an_action_item(settings, store):
     jid = add_job(store, 1, status="found", decision=None)
     first = batch(settings, "score", Fake(settings, default="score_garbage"))

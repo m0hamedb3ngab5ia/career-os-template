@@ -338,10 +338,10 @@ def read_resume_json(path: Path) -> dict[str, Any]:
     return migrate(json.loads(Path(path).read_text(encoding="utf-8")))
 
 
-def bullets(doc: dict[str, Any]) -> list[dict[str, Any]]:
-    """Every bullet dict of a résumé.json's entry sections."""
-    return [b for sec in ENTRY_SECTIONS for e in doc.get(sec) or [] if isinstance(e, dict)
-            for b in e.get("bullets") or [] if isinstance(b, dict)]
+def placed_bullets(doc: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:
+    """(key, bullet) per bullet; key = JSON of (section, entry id, bullet id, text), since ids/text may be any JSON."""
+    return [(json.dumps([sec, e.get("id"), b.get("id"), b.get("text")], sort_keys=True), b) for sec in ENTRY_SECTIONS
+            for e in doc.get(sec) or [] if isinstance(e, dict) for b in e.get("bullets") or [] if isinstance(b, dict)]
 
 
 def _check_origin(doc: dict[str, Any], prev: dict[str, Any] | None, author: str) -> None:
@@ -350,14 +350,10 @@ def _check_origin(doc: dict[str, Any], prev: dict[str, Any] | None, author: str)
     if author not in ("user", "ai"):
         raise ValueError(f"author must be user or ai, not {author!r}")
 
-    def placed(d: dict[str, Any]) -> list[tuple[str, dict[str, Any]]]:  # JSON key: ids/text may be any JSON
-        return [(json.dumps([sec, e.get("id"), b.get("id"), b.get("text")], sort_keys=True), b) for sec in ENTRY_SECTIONS
-                for e in d.get(sec) or [] if isinstance(e, dict) for b in e.get("bullets") or [] if isinstance(b, dict)]
-
-    marked = [(k, b) for k, b in placed(doc) if "origin" in b]
+    marked = [(k, b) for k, b in placed_bullets(doc) if "origin" in b]
     if any(b["origin"] != "user" for _, b in marked):
         raise ValueError('bullet origin may only be "user"')
-    kept = {k for k, b in placed(prev or {}) if b.get("origin") == "user"}
+    kept = {k for k, b in placed_bullets(prev or {}) if b.get("origin") == "user"}
     if author == "ai" and any(k not in kept for k, _ in marked):
         raise ValueError('an AI write may not set bullet origin "user"')
 
