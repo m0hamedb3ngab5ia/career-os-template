@@ -72,10 +72,31 @@ Links: REQ-094 REQ-095 REQ-096 REQ-097 REQ-099 · Area: frontend · After: TASK-
 Links: REQ-105 UC-008 · Area: full · After: TASK-014 · Done when: `build_plan` reads the job's `answers.json` drafts for freetext fields with no saved answer (never legal/salary/EEO), source `ai_draft`, `reviewed: false`; `plan_problems` blocks fill on unreviewed drafts; approve endpoint + edit marks reviewed; carry_over keeps review state; Fill preview shows "AI draft" badge + Approve; save-to-profile off for drafts; CLI/scheduled one Action Item "review N drafts"; unit + integration tests (E2E-008-01 extended); before MVP
 
 ### TASK-024 Résumé hand editor + applied-edit diff/undo UI
-Follow-up from TASK-022 review: Profile › Résumés hand editor with Save (`PUT /api/profile/resumes/{rid}/text`, REQ-097) and, after Apply, the new version's diff with undo = open the previous version (REQ-095). Status: todo.
+Follow-up from TASK-022 review: Profile › Résumés hand editor with Save (`PUT /api/profile/resumes/{rid}/text`, REQ-097) and, after Apply, the new version's diff with undo = open the previous version (REQ-095). Status: superseded by TASK-027..033 (résumé workspace, DEC-012..019).
 
 ### TASK-025 Check-a-job dialog: Prepare application + Why this score
 Links: REQ-114 REQ-116 UC-010 FLOW-003 · Area: full · After: TASK-015 · Done when: result shows primary "Prepare application" (ticks job + starts prepare run) and secondary "Cancel" (job kept, unticked); "Done" / "Keep job, no résumé" / separate "Tailor from master" removed; below-threshold keep/discard kept; `GET /api/jobs/{id}/matches` exposes per-résumé matched + missing keywords (required vs preferred, from match.py `hit`); match table "Why this score" toggle; unit + API integration + vitest; E2E-010-01 updated. Status: done
 
 ### TASK-026 Action Items to data/action_items.json
 Links: REQ-123 REQ-052 REQ-073 · Area: backend · Done when: store in `data/action_items.json` (atomic write like status.json), CLI/UI/API read it, one-time import from the xlsx sheet, xlsx Action Items sheet written json → xlsx only on sync; unit + integration tests. Status: todo (not built)
+
+### TASK-027 Résumé schema v1 + migrate on read
+Links: REQ-124 · Area: backend · Done when: one schema = `data/jobs/<id>/resume.json` shape + `schema_version` + résumé-local ids + optional `source` (master.yaml id) (DEC-018); `resume_store` reads old files and migrates in memory; render.py/qa accept it; QA bullet_fidelity only on `source` bullets; unit tests (migrate, ids stable) + render integration test
+
+### TASK-028 Draft API: autosave + stale-write 409
+Links: REQ-126 UC-002 · Area: backend · After: TASK-027 · Done when: `profile/resumes/<rid>/draft.json` with `rev`; `GET/PUT /api/profile/resumes/{rid}/draft` (PUT with old `rev` → 409); atomic write; "Draft" status = hash(draft) ≠ hash(latest) (DEC-014); stale temp-dir cleanup on startup; unit + API integration tests
+
+### TASK-029 Change log + revert
+Links: REQ-126 UC-002 · Area: backend · After: TASK-028 · Done when: every draft write appends `draft.changes.jsonl` `{id, at, author, target_id, op, before, after, reverts?}`; `POST .../draft/changes/{id}/revert` = inverse change, refused (409 with both texts) when target no longer holds `after` (DEC-015); E2E-002-06 green
+
+### TASK-030 Annotations: suggestions, comments, replies, accept
+Links: REQ-095 REQ-126 UC-002 · Area: backend · After: TASK-029 · Done when: `annotations.json` replaces review.json items (migrate); statuses open/accepted/rejected/outdated; accept runs the apply-edit base check + zero-fabrication guard, then a draft change author=ai; reply with "Apply comment" queues an AI re-draft run, AI only proposes/replies (DEC-016); `review-resume`/`edit-resume` skills write annotations; unit + integration tests; E2E-002-05 green
+
+### TASK-031 Publish: one version per Next/Done
+Links: REQ-126 UC-002 · Area: backend · After: TASK-030 · Done when: `POST .../publish` (idempotency key) builds `v<n+1>` in a temp dir → rename → meta.json; unchanged hash = no-op; text.txt/ats.json derived; deterministic .tex/.txt, PDF with SOURCE_DATE_EPOCH; annotations carried or `outdated`; per-change authors in meta (DEC-017); crash-between-steps integration test; E2E-002-07 green
+
+### TASK-032 Import run + verbatim guard
+Links: REQ-124 UC-001 · Area: backend · After: TASK-027 · Done when: every upload runs extract-master as the single import (DEC-019) → v2 structured; guard: every bullet appears whitespace-normalised in v1 text.txt; fail → `import.json` failed + Action Item, v1 kept, Retry endpoint; "Not carried over" list + Restore (adds to draft); E2E-001-03/04 green
+
+### TASK-033 Workspace UI `/resumes/<rid>`
+Links: REQ-125 REQ-126 UC-001 UC-002 · Area: frontend · After: TASK-028..032 · Done when: page per `mockups/resume-workspace.html`: HTML render with inline suggestions, aligned margin cards, reply threads, in-place edit of structured fields, History with Revert, ⌘Z client undo, autosave (500–800 ms debounce, flush on navigation, pagehide sendBeacon), "Saving…/All changes saved", Next/Done → publish; Profile › Résumés row status Reviewing/Draft/Ready/Failed; UI_UX_PRINCIPLES applied; vitest + UI bundle rebuilt; E2E-002-01 green
