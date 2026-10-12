@@ -177,3 +177,10 @@ def test_main_missing_or_unsupported_file_clean_exit(tmp_path, capsys):
     assert main([str(tmp_path / "nope.pdf")]) == 2
     assert main([str(tmp_path / "r.rtf")]) == 2
     assert "Traceback" not in capsys.readouterr().err
+
+
+def test_pdf_kerned_words_and_ligatures_clean():
+    text = extract_text(Path(__file__).parent / "fixtures" / "split_words.pdf")
+    assert "Skills: AWS, Python, Docker" in text
+    assert "Tools: Tableau, Terraform" in text
+    assert "Built offline workflows for financial staff." in text

@@ -25,13 +25,36 @@ DOCX_XML_CAP = 20 * 1024 * 1024  # uncompressed bytes per part; zip-bomb guard (
 EMAIL_RE = re.compile(r"[\w.+-]+@[\w-]+(?:\.[\w-]+)+")
 PHONE_RE = re.compile(r"(?<!\d)(?:\+\d{1,3}[\s.-]?)?\(?\d{3}\)?[\s.-]?\d{3}[\s.-]?\d{4}(?!\d)")
 LINK_RE = re.compile(r"(?:https?://|www\.|(?:linkedin|github)\.com/)[^\s|,;]+", re.I)
+KERN_RE = re.compile(rb"(?<=[>)])\s*\+?\d*\.?\d+\s*(?=[<(])")  # positive kern between TJ strings
+LIGATURES = str.maketrans({"\ufb00": "ff", "\ufb01": "fi", "\ufb02": "fl", "\ufb03": "ffi", "\ufb04": "ffl",
+                           "\ufb05": "st", "\ufb06": "st"})
+
+
+def pdf_page_text(page: Any) -> str:
+    """Text of one pypdf page; every PDF text read goes through here.
+
+    pypdf turns any TJ kern >= a space width into a space, so tight kerns (positive: A-W, T-a) split
+    words ("A WS", "T ableau"); only negative kerns open a gap, so drop the positive ones first.
+    Ligature glyphs (U+FB00-FB06) are expanded to letters.
+    """
+    from pypdf.generic import DecodedStreamObject, NameObject
+
+    contents = page.get_contents()
+    if contents is not None:
+        # ponytail: byte regex, not a content parser (pypdf's ContentStream re-encodes Identity-H strings
+        # wrongly); misses Form XObjects; strips a number between unescaped parens in a literal string, e.g. ((1) 2 (3)).
+        # Parse properly if those bite.
+        fixed = DecodedStreamObject()
+        fixed.set_data(KERN_RE.sub(b"", contents.get_data()))
+        page[NameObject("/Contents")] = fixed
+    return (page.extract_text() or "").translate(LIGATURES)
 
 
 def _pdf(path: Path) -> tuple[str, list[str]]:
     from pypdf import PdfReader
 
     reader = PdfReader(str(path))
-    text = "\n".join(p.extract_text() or "" for p in reader.pages)
+    text = "\n".join(pdf_page_text(p) for p in reader.pages)
     images = False
     for p in reader.pages:
         try:
