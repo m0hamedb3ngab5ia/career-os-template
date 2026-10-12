@@ -923,7 +923,7 @@ tasks:
     use_cases:
     - UC-008
   TASK-024:
-    status: todo
+    status: deprecated
     requirements:
     - REQ-095
     - REQ-097
@@ -942,3 +942,46 @@ tasks:
     - REQ-123
     - REQ-052
     - REQ-073
+  TASK-027:
+    status: todo
+    requirements:
+    - REQ-124
+  TASK-028:
+    status: todo
+    requirements:
+    - REQ-126
+    use_cases:
+    - UC-002
+  TASK-029:
+    status: todo
+    requirements:
+    - REQ-126
+    use_cases:
+    - UC-002
+  TASK-030:
+    status: todo
+    requirements:
+    - REQ-095
+    - REQ-126
+    use_cases:
+    - UC-002
+  TASK-031:
+    status: todo
+    requirements:
+    - REQ-126
+    use_cases:
+    - UC-002
+  TASK-032:
+    status: todo
+    requirements:
+    - REQ-124
+    use_cases:
+    - UC-001
+  TASK-033:
+    status: todo
+    requirements:
+    - REQ-125
+    - REQ-126
+    use_cases:
+    - UC-001
+    - UC-002
