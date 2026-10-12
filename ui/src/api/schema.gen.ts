@@ -340,7 +340,8 @@ export interface paths {
   "/api/profile/resumes/{rid}/annotations": {
     /**
      * List Annotations
-     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
+     * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
      */
     get: operations["list_annotations_api_profile_resumes__rid__annotations_get"];
     /** Create Annotation */
@@ -788,6 +789,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Run */
+      run?: string | null;
       /**
        * Status
        * @enum {string}
@@ -2488,6 +2491,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Run */
+      run?: string | null;
       /** Run Id */
       run_id?: string | null;
       /**
@@ -2584,6 +2589,11 @@ export interface components {
       name: string;
       /** Rid */
       rid: string;
+      /**
+       * Status
+       * @enum {string}
+       */
+      status: "reviewing" | "draft" | "ready" | "failed";
       /**
        * Type
        * @enum {string}
@@ -5142,10 +5152,14 @@ export interface operations {
   };
   /**
    * List Annotations
-   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`.
+   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
+   * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
    */
   list_annotations_api_profile_resumes__rid__annotations_get: {
     parameters: {
+      query?: {
+        run?: string | null;
+      };
       path: {
         rid: string;
       };

@@ -977,6 +977,8 @@ def cmd_resume_feedback(args: argparse.Namespace) -> int:
 def cmd_resume_annotate(args: argparse.Namespace) -> int:
     """review-resume / edit-resume (DEC-016, TASK-030): read the draft + annotations, write AI suggestions, comments
     and replies (author=ai). The AI only proposes: accepting one is the user's action in the UI."""
+    import os
+
     from careeros import annotations as ann
     from careeros import resumes as store
 
@@ -988,9 +990,9 @@ def cmd_resume_annotate(args: argparse.Namespace) -> int:
             if args.kind == "comment" and args.proposed is not None:
                 raise ValueError("a comment takes --text, not --proposed")
             out = ann.create(root, args.rid, kind=args.kind, target_id=args.target, text=args.text or "",
-                             proposed=args.proposed, author="ai")
+                             proposed=args.proposed, author="ai", run=os.environ.get("CAREEROS_RUN_ID"))
         else:
-            out = ann.reply(root, args.rid, args.aid, args.text, author="ai")
+            out = ann.reply(root, args.rid, args.aid, args.text, author="ai", run=os.environ.get("CAREEROS_RUN_ID"))
     except (OSError, ValueError, LookupError, store.Refused) as e:
         print(f"error: {e}", file=sys.stderr)
         return 1

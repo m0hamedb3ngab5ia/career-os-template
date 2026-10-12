@@ -246,3 +246,37 @@ def test_completed_runs_without_new_ai_annotations_fail(tmp_path: Path):  # a "d
 
     rec = _run(tmp_path, "resume_edit", rid, u["id"], ai_reply_only)
     assert rec["stop_reason"] == "completed"
+
+
+def test_run_stamp_and_filter(tmp_path: Path):  # TASK-033b: Apply-comment polling by run id
+    rid = _resume(tmp_path)
+    u = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="shorter")
+    s = ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="Eng", author="ai", run="r1")
+    assert s["run"] == "r1" and "run" not in u
+    ann.reply(tmp_path, rid, u["id"], "on it", author="ai", run="r2")
+    assert [i["id"] for i in ann.list_items(tmp_path, rid, run="r1")] == [s["id"]]
+    assert [i["id"] for i in ann.list_items(tmp_path, rid, run="r2")] == [u["id"]]
+    assert ann.list_items(tmp_path, rid, run="r9") == []
+    assert (ann.run_count(tmp_path, rid, "r1"), ann.run_count(tmp_path, rid, "r2"),
+            ann.run_count(tmp_path, rid, "r9")) == (1, 1, 0)
+
+
+def test_step_counts_only_this_runs_annotations(tmp_path: Path):  # TASK-033b: another run's writes don't count
+    from careeros.ui.services.step import run_resume_skill
+    rid = _resume(tmp_path)
+    u = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="shorter")
+
+    def other_run_writes(*a, **kw):  # a concurrent run on the same résumé proposes; this run wrote nothing
+        ann.create(tmp_path, rid, kind="comment", target_id="summary", text="x", author="ai", run="other")
+        return {"id": "mine", "stop_reason": "completed"}
+
+    S = type("S", (), {"root": tmp_path})()
+    rec = run_resume_skill(S, "resume_edit", rid, u["id"], run_skill=other_run_writes, run_id="mine")
+    assert rec["stop_reason"] == "failed" and "no annotations" in rec["detail"]
+
+    def this_run_replies(*a, **kw):
+        ann.reply(tmp_path, rid, u["id"], "kept", author="ai", run="mine2")
+        return {"id": "mine2", "stop_reason": "completed"}
+
+    rec = run_resume_skill(S, "resume_edit", rid, u["id"], run_skill=this_run_replies, run_id="mine2")
+    assert rec["stop_reason"] == "completed"
