@@ -90,7 +90,6 @@ function Workspace() {
     },
   });
 
-  const locked = accepting || done.isPending;  // no edit may land between the flush and the publish (it would 409 later and be lost) or during an accept
   const retake = useMutation({
     mutationFn: async (how: "reload" | "overwrite") => {
       if (how === "overwrite") { await save.overwrite(); return; }
@@ -99,6 +98,7 @@ function Workspace() {
       key.current = null;
     },
   });
+  const locked = accepting || done.isPending || retake.isPending;  // no edit may land between the flush and the publish (it would 409 later and be lost) or during an accept
 
   const back = <Link to="/profile#resumes">Back to Profile</Link>;
   const title = meta.data?.name ?? "Résumé";
@@ -237,7 +237,8 @@ function Margin({ rid, cards, active, setActive, onAccepted, flush, lock, refres
 function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "active"> & { a: Annotation; on: boolean }) {
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
-  const [failed, setFailed] = useState("");  // reply text whose send failed: the reply may exist server-side, so no resend until edited
+  const [failed, setFailed] = useState("");
+  const sent = useRef("");  // the text actually submitted: the input may change while the send is pending  // reply text whose send failed: the reply may exist server-side, so no resend until edited
   const act = useMutation({
     mutationFn: async (what: "accept" | "reject" | "reply") => {
       if (what === "accept") {
@@ -253,12 +254,12 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
         setApply(false);
       }
     },
-    onError: (_e, what) => { if (what === "reply") setFailed(text.trim()); },
+    onError: (_e, what) => { if (what === "reply") setFailed(sent.current); },
     onSettled: refresh,
   });
   const submit = (e: FormEvent) => {
     e.preventDefault();
-    if (text.trim() && text.trim() !== failed && !act.isPending) act.mutate("reply");  // Enter bypasses the disabled button
+    if (text.trim() && text.trim() !== failed && !act.isPending) { sent.current = text.trim(); act.mutate("reply"); }  // Enter bypasses the disabled button
   };
   const who = a.author === "ai" ? "Claude" : "You";
   const tid = `card-${a.id}`;
