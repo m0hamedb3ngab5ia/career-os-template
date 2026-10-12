@@ -120,7 +120,7 @@ def test_guard_bullet_is_whole_v1_lines(tmp_path: Path, v1: str, bullet: str):  
         imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Acme", "bullets": [{"text": bullet}]}]})
 
 
-def test_guard_field_within_one_line_case_insensitive(tmp_path: Path):
+def test_guard_field_word_bounded_case_insensitive(tmp_path: Path):
     root, rid = _v1(tmp_path)
     with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):  # fields may cross a header (review-3)
         imp.save(root, rid, {"schema_version": 1, "experience": [{"company": "Doe Experienced"}]})
@@ -226,6 +226,15 @@ def test_guard_field_wrapped_onto_header_words_passes(tmp_path: Path):  # review
     root, rid = _v1(tmp_path, "Pat Doe\nSummary\nEngineer with ten years of professional\nexperience\n")
     assert imp.save(root, rid, {"schema_version": 1, "summary": "Engineer with ten years of professional experience"}
                     )["state"] == "done"
+
+
+def test_guard_field_across_header_still_verbatim(tmp_path: Path):
+    root, rid = _v1(tmp_path, "Pat Doe\nSummary\nEngineer with ten years of professional\nexperience\n")
+    with pytest.raises(imp.ImportRefused, match="not in the uploaded text"):
+        imp.save(root, rid, {"schema_version": 1, "summary": "Engineer with ten years of professional Invented experience"})
+    # accepted looseness: adjacent lines join in order, so "Doe Summary" passes; no new words can enter
+    imp.set_state(root, rid, "running")
+    assert imp.save(root, rid, {"schema_version": 1, "summary": "Doe Summary"})["state"] == "done"
 
 
 def test_run_import_guard_refusal_fails_with_guard_reason(tmp_path: Path, monkeypatch):  # review-3 NIT: end to end
