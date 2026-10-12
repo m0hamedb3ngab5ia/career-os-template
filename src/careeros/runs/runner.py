@@ -390,10 +390,10 @@ class _Loop:
             st = self.store.get_status(jid)
             if st != result.get("status"):
                 outcome, detail = "invalid_result", f"RESULT status {result.get('status')} but status.json says {st}"
-        if outcome == "ok" and self.kind == "prepare":  # DEC-018 amendment: the AI never marks bullets user-written
-            from careeros import match
+        if self.kind == "prepare" and (self.store.job_dir(jid) / "resume.json").exists():
+            from careeros import match  # DEC-018 amendment: the AI never marks bullets user-written, on any outcome
             stripped = match.strip_ai_origin(self.s, self.store.job_dir(jid))
-            if stripped:
+            if stripped and outcome == "ok":
                 outcome, detail = "invalid_result", f"AI résumé marked bullets origin (user-only; stripped): {stripped}"
         if outcome == "ok" and self.kind == "prepare" and result and result.get("qa_pass"):
             from careeros import check, match

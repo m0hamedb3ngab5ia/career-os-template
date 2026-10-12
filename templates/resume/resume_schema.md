@@ -14,7 +14,7 @@ One schema for tailored, master and draft résumés. Current: `"schema_version":
   Uploaded or hand-written bullets have no `source`.
 - Optional bullet `origin: "user"` marks a user-written bullet (DEC-018 amendment). Only the user sets it; the AI
   tailor path strips it. It is metadata only: render output is unchanged.
-- QA `bullet_fidelity` and the consistency checks run only on bullets with `source` (job-dir résumés, i.e.
+- QA `bullet_fidelity` and the consistency checks are traced on sourced bullets (job-dir résumés, i.e.
   tailored ones). In v1 a `source` must be a master.yaml bullet; a bullet without `source` passes only with
   `origin: "user"` and is listed as "user-written, unverified"; any other unsourced bullet is a hard fail. `entry_headers` still needs
   every entry to name a profile entry: a v1 entry without `source` fails it.
