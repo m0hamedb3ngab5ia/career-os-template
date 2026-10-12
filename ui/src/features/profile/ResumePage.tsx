@@ -35,13 +35,16 @@ export function ResumePage() {
                     {v.n === latest ? <> · {r.type === "master" ? "Used for tailored résumés" : "Current version"}</> : null}
                   </span>
                   <span className={styles.muted}>{new Date(v.at).toLocaleDateString()}</span>
-                  <a href={`/api/profile/resumes/${encodeURIComponent(rid)}/file?v=${v.n}&download=true`} download
-                    aria-label={`Download ${name}`}>Download</a>
+                  {/* Published versions keep only JSON; only the latest has a PDF (DEC-020). */}
+                  {v.source === "publish" && v.n !== latest ? null : (
+                    <a href={`/api/profile/resumes/${encodeURIComponent(rid)}/file?v=${v.n}&download=true`} download
+                      aria-label={`Download ${name}`}>Download</a>
+                  )}
                 </li>
               );
             })}
           </ul>
-          {r.versions.length > 1 ? <p className={styles.muted}>Older versions are kept and can still be downloaded.</p> : null}
+          {r.versions.length > 1 ? <p className={styles.muted}>Older versions are kept. Uploaded files can still be downloaded.</p> : null}
         </section>
       </div>
     </Page>

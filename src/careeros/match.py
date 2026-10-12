@@ -141,7 +141,10 @@ def _link(settings: Any, job_dir: Path, rid: str, v: dict[str, Any]) -> str:
     if pdf:
         shutil.copyfile(pdf, job_dir / "resume.pdf")
     elif v.get("source") == "publish" and v["n"] == resumes.get(settings.root, rid)["versions"][-1]["n"]:
-        data = resumes.render_pdf(settings.root, rid, v["n"])  # JSON-only version (DEC-020): render on demand
+        try:
+            data = resumes.render_pdf(settings.root, rid, v["n"])  # JSON-only version (DEC-020): render on demand
+        except RuntimeError:  # render.CompileError: link without a PDF; prepare-job renders its own
+            data = None
         if data:
             (job_dir / "resume.pdf").write_bytes(data)
     return _sha(text)

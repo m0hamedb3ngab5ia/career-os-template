@@ -273,3 +273,15 @@ def test_latex_runs_with_fixed_source_date(tmp_path: Path, monkeypatch: pytest.M
     (tmp_path / "x.tex").write_text("x", encoding="utf-8")
     mod.compile_tex(tmp_path / "x.tex")
     assert seen["SOURCE_DATE_EPOCH"] == "0" and seen["FORCE_SOURCE_DATE"] == "1"
+
+
+def test_pdf_compile_error_is_refused(tmp_path: Path, monkeypatch: pytest.MonkeyPatch):
+    root, rid = _rid(tmp_path)
+    _edit(root, rid)
+    resumes.publish(root, rid, key="k1")
+    mod = resumes._renderer()
+    def broken(*a: object, **k: object) -> None:
+        raise mod.CompileError("bad tex")
+    monkeypatch.setattr(mod, "compile_tex", broken)
+    with pytest.raises(resumes.Refused, match="could not build"):
+        resumes.download_name(root, rid, 2)  # 409 with the cause, not a 500

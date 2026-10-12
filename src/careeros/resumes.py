@@ -107,7 +107,10 @@ def download_name(root: Path, rid: str, n: int) -> tuple[Path | bytes, str]:
     elif v and v["source"] == "publish":
         if n != meta["versions"][-1]["n"]:
             raise Refused(f"v{n} is an older published version: only the latest version has a PDF; open it in the editor")
-        pdf = render_pdf(root, rid, n)
+        try:
+            pdf = render_pdf(root, rid, n)
+        except RuntimeError as e:  # render.CompileError: LaTeX could not build this résumé
+            raise Refused(f"could not build the PDF: {e}") from e
         if pdf is None:
             raise Refused("no LaTeX engine installed (`brew install tectonic`), so no PDF")
         data, ext = pdf, ".pdf"
