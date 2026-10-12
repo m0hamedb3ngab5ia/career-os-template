@@ -185,8 +185,8 @@ def pick(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str
 
 def strip_ai_origin(settings: Any, job_dir: Path) -> list[str]:
     """DEC-018 amendment: only the user marks a bullet `origin: "user"`. After an AI prepare, drop `origin` from
-    every job résumé bullet the chosen base version (reuse / tweak) did not already carry with the same id and text,
-    so an AI claim reads as unsourced and fails bullet_fidelity. Returns the stripped bullet ids. Not tamper-proof:
+    every job résumé bullet the chosen base version (reuse / tweak) did not already carry under the same section
+    entry with the same id and text, so an AI claim reads as unsourced and fails bullet_fidelity. Returns the stripped bullet ids. Not tamper-proof:
     that needs the DEC-019 import guard and DEC-020 changes.jsonl."""
     p = job_dir / "resume.json"
     doc, c = _json(p), _json(job_dir / "resume_choice.json")
@@ -195,13 +195,12 @@ def strip_ai_origin(settings: Any, job_dir: Path) -> list[str]:
                 if c.get("action") in ("reuse", "tweak") else {})
     except LookupError:
         base = {}
-    kept = {(b.get("id"), b.get("text"), b.get("origin")) for b in resumes.bullets(base) if "origin" in b}
-    stripped = [str(b.get("id")) for b in resumes.bullets(doc) if "origin" in b
-                and (b.get("id"), b.get("text"), b.get("origin")) not in kept]
-    if stripped:
-        for b in resumes.bullets(doc):
-            if "origin" in b and (b.get("id"), b.get("text"), b.get("origin")) not in kept:
-                del b["origin"]
+    kept = {(k, json.dumps(b["origin"])) for k, b in resumes.placed_bullets(base) if "origin" in b}
+    drop = [b for k, b in resumes.placed_bullets(doc) if "origin" in b and (k, json.dumps(b["origin"])) not in kept]
+    stripped = [str(b.get("id")) for b in drop]
+    for b in drop:
+        del b["origin"]
+    if drop:
         p.write_text(json.dumps(doc, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     return stripped
 
