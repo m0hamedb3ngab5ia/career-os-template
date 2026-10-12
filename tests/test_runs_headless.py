@@ -57,6 +57,14 @@ def test_build_command_tells_the_model_the_shell_rule():
     assert cmd[-1] == "/extract-master r1"
 
 
+def test_build_command_skips_user_settings_so_user_hooks_cannot_eat_the_result():
+    # B3: a user-scope Stop hook forced an extra final message, so the result event lost its RESULT line
+    cmd = build_command(CFG, "/extract-master r1", kind="extract_master")
+    assert cmd[cmd.index("--setting-sources") + 1] == "project,local"
+    own = type(CFG)(**{**CFG.__dict__, "headless_cmd": [*CFG.headless_cmd, "--setting-sources", "project"]})
+    assert build_command(own, "x").count("--setting-sources") == 1  # a configured choice wins
+
+
 def test_build_command_keeps_a_configured_system_prompt():
     cfg = load_runs_config(type("S", (), {"pipeline": {"llm": {"headless_cmd": [
         "claude", "-p", "--append-system-prompt", "mine"]}}})())
@@ -289,3 +297,11 @@ def test_headless_cmd_allowed_tools_is_replaced_by_the_per_kind_list(flag):
     assert cmd[:2] == ["claude", "-p"] and "Read,WebFetch,Bash" not in cmd
     assert cmd.count("--allowedTools") == 1 and "--allowed-tools" not in cmd
     assert "WebFetch" not in cmd[cmd.index("--allowedTools") + 1].split(",")
+
+
+def test_extract_master_skill_result_line_is_the_json_the_runner_parses():
+    # B2: the skill printed `RESULT: proposed`, which parse_result_line can't read -> invalid_result
+    from pathlib import Path
+    text = (Path(__file__).parents[1] / ".claude/skills/extract-master/SKILL.md").read_text()
+    lines = [ln.strip("`") for ln in text.splitlines() if ln.startswith("`RESULT: {")]
+    assert lines and all(parse_result_line(ln) for ln in lines)

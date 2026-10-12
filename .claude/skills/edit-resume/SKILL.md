@@ -19,7 +19,7 @@ without a new version. Read JSON output yourself; write files with Write.
 ## 2a. State `redrafting` (the user commented)
 
 Re-draft the suggestion so it honors the latest comment (e.g. "keep the Python line"). Write nothing to the résumé.
-`.venv/bin/careeros resume redraft <rid> <item> "<new suggestion>"`. RESULT: `{"rid", "item", "action": "redrafted"}`.
+`.venv/bin/careeros resume redraft <rid> <item> "<new suggestion>"`. `RESULT: {"rid":"<rid>","item":"<item>","action":"redrafted"}`.
 
 ## 2b. State `open` (Apply)
 
@@ -33,6 +33,6 @@ Write the full new text to a temp file, then `.venv/bin/careeros resume apply-ed
 - Exit 1: the guard's reasons are printed and recorded on the item. Do not retry with the same claim; the item
   stays open for the user.
 
-RESULT: `{"rid", "item", "action": "applied" | "refused", "reason"?}`.
+`RESULT: {"rid":"<rid>","item":"<item>","action":"applied"}` (`action`: `applied` | `refused`; add `"reason":"..."` when refused).
 
-Any other state (`applied`, `dismissed`): do nothing, RESULT `{"error": "item is <state>"}`.
+Any other state (`applied`, `dismissed`): do nothing, `RESULT: {"error":"item is <state>"}`.
