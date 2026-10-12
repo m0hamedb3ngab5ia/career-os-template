@@ -182,3 +182,13 @@ def test_truncated_log_line_is_skipped_and_next_append_starts_a_new_line(tmp_pat
     d["summary"] = "S2"
     resumes.put_draft(tmp_path, rid, d, rev=1, author="user")
     assert [c["target_id"] for c in resumes.changes(tmp_path, rid)] == ["mine", "summary"]
+
+
+def test_log_line_truncated_mid_utf8_char_is_skipped(tmp_path: Path):
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "mine", "Mine", origin="user")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="user")
+    p = tmp_path / "profile/resumes" / rid / "draft.changes.jsonl"
+    p.write_bytes(p.read_bytes() + '{"after": "café'.encode()[:-1])
+    assert resumes.user_texts(tmp_path, rid) == {"Mine"} and len(resumes.changes(tmp_path, rid)) == 1

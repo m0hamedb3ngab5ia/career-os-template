@@ -421,7 +421,7 @@ def _commit(d: Path, prev: dict[str, Any], doc: dict[str, Any], latest: dict[str
              for k, c in enumerate(_diff(old or {}, doc), 1)]
     if lines:
         log = d / "draft.changes.jsonl"
-        torn = log.is_file() and log.stat().st_size and not log.read_bytes().endswith(b"\n")
+        torn = log.is_file() and log.stat().st_size and _last_byte(log) != b"\n"
         with open(log, "a", encoding="utf-8") as f:
             f.write("\n" if torn else "")  # a crash-truncated last line stays its own (skipped) line
             f.writelines(json.dumps(c, ensure_ascii=False) + "\n" for c in lines)
@@ -508,10 +508,16 @@ def _text(v: Any) -> Any:
     return v.get("text", v) if isinstance(v, dict) else v
 
 
+def _last_byte(p: Path) -> bytes:
+    with open(p, "rb") as f:
+        f.seek(-1, 2)
+        return f.read(1)
+
+
 def _read_log(p: Path) -> list[dict[str, Any]]:
     """Parsed log lines; an unparsable (e.g. crash-truncated) line is skipped, which only loses provenance (fails closed)."""
     out = []
-    for line in p.read_text(encoding="utf-8").splitlines() if p.is_file() else []:
+    for line in p.read_text(encoding="utf-8", errors="replace").splitlines() if p.is_file() else []:
         try:
             c = json.loads(line)
         except ValueError:
