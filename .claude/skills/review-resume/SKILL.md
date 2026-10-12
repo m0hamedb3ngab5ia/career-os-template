@@ -37,4 +37,6 @@ One call per annotation:
 `.venv/bin/careeros resume annotate <rid> comment --text "<issue and fix>" [--target <id>]`.
 Exit 1 → read the error (unknown target, empty text), fix it and retry once.
 
+Nothing to fix: still save one comment (`--text "No issues found"`); a review with zero annotations counts as failed.
+
 Print `RESULT: {"rid": "<rid>", "items": <count>}` (or `{"error": "<why>"}` if the résumé is empty/unreadable).

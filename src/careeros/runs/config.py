@@ -51,7 +51,8 @@ KIND_TOOLS: dict[str, list[str]] = {"apply": ["mcp__claude-in-chrome__*"], "prep
 # Kinds whose skill needs less than llm.allowed_tools get exactly this list instead (samples and résumés can carry
 # third-party text, so no python and no writes outside what the skill produces).
 ANNOTATION_TOOLS = ["Read", "Bash(.venv/bin/careeros resume annotations *)",
-                    "Bash(.venv/bin/careeros resume annotate *)", "Bash(.venv/bin/careeros resume annotate-reply *)"]
+                    "Bash(.venv/bin/careeros resume annotate *)", "Bash(.venv/bin/careeros resume annotate-reply *)",
+                    "Bash(.venv/bin/careeros resume list *)"]  # list: review-resume's no-structured-draft fallback
 KIND_ONLY_TOOLS: dict[str, list[str]] = {
     "learn_voice": ["Read", "Glob", "Grep", "Edit(profile/voice/**)"],
     "extract_master": ["Read", "Write", "Bash(.venv/bin/careeros *)"],

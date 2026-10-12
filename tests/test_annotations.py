@@ -203,7 +203,7 @@ def test_review_run_writing_annotations_is_done(tmp_path: Path):  # review-resum
 def test_review_and_edit_runs_cannot_write_files():  # DEC-016: annotations only via the CLI, no direct draft edit
     from careeros.runs.config import KIND_ONLY_TOOLS
     narrow = ["Read", "Bash(.venv/bin/careeros resume annotations *)", "Bash(.venv/bin/careeros resume annotate *)",
-              "Bash(.venv/bin/careeros resume annotate-reply *)"]  # not every careeros command (e.g. apply-edit)
+              "Bash(.venv/bin/careeros resume annotate-reply *)", "Bash(.venv/bin/careeros resume list *)"]  # not every careeros command (e.g. apply-edit)
     for kind in ("review", "resume_edit"):
         assert KIND_ONLY_TOOLS[kind] == narrow
 
@@ -224,3 +224,10 @@ def test_completed_runs_without_new_ai_annotations_fail(tmp_path: Path):  # a "d
     rec = _run(tmp_path, "resume_edit", rid, u["id"], reply_only)
     assert rec["stop_reason"] == "failed" and "no annotations" in rec["detail"]
     assert old["author"] == "ai"
+
+    def ai_reply_only(*a, **kw):  # edit-resume may legitimately only reply and say why (SKILL.md, action replied)
+        ann.reply(tmp_path, rid, u["id"], "keeping it, the number is in the source", author="ai")
+        return {"id": "r3", "stop_reason": "completed"}
+
+    rec = _run(tmp_path, "resume_edit", rid, u["id"], ai_reply_only)
+    assert rec["stop_reason"] == "completed"
