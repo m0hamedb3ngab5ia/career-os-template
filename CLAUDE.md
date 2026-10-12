@@ -72,6 +72,10 @@ Personal context (who the candidate is, where their private files live) lives in
 - Skill-only (SKILL.md) or docs-only PRs are exempt, but any Python a skill calls is not.
 - `.venv/bin/python -m pytest -q` (all), `-m unit`, `-m integration`. CI runs both on every PR.
 - Runs in parallel (`-n auto` in addopts); one test or a debugger: `.venv/bin/python -m pytest -n0 tests/x.py::t`.
+- While coding: run only touched tests (path / `-k`). Single test: `pytest -n0 <path>::<test>`.
+- Before pushing a code PR: full `pytest -q` locally, then `gh pr merge --auto --squash`. CI full suite is the gate.
+- Before merging a private sync PR: full `pytest -q` locally.
+- Docs/skill-only changes: no tests.
 
 ## Git / PR workflow
 - Never push to `main`. One branch per change (`feat/…`, `fix/…`, `docs/…`), open a PR with `gh pr create`.
