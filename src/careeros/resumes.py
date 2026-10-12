@@ -4,9 +4,11 @@ profile/resumes/<rid>/meta.json  {rid, name, type, category, versions: [{n, auth
 profile/resumes/<rid>/v<n>/      original.<ext>, text.txt, ats.json (careeros.extract)
                                   [+ resume.json, resume.pdf: snapshot of a tailored version's job files]
 Exactly one résumé is `master` (the first upload; marking another demotes the old one to `variant`).
+Structured résumés (`resume.json`, DEC-018) are read through `read_resume_json` / `migrate` (schema v1).
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import re
@@ -26,6 +28,8 @@ MAX_BYTES = 5 * 1024 * 1024  # REQ-093 (Q-009)
 MAGIC = {".pdf": b"%PDF", ".docx": b"PK"}  # DEC-006: extension + magic bytes
 TYPES = ("master", "variant", "other", "tailored")
 _RID = re.compile(r"[a-z0-9][a-z0-9-]*")
+SCHEMA_VERSION = 1  # resume.json (templates/resume/resume_schema.md, DEC-018)
+ENTRY_SECTIONS = ("experience", "projects", "leadership", "education")
 
 
 class BadType(ValueError):
@@ -268,3 +272,54 @@ def delete_version(root: Path, rid: str, n: int) -> dict[str, Any]:
         _write(d, meta)
         shutil.rmtree(d / f"v{n}", ignore_errors=True)
         return meta
+
+
+def migrate(doc: dict[str, Any]) -> dict[str, Any]:
+    """resume.json -> schema v1 in memory (DEC-018); returns a copy, never writes.
+
+    No `schema_version` = pre-v1: each entry/bullet `id` was a profile/master.yaml id, so it moves to `source`.
+    Missing ids are assigned from position (`sec-<type>`, `<section>-<n>`, `<entry id>.b<n>`), so the same file
+    gets the same ids on every read; an id already in use gets a `-<k>` suffix."""
+    doc = copy.deepcopy(doc)
+    version = doc.get("schema_version")
+    if version not in (None, SCHEMA_VERSION):
+        raise ValueError(f"unknown resume.json schema_version {version!r} (supported: {SCHEMA_VERSION})")
+    old = version is None
+    nodes: list[tuple[dict[str, Any], str]] = []  # (node, positional id), parents before their bullets
+    for s in doc.get("sections") or []:
+        if isinstance(s, dict):
+            nodes.append((s, f"sec-{s.get('type')}"))
+    for section in ENTRY_SECTIONS:
+        for i, e in enumerate(doc.get(section) or [], 1):
+            if not isinstance(e, dict):
+                continue
+            if old and e.get("id"):
+                e.setdefault("source", e.pop("id"))
+            nodes.append((e, f"{section}-{i}"))
+            for b in e.get("bullets") or []:
+                if isinstance(b, dict) and old and b.get("id"):
+                    b.setdefault("source", b.pop("id"))
+    used = {str(n["id"]) for n, _ in nodes if n.get("id")}
+    used |= {str(b["id"]) for n, _ in nodes for b in n.get("bullets") or [] if isinstance(b, dict) and b.get("id")}
+
+    def fresh(want: str) -> str:
+        nid, k = want, 1
+        while nid in used:
+            k += 1
+            nid = f"{want}-{k}"
+        used.add(nid)
+        return nid
+
+    for n, want in nodes:
+        if not n.get("id"):
+            n["id"] = fresh(want)
+        for j, b in enumerate(n.get("bullets") or [], 1):
+            if isinstance(b, dict) and not b.get("id"):
+                b["id"] = fresh(f"{n['id']}.b{j}")
+    doc["schema_version"] = SCHEMA_VERSION
+    return doc
+
+
+def read_resume_json(path: Path) -> dict[str, Any]:
+    """Read a resume.json (any supported schema) migrated to the current one (DEC-018)."""
+    return migrate(json.loads(Path(path).read_text(encoding="utf-8")))

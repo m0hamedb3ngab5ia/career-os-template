@@ -943,7 +943,7 @@ tasks:
     - REQ-052
     - REQ-073
   TASK-027:
-    status: todo
+    status: done
     requirements:
     - REQ-124
   TASK-028:

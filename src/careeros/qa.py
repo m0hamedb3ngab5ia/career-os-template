@@ -53,6 +53,7 @@ from typing import Any, Iterable
 
 import yaml
 
+from careeros import resumes
 from careeros.extract import pdf_page_text
 from careeros.markup import MARKER, strip_bold, validate_bold, has_markdown_bold
 from careeros.terms import term_hit, term_in_text as _term_in_text
@@ -383,6 +384,34 @@ class ProfileIndex:
         return ""
 
 
+def _resume_views(raw: Any) -> tuple[Any, Any, int]:
+    """resume.json as read -> (migrated v1 doc, trace view, number of bullets without `source`) (DEC-018).
+
+    The trace view is what the truth checks read: each entry/bullet `id` is its master.yaml `source`, and
+    v1 bullets without `source` (uploaded or hand-written) are left out, so bullet_fidelity and the consistency
+    checks run only on sourced bullets. A pre-v1 file required master ids on every bullet, so there an id-less
+    bullet stays in the view (id None) and still fails. An unknown schema_version reads as a parse error."""
+    if not isinstance(raw, dict) or "__parse_error__" in raw:
+        return raw, raw, 0
+    try:
+        doc = resumes.migrate(raw)
+    except ValueError as e:
+        return {"__parse_error__": str(e)}, {"__parse_error__": str(e)}, 0
+    view, unsourced, pre_v1 = json.loads(json.dumps(doc)), 0, "schema_version" not in raw
+    for section in resumes.ENTRY_SECTIONS:
+        for e in view.get(section) or []:
+            if not isinstance(e, dict):
+                continue
+            e["id"] = e.get("source")
+            bullets = e.get("bullets") or []
+            kept = [dict(b, id=b.get("source")) if isinstance(b, dict) else b for b in bullets
+                    if pre_v1 or not isinstance(b, dict) or b.get("source")]
+            unsourced += len(bullets) - len(kept)
+            if "bullets" in e:
+                e["bullets"] = kept
+    return doc, view, unsourced
+
+
 # --------------------------------------------------------------------------- #
 # id extraction from artifacts
 # --------------------------------------------------------------------------- #
@@ -462,7 +491,8 @@ class Checker:
         # artifacts
         self.posting = _read_json(job_dir / "posting.json")
         self.score = _read_json(job_dir / "score.json")
-        self.resume_json = _read_json(job_dir / "resume.json")
+        # DEC-018: resume_doc = the migrated résumé; resume_json = its trace view (ids = master.yaml sources)
+        self.resume_doc, self.resume_json, self.unsourced_bullets = _resume_views(_read_json(job_dir / "resume.json"))
         self.resume_txt = _read_text(job_dir / "resume.txt")
         self.cover_md = _read_text(job_dir / "cover_letter.md")
         self.answers = _read_json(job_dir / "answers.json")
@@ -955,8 +985,10 @@ class Checker:
             variants = [strip_bold(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
             if strip_bold(summary).strip() not in variants:
                 problems.append("summary is not one of profile.summary_variants")
+        k = self.unsourced_bullets
+        skipped = f"; {k} bullet{'' if k == 1 else 's'} without source not checked" if k else ""
         self.add("bullet_fidelity", "hard", not problems,
-                 f"{n} bullets match master text/variants" if not problems else "; ".join(problems))
+                 (f"{n} bullets match master text/variants" if not problems else "; ".join(problems)) + skipped)
 
     def check_entry_headers(self) -> None:
         """Every experience/project/leadership/education entry names a profile entry by `id`, and its
@@ -1301,7 +1333,7 @@ class Checker:
         """Hard: resume.json `**bold**` markup is valid (paired, non-empty, not nested) and appears only in bullet
         text and the summary (render.py fails otherwise); resume.txt carries no markers (render strips them)."""
         name = "bold_markup"
-        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        rj = self.resume_doc if isinstance(self.resume_doc, dict) and "__parse_error__" not in self.resume_doc else None
         if rj is None:
             self.skip(name, "hard", "resume.json missing")
             return

@@ -635,6 +635,21 @@ def test_bullet_without_id_fails(tmp_path: Path, bullet) -> None:
     assert by_name(run(job), "bullet_fidelity")["ok"] is False
 
 
+
+def test_v1_bullet_without_source_is_not_traced_but_bold_still_checked(tmp_path: Path) -> None:
+    """DEC-018: in a schema v1 résumé, only bullets with `source` are traced to master.yaml."""
+    job = _resume_with(make_job(tmp_path), schema_version=1, projects=[], experience=[
+        {"id": "experience-1", "source": "acme", "bullets": [{"id": "experience-1.b1", "text": "Managed **hiring"}]}])
+    res = run(job)
+    assert by_name(res, "bullet_fidelity")["ok"] is True
+    assert "1 bullet without source" in by_name(res, "bullet_fidelity")["detail"]
+    assert by_name(res, "bold_markup")["ok"] is False  # the full résumé, not the trace view
+
+
+def test_unknown_resume_schema_version_is_a_hard_fail(tmp_path: Path) -> None:
+    job = _resume_with(make_job(tmp_path), schema_version=99)
+    assert by_name(run(job), "json_valid:resume.json")["ok"] is False
+
 @pytest.mark.parametrize("section,entry,ok", [
     ("experience", {"id": "acme", "company": "Acme", "title": "Software Engineer", "start": "Jun 2026", "end": "Present"}, True),
     ("experience", {"id": "acme", "company": "Google", "title": "Software Engineer"}, False),
