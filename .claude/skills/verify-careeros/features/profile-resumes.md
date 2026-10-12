@@ -14,14 +14,14 @@ A user uploads a PDF or DOCX résumé; it is stored as a versioned résumé (fir
 ## How to get to it (user POV)
 
 - Sidebar `Profile`, then section `Résumés` (`/profile#resumes`).
-- Button `Upload résumé` (accepts .pdf .docx .txt .md in the picker, but the backend only stores PDF/DOCX).
+- Button `Add résumé` (accepts .pdf .docx .txt .md in the picker, but the backend only stores PDF/DOCX).
 - Button `Retry review` after a failed review.
 
 ## Driving it (user mode, Playwright)
 
 Preconditions: baseline from `README.md`; no résumé stored (`curl -s 127.0.0.1:8799/api/profile/resumes` returns `{"resumes":[]}`). Fixture: `tests/fixtures/voice_sample.docx` (tracked).
 
-- **Upload.** `drive.py` steps: `goto /profile#resumes` (expect `Upload résumé`), skip tour if shown, `set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx")` (expect `voice_sample · master`, the refreshed list row). Page lists `voice_sample · master · v1`, `Master`, `Delete`.
+- **Upload.** `drive.py` steps: `goto /profile#resumes` (expect `Add résumé`), skip tour if shown, `set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx")` (expect `voice_sample · master`, the refreshed list row). Page lists `voice_sample · master · v1`, `Master`, `Delete`.
 - **Listed.** Reload `/profile#resumes`; same row. Also `The review failed. Retry review` without `claude`.
 - **ATS view (dev API read; no UI panel).** `GET /api/profile/resumes/<rid>/versions/1` returns `text` and `ats.fields` + `ats.warnings` (the fixture gives `missing contact (no email or phone)`).
 - **Side effects (disk check).** `ls profile/resumes/<rid>/v1` shows `original.docx text.txt ats.json`.
@@ -35,7 +35,7 @@ Preconditions: baseline from `README.md`; no résumé stored (`curl -s 127.0.0.1
 
 ## UX checks
 
-- One obvious next action per screen: `Upload résumé` first, then review.
+- One obvious next action per screen: `Add résumé` first, then review.
 - Steps to value: clicks from `/profile` to a listed master (TTA).
 - Wait shows progress: upload and review states visible, not silent.
 - Error shows a fix: `The review failed. Retry review` names the action; refused file type says what is accepted.
