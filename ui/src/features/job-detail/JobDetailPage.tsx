@@ -122,7 +122,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
               otherFiles={detail.other_files}
               submitted={detail.submitted}
             />
-            <FillPlanCard jobId={jobId} ats={detail.posting.ats} />
+            <FillPlanCard jobId={jobId} ats={detail.posting.ats} canPlan={!!detail.posting.source_slug && !!detail.posting.ats_job_id} />
           </div>
           <div className={styles.col}>
             <ScoreCard jobId={jobId} score={detail.score} />
