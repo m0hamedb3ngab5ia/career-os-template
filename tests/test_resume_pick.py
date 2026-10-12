@@ -212,3 +212,51 @@ def test_must_tweak_cap_counts_added_bullets_sharing_one_source(root):
                                           for i in range(4)]
     ck = _v1_tweak(root, V1_BASE, tweak, ["acme.2"])
     assert not ck.checks[-1]["ok"] and ck.checks[-1]["level"] == "hard", ck.checks[-1]
+
+
+def _pdf(pages: int) -> bytes:
+    import io
+
+    from pypdf import PdfWriter
+    w = PdfWriter()
+    for _ in range(pages):
+        w.add_blank_page(width=612, height=792)
+    b = io.BytesIO()
+    w.write(b)
+    return b.getvalue()
+
+
+def _settings_with_qa(root: Path, **qa):
+    s = Settings.load(root)
+    s.qa = {**s.qa, **qa}
+    return s
+
+
+def test_dec_021_preflight_banned_phrase_forces_tailor(root):  # fluff #18: no reuse attempt that QA will fail
+    _resume(root, "Backend", "Python Kafka PostgreSQL React TypeScript passionate backend engineer")
+    d = _job(root, "j1")
+    c = match.pick(_settings_with_qa(root, banned_phrases=["passionate"]), d)
+    assert c["action"] == "tailor"
+    assert "passionate" in c["reason"] and c["preflight"]["ok"] is False
+    assert not (d / "resume.txt").exists()  # nothing linked
+
+
+def test_dec_021_preflight_page_count_forces_tailor(root):
+    rid = _resume(root, "Backend", "Python Kafka PostgreSQL React TypeScript backend engineer")
+    d = _job(root, "j1")
+    vd = match._vdir(Settings.load(root), rid, resumes.get(root, rid)["versions"][-1]["n"])
+    (vd / "resume.pdf").write_bytes(_pdf(4))
+    s = _settings_with_qa(root, resume={"max_pages": 1})
+    c = match.pick(s, d)
+    assert c["action"] == "tailor" and "4 page" in c["reason"]
+
+
+def test_dec_021_preflight_pass_reuses_and_caches(root):
+    rid = _resume(root, "Backend", "Python Kafka PostgreSQL React TypeScript backend engineer")
+    d = _job(root, "j1")
+    vd = match._vdir(Settings.load(root), rid, resumes.get(root, rid)["versions"][-1]["n"])
+    (vd / "resume.pdf").write_bytes(_pdf(1))
+    c = match.pick(_settings_with_qa(root, banned_phrases=["passionate"], resume={"max_pages": 1}), d)
+    assert c["action"] == "reuse" and c["preflight"]["ok"] is True
+    cached = json.loads((d / "preflight.json").read_text())
+    assert cached["key"] == c["preflight"]["key"] and cached["ok"] is True

@@ -90,7 +90,8 @@ Hand off in `careeros jobs list --status queued --order urgent` order.
 
 Read `JOB/resume_choice.json` (written by `careeros run prepare` before this skill; REQ-112/113). If it is
 missing or has `"scored": false`, run `.venv/bin/careeros resume pick <job_id>` now (score.json exists after
-Step 1) and read it again. Then obey `action`, never override it:
+Step 1) and read it again (pick runs a deterministic QA preflight on a reuse candidate, writes `preflight.json`, and
+switches to `tailor` when banned phrases / page count would fail; DEC-021). Then obey `action`, never override it:
 - `reuse`: `resume.txt` / `resume.json` (and `resume.pdf` when the résumé had one) are already in `JOB`. Do NOT
   run tailor-resume and never edit the text. If `resume.pdf` is missing, `.venv/bin/careeros action add "export
   résumé <rid> as PDF for <job_id>" --type laptop_required --needs laptop`.
@@ -120,7 +121,8 @@ Store RESULT as `steps.cover_letter`.
 `regenerations = 0`. Loop:
 1. Follow `.claude/skills/qa-review/SKILL.md` with `JOB`. Store RESULT as `steps.qa`.
 2. If `pass`: break.
-3. If `next_action == "regenerate"` and `regenerations < max_regenerations`:
+3. If `next_action == "regenerate"` and `regenerations < max_regenerations` and the failing inputs can change (a
+   suggestion exists; never rerun identical inputs, DEC-021):
    - `regenerations += 1`; update `JOB/qa.json` field `regenerations`.
    - For each distinct `skill` in `regenerate[]` (order: tailor-resume, then write-cover-letter):
      follow that SKILL.md again with `JOB --suggestions "<its suggestions joined by '; '>"`.

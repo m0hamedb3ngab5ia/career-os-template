@@ -1541,6 +1541,32 @@ def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> di
     return Checker(job_dir, root_path).run()
 
 
+def preflight_resume(qa_cfg: dict[str, Any], text: str, pdf: Path | None = None) -> dict[str, Any]:
+    """DEC-021: the deterministic résumé checks (banned phrases, PDF page count) on a reuse candidate, before it
+    is chosen. No LLM, no render: reads the PDF the candidate already has. `key` hashes text + PDF + config, so the
+    result can be cached and a rerun with identical inputs never repeats the work."""
+    banned = [str(b).strip() for b in (qa_cfg.get("banned_phrases") or []) if str(b).strip()]
+    max_pages = int(((qa_cfg.get("resume") or {}).get("max_pages", 1)) or 1)
+    pdf_bytes = pdf.read_bytes() if pdf is not None and pdf.is_file() else b""
+    key = hashlib.sha256(json.dumps([text, hashlib.sha256(pdf_bytes).hexdigest(), banned, max_pages]).encode()).hexdigest()
+    issues: list[dict[str, str]] = []
+    low = text.lower()
+    for phrase in banned:
+        if re.search(r"(?<![a-z])" + re.escape(phrase.lower().rstrip(",")) + r"(?![a-z])", low):
+            issues.append({"check": "banned_phrases", "detail": f"contains '{phrase}'"})
+    if pdf_bytes:
+        try:
+            from io import BytesIO
+
+            from pypdf import PdfReader  # type: ignore
+            pages = len(PdfReader(BytesIO(pdf_bytes)).pages)
+            if pages > max_pages:
+                issues.append({"check": "pdf_page_count", "detail": f"{pages} page(s) (max {max_pages})"})
+        except Exception:  # noqa: BLE001  unreadable PDF: the full QA reports it
+            pass
+    return {"ok": not issues, "key": key, "issues": issues}
+
+
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     if not argv or argv[0] in ("-h", "--help"):

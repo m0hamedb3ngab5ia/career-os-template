@@ -96,11 +96,22 @@ export function QaCard({ jobId, qa, nested }: { jobId: string; qa: Qa | null; ne
   return (
     <Card id="qa" title="QA" nested={nested} aside={<span className={styles.qaVerdict}>{verdict}</span>}>
       {qa?.fail_reasons?.length ? (
-        <ul className={styles.bullets}>
-          {qa.fail_reasons.map((r) => (
-            <li key={r}>{r}</li>
-          ))}
-        </ul>
+        <>
+          <ul className={styles.bullets}>
+            {qa.fail_reasons.slice(0, 2).map((r) => (
+              <li key={r}>{r}</li>
+            ))}
+          </ul>
+          {qa.fail_reasons.length > 2 ? (
+            <Details summary={`Show all ${formatCount(qa.fail_reasons.length)} issues`}>
+              <ul className={styles.bullets}>
+                {qa.fail_reasons.map((r) => (
+                  <li key={r}>{r}</li>
+                ))}
+              </ul>
+            </Details>
+          ) : null}
+        </>
       ) : null}
       {meanText || rubric.length ? (
         <Details summary="QA scores">
