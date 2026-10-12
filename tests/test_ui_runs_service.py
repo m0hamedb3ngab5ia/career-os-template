@@ -609,6 +609,20 @@ def test_run_state_rereads_a_run_that_finished_between_reads(rc):
     assert got["state"] == "done" and got["stop_reason"] == "completed"
 
 
+def test_run_on_its_own_lock_stays_running_beside_a_batch(rc):
+    """A résumé review holds data/runs/resume-<id>.lock, not the runner lock: a sibling run (extract_master) holding
+    the runner lock must not make it look interrupted."""
+    rs = RunStore(rc.settings)
+    review = running_run(rs, kind="review", rid="r-review", lock="resume-r1")
+    locks.acquire(rs.dir / "resume-r1.lock", owner="run:r-review", ttl_seconds=3600, pid=777, pid_alive=lambda p: True)
+    sibling = running_run(rs, kind="extract_master", rid="r-extract")
+    hold_runner(rs, sibling["id"], pid=777)
+
+    states = {r["id"]: r["state"] for r in make_rc(rc.settings, pid_alive=lambda p: True).history()["runs"]}
+    assert states == {"r-review": "running", "r-extract": "running"}
+    assert review["lock"] == "resume-r1"
+
+
 def test_catch_up_cancel_leaves_unstarted_kinds_pending(settings):
     import threading
 

@@ -123,6 +123,10 @@ def test_suspicious_process_is_review(example_settings, text, code):
     "Our fee-free payments API serves millions.",
     "Laptop and equipment provided on day one.",
     "We use TeamViewer-like remote support tooling in our product.",
+    # employers' own anti-scam notices quote the scam phrases in negated / warning context
+    "Beware of fraud: we will never ask you to deposit or cash a check.",
+    "We do not ask candidates to buy gift cards or pay an application fee.",
+    "Recruiters will never request that you purchase equipment and get reimbursed by a vendor.",
 ])
 def test_legit_mentions_do_not_trip(example_settings, text):
     assert check_posting(_p(description_text=text), example_settings) == []

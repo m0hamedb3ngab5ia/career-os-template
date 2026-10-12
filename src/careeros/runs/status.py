@@ -13,10 +13,13 @@ STATUS_QUEUE_KINDS = ("score", "prepare")
 
 def run_state(rs: RunStore, run: dict[str, Any], alive=locks.pid_alive) -> str:
     """run.json `status`, except a `running` run whose process no longer holds its lock: interrupted. Batches hold
-    the runner lock (owner run:<id>); UI steps (scout, tracker, prune) hold data/runs/step-<kind>.lock (step:<id>)."""
+    the runner lock (owner run:<id>); UI steps (scout, tracker, prune) hold data/runs/step-<kind>.lock (step:<id>);
+    a skill run on its own lock (résumé review/edit) holds data/runs/<run.lock>.lock (run:<id>)."""
     if run.get("status") != "running":
         return str(run.get("status"))
-    for path, owner in ((rs.runner_lock_path, f"run:{run['id']}"),
+    own = run.get("lock")
+    lock = rs.dir / f"{own}.lock" if own else rs.runner_lock_path
+    for path, owner in ((lock, f"run:{run['id']}"),
                         (rs.dir / f"step-{run.get('kind')}.lock", f"step:{run['id']}")):
         held = locks.status(path, alive=alive)
         if held.get("state") == "held" and held.get("owner") == owner:
