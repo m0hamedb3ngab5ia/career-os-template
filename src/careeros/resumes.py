@@ -3,6 +3,8 @@
 profile/resumes/<rid>/meta.json  {rid, name, type, category, versions: [{n, author, source, at}]}
 profile/resumes/<rid>/v<n>/      original.<ext>, text.txt, ats.json (careeros.extract)
                                   [+ resume.json, resume.pdf: snapshot of a tailored version's job files]
+profile/resumes/<rid>/v<n>/      resume.json, changes.jsonl  (published by `publish`, DEC-017/020: JSON only;
+                                  text/ATS/.tex via `version` / `rendered`, PDF via `render_pdf` -> cache/)
 Exactly one résumé is `master` (the first upload; marking another demotes the old one to `variant`).
 Structured résumés (`resume.json`, DEC-018) are read through `read_resume_json` / `migrate` (schema v1).
 """
@@ -81,6 +83,7 @@ def _write(d: Path, meta: dict[str, Any]) -> None:
 def label(v: dict[str, Any]) -> str:
     """Plain name of a version: the upload is the Original, an AI rewrite applied review feedback, a hand edit."""
     return v.get("label") or ("Original" if v["n"] == 1 else "Edited" if v["source"] == "edit"
+                              else "Published" if v["source"] == "publish"
                               else "Feedback applied" if v["author"] == "ai" else "Uploaded")
 
 
@@ -227,7 +230,16 @@ def version(root: Path, rid: str, n: int) -> dict[str, Any]:
     entry = next((v for v in meta["versions"] if v["n"] == n), None)
     if entry is None:
         raise LookupError(f"résumé {rid!r} has no v{n}")
-    ats = json.loads((d / f"v{n}" / "ats.json").read_text(encoding="utf-8"))
+    a = d / f"v{n}" / "ats.json"
+    if a.is_file():
+        ats = json.loads(a.read_text(encoding="utf-8"))
+    else:  # published version: JSON only, text/ATS rendered on demand (DEC-020)
+        import tempfile
+
+        from careeros.extract import ats_view
+
+        with tempfile.TemporaryDirectory() as t:
+            ats = ats_view(_render_into(_published_json(root, rid, n), Path(t)) / "resume.txt")
     return {**entry, "rid": rid, "text": ats["text"], "ats": ats}
 
 
@@ -577,6 +589,137 @@ def user_texts(root: Path, rid: str) -> set[str]:
                 who = was[1]
             cur[bid] = (text, who)
     return {t for t, who in cur.values() if who == "user" and isinstance(t, str)}
+
+
+def _orphan(d: Path, meta: dict[str, Any]) -> None:
+    """Under `_locked`: finish a publish that crashed after its rename (DEC-017 roll-forward). v<n+1>/resume.json
+    exists but meta.json doesn't list it: move the draft log in if it's still there, then list the version."""
+    n = meta["versions"][-1]["n"] + 1
+    v = d / f"v{n}"
+    if not (v / "resume.json").is_file():
+        return
+    if not (v / "changes.jsonl").exists() and (d / "draft.changes.jsonl").exists():
+        os.replace(d / "draft.changes.jsonl", v / "changes.jsonl")
+    entry = {"n": n, "author": "user", "source": "publish", "at": _now()}
+    meta["versions"].append({**entry, "label": label(entry)})
+    _write(d, meta)
+
+
+def publish(root: Path, rid: str, *, key: str, master: bool = False) -> dict[str, Any]:
+    """Next/Done (DEC-017, DEC-020): the draft becomes v<n+1> = resume.json + changes.jsonl only. Steps: write
+    `.v<n+1>.tmp/resume.json`, rename to v<n+1>, move draft.changes.jsonl in, write meta.json (the commit point),
+    restart the draft from it (rev kept monotonic so change ids stay unique). Unchanged hash or an already-seen
+    `key` = no new version. A crash after the rename is rolled forward on the next call. `master` sets the
+    résumé master (onboarding). Returns meta + {published, n}."""
+    from careeros.runs.atomic import write_json
+
+    if not key.strip():
+        raise ValueError("publish needs an idempotency key")
+    with _locked(root):
+        d, meta = _dir(root, rid), get(root, rid)
+        _orphan(d, meta)
+        published = False
+        if not any(v.get("key") == key for v in meta["versions"]):
+            _, prev, latest = _draft_state(root, rid)
+            doc = migrate(prev["resume"])
+            if _hash(doc) != _hash(latest):
+                n = meta["versions"][-1]["n"] + 1
+                tmp = d / f".v{n}.tmp"
+                shutil.rmtree(tmp, ignore_errors=True)  # left by a crash before the rename
+                tmp.mkdir()
+                write_json(tmp / "resume.json", doc, ensure_ascii=False)
+                tmp.rename(d / f"v{n}")
+                if (d / "draft.changes.jsonl").exists():
+                    os.replace(d / "draft.changes.jsonl", d / f"v{n}" / "changes.jsonl")
+                entry = {"n": n, "author": "user", "source": "publish", "at": _now(), "key": key}
+                meta["versions"].append({**entry, "label": label(entry)})
+                _write(d, meta)
+                write_json(d / "draft.json", {"rev": prev["rev"] + 1, "resume": doc}, ensure_ascii=False)
+                published = True
+        if master and meta["type"] != "master":
+            meta = _update(root, rid, type="master")
+        return {**get(root, rid), "published": published, "n": meta["versions"][-1]["n"]}
+
+
+def _renderer() -> Any:
+    """templates/resume/render.py as a module (one renderer, DEC-018)."""
+    import importlib.util
+    import sys
+
+    mod = sys.modules.get("careeros_resume_render")
+    if mod is None:
+        path = Path(__file__).resolve().parents[2] / "templates" / "resume" / "render.py"
+        spec = importlib.util.spec_from_file_location("careeros_resume_render", path)
+        mod = importlib.util.module_from_spec(spec)  # type: ignore[arg-type]
+        spec.loader.exec_module(mod)  # type: ignore[union-attr]
+        sys.modules["careeros_resume_render"] = mod
+    return mod
+
+
+def renderer_version() -> str:
+    """Hash of render.py + its templates: part of the PDF cache key (DEC-020)."""
+    here = Path(_renderer().__file__).parent
+    h = hashlib.sha256()
+    for p in sorted([here / "render.py", *here.glob("*.tex")]):
+        h.update(p.name.encode() + b"\0" + p.read_bytes())
+    return h.hexdigest()[:12]
+
+
+def _render_into(src: Path, out: Path, *, pdf: bool = False) -> Path:
+    """Copy a version's resume.json into `out` and render resume.txt + resume.tex (+ PDF) there."""
+    import io
+    from contextlib import redirect_stdout
+
+    shutil.copyfile(src, out / "resume.json")
+    mod = _renderer()
+    with redirect_stdout(io.StringIO()):
+        mod.render_txt(out / "resume.json")
+        mod.render(out / "resume.json", pdf=pdf)
+    return out
+
+
+def _published_json(root: Path, rid: str, n: int) -> Path:
+    p = _dir(root, rid) / f"v{n}" / "resume.json"
+    if not p.is_file():
+        raise LookupError(f"résumé {rid!r} v{n} has no resume.json")
+    return p
+
+
+def rendered(root: Path, rid: str, n: int, kind: str) -> str:
+    """The one store helper for derived outputs of a JSON-only version (DEC-020): `txt` or `tex`, rendered on
+    demand into a temp dir; same resume.json -> identical output."""
+    import tempfile
+
+    if kind not in ("txt", "tex"):
+        raise ValueError("kind must be txt or tex")
+    src = _published_json(root, rid, n)
+    with tempfile.TemporaryDirectory() as t:
+        return (_render_into(src, Path(t)) / f"resume.{kind}").read_text(encoding="utf-8")
+
+
+def render_pdf(root: Path, rid: str, n: int) -> Path | None:
+    """Latest version's PDF, cached as cache/<hash(resume.json)>-<renderer_version>.pdf (DEC-020; older entries
+    removed, disposable). None = no LaTeX engine. Older versions have no PDF: LookupError."""
+    import tempfile
+
+    if n != get(root, rid)["versions"][-1]["n"]:
+        raise LookupError(f"only the latest version of {rid!r} has a PDF")
+    src = _published_json(root, rid, n)
+    cache = _dir(root, rid) / "cache"
+    want = cache / f"{_hash(read_resume_json(src))}-{renderer_version()}.pdf"
+    if want.is_file():
+        return want
+    with tempfile.TemporaryDirectory() as t:
+        pdf = _render_into(src, Path(t), pdf=True) / "resume.pdf"
+        if not pdf.is_file():
+            return None
+        cache.mkdir(exist_ok=True)
+        for old in cache.glob("*.pdf"):
+            old.unlink()
+        tmp = cache / f"{want.name}.{os.getpid()}.tmp"
+        shutil.copyfile(pdf, tmp)
+        tmp.replace(want)
+    return want
 
 
 def cleanup_tmp(root: Path, max_age: float = 600) -> int:
