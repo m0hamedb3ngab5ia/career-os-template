@@ -24,6 +24,9 @@ Manual: boards in browser, résumé edits by hand, spreadsheet tracker. (inferre
 ## Value
 Volume + quality at once: more tailored applications per week without fabrication or scam exposure. (inferred)
 
+## Principle
+Minimize the time and effort between intent and a meaningful result (TTV/TTA). Targets and fluff rules: DEC-011 in DECISIONS.md.
+
 ## Success metrics
 - None defined in repo. Candidates: applications/week, QA first-pass rate, interview rate by tier, minutes of candidate time per application. (decision-needed, Q-002)
 - TODO "Weekly self-review report" hints at acceptance rate by category/tier, QA fail reasons, time saved. (observed: TODO.md:39)

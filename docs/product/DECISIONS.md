@@ -56,3 +56,42 @@ Decision: fill plan uses the job's `/answer-question` drafts for freetext fields
 Reason: user wants drafts offered but reviewed before fill (2026-10-04). Reasoned by: human (gate); agent (accepted) for edit = reviewed, save default off, Action Item.
 Alternatives: drop "AI draft" from REQ-105 (user types every essay); auto-fill drafts (unreviewed AI text reaches employers).
 Consequences: new TASK-023; TASK-014 tests re-reviewed for the draft source.
+
+### DEC-011 Minimize time to value (TTV/TTA)
+Decision: users have limited time, patience, attention. Every screen, interaction and workflow either produces value or brings the user visibly closer to it. Prioritize simplicity, sensible defaults, minimal user effort, immediate feedback. Eliminate unnecessary decisions, steps, complexity. Slow process: show progress and what to expect.
+**The goal is not simply to make the application faster, but to minimize the time and effort between a user's intent and a meaningful result.**
+- TTV (Time to Value) = intent -> first useful visible result.
+- TTA (Time to Action) = time and effort to identify and take the next meaningful action in an interface. Not "time to apply".
+- Targets are design targets, not guarantees. Meaningful results over arbitrary speed. No promises dependent on external sites, AI processing or job availability. Validate with real users; measure TTV/TTA.
+- Review gate: every UI PR answers "does this add a step, screen or wait before value?" (`docs/CODE_REVIEW_PROMPT.md`).
+
+TTV targets (aggressive, but optimize for meaningful value, not fewer clicks):
+
+| Area | Target |
+|---|---|
+| a. Getting started | First résumé feedback within 5 min, no edits required. Upload is the primary action; skipping allowed for exploration. |
+| b. Finding jobs | Scored jobs in same session. Keep/skip in one click. Show why each job matches. |
+| c. Preparing | Initial fit score within seconds; review-ready docs within minutes. Approve or open editor in one action. |
+| d. Applying | 30 s of user interaction, excluding external site delays. Fill in one action, review, then submit. Never sacrifice accuracy. |
+| e. Running on its own | One-action setup with sensible defaults. Results ready on next visit, with clear progress, errors, actions needing approval. |
+| f. Profile | Never re-request info already given unless outdated, missing or needing confirmation. Reuse across workflows. |
+| g. Settings | No settings before first value. Sensible defaults; introduce configuration when relevant. |
+| h. Staying on top | To-do list immediately on open. Highest-impact actions first. |
+| i. Recovering from interruptions | Leave and return without losing progress. Every workflow resumes where it stopped, with a clear next action. |
+
+Fluff rules:
+
+| Rule | Meaning |
+|---|---|
+| Defaults over questions | Reduce decisions. Allow overrides. |
+| Defer setup until needed | Value before configuration. |
+| Progress, not spinners | Progress for longer tasks; spinners fine for brief waits. Never fake progress. |
+| Undo over confirm | Undo for reversible actions. Confirm irreversible/high-risk ones, esp. submitting applications. |
+| Every screen has a purpose | Needs a clear purpose, not necessarily an action. |
+| Minimize user input | Reuse existing data. Automate repetitive work. |
+| Progressive disclosure | Essentials first; complexity when needed. |
+| Clear, concise language | Plain language. No jargon, redundant explanations, lengthy instructions. |
+| Preserve user progress | Auto-save. Resume interrupted workflows. |
+
+Reason: user stated principle 2026-10-11. Reasoned by: human.
+Consequences: UI work (with DEC-009) is judged against these targets; a UI PR that adds a step/screen/wait before value needs justification.
