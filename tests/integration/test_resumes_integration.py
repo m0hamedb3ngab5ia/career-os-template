@@ -282,6 +282,7 @@ def test_import_guard_http_api(root: Path):  # TASK-032: E2E-001-03, E2E-001-04 
             "EXPERIENCE\nAcme — Dev 2020\n• Built the thing\nHobbies: chess\n", encoding="utf-8")
         doc = {"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "dates": "2019",
                                                     "bullets": [{"text": "Built the thing"}]}]}
+        resume_import.set_state(root, rid, "running", run="r1")  # the (faked) run's step process
         with pytest.raises(resume_import.ImportRefused):  # E2E-001-03: a date absent from v1 -> no v2
             resume_import.save(root, rid, doc)
         st = c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()
@@ -289,6 +290,9 @@ def test_import_guard_http_api(root: Path):  # TASK-032: E2E-001-03, E2E-001-04 
         assert c.get(f"/api/profile/resumes/{rid}/draft", headers=W).status_code == 404  # no guessed résumé
         assert c.post(f"/api/profile/resumes/{rid}/import", headers=W).status_code == 202  # Retry
         assert started[-1] == ("extract_master", rid)
+        resume_import.set_state(root, rid, "running", run="r2")
+        assert c.post(f"/api/profile/resumes/{rid}/import", headers=W).status_code == 409  # Retry while running
+        assert resume_import.load(root, rid)["run"] == "r2" and started[-1] == ("extract_master", rid)
         doc["experience"][0]["dates"] = "2020"
         resume_import.save(root, rid, doc)
         st = c.get(f"/api/profile/resumes/{rid}/import", headers=W).json()
@@ -308,13 +312,22 @@ def test_import_save_cli(root: Path, tmp_path: Path):  # TASK-032: the extract-m
     from careeros import resume_import, resumes
 
     rid = resumes.add_tailored(root, "Acme Dev\n• Built the thing\n", category="x", source="up")["rid"]
+    resume_import.set_state(root, rid, "running", run="r1")
     f = tmp_path / "r.json"
+    f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "bullets": [
+        {"text": "Built the thing"}]}]}), encoding="utf-8")
+    r = _cli(root, "resume", "import-save", rid, str(f))  # review MUST: an AI résumé is never marked user text
+    assert r.returncode == 1 and "upload" in r.stderr and len(resumes.get(root, rid)["versions"]) == 1
+    rid = resumes.add(root, "cv.pdf", PDF)["rid"]
+    (resumes._dir(root, rid) / "v1" / "text.txt").write_text("Acme Dev\n• Built the thing\n", encoding="utf-8")
+    resume_import.set_state(root, rid, "running", run="r2")
     f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "bullets": [
         {"text": "Built 40 things"}]}]}), encoding="utf-8")
     r = _cli(root, "resume", "import-save", rid, str(f))
     assert r.returncode == 1 and "not in the uploaded text" in r.stderr
     f.write_text(json.dumps({"schema_version": 1, "experience": [{"company": "Acme", "title": "Dev", "bullets": [
         {"text": "Built the thing"}]}]}), encoding="utf-8")
+    resume_import.set_state(root, rid, "running", run="r3")  # Retry
     r = _cli(root, "resume", "import-save", rid, str(f))
     assert r.returncode == 0, r.stderr
     assert resume_import.load(root, rid)["state"] == "done" and "v2" in r.stdout

@@ -310,6 +310,8 @@ def get_import(rid: str, c=Depends(ctx)) -> ImportState:
 def retry_import(rid: str, request: Request, c=Depends(ctx)) -> Started:
     with _refusals():
         store.get(c.settings.root, rid)
+    if imp.load(c.settings.root, rid).get("state") == "running":  # never overwrite a live run's import.json
+        raise HTTPException(409, "the import is already running")
     return _import(request, c, rid)
 
 

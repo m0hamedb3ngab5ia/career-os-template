@@ -152,6 +152,7 @@ Decision: every upload (master, variant, other) → existing text extraction (DE
 Why: one import pipeline; import must never invent content.
 Alternatives: separate converter skill (second pipeline); trust the model (fabrication risk).
 Consequences: one AI run per upload = visible wait during onboarding (DEC-011 cost, accepted).
+Verbatim (TASK-032; agent, pending human review) = whitespace-normalised, case-insensitive: a bullet equals whole consecutive v1 lines (bullet marker stripped; a wrapped bullet, never across a new bullet or header); any other field is a word-bounded match inside one v1 line. Only a running import of a user-uploaded v1 may save.
 
 ### DEC-020 Published résumé versions store JSON only; outputs rendered on demand
 Reasoned by: human (2026-10-12; outside review of TASK-031 on storage, agent pushed back on content-addressing and retention)
