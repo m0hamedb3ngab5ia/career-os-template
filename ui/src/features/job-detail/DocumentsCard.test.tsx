@@ -88,6 +88,15 @@ describe("QaCard Tailor instead", () => {
     expect(await screen.findByText(/Tailoring started/)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Tailor instead" })).toBeNull();
   });
+
+  it("comes back with the run's error when the tailor run fails, so the user can retry", async () => {
+    renderCard({ qa: failed, resumeChoice: "reuse" }, {
+      "GET /api/runs/r-tailor": { run_id: "r-tailor", state: "done", stop_reason: "failed", detail: "LaTeX failed" },
+    });
+    await userEvent.click(screen.getByRole("button", { name: "Tailor instead" }));
+    expect(await screen.findByText("LaTeX failed")).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: "Tailor instead" })).toBeEnabled();
+  });
 });
 
 describe("DocumentsCard", () => {
