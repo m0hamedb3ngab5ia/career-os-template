@@ -26,7 +26,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, Callable, Iterable
 
-from careeros.runs.config import KIND_FLAGS, RunsConfig, allowed_tools_for
+from careeros.runs.config import KIND_FLAGS, KIND_ONLY_TOOLS, RunsConfig, allowed_tools_for
 
 OUTCOMES = ("ok", "usage_limit", "auth_required", "permission_denied", "timeout", "cancelled", "skill_error",
             "invalid_result", "error", "time_budget")  # time_budget: the runner cut the job at the run's budget
@@ -89,10 +89,13 @@ SHELL_RULE = ("Headless run, --permission-mode dontAsk: a tool call outside the 
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
                   extra_tools: list[str] | tuple = ()) -> list[str]:
     cmd, it = [], iter(cfg.headless_cmd)
-    for a in it:  # the per-kind list is the only allowlist: drop any configured one (and its value)
-        if a in ("--allowedTools", "--allowed-tools"):
+    # the per-kind list is the only allowlist: drop any configured one (and its value). KIND_ONLY kinds also load
+    # project settings only: local allow-rules would widen their list (project is kept: it carries the skills)
+    drop = ("--allowedTools", "--allowed-tools") + (("--setting-sources",) if kind in KIND_ONLY_TOOLS else ())
+    for a in it:
+        if a in drop:
             next(it, None)
-        elif not a.startswith(("--allowedTools=", "--allowed-tools=")):
+        elif not a.startswith(tuple(f"{d}=" for d in drop)):
             cmd.append(a)
     tools = allowed_tools_for(cfg, kind, extra_tools)
     if tools:
@@ -106,7 +109,7 @@ def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, k
             cmd += ["--append-system-prompt", rule]
     cmd += [f for f in KIND_FLAGS.get(kind or "", []) if f not in cmd]
     if not any(a.startswith("--setting-sources") for a in cmd):  # user-scope hooks (Stop) would eat the RESULT line
-        cmd += ["--setting-sources", "project,local"]
+        cmd += ["--setting-sources", "project" if kind in KIND_ONLY_TOOLS else "project,local"]
     if cfg.model and "--model" not in cmd:
         cmd += ["--model", cfg.model]
     if session_id and "--session-id" not in cmd:
