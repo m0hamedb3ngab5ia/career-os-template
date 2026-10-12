@@ -4,6 +4,7 @@ import json
 import os
 import shutil
 import sys
+import zlib
 from pathlib import Path
 
 import pytest
@@ -253,3 +254,17 @@ def personalize(root: Path) -> Path:
     samples.mkdir(parents=True, exist_ok=True)
     (samples / "letter1.md").write_text("I built the thing because the old one kept breaking.\n")
     return root
+
+
+def pytest_collection_modifyitems(config, items):
+    # CI splits the suite across parallel jobs: CAREEROS_TEST_SHARD=k of CAREEROS_TEST_SHARDS=n keeps the tests
+    # whose node-ID hash is k mod n, so the shards are disjoint and together run everything.
+    total = int(os.environ.get("CAREEROS_TEST_SHARDS", "1"))
+    if total < 2:
+        return
+    shard = int(os.environ["CAREEROS_TEST_SHARD"])
+    keep, drop = [], []
+    for item in items:
+        (keep if zlib.crc32(item.nodeid.encode()) % total == shard else drop).append(item)
+    config.hook.pytest_deselected(items=drop)
+    items[:] = keep
