@@ -5,7 +5,7 @@ import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
-import { useResumeMeta } from "../profile/api";
+import { useResumeMeta, useResumes } from "../profile/api";
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput } from "./fields";
 import { History } from "./History";
@@ -27,7 +27,9 @@ function Workspace() {
   const [active, setActive] = useState<string | null>(null);
   const [tab, setTab] = useState<"doc" | "ats">("doc");
   const [history, setHistory] = useState(false);
-  const onboarding = useSearchParams()[0].get("onboarding") === "1";  // FLOW-001: Next replaces Done
+  // FLOW-001: Next replaces Done while the master is still a draft; ?onboarding=1 forces the first-run flow for testing.
+  const row = useResumes().data?.resumes.find((r) => r.rid === rid);
+  const onboarding = useSearchParams()[0].get("onboarding") === "1" || (row?.type === "master" && row.status === "draft");
   const ats = useAtsText(rid, tab === "ats");
   const undo = useRef<{ past: Doc[]; future: Doc[]; path: string; at: number }>({ past: [], future: [], path: "", at: 0 });
   const docRef = useRef<Doc | null>(null);

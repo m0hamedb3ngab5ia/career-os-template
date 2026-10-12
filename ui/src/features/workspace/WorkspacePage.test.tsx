@@ -330,6 +330,20 @@ describe("WorkspacePage", () => {
     expect(calls.find((c) => c.url.endsWith("/publish"))!.body).toMatchObject({ master: true });
   });
 
+  it("onboarding: a draft master shows Next without the URL flag", async () => {
+    api({ "GET /api/profile/resumes": { resumes: [{ rid: "cv", type: "master", status: "draft" }] } });
+    renderRoutes(routes, "/resumes/cv");
+    expect(await screen.findByRole("button", { name: /Next: Saved answers/ })).toBeInTheDocument();
+  });
+
+  it("onboarding: a ready master keeps Done", async () => {
+    api({ "GET /api/profile/resumes": { resumes: [{ rid: "cv", type: "master", status: "ready" }] } });
+    renderRoutes(routes, "/resumes/cv");
+    expect(await screen.findByRole("button", { name: "Done" })).toBeInTheDocument();
+    await tick(300);
+    expect(screen.queryByRole("button", { name: /Next: Saved answers/ })).toBeNull();
+  });
+
   it("shows Not carried over lines from the import", async () => {
     api({ "GET /api/profile/resumes/cv/import": { state: "done", dropped: [{ id: "d1", text: "Hobby: chess", restored: false }] } });
     renderRoutes(routes, "/resumes/cv");

@@ -1,4 +1,4 @@
-import { act, fireEvent, screen, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Call, mockApi, renderRoutes } from "../../test/mockApi";
 import { WorkspacePage } from "./WorkspacePage";
@@ -46,7 +46,8 @@ describe("Workspace extras", () => {
     api({ "GET /api/profile/resumes/cv/draft/text": "Alex Example\n- Worked on billing\n" });
     renderRoutes(routes, "/resumes/cv");
     fireEvent.click(await screen.findByRole("tab", { name: "ATS view" }));
-    expect(await screen.findByLabelText("ATS view")).toHaveTextContent("- Worked on billing");
+    const ats = await screen.findByLabelText("ATS view");
+    await waitFor(() => expect(ats).toHaveTextContent("- Worked on billing"));  // the panel mounts before its text loads
     expect(screen.queryByRole("textbox", { name: "Summary" })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Résumé" }));
     expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();
