@@ -151,7 +151,7 @@ export function ProfilePage() {
       <div className={styles.col}>
         <JustReadyNextStep />
         <ReadinessSummary />
-        <Section id="resumes" title="Résumés" intro="Source of truth for tailored résumés." aside={<FilePick primary label="Add résumé" accept=".pdf,.docx,.txt,.md" pending={addResume.isPending} onFiles={(f) => f[0] && addResume.mutate(f[0])} />}>
+        <Section id="resumes" title="Résumés" intro="Source of truth for tailored résumés." aside={<FilePick primary label="Add résumé" accept=".pdf,.docx" pending={addResume.isPending} onFiles={(f) => f[0] && addResume.mutate(f[0])} />}>
           <Loaded q={resumes} empty={(d) => !d.resumes.length}>
             {() => (
               <>

@@ -20,6 +20,8 @@ export interface Posting {
   url?: string;
   apply_url?: string;
   ats?: string;
+  source_slug?: string;
+  ats_job_id?: string | number | null;
   posted_at?: string | null;
   closes_at?: string | null;
 }

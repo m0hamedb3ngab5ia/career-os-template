@@ -4,6 +4,7 @@ import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
 import { SelectInput, TextInput } from "../../kit/inputs";
 import { useToast } from "../../kit/Toast";
+import { optionLabel } from "../settings/format";
 import { errorText, useApproveFillField, useEditFillField, useFillPlan, useMakeFillPlan, type FillField } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -130,7 +131,7 @@ function FieldRow({ jobId, f }: { jobId: string; f: FillField }) {
 }
 
 /** Preview fill: every field career-os will type, editable; unknown ones asked; Fill waits for required answers. */
-export function FillPlanCard({ jobId, ats }: { jobId: string; ats?: string }) {
+export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; ats?: string; canPlan?: boolean }) {
   const q = useFillPlan(jobId);
   const make = useMakeFillPlan(jobId);
   const toast = useToast();
@@ -140,7 +141,7 @@ export function FillPlanCard({ jobId, ats }: { jobId: string; ats?: string }) {
   const setAll = (open: boolean) => sectionsRef.current?.querySelectorAll("details").forEach((d) => (d.open = open));
   const problems = q.data?.problems ?? [];
   const preview = (
-    <Button disabled={make.isPending} onClick={() => make.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) })}>
+    <Button disabled={make.isPending || !canPlan} onClick={() => make.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) })}>
       {make.isPending ? "Building preview…" : plan ? "Rebuild preview" : "Preview fill"}
     </Button>
   );
@@ -153,9 +154,9 @@ export function FillPlanCard({ jobId, ats }: { jobId: string; ats?: string }) {
       </span>
     ) : null}>
       {!plan && ats && ats !== "greenhouse" ? (
-        <p>career-os can preview and fill only Greenhouse postings; this one is on {ats}. Apply on the posting's own page.</p>
+        <p>career-os can preview and fill only Greenhouse postings; this one is on {optionLabel(ats)}. Apply on the posting's own page.</p>
       ) : !plan ? (
-        <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}</p>
+        <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}{!canPlan ? <> This posting is missing its board or job id, so a preview isn't possible. Apply on the posting's own page.</> : null}</p>
       ) : (
         <>
           <div role="status" aria-live="polite">
