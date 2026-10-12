@@ -24,21 +24,26 @@ UC-006 sits in front of all apply paths, manual or scheduled.
 
 ### UC-001 Upload résumé, get review
 REQs: REQ-093, REQ-094 · Pre: `careeros init` done · Trigger: drop file on Profile › Résumés
-Main: 1 validate type/size 2 store v1 author=user 3 start review run 4 progress screen streams 5 feedback list shown
+Main: 1 validate type/size 2 store v1 author=user (read-only original) 3 convert → v2 (REQ-124) 4 start review run on v2 5 workspace shows progress 6 feedback cards beside résumé
 Alt: user leaves page → review continues; Résumés row shows "reviewing", reopen shows result
 Fail: bad type/size → inline error, nothing stored · `claude` missing/timeout → `failed` + Retry, file kept
 Outcome: résumé stored, feedback items open
 E2E-001-01: Given fresh profile When upload 1-page PDF Then v1 listed and review result has ≥1 feedback item (fake skill runner).
 E2E-001-02: Given upload When file is `.png` Then error shown and `profile/resumes/` unchanged.
+E2E-001-03: Given upload When conversion adds a date absent from v1 Then no v2, workspace shows v1 + reason, review runs on v1 text.
+E2E-001-04: Given converter drops one v1 line When workspace opens Then "Not carried over" lists it; Restore adds it to draft.
 
 ### UC-002 Improve résumé
 REQs: REQ-095, REQ-096, REQ-097 · Pre: UC-001 done · Trigger: Apply / Comment / Edit on a résumé
-Main: Apply → section rewrite → guard → vN+1 author=ai + diff · Comment → suggestion re-drafted → Apply or Dismiss · Edit → save vN+1 author=user
+Main: hover card → quote highlighted · Accept → guarded rewrite replaces quote in draft (inline diff) · Reject · Revert from History · Edit in place → draft (autosaved) · Next/Done → one vN+1, per-change authors (REQ-125, REQ-126)
 Fail: guard finds new number/employer/tool → version not created, item shows reason
 Outcome: new version, provenance recorded
-E2E-002-01: Given item When Apply Then v2 author=ai, diff shown, item `applied`.
+E2E-002-01: Given item When Accept + Done Then one new version, change tagged ai, inline diff shown, item `applied`.
+E2E-002-05: Given 2 accepts + 1 edit When Done Then exactly one new version; Revert of 1 accept before Done leaves its text unchanged.
+E2E-002-06: Given draft When page reloaded or "← Résumés" Then Profile row shows "Draft"; reopen restores draft + History.
+E2E-002-07: Given 4 items, 2 handled When "Next: Saved answers" Then one version, résumé master, Saved answers opens, 2 items still open.
 E2E-002-02: Given AI rewrite adding "40%" absent from v1 When guard runs Then no v2, item open with reason.
-E2E-002-03: Given v2 When manual edit + Save Then v3 author=user.
+E2E-002-03: Given v2 When manual edit + Done Then v3 author=user.
 E2E-002-04: Given v1 "supported migration" When rewrite says "led migration" Then no v2, item open with reason.
 
 ### UC-003 Check ATS read, set master
@@ -53,7 +58,8 @@ E2E-003-02: Given A master When mark B master Then A=`variant`, diff proposed, m
 REQs: REQ-100 · Trigger: open résumé
 Main: list résumés → versions (author, time, source) → open any → delete old version
 Fail: delete latest master version / master résumé → refused with reason
-E2E-004-01: Given v1..v3 When delete v1 Then v2,v3 remain; delete v3 of master refused.
+E2E-004-01: Given v1..v3 When delete v2 Then v1,v3 remain; delete v3 of master refused; delete v1 (original) refused.
+E2E-004-02: Given v2,v3 When open v3 in version history + "Show changes" Then removed text struck through, added text in AI colour; "Restore this version" makes it the draft.
 
 ### UC-005 Writing samples
 REQs: REQ-101 · Trigger: upload/remove on Profile › Writing samples

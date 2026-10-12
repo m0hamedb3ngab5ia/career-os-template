@@ -197,6 +197,7 @@ All uploads + versions live under `profile/` (gitignored, REQ-003). One profile 
 Profile page has a Résumés section; accepts PDF or DOCX ≤5 MB (Q-009); stored with its original file.
 Given Profile page · When user drops `cv.pdf` · Then file stored under `profile/resumes/<rid>/`, v1 (author=user) listed, review starts (REQ-094).
 Failure: wrong type/too big → inline error, nothing stored. Corrupt/unreadable → stored, ATS view (REQ-098) warns "no text found".
+Changed 2026-10-12 (DEC-012): upload = v1 original file, read-only forever; then convert (REQ-124) → v2; review runs on v2. Upload lands in the workspace (REQ-125).
 
 ### REQ-094 Background résumé review with progress
 Upload starts one headless review run (skill, no API key); UI shows live progress; result = feedback items `{id, section, issue, suggestion}`.
@@ -204,17 +205,18 @@ Given upload done · When review runs · Then progress screen streams steps; on 
 Failure: `claude` missing/timeout → review state `failed` + Retry; upload kept. Events: run log like REQ-040.
 
 ### REQ-095 Apply feedback with one click
-Apply → AI rewrites only the targeted section → new version (author=ai), diff shown, undo = open previous version.
-Given feedback item · When Apply · Then new version vN+1 author=ai; item marked applied.
+Changed 2026-10-12 (DEC-012, wireframe). Accept (✓) → AI rewrite of the item's `quote` replaces it in place in the draft (REQ-126), shown as inline suggestion (deleted struck through, inserted in AI colour); card leaves margin → History. Reject (✕) same, text unchanged. Revert from History or ⌘Z. No version per accept.
+Given feedback item · When Accept · Then draft text changed in place, item `accepted` (draft), entry in History, no new version until Next/Done.
 Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version, nor stronger claims (scope, outcome, seniority verb e.g. supported → led) (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
 
-### REQ-096 Comment on feedback
-User comment on an item replaces one-click: AI re-drafts the suggestion using the comment (Q-010); user then Applies or Dismisses. Comments kept on the item.
-Given item · When user comments "keep the Python line" · Then suggestion regenerated honoring comment; nothing written to résumé until Apply.
+### REQ-096 Reply on feedback, optional Apply comment
+Changed 2026-10-12 (Q-023): any card (suggestion or comment) has a reply thread, Google-Docs style. Reply box has checkbox "Apply comment": checked → reply sent to AI as feedback; it re-drafts the suggestion (or turns a comment into a suggestion) and posts a short reply. Unchecked → reply kept as a note, no AI run. Replies kept on the item, join the draft (REQ-126). Re-draft still a suggestion: nothing changes in the résumé until ✓.
+Given suggestion · When user replies "keep the Python line" with Apply comment checked · Then suggestion re-drafted honoring it, thread shows reply + AI reply; résumé text unchanged until ✓.
+Given card · When user replies with Apply comment unchecked · Then reply saved on card; no AI run.
 
 ### REQ-097 Edit résumé by hand
-In-app text editor on the parsed résumé content; Save → new version author=user. No guard (user owns facts).
-Given v2 · When user edits a bullet + Save · Then v3 author=user, v2 unchanged.
+Changed 2026-10-12: edit text in place in the workspace (structured fields: bullets, headings, contact), never raw LaTeX. Edits join the draft (REQ-126), change tagged author=user. No guard (user owns facts).
+Given v2 · When user edits a bullet + Next/Done · Then v3 holds the edit tagged user, v2 unchanged.
 
 ### REQ-098 ATS view
 Per version: plain text an ATS would read + parsed fields (contact, sections, roles+dates, skills) + warnings (images, tables, multi-column, missing contact, unreadable dates). Deterministic, no LLM.
@@ -228,6 +230,28 @@ Given 2 résumés · When mark B master · Then A becomes `variant`, master.yaml
 ### REQ-100 Résumé list + version history
 List all résumés (name, type, latest version, date). Per résumé: versions with author user|ai, time, source (upload/edit/feedback id). Open any version (view + ATS view). Delete non-latest versions; latest of master can't be deleted; deleting a whole résumé allowed unless master.
 Given master v1..v3 · When delete v1 · Then v2,v3 remain · When delete v3 · Then refused with reason.
+Changed 2026-10-12 (wireframe): in workspace, "All changes saved" opens version history panel: Current + versions newest first; select → read-only view, "Show changes" (inline diff vs previous), "Restore this version" (becomes draft, History cleared). No "Compare with…" (dropped). Any "new version" toast links to that version; never a bare "Applied vN". v1 (original upload) never deletable.
+
+### REQ-124 Convert upload to structured résumé
+After upload, AI converts v1 text into structured résumé (`resume_schema.md` shape: identity, sections, roles, bullets) → v2 author=ai source=convert, rendered with `templates/resume/default.tex` (PDF when LaTeX present) and HTML (REQ-125).
+Guard: v2 may not add numbers, employers, titles, dates or tools absent from v1 text (REQ-095 guard). Dropped text (v1 lines not in v2) listed in a "Not carried over" panel; each line → Restore (adds to draft).
+Given 1-page PDF · When convert · Then v2 structured, guard passes, dropped list shown (may be empty).
+Failure: guard fails or no text → v2 not created, workspace shows v1 read-only + reason + Retry; review still runs on v1 text.
+
+### REQ-125 Résumé workspace page
+Changed 2026-10-12 (wireframe `mockups/resume-workspace.html`). Route `/resumes/<rid>`, full page. Header: "← Résumés" (back to Profile › Résumés, no confirm: autosaved) · name · "All changes saved" (REQ-100 history) · "↶ History (n)" · "N open" / "All handled" · one primary: onboarding → "Next: <next checklist step>" (first run: Saved answers), else "Done". Open items never block primary.
+Body: résumé HTML render (our template look, no LaTeX) with inline suggestions; margin cards aligned to their text (Google Docs: active card level with its text, others stack without overlap). Click text ↔ card pairs both; hover card highlights its text. Card text = why, one line. Format-kind items (no quote) at top. AI comments (no rewrite) = yellow, ✓ resolve only.
+Primary click → one version (REQ-126); onboarding also sets master (REQ-099) → next step.
+Profile › Résumés keeps one row per résumé: name, role, status (Reviewing / Draft / Ready / Failed), one primary action linking to the workspace; errors inline banner + fix button. ATS view (REQ-098) = workspace tab.
+Given review done with 3 items · When open workspace + click item 2 · Then item 2 text highlighted and card level with it, others not.
+Given 2 of 4 items handled · When "Next: Saved answers" · Then new version, résumé master, Saved answers opens, 2 items still open on résumé.
+
+### REQ-126 Autosaved draft, one version per Next/Done
+Changed 2026-10-12 (wireframe). Accepts, rejects, resolves, restores and hand edits collect in one draft per résumé, autosaved server-side ("Saving…" → "All changes saved"), survives leaving page/restart. Each change records author (ai|user) + feedback id. History (n) lists handled items (Accepted/Rejected/Resolved/Restored + text), each Revert → item open again, any order; ⌘Z/⌘⇧Z undo/redo last change. No Save, no Discard (Revert / Restore version cover it).
+Next/Done → one version vN+1 with per-change authors (label "you + AI" when mixed); handled items final, open items stay open for later. Leave via "← Résumés" or nav with changes → draft kept, Profile row status "Draft" until Next/Done. No changes → no draft, status unchanged.
+Given draft with 2 accepts + 1 edit · When Done · Then exactly one new version, 3 changes tagged ai, ai, user; toast links to vN+1.
+Given 1 accept · When "← Résumés" · Then row shows "Draft"; reopen → accepted text + History (1) restored.
+Given accept then Revert in History · Then suggestion open again, text as before, History (0).
 
 ### REQ-101 Writing samples
 Same Profile page: upload past cover letters / writing (txt, md, pdf, docx ≤5 MB) → `profile/voice/samples/`. List + remove. Any change re-runs `learn-voice` in background → `style_guide.md` Learned section. Cover letters use it; `voice_verified` true iff ≥1 sample.

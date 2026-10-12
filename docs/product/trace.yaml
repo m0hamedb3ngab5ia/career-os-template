@@ -1,180 +1,944 @@
-# Canonical status + links. See ~/.claude/skills/product/SKILL.md.
 user_requirements:
-  USR-001: {status: proposed, provenance: observed}
-  USR-002: {status: approved, provenance: confirmed}
-  USR-003: {status: approved, provenance: confirmed}
-  USR-004: {status: approved, provenance: confirmed}
-  USR-005: {status: proposed, provenance: observed}
-  USR-006: {status: proposed, provenance: observed}
-  USR-007: {status: proposed, provenance: observed}
-  USR-008: {status: proposed, provenance: observed}
-  USR-009: {status: proposed, provenance: observed}
-  USR-010: {status: proposed, provenance: observed}
-  USR-011: {status: proposed, provenance: observed}
-  USR-012: {status: proposed, provenance: observed}
-  USR-013: {status: proposed, provenance: observed}
-  USR-014: {status: proposed, provenance: observed}
-  USR-015: {status: proposed, provenance: observed}
-  USR-016: {status: proposed, provenance: observed}
-  USR-017: {status: proposed, provenance: observed}
-  USR-018: {status: proposed, provenance: observed}
-  USR-019: {status: proposed, provenance: observed}
-  USR-020: {status: proposed, provenance: observed}
-  USR-021: {status: proposed, provenance: observed}
-  USR-022: {status: approved, provenance: confirmed}
-  USR-023: {status: approved, provenance: confirmed}
-  USR-024: {status: approved, provenance: confirmed}
-  USR-025: {status: approved, provenance: confirmed}
-  USR-026: {status: approved, provenance: confirmed}
-  USR-027: {status: approved, provenance: confirmed}
-  USR-028: {status: approved, provenance: confirmed}
-  USR-029: {status: approved, provenance: confirmed}
-  USR-030: {status: approved, provenance: confirmed}
-  USR-031: {status: approved, provenance: confirmed}
-  USR-032: {status: approved, provenance: confirmed}
-  USR-033: {status: approved, provenance: confirmed}
-  USR-034: {status: approved, provenance: confirmed}
-  USR-035: {status: approved, provenance: confirmed}
-  USR-036: {status: approved, provenance: confirmed}
-  USR-037: {status: approved, provenance: confirmed}
+  USR-001:
+    status: proposed
+    provenance: observed
+  USR-002:
+    status: approved
+    provenance: confirmed
+  USR-003:
+    status: approved
+    provenance: confirmed
+  USR-004:
+    status: approved
+    provenance: confirmed
+  USR-005:
+    status: proposed
+    provenance: observed
+  USR-006:
+    status: proposed
+    provenance: observed
+  USR-007:
+    status: proposed
+    provenance: observed
+  USR-008:
+    status: proposed
+    provenance: observed
+  USR-009:
+    status: proposed
+    provenance: observed
+  USR-010:
+    status: proposed
+    provenance: observed
+  USR-011:
+    status: proposed
+    provenance: observed
+  USR-012:
+    status: proposed
+    provenance: observed
+  USR-013:
+    status: proposed
+    provenance: observed
+  USR-014:
+    status: proposed
+    provenance: observed
+  USR-015:
+    status: proposed
+    provenance: observed
+  USR-016:
+    status: proposed
+    provenance: observed
+  USR-017:
+    status: proposed
+    provenance: observed
+  USR-018:
+    status: proposed
+    provenance: observed
+  USR-019:
+    status: proposed
+    provenance: observed
+  USR-020:
+    status: proposed
+    provenance: observed
+  USR-021:
+    status: proposed
+    provenance: observed
+  USR-022:
+    status: approved
+    provenance: confirmed
+  USR-023:
+    status: approved
+    provenance: confirmed
+  USR-024:
+    status: approved
+    provenance: confirmed
+  USR-025:
+    status: approved
+    provenance: confirmed
+  USR-026:
+    status: approved
+    provenance: confirmed
+  USR-027:
+    status: approved
+    provenance: confirmed
+  USR-028:
+    status: approved
+    provenance: confirmed
+  USR-029:
+    status: approved
+    provenance: confirmed
+  USR-030:
+    status: approved
+    provenance: confirmed
+  USR-031:
+    status: approved
+    provenance: confirmed
+  USR-032:
+    status: approved
+    provenance: confirmed
+  USR-033:
+    status: approved
+    provenance: confirmed
+  USR-034:
+    status: approved
+    provenance: confirmed
+  USR-035:
+    status: approved
+    provenance: confirmed
+  USR-036:
+    status: approved
+    provenance: confirmed
+  USR-037:
+    status: approved
+    provenance: confirmed
 requirements:
-  REQ-001: {status: proposed, provenance: observed, user_requirements: [USR-001]}
-  REQ-002: {status: proposed, provenance: observed, user_requirements: [USR-001, USR-023]}
-  REQ-003: {status: proposed, provenance: observed, user_requirements: [USR-001]}
-  REQ-004: {status: proposed, provenance: observed, user_requirements: [USR-001]}
-  REQ-010: {status: proposed, provenance: observed, user_requirements: [USR-005]}
-  REQ-011: {status: proposed, provenance: observed, user_requirements: [USR-005]}
-  REQ-012: {status: proposed, provenance: observed, user_requirements: [USR-005]}
-  REQ-013: {status: proposed, provenance: observed, user_requirements: [USR-006]}
-  REQ-014: {status: proposed, provenance: observed, user_requirements: [USR-006]}
-  REQ-015: {status: proposed, provenance: observed, user_requirements: [USR-006]}
-  REQ-016: {status: proposed, provenance: observed, user_requirements: [USR-006]}
-  REQ-020: {status: proposed, provenance: observed, user_requirements: [USR-005]}
-  REQ-021: {status: proposed, provenance: observed, user_requirements: [USR-007]}
-  REQ-022: {status: proposed, provenance: observed, user_requirements: [USR-007]}
-  REQ-023: {status: proposed, provenance: observed, user_requirements: [USR-007]}
-  REQ-024: {status: proposed, provenance: observed, user_requirements: [USR-008]}
-  REQ-025: {status: proposed, provenance: observed, user_requirements: [USR-008]}
-  REQ-026: {status: proposed, provenance: observed, user_requirements: [USR-007]}
-  REQ-027: {status: proposed, provenance: observed, user_requirements: [USR-009]}
-  REQ-030: {status: proposed, provenance: observed, user_requirements: [USR-010]}
-  REQ-031: {status: proposed, provenance: observed, user_requirements: [USR-010]}
-  REQ-032: {status: proposed, provenance: observed, user_requirements: [USR-011]}
-  REQ-033: {status: proposed, provenance: confirmed, user_requirements: [USR-011]}
-  REQ-034: {status: proposed, provenance: observed, user_requirements: [USR-010]}
-  REQ-035: {status: proposed, provenance: observed, user_requirements: [USR-011]}
-  REQ-036: {status: proposed, provenance: observed, user_requirements: [USR-010]}
-  REQ-037: {status: proposed, provenance: observed, user_requirements: [USR-010]}
-  REQ-038: {status: proposed, provenance: inferred, user_requirements: [USR-010]}
-  REQ-040: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-041: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-042: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-043: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-044: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-045: {status: proposed, provenance: observed, user_requirements: [USR-012]}
-  REQ-046: {status: proposed, provenance: confirmed, user_requirements: [USR-011]}
-  REQ-050: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-051: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-052: {status: proposed, provenance: observed, user_requirements: [USR-014]}
-  REQ-053: {status: proposed, provenance: observed, user_requirements: [USR-015, USR-026, USR-027]}
-  REQ-054: {status: proposed, provenance: observed, user_requirements: [USR-015]}
-  REQ-060: {status: proposed, provenance: observed, user_requirements: [USR-016]}
-  REQ-061: {status: proposed, provenance: observed, user_requirements: [USR-016]}
-  REQ-062: {status: rejected, provenance: confirmed, user_requirements: [USR-016]}
-  REQ-063: {status: proposed, provenance: inferred, user_requirements: [USR-017]}
-  REQ-070: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-071: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-072: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-073: {status: proposed, provenance: observed, user_requirements: [USR-014]}
-  REQ-074: {status: proposed, provenance: observed, user_requirements: [USR-013]}
-  REQ-075: {status: proposed, provenance: observed, user_requirements: [USR-018]}
-  REQ-076: {status: proposed, provenance: observed, user_requirements: [USR-018]}
-  REQ-077: {status: proposed, provenance: observed, user_requirements: [USR-016]}
-  REQ-078: {status: proposed, provenance: confirmed}
-  REQ-079: {status: proposed, provenance: inferred, user_requirements: [USR-021]}
-  REQ-090: {status: proposed, provenance: observed, user_requirements: [USR-019]}
-  REQ-091: {status: proposed, provenance: observed, user_requirements: [USR-019]}
-  REQ-092: {status: proposed, provenance: inferred, user_requirements: [USR-020]}
-  REQ-093: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
-  REQ-094: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-001-01, E2E-001-02]}
-  REQ-095: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03, E2E-002-04]}
-  REQ-096: {status: approved, provenance: confirmed, user_requirements: [USR-002], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
-  REQ-097: {status: approved, provenance: confirmed, user_requirements: [USR-002, USR-004], tests: [E2E-002-01, E2E-002-02, E2E-002-03]}
-  REQ-098: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
-  REQ-099: {status: approved, provenance: confirmed, user_requirements: [USR-003], tests: [E2E-003-01, E2E-003-02]}
-  REQ-100: {status: approved, provenance: confirmed, user_requirements: [USR-004], tests: [E2E-004-01]}
-  REQ-101: {status: approved, provenance: confirmed, user_requirements: [USR-022], tests: [E2E-005-01]}
-  REQ-102: {status: approved, provenance: confirmed, user_requirements: [USR-023], tests: [E2E-006-01, E2E-006-02]}
-  REQ-103: {status: approved, provenance: confirmed, user_requirements: [USR-023], tests: [E2E-006-01, E2E-006-02]}
-  REQ-104: {status: approved, provenance: confirmed, user_requirements: [USR-024], tests: [E2E-007-01, E2E-007-02]}
-  REQ-105: {status: approved, provenance: confirmed, user_requirements: [USR-025], tests: [E2E-008-01, E2E-008-02]}
-  REQ-106: {status: approved, provenance: confirmed, user_requirements: [USR-026], tests: [E2E-008-01, E2E-008-02]}
-  REQ-107: {status: approved, provenance: confirmed, user_requirements: [USR-027], tests: [E2E-009-01]}
-  REQ-108: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-01]}
-  REQ-109: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-01]}
-  REQ-110: {status: approved, provenance: confirmed, user_requirements: [USR-033], tests: [E2E-012-02]}
-  REQ-111: {status: approved, provenance: confirmed, user_requirements: [USR-028, USR-031], tests: [E2E-010-01]}
-  REQ-112: {status: approved, provenance: confirmed, user_requirements: [USR-031], tests: [E2E-011-01]}
-  REQ-113: {status: approved, provenance: confirmed, user_requirements: [USR-031], tests: [E2E-011-01]}
-  REQ-114: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
-  REQ-115: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-01]}
-  REQ-116: {status: approved, provenance: confirmed, user_requirements: [USR-028], tests: [E2E-010-02]}
-  REQ-117: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-01]}
-  REQ-118: {status: approved, provenance: confirmed, user_requirements: [USR-034], tests: [E2E-013-02]}
-  REQ-119: {status: approved, provenance: confirmed, user_requirements: [USR-035]}
-  REQ-120: {status: approved, provenance: confirmed, user_requirements: [USR-034, USR-036]}
-  REQ-121: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-01]}
-  REQ-122: {status: approved, provenance: confirmed, user_requirements: [USR-037], tests: [E2E-014-02]}
-  REQ-123: {status: approved, provenance: confirmed, user_requirements: [USR-014], tests: []}
-  NFR-001: {status: proposed, provenance: observed}
-  NFR-002: {status: proposed, provenance: observed}
-  NFR-003: {status: proposed, provenance: observed}
-  NFR-004: {status: proposed, provenance: observed}
-  NFR-005: {status: proposed, provenance: inferred}
+  REQ-001:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-001
+  REQ-002:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-001
+    - USR-023
+  REQ-003:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-001
+  REQ-004:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-001
+  REQ-010:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-005
+  REQ-011:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-005
+  REQ-012:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-005
+  REQ-013:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-006
+  REQ-014:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-006
+  REQ-015:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-006
+  REQ-016:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-006
+  REQ-020:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-005
+  REQ-021:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-007
+  REQ-022:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-007
+  REQ-023:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-007
+  REQ-024:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-008
+  REQ-025:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-008
+  REQ-026:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-007
+  REQ-027:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-009
+  REQ-030:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-010
+  REQ-031:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-010
+  REQ-032:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-011
+  REQ-033:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-011
+  REQ-034:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-010
+  REQ-035:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-011
+  REQ-036:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-010
+  REQ-037:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-010
+  REQ-038:
+    status: proposed
+    provenance: inferred
+    user_requirements:
+    - USR-010
+  REQ-040:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-041:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-042:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-043:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-044:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-045:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-012
+  REQ-046:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-011
+  REQ-050:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-051:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-052:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-014
+  REQ-053:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-015
+    - USR-026
+    - USR-027
+  REQ-054:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-015
+  REQ-060:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-016
+  REQ-061:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-016
+  REQ-062:
+    status: rejected
+    provenance: confirmed
+    user_requirements:
+    - USR-016
+  REQ-063:
+    status: proposed
+    provenance: inferred
+    user_requirements:
+    - USR-017
+  REQ-070:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-071:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-072:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-073:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-014
+  REQ-074:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-013
+  REQ-075:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-018
+  REQ-076:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-018
+  REQ-077:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-016
+  REQ-078:
+    status: proposed
+    provenance: confirmed
+  REQ-079:
+    status: proposed
+    provenance: inferred
+    user_requirements:
+    - USR-021
+  REQ-090:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-019
+  REQ-091:
+    status: proposed
+    provenance: observed
+    user_requirements:
+    - USR-019
+  REQ-092:
+    status: proposed
+    provenance: inferred
+    user_requirements:
+    - USR-020
+  REQ-093:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    tests:
+    - E2E-001-01
+    - E2E-001-02
+    - E2E-001-03
+    - E2E-001-04
+  REQ-094:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    tests:
+    - E2E-001-01
+    - E2E-001-02
+  REQ-095:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    - USR-004
+    tests:
+    - E2E-002-01
+    - E2E-002-02
+    - E2E-002-03
+    - E2E-002-04
+    - E2E-002-05
+  REQ-096:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    tests:
+    - E2E-002-01
+    - E2E-002-02
+    - E2E-002-03
+  REQ-097:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    - USR-004
+    tests:
+    - E2E-002-01
+    - E2E-002-02
+    - E2E-002-03
+  REQ-098:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-003
+    tests:
+    - E2E-003-01
+    - E2E-003-02
+  REQ-099:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-003
+    tests:
+    - E2E-003-01
+    - E2E-003-02
+  REQ-100:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-004
+    tests:
+    - E2E-004-01
+    - E2E-004-02
+  REQ-101:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-022
+    tests:
+    - E2E-005-01
+  REQ-102:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-023
+    tests:
+    - E2E-006-01
+    - E2E-006-02
+  REQ-103:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-023
+    tests:
+    - E2E-006-01
+    - E2E-006-02
+  REQ-104:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-024
+    tests:
+    - E2E-007-01
+    - E2E-007-02
+  REQ-105:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-025
+    tests:
+    - E2E-008-01
+    - E2E-008-02
+  REQ-106:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-026
+    tests:
+    - E2E-008-01
+    - E2E-008-02
+  REQ-107:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-027
+    tests:
+    - E2E-009-01
+  REQ-108:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-033
+    tests:
+    - E2E-012-01
+  REQ-109:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-033
+    tests:
+    - E2E-012-01
+  REQ-110:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-033
+    tests:
+    - E2E-012-02
+  REQ-111:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-028
+    - USR-031
+    tests:
+    - E2E-010-01
+  REQ-112:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-031
+    tests:
+    - E2E-011-01
+  REQ-113:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-031
+    tests:
+    - E2E-011-01
+  REQ-114:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-028
+    tests:
+    - E2E-010-01
+  REQ-115:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-028
+    tests:
+    - E2E-010-01
+  REQ-116:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-028
+    tests:
+    - E2E-010-02
+  REQ-117:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-034
+    tests:
+    - E2E-013-01
+  REQ-118:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-034
+    tests:
+    - E2E-013-02
+  REQ-119:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-035
+  REQ-120:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-034
+    - USR-036
+  REQ-121:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-037
+    tests:
+    - E2E-014-01
+  REQ-122:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-037
+    tests:
+    - E2E-014-02
+  REQ-123:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-014
+    tests: []
+  REQ-124:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    tests:
+    - E2E-001-03
+    - E2E-001-04
+  REQ-125:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    tests:
+    - E2E-002-01
+    - E2E-002-07
+  REQ-126:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-002
+    - USR-004
+    tests:
+    - E2E-002-05
+    - E2E-002-06
+    - E2E-002-07
+  NFR-001:
+    status: proposed
+    provenance: observed
+  NFR-002:
+    status: proposed
+    provenance: observed
+  NFR-003:
+    status: proposed
+    provenance: observed
+  NFR-004:
+    status: proposed
+    provenance: observed
+  NFR-005:
+    status: proposed
+    provenance: inferred
 use_cases:
-  UC-001: {status: approved, requirements: [REQ-093, REQ-094]}
-  UC-002: {status: approved, requirements: [REQ-095, REQ-096, REQ-097]}
-  UC-003: {status: approved, requirements: [REQ-098, REQ-099]}
-  UC-004: {status: approved, requirements: [REQ-100]}
-  UC-005: {status: approved, requirements: [REQ-101]}
-  UC-006: {status: approved, requirements: [REQ-102, REQ-103]}
-  UC-007: {status: approved, requirements: [REQ-104]}
-  UC-008: {status: approved, requirements: [REQ-105, REQ-106]}
-  UC-009: {status: approved, requirements: [REQ-107]}
-  UC-010: {status: approved, requirements: [REQ-111, REQ-114, REQ-115, REQ-116]}
-  UC-011: {status: approved, requirements: [REQ-112, REQ-113]}
-  UC-012: {status: approved, requirements: [REQ-108, REQ-109, REQ-110]}
-  UC-013: {status: approved, requirements: [REQ-117, REQ-118, REQ-120]}
-  UC-014: {status: approved, requirements: [REQ-119, REQ-121, REQ-122]}
+  UC-001:
+    status: approved
+    requirements:
+    - REQ-093
+    - REQ-094
+    - REQ-124
+    - REQ-125
+  UC-002:
+    status: approved
+    requirements:
+    - REQ-095
+    - REQ-096
+    - REQ-097
+    - REQ-125
+    - REQ-126
+  UC-003:
+    status: approved
+    requirements:
+    - REQ-098
+    - REQ-099
+  UC-004:
+    status: approved
+    requirements:
+    - REQ-100
+  UC-005:
+    status: approved
+    requirements:
+    - REQ-101
+  UC-006:
+    status: approved
+    requirements:
+    - REQ-102
+    - REQ-103
+  UC-007:
+    status: approved
+    requirements:
+    - REQ-104
+  UC-008:
+    status: approved
+    requirements:
+    - REQ-105
+    - REQ-106
+  UC-009:
+    status: approved
+    requirements:
+    - REQ-107
+  UC-010:
+    status: approved
+    requirements:
+    - REQ-111
+    - REQ-114
+    - REQ-115
+    - REQ-116
+  UC-011:
+    status: approved
+    requirements:
+    - REQ-112
+    - REQ-113
+  UC-012:
+    status: approved
+    requirements:
+    - REQ-108
+    - REQ-109
+    - REQ-110
+  UC-013:
+    status: approved
+    requirements:
+    - REQ-117
+    - REQ-118
+    - REQ-120
+  UC-014:
+    status: approved
+    requirements:
+    - REQ-119
+    - REQ-121
+    - REQ-122
 flows:
-  FLOW-001: {status: approved, use_cases: [UC-001, UC-002, UC-003, UC-005, UC-006]}
-  FLOW-002: {status: approved, use_cases: [UC-002]}
-  FLOW-003: {status: approved, use_cases: [UC-010]}
-  FLOW-004: {status: draft, use_cases: [UC-007, UC-013]}
+  FLOW-001:
+    status: approved
+    use_cases:
+    - UC-001
+    - UC-002
+    - UC-003
+    - UC-005
+    - UC-006
+  FLOW-002:
+    status: approved
+    use_cases:
+    - UC-002
+  FLOW-003:
+    status: approved
+    use_cases:
+    - UC-010
+  FLOW-004:
+    status: draft
+    use_cases:
+    - UC-007
+    - UC-013
 tasks:
-  TASK-001: {status: done, requirements: [REQ-108]}
-  TASK-002: {status: done, requirements: [REQ-109], use_cases: [UC-012]}
-  TASK-003: {status: done, requirements: [REQ-110], use_cases: [UC-012]}
-  TASK-004: {status: done, requirements: [REQ-098]}
-  TASK-005: {status: done, requirements: [REQ-102, REQ-103]}
-  TASK-006: {status: done, requirements: [REQ-104]}
-  TASK-007: {status: done, requirements: [REQ-093, REQ-099, REQ-100], use_cases: [UC-001]}
-  TASK-008: {status: done, requirements: [REQ-094, REQ-095, REQ-096, REQ-097], use_cases: [UC-002], flows: [FLOW-002]}
-  TASK-009: {status: done, requirements: [REQ-099], use_cases: [UC-003]}
-  TASK-010: {status: done, requirements: [REQ-111, REQ-115]}
-  TASK-011: {status: done, requirements: [REQ-112, REQ-113], use_cases: [UC-011]}
-  TASK-012: {status: done, requirements: [REQ-114, REQ-116], use_cases: [UC-010], flows: [FLOW-003]}
-  TASK-013: {status: done, requirements: [REQ-107, REQ-101, REQ-102], use_cases: [UC-005, UC-006], flows: [FLOW-001]}
-  TASK-014: {status: done, requirements: [REQ-105, REQ-106]}
-  TASK-015: {status: done, requirements: [REQ-104, REQ-109, REQ-114, REQ-115]}
-  TASK-016: {status: done, requirements: [REQ-118], use_cases: [UC-013]}
-  TASK-017: {status: done, requirements: [REQ-117, REQ-120], use_cases: [UC-013], flows: [FLOW-004]}
-  TASK-018: {status: done, requirements: [REQ-119, REQ-120]}
-  TASK-019: {status: done, requirements: [REQ-121], use_cases: [UC-014]}
-  TASK-020: {status: done, requirements: [REQ-122], use_cases: [UC-014]}
-  TASK-021: {status: done, requirements: [REQ-101]}
-  TASK-022: {status: done, requirements: [REQ-094, REQ-095, REQ-096, REQ-097, REQ-099]}
-  TASK-023: {status: done, requirements: [REQ-105], use_cases: [UC-008]}
-  TASK-024: {status: todo, requirements: [REQ-095, REQ-097]}
-  TASK-025: {status: done, requirements: [REQ-114, REQ-116], use_cases: [UC-010], flows: [FLOW-003]}
-  TASK-026: {status: todo, requirements: [REQ-123, REQ-052, REQ-073]}
+  TASK-001:
+    status: done
+    requirements:
+    - REQ-108
+  TASK-002:
+    status: done
+    requirements:
+    - REQ-109
+    use_cases:
+    - UC-012
+  TASK-003:
+    status: done
+    requirements:
+    - REQ-110
+    use_cases:
+    - UC-012
+  TASK-004:
+    status: done
+    requirements:
+    - REQ-098
+  TASK-005:
+    status: done
+    requirements:
+    - REQ-102
+    - REQ-103
+  TASK-006:
+    status: done
+    requirements:
+    - REQ-104
+  TASK-007:
+    status: done
+    requirements:
+    - REQ-093
+    - REQ-099
+    - REQ-100
+    use_cases:
+    - UC-001
+  TASK-008:
+    status: done
+    requirements:
+    - REQ-094
+    - REQ-095
+    - REQ-096
+    - REQ-097
+    use_cases:
+    - UC-002
+    flows:
+    - FLOW-002
+  TASK-009:
+    status: done
+    requirements:
+    - REQ-099
+    use_cases:
+    - UC-003
+  TASK-010:
+    status: done
+    requirements:
+    - REQ-111
+    - REQ-115
+  TASK-011:
+    status: done
+    requirements:
+    - REQ-112
+    - REQ-113
+    use_cases:
+    - UC-011
+  TASK-012:
+    status: done
+    requirements:
+    - REQ-114
+    - REQ-116
+    use_cases:
+    - UC-010
+    flows:
+    - FLOW-003
+  TASK-013:
+    status: done
+    requirements:
+    - REQ-107
+    - REQ-101
+    - REQ-102
+    use_cases:
+    - UC-005
+    - UC-006
+    flows:
+    - FLOW-001
+  TASK-014:
+    status: done
+    requirements:
+    - REQ-105
+    - REQ-106
+  TASK-015:
+    status: done
+    requirements:
+    - REQ-104
+    - REQ-109
+    - REQ-114
+    - REQ-115
+  TASK-016:
+    status: done
+    requirements:
+    - REQ-118
+    use_cases:
+    - UC-013
+  TASK-017:
+    status: done
+    requirements:
+    - REQ-117
+    - REQ-120
+    use_cases:
+    - UC-013
+    flows:
+    - FLOW-004
+  TASK-018:
+    status: done
+    requirements:
+    - REQ-119
+    - REQ-120
+  TASK-019:
+    status: done
+    requirements:
+    - REQ-121
+    use_cases:
+    - UC-014
+  TASK-020:
+    status: done
+    requirements:
+    - REQ-122
+    use_cases:
+    - UC-014
+  TASK-021:
+    status: done
+    requirements:
+    - REQ-101
+  TASK-022:
+    status: done
+    requirements:
+    - REQ-094
+    - REQ-095
+    - REQ-096
+    - REQ-097
+    - REQ-099
+  TASK-023:
+    status: done
+    requirements:
+    - REQ-105
+    use_cases:
+    - UC-008
+  TASK-024:
+    status: todo
+    requirements:
+    - REQ-095
+    - REQ-097
+  TASK-025:
+    status: done
+    requirements:
+    - REQ-114
+    - REQ-116
+    use_cases:
+    - UC-010
+    flows:
+    - FLOW-003
+  TASK-026:
+    status: todo
+    requirements:
+    - REQ-123
+    - REQ-052
+    - REQ-073

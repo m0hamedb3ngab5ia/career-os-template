@@ -7,9 +7,10 @@ UCs: UC-001, UC-002, UC-003, UC-005, UC-006
 flowchart TD
   A[Open app] --> B{Readiness all must-haves?}
   B -- no --> C[Checklist: next open item + link]
-  C --> D[Profile › Résumés: upload]
-  D --> E[Review progress] --> F[Feedback: apply / comment / edit]
-  F --> G[Make master → approve master.yaml diff]
+  C --> D[Profile › Résumés: upload → Résumé workspace]
+  D --> E[Review progress] --> F[Workspace: accept / reject / edit, autosaved]
+  F -- "← Résumés" --> K[Row shows Draft] --> C
+  F -- "Next: Saved answers, open items OK" --> G[Version + master → approve master.yaml diff]
   G --> H[Saved answers: work auth, salary]
   H --> I[Optional: writing samples]
   I --> B
@@ -22,14 +23,18 @@ UCs: UC-002
 ```mermaid
 stateDiagram-v2
   [*] --> open
-  open --> applied: Apply (guard ok)
-  open --> open: Apply (guard fails, reason shown)
+  open --> accepted: Accept (guard ok, text replaced in draft)
+  open --> open: Accept (guard fails, reason shown)
+  accepted --> open: Revert (History) / ⌘Z
   open --> redrafting: Comment
   redrafting --> open: new suggestion
   open --> dismissed: Dismiss
+  dismissed --> open: Revert (History) / ⌘Z
+  accepted --> applied: Next / Done
   applied --> [*]
   dismissed --> [*]
 ```
+What to notice: `accepted` lives only in the autosaved draft (REQ-126); Next/Done turns every accepted card into `applied` in one version. `open` items survive Next, so partial review is fine.
 What to notice: nothing reaches the résumé except via `applied`, and only after the zero-fabrication guard.
 
 ### FLOW-003 Check a job
