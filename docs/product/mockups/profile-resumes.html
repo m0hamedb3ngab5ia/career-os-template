@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Profile résumés wireframe</title>
+<!-- TASK-033b: Profile › Résumés row status (Reviewing/Draft/Ready/Failed) and the "Not carried over" list (DEC-019).
+     Not carried over lives on the résumé detail page (and may be mounted in the workspace). Static. -->
+<style>body{font:14px/1.5 system-ui;margin:24px;max-width:640px}.row{display:flex;gap:8px;align-items:center;padding:8px 0;border-bottom:1px solid #ddd}.g{flex:1}
+.b{border-radius:99px;padding:0 8px;font-size:12px;border:1px solid}.reviewing{color:#0b57d0}.draft{color:#a15c00}.ready{color:#188038}.failed{color:#b3261e}</style></head><body>
+<h2>Résumés</h2>
+<div class="row"><span class="g"><b>Master résumé</b> <span class="b ready">Ready</span> · Updated Oct 1</span><a href="#">Edit</a><a href="#">View</a></div>
+<div class="row"><span class="g"><b>alt.pdf</b> <span class="b draft">Draft</span></span><a href="#">Edit</a></div>
+<div class="row"><span class="g"><b>new.pdf</b> <span class="b reviewing">Reviewing</span></span><a href="#">Edit</a></div>
+<div class="row"><span class="g"><b>bad.pdf</b> <span class="b failed">Failed</span></span><button>Retry import</button></div>
+<h2>Not carried over</h2>
+<p>These lines from your upload weren't added to your résumé. Restore any you want to keep.</p>
+<div class="row"><span class="g">References available on request</span><button>Restore</button></div>
+<div class="row"><span class="g">Hobbies: chess</span><span class="b ready">Restored</span></div>
+</body></html>
