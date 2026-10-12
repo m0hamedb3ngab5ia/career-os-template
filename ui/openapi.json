@@ -678,15 +678,6 @@
       },
       "AnnotationIn": {
         "properties": {
-          "author": {
-            "default": "user",
-            "enum": [
-              "user",
-              "ai"
-            ],
-            "title": "Author",
-            "type": "string"
-          },
           "kind": {
             "enum": [
               "suggestion",
@@ -6019,15 +6010,6 @@
       },
       "Reply": {
         "properties": {
-          "author": {
-            "default": "user",
-            "enum": [
-              "user",
-              "ai"
-            ],
-            "title": "Author",
-            "type": "string"
-          },
           "text": {
             "title": "Text",
             "type": "string"
@@ -13112,7 +13094,7 @@
     },
     "/api/profile/resumes/{rid}/annotations/{aid}/accept": {
       "post": {
-        "description": "User accept: target changed -> 409 {message, expected, current}; zero-fabrication guard refuses -> 422 with\nthe reasons; else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).",
+        "description": "User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard\nrefuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).\nUser suggestion: no guard, one draft change author=user.",
         "operationId": "accept_annotation_api_profile_resumes__rid__annotations__aid__accept_post",
         "parameters": [
           {

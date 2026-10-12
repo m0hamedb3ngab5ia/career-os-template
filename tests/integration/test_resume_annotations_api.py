@@ -7,6 +7,7 @@ from pathlib import Path
 import pytest
 from conftest import make_temp_root
 
+from careeros import annotations as ann
 from careeros import resumes
 
 pytestmark = pytest.mark.integration
@@ -36,19 +37,21 @@ def test_annotations_api(tmp_path: Path):
     tid = "experience-1.b1"
     with TestClient(app) as c:
         assert c.get(url).json() == []
-        r = c.post(url, json={"kind": "suggestion", "target_id": tid, "proposed": "Built a thing", "author": "ai"},
-                   headers=W)
+        # AI annotations come only through the Python API (part B CLI); HTTP is the user's UI
+        good = ann.create(root, rid, kind="suggestion", target_id=tid, proposed="Built a thing", author="ai")["id"]
+        bad = ann.create(root, rid, kind="suggestion", target_id=tid, proposed="Led the thing for 9 years",
+                         author="ai")["id"]
+        r = c.post(url, json={"kind": "suggestion", "target_id": tid, "proposed": "Built thing"}, headers=W)
         assert r.status_code == 201 and r.json()["base"] == "Built the thing"
-        good = r.json()["id"]
-        bad = c.post(url, json={"kind": "suggestion", "target_id": tid, "proposed": "Led the thing for 9 years"},
-                     headers=W).json()["id"]
-        late = c.post(url, json={"kind": "suggestion", "target_id": tid, "proposed": "Built thing"}, headers=W).json()["id"]
-        com = c.post(url, json={"kind": "comment", "target_id": tid, "text": "why?"}, headers=W).json()["id"]
+        late = r.json()["id"]
+        r = c.post(url, json={"kind": "comment", "target_id": tid, "text": "why?", "author": "ai"}, headers=W)
+        assert r.json()["author"] == "user"  # author is not client-settable
+        com = r.json()["id"]
         assert c.post(url, json={"kind": "suggestion", "target_id": tid}, headers=W).status_code == 422
         assert c.post(url, json={"kind": "comment", "target_id": "nope", "text": "x"}, headers=W).status_code == 404
 
         r = c.post(f"{url}/{com}/replies", json={"text": "because", "author": "ai"}, headers=W)
-        assert r.status_code == 200 and r.json()["replies"][0]["author"] == "ai"
+        assert r.status_code == 200 and r.json()["replies"][0]["author"] == "user"
         r = c.post(f"{url}/{bad}/accept", headers=W)
         assert r.status_code == 422 and "9" in r.json()["detail"]
         r = c.post(f"{url}/{good}/accept", headers=W)
@@ -63,4 +66,11 @@ def test_annotations_api(tmp_path: Path):
         st = {i["id"]: i["status"] for i in c.get(url).json()}
         assert st == {good: "accepted", bad: "rejected", late: "outdated", com: "outdated"}
         assert c.post(f"{url}/zz/accept", headers=W).status_code == 404
+        fbp = root / "profile/resumes" / rid / "feedback.json"
+        fbp.write_text(json.dumps({"review": None, "items": [{"id": "f1", "section": "S", "issue": "i",
+                       "suggestion": "s", "quote": None, "state": "open", "comments": [], "reason": None,
+                       "v": 1}]}), encoding="utf-8")
+        r = c.post(f"{url}/f1/reject", headers=W)  # a migrated review item, rejected over the API
+        assert r.status_code == 200 and r.json()["status"] == "rejected"
+        assert {i["id"]: i["status"] for i in c.get(url).json()}["f1"] == "rejected"
         assert c.get("/api/profile/resumes/nope/annotations").status_code == 404

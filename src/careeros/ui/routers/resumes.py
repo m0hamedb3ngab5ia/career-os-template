@@ -137,12 +137,11 @@ class AnnotationIn(BaseModel):
     target_id: str | None = None  # a draft bullet id or top-level text field
     text: str = ""
     proposed: str | None = None  # suggestion: the replacement text
-    author: Author = "user"
+    # no `author`: HTTP is the user's UI, so always "user"; AI writes via annotations.create/reply (CLI)
 
 
 class Reply(BaseModel):
     text: str
-    author: Author = "user"
 
 
 class Annotation(BaseModel):  # DEC-016
@@ -351,19 +350,20 @@ def list_annotations(rid: str, c=Depends(ctx)) -> list[Annotation]:
 @router.post("/profile/resumes/{rid}/annotations", status_code=201)
 def create_annotation(rid: str, body: AnnotationIn, c=Depends(ctx)) -> Annotation:
     with _refusals():
-        return Annotation(**ann.create(c.settings.root, rid, **body.model_dump()))
+        return Annotation(**ann.create(c.settings.root, rid, **body.model_dump(), author="user"))
 
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/replies")
 def reply_annotation(rid: str, aid: str, body: Reply, c=Depends(ctx)) -> Annotation:
     with _refusals():
-        return Annotation(**ann.reply(c.settings.root, rid, aid, body.text, author=body.author))
+        return Annotation(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
 
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/accept")
 def accept_annotation(rid: str, aid: str, c=Depends(ctx)) -> Draft:
-    """User accept: target changed -> 409 {message, expected, current}; zero-fabrication guard refuses -> 422 with
-    the reasons; else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment)."""
+    """User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard
+    refuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).
+    User suggestion: no guard, one draft change author=user."""
     with _refusals():
         return Draft(**ann.accept(c.settings.root, rid, aid))
 
