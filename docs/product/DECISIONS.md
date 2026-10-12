@@ -149,3 +149,10 @@ Decision: every upload (master, variant, other) → existing text extraction (DE
 Why: one import pipeline; import must never invent content.
 Alternatives: separate converter skill (second pipeline); trust the model (fabrication risk).
 Consequences: one AI run per upload = visible wait during onboarding (DEC-011 cost, accepted).
+
+### DEC-020 Published résumé versions store JSON only; outputs rendered on demand
+Reasoned by: human (2026-10-12; outside review of TASK-031 on storage, agent pushed back on content-addressing and retention)
+Decision: a published version is `resume.json` (DEC-018) + `changes.jsonl` (authors, moved from the draft, not copied). Text, ATS, `.tex` and PDF are derived on demand through one store helper; only the latest version's PDF is cached (`cache/`, keyed by hash(resume.json) + renderer version, disposable). v1 keeps the original upload and its extracted `text.txt` (import guard source, DEC-019). Unchanged hash = no new version; published versions are never deleted.
+Why: measured per version ~10 KB JSON vs ~65 KB of derivable text/ATS/.tex/PDF; storage grows by the source only.
+Alternatives: store all outputs per version (~7x storage); content-addressed blobs (saves only on non-adjacent identical versions, adds indirection); retention policy (deletes history, not needed at ~10 KB/version).
+Consequences: an old version re-rendered after a template change looks new, not as published; PDFs actually sent to employers live in the job folder, unaffected. Readers of `text.txt`/`ats.json` for v2+ go through the helper.
