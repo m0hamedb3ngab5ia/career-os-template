@@ -420,6 +420,16 @@ export interface paths {
      */
     get: operations["resume_file_api_profile_resumes__rid__file_get"];
   };
+  "/api/profile/resumes/{rid}/import": {
+    /** Get Import */
+    get: operations["get_import_api_profile_resumes__rid__import_get"];
+    /** Retry Import */
+    post: operations["retry_import_api_profile_resumes__rid__import_post"];
+  };
+  "/api/profile/resumes/{rid}/import/dropped/{did}/restore": {
+    /** Restore Dropped */
+    post: operations["restore_dropped_api_profile_resumes__rid__import_dropped__did__restore_post"];
+  };
   "/api/profile/resumes/{rid}/master": {
     /** Set Master */
     post: operations["set_master_api_profile_resumes__rid__master_post"];
@@ -1330,6 +1340,15 @@ export interface components {
       /** Rev */
       rev: number;
     };
+    /** Dropped */
+    Dropped: {
+      /** Id */
+      id: string;
+      /** Restored */
+      restored: boolean;
+      /** Text */
+      text: string;
+    };
     /** Due */
     Due: {
       /** Due */
@@ -1626,6 +1645,24 @@ export interface components {
     Ids: {
       /** Ids */
       ids: string[];
+    };
+    /** ImportState */
+    ImportState: {
+      /** At */
+      at?: string | null;
+      /**
+       * Dropped
+       * @default []
+       */
+      dropped?: components["schemas"]["Dropped"][];
+      /** N */
+      n?: number | null;
+      /** Reason */
+      reason?: string | null;
+      /** Run */
+      run?: string | null;
+      /** State */
+      state?: string | null;
     };
     /** InboxAvailability */
     InboxAvailability: {
@@ -2507,6 +2544,11 @@ export interface components {
       /** Rows */
       rows: components["schemas"]["TileRow"][];
     };
+    /** RestoreIn */
+    RestoreIn: {
+      /** Entry */
+      entry?: string | null;
+    };
     /** Resume */
     Resume: {
       /** Category */
@@ -3190,6 +3232,8 @@ export interface components {
     };
     /** Uploaded */
     Uploaded: {
+      /** Import Run */
+      import_run?: string | null;
       /** N */
       n: number;
       /** Review Run */
@@ -5481,6 +5525,78 @@ export interface operations {
       /** @description Successful Response */
       200: {
         content: never;
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Import */
+  get_import_api_profile_resumes__rid__import_get: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["ImportState"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Retry Import */
+  retry_import_api_profile_resumes__rid__import_post: {
+    parameters: {
+      path: {
+        rid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      202: {
+        content: {
+          "application/json": components["schemas"]["Started"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Restore Dropped */
+  restore_dropped_api_profile_resumes__rid__import_dropped__did__restore_post: {
+    parameters: {
+      path: {
+        rid: string;
+        did: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["RestoreIn"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Draft"];
+        };
       };
       /** @description Validation Error */
       422: {
