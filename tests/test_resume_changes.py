@@ -113,3 +113,72 @@ def test_user_texts_counts_only_bullets_a_user_change_last_wrote(tmp_path: Path)
     resumes.put_draft(tmp_path, rid, d, rev=1, author="ai")
     assert resumes.user_texts(tmp_path, rid) == {"Mine"}
     assert resumes.user_texts(tmp_path, "nope") == set()
+
+
+def _add(d: dict, bid: str, text: str, **kw) -> None:
+    d["experience"][0]["bullets"].append({"id": bid, "text": text, **kw})
+
+
+def _bullet(d: dict, bid: str) -> dict:
+    return next(b for b in d["experience"][0]["bullets"] if b["id"] == bid)
+
+
+def test_user_texts_ignores_user_lines_that_left_the_text_unchanged(tmp_path: Path):  # DEC-020
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "ai1", "AI text")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="ai")
+    _bullet(d, "ai1")["origin"] = "user"
+    resumes.put_draft(tmp_path, rid, d, rev=1, author="user")
+    assert _log(tmp_path, rid)[-1]["author"] == "user"
+    assert "AI text" not in resumes.user_texts(tmp_path, rid)
+
+
+def test_user_texts_revert_inherits_the_restored_texts_author(tmp_path: Path):  # DEC-020
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "mine", "Mine", origin="user")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="user")
+    _bullet(d, "mine")["text"] = "AI rewrite"
+    del _bullet(d, "mine")["origin"]  # DEC-018: an AI text edit drops the mark
+    resumes.put_draft(tmp_path, rid, d, rev=1, author="ai")
+    resumes.revert_change(tmp_path, rid, _log(tmp_path, rid)[-1]["id"])
+    assert resumes.user_texts(tmp_path, rid) == {"Mine"}
+
+    tmp_path = tmp_path / "second"
+    tmp_path.mkdir()
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "ai1", "AI text")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="ai")
+    _bullet(d, "ai1")["text"] = "User text"
+    resumes.put_draft(tmp_path, rid, d, rev=1, author="user")
+    assert resumes.user_texts(tmp_path, rid) == {"User text"}
+    resumes.revert_change(tmp_path, rid, _log(tmp_path, rid)[-1]["id"])
+    assert _log(tmp_path, rid)[-1]["author"] == "user"  # the actor stays on disk
+    assert resumes.user_texts(tmp_path, rid) == set()
+
+
+def test_user_texts_last_author_wins(tmp_path: Path):  # DEC-020, no monkeypatch
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "mine", "Mine", origin="user")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="user")
+    assert resumes.user_texts(tmp_path, rid) == {"Mine"}
+    _bullet(d, "mine")["text"] = "AI took over"
+    del _bullet(d, "mine")["origin"]
+    resumes.put_draft(tmp_path, rid, d, rev=1, author="ai")
+    assert resumes.user_texts(tmp_path, rid) == set()
+
+
+def test_truncated_log_line_is_skipped_and_next_append_starts_a_new_line(tmp_path: Path):
+    rid = _resume(tmp_path)
+    d = _copy()
+    _add(d, "mine", "Mine", origin="user")
+    resumes.put_draft(tmp_path, rid, d, rev=0, author="user")
+    p = tmp_path / "profile/resumes" / rid / "draft.changes.jsonl"
+    p.write_text(p.read_text(encoding="utf-8") + '{"id": "2.1", "kind": "bul', encoding="utf-8")
+    assert resumes.user_texts(tmp_path, rid) == {"Mine"} and len(resumes.changes(tmp_path, rid)) == 1
+    d["summary"] = "S2"
+    resumes.put_draft(tmp_path, rid, d, rev=1, author="user")
+    assert [c["target_id"] for c in resumes.changes(tmp_path, rid)] == ["mine", "summary"]

@@ -420,7 +420,10 @@ def _commit(d: Path, prev: dict[str, Any], doc: dict[str, Any], latest: dict[str
     lines = [{"id": f"{rev}.{k}", "at": _now(), "author": author, **c, **({"reverts": reverts} if reverts else {})}
              for k, c in enumerate(_diff(old or {}, doc), 1)]
     if lines:
-        with open(d / "draft.changes.jsonl", "a", encoding="utf-8") as f:
+        log = d / "draft.changes.jsonl"
+        torn = log.is_file() and log.stat().st_size and not log.read_bytes().endswith(b"\n")
+        with open(log, "a", encoding="utf-8") as f:
+            f.write("\n" if torn else "")  # a crash-truncated last line stays its own (skipped) line
             f.writelines(json.dumps(c, ensure_ascii=False) + "\n" for c in lines)
             f.flush()
             os.fsync(f.fileno())
@@ -506,7 +509,16 @@ def _text(v: Any) -> Any:
 
 
 def _read_log(p: Path) -> list[dict[str, Any]]:
-    return [json.loads(line) for line in p.read_text(encoding="utf-8").splitlines() if line.strip()] if p.is_file() else []
+    """Parsed log lines; an unparsable (e.g. crash-truncated) line is skipped, which only loses provenance (fails closed)."""
+    out = []
+    for line in p.read_text(encoding="utf-8").splitlines() if p.is_file() else []:
+        try:
+            c = json.loads(line)
+        except ValueError:
+            continue
+        if isinstance(c, dict):
+            out.append(c)
+    return out
 
 
 def changes(root: Path, rid: str) -> list[dict[str, Any]]:
@@ -519,7 +531,7 @@ def revert_change(root: Path, rid: str, cid: str) -> dict[str, Any]:
     change's `after`; else Conflict. Returns get_draft's shape."""
     with _locked(root):
         d, prev, latest = _draft_state(root, rid)
-        c = next((c for c in _read_log(d / "draft.changes.jsonl") if c.get("id") == cid), None)
+        c = next((c for c in reversed(_read_log(d / "draft.changes.jsonl")) if c.get("id") == cid), None)
         if c is None:
             raise LookupError(f"no change {cid!r}")
         doc = migrate(prev["resume"])
@@ -532,20 +544,33 @@ def revert_change(root: Path, rid: str, cid: str) -> dict[str, Any]:
 
 
 def user_texts(root: Path, rid: str) -> set[str]:
-    """DEC-020: bullet texts whose latest logged change (published versions' changes.jsonl, then the draft's) is a
-    user change that wrote that text. Only these make `origin: "user"` count."""
+    """DEC-020: bullet texts a user wrote, replaying the logs (published versions' changes.jsonl, then the draft's).
+    Per bullet, the current text's author is the last line that changed the text (an add, or before.text !=
+    after.text); a line leaving the text as is keeps the previous author; a revert line inherits whoever wrote the
+    text it restores, not its actor. Only user-authored texts make `origin: "user"` count."""
     try:
         d = _dir(root, rid)
     except LookupError:
         return set()
     logs = sorted(d.glob("v*/changes.jsonl"), key=lambda p: int(p.parent.name[1:]) if p.parent.name[1:].isdigit() else 0)
-    last: dict[str, dict[str, Any]] = {}
+    cur: dict[str, tuple[Any, str | None]] = {}  # bullet id -> (text, its author)
     for p in [*logs, d / "draft.changes.jsonl"]:
+        prior: dict[str, str | None] = {}  # line id -> author of the text it replaced (newest line per id wins)
         for c in _read_log(p):
-            if c.get("kind") == "bullet":
-                last[str(c.get("target_id"))] = c
-    return {c["after"]["text"] for c in last.values() if c.get("author") == "user"
-            and isinstance(c.get("after"), dict) and isinstance(c["after"].get("text"), str)}
+            if c.get("kind") != "bullet":
+                continue
+            bid = str(c.get("target_id"))
+            was = cur.get(bid, (None, None))
+            prior[str(c.get("id"))] = was[1]
+            text = _text(c.get("after"))
+            if c.get("reverts") is not None:
+                who = prior.get(str(c["reverts"]))
+            elif c.get("op") == "add" or _text(c.get("before")) != text:
+                who = c.get("author")
+            else:
+                who = was[1]
+            cur[bid] = (text, who)
+    return {t for t, who in cur.values() if who == "user" and isinstance(t, str)}
 
 
 def cleanup_tmp(root: Path, max_age: float = 600) -> int:
