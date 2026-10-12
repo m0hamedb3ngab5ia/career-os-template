@@ -636,14 +636,67 @@ def test_bullet_without_id_fails(tmp_path: Path, bullet) -> None:
 
 
 
-def test_v1_bullet_without_source_is_not_traced_but_bold_still_checked(tmp_path: Path) -> None:
+def _v1(job: Path, *bullets: dict) -> Path:
+    return _resume_with(job, schema_version=1, projects=[], experience=[
+        {"id": "experience-1", "source": "acme", "bullets": list(bullets)}])
+
+
+def test_v1_user_origin_bullet_is_not_traced_but_bold_still_checked(tmp_path: Path) -> None:
     """DEC-018: in a schema v1 résumé, only bullets with `source` are traced to master.yaml."""
-    job = _resume_with(make_job(tmp_path), schema_version=1, projects=[], experience=[
-        {"id": "experience-1", "source": "acme", "bullets": [{"id": "experience-1.b1", "text": "Managed **hiring"}]}])
-    res = run(job)
+    res = run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "text": "Managed **hiring", "origin": "user"}))
     assert by_name(res, "bullet_fidelity")["ok"] is True
-    assert "1 bullet without source" in by_name(res, "bullet_fidelity")["detail"]
     assert by_name(res, "bold_markup")["ok"] is False  # the full résumé, not the trace view
+
+
+def test_v1_unsourced_ai_bullet_fails(tmp_path: Path) -> None:
+    """DEC-018 amendment: a missing `source` is never read as user-written."""
+    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "text": "Managed global hiring"})),
+                "bullet_fidelity")
+    assert c["ok"] is False and "experience-1.b1" in c["detail"] and "no source" in c["detail"]
+
+
+@pytest.mark.parametrize("source", ["acme.99", "acme", "nope"])  # unknown id; an entry id, not a bullet
+def test_v1_bogus_source_fails(tmp_path: Path, source: str) -> None:
+    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "source": source, "text": ACME_1})),
+                "bullet_fidelity")
+    assert c["ok"] is False and "not a master.yaml bullet" in c["detail"]
+
+
+def test_v1_sourced_bullet_with_drifted_text_fails(tmp_path: Path) -> None:
+    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "source": "acme.1",
+                                             "text": "Led company-wide hiring strategy"})), "bullet_fidelity")
+    assert c["ok"] is False and "acme.1" in c["detail"]
+
+
+def test_v1_user_origin_bullet_passes_and_is_reported_unverified(tmp_path: Path) -> None:
+    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "source": "acme.1", "text": ACME_1},
+                        {"id": "experience-1.b2", "text": "Mentored new team members", "origin": "user"})),
+                "bullet_fidelity")
+    assert c["ok"] is True, c["detail"]
+    assert c["detail"].startswith("1 bullets match") and "user-written, unverified: ['experience-1.b2']" in c["detail"]
+
+
+def test_v1_origin_other_than_user_is_not_user_written(tmp_path: Path) -> None:
+    c = by_name(run(_v1(make_job(tmp_path), {"id": "experience-1.b1", "text": "Mentored", "origin": "ai"})),
+                "bullet_fidelity")
+    assert c["ok"] is False
+
+
+def test_legacy_resume_ignores_origin(tmp_path: Path) -> None:
+    """Pre-v1 files keep their rules exactly: every bullet needs a master id; `origin` changes nothing."""
+    job = _resume_with(make_job(tmp_path), experience=[{"id": "acme", "bullets": [
+        {"id": "acme.1", "text": ACME_1}, {"text": "Mentored new team members", "origin": "user"}]}])
+    c = by_name(run(job), "bullet_fidelity")
+    assert c["ok"] is False and "without an id" in c["detail"] and "unverified" not in c["detail"]
+    job2 = _resume_with(make_job(tmp_path / "b"), experience=[{"id": "acme", "bullets": [{"id": "acme.1", "text": ACME_1}]}])
+    c2 = by_name(run(job2), "bullet_fidelity")
+    assert c2["ok"] is True and c2["detail"].endswith("bullets match master text/variants")
+
+
+def test_bullet_provenance_is_the_bullet_fidelity_check(tmp_path: Path) -> None:
+    from careeros.qa import bullet_provenance
+    job = _v1(make_job(tmp_path), {"id": "experience-1.b1", "text": "Managed global hiring"})
+    assert bullet_provenance(job, ROOT) == by_name(run(job), "bullet_fidelity")
 
 
 def test_unknown_resume_schema_version_is_a_hard_fail(tmp_path: Path) -> None:

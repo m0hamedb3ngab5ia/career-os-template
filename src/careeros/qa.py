@@ -492,7 +492,9 @@ class Checker:
         self.posting = _read_json(job_dir / "posting.json")
         self.score = _read_json(job_dir / "score.json")
         # DEC-018: resume_doc = the migrated résumé; resume_json = its trace view (ids = master.yaml sources)
-        self.resume_doc, self.resume_json, self.unsourced_bullets = _resume_views(_read_json(job_dir / "resume.json"))
+        raw_resume = _read_json(job_dir / "resume.json")
+        self.resume_v1 = isinstance(raw_resume, dict) and raw_resume.get("schema_version") is not None
+        self.resume_doc, self.resume_json, self.unsourced_bullets = _resume_views(raw_resume)
         self.resume_txt = _read_text(job_dir / "resume.txt")
         self.cover_md = _read_text(job_dir / "cover_letter.md")
         self.answers = _read_json(job_dir / "answers.json")
@@ -987,15 +989,27 @@ class Checker:
                 n += 1
                 bid = str(b["id"])
                 sources = self.profile.bullet_sources(bid)
-                if sources and not bullet_text_allowed(strip_bold(b["text"]), sources):
+                if not sources and self.resume_v1:  # DEC-018 amendment: `source` must name a master.yaml bullet
+                    problems.append(f"source '{bid}' is not a master.yaml bullet")
+                elif sources and not bullet_text_allowed(strip_bold(b["text"]), sources):
                     problems.append(f"'{bid}' text differs from master text/variants: {str(b['text'])[:80]!r}")
+        # DEC-018 amendment: an unsourced v1 bullet passes only when marked origin "user" (user-written, never
+        # fact-verified, so listed apart); a missing `source` is never read as user-written
+        user: list[str] = []
+        for e in self._resume_entries(self.resume_doc) if self.resume_v1 else []:
+            for b in e.get("bullets") or []:
+                if isinstance(b, dict) and not b.get("source"):
+                    if b.get("origin") == "user":
+                        user.append(str(b.get("id")))
+                    else:
+                        problems.append(f"'{b.get('id')}' has no source and is not origin \"user\": "
+                                        "an AI bullet must cite a master.yaml bullet")
         summary = rj.get("summary")
         if summary:
             variants = [strip_bold(v).strip() for v in (self.profile.profile.get("summary_variants") or {}).values()]
             if strip_bold(summary).strip() not in variants:
                 problems.append("summary is not one of profile.summary_variants")
-        k = self.unsourced_bullets
-        skipped = f"; {k} bullet{'' if k == 1 else 's'} without source not checked" if k else ""
+        skipped = f"; {len(user)} user-written, unverified: {user}" if user else ""
         self.add("bullet_fidelity", "hard", not problems,
                  (f"{n} bullets match master text/variants" if not problems else "; ".join(problems)) + skipped)
 
@@ -1478,6 +1492,14 @@ class Checker:
             "outreach_policy": self.extras.get("outreach_policy", {}),
             "pdf_fidelity": self.extras.get("pdf_fidelity", {}),
         }
+
+
+def bullet_provenance(job_dir: str | Path, root: str | Path) -> dict[str, Any]:
+    """The bullet_fidelity check alone for one job dir (DEC-018 amendment): the apply gate re-runs it in code
+    rather than trust the skill-written prepare.json `qa_pass`."""
+    ck = Checker(Path(job_dir), Path(root))
+    ck.check_bullet_fidelity()
+    return ck.checks[-1]
 
 
 def run_deterministic(job_dir: str | Path, root: str | Path | None = None) -> dict[str, Any]:

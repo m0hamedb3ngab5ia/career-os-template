@@ -61,6 +61,12 @@ class Fake:
         if mode == "lie_prepared":  # wrote a passing prepare.json but left status.json at scored
             (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True, "status": "queued"}))
             return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued"}))
+        if mode == "origin":  # the AI marks its own bullet user-written (DEC-018 amendment: never allowed)
+            store.set_status(jid, "queued", "fake prepare")
+            (store.job_dir(jid) / "resume.json").write_text(json.dumps({"schema_version": 1, "experience": [
+                {"id": "experience-1", "source": "acme", "bullets": [
+                    {"id": "experience-1.b1", "text": "Invented a claim", "origin": "user"}]}]}))
+            return parse_stream(events({"skill": "prepare-job", "job_id": jid, "status": "queued", "qa_pass": True}))
         if mode == "garbage":
             return parse_stream(events(None))
         if mode == "usage_limit":
@@ -130,6 +136,17 @@ def test_result_that_disagrees_with_status_json_is_invalid(settings, store):
     (att,) = RunStore(settings).load_attempts(RunStore(settings).list_runs()[0]["id"])
     assert att["outcome"] == "invalid_result" and "status.json" in att["detail"]
     assert jid
+
+
+def test_ai_prepare_cannot_mark_bullets_user_written(settings, store):
+    """DEC-018 amendment: the tailor path strips `origin` from the AI's résumé and fails the attempt, so the
+    bullet reads as unsourced (hard QA fail) and never ships as user-written."""
+    jid = add_job(store, 1)
+    batch(settings, "prepare", Fake(settings, default="origin"))
+    (att,) = RunStore(settings).load_attempts(RunStore(settings).list_runs()[0]["id"])
+    assert att["outcome"] == "invalid_result" and "origin" in att["detail"] and "experience-1.b1" in att["detail"]
+    rj = json.loads((store.job_dir(jid) / "resume.json").read_text())
+    assert "origin" not in rj["experience"][0]["bullets"][0]
 
 
 def test_failed_job_is_retried_once_then_becomes_an_action_item(settings, store):
