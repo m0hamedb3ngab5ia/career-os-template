@@ -167,3 +167,24 @@ def test_draft_text_is_the_rendered_draft(tmp_path: Path):
         r = c.get(url + "/text")
         assert "Mine" in r.text and r.headers["content-type"].startswith("text/plain")
         assert c.get("/api/profile/resumes/nope/draft/text").status_code == 404
+
+
+def test_import_state_without_import_json_is_empty_200(tmp_path: Path):
+    """A résumé that was never imported: GET .../import is 200 {state: null, dropped: []}, not 404."""
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    from careeros.config import Settings
+    from careeros.ui.app import create_app
+    from careeros.ui.index import Index
+    from careeros.ui.security import LOOPBACK
+
+    root = make_temp_root(tmp_path / "repo")
+    src = tmp_path / "resume.json"
+    src.write_text(json.dumps(DOC), encoding="utf-8")
+    rid = resumes.add_tailored(root, "text", category="x", source="job-1", files={"resume.json": src})["rid"]
+    s = Settings.load(root)
+    app = create_app(s, index=Index(s), broker=None, allowed_hosts=LOOPBACK | {"testserver"}, static_dir=root / "no-static")
+    with TestClient(app) as c:
+        r = c.get(f"/api/profile/resumes/{rid}/import")
+        assert r.status_code == 200 and r.json()["dropped"] == []

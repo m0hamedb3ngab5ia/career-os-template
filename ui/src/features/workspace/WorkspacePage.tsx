@@ -1,15 +1,15 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { type FormEvent, type ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate, useParams } from "react-router";
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
 import { useResumeMeta } from "../profile/api";
-import { atsText } from "./atsText";
+import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput } from "./fields";
 import { History } from "./History";
-import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useDraft, wsKeys } from "./api";
+import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
 import { cap, type Entry, SKIP, sectionOrder, setAt, targetOrder } from "./doc";
 import styles from "./Workspace.module.css";
@@ -27,6 +27,8 @@ function Workspace() {
   const [active, setActive] = useState<string | null>(null);
   const [tab, setTab] = useState<"doc" | "ats">("doc");
   const [history, setHistory] = useState(false);
+  const onboarding = useSearchParams()[0].get("onboarding") === "1";  // FLOW-001: Next replaces Done
+  const ats = useAtsText(rid, tab === "ats");
   const undo = useRef<{ past: Doc[]; future: Doc[]; path: string; at: number }>({ past: [], future: [], path: "", at: 0 });
   const docRef = useRef<Doc | null>(null);
   docRef.current = doc;
@@ -167,7 +169,9 @@ function Workspace() {
 
   return (
     <Page title={title} subtitle={<>{back} · {status} · <span className={styles.muted}>{open.length ? `${open.length} open suggestion${open.length === 1 ? "" : "s"}` : "All handled"}</span></>}
-      actions={<><Button disabled={tab !== "doc"} onClick={() => setHistory((h) => !h)} aria-pressed={history}>↶ History</Button>{" "}<Button variant="primary" pending={done.isPending} pendingLabel="Saving…" disabled={accepting} onClick={() => done.mutate()}>Done</Button></>}>
+      actions={<><Button disabled={tab !== "doc"} onClick={() => setHistory((h) => !h)} aria-pressed={history}>↶ History</Button>{" "}{onboarding
+        ? <NextButton rid={rid} flush={save.flush} onDone={() => void nav("/profile/answers")} />
+        : <Button variant="primary" pending={done.isPending} pendingLabel="Saving…" disabled={accepting} onClick={() => done.mutate()}>Done</Button>}</>}>
       {blocker.state === "blocked" ? (
         <p role="alert" className={styles.alert}>Your latest edits aren’t saved. Leave anyway?{" "}
           <Button size="small" onClick={() => blocker.proceed()}>Leave anyway</Button>{" "}
@@ -176,10 +180,12 @@ function Workspace() {
       {done.isError ? <p role="alert" className={styles.alert}>Couldn’t finish: {errorText(done.error)}. Press Done to try again.</p> : null}
       <div role="tablist" aria-label="Document tabs" className={styles.tabs}>
         {([["doc", "Résumé"], ["ats", "ATS view"]] as const).map(([t, l]) => (
-          <Button key={t} role="tab" aria-selected={tab === t} className={styles.tab} onClick={() => setTab(t)}>{l}</Button>
+          <Button key={t} role="tab" aria-selected={tab === t} className={styles.tab} onClick={() => { if (t === "ats") void save.flush().then(() => setTab(t)); else setTab(t); }}>{l}</Button>
         ))}
       </div>
-      {tab === "ats" ? <pre className={styles.ats} aria-label="ATS view" tabIndex={0}>{atsText(doc)}</pre> : (
+      {tab === "ats" ? (ats.isError
+        ? <p role="alert" className={styles.alert}>Couldn’t load the ATS view: {errorText(ats.error)}</p>
+        : <pre className={styles.ats} aria-label="ATS view" tabIndex={0}>{ats.data ?? "Loading…"}</pre>) : (
       <div className={styles.app}>
         <article className={styles.page} aria-label="Résumé draft">
           <div className={styles.name}>{field("Name", ["identity", "name"], identity.name)}</div>
@@ -219,6 +225,7 @@ function Workspace() {
               onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} flush={save.flush} lock={setAccepting}
               refresh={() => void qc.invalidateQueries({ queryKey: wsKeys.annotations(rid) })} />}
       </div>)}
+      <NotCarriedOver rid={rid} flush={save.flush} onRestored={() => retake.mutate("reload")} />
     </Page>
   );
 }
@@ -262,6 +269,9 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
   const [failed, setFailed] = useState("");
+  const [runId, setRunId] = useState<string | null>(null);  // the Apply-comment re-draft run being followed
+  const follow = useApplyRun(rid, runId);
+  useEffect(() => { if (follow.ended) refresh(); }, [follow.ended, refresh]);  // its suggestions/replies show up
   const sent = useRef("");  // the text actually submitted: the input may change while the send is pending  // reply text whose send failed: the reply may exist server-side, so no resend until edited
   const act = useMutation({
     mutationFn: async (what: "accept" | "reject" | "reply") => {
@@ -273,7 +283,8 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
         } finally { lock(false); }
       } else if (what === "reject") await reject(rid, a.id);
       else {
-        await reply(rid, a.id, text.trim(), apply);
+        const r = await reply(rid, a.id, text.trim(), apply);
+        if (r.run_id) setRunId(r.run_id);
         setText("");
         setApply(false);
       }
@@ -295,6 +306,9 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
       {(a.replies ?? []).map((r, i) => (
         <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>
       ))}
+      {runId && !follow.ended ? <p className={styles.muted} role="status">Claude is revising…</p> : null}
+      {runId && follow.ended && follow.failed ? <p role="alert" className={styles.alert}>Claude couldn’t revise this: {follow.error}. Your comment is saved.</p> : null}
+      {runId && follow.ended && !follow.failed && follow.written ? <p className={styles.muted} role="status">Claude added {follow.written.length} {follow.written.length === 1 ? "response" : "responses"}.</p> : null}
       <form className={styles.replyForm} onSubmit={submit}>
         <input aria-label="Reply" placeholder="Reply…" className={styles.input} value={text} onChange={(e) => setText(e.target.value)} />
         <label className={styles.muted}><input type="checkbox" checked={apply} onChange={(e) => setApply(e.target.checked)} /> Apply comment (Claude revises this)</label>

@@ -1,7 +1,6 @@
 import { act, fireEvent, screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { type Call, mockApi, renderRoutes } from "../../test/mockApi";
-import { atsText } from "./atsText";
 import { WorkspacePage } from "./WorkspacePage";
 
 const routes = [{ path: "/resumes/:rid", element: <WorkspacePage /> }, { path: "/profile", element: <p>Profile page</p> }];
@@ -36,19 +35,6 @@ const tick = (ms: number) => act(async () => { await vi.advanceTimersByTimeAsync
 beforeEach(() => vi.useFakeTimers({ shouldAdvanceTime: true }));
 afterEach(() => vi.useRealTimers());
 
-describe("atsText", () => {
-  it("is plain text: header, summary, sections in order, no suggestions", () => {
-    const t = atsText(DOC);
-    expect(t).toContain("Alex Example\nalex@example.com");
-    expect(t).toMatch(/SUMMARY\nBackend engineer/);
-    expect(t.indexOf("EXPERIENCE")).toBeLessThan(t.indexOf("SKILLS"));
-    expect(t).toContain("- Worked on billing");
-    expect(t).toContain("Stack: Swift, SwiftUI");
-    expect(t).toContain("Languages: Python, SQL");
-    expect(t).not.toContain("Fixed billing");
-  });
-});
-
 describe("Workspace extras", () => {
   it("shows the open-suggestions count", async () => {
     api();
@@ -56,11 +42,11 @@ describe("Workspace extras", () => {
     expect(await screen.findByText("1 open suggestion")).toBeInTheDocument();
   });
 
-  it("ATS view tab shows the plain text and hides the editor", async () => {
-    api();
+  it("ATS view tab shows the server-rendered plain text and hides the editor", async () => {
+    api({ "GET /api/profile/resumes/cv/draft/text": "Alex Example\n- Worked on billing\n" });
     renderRoutes(routes, "/resumes/cv");
     fireEvent.click(await screen.findByRole("tab", { name: "ATS view" }));
-    expect(screen.getByLabelText("ATS view")).toHaveTextContent("- Worked on billing");
+    expect(await screen.findByLabelText("ATS view")).toHaveTextContent("- Worked on billing");
     expect(screen.queryByRole("textbox", { name: "Summary" })).toBeNull();
     fireEvent.click(screen.getByRole("tab", { name: "Résumé" }));
     expect(screen.getByRole("textbox", { name: "Summary" })).toBeInTheDocument();

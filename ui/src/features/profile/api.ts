@@ -8,9 +8,8 @@ export type SavedAnswer = components["schemas"]["SavedAnswer"];
 export type SampleChange = components["schemas"]["SampleChange"];
 type Samples = components["schemas"]["Samples"];
 type Lesson = components["schemas"]["Lesson"];
-// `status` is added by the 033b API; hand-typed until schema.gen.ts carries it.
-export type ResumeStatus = "reviewing" | "draft" | "ready" | "failed";
-type ResumeRow = components["schemas"]["ResumeRow"] & { status?: ResumeStatus };
+type ResumeRow = components["schemas"]["ResumeRow"];
+export type ResumeStatus = ResumeRow["status"];
 export type ImportState = components["schemas"]["ImportState"];
 
 export interface ReadinessItem {

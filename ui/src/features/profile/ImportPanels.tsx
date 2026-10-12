@@ -33,7 +33,7 @@ export function RetryImport({ rid }: { rid: string }) {
  * "Not carried over" (DEC-019): lines the import left out, each restorable into the draft. Self-contained so the
  * workspace page can mount it as well as Profile › résumé.
  */
-export function NotCarriedOver({ rid }: { rid: string }) {
+export function NotCarriedOver({ rid, flush, onRestored }: { rid: string; flush?: () => Promise<boolean>; onRestored?: () => void }) {
   const q = useImport(rid);
   const restore = useProfileWrite(restoreDropped);
   const dropped = q.data?.dropped ?? [];
@@ -48,7 +48,10 @@ export function NotCarriedOver({ rid }: { rid: string }) {
             <span className={styles.grow}>{d.text}</span>
             {d.restored ? <Chip tone="green">Restored</Chip> : (
               <Button size="small" aria-label={`Restore ${d.text}`} pending={restore.isPending && restore.variables?.did === d.id}
-                pendingLabel="Restoring…" onClick={() => restore.mutate({ rid, did: d.id })}>Restore</Button>
+                pendingLabel="Restoring…" onClick={async () => {
+                  if (flush && !(await flush())) return;  // the workspace saves its pending edits first, then reloads the draft
+                  restore.mutate({ rid, did: d.id }, { onSuccess: onRestored });
+                }}>Restore</Button>
             )}
           </li>
         ))}
