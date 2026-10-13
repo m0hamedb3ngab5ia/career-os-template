@@ -167,6 +167,24 @@ def test_qa_step_needs_exactly_a_job_id(rc, kind, job):
     assert FakePopen.calls == []
 
 
+def test_prepare_step_with_force_tailor_runs_a_forced_prepare_that_tailors(rc, settings):
+    """DEC-021 "Tailor instead": QA failed a reused résumé; rerun prepare with a full tailor."""
+    (jid,) = add_jobs(settings, 1)
+    _prepared(settings, jid, status="prepared")
+    out = rc.start_step("prepare", jid, force_tailor=True)
+    cmd = FakePopen.calls[0]["cmd"]
+    assert cmd[3:5] == ["run", "prepare"] and cmd[cmd.index("--job") + 1] == jid
+    assert "--force" in cmd and "--force-tailor" in cmd and out["kind"] == "prepare" and out["run_id"]
+
+
+@pytest.mark.parametrize("kind,job,ft", [("prepare", "nw01", False), ("prepare", None, True), ("qa", "nw01", True),
+                                         ("scout", None, True)])
+def test_force_tailor_only_with_prepare_and_a_job(rc, kind, job, ft):
+    with pytest.raises(ValueError):
+        rc.start_step(kind, job, force_tailor=ft)
+    assert FakePopen.calls == []
+
+
 def test_unknown_step(rc):
     with pytest.raises(ValueError):
         rc.start_step("apply")

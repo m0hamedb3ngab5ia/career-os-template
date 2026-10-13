@@ -1277,7 +1277,8 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
     try:
         with _cancel_on_signals() as cancel:
             rec = run_batch(s, kind, budget, cfg=cfg, trigger=args.trigger, dry_run=args.dry_run, cancel=cancel,
-                            echo=echo, job_ids=job_ids, force=args.force, run_id=args.run_id)
+                            echo=echo, job_ids=job_ids, force=args.force, run_id=args.run_id,
+                            force_tailor=getattr(args, "force_tailor", False))
     except RunBusy as e:
         print(f"run {kind}: {e}; not started", file=sys.stderr)
         return RUN_BUSY_EXIT
@@ -1861,6 +1862,7 @@ def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--job", metavar="JOB_ID", help="run this one job only (exit 2 with the reason if it is not a "
                                                   "candidate); locks, pruned and the company gate still apply")
     p.add_argument("--force", action="store_true", help="with --job: rerun a job that is already scored/prepared")
+    p.add_argument("--force-tailor", action="store_true", help=argparse.SUPPRESS)  # DEC-021 "Tailor instead"
     p.add_argument("--trigger", choices=("manual", "schedule", "catch_up"), default="manual", help=argparse.SUPPRESS)
     p.add_argument("--run-id", help=argparse.SUPPRESS)  # the UI names the run it spawns so it can stream it
     p.add_argument("--json", action="store_true")

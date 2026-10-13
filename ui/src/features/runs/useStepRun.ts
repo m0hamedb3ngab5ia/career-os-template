@@ -4,12 +4,13 @@ import { ApiError, apiFetch, apiSend } from "../../api/client";
 import { runKeys } from "./api";
 import type { RunDetail } from "./types";
 
-type StepRunKind = "scout" | "qa";
+type StepRunKind = "scout" | "qa" | "prepare";
 
 /** One step run the UI started and watches (scout, a job's QA; reusable for Prepare/Apply): start, poll, Stop.
  * The run id lives in the query cache, so leaving the page (Back) keeps watching the same run when you return.
  * Stop kills the process and discards its partial output server side; the page drops the run at once. */
-export function useStepRun(kind: StepRunKind, jobId?: string, onDone?: (run: RunDetail) => void) {
+/** `extra`: more query params for the start call (prepare: `force_tailor=true`, DEC-021). */
+export function useStepRun(kind: StepRunKind, jobId?: string, onDone?: (run: RunDetail) => void, extra?: string) {
   const qc = useQueryClient();
   const key = ["stepRun", kind, jobId ?? ""];
   const runId = useQuery({ queryKey: key, queryFn: () => null as string | null, enabled: false, initialData: null,
@@ -34,7 +35,7 @@ export function useStepRun(kind: StepRunKind, jobId?: string, onDone?: (run: Run
   }, [finished, startError, run.isError]);
   const start = useMutation({
     mutationFn: () =>
-      apiSend<{ run_id: string }>("POST", `/api/runs/steps/${kind}${jobId ? `?job_id=${encodeURIComponent(jobId)}` : ""}`),
+      apiSend<{ run_id: string }>("POST", `/api/runs/steps/${kind}?${[jobId && `job_id=${encodeURIComponent(jobId)}`, extra].filter(Boolean).join("&")}`),
     onSuccess: (r) => qc.setQueryData(key, r.run_id),
   });
   const stop = useMutation({

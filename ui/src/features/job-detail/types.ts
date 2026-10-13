@@ -128,6 +128,7 @@ export type JobDetail = Omit<
   score: Score | null;
   safety: Safety | null;
   qa: Qa | null;
+  resume_choice?: { action?: string } | null; // resume_choice.json (match.pick): reuse | tweak | tailor
   apply_session: ApplySession | null;
   contacts: Contact[];
   registry: Registry;

@@ -217,7 +217,7 @@ class RunControl:
 
     def start(self, kind: str, preset: str | None = None, max_jobs: int | None = None,
               max_minutes: float | None = None, dry_run: bool = False, *, job_id: str | None = None,
-              force: bool = False) -> dict[str, Any]:
+              force: bool = False, force_tailor: bool = False) -> dict[str, Any]:
         """Start a score or prepare batch (same as `careeros run <kind> ...`), or with `job_id` one job's
         score / prepare / apply run (`careeros run <kind> --job <id> [--force]`, run id chosen here and returned
         as `run_id`). A dry run ranks and returns the selection in-process: it never calls Claude and takes no
@@ -273,7 +273,8 @@ class RunControl:
         if max_minutes is not None:
             argv += ["--max-minutes", f"{max_minutes:g}"]
         if job_id:
-            argv += ["--job", job_id, *(["--force"] if force else []), "--run-id", run_id]
+            argv += ["--job", job_id, *(["--force"] if force else []), *(["--force-tailor"] if force_tailor else []),
+                     "--run-id", run_id]
         out = {"kind": kind, **self.spawn(run_id or kind, [*argv, "--json"])}
         return {**out, "run_id": run_id} if job_id else out
 
@@ -309,10 +310,18 @@ class RunControl:
         return None
 
     def start_step(self, kind: str, job_id: str | None = None, resume: str | None = None,
-                   item: str | None = None) -> dict[str, Any]:
+                   item: str | None = None, force_tailor: bool = False) -> dict[str, Any]:
         """Start scout | tracker | prune (--yes) | inbox_sync | qa (`job_id` required) as a recorded step run.
-        Scout and qa get their run id here (returned as `run_id`), so the UI can watch and cancel exactly that run."""
+        Scout and qa get their run id here (returned as `run_id`), so the UI can watch and cancel exactly that run.
+        `prepare` + `job_id` + `force_tailor` (DEC-021 "Tailor instead"): a forced one-job prepare that tailors."""
         from careeros.ui.services.step import step_lock_path
+
+        if force_tailor or kind == "prepare":
+            if not (force_tailor and kind == "prepare" and job_id):
+                raise ValueError("force_tailor needs the prepare step and a job id")
+            if not re.fullmatch(r"\w[\w.-]*", job_id):
+                raise ValueError(f"bad job id {job_id!r}")
+            return self.start("prepare", job_id=job_id, force=True, force_tailor=True)
 
         if kind not in STEP_KINDS:
             raise ValueError(f"unknown step {kind!r}; use one of {', '.join(STEP_KINDS)}")
