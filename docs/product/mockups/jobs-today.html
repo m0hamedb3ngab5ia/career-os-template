@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Jobs on Today wireframe</title>
+<!-- Static wireframe for DEC-022: SCREEN-Today (to-be), SCREEN-Jobs (to-be), Board view (06_IA.md Delta 2026-10-13).
+     REQ-071 REQ-072 REQ-127..132, UC-015 UC-016, FLOW-004 FLOW-005. Fictional data only. Minimal: only what the flow needs. -->
+<style>
+:root{--bg:#fff;--group:#f0f2f5;--card:#fff;--fill:#eeebe3;--sep:#dadce0;--label:#1d1d1f;--sec:#5f6368;--accent:#0b57d0;--focus:#0b57d0;--sel:#d3e3fd;
+--amber:#a34700;--amberb:#fdeedc;--red:#b3261e;--redb:#fce8e6;--green:#188038;--greenb:#e6f4ea;--grey:#80868b;--shadow:0 1px 2px rgba(60,64,67,.3)}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1f1f1f;--group:#131314;--card:#2d2e30;--fill:#3c4043;--sep:#444746;--label:#e3e3e3;--sec:#a8abaf;--accent:#a8c7fa;--focus:#a8c7fa;--sel:#0842a0;
+--amber:#ffb340;--amberb:#3a2a12;--red:#f2b8b5;--redb:#601410;--green:#6dd58c;--greenb:#0f3a1f;--grey:#9aa0a6;--shadow:0 1px 2px #000}}
+*{box-sizing:border-box}body{margin:0;background:var(--group);color:var(--label);font:14px/1.45 -apple-system,"SF Pro Text",system-ui}
+h1,h2,h3,p{margin:0}a{color:var(--accent);text-decoration:none}
+button{font:inherit;color:inherit;border:0;background:none;border-radius:99px;padding:6px 12px;cursor:pointer;white-space:nowrap}button:hover{background:var(--fill)}
+button.primary{background:var(--accent);color:var(--bg)}button.ic{padding:4px 8px;color:var(--sec)}button[disabled]{opacity:.45;cursor:not-allowed}
+:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.intro{max-width:1100px;margin:0 auto;padding:16px}.intro p{color:var(--sec)}
+.frame{max-width:1100px;margin:0 auto 32px;padding:0 16px}
+.cap{display:flex;flex-wrap:wrap;gap:4px 12px;align-items:baseline;margin:0 0 8px}.cap h2{font-size:15px}.ref{font-size:11px;color:var(--sec);font-family:ui-monospace,Menlo,monospace}
+.win{background:var(--bg);border:1px solid var(--sep);border-radius:12px;display:grid;grid-template-columns:150px minmax(0,1fr);overflow:hidden}
+nav{border-right:1px solid var(--sep);padding:12px 8px;display:flex;flex-direction:column;gap:2px}
+nav .g{font-size:11px;color:var(--sec);text-transform:uppercase;letter-spacing:.05em;margin:8px 8px 2px}
+nav a{display:flex;justify-content:space-between;padding:6px 10px;border-radius:99px;color:var(--label)}nav a.on{background:var(--sel);font-weight:600}nav a span{color:var(--sec);font-size:12px}
+main{padding:16px 20px;min-width:0}main>h1{font-size:22px;font-weight:500}.guide{color:var(--sec);margin:2px 0 16px}
+section{margin:0 0 20px}.sh{display:flex;flex-wrap:wrap;gap:4px 8px;align-items:baseline;margin:0 0 8px}.sh h3{font-size:15px}.sh .why{color:var(--sec);font-size:12px;flex-basis:100%}
+.card{background:var(--card);border:1px solid var(--sep);border-left:3px solid transparent;border-radius:8px;padding:10px 12px;box-shadow:var(--shadow)}
+.s-amber{border-left-color:var(--amber)}.s-red{border-left-color:var(--red)}.s-green{border-left-color:var(--green)}
+.picks{display:grid;grid-template-columns:repeat(auto-fill,minmax(230px,1fr));gap:10px}
+.job{display:grid;grid-template-columns:44px minmax(0,1fr);gap:2px 10px;align-items:start}
+.fit{font-size:24px;font-weight:600;font-variant-numeric:tabular-nums;line-height:1.1;text-align:center}.fit small{display:block;font-size:10px;font-weight:400;color:var(--sec)}
+.t{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.m{color:var(--sec);font-size:12px}
+.why1{font-size:12px;color:var(--sec);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.acts{grid-column:1/-1;display:flex;gap:6px;align-items:center;margin-top:6px;flex-wrap:wrap}
+.st{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--label)}.st::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--grey)}
+.st.amber::before{background:var(--amber)}.st.red::before{background:var(--red)}.st.green::before{background:var(--green)}
+.setup{display:flex;gap:14px;align-items:center;flex-wrap:wrap}.setup .tx{flex:1;min-width:180px}.setup .tx p{color:var(--sec);font-size:13px}
+.ring{width:44px;height:44px;border-radius:50%;background:conic-gradient(var(--accent) 40%,var(--fill) 0);display:grid;place-items:center;flex:none}
+.ring b{width:34px;height:34px;border-radius:50%;background:var(--card);display:grid;place-items:center;font-size:12px}
+.rows{display:flex;flex-direction:column;gap:6px}.row{display:flex;gap:10px;align-items:center;flex-wrap:wrap}.row .tx{flex:1;min-width:180px}.row .k{font-size:11px;color:var(--sec);text-transform:uppercase;letter-spacing:.05em}
+.row .tx p{color:var(--sec);font-size:13px}.line{color:var(--sec)}.line a{margin-left:6px}
+.tabs{display:flex;gap:2px;border-bottom:1px solid var(--sep);margin:0 0 10px;overflow-x:auto}.tabs a{padding:8px 12px;color:var(--sec);border-bottom:2px solid transparent;white-space:nowrap}.tabs a.on{color:var(--label);border-bottom-color:var(--accent);font-weight:600}
+.sub{display:flex;gap:4px;margin:0 0 10px;flex-wrap:wrap}.sub a{padding:3px 10px;border-radius:99px;font-size:12px;color:var(--sec);border:1px solid var(--sep)}.sub a.on{background:var(--sel);color:var(--label);border-color:transparent}
+.bar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin:0 0 10px}.bar .sp{flex:1}
+.chip{border:1px solid var(--sep);border-radius:99px;padding:3px 10px;font-size:12px;color:var(--sec)}
+.seg{display:inline-flex;border:1px solid var(--sep);border-radius:99px;overflow:hidden}.seg button{border-radius:0;padding:4px 12px;font-size:12px}.seg .on{background:var(--sel);font-weight:600}
+.md{display:grid;grid-template-columns:320px minmax(0,1fr);gap:12px}.list{display:flex;flex-direction:column;gap:6px}.list .card.on{background:var(--sel)}
+.detail{background:var(--card);border:1px solid var(--sep);border-radius:8px;padding:14px 16px}.detail h3{font-size:18px;font-weight:500}.detail h4{font-size:12px;text-transform:uppercase;letter-spacing:.05em;color:var(--sec);margin:14px 0 4px}
+.detail table,.tbl{width:100%;border-collapse:collapse;font-size:13px}.detail td,.detail th,.tbl td,.tbl th{text-align:left;padding:5px 6px;border-bottom:1px solid var(--sep)}.tbl th{color:var(--sec);font-weight:500;white-space:nowrap}
+.miss{color:var(--amber)}.best{color:var(--green);font-weight:600}
+.selbar{background:var(--sel);border-radius:8px;padding:8px 12px;display:flex;gap:8px;align-items:center;flex-wrap:wrap}.selbar .sp{flex:1}
+.board{display:grid;grid-template-columns:repeat(5,minmax(170px,1fr));gap:10px;overflow-x:auto;padding-bottom:4px}
+.col{background:var(--group);border-radius:8px;padding:8px;display:flex;flex-direction:column;gap:6px;min-height:160px}.col h4{font-size:12px;color:var(--sec);font-weight:600;margin:0 0 2px}
+.tw{overflow-x:auto}.pager{display:flex;justify-content:flex-end;gap:12px;color:var(--sec);font-size:12px;margin-top:6px}
+.empty{text-align:center;padding:20px 12px;color:var(--sec)}.empty p{margin:0 0 10px}
+.fail p{font-size:13px;margin-top:4px}.fail b{color:var(--red)}
+.toast{display:inline-flex;gap:10px;align-items:center;background:var(--label);color:var(--bg);border-radius:8px;padding:8px 12px;font-size:13px}.toast a{color:var(--sel)}
+.grid3{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px}
+.note{font-size:12px;color:var(--sec);margin-top:6px}
+@media(max-width:760px){.win{grid-template-columns:1fr}nav{flex-direction:row;flex-wrap:wrap;border-right:0;border-bottom:1px solid var(--sep)}nav .g{display:none}
+ main{padding:12px}.md{grid-template-columns:1fr}.md .detail{display:none}}
+</style></head><body>
+
+<div class="intro">
+  <h1 style="font-size:20px;font-weight:500">Jobs on Today + tracker in Jobs (DEC-022)</h1>
+  <p>Frames a–g. Nav: Today, Jobs, Inbox · More: Profile, Settings (no Pipeline). Colour only for meaning: amber = needs you, red = blocked/failed, green = done (REQ-132). Fictional data.</p>
+</div>
+
+<!-- (a) -->
+<div class="frame">
+  <div class="cap"><h2>a · Today, setup not done</h2><span class="ref">REQ-071 REQ-131 REQ-127 REQ-130 · UC-015 FLOW-005 · P1 P7 P9 P16</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a class="on" href="#">Today <span>3</span></a><a href="#">Jobs</a><a href="#">Inbox <span>1</span></a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <h1>Today</h1><p class="guide">What needs you now, and the best new jobs for you.</p>
+      <section class="card setup" aria-label="Setup">
+        <div class="ring" role="img" aria-label="2 of 5 done"><b>2/5</b></div>
+        <div class="tx"><h3 style="font-size:15px">Finish setup</h3><p>Finish setup so CareerOS can fill applications for you. 3 items left.</p></div>
+        <button class="primary">Fill from résumé</button><button>Show all (5)</button>
+        <span class="ref" style="flex-basis:100%">REQ-131 · ring + one action, only until done · P16 P7</span>
+      </section>
+      <section>
+        <div class="sh"><h3>Top picks for Backend Engineer in Springfield, NY</h3><a href="#">Edit</a><span class="why">New this week, best fit first. Not skipped or saved. <span class="ref">REQ-127 Q-025 Q-026</span></span></div>
+        <div class="picks">
+          <div class="card job"><div class="fit">91<small>fit</small></div><div><div class="t">Backend Engineer</div><div class="m">Northwind Labs · Springfield, NY · 2d</div><div class="why1">9/10 skills · missing: Kafka</div></div>
+            <div class="acts"><button class="primary">Prepare</button><button>Skip</button></div></div>
+          <div class="card job"><div class="fit">84<small>fit</small></div><div><div class="t">Platform Engineer II</div><div class="m">Acme Robotics · Hybrid · 1d</div><div class="why1">7/10 skills · missing: Go, Kubernetes</div></div>
+            <div class="acts"><button class="primary">Prepare</button><button>Skip</button></div></div>
+          <div class="card job"><div class="fit">78<small>fit</small></div><div><div class="t">Software Engineer, API</div><div class="m">Globex Health · Remote · 4d</div><div class="why1">8/12 skills · missing: GraphQL, gRPC, +2</div></div>
+            <div class="acts"><button class="primary">Prepare</button><button>Skip</button></div></div>
+        </div>
+        <p class="note">Card: fit number = anchor, reasons from best résumé match. No sub-scores (Q-024). REQ-130 · P4 P8</p>
+      </section>
+      <section>
+        <div class="sh"><h3>Needs you</h3></div>
+        <div class="rows">
+          <div class="card row s-amber"><div class="tx"><div class="k">Application · Initech</div><b>Review tailored résumé + cover letter</b><p>CareerOS prepared your application documents.</p></div><button class="primary">Review documents</button></div>
+          <div class="card row s-amber"><div class="tx"><div class="k">Profile</div><b>Add Example Corp experience details</b><p>CareerOS won't use placeholder experience in applications.</p></div><button>Add details</button></div>
+        </div>
+        <p class="note">Locked Today rows (IA review). Amber stripe + dot = needs you. REQ-132</p>
+      </section>
+      <section><p class="line">12 new matches · 3 saved · 2 applied <a href="#">Open Jobs</a></p></section>
+    </main>
+  </div>
+</div>
+
+<!-- (b) -->
+<div class="frame">
+  <div class="cap"><h2>b · Today, setup done, one pick preparing</h2><span class="ref">REQ-127 REQ-131 · FLOW-005 · P10 P11 P12 P18</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a class="on" href="#">Today <span>1</span></a><a href="#">Jobs</a><a href="#">Inbox</a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <h1>Today</h1><p class="guide">What needs you now, and the best new jobs for you.</p>
+      <section>
+        <div class="sh"><h3>Top picks for Backend Engineer in Springfield, NY</h3><a href="#">Edit</a><span class="why">New this week, best fit first.</span></div>
+        <div class="picks">
+          <div class="card job"><div class="fit">91<small>fit</small></div><div><div class="t">Backend Engineer</div><div class="m">Northwind Labs · Springfield, NY · 2d</div><div class="why1">9/10 skills · missing: Kafka</div></div>
+            <div class="acts"><span class="st">Preparing…</span><span class="m">moves to Jobs › Saved</span></div></div>
+          <div class="card job"><div class="fit">78<small>fit</small></div><div><div class="t">Software Engineer, API</div><div class="m">Globex Health · Remote · 4d</div><div class="why1">8/12 skills · missing: GraphQL, gRPC, +2</div></div>
+            <div class="acts"><button class="primary">Prepare</button><button>Skip</button></div></div>
+          <div class="card job"><div class="fit">72<small>fit</small></div><div><div class="t">Backend Developer</div><div class="m">Umbrella Data · Springfield, NY · 5d</div><div class="why1">7/10 skills · missing: Rust, Redis</div></div>
+            <div class="acts"><button class="primary">Prepare</button><button>Skip</button></div></div>
+        </div>
+        <p style="margin-top:10px"><span class="toast">Skipped Platform Engineer II · Acme Robotics <a href="#">Undo</a></span></p>
+      </section>
+      <section><div class="sh"><h3>Needs you</h3></div>
+        <div class="card row s-amber"><div class="tx"><div class="k">Application · Initech</div><b>Review tailored résumé + cover letter</b><p>CareerOS prepared your application documents.</p></div><button class="primary">Review documents</button></div></section>
+      <section><div class="sh"><h3>Recent activity</h3></div><p class="line">Prepared Initech application · Found 12 new matching jobs <a href="#">View all activity</a></p></section>
+      <p class="note">No setup card (gone when must-haves done), no Next step card (REQ-122 deprecated).</p>
+    </main>
+  </div>
+</div>
+
+<!-- (c) -->
+<div class="frame">
+  <div class="cap"><h2>c · Jobs › Recommended, List view, job open</h2><span class="ref">REQ-072 REQ-128 REQ-129 REQ-130 REQ-115 · UC-016 · P3 P5 P8 P14</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a href="#">Today</a><a class="on" href="#">Jobs</a><a href="#">Inbox</a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <div class="bar"><h1 style="font-size:22px;font-weight:500">Jobs</h1><span class="sp"></span><button>Check a job</button></div>
+      <div class="tabs" role="tablist"><a class="on" href="#">Recommended (12)</a><a href="#">Saved (3)</a><a href="#">Applied (5)</a></div>
+      <div class="bar"><span class="chip">Springfield, NY</span><span class="chip">Backend +2</span><span class="chip">Sort: best fit</span><span class="sp"></span>
+        <span class="seg" role="group" aria-label="View"><button class="on">☰ List</button><button>▦ Table</button></span></div>
+      <div class="md">
+        <div class="list">
+          <div class="card job on"><div class="fit">91</div><div><div class="t">Backend Engineer</div><div class="m">Northwind Labs · Springfield, NY · 2d</div><div class="why1">9/10 skills · missing: Kafka</div></div></div>
+          <div class="card job"><div class="fit">78</div><div><div class="t">Software Engineer, API</div><div class="m">Globex Health · Remote · 4d</div><div class="why1">8/12 skills · missing: GraphQL, gRPC, +2</div></div></div>
+          <div class="card job"><div class="fit">72</div><div><div class="t">Backend Developer</div><div class="m">Umbrella Data · Springfield, NY · 5d</div><div class="why1">7/10 skills · missing: Rust, Redis</div></div></div>
+          <div class="card job"><div class="fit">64</div><div><div class="t">Data Platform Engineer</div><div class="m">Initrode · Remote · 6d</div><div class="why1">6/11 skills · missing: Spark, Scala, +3</div></div></div>
+        </div>
+        <article class="detail" aria-label="Job detail">
+          <p class="ref">URL /jobs/northwind-backend-engineer?tab=recommended&amp;view=list</p>
+          <h3>Backend Engineer</h3><p class="m">Northwind Labs · Springfield, NY · Hybrid · posted 2 days ago</p>
+          <div class="acts" style="margin:10px 0 0"><button class="primary">Save</button><button>Prepare application</button><button>Skip</button></div>
+          <h4>Why it fits · 91</h4><p>9 of 10 required skills in your résumé. <span class="miss">Missing: Kafka.</span></p>
+          <h4>Your résumés</h4>
+          <table><tr><th>Résumé</th><th>Match</th><th>Missing</th></tr>
+            <tr><td>Master</td><td class="best">88 best</td><td>Kafka</td></tr><tr><td>Variant: data</td><td>71</td><td>Kafka, Docker</td></tr></table>
+          <h4>Posting</h4><p class="m">Build and run the services behind our scheduling product. Python, PostgreSQL, AWS… <a href="#">More</a></p>
+        </article>
+      </div>
+      <p class="note">Save = tick (REQ-104 selected) → Saved tab. Phone (&lt;900px): list only, job opens full page.</p>
+    </main>
+  </div>
+</div>
+
+<!-- (d) -->
+<div class="frame">
+  <div class="cap"><h2>d · Jobs › Saved, Start pipeline</h2><span class="ref">REQ-128 REQ-117 REQ-132 · FLOW-004 UC-016 · P7 P11 P13</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a href="#">Today</a><a class="on" href="#">Jobs</a><a href="#">Inbox</a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <div class="bar"><h1 style="font-size:22px;font-weight:500">Jobs</h1><span class="sp"></span><button>Check a job</button></div>
+      <div class="tabs"><a href="#">Recommended (12)</a><a class="on" href="#">Saved (3)</a><a href="#">Applied (5)</a></div>
+      <div class="selbar"><span>2 of 3 selected</span><span class="sp"></span><button>Unsave</button><button class="primary">Start pipeline</button></div>
+      <p class="note">Saved = the queue Start pipeline runs on. Jobs stay here while preparing / filled, until applied.</p>
+      <div class="list" style="margin-top:8px">
+        <div class="card job"><div class="fit">91</div><div><div class="t">☑ Backend Engineer</div><div class="m">Northwind Labs · Springfield, NY</div><span class="st">Preparing…</span></div></div>
+        <div class="card job s-green"><div class="fit">83</div><div><div class="t">☑ Site Reliability Engineer</div><div class="m">Hooli · Remote</div><span class="st green">Ready to apply</span></div></div>
+        <div class="card job s-amber"><div class="fit">80</div><div><div class="t">☐ Backend Engineer, Payments</div><div class="m">Initech · Springfield, NY</div><span class="st amber">Needs you · review documents</span></div></div>
+      </div>
+    </main>
+  </div>
+</div>
+
+<!-- (e) -->
+<div class="frame">
+  <div class="cap"><h2>e · Jobs › Applied, Board view (replaces Pipeline)</h2><span class="ref">REQ-128 REQ-129 REQ-132 REQ-074 deprecated · UC-016 · P3 P5 P20</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a href="#">Today</a><a class="on" href="#">Jobs</a><a href="#">Inbox</a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <div class="bar"><h1 style="font-size:22px;font-weight:500">Jobs</h1><span class="sp"></span><span class="ref">/pipeline → /jobs?tab=applied&amp;view=board</span></div>
+      <div class="tabs"><a href="#">Recommended (12)</a><a href="#">Saved (3)</a><a class="on" href="#">Applied (5)</a></div>
+      <div class="bar"><div class="sub"><a class="on" href="#">All (5)</a><a href="#">Applied (2)</a><a href="#">Screening (1)</a><a href="#">Interview (1)</a><a href="#">Offer (0)</a><a href="#">Closed (1)</a></div><span class="sp"></span>
+        <span class="seg"><button>☰ List</button><button>▦ Table</button><button class="on">▥ Board</button></span></div>
+      <div class="board">
+        <div class="col"><h4>Applied 2</h4>
+          <div class="card job"><div class="fit">86</div><div><div class="t">Backend Engineer</div><div class="m">Vandelay · 3d ago</div><span class="st">Applied</span></div></div>
+          <div class="card job"><div class="fit">74</div><div><div class="t">API Engineer</div><div class="m">Stark Ind. · 8d ago</div><span class="st">Applied</span></div></div></div>
+        <div class="col"><h4>Screening 1</h4>
+          <div class="card job s-amber"><div class="fit">81</div><div><div class="t">Software Engineer</div><div class="m">Soylent · call to book</div><span class="st amber">Needs you</span></div></div></div>
+        <div class="col"><h4>Interview 1</h4>
+          <div class="card job"><div class="fit">88</div><div><div class="t">Platform Engineer</div><div class="m">Wonka Tech · Thu 10:00</div><span class="st">Interview</span></div></div></div>
+        <div class="col"><h4>Offer 0</h4><p class="m">None yet</p></div>
+        <div class="col"><h4>Closed 1</h4>
+          <div class="card job"><div class="fit">69</div><div><div class="t">Backend Dev</div><div class="m">Cyberdyne</div><span class="st">Rejected</span></div></div></div>
+      </div>
+      <p class="note">Neutral lanes; colour only from status (stripe + dot). Card → detail. Moving stage: Q-028.</p>
+    </main>
+  </div>
+</div>
+
+<!-- (f) -->
+<div class="frame">
+  <div class="cap"><h2>f · View toggle → Table (Recommended)</h2><span class="ref">REQ-129 REQ-120 REQ-104 · P3 P20</span></div>
+  <div class="win">
+    <nav aria-label="Main"><span class="g">Job search</span><a href="#">Today</a><a class="on" href="#">Jobs</a><a href="#">Inbox</a><span class="g">More</span><a href="#">Profile</a><a href="#">Settings</a></nav>
+    <main>
+      <div class="tabs"><a class="on" href="#">Recommended (12)</a><a href="#">Saved (3)</a><a href="#">Applied (5)</a></div>
+      <div class="bar"><span class="chip">Fit ≥ 70 ✕</span><span class="sp"></span><span class="seg"><button>☰ List</button><button class="on">▦ Table</button></span></div>
+      <div class="tw"><table class="tbl">
+        <tr><th>☐</th><th>Fit ▾</th><th>Job ▾</th><th>Company ▾</th><th>Reasons</th><th>Place ▾</th><th>Found ▾</th></tr>
+        <tr><td>☐</td><td><b>91</b></td><td>Backend Engineer</td><td>Northwind Labs</td><td>9/10 · missing Kafka</td><td>Springfield, NY</td><td>2d</td></tr>
+        <tr><td>☐</td><td><b>78</b></td><td>Software Engineer, API</td><td>Globex Health</td><td>8/12 · missing GraphQL, gRPC, +2</td><td>Remote</td><td>4d</td></tr>
+        <tr><td>☐</td><td><b>72</b></td><td>Backend Developer</td><td>Umbrella Data</td><td>7/10 · missing Rust, Redis</td><td>Springfield, NY</td><td>5d</td></tr>
+      </table></div>
+      <div class="pager"><span>Rows: 25 ▾</span><span>1–3 of 3</span></div>
+      <p class="note">Same REQ-120 spreadsheet table (sort/filter headers, pager). Choice kept in URL + remembered.</p>
+    </main>
+  </div>
+</div>
+
+<!-- (g) -->
+<div class="frame">
+  <div class="cap"><h2>g · Empty and failure states</h2><span class="ref">REQ-127 · FLOW-005 · DEC-021 · P11 P12 USR-035</span></div>
+  <div class="grid3">
+    <div class="card empty"><h3 style="font-size:15px;color:var(--label)">Top picks for Backend Engineer in Springfield, NY</h3><p>No new picks this week.</p><button class="primary">Find jobs now</button></div>
+    <div class="card empty"><h3 style="font-size:15px;color:var(--label)">Top picks</h3><p>Tell us what you're looking for (role and city) to see picks here.</p><button class="primary">Set what you're looking for</button></div>
+    <div class="card job s-red fail"><div class="fit">84</div><div><div class="t">Platform Engineer II</div><div class="m">Acme Robotics</div>
+      <span class="st red">Couldn't prepare</span><p>Best résumé failed checks: 2 pages (max 1), one banned phrase.</p></div>
+      <div class="acts"><button class="primary">Tailor instead</button><button>Retry</button><a href="#">Details</a></div></div>
+    <div class="card job"><div class="fit">78</div><div><div class="t">Software Engineer, API</div><div class="m">Globex Health</div><div class="why1">Match pending</div></div>
+      <div class="acts"><button class="primary" disabled title="Add your résumé first">Prepare</button><button>Skip</button><a href="#">Add your résumé first</a></div></div>
+  </div>
+  <p class="note">Every dead end has one button. Failure = cause in plain words + one fix (Tailor instead = DEC-021). Disabled button says why.</p>
+</div>
+</body></html>
