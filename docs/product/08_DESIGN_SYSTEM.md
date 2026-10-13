@@ -176,12 +176,28 @@ Page header (USR-035): h1 + one-line `--sec` guidance + primary action, every sc
 | Version history panel | list Current + vN…v1, "Show changes", "Restore this version" | REQ-100 |
 Colour meaning (app-wide, Task 3 §4): orange = needs you, red = blocked/removed, green = done/added.
 
+## Delta 2026-10-13 (Jobs on Today, DEC-022)
+| need | build from | REQ |
+|---|---|---|
+| Status | dot 8px + word, `--fs-caption`; never colour alone | REQ-132 |
+| Status colour | amber (orange token) = needs you, red = blocked/failed, green = done (ready, applied, offer); all else `--sec` grey | REQ-132 |
+| Status stripe | card `border-left: 3px` in status colour; neutral = none | REQ-132 |
+| Job card | grid: fit number (24px, tabular, left) · title / company · place · age · reasons line (`--sec`, 1 line ellipsis); status dot+word right | REQ-130 |
+| Top-pick card | job card + footer: Prepare (primary) · Skip (plain); states Preparing… (spinner + word) / failed (red stripe, cause + one fix button) | REQ-127 |
+| Setup card | ring 40px (n/N inside) · one-line benefit · one primary · "Show all (n)" disclosure | REQ-131 |
+| Tabs with counts | segmented tabs "Saved (3)"; count = plain text, not a badge; sub-tabs smaller, under Applied only | REQ-128 |
+| View toggle | 2–3 segment control List / Table / Board, icon + word; state in URL | REQ-129 |
+| Master-detail | grid 360px list + flex detail; selected card = `--selected` bg; <900px single column | REQ-129 |
+| Board | columns = stages, header word + count; neutral lanes, colour only from card stripes | REQ-129 REQ-132 |
+Replaces line above for app-wide colour: amber = needs you, red = blocked, green = done.
+
 ## Mockups
 Wireframes, minimal, existing tokens: https://claude.ai/artifact/LiWEdd7CnMgFChRLo4hCMt
 | artboard | FLOW / UC |
 |---|---|
 | Main.dc.html (Profile) | FLOW-001 UC-001..006 UC-009 |
 | `docs/product/mockups/resume-workspace.html` | FLOW-002 UC-001 UC-002 UC-004 |
+| `docs/product/mockups/jobs-today.html` | FLOW-004 FLOW-005 UC-015 UC-016 |
 | CheckJob.dc.html | FLOW-003 UC-010 |
 | JobsSelect.dc.html | UC-007 UC-012 |
 | FillPreview.dc.html | UC-008 |

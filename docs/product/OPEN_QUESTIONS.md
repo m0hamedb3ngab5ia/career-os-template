@@ -143,3 +143,39 @@
 - Recommended: defer REQ-096 (✕ + edit in place covers it); revisit after user test.
 - Answer (2026-10-12): keep. Reply thread under every card; "Apply comment" checkbox sends the reply to AI as feedback (like Claude Design's send-to-Claude). REQ-096 rewritten.
 - Status: answered
+
+### Q-024 Labelled sub-scores on the job card
+- Links: REQ-130, REQ-111, REQ-020, DEC-022
+- Context: competitor move 1 wants 3–4 labelled sub-scores (skills, experience, title, keywords), each with a plain reason linking to evidence. Not yet specified; new scoring work. Card shows one fit number + reasons line only.
+- Recommended: defer to after the user test; then a REQ for a per-sub-score breakdown (REQ-111 already has skills + title terms).
+- Status: open
+
+### Q-025 Which jobs count as "new" top picks
+- Links: REQ-127
+- Context: band shows 3–5 "new" jobs; "new" undefined. Also: minimum fit for a pick.
+- Recommended: found in the last 7 days, fit tier A or B (REQ-020), not skipped / Saved / Applied; fewer than 3 qualify → show those only.
+- Status: open
+
+### Q-026 Where search preferences live (band heading + Edit link)
+- Links: REQ-127, DEC-022
+- Context: heading "Top picks for <role> in <city>" needs role + city; prefs may hold several roles/cities; Edit link target undefined.
+- Recommended: first role + first city from Settings search section, "+N more" when several; Edit → that Settings section (editable chips later, move 10).
+- Status: open
+
+### Q-027 What "Fill from résumé" fills on the setup card
+- Links: REQ-131, REQ-102, REQ-099
+- Context: move 8 names "Fill from résumé" as the primary action; which readiness items can be filled from the master résumé is unspecified.
+- Recommended: profile fields + master.yaml sync (REQ-099) only; legal / work-auth / salary answers always asked, never filled.
+- Status: open
+
+### Q-028 Applied stage mapping and where skipped jobs go
+- Links: REQ-128, REQ-129, REQ-127
+- Context: stage sub-tabs Applied/Screening/Interview/Offer/Closed must map to job statuses; Closed = rejected/withdrawn/declined? Skipped jobs have no tab; how a job moves stage on the Board is unspecified.
+- Recommended: map existing statuses 1:1, Closed = rejected + withdrawn + declined; skipped jobs behind a "Skipped (n)" filter on Recommended; move stage via the detail status control (Board drag later).
+- Status: open
+
+### Q-029 Profile one-time "ready" card from REQ-122
+- Links: REQ-122, REQ-131
+- Context: REQ-122 also showed a card once on Profile when the last must-have closed; REQ-122 is deprecated.
+- Recommended: drop it; setup card's disappearance + Top picks on Today is the signal.
+- Status: open

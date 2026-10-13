@@ -64,6 +64,7 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 - Users can filter out jobs by title, seniority, country or company.
 - Each job gets a fit score, a category and a priority tier.
 - Users can see when a posting closes.
+- The home screen shows the few best new jobs for the role and city the user is looking for, with the fit score and the main reasons. Users can start preparing one, or skip it, with one click.
 - Why: spend time only on jobs worth applying to
 
 ### USR-029 Find jobs on more job boards (later)
@@ -187,7 +188,8 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 
 ## Staying on top of my search
 ### USR-013 See every job and where it stands
-- Users see all jobs and their stage, from found to offer.
+- Users see all jobs and their stage, from found to offer, in one Jobs area: jobs recommended to them, jobs they saved, and jobs they applied to.
+- Users can view their jobs as a list with details beside it, as a table, or (for jobs they applied to) as a board by stage.
 - Users see what needs them today on the home screen.
 - Users can change a job's status, withdraw, or open its files.
 - The app keeps a spreadsheet copy of everything up to date as a backup.

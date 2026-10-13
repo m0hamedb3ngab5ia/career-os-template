@@ -340,22 +340,26 @@ requirements:
     user_requirements:
     - USR-013
   REQ-071:
-    status: proposed
-    provenance: observed
+    status: approved
+    provenance: confirmed
     user_requirements:
     - USR-013
+    tests:
+    - E2E-015-01
   REQ-072:
-    status: proposed
-    provenance: observed
+    status: approved
+    provenance: confirmed
     user_requirements:
     - USR-013
+    tests:
+    - E2E-016-02
   REQ-073:
     status: proposed
     provenance: observed
     user_requirements:
     - USR-014
   REQ-074:
-    status: proposed
+    status: deprecated
     provenance: observed
     user_requirements:
     - USR-013
@@ -621,12 +625,10 @@ requirements:
     tests:
     - E2E-014-01
   REQ-122:
-    status: approved
+    status: deprecated
     provenance: confirmed
     user_requirements:
     - USR-037
-    tests:
-    - E2E-014-02
   REQ-123:
     status: approved
     provenance: confirmed
@@ -674,6 +676,57 @@ requirements:
   NFR-005:
     status: proposed
     provenance: inferred
+  REQ-127:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-005
+    - USR-013
+    tests:
+    - E2E-015-01
+    - E2E-015-02
+    - E2E-015-03
+    - E2E-015-04
+  REQ-128:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-013
+    - USR-024
+    tests:
+    - E2E-016-03
+  REQ-129:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-013
+    - USR-036
+    tests:
+    - E2E-016-01
+    - E2E-016-02
+    - E2E-016-04
+  REQ-130:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-005
+    tests:
+    - E2E-015-01
+  REQ-131:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-037
+    tests:
+    - E2E-015-05
+    - E2E-014-02
+  REQ-132:
+    status: approved
+    provenance: confirmed
+    user_requirements:
+    - USR-013
+    tests:
+    - E2E-016-05
 use_cases:
   UC-001:
     status: approved
@@ -750,7 +803,22 @@ use_cases:
     requirements:
     - REQ-119
     - REQ-121
-    - REQ-122
+    - REQ-131
+  UC-015:
+    status: draft
+    requirements:
+    - REQ-127
+    - REQ-130
+    - REQ-131
+    - REQ-114
+  UC-016:
+    status: draft
+    requirements:
+    - REQ-072
+    - REQ-128
+    - REQ-129
+    - REQ-130
+    - REQ-132
 flows:
   FLOW-001:
     status: approved
@@ -773,6 +841,12 @@ flows:
     use_cases:
     - UC-007
     - UC-013
+    - UC-016
+  FLOW-005:
+    status: draft
+    use_cases:
+    - UC-015
+    - UC-016
 tasks:
   TASK-001:
     status: done
@@ -850,7 +924,7 @@ tasks:
     flows:
     - FLOW-003
   TASK-013:
-    status: done
+    status: needs-review
     requirements:
     - REQ-107
     - REQ-101
@@ -866,7 +940,7 @@ tasks:
     - REQ-105
     - REQ-106
   TASK-015:
-    status: done
+    status: needs-review
     requirements:
     - REQ-104
     - REQ-109
@@ -879,7 +953,7 @@ tasks:
     use_cases:
     - UC-013
   TASK-017:
-    status: done
+    status: needs-review
     requirements:
     - REQ-117
     - REQ-120
@@ -893,13 +967,13 @@ tasks:
     - REQ-119
     - REQ-120
   TASK-019:
-    status: done
+    status: needs-review
     requirements:
     - REQ-121
     use_cases:
     - UC-014
   TASK-020:
-    status: done
+    status: needs-review
     requirements:
     - REQ-122
     use_cases:

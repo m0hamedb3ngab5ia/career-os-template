@@ -39,27 +39,32 @@ Links: REQ-114 REQ-116 UC-010 FLOW-003 · Area: backend · Done when: `POST /api
 
 ### TASK-013 Profile page UI
 Links: REQ-107 REQ-101 REQ-102 UC-005 UC-006 FLOW-001 · Area: frontend · Done when: sections Résumés, Writing samples (learn-voice rerun), Saved answers, Learned, Readiness card on Today+Profile; snapshots updated
+Needs review 2026-10-13 (DEC-022): Readiness card on Today replaced by setup card (REQ-131); Profile Readiness tab unchanged.
 
 ### TASK-014 Fill preview + ask unknown
 Links: REQ-105 REQ-106 · Area: frontend · Done when: fill plan table edit + save-to-profile; needs_input prompt / Action Item; required unanswered blocks fill
 
 ### TASK-015 Jobs list: select, badges, check dialog
 Links: REQ-104 REQ-109 REQ-114 REQ-115 · Area: frontend · Done when: checkbox + bulk select, injection badge + I checked it, Check a job dialog, résumé match table on job detail
+Needs review 2026-10-13 (DEC-022): Jobs list becomes tabs + List/Table views (REQ-128, REQ-129); select/badges/check dialog kept, moved into Saved/List.
 
 ### TASK-016 Per-job stop point in batches
 Links: REQ-118 UC-013 · Area: backend · Done when: batch `stops` map + `--job-stop`; API accepts `stops`; server-side caps (Tier A, LinkedIn, readiness, injection); old batches unchanged. E2E-013-02 green
 
 ### TASK-017 Start pipeline sheet
 Links: REQ-117 REQ-120 UC-013 FLOW-004 · Area: frontend · After: TASK-015, TASK-016 · Done when: Start pipeline button (disabled reason), review sheet on the Jobs table with "Go as far as" + per-row override + cap reasons, Start → batch progress; tour gains a Start pipeline step (REQ-121). E2E-013-01 green
+Needs review 2026-10-13 (DEC-022): Start pipeline moves to Jobs › Saved tab (REQ-128, FLOW-004).
 
 ### TASK-018 Page guidance on every page
 Links: REQ-119 REQ-120 · Area: frontend · Done when: every route has h1 + guidance line + primary action; empty states with button; test enumerates routes; job lists reuse the Jobs table
 
 ### TASK-019 First-run tour + How to use
 Links: REQ-121 UC-014 · Area: full · Done when: `GET/PUT /api/ui-state` (tour_done, `data/ui_state.json`, atomic); overlay tour, skip/Esc, keyboard, focus return; Settings "How to use". E2E-014-01 green
+Needs review 2026-10-13 (DEC-022): Tour steps name nav items; Pipeline item removed (DEC-022).
 
 ### TASK-020 Next-step card
 Links: REQ-122 UC-014 · Area: full · Done when: `GET /api/next-step` rule order per REQ-122 (unit tests per rule); Today card + Profile once on readiness done. E2E-014-02 green
+Needs review 2026-10-13 (DEC-022): Next-step card deprecated (REQ-122); removal + E2E-014-02 rewrite = new task.
 
 
 ### TASK-021 Voice samples accept pdf + docx

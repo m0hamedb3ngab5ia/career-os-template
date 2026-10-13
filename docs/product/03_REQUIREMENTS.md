@@ -156,14 +156,19 @@ inferred, half-built (scheduler job off) · Evidence: TODO.md:12,35 · Tests: te
 `careeros ui` FastAPI + React on loopback; disposable SQLite index; watcher + SSE.
 observed · Evidence: src/careeros/ui/app.py, index.py, watch.py · Tests: tests/test_ui_*.py
 ### REQ-071 Today page
+Changed 2026-10-13 (DEC-022), to-be, one column: setup card (REQ-131, only until done) · Top picks (REQ-127) · Needs you · Recent activity (≤3) · job search line. No Next step card, side panel, run buttons (locked Today, IA review).
+Given setup done, 4 new picks · When open Today · Then order Top picks → Needs you; no setup card, no Next step card.
 observed · Evidence: ui/src/app/routes.tsx:12, routers/today.py · Tests: tests/test_ui_today_jobs.py
 ### REQ-072 Jobs list + detail actions
 Tabs, facets, export, files, status/withdraw/submitted/override, safety verify/flag/clear, fill application.
+Changed 2026-10-13 (DEC-022): tabs = REQ-128, views = REQ-129, card = REQ-130; detail actions above unchanged, shown in the detail pane and at `/jobs/:id`. Tracker lives here (no Pipeline page).
+Given `/jobs` · When open · Then Recommended tab, List view, first job's detail in the right pane.
 observed · Evidence: src/careeros/ui/routers/jobs.py · Tests: tests/test_ui_job_pipeline.py
 ### REQ-073 Action Items page
 Bulk done/reopen, answer, due, block/unblock company, mark-safe + undo.
 observed · Evidence: routers/actions.py:65-147 · Tests: tests/test_ui_actions_service.py
 ### REQ-074 Pipeline + batch builder
+Deprecated 2026-10-13 (DEC-022): Pipeline page folded into Jobs › Applied › Board (REQ-129). `/pipeline` redirects to `/jobs?tab=applied&view=board`. Batch progress `/pipeline/batch/:id` stays (REQ-117).
 observed · Evidence: routers/pipeline.py, batches.py · Tests: tests/test_ui_pipeline_service.py
 ### REQ-075 Automation (runs) page
 Runs list/detail/stream, steps, cancel/pause/resume/catch-up, schedule control.
@@ -338,10 +343,39 @@ Given fresh install · When open UI, skip at step 2, reload · Then no tour; Set
 ### REQ-122 Next-step card
 Today shows one "Next step" card with one button, from the first rule that holds: readiness must-have open → "Finish setup" (link to first open item); no jobs → "Find jobs" (scout); no ticked jobs → "Pick jobs" (Jobs list); a batch running → "See progress"; else → "Start pipeline" (REQ-117). Also shown once on the Profile page when the last must-have closes.
 Given ready, 12 jobs, 0 ticked · When open Today · Then card says "Pick jobs" and links to the Jobs list.
+Deprecated 2026-10-13 (DEC-022): locked Today drops the Next step card. Setup branch → setup card (REQ-131); Find / Pick jobs → Top picks + its empty state (REQ-127); Start pipeline / See progress → Jobs › Saved (REQ-128, REQ-117). Profile one-time card: Q-029.
 ### REQ-123 Action Items stored in data/action_items.json
 Action Items live in `data/action_items.json`, written atomically like `status.json` (NFR-002). The tracker xlsx Action Items sheet is a one-way synced view (json → xlsx only); edits in Excel are never read back. Amends REQ-052, REQ-073 (Q-008).
 Given an Action Item added · When written · Then json updated atomically and xlsx sheet refreshed on sync; an Excel edit is overwritten.
 Amendment (Q-022, user-approved 2026-10-05): "ticked" here = rows selected in the Jobs table. The batch takes the jobs it names, ticked or not, and creating it ticks them (REQ-104 `selected`); the dry-run preview changes nothing. Unticking a job mid-run holds it back from its next stage.
+
+## Jobs on Today (DEC-022, 2026-10-13)
+Mockup: `mockups/jobs-today.html`.
+
+### REQ-127 Top picks band on Today
+Band "Top picks for <role> in <city>" above Needs you: 3–5 new jobs (Q-025), best fit (REQ-020) first; never skipped, Saved or Applied. Heading says why picked + "Edit" link to search preferences (Q-026). Card = REQ-130 + primary Prepare (ticks job + one-job prepare run, as REQ-114) + Skip (status `skipped`, undo toast). Prepare disabled + reason while no master résumé.
+Empty: no picks → "No new picks for <role> in <city>" + "Find jobs now" (scout); no preferences → "Tell us what you're looking for" + button to preferences.
+Given 6 new scored jobs, 1 skipped, 1 Saved · When open Today · Then 4 cards, best fit first.
+Given pick · When Prepare · Then job `selected`, prepare run for that job only, card "Preparing…", then job in Jobs › Saved.
+Given pick · When Skip, then Undo · Then card back, status as before.
+Failure: run fails → card stays: "Couldn't prepare: <cause>" + one fix (Retry / Tailor instead (DEC-021) / link to cause). FLOW-005.
+### REQ-128 Jobs tabs with counts
+`/jobs` tabs Recommended · Saved · Applied, each with count. Recommended = scored, not ticked, not skipped, not applied. Saved = ticked (REQ-104 `selected`), not applied yet, incl. preparing / prepared / filled; Start pipeline (REQ-117) lives here and runs on Saved. Applied = applied or later; stage sub-tabs Applied · Screening · Interview · Offer · Closed with counts (status mapping Q-028). Save = tick, Unsave = untick. Tab + stage in URL (`?tab=&stage=`).
+Given 3 ticked, 2 applied (1 at interview) · When open `/jobs` · Then Saved (3), Applied (2), Applied › Interview (1).
+### REQ-129 Jobs views: List, Table, Board
+View toggle List | Table; Applied tab adds Board. `view=` in URL, last choice remembered (`ui.jobs_view`). List (default) = master-detail: compact cards (REQ-130) left, detail right, selected job = `/jobs/:id` (tab/view query kept), back/forward works; <900px list only, job opens full page. Table = REQ-120 unchanged. Board = Applied jobs in stage columns (sub-tabs as columns); card opens detail. Replaces Pipeline page (REQ-074).
+Given `/pipeline` · When open · Then `/jobs?tab=applied&view=board`.
+Given List view · When click 2nd job · Then URL `/jobs/<id>`, its detail on the right, list scroll kept; reload shows same job.
+### REQ-130 Job card: fit score anchor + reasons
+Every job card (Top picks, List, Board) = fit score (REQ-020) as one big number + title · company · place · age + one reasons line from the best résumé match (REQ-111): "<covered>/<required> skills · missing: <top 2>, +n". No sub-scores (Q-024). Match not computed yet → "Match pending". Saved/Applied cards add status (REQ-132).
+Given best résumé covers 7 of 10, missing Go, Kubernetes · When card shown · Then "7/10 skills · missing: Go, Kubernetes".
+### REQ-131 Setup checklist card on Today
+Replaces the readiness card on Today; REQ-102 stays the data source, Profile Readiness tab unchanged. Top of Today only while a must-have is open: progress ring (done/total must-haves), one-line benefit ("Finish setup so CareerOS can fill applications for you."), one primary button: "Fill from résumé" when open items can come from the master résumé (Q-027), else the first open item's fix link. "Show all (n)" expands items. All must-haves done → card gone.
+Given 2 of 5 must-haves done · When open Today · Then setup card first, ring 2/5, one primary button.
+Given all must-haves done · When open Today · Then no setup card.
+### REQ-132 Colour only for meaning; status = dot + word
+Status everywhere (cards, rows, board, tabs) = dot + word, never colour alone. Colour only: amber = needs you, red = blocked / failed, green = done; everything else neutral. Cards carry a 3px left edge stripe in the status colour (neutral = no stripe). Contrast ≥4.5:1 both themes.
+Given card "Needs you" · Then amber dot + word + amber stripe. Given card "Saved" · Then grey dot + word, no stripe.
 
 ## Non-functional
 ### NFR-001 No API key; LLM only via Claude Code subscription
