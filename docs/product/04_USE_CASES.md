@@ -129,10 +129,32 @@ E2E-013-01: Given ticked jobs (Tier A, LinkedIn Easy Apply, LinkedIn-found with 
 E2E-013-02: Given `POST /api/batches` with stops {tierA: submit} When run Then Tier A never submitted, reason in batch file.
 
 ### UC-014 First run and next step
-REQs: REQ-119, REQ-121, REQ-122 · Trigger: first UI open; Today page
-Main: 1 tour runs once 2 user skips or finishes 3 Today shows next-step card 4 one click goes there
+REQs: REQ-119, REQ-121, REQ-131 (REQ-122 deprecated, DEC-022) · Trigger: first UI open; Today page
+Main: 1 tour runs once 2 user skips or finishes 3 Today shows setup card until done, then Top picks (UC-015) 4 one click goes there
 Alt: Settings "How to use" restarts the tour
 Outcome: new user always sees one clear next action
 E2E-014-01: Given fresh data dir When open UI, finish tour, reload Then no tour; `data/ui_state.json` tour_done true.
-E2E-014-02: Given readiness done and 0 ticked jobs When open Today Then next-step card "Pick jobs".
+E2E-014-02: Given readiness done and 0 ticked jobs When open Today Then no setup card, no next-step card; Top picks band (or its empty state) first. (amended 2026-10-13)
 
+### UC-015 Prepare a top pick from Today
+REQs: REQ-127, REQ-130, REQ-131, REQ-114 · Actor: candidate · Trigger: open Today
+Main: 1 setup card while a must-have is open 2 Top picks: 3–5 new best-fit jobs, fit + reasons 3 Prepare → job ticked, one-job prepare run 4 job moves to Jobs › Saved; Needs you gets "Review documents" when ready
+Alt: Skip → card gone + Undo · no picks → empty state + "Find jobs now" · no preferences → button to preferences
+Fail: prepare fails → card keeps job, cause + one fix · no master résumé → Prepare disabled, reason + link
+Outcome: first job prepared from Today without visiting Jobs
+E2E-015-01: Given setup done, 6 new scored jobs (1 skipped, 1 Saved) When open Today Then 4 pick cards, best fit first, no setup card.
+E2E-015-02: Given a pick When Prepare Then job `selected`, one prepare run for that job, card "Preparing…".
+E2E-015-03: Given a pick When Skip then Undo Then card back, status unchanged.
+E2E-015-04: Given prepare run failed When open Today Then card shows cause + Retry; Retry starts a new run.
+E2E-015-05: Given 2 of 5 must-haves done When open Today Then setup card first, ring 2/5, one primary button.
+
+### UC-016 Track jobs in Jobs
+REQs: REQ-072, REQ-128, REQ-129, REQ-130, REQ-132 · Actor: candidate · Trigger: nav Jobs; old `/pipeline` link
+Main: 1 Recommended tab, List view, detail right 2 Save → Saved (n) 3 Saved: Start pipeline (REQ-117) 4 applied jobs → Applied tab, stage sub-tabs 5 Board view shows them by stage
+Alt: Table view (REQ-120) · phone: list, job opens full page
+Outcome: found, saved and applied jobs in one place; no Pipeline page
+E2E-016-01: Given any state When open `/pipeline` Then URL `/jobs?tab=applied&view=board`.
+E2E-016-02: Given List view When click a job Then URL `/jobs/:id`, detail pane shows it; reload keeps it.
+E2E-016-03: Given 3 ticked, 2 applied (1 interview) When open `/jobs` Then Saved (3), Applied (2), Interview (1).
+E2E-016-04: Given view Table When reload Then Table still selected.
+E2E-016-05: Given a Needs-you job and a Saved job When shown Then amber dot + "Needs you" + amber stripe; grey dot + "Saved", no stripe.

@@ -60,10 +60,10 @@ flowchart TD
 What to notice: max one tailor run per check; a flagged posting is still scored but can't be prepared until cleared.
 
 ### FLOW-004 Select jobs → start pipeline
-UCs: UC-007, UC-013
+UCs: UC-007, UC-013, UC-016
 ```mermaid
 flowchart TD
-  A[Jobs list] --> B[filter / sort optional]
+  A[Jobs › Saved tab] --> B[filter / sort optional]
   B --> C[tick jobs: row, select visible, bulk]
   C --> D[Start pipeline]
   D --> E[Review sheet: one 'Go as far as' for all (default Fill, I submit), override per row: Prepare / Fill / Submit]
@@ -73,4 +73,25 @@ flowchart TD
   F1 --> G[Start] --> H[Progress: per-job stage, Pause / Cancel / Retry]
   H --> I[done: Prepared / Filled (open tab) / Submitted / Needs you]
 ```
-What to notice: one entry point (Start pipeline on the Jobs list); stop stage chosen per job; Tier A never offered Submit, LinkedIn Easy Apply capped at Prepare (LinkedIn-found jobs on a company ATS follow the chosen stop), flagged postings excluded.
+What to notice: one entry point (Start pipeline on Jobs › Saved, DEC-022); stop stage chosen per job; Tier A never offered Submit, LinkedIn Easy Apply capped at Prepare (LinkedIn-found jobs on a company ATS follow the chosen stop), flagged postings excluded.
+
+### FLOW-005 Today → prepare a top pick
+UCs: UC-015, UC-016
+```mermaid
+flowchart TD
+  A[Open Today] --> S{must-have open?}
+  S -- yes --> S1[Setup card: ring + one action] --> P
+  S -- no --> P{new picks?}
+  P -- no preferences --> E1[Empty: Tell us what you're looking for → preferences]
+  P -- none --> E2[Empty: No new picks + Find jobs now] --> SC[scout + score] --> P
+  P -- yes --> C[Top picks: 3–5 cards, fit + reasons]
+  C --> K[Skip → card gone, toast Undo]
+  C --> R{master résumé?}
+  R -- no --> R1[Prepare disabled: reason + Add résumé → Profile]
+  R -- yes --> G[Prepare: tick + one-job prepare run, card Preparing…]
+  G --> H{run ok?}
+  H -- yes --> I[job → Jobs › Saved; Needs you: Review documents]
+  H -- no --> F[card: Couldn't prepare + cause + one fix: Retry / Tailor instead / open cause]
+  F --> G
+```
+What to notice: every dead end has one button (preferences, Find jobs now, Add résumé, Retry). Setup open never hides picks; it only blocks fill/submit (REQ-103), not prepare.

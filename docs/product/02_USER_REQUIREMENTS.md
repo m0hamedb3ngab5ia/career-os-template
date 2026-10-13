@@ -64,6 +64,7 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 - Users can filter out jobs by title, seniority, country or company.
 - Each job gets a fit score, a category and a priority tier.
 - Users can see when a posting closes.
+- The home screen shows the few best new jobs for the role and city the user is looking for, with the fit score and the main reasons. Users can start preparing one, or skip it, with one click.
 - Why: spend time only on jobs worth applying to
 
 ### USR-029 Find jobs on more job boards (later)
@@ -187,7 +188,8 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 
 ## Staying on top of my search
 ### USR-013 See every job and where it stands
-- Users see all jobs and their stage, from found to offer.
+- Users see all jobs and their stage, from found to offer, in one Jobs area: jobs recommended to them, jobs they saved, and jobs they applied to.
+- Users can view their jobs as a list with details beside it, as a table, or (for jobs they applied to) as a board by stage.
 - Users see what needs them today on the home screen.
 - Users can change a job's status, withdraw, or open its files.
 - The app keeps a spreadsheet copy of everything up to date as a backup.
@@ -262,10 +264,10 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | user requirement | status | technical REQs |
 |---|---|---|
 | USR-001 Set up my own private copy | proposed | REQ-001, REQ-002, REQ-003, REQ-004 |
-| USR-002 Upload my résumé and get feedback | approved | REQ-093, REQ-094, REQ-095, REQ-096, REQ-097 |
+| USR-002 Upload my résumé and get feedback | approved | REQ-093, REQ-094, REQ-095, REQ-096, REQ-097, REQ-124, REQ-125, REQ-126 |
 | USR-003 See what hiring systems read from my résumé | approved | REQ-098, REQ-099 |
-| USR-004 Keep a history of my résumés | approved | REQ-095, REQ-097, REQ-100 |
-| USR-005 Find jobs that fit me automatically | proposed | REQ-010, REQ-011, REQ-012, REQ-020 |
+| USR-004 Keep a history of my résumés | approved | REQ-095, REQ-097, REQ-100, REQ-126 |
+| USR-005 Find jobs that fit me automatically | proposed | REQ-010, REQ-011, REQ-012, REQ-020, REQ-127, REQ-130 |
 | USR-006 Stay safe from scams and fake jobs | proposed | REQ-013, REQ-014, REQ-015, REQ-016 |
 | USR-007 Get a tailored résumé and cover letter for each job | proposed | REQ-021, REQ-022, REQ-023, REQ-026 |
 | USR-008 Trust that nothing is made up | proposed | REQ-024, REQ-025 |
@@ -273,7 +275,7 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | USR-010 Have forms filled for me, then submit myself | proposed | REQ-030, REQ-031, REQ-034, REQ-036, REQ-037, REQ-038 |
 | USR-011 Optionally let the app submit for me | proposed | REQ-032, REQ-033, REQ-035, REQ-046 |
 | USR-012 Let the app work overnight within my limits | proposed | REQ-040, REQ-041, REQ-042, REQ-043, REQ-044, REQ-045 |
-| USR-013 See every job and where it stands | proposed | REQ-050, REQ-051, REQ-070, REQ-071, REQ-072, REQ-074 |
+| USR-013 See every job and where it stands | proposed | REQ-050, REQ-051, REQ-070, REQ-071, REQ-072, REQ-074, REQ-127, REQ-128, REQ-129, REQ-132 |
 | USR-014 Get a to-do list of things that need me | proposed | REQ-052, REQ-073, REQ-123 |
 | USR-015 Answer a question once, never again | proposed | REQ-053, REQ-054 |
 | USR-016 Reach out to people at the company | proposed | REQ-060, REQ-061, REQ-062, REQ-077 |
@@ -284,7 +286,7 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | USR-021 Use the app from my phone (later) | proposed | REQ-079 |
 | USR-022 Teach the app my writing style | approved | REQ-101 |
 | USR-023 Know when I'm ready to start applying | approved | REQ-002, REQ-102, REQ-103 |
-| USR-024 Pick which jobs go into my pipeline | approved | REQ-104 |
+| USR-024 Pick which jobs go into my pipeline | approved | REQ-104, REQ-128 |
 | USR-025 Preview and edit how my applications get filled | approved | REQ-105 |
 | USR-026 Get asked when the app doesn't know an answer | approved | REQ-053, REQ-106 |
 | USR-027 One place for everything the app knows about me | approved | REQ-053, REQ-107 |
@@ -296,6 +298,6 @@ Technical detail: 03_REQUIREMENTS.md (REQ-NNN), each linked to the user requirem
 | USR-033 Job postings can't trick the app | approved | REQ-108, REQ-109, REQ-110 |
 | USR-034 Start my pipeline and choose how far it goes | approved | REQ-117, REQ-118, REQ-120 |
 | USR-035 Always know what to do on each page | approved | REQ-119 |
-| USR-036 Tables that work like a spreadsheet | approved | REQ-120 |
-| USR-037 First-time guide and a clear next step | approved | REQ-121, REQ-122 |
+| USR-036 Tables that work like a spreadsheet | approved | REQ-120, REQ-129 |
+| USR-037 First-time guide and a clear next step | approved | REQ-121, REQ-122, REQ-131 |
 <!-- /trace:map -->
