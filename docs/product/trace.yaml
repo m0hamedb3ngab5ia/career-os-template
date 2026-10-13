@@ -924,7 +924,7 @@ tasks:
     flows:
     - FLOW-003
   TASK-013:
-    status: needs-review
+    status: done
     requirements:
     - REQ-107
     - REQ-101
@@ -940,7 +940,7 @@ tasks:
     - REQ-105
     - REQ-106
   TASK-015:
-    status: needs-review
+    status: done
     requirements:
     - REQ-104
     - REQ-109
@@ -953,7 +953,7 @@ tasks:
     use_cases:
     - UC-013
   TASK-017:
-    status: needs-review
+    status: done
     requirements:
     - REQ-117
     - REQ-120
@@ -967,13 +967,13 @@ tasks:
     - REQ-119
     - REQ-120
   TASK-019:
-    status: needs-review
+    status: done
     requirements:
     - REQ-121
     use_cases:
     - UC-014
   TASK-020:
-    status: needs-review
+    status: done
     requirements:
     - REQ-122
     use_cases:
@@ -1066,3 +1066,45 @@ tasks:
     use_cases:
     - UC-001
     - UC-002
+  TASK-034:
+    status: todo
+    requirements:
+    - REQ-127
+    - REQ-128
+    - REQ-130
+    use_cases:
+    - UC-015
+    - UC-016
+  TASK-035:
+    status: todo
+    requirements:
+    - REQ-128
+    - REQ-129
+    - REQ-130
+    - REQ-132
+    - REQ-104
+    - REQ-117
+    use_cases:
+    - UC-013
+    - UC-016
+    flows:
+    - FLOW-004
+  TASK-036:
+    status: todo
+    requirements:
+    - REQ-127
+    - REQ-131
+    - REQ-102
+    use_cases:
+    - UC-014
+    - UC-015
+    flows:
+    - FLOW-005
+  TASK-037:
+    status: todo
+    requirements:
+    - REQ-129
+    - REQ-121
+    use_cases:
+    - UC-014
+    - UC-016
