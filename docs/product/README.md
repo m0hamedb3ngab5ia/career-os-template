@@ -30,6 +30,7 @@ Numbers = order of operations (01 → 11). Unnumbered = living files, updated ev
 | 01_VISION.md | user, problem, outcome, metrics |
 | 02_USER_REQUIREMENTS.md | **start here**: what users can do, plain words (USR). You own this. |
 | 03_REQUIREMENTS.md | technical REQ/NFR + Given/When/Then, derived from USRs by the agent |
+| 03b_REQUIREMENTS_USER_FLOWS.md | REQs for onboarding & profile, job match, Jobs on Today (split from 03 at 400 lines) |
 | 04_USE_CASES.md | UC + E2E specs + use-case diagram |
 | 05_SCOPE.md | MVP / must / should / later / excluded |
 | 06_IA.md · 07_USER_FLOWS.md | navigation · FLOW steps, activity/state diagrams |
