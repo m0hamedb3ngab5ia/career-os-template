@@ -333,3 +333,19 @@ def test_apply_gate_fails_closed_on_unreadable_resume(settings, store, text):
     (store.job_dir(jid) / "prepare.json").write_text(json.dumps({"qa_pass": True}))
     (store.job_dir(jid) / "resume.json").write_text(text)
     assert prepared_ok(settings, store, jid, "apply") is False
+
+
+@pytest.mark.parametrize("flag", [True, False])
+def test_dec_021_run_batch_passes_force_tailor_to_the_resume_pick(settings, store, monkeypatch, flag):
+    # regression: run_batch once dropped force_tailor, so "Tailor instead" silently reused the résumé
+    from careeros import match
+    seen = []
+    monkeypatch.setattr(match, "pick", lambda s, d, force_tailor=False: seen.append(force_tailor) or
+                        {"action": "tailor", "reason": "test"})
+    jid = add_job(store, 1)
+    settings.pipeline = {**settings.pipeline, "runs": {**(settings.pipeline.get("runs") or {}),
+                                                       "preflight_doctor": False}}
+    cfg = load_runs_config(settings)
+    run_batch(settings, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg, invoke=Fake(settings),
+              now=lambda: NOW, job_ids=[jid], force=True, force_tailor=flag)
+    assert seen == [flag]
