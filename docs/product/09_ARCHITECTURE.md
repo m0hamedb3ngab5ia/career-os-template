@@ -281,3 +281,52 @@ Edit + publish:
 | deterministic render | same JSON twice → identical text, ATS and `.tex` (on-demand output must be stable) | integration render (skipif no LaTeX) |
 | auditable revert | revert appends inverse; conflicting revert refused | unit history |
 | import never invents | bullet not in text.txt → import failed | unit guard |
+
+## Delta 2026-10-13 — Jobs on Today, tracker in Jobs (DEC-022)
+Scope: REQ-127..132, UC-015, UC-016, FLOW-004, FLOW-005. Today = read-only summary; Jobs = the workspace. No new store, no new job state.
+
+### Components (changed = bold)
+```mermaid
+flowchart LR
+  ix[(SQLite index, rebuilt)] --> bucket[**services/jobs.py TABS + _tab_clause**: recommended / saved / applied]
+  bucket --> list[GET /api/jobs?tab=] --> jobsui[**Jobs: tabs + List / Table / Board**]
+  bucket --> tabs[GET /api/jobs/tabs counts] --> jobsui
+  bucket --> today[**GET /api/today top_picks** = first N of recommended] --> todayui[**Today: Top picks / setup card**]
+  list --> reasons[**match.matches for rows on the page only**, résumé texts loaded once per request]
+  jobsui -->|Board drag| status[POST /api/jobs/id/status → Tracker.set_status, atomic, NFR-002]
+  todayui -->|click| jobsui
+  old[/pipeline] -->|**redirect**| jobsui
+```
+What to notice: Today and the Jobs counts call the same bucket clause, so a job can never be "recommended" on one page and not the other.
+
+### Buckets (replace the current TABS: active / review / applied / tier_a / all)
+| tab | clause | notes |
+|---|---|---|
+| recommended | fit scored, `selected = 0`, status not skipped, not in APPLIED_STATUSES, not closed | sort fit desc; Today takes the first N |
+| saved | `selected = 1`, not in APPLIED_STATUSES | Start pipeline lives here (FLOW-004) |
+| applied | status in APPLIED_STATUSES | Board view: one column per status |
+Old tab keys in a saved URL → map to the nearest new tab (review/tier_a/all → recommended with that filter), never a 400.
+
+### Reasons line (REQ-130)
+- Computed on read: `match.matches()` is deterministic, no LLM, and its inputs (résumés) change after scoring, so a stored value goes stale.
+- Only the rows returned (one page of List, N Top picks); résumé texts read once per request, not once per row.
+- `ponytail:` no cache. Add one keyed on (job score.json mtime, résumé version ids) only if a timed request on a ~750-job copy is slow.
+
+### Settings
+- `ui.jobs_view` (list / table / board) in `data/ui_state.json` via existing `GET/PUT /api/ui-state` (atomic write, same as `tour_done`).
+- `/pipeline` route: 308 to `/jobs?tab=applied&view=board`; `GET /api/pipeline` kept until the Board reads from `/api/jobs?tab=applied`, then removed.
+
+### Failure + recovery
+| failure | effect | recovery |
+|---|---|---|
+| Board drag while Excel holds the tracker | write queued to `.pending.json` | card shows "Saved, Excel open"; `careeros tracker flush` |
+| status write refused (`acts.set_status` raises) | card snaps back | refusal reason shown inline |
+| résumé file unreadable during reasons | that row has no reasons line | row still listed; no 500 |
+
+### Quality scenarios
+| invariant | scenario | test |
+|---|---|---|
+| one bucket rule | Today top picks ⊆ recommended tab rows, same order | unit services |
+| counts match lists | tab count == rows returned without limit | unit services |
+| no duplicate state | Board drag changes only the tracker status | integration API |
+| reasons cost bounded | reasons computed for page rows only (call count) | unit with fake match |
