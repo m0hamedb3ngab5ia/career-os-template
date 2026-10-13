@@ -2,7 +2,7 @@
 
 ## Now
 - Lane: Feature — §2 Jobs on Today (DEC-022: REQ-127..132, UC-015/016, FLOW-005, mockup `mockups/jobs-today.html`). Stream: ttv-user-test
-- Stage: combined gate (spec + IA + UI) pending user review; Q-024..029 open; then new TASKs for needs-review TASK-013/015/017/019/020
+- Stage: combined gate approved 2026-10-13 (Q-024..029 answered); next arch delta + new TASKs for needs-review TASK-013/015/017/019/020
 - Also: Feature — onboarding + profile (USR-002..004, 022..027) + injection guard, résumé reuse, check a job (USR-033, 031, 028)
 - Its stage: Build. TASK-001..023 and TASK-025 shipped (#115..#150); private UI ported to the template (#156). Specs/IA/arch approved 2026-10-04 (see Gates)
 - Done: REQ-093..116, UC-001..012, FLOW-001/002 approved (gates 2026-10-04)
@@ -14,6 +14,7 @@
 |---|---|---|
 | Audit triage | pending | |
 | Onboarding+profile spec (Feature) | approved | 2026-10-04 |
+| §2 Jobs on Today spec+IA+UI (Feature, DEC-022) | approved | 2026-10-13 |
 | Résumé workspace spec (Feature, DEC-012) | approved | 2026-10-12 |
 | Jobs on Today spec + IA + UI (Feature, DEC-022) | pending | |
 | Injection guard + résumé reuse + check-a-job spec (Feature) | approved | 2026-10-04 |

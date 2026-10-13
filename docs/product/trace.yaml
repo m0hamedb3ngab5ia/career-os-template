@@ -805,14 +805,14 @@ use_cases:
     - REQ-121
     - REQ-131
   UC-015:
-    status: draft
+    status: approved
     requirements:
     - REQ-127
     - REQ-130
     - REQ-131
     - REQ-114
   UC-016:
-    status: draft
+    status: approved
     requirements:
     - REQ-072
     - REQ-128
@@ -843,7 +843,7 @@ flows:
     - UC-013
     - UC-016
   FLOW-005:
-    status: draft
+    status: approved
     use_cases:
     - UC-015
     - UC-016

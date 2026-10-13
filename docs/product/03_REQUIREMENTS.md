@@ -353,7 +353,7 @@ Amendment (Q-022, user-approved 2026-10-05): "ticked" here = rows selected in th
 Mockup: `mockups/jobs-today.html`.
 
 ### REQ-127 Top picks band on Today
-Band "Top picks for <role> in <city>" above Needs you: 3–5 new jobs (Q-025), best fit (REQ-020) first; never skipped, Saved or Applied. Heading says why picked + "Edit" link to search preferences (Q-026). Card = REQ-130 + primary Prepare (ticks job + one-job prepare run, as REQ-114) + Skip (status `skipped`, undo toast). Prepare disabled + reason while no master résumé.
+Band "Top picks for <role> in <city>" above Needs you: 3–5 new jobs (found ≤14 days, tier A/B; Q-025), best fit (REQ-020) first; never skipped, Saved or Applied. Heading says why picked + "Edit" link to search preferences (Q-026). Card = REQ-130 + primary Prepare (ticks job + one-job prepare run, as REQ-114) + Skip (status `skipped`, undo toast). Prepare disabled + reason while no master résumé.
 Empty: no picks → "No new picks for <role> in <city>" + "Find jobs now" (scout); no preferences → "Tell us what you're looking for" + button to preferences.
 Given 6 new scored jobs, 1 skipped, 1 Saved · When open Today · Then 4 cards, best fit first.
 Given pick · When Prepare · Then job `selected`, prepare run for that job only, card "Preparing…", then job in Jobs › Saved.
@@ -374,7 +374,7 @@ Replaces the readiness card on Today; REQ-102 stays the data source, Profile Rea
 Given 2 of 5 must-haves done · When open Today · Then setup card first, ring 2/5, one primary button.
 Given all must-haves done · When open Today · Then no setup card.
 ### REQ-132 Colour only for meaning; status = dot + word
-Status everywhere (cards, rows, board, tabs) = dot + word, never colour alone. Colour only: amber = needs you, red = blocked / failed, green = done; everything else neutral. Cards carry a 3px left edge stripe in the status colour (neutral = no stripe). Contrast ≥4.5:1 both themes.
+Status everywhere (cards, rows, board, tabs) = dot + word, never colour alone. Colour only: amber = needs you, red = blocked / failed, green = Ready / Applied / Offer, and the word always names the stage ("Ready", "Applied · Interview", "Offer"); Applied-tab cards add a small stage progress line (Applied → Screening → Interview → Offer); everything else neutral. Cards carry a 3px left edge stripe in the status colour (neutral = no stripe). Contrast ≥4.5:1 both themes.
 Given card "Needs you" · Then amber dot + word + amber stripe. Given card "Saved" · Then grey dot + word, no stripe.
 
 ## Non-functional
