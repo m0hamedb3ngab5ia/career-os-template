@@ -117,3 +117,20 @@ def test_reasons_real_match_and_pending(idx, data):
     rows = jobs_svc.with_reasons(data["settings"], [{"job_id": jid}, {"job_id": data["jobs"]["found"]}])
     assert rows[0]["reasons"] == {"covered": 2, "total": 3, "missing": ["Go", "Rust"]}
     assert rows[1]["reasons"] is None   # not scored yet → "Match pending"
+
+
+def test_corrupt_resume_meta_drops_reasons_not_500(idx, data):
+    root = data["settings"].root
+    bad = root / "profile" / "resumes" / "broken"
+    bad.mkdir(parents=True)
+    (bad / "meta.json").write_text("{not json")
+    rows = jobs_svc.with_reasons(data["settings"], [{"job_id": data["jobs"]["queued"]}])
+    assert rows[0]["reasons"] is None
+
+
+def test_malformed_score_drops_that_rows_reasons_not_500(idx, data):
+    import json
+    jid = data["jobs"]["queued"]
+    (Store(data["settings"]).job_dir(jid) / "score.json").write_text(json.dumps({"required_skills": 5}))
+    rows = jobs_svc.with_reasons(data["settings"], [{"job_id": jid}])
+    assert rows[0]["reasons"] is None

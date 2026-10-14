@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import re
+from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
@@ -275,15 +276,29 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
 
 
+@lru_cache(maxsize=256)
+def _version_text(root: Path, rid: str, n: int) -> str:
+    """A résumé version never changes once written, so its text (rendered + extracted, slow) is cached by (root, rid, n)."""
+    from careeros import resumes
+
+    return str(resumes.version(root, rid, n)["text"])
+
+
 def _resume_texts(settings: Any) -> list[tuple[dict[str, Any], str]]:
     """Every résumé's latest text, once per request; an unreadable résumé is left out (its rows lose nothing else)."""
     from careeros import resumes
 
     out = []
-    for r in resumes.list_resumes(settings.root):
+    try:
+        listed = resumes.list_resumes(settings.root)
+    except (OSError, ValueError, LookupError):
+        # ponytail: one corrupt meta.json drops reasons for all résumés (rows show "Match pending"), never a 500.
+        # Per-résumé isolation needs a lenient resumes._all; its write callers must keep failing loudly.
+        return out
+    for r in listed:
         try:
-            out.append((r, resumes.version(settings.root, r["rid"], r["latest"])["text"]))
-        except (OSError, ValueError, LookupError):
+            out.append((r, _version_text(settings.root, r["rid"], r["latest"])))
+        except Exception:  # noqa: BLE001 - any unreadable résumé is left out, never a 500
             continue
     return out
 
@@ -309,7 +324,7 @@ def with_reasons(settings: Any, rows: list[Any], matcher: Any = None) -> list[An
         d = job_dir_for(settings, r["job_id"])
         try:
             r["reasons"] = _reasons(matcher(settings, d, texts=texts)) if d else None
-        except (OSError, ValueError):   # unreadable score/posting: row still listed, no reasons line
+        except Exception:  # noqa: BLE001 - malformed score/posting/config: row still listed, no reasons line
             r["reasons"] = None
     return rows
 
