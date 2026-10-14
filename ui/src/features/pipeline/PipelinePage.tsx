@@ -32,9 +32,19 @@ function humanStatus(s: string): string {
   return (HUMAN.status as Record<string, string>)[s] ?? statusLabel(s);
 }
 
-/** Jobs (every tab) filtered to one column value or date range: the funnel's "open the list" link. */
+const AFTER_APPLY = ["applied", "screening", "interview", "offer", "rejected", "withdrawn", "ghosted"];
+const SAVED = ["queued", "prepared", "needs_review"];
+
+/** The Jobs tab that holds these statuses (Recommended = found/scored, Saved = ticked, Applied = applied or later). */
+function tabFor(field: string, value: string): string {
+  if (field === "applied_at") return "applied";
+  const v = value.split(",");
+  return v.some((s) => AFTER_APPLY.includes(s)) ? "applied" : v.some((s) => SAVED.includes(s)) ? "saved" : "recommended";
+}
+
+/** Jobs filtered to one column value or date range, on the tab that holds it: the funnel's "open the list" link. */
 function jobsHref(field: string, value: string): string {
-  return `/jobs?${new URLSearchParams({ tab: "all", [`f.${field}`]: value })}`;
+  return `/jobs?${new URLSearchParams({ tab: tabFor(field, value), [`f.${field}`]: value })}`;
 }
 
 function problem(e: unknown): string {

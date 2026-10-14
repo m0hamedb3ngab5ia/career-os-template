@@ -20,6 +20,7 @@ function setup(path = "/jobs", extra: Record<string, unknown> = {}) {
     "GET /api/meta": META,
     "GET /api/jobs": page,
     "GET /api/jobs/tabs": TABS_REPLY,
+    "GET /api/ui-state": { tour_done: true, jobs_view: "table" },   // these tests drive the Table
     ...extra,
   });
   const app = renderApp(path);
@@ -42,11 +43,11 @@ describe("Jobs screen", () => {
     const table = await screen.findByRole("table", { name: "Tracked jobs, sorted by fit, highest first" });
     expect(within(table).getByRole("rowheader", { name: "Northwind Labs" })).toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Northwind Labs" })).toHaveAttribute("href", "/jobs/nw01");
-    expect(await screen.findByRole("tab", { name: "Active (59)" })).toHaveAttribute("aria-selected", "true");
-    expect(screen.getByRole("tab", { name: "All (736)" })).toBeInTheDocument();
+    expect(await screen.findByRole("tab", { name: "Recommended (59)" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Applied (41)" })).toBeInTheDocument();
     const req = api.callsTo("GET /api/jobs")[0]!;
-    expect(Object.fromEntries(req.search)).toEqual({ tab: "active", sort: "-fit", limit: "2" });
-    expect(await screen.findByText(/3 active jobs · live from/)).toBeInTheDocument();
+    expect(Object.fromEntries(req.search)).toEqual({ tab: "recommended", sort: "-fit", limit: "2" });
+    expect(await screen.findByText(/3 recommended jobs · live from/)).toBeInTheDocument();
   });
 
   it("renders every mockup column with chips, dates and spoken dashes for empty cells", async () => {
@@ -82,7 +83,7 @@ describe("Jobs screen", () => {
   it("fills a 10-row page by fetching the next cursor page; no pager while it all fits", async () => {
     const { api } = setup();
     expect(await screen.findByRole("rowheader", { name: "Initech" })).toBeInTheDocument();
-    expect(screen.getByText(/3 active jobs · live from/)).toBeInTheDocument();
+    expect(screen.getByText(/3 recommended jobs · live from/)).toBeInTheDocument();
     expect(api.callsTo("GET /api/jobs")[1]!.search.get("cursor")).toBe("2");
     expect(screen.queryByRole("navigation", { name: "Jobs pages" })).not.toBeInTheDocument();
   });
@@ -90,15 +91,15 @@ describe("Jobs screen", () => {
   it("tabs are a roving tablist: arrow keys switch the filter and the URL", async () => {
     const { api, router } = setup();
     const user = userEvent.setup();
-    const active = await screen.findByRole("tab", { name: "Active (59)" });
-    expect(screen.getByRole("tab", { name: "Needs review (6)" })).toHaveAttribute("tabindex", "-1");
+    const active = await screen.findByRole("tab", { name: "Recommended (59)" });
+    expect(screen.getByRole("tab", { name: "Saved (3)" })).toHaveAttribute("tabindex", "-1");
     active.focus();
     await user.keyboard("{ArrowRight}");
-    const review = screen.getByRole("tab", { name: "Needs review (6)" });
+    const review = screen.getByRole("tab", { name: "Saved (3)" });
     expect(review).toHaveFocus();
     expect(review).toHaveAttribute("aria-selected", "true");
-    expect(router.state.location.search).toBe("?tab=review");
-    await waitFor(() => expect(api.callsTo("GET /api/jobs").some((c) => c.search.get("tab") === "review")).toBe(true));
+    expect(router.state.location.search).toBe("?tab=saved");
+    await waitFor(() => expect(api.callsTo("GET /api/jobs").some((c) => c.search.get("tab") === "saved")).toBe(true));
   });
 
   it("clicking a sortable header sorts, sets aria-sort and updates the caption and URL", async () => {
@@ -118,13 +119,13 @@ describe("Jobs screen", () => {
   });
 
   it("reads tab, search, sort and hidden columns from the URL", async () => {
-    const { api } = setup("/jobs?tab=tier_a&q=globex&sort=-found_at&cols=ats,qa");
+    const { api } = setup("/jobs?tab=saved&q=globex&sort=-found_at&cols=ats,qa");
     const table = await screen.findByRole("table", { name: "Tracked jobs, sorted by found date, newest first" });
     expect(within(table).queryByRole("columnheader", { name: "ATS" })).not.toBeInTheDocument();
     expect(within(table).queryByRole("columnheader", { name: "QA" })).not.toBeInTheDocument();
     expect(screen.getByRole("searchbox", { name: "Search jobs" })).toHaveValue("globex");
     const req = api.callsTo("GET /api/jobs")[0]!;
-    expect(req.search.get("tab")).toBe("tier_a");
+    expect(req.search.get("tab")).toBe("saved");
     expect(req.search.get("q")).toBe("globex");
     expect(api.callsTo("GET /api/jobs/tabs")[0]!.search.get("q")).toBe("globex");
   });
@@ -188,12 +189,12 @@ describe("Jobs screen", () => {
   });
 
   it("selects rows, announces the count, selects all shown and clears", async () => {
-    const { router } = setup();
+    const { router } = setup("/jobs?tab=saved");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("checkbox", { name: "Select Northwind Labs" }));
     const live = screen.getByText("1 selected").closest("[role=status]")!;
     expect(live).toHaveAttribute("aria-live", "polite");
-    expect(router.state.location.search).toBe("?sel=nw01");
+    expect(router.state.location.search).toBe("?tab=saved&sel=nw01");
     expect(screen.getByRole("button", { name: "Export 1 to xlsx" })).toBeInTheDocument();
     await screen.findByRole("rowheader", { name: "Initech" });
     const all = screen.getByRole("checkbox", { name: "Select all shown jobs" });
@@ -205,7 +206,7 @@ describe("Jobs screen", () => {
   });
 
   it("clears the selection and Start pipeline says why it is unavailable", async () => {
-    setup("/jobs?sel=nw01");
+    setup("/jobs?tab=saved&sel=nw01");
     const user = userEvent.setup();
     expect(await screen.findByText("1 selected")).toBeInTheDocument();
     await user.click(screen.getByRole("button", { name: "Clear selection" }));
@@ -289,7 +290,7 @@ describe("Jobs screen", () => {
 
   it("empty states: nothing tracked, and no search match with a way out", async () => {
     const empty = { items: [], total: 0, next_cursor: null };
-    setup("/jobs?tab=all", { "GET /api/jobs": empty });
+    setup("/jobs?tab=recommended", { "GET /api/jobs": empty });
     expect(await screen.findByRole("heading", { name: "No jobs here yet" })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: "Open Automation" })).toHaveAttribute("href", "/automation");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
@@ -337,7 +338,7 @@ describe("Jobs screen", () => {
       expect(within(menu).getByRole("checkbox", { name: "Needs review (1)" })).toBeInTheDocument();
       const facetReq = api.callsTo("GET /api/jobs/facets")[0]!;
       expect(facetReq.search.get("field")).toBe("status");
-      expect(facetReq.search.get("tab")).toBe("active");
+      expect(facetReq.search.get("tab")).toBe("recommended");
       expect(within(menu).getByRole("button", { name: "Sort A to Z" })).toBeInTheDocument();
       await user.type(within(menu).getByRole("searchbox", { name: "Search Status values" }), "ap");
       expect(within(menu).queryByRole("checkbox", { name: "Queued (5)" })).not.toBeInTheDocument();
@@ -430,9 +431,9 @@ describe("Jobs screen", () => {
   });
 
   it("has no axe violations", { timeout: 20_000 }, async () => {
-    const { container } = setup("/jobs?sel=nw01");
+    const { container } = setup("/jobs?tab=saved&sel=nw01");
     await screen.findByRole("table");
-    await screen.findByRole("tab", { name: "Active (59)" });
+    await screen.findByRole("tab", { name: "Recommended (59)" });
     await act(async () => undefined);
     expect(await axeViolations(container)).toEqual([]);
   });

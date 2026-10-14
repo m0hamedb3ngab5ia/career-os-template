@@ -1,0 +1,123 @@
+.list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.card {
+  display: grid;
+  grid-template-columns: auto 44px 1fr auto;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  border-bottom: 1px solid var(--sep);
+  border-left: 3px solid transparent;
+}
+.card:hover {
+  background: var(--hover);
+}
+.card[data-needs-you] {
+  border-left-color: var(--orange);
+}
+.fit {
+  font-size: var(--fs-title, 20px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+.text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  gap: 2px;
+}
+.title {
+  font-weight: 600;
+  color: var(--label);
+  text-decoration: none;
+}
+.title:hover {
+  text-decoration: underline;
+}
+.role {
+  font-weight: 400;
+  color: var(--sec);
+}
+.meta,
+.reasons,
+.pending {
+  font-size: var(--fs-caption);
+  color: var(--sec);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.pending {
+  font-style: italic;
+}
+.badge {
+  font-size: var(--fs-caption);
+}
+.needs,
+.saved {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.needs {
+  color: var(--orange);
+}
+.saved {
+  color: var(--sec);
+}
+.dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+}
+
+.board {
+  display: grid;
+  grid-auto-flow: column;
+  grid-auto-columns: minmax(220px, 1fr);
+  gap: var(--space-3);
+  padding: var(--space-3);
+  overflow-x: auto;
+}
+.column {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  min-height: 120px;
+  padding: var(--space-2);
+  border-radius: var(--r-card);
+  background: var(--group);
+}
+.column[data-over] {
+  outline: 2px dashed var(--accent);
+}
+.column h3 {
+  margin: 0;
+  font-size: var(--fs-caption);
+  font-weight: 600;
+  color: var(--sec);
+}
+.boardCard {
+  display: grid;
+  grid-template-columns: 36px 1fr;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--sep);
+  border-radius: var(--r-control);
+  background: var(--card);
+  cursor: grab;
+}
+.boardCard[data-needs-you] {
+  border-left: 3px solid var(--orange);
+}
+.boardCard select {
+  grid-column: 2;
+  justify-self: start;
+  font-size: var(--fs-caption);
+}
+.refused { margin: 0; padding: var(--space-2) var(--space-4); color: var(--red); }

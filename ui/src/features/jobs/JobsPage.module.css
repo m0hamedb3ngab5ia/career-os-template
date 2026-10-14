@@ -317,3 +317,20 @@
   gap: 8px;
   justify-content: flex-end;
 }
+
+.split {
+  display: grid;
+  grid-template-columns: minmax(320px, 2fr) 3fr;
+  gap: var(--space-4);
+  align-items: start;
+}
+.detail {
+  min-width: 0;
+  position: sticky;
+  top: var(--space-4);
+  max-height: calc(100vh - 2 * var(--space-4));
+  overflow-y: auto;
+}
+.detail > header {
+  padding-inline: var(--space-4);
+}

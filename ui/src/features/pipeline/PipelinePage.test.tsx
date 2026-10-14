@@ -60,13 +60,13 @@ describe("Pipeline", () => {
     setup();
     const funnel = await screen.findByRole("navigation", { name: "Automation funnel" }, { timeout: 8000 });
     const link = (name: RegExp) => within(funnel).getByRole("link", { name }).getAttribute("href");
-    expect(link(/^12 New$/)).toBe("/jobs?tab=all&f.status=found");
-    expect(link(/^1 Ready to prepare$/)).toBe("/jobs?tab=all&f.status=queued");
-    expect(link(/^0 Ready to apply$/)).toBe("/jobs?tab=all&f.status=prepared");
-    expect(link(/^2 Needs your review$/)).toBe("/jobs?tab=all&f.status=needs_review");
-    expect(link(/^4 Submitted this week$/)).toBe("/jobs?tab=all&f.applied_at=2026-09-21..");
+    expect(link(/^12 New$/)).toBe("/jobs?tab=recommended&f.status=found");
+    expect(link(/^1 Ready to prepare$/)).toBe("/jobs?tab=saved&f.status=queued");
+    expect(link(/^0 Ready to apply$/)).toBe("/jobs?tab=saved&f.status=prepared");
+    expect(link(/^2 Needs your review$/)).toBe("/jobs?tab=saved&f.status=needs_review");
+    expect(link(/^4 Submitted this week$/)).toBe("/jobs?tab=applied&f.applied_at=2026-09-21..");
     expect(screen.getByRole("link", { name: "Closed: 3 (skipped 2 · rejected 1)" })).toHaveAttribute(
-      "href", "/jobs?tab=all&f.status=skipped%2Crejected%2Cwithdrawn%2Cghosted");
+      "href", "/jobs?tab=applied&f.status=skipped%2Crejected%2Cwithdrawn%2Cghosted");
   });
 
   it("applications are grouped Applied · Screening · Interview · Offer, with no drag", { timeout: 20_000 }, async () => {
@@ -153,7 +153,7 @@ describe("Pipeline", () => {
   it("Closed link carries the active filters to Jobs", async () => {
     setup(board(), {}, "/pipeline?tier=A");
     expect(await screen.findByRole("link", { name: /^Closed: 3/ })).toHaveAttribute(
-      "href", "/jobs?tab=all&f.status=skipped%2Crejected%2Cwithdrawn%2Cghosted&f.tier=A");
+      "href", "/jobs?tab=applied&f.status=skipped%2Crejected%2Cwithdrawn%2Cghosted&f.tier=A");
   });
 
   it("empty data shows zeros and empty groups, never sample cards", async () => {

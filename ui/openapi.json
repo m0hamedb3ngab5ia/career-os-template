@@ -8722,6 +8722,22 @@
       },
       "UiState": {
         "properties": {
+          "jobs_view": {
+            "anyOf": [
+              {
+                "enum": [
+                  "list",
+                  "table",
+                  "board"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Jobs View"
+          },
           "tour_done": {
             "default": false,
             "title": "Tour Done",
@@ -15856,6 +15872,7 @@
         ]
       },
       "put": {
+        "description": "Merge: only the keys sent change, so the tour and the Jobs view never overwrite each other.",
         "operationId": "put_ui_state_api_ui_state_put",
         "requestBody": {
           "content": {

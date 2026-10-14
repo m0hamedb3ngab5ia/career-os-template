@@ -13,7 +13,7 @@ export const routes: RouteObject[] = [
       { path: "pipeline", lazy: () => import("../features/pipeline/PipelinePage").then((m) => ({ Component: m.PipelinePage })) },
       { path: "pipeline/batch/:id", lazy: () => import("../features/pipeline/batch/Progress").then((m) => ({ Component: m.BatchProgressPage })) },
       { path: "jobs", lazy: () => import("../features/jobs/JobsPage").then((m) => ({ Component: m.JobsPage })) },
-      { path: "jobs/:jobId", lazy: () => import("../features/job-detail/JobDetailPage").then((m) => ({ Component: m.JobDetailPage })) },
+      { path: "jobs/:jobId", lazy: () => import("../features/jobs/JobsRoute").then((m) => ({ Component: m.JobsRoute })) },
       { path: "actions", lazy: () => import("../features/actions/ActionItemsPage").then((m) => ({ Component: m.ActionItemsPage })) },
       { path: "inbox", lazy: () => import("../features/inbox/InboxPage").then((m) => ({ Component: m.InboxPage })) },
       { path: "inbox/:jobId", lazy: () => import("../features/inbox/InboxPage").then((m) => ({ Component: m.InboxPage })) },

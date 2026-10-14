@@ -592,7 +592,10 @@ export interface paths {
   "/api/ui-state": {
     /** Get Ui State */
     get: operations["get_ui_state_api_ui_state_get"];
-    /** Put Ui State */
+    /**
+     * Put Ui State
+     * @description Merge: only the keys sent change, so the tour and the Jobs view never overwrite each other.
+     */
     put: operations["put_ui_state_api_ui_state_put"];
   };
 }
@@ -3216,6 +3219,8 @@ export interface components {
     };
     /** UiState */
     UiState: {
+      /** Jobs View */
+      jobs_view?: ("list" | "table" | "board") | null;
       /**
        * Tour Done
        * @default false
@@ -6409,7 +6414,10 @@ export interface operations {
       };
     };
   };
-  /** Put Ui State */
+  /**
+   * Put Ui State
+   * @description Merge: only the keys sent change, so the tour and the Jobs view never overwrite each other.
+   */
   put_ui_state_api_ui_state_put: {
     requestBody: {
       content: {

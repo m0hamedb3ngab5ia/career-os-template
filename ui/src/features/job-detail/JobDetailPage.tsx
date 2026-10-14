@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Link, useParams } from "react-router";
+import { Link, useLocation, useParams } from "react-router";
 import { ApiError } from "../../api/client";
 import { useMeta } from "../../api/meta";
 import { Page } from "../../app/PageHeader";
@@ -26,14 +26,15 @@ import type { JobDetail } from "./types";
 const CLOSED_FOR_WITHDRAW = new Set(["withdrawn", "rejected", "ghosted", "skipped", "offer"]);
 
 function Breadcrumb({ company }: { company: string }) {
+  const { search } = useLocation();
   return (
     <nav aria-label="Breadcrumb" className={styles.breadcrumb}>
-      <Link to="/jobs">Jobs</Link> <span aria-hidden="true">›</span> <span aria-current="page">{company}</span>
+      <Link to={{ pathname: "/jobs", search }}>Jobs</Link> <span aria-hidden="true">›</span> <span aria-current="page">{company}</span>
     </nav>
   );
 }
 
-function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
+function Detail({ jobId, detail, embedded }: { jobId: string; detail: JobDetail; embedded?: boolean }) {
   const toast = useToast();
   const meta = useMeta();
   const withdraw = useWithdraw(jobId);
@@ -85,6 +86,7 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
 
   return (
     <Page
+      embedded={embedded}
       title={company}
       subtitle={subtitle}
       actions={
@@ -140,13 +142,13 @@ function Detail({ jobId, detail }: { jobId: string; detail: JobDetail }) {
   );
 }
 
-export function JobDetailPage() {
+export function JobDetailPage({ embedded }: { embedded?: boolean } = {}) {
   const { jobId = "" } = useParams();
   const job = useJob(jobId);
 
   if (job.isPending) {
     return (
-      <Page busy title="Job" subtitle={<Breadcrumb company="Loading…" />}>
+      <Page embedded={embedded} busy title="Job" subtitle={<Breadcrumb company="Loading…" />}>
         <p className={styles.muted}>Loading job…</p>
       </Page>
     );
@@ -155,6 +157,7 @@ export function JobDetailPage() {
     const missing = job.error instanceof ApiError && job.error.status === 404;
     return (
       <Page
+        embedded={embedded}
         title={missing ? "Job not found" : "Couldn’t load this job"}
         subtitle={missing ? "This job is gone or the link is wrong · go back to Jobs" : "Career OS didn’t answer · try again"}
       >
@@ -175,5 +178,5 @@ export function JobDetailPage() {
       </Page>
     );
   }
-  return <Detail jobId={jobId} detail={job.data} />;
+  return <Detail jobId={jobId} detail={job.data} embedded={embedded} />;
 }
