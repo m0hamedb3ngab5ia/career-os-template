@@ -1,9 +1,9 @@
 import { useCallback } from "react";
 import { useSearchParams } from "react-router";
-import type { TabKey, ViewKey } from "./types";
+import type { StageKey, TabKey, ViewKey } from "./types";
 
 // Jobs view state lives in the query string (docs/UI.md "URL state"):
-//   ?tab=recommended|saved|applied  &view=list|table|board  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
+//   ?tab=recommended|saved|applied  &stage=applied|screening|interview|offer|closed (Applied tab)  &view=list|table|board  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
 //   &cols=<hidden column keys>  &sel=<selected job ids>
 //   &f.<field>=v1,v2 (column value filter; literal commas in a value are backslash-escaped so they survive the
 //   split; URLSearchParams itself percent-encodes the rest, so values aren't double-encoded)  &f.<field>=min..max (number
@@ -14,6 +14,14 @@ export const TABS: TabKey[] = ["recommended", "saved", "applied"];
 export const DEFAULT_TAB: TabKey = "recommended";
 export const VIEWS: ViewKey[] = ["list", "table", "board"];
 export const DEFAULT_VIEW: ViewKey = "list";
+/** Applied-tab sub-tabs (REQ-128, Q-028): statuses 1:1; Closed = rejected + withdrawn + declined (ghosted). */
+export const STAGES: { key: StageKey; label: string; statuses: string[] }[] = [
+  { key: "applied", label: "Applied", statuses: ["applied"] },
+  { key: "screening", label: "Screening", statuses: ["screening"] },
+  { key: "interview", label: "Interview", statuses: ["interview"] },
+  { key: "offer", label: "Offer", statuses: ["offer"] },
+  { key: "closed", label: "Closed", statuses: ["rejected", "withdrawn", "ghosted"] },
+];
 /** The view to show: the URL's, else the remembered one (ui.jobs_view), else List. Board only exists on Applied. */
 export function effectiveView(view: ViewKey | "", remembered: ViewKey | undefined, tab: TabKey): ViewKey {
   const v = view || remembered || DEFAULT_VIEW;
@@ -63,6 +71,8 @@ export type Filters = Partial<Record<FilterField, ColumnFilter>>;
 
 export interface JobsView {
   tab: TabKey;
+  /** Applied tab only; "" = all stages. */
+  stage: StageKey | "";
   /** From the URL only; "" = not chosen yet (see effectiveView). */
   view: ViewKey | "";
   q: string;
@@ -125,6 +135,7 @@ export function readView(p: URLSearchParams): JobsView {
   const tab = p.get("tab");
   return {
     tab: (TABS as string[]).includes(tab ?? "") ? (tab as TabKey) : DEFAULT_TAB,
+    stage: tab === "applied" && STAGES.some((x) => x.key === p.get("stage")) ? (p.get("stage") as StageKey) : "",
     view: (VIEWS as string[]).includes(p.get("view") ?? "") ? (p.get("view") as ViewKey) : "",
     q: p.get("q") ?? "",
     location: p.get("loc") ?? "",
@@ -152,6 +163,8 @@ export function writeView(p: URLSearchParams, patch: Partial<JobsView>): URLSear
   const set = (k: string, v: string, dflt = "") => (v && v !== dflt ? next.set(k, v) : next.delete(k));
   if (patch.tab !== undefined) set("tab", patch.tab, DEFAULT_TAB);
   if (patch.view !== undefined) set("view", patch.view);
+  if (patch.stage !== undefined) set("stage", patch.stage);
+  if (patch.tab !== undefined && patch.tab !== "applied" && patch.stage === undefined) next.delete("stage");
   if (patch.q !== undefined) set("q", patch.q.trim());
   if (patch.location !== undefined) set("loc", patch.location.trim());
   if (patch.sort !== undefined) set("sort", patch.sort, DEFAULT_SORT);

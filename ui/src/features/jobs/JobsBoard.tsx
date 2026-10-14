@@ -17,15 +17,25 @@ interface Props {
 
 export function JobsBoard({ rows, onMove }: Props) {
   const [over, setOver] = useState<string | null>(null);
+  const [refused, setRefused] = useState<string | null>(null);
   const columns = [
     ...STAGES.map((s) => ({ key: s, name: label(s), jobs: rows.filter((j) => j.status === s) })),
     { key: "", name: "Closed", jobs: rows.filter((j) => !STAGES.includes(j.status ?? "")) },
   ];
   const drop = (id: string, status: string) => {
     const job = rows.find((j) => j.job_id === id);
-    if (job && job.status !== status) void onMove(job, status).catch(() => undefined);
+    if (!job || job.status === status) return;
+    if (status === "applied") {
+      // Applying is a fact the user confirms on the job (POST /submitted), never a plain status change.
+      setRefused(`${job.company || job.job_id} can't be dragged to Applied. A job becomes Applied when its application is submitted.`);
+      return;
+    }
+    setRefused(null);
+    void onMove(job, status).catch(() => undefined);
   };
   return (
+    <>
+    <p role="alert" className={styles.refused} hidden={!refused}>{refused}</p>
     <div className={styles.board}>
       {columns.map((c) => (
         <section
@@ -66,7 +76,7 @@ export function JobsBoard({ rows, onMove }: Props) {
                 onChange={(e) => drop(j.job_id, e.target.value)}
               >
                 {!STAGES.includes(j.status ?? "") ? <option value={j.status ?? ""}>{label(j.status ?? "")}</option> : null}
-                {STAGES.map((s) => (
+                {STAGES.filter((s) => s !== "applied" || j.status === "applied").map((s) => (
                   <option key={s} value={s}>
                     {label(s)}
                   </option>
@@ -77,5 +87,6 @@ export function JobsBoard({ rows, onMove }: Props) {
         </section>
       ))}
     </div>
+    </>
   );
 }

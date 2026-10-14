@@ -12,9 +12,10 @@ import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
+import { useJobFacets, useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsBoard } from "./JobsBoard";
+import { JobDetailPage } from "../job-detail/JobDetailPage";
 import { JobsList } from "./JobsCards";
 import { JobsTable } from "./JobsTable";
 import { StartPipeline } from "./StartPipeline";
@@ -22,8 +23,8 @@ import { useStepRun } from "../runs/useStepRun";
 import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
-import { TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
-import type { TabKey, ViewKey } from "./types";
+import { STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
+import type { StageKey, TabKey, ViewKey } from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
 const SEARCH_DEBOUNCE_MS = 250;
@@ -144,10 +145,11 @@ function FilterField({ value: q, onCommit, name, label, placeholder, icon }: Fil
   );
 }
 
-export function JobsPage() {
+export function JobsPage({ jobId }: { jobId?: string } = {}) {
   const toast = useToast();
   const [view, update] = useJobsView();
-  const { tab, q, location, sort, filters } = view;
+  const { tab, q, location, sort, stage } = view;
+  const columnFilters = view.filters;
   const meta = useMeta();
   const uiState = useUiState();
   const remember = useRememberView();
@@ -158,7 +160,17 @@ export function JobsPage() {
     remember.mutate(v);
   };
   const pageSize = meta.data?.ui?.page_size ?? DEFAULT_PAGE_SIZE;
-  const filterParams = useMemo(() => ({ tab, q, location, filters }), [tab, q, location, filters]);
+  const filters = columnFilters;
+  const stageStatuses = STAGES.find((x) => x.key === stage)?.statuses;
+  // A stage is a status filter on the Applied tab (REQ-128); Board shows every stage as a column.
+  const requestFilters = useMemo(
+    () => (stageStatuses && mode !== "board" ? { ...filters, status: { kind: "values" as const, values: stageStatuses } } : filters),
+    [filters, stageStatuses, mode],
+  );
+  const filterParams = useMemo(() => ({ tab, q, location, filters: requestFilters }), [tab, q, location, requestFilters]);
+  const stageFacets = useJobFacets("status", { tab, q, location, filters: { ...filters, status: undefined } }, tab === "applied");
+  const stageCount = (statuses: string[]) =>
+    stageFacets.data ? (stageFacets.data.values ?? []).filter((v) => statuses.includes(String(v.value))).reduce((n, v) => n + v.count, 0) : null;
   const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
   const tabs = useJobsTabs(filterParams);
   const exporter = useExportJobs();
@@ -296,7 +308,7 @@ export function JobsPage() {
       </EmptyState>
     );
   } else if (mode === "list") {
-    body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} />;
+    body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} current={jobId} />;
   } else if (mode === "board") {
     body = (
       <JobsBoard
@@ -329,6 +341,7 @@ export function JobsPage() {
     );
   }
 
+  if (jobId && mode !== "list") return <JobDetailPage />;
   return (
     <Page
       title="Jobs"
@@ -432,7 +445,18 @@ export function JobsPage() {
             {nSel > 0 ? `Export ${formatCount(nSel)} to xlsx` : "Export xlsx"}
           </Button>
         </div>
+        {tab === "applied" && mode !== "board" ? (
+          <Tabs label="Stage" value={stage || "all"} onValueChange={(v) => update({ stage: v === "all" ? "" : (v as StageKey) })} controls={panelId}>
+            <Tabs.Tab value="all" count={stageCount(STAGES.flatMap((x) => x.statuses))}>All</Tabs.Tab>
+            {STAGES.map((x) => (
+              <Tabs.Tab key={x.key} value={x.key} count={stageCount(x.statuses)}>
+                {x.label}
+              </Tabs.Tab>
+            ))}
+          </Tabs>
+        ) : null}
         <FilterChips filters={filters} onFilter={onFilter} onClearAll={() => update({ filters: {} })} />
+        <div className={jobId ? styles.split : undefined}>
         <section
           id={panelId}
           role="tabpanel"
@@ -452,6 +476,12 @@ export function JobsPage() {
             </div>
           ) : null}
         </section>
+        {jobId ? (
+          <aside aria-label="Job detail" className={styles.detail}>
+            <JobDetailPage embedded />
+          </aside>
+        ) : null}
+        </div>
       </div>
       )}
     </Page>

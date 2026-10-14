@@ -120,3 +120,4 @@
   justify-self: start;
   font-size: var(--fs-caption);
 }
+.refused { margin: 0; padding: var(--space-2) var(--space-4); color: var(--red); }
