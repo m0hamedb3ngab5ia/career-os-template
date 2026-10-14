@@ -4525,6 +4525,16 @@
             ],
             "title": "Qa Score"
           },
+          "reasons": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Reasons"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "safety": {
             "anyOf": [
               {
@@ -6081,6 +6091,32 @@
           "detail"
         ],
         "title": "Reason",
+        "type": "object"
+      },
+      "Reasons": {
+        "properties": {
+          "covered": {
+            "title": "Covered",
+            "type": "integer"
+          },
+          "missing": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Missing",
+            "type": "array"
+          },
+          "total": {
+            "title": "Total",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "covered",
+          "total",
+          "missing"
+        ],
+        "title": "Reasons",
         "type": "object"
       },
       "Recommendation": {
@@ -8663,11 +8699,19 @@
           },
           "prepare_queue": {
             "$ref": "#/components/schemas/PrepareQueue"
+          },
+          "top_picks": {
+            "items": {
+              "$ref": "#/components/schemas/JobListItem"
+            },
+            "title": "Top Picks",
+            "type": "array"
           }
         },
         "required": [
           "actions",
-          "prepare_queue"
+          "prepare_queue",
+          "top_picks"
         ],
         "title": "Today",
         "type": "object"

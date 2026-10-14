@@ -14,6 +14,7 @@
       "next_action": "Send the LinkedIn note",
       "qa_passed": 1,
       "qa_score": 8.2,
+      "reasons": null,
       "safety": "pass",
       "selected": 1,
       "status": "interview",
@@ -36,6 +37,7 @@
       "next_action": null,
       "qa_passed": 1,
       "qa_score": 8.2,
+      "reasons": null,
       "safety": "pass",
       "selected": 1,
       "status": "applied",
@@ -43,8 +45,31 @@
       "title": "New Grad Engineer",
       "updated_at": "2026-09-22T15:00:00+00:00",
       "url": "https://boards.example.com/applied"
+    },
+    {
+      "applied_at": "2026-09-04T15:00:00+00:00",
+      "ats": "greenhouse",
+      "category": "swe_backend",
+      "closes_at": null,
+      "company": "Wayne Enterprises",
+      "fit": 77,
+      "found_at": "2026-08-25T15:00:00+00:00",
+      "injection": null,
+      "job_id": "<job:rejected>",
+      "location": "New York, NY",
+      "next_action": null,
+      "qa_passed": null,
+      "qa_score": null,
+      "reasons": null,
+      "safety": "pass",
+      "selected": 1,
+      "status": "rejected",
+      "tier": "C",
+      "title": "Data Engineer",
+      "updated_at": "2026-09-07T15:00:00+00:00",
+      "url": "https://boards.example.com/rejected"
     }
   ],
   "next_cursor": null,
-  "total": 2
+  "total": 3
 }

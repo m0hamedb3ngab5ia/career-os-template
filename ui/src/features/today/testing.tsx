@@ -37,7 +37,7 @@ export const actions: ActionItem[] = [
     link: "", created: "2026-09-21T09:00:00Z", due: "2026-09-24T09:00:00Z", due_reason: "note was due", level: "overdue", bucket: "overdue" }),
 ];
 
-export const today: TodayData = { actions, prepare_queue: { total: 3, error: null } };
+export const today: TodayData = { actions, prepare_queue: { total: 3, error: null }, top_picks: [] };
 
 export const meta: Meta = {
   ...META,

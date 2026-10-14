@@ -67,5 +67,6 @@
   "prepare_queue": {
     "error": null,
     "total": 0
-  }
+  },
+  "top_picks": []
 }

@@ -62,8 +62,16 @@ def _json(p: Path) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
-def matches(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[str, Any]:
-    """Every résumé (latest version) scored against the job, best first (REQ-115)."""
+def resume_texts(settings: Any) -> list[tuple[dict[str, Any], str]]:
+    """(list_resumes row, latest version text) per résumé: read once, then passed to `matches` per job."""
+    return [(r, resumes.version(settings.root, r["rid"], r["latest"])["text"])
+            for r in resumes.list_resumes(settings.root)]
+
+
+def matches(settings: Any, job_dir: Path, threshold: int | None = None,
+            texts: list[tuple[dict[str, Any], str]] | None = None) -> dict[str, Any]:
+    """Every résumé (latest version) scored against the job, best first (REQ-115). `texts` = `resume_texts()`,
+    read once by a caller scoring many jobs."""
     sc, posting = _json(job_dir / "score.json"), _json(job_dir / "posting.json")
     req = sc.get("required_skills") or []
     pref = sc.get("preferred_skills") or sc.get("nice_to_have_skills") or []
@@ -74,8 +82,7 @@ def matches(settings: Any, job_dir: Path, threshold: int | None = None) -> dict[
                 "hint": f"job not scored yet: run `careeros run score --job {job_dir.name}`"}
     syn = (settings.pipeline.get("match") or {}).get("synonyms") or {}
     rows = []
-    for r in resumes.list_resumes(settings.root):
-        text = resumes.version(settings.root, r["rid"], r["latest"])["text"]
+    for r, text in resume_texts(settings) if texts is None else texts:
         m = score(text, req, pref, str(posting.get("title") or ""), syn)
         rows.append({"rid": r["rid"], "name": r["name"], "type": r["type"], "version": r["latest"], **m})
     rows.sort(key=lambda x: -x["score"])

@@ -220,5 +220,5 @@ def test_create_ticks_named_unticked_job_but_dry_run_does_not(client, data):
     r = client.post("/api/batches", json=body, headers=W)
     assert r.status_code == 200, r.text
     assert json.loads((data["settings"].root / "data" / "jobs" / jid / "flags.json").read_text())["selected"] is True
-    row = next(x for x in client.get("/api/jobs?tab=all").json()["items"] if x["job_id"] == jid)
+    row = next(x for x in client.get("/api/jobs").json()["items"] if x["job_id"] == jid)
     assert row["selected"] == 1

@@ -1936,6 +1936,7 @@ export interface components {
       qa_passed: number | null;
       /** Qa Score */
       qa_score: number | null;
+      reasons?: components["schemas"]["Reasons"] | null;
       /** Safety */
       safety: string | null;
       /** Selected */
@@ -2434,6 +2435,15 @@ export interface components {
       detail: string | null;
       /** Text */
       text: string;
+    };
+    /** Reasons */
+    Reasons: {
+      /** Covered */
+      covered: number;
+      /** Missing */
+      missing: string[];
+      /** Total */
+      total: number;
     };
     /** Recommendation */
     Recommendation: {
@@ -3201,6 +3211,8 @@ export interface components {
       /** Actions */
       actions: components["schemas"]["ActionItem"][];
       prepare_queue: components["schemas"]["PrepareQueue"];
+      /** Top Picks */
+      top_picks: components["schemas"]["JobListItem"][];
     };
     /** UiSettings */
     UiSettings: {

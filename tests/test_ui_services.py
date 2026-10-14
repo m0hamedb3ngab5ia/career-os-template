@@ -206,25 +206,25 @@ def test_column_filters_are_validated(idx):
 
 
 def test_facets_count_under_the_other_filters(idx):
-    tiers = jobs_svc.facets(idx, "tier", closed=[], tab="all")
+    tiers = jobs_svc.facets(idx, "tier", closed=[])
     assert tiers["field"] == "tier"
     assert tiers["values"] == [{"value": "C", "count": 3}, {"value": "A", "count": 2}, {"value": "B", "count": 2}]
     # Excel semantics: a filter on the requested field is ignored, the others apply.
-    under = jobs_svc.facets(idx, "tier", closed=[], tab="all", tier=["A"], status=["applied", "interview"])
+    under = jobs_svc.facets(idx, "tier", closed=[], tier=["A"], status=["applied", "interview"])
     assert under["values"] == [{"value": "A", "count": 1}, {"value": "B", "count": 1}]
-    st = jobs_svc.facets(idx, "status", closed=[], tab="all", values={"company": ["Hooli"]}, ranges={"fit": (85, None)})
+    st = jobs_svc.facets(idx, "status", closed=[], values={"company": ["Hooli"]}, ranges={"fit": (85, None)})
     assert st["values"] == []
-    assert jobs_svc.facets(idx, "qa_passed", closed=[], tab="all")["values"][0]["count"] >= 1
+    assert jobs_svc.facets(idx, "qa_passed", closed=[])["values"][0]["count"] >= 1
 
 
 def test_tabs_and_export_honour_column_filters(idx):
     t = {x["key"]: x["count"] for x in jobs_svc.tabs(idx, [], values={"company": ["Hooli", "Globex"]})}
-    assert t["all"] == 2 and t["applied"] == 1
+    assert t == {"recommended": 0, "saved": 1, "applied": 1}   # fixture jobs carry no flag = ticked
     from openpyxl import load_workbook
     import io
-    wb = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, tab="all", ranges={"fit": (85, None)})))
+    wb = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, ranges={"fit": (85, None)})))
     assert wb["Jobs"].max_row == 4
-    ws = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, tab="all", columns=["selected"])))["Jobs"]
+    ws = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, columns=["selected"])))["Jobs"]
     assert ws["B1"].value == "Pipeline" and {c.value for c in ws["B"][1:]} <= {"yes", "no"}
 
 

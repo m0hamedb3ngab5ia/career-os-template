@@ -68,9 +68,9 @@ def test_jobs_list_filters_and_paging(client):
     assert [j["location"] for j in remote["items"]] == ["Remote"]
     assert client.get("/api/jobs", params={"location": "new york"}).json()["total"] == 7
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"location": "remote"}).json()["tabs"]}
-    assert tabs["all"] == 1
+    assert tabs == {"recommended": 0, "saved": 1, "applied": 0}
     xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
-                       json={"tab": "all", "location": "remote", "sort": "-fit", "columns": ["company"]})
+                       json={"location": "remote", "sort": "-fit", "columns": ["company"]})
     assert xlsx.status_code == 200
     from io import BytesIO
 
@@ -82,28 +82,27 @@ def test_jobs_list_filters_and_paging(client):
 
 
 def test_jobs_column_filters_facets_tabs_and_export(client):
-    r = client.get("/api/jobs", params=[("company", "Hooli"), ("company", "Initech"), ("tab", "all")]).json()
+    r = client.get("/api/jobs", params=[("company", "Hooli"), ("company", "Initech")]).json()
     assert {j["company"] for j in r["items"]} == {"Hooli", "Initech"}
-    assert client.get("/api/jobs", params={"fit_min": 85, "fit_max": 90, "tab": "all"}).json()["total"] == 2
-    assert client.get("/api/jobs", params={"found_from": "2026-09-19", "found_to": "2026-09-21", "tab": "all"}).json()["total"] == 3
+    assert client.get("/api/jobs", params={"fit_min": 85, "fit_max": 90}).json()["total"] == 2
+    assert client.get("/api/jobs", params={"found_from": "2026-09-19", "found_to": "2026-09-21"}).json()["total"] == 3
     assert client.get("/api/jobs", params=[("location_in", "Remote"), ("location", "rem")]).json()["total"] == 1
     assert client.get("/api/jobs", params={"fit_min": "high"}).status_code == 422
     assert client.get("/api/jobs", params={"found_from": "yesterday"}).status_code == 422
-    assert client.get("/api/jobs", params={"qa_passed": "1", "tab": "all"}).json()["total"] == 4
-    assert client.get("/api/jobs", params={"closes_from": "2026-01-01", "closes_to": "2026-12-31",
-                                           "tab": "all"}).json()["total"] == 0
+    assert client.get("/api/jobs", params={"qa_passed": "1"}).json()["total"] == 4
+    assert client.get("/api/jobs", params={"closes_from": "2026-01-01", "closes_to": "2026-12-31"}).json()["total"] == 0
     assert client.get("/api/jobs", params={"closes_from": "not-a-date"}).status_code == 422
-    f = client.get("/api/jobs/facets", params={"field": "tier", "tab": "all", "tier": "A", "status": "applied"}).json()
+    f = client.get("/api/jobs/facets", params={"field": "tier", "tier": "A", "status": "applied"}).json()
     assert f == {"field": "tier", "values": [{"value": "B", "count": 1}]}
     # location facet must drop only the values["location"] filter, not the `location` substring search, so a
     # substring search still narrows the facet counts (regression: field-name kwarg pop used to eat `location`).
-    loc_facet = client.get("/api/jobs/facets", params={"field": "location", "tab": "all", "location": "rem"}).json()
+    loc_facet = client.get("/api/jobs/facets", params={"field": "location", "location": "rem"}).json()
     assert loc_facet == {"field": "location", "values": [{"value": "Remote", "count": 1}]}
     assert client.get("/api/jobs/facets", params={"field": "url"}).status_code == 400
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"fit_min": 85}).json()["tabs"]}
-    assert tabs["all"] == 3 and tabs["tier_a"] == 2
+    assert tabs == {"recommended": 0, "saved": 2, "applied": 1}
     xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
-                       json={"tab": "all", "company": ["Hooli"], "fit_min": 80, "columns": ["company"]})
+                       json={"company": ["Hooli"], "fit_min": 80, "columns": ["company"]})
     assert xlsx.status_code == 200
     from openpyxl import load_workbook
     import io
@@ -544,14 +543,14 @@ def test_jobs_list_shows_selected_and_injection_and_clear(client, data):
     assert client.post(f"/api/jobs/{jid}/injection/clear", headers=h).status_code == 409  # not flagged
     store._write(jid, "flags.json", {"injection_suspected": True, "injection_reasons": ["hidden text"]})
     client.post("/api/jobs/select", headers=h, json={"ids": [jid], "selected": False})
-    row = next(r for r in client.get("/api/jobs?tab=all").json()["items"] if r["job_id"] == jid)
+    row = next(r for r in client.get("/api/jobs").json()["items"] if r["job_id"] == jid)
     assert (row["selected"], row["injection"]) == (0, "hidden text")
     r = client.post(f"/api/jobs/{jid}/injection/clear", headers=h)
     assert r.status_code == 200, r.text
     flags = store.load_flags(jid)
     assert flags["injection_cleared_at"] and flags["injection_cleared_via"] == "ui"
     assert client.post("/api/jobs/nope/injection/clear", headers=h).status_code == 404
-    row = next(r for r in client.get("/api/jobs?tab=all").json()["items"] if r["job_id"] == jid)
+    row = next(r for r in client.get("/api/jobs").json()["items"] if r["job_id"] == jid)
     assert row["injection"] is None
 
 def _write_plan(data, jid):
