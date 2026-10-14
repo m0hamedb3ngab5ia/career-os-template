@@ -1,6 +1,6 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
-import type { JobFacets, JobListItem, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync } from "./types";
+import type { JobFacets, JobListItem, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync, ViewKey } from "./types";
 import { FILTERS, type FilterField, type Filters } from "./urlState";
 
 export interface FilterParams {

@@ -11,7 +11,8 @@ export type JobsTab = Schemas["JobsTab"];
 export type JobsTabs = Schemas["JobsTabs"];
 export type JobFacets = Schemas["JobFacets"];
 
-export type TabKey = "active" | "review" | "applied" | "tier_a" | "all";
+export type TabKey = "recommended" | "saved" | "applied";
+export type ViewKey = "list" | "table" | "board";
 
 export interface TrackerSync {
   synced: number;

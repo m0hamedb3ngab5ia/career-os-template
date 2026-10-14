@@ -8,39 +8,31 @@ import { CheckJobDialog } from "./CheckJobDialog";
 import { EmptyState } from "../../kit/EmptyState";
 import { Menu } from "../../kit/Menu";
 import { Pager, usePaged } from "../../kit/Pager";
+import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useOpenTracker, useSyncTracker, exportFilters } from "./api";
+import { useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
+import { JobsBoard } from "./JobsBoard";
+import { JobsList } from "./JobsCards";
 import { JobsTable } from "./JobsTable";
 import { StartPipeline } from "./StartPipeline";
 import { useStepRun } from "../runs/useStepRun";
 import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
-import { TABS, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
-import type { TabKey } from "./types";
+import { TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
+import type { TabKey, ViewKey } from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
 const SEARCH_DEBOUNCE_MS = 250;
 
 // Fallback labels until GET /api/jobs/tabs answers (the server's labels win).
-const TAB_LABELS: Record<TabKey, string> = {
-  active: "Active",
-  review: "Needs review",
-  applied: "Applied",
-  tier_a: "Tier A",
-  all: "All",
-};
-// Footer noun: "Showing 12 of 59 active jobs".
-const TAB_NOUNS: Record<string, string> = {
-  active: "active jobs",
-  review: "jobs needing review",
-  applied: "applied jobs",
-  tier_a: "Tier A jobs",
-  all: "jobs",
-};
+const TAB_LABELS: Record<TabKey, string> = { recommended: "Recommended", saved: "Saved", applied: "Applied" };
+// Footer noun: "Showing 12 of 59 recommended jobs".
+const TAB_NOUNS: Record<TabKey, string> = { recommended: "recommended jobs", saved: "saved jobs", applied: "applied jobs" };
+const VIEW_LABELS: Record<ViewKey, string> = { list: "List", table: "Table", board: "Board" };
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong";
@@ -157,6 +149,14 @@ export function JobsPage() {
   const [view, update] = useJobsView();
   const { tab, q, location, sort, filters } = view;
   const meta = useMeta();
+  const uiState = useUiState();
+  const remember = useRememberView();
+  const move = useMoveJob();
+  const mode = effectiveView(view.view, uiState.data?.jobs_view, tab);
+  const chooseView = (v: ViewKey) => {
+    update({ view: v }, true);
+    remember.mutate(v);
+  };
   const pageSize = meta.data?.ui?.page_size ?? DEFAULT_PAGE_SIZE;
   const filterParams = useMemo(() => ({ tab, q, location, filters }), [tab, q, location, filters]);
   const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
@@ -281,19 +281,33 @@ export function JobsPage() {
       <EmptyState
         title="No jobs here yet"
         action={
-          tab === "all" ? (
+          tab === "recommended" ? (
             <Link to="/automation">Open Automation</Link>
           ) : (
-            <Button size="small" onClick={() => update({ tab: "all" }, true)}>
-              Show all jobs
+            <Button size="small" onClick={() => update({ tab: "recommended" }, true)}>
+              Show recommended jobs
             </Button>
           )
         }
       >
-        {tab === "all"
-          ? "Scout adds postings to this table. Run scout from Automation or the command line."
+        {tab === "recommended"
+          ? "Scout adds postings here. Run scout from Automation or the command line."
           : "Nothing in this tab right now. Other tabs may have jobs."}
       </EmptyState>
+    );
+  } else if (mode === "list") {
+    body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} />;
+  } else if (mode === "board") {
+    body = (
+      <JobsBoard
+        rows={paged.pageItems}
+        onMove={(job, status) =>
+          move.mutateAsync({ jobId: job.job_id, status }).catch((e) => {
+            toast.show({ message: `Couldn’t move ${job.company || job.job_id} to ${status}: ${errorText(e)}` });
+            throw e;
+          })
+        }
+      />
     );
   } else {
     body = (
@@ -372,7 +386,7 @@ export function JobsPage() {
               </>
             ) : null}
           </div>
-          <span data-tour="start-pipeline">
+          <span data-tour="start-pipeline" hidden={tab !== "saved"}>
             {nSel > 0 ? (
               <Button ref={startRef} size="small" variant="primary" onClick={() => setReviewing(true)}>
                 Start pipeline
@@ -383,6 +397,13 @@ export function JobsPage() {
               </UnavailableButton>
             )}
           </span>
+          <SegmentedControl label="View" value={mode} onValueChange={(v) => chooseView(v as ViewKey)}>
+            {VIEWS.filter((v) => v !== "board" || tab === "applied").map((v) => (
+              <SegmentedControl.Option key={v} value={v}>
+                {VIEW_LABELS[v]}
+              </SegmentedControl.Option>
+            ))}
+          </SegmentedControl>
           <Menu label="Columns">
             <Menu.Trigger size="small" icon={<Table2 size={14} strokeWidth={1.7} aria-hidden="true" />}>
               Columns
@@ -424,7 +445,7 @@ export function JobsPage() {
           {rows.length > 0 ? (
             <div className={styles.footer}>
               <span className="tabular">
-                {formatCount(total)} {TAB_NOUNS[tab] ?? "jobs"} · live from data/careeros.db
+                {formatCount(total)} {TAB_NOUNS[tab]} · live from data/careeros.db
               </span>
               <span>Open a job to change its status or add notes</span>
               <Pager paged={paged} label="Jobs" />

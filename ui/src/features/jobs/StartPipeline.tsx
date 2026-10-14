@@ -167,7 +167,7 @@ export function StartPipeline({ ids, rows, onToggle, onUntick, onClose }: {
           captionId={`${headingId}-c`}
           filters={filters}
           onFilter={onFilter}
-          filterParams={{ tab: "all", q: "", location: "", filters, rows }}
+          filterParams={{ tab: "saved", q: "", location: "", filters, rows }}
         />
         <div className={styles.footer}>
           <span>
