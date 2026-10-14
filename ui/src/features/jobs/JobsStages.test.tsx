@@ -17,6 +17,7 @@ const FACETS = {
     { value: "interview", count: 1 },
     { value: "rejected", count: 1 },
     { value: "withdrawn", count: 1 },
+    { value: "ghosted", count: 1 },
   ],
 };
 
@@ -43,10 +44,11 @@ const wide = (on: boolean) =>
   vi.stubGlobal("matchMedia", (q: string) => ({ matches: on, media: q, addEventListener() {}, removeEventListener() {} }));
 
 describe("Applied stage sub-tabs", () => {
-  it("shows Applied · Screening · Interview · Offer · Closed with counts, Closed = rejected + withdrawn + declined", async () => {
+  it("shows Applied · Screening · Interview · Offer · Closed with counts, Closed = rejected + withdrawn, not ghosted", async () => {
     setup("/jobs?tab=applied");
     const stages = await screen.findByRole("tablist", { name: "Stage" });
     await waitFor(() => expect(within(stages).getByRole("tab", { name: "Closed (2)" })).toBeInTheDocument());
+    expect(within(stages).getByRole("tab", { name: "All (6)" })).toBeInTheDocument();
     expect(within(stages).getByRole("tab", { name: "Interview (1)" })).toBeInTheDocument();
     expect(within(stages).getByRole("tab", { name: "Screening (0)" })).toBeInTheDocument();
   });
@@ -59,7 +61,7 @@ describe("Applied stage sub-tabs", () => {
     expect(router.state.location.search).toContain("stage=closed");
     await waitFor(() => {
       const last = api.callsTo("GET /api/jobs").at(-1)!;
-      expect(last.search.getAll("status").sort()).toEqual(["ghosted", "rejected", "withdrawn"]);
+      expect(last.search.getAll("status").sort()).toEqual(["rejected", "withdrawn"]);
     });
   });
 
@@ -119,5 +121,36 @@ describe("Board drag to Applied", () => {
     expect(await screen.findByText(/becomes Applied when its application is submitted/)).toBeInTheDocument();
     expect(api.callsTo("POST /api/jobs/b2/status")).toHaveLength(0);
     expect(within(screen.getByRole("region", { name: "Interview" })).getByText("Borealis")).toBeInTheDocument();
+  });
+});
+
+describe("review fixes", () => {
+  it("keeps top-level tab counts and Export on the chosen stage", async () => {
+    const user = userEvent.setup();
+    const { api } = setup("/jobs?tab=applied&stage=closed", ROWS, { "POST /api/jobs/export": { name: "x.xlsx" } });
+    await screen.findByRole("tablist", { name: "Stage" });
+    await waitFor(() => expect(api.callsTo("GET /api/jobs/tabs").length).toBeGreaterThan(0));
+    for (const c of api.callsTo("GET /api/jobs/tabs")) expect(c.search.getAll("status")).toEqual([]);
+    await user.click(screen.getByRole("button", { name: "Export xlsx" }));
+    await waitFor(() => expect(api.callsTo("POST /api/jobs/export")).toHaveLength(1));
+    expect((api.callsTo("POST /api/jobs/export")[0]!.body as Record<string, unknown>).status).toEqual(["rejected", "withdrawn"]);
+  });
+
+  it("drops the selection when the tab changes", async () => {
+    const user = userEvent.setup();
+    const { router } = setup("/jobs?tab=saved&sel=a1");
+    await screen.findByText("1 selected");
+    await user.click(screen.getByRole("tab", { name: /^Applied/ }));
+    await waitFor(() => expect(router.state.location.search).toContain("tab=applied"));
+    expect(router.state.location.search).not.toContain("sel=");
+  });
+
+  it("selects the first job on a wide List view with none open, without adding history", async () => {
+    wide(true);
+    const { router } = setup("/jobs?tab=applied&view=list");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/a1"));
+    expect(router.state.location.search).toContain("tab=applied");
+    await router.navigate(-1);
+    expect(router.state.location.pathname).not.toBe("/jobs");
   });
 });

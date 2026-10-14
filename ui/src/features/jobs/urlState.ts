@@ -14,13 +14,13 @@ export const TABS: TabKey[] = ["recommended", "saved", "applied"];
 export const DEFAULT_TAB: TabKey = "recommended";
 export const VIEWS: ViewKey[] = ["list", "table", "board"];
 export const DEFAULT_VIEW: ViewKey = "list";
-/** Applied-tab sub-tabs (REQ-128, Q-028): statuses 1:1; Closed = rejected + withdrawn + declined (ghosted). */
+/** Applied-tab sub-tabs (REQ-128, Q-028): statuses 1:1; Closed = rejected + withdrawn; ghosted shows only under All. */
 export const STAGES: { key: StageKey; label: string; statuses: string[] }[] = [
   { key: "applied", label: "Applied", statuses: ["applied"] },
   { key: "screening", label: "Screening", statuses: ["screening"] },
   { key: "interview", label: "Interview", statuses: ["interview"] },
   { key: "offer", label: "Offer", statuses: ["offer"] },
-  { key: "closed", label: "Closed", statuses: ["rejected", "withdrawn", "ghosted"] },
+  { key: "closed", label: "Closed", statuses: ["rejected", "withdrawn"] },
 ];
 /** The view to show: the URL's, else the remembered one (ui.jobs_view), else List. Board only exists on Applied. */
 export function effectiveView(view: ViewKey | "", remembered: ViewKey | undefined, tab: TabKey): ViewKey {

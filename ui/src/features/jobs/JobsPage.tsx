@@ -1,6 +1,7 @@
 import { Download, FileSearch, RotateCw, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link } from "react-router";
+import { Link, useLocation, useNavigate } from "react-router";
+import { useWide } from "./useWide";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
@@ -147,6 +148,9 @@ function FilterField({ value: q, onCommit, name, label, placeholder, icon }: Fil
 
 export function JobsPage({ jobId }: { jobId?: string } = {}) {
   const toast = useToast();
+  const navigate = useNavigate();
+  const { search } = useLocation();
+  const wideScreen = useWide();
   const [view, update] = useJobsView();
   const { tab, q, location, sort, stage } = view;
   const columnFilters = view.filters;
@@ -172,7 +176,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
   const stageCount = (statuses: string[]) =>
     stageFacets.data ? (stageFacets.data.values ?? []).filter((v) => statuses.includes(String(v.value))).reduce((n, v) => n + v.count, 0) : null;
   const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
-  const tabs = useJobsTabs(filterParams);
+  const tabs = useJobsTabs({ tab, q, location, filters });
   const exporter = useExportJobs();
   const pick = useSelectJobs();
   const bulkPick = (on: boolean) =>
@@ -196,6 +200,11 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
     }, [hasNextPage, isFetchingNextPage, fetchNextPage]),
   });
+  // Wide List view always shows a detail pane: open the first job when none is (replace, so Back isn't trapped).
+  const firstId = rows[0]?.job_id;
+  useEffect(() => {
+    if (wideScreen && mode === "list" && !jobId && firstId) navigate({ pathname: `/jobs/${firstId}`, search }, { replace: true });
+  }, [wideScreen, mode, jobId, firstId, navigate, search]);
   const hidden = useMemo(() => new Set(view.hidden), [view.hidden]);
   const columns = useMemo(() => COLUMNS.filter((c) => !hidden.has(c.key)), [hidden]);
   const selectedKey = view.selected.join(",");
@@ -254,7 +263,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
     const body =
       nSel > 0
         ? { job_ids: [...selected], columns: cols }
-        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols, ...exportFilters(filters) };
+        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols, ...exportFilters(requestFilters) };
     exporter.mutate(body, {
       onSuccess: (name) => toast.show({ message: `Downloaded ${name}` }),
       onError: (e) => toast.show({ message: errorText(e) }),
@@ -359,7 +368,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       ) : (
       <div className={styles.stack}>
         <div className={styles.toolbar}>
-          <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey })} controls={panelId}>
+          <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey, selected: [] })} controls={panelId}>
             {TABS.map((k) => (
               <Tabs.Tab key={k} value={k} count={serverTabs.get(k)?.count}>
                 {serverTabs.get(k)?.label ?? TAB_LABELS[k]}
@@ -447,7 +456,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         </div>
         {tab === "applied" && mode !== "board" ? (
           <Tabs label="Stage" value={stage || "all"} onValueChange={(v) => update({ stage: v === "all" ? "" : (v as StageKey) })} controls={panelId}>
-            <Tabs.Tab value="all" count={stageCount(STAGES.flatMap((x) => x.statuses))}>All</Tabs.Tab>
+            <Tabs.Tab value="all" count={stageFacets.data ? (stageFacets.data.values ?? []).reduce((n, v) => n + v.count, 0) : null}>All</Tabs.Tab>
             {STAGES.map((x) => (
               <Tabs.Tab key={x.key} value={x.key} count={stageCount(x.statuses)}>
                 {x.label}
