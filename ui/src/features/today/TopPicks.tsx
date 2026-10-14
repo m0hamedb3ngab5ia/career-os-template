@@ -53,6 +53,7 @@ function PickCard({ pick: p }: { pick: Pick }) {
   const pipe = usePipeline(id, start.isSuccess);
   const [skipped, setSkipped] = useState(false);
   const failure = pipe.data?.failures?.kind === "prepare" ? pipe.data.failures : null;
+  const blocked = failure ? null : pipe.data?.blocked_reason;
   const newRun = start.isSuccess && start.data.run_id !== failure?.last_run;
   const preparing = Boolean(pipe.data?.active_run_id) || start.isPending || newRun;
   const runIt = () => start.mutate({ action: "start" }, { onError: (e) => toast.show({ message: `Couldn’t start: ${errorText(e)}` }) });
@@ -91,7 +92,8 @@ function PickCard({ pick: p }: { pick: Pick }) {
         ) : (
           <>
             {failure && <span className={styles.caption}>Prepare failed: {failure.last_detail || failure.last_outcome || "unknown cause"}</span>}
-            <Button variant="primary" size="small" onClick={runIt}>{failure ? "Retry" : "Prepare"}</Button>
+            {blocked && <span className={styles.caption}>{blocked}</span>}
+            <Button variant="primary" size="small" onClick={runIt} disabled={Boolean(blocked)}>{failure ? "Retry" : "Prepare"}</Button>
             <Button size="small" onClick={skip} pending={setStatus.isPending}>Skip</Button>
           </>
         )}

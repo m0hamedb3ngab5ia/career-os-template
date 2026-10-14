@@ -119,6 +119,12 @@ describe("TodayPage", () => {
     expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/jobs/j1/pipeline"]);
   });
 
+  it("blocked prepare is disabled and shows the reason (UC-015 fail)", async () => {
+    picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ blocked_reason: "No master résumé" }) });
+    expect(await screen.findByText(/No master résumé/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Prepare/ })).toBeDisabled();
+  });
+
   it("Top picks empty state links to the Jobs page", async () => {
     setup({ "GET /api/readiness": ready });
     const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
