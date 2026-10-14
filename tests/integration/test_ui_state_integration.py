@@ -63,3 +63,19 @@ def test_broken_file_reads_as_not_done(setup):
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text("{not json")
     assert client.get("/api/ui-state").json() == {"tour_done": False}
+
+
+def test_jobs_view_persists_and_tour_put_keeps_it(setup):
+    client, path = setup
+    r = client.put("/api/ui-state", json={"jobs_view": "board"}, headers=W)
+    assert r.status_code == 200, r.text
+    assert r.json() == {"tour_done": False, "jobs_view": "board"}
+    r = client.put("/api/ui-state", json={"tour_done": True}, headers=W)   # a partial PUT leaves other keys alone
+    assert r.json() == {"tour_done": True, "jobs_view": "board"}
+    assert json.loads(path.read_text()) == {"tour_done": True, "jobs_view": "board"}
+    assert client.get("/api/ui-state").json() == {"tour_done": True, "jobs_view": "board"}
+
+
+def test_jobs_view_rejects_unknown_value(setup):
+    client, _ = setup
+    assert client.put("/api/ui-state", json={"jobs_view": "grid"}, headers=W).status_code == 422
