@@ -76,13 +76,13 @@ describe("List master-detail", () => {
     const user = userEvent.setup();
     const { router } = setup("/jobs?tab=applied&view=list");
     await user.click(await screen.findByRole("link", { name: /Borealis/ }));
-    expect(router.state.location.pathname).toBe("/jobs/b2");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/b2"));
     expect(router.state.location.search).toContain("tab=applied");
     expect(await screen.findByRole("heading", { name: "Borealis", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Acme/ })).toBeInTheDocument();
     await router.navigate(-1);
     await waitFor(() => expect(router.state.location.pathname).toBe("/jobs"));
-    expect(screen.queryByRole("heading", { name: "Borealis", level: 2 })).not.toBeInTheDocument();
+    await waitFor(() => expect(screen.queryByRole("heading", { name: "Borealis", level: 2 })).not.toBeInTheDocument());
   });
 
   it("is a full page under 900px", async () => {

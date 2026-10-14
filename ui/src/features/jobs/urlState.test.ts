@@ -5,7 +5,7 @@ describe("Jobs URL state", () => {
   it("reads defaults from an empty query string", () => {
     expect(readView(new URLSearchParams())).toEqual({
       tab: "recommended",
-      view: "",
+      view: "", stage: "",
       q: "",
       location: "",
       sort: DEFAULT_SORT,
@@ -47,7 +47,7 @@ describe("Jobs URL state", () => {
     const v = readView(new URLSearchParams("tab=saved&view=table&q=data&loc=remote&sort=company&cols=ats,qa,bogus&sel=a1,b2"));
     expect(v).toEqual({
       tab: "saved",
-      view: "table",
+      view: "table", stage: "",
       q: "data",
       location: "remote",
       sort: "company",
@@ -91,5 +91,15 @@ describe("Jobs URL state", () => {
     expect(sortCaption("company")).toBe("sorted by company, A to Z");
     expect(sortCaption("-location")).toBe("sorted by location, Z to A");
     expect(sortCaption("-applied_at")).toBe("sorted by applied date, newest first");
+  });
+});
+
+describe("stage param", () => {
+  it("reads ?stage= on Applied only and drops it with the tab", () => {
+    expect(readView(new URLSearchParams("tab=applied&stage=closed")).stage).toBe("closed");
+    expect(readView(new URLSearchParams("tab=saved&stage=closed")).stage).toBe("");
+    expect(readView(new URLSearchParams("tab=applied&stage=bogus")).stage).toBe("");
+    const p = writeView(new URLSearchParams("tab=applied&stage=offer"), { tab: "saved" });
+    expect(p.has("stage")).toBe(false);
   });
 });
