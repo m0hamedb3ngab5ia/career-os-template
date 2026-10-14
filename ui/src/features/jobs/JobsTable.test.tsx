@@ -35,7 +35,7 @@ function renderTable(props: Partial<Parameters<typeof JobsTable>[0]> = {}) {
         captionId="cap"
         filters={{}}
         onFilter={vi.fn()}
-        filterParams={{ tab: "active", q: "", location: "", filters: {} }}
+        filterParams={{ tab: "recommended", q: "", location: "", filters: {} }}
         onSortTo={vi.fn()}
         {...props}
       />
@@ -80,7 +80,7 @@ describe("JobsTable", () => {
     expect(all()).toBeChecked();
     expect(all().indeterminate).toBe(false);
     const props = { columns: COLUMNS, sort: "-fit", onSort: vi.fn(), onToggle: vi.fn(), onToggleAll: vi.fn(), total: 3,
-      captionId: "cap", filters: {}, onFilter: vi.fn(), filterParams: { tab: "active" as const, q: "", location: "", filters: {} },
+      captionId: "cap", filters: {}, onFilter: vi.fn(), filterParams: { tab: "recommended" as const, q: "", location: "", filters: {} },
       onSortTo: vi.fn() };
     rerender(<MemoryRouter><JobsTable {...props} rows={rows} selected={new Set(["j1"])} /></MemoryRouter>);
     expect(all()).not.toBeChecked();

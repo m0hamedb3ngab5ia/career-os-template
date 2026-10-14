@@ -38,7 +38,7 @@ describe("Jobs tabs and List view", () => {
     const card = (await screen.findByRole("link", { name: /Acme/ })).closest("li")!;
     expect(card).toHaveTextContent("88");
     expect(card).toHaveTextContent("7/10 skills · missing: Go, Kubernetes, +1");
-    expect(screen.getByText("Match pending", { selector: "li *" })).toBeInTheDocument();
+    expect(screen.getAllByText("Match pending")).toHaveLength(2);
     expect(screen.getByRole("link", { name: /Acme/ })).toHaveAttribute("href", "/jobs/a1");
   });
 

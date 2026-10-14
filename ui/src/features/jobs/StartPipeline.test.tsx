@@ -66,14 +66,14 @@ const opts = { timeout: 8000 };
 
 describe("Start pipeline (REQ-117)", () => {
   it("is unavailable until jobs are ticked, with the reason", async () => {
-    setup("/jobs");
+    setup("/jobs?tab=saved&view=table");
     const btn = await screen.findByRole("button", { name: "Start pipeline" }, opts);
     expect(btn).toHaveAttribute("aria-disabled", "true");
     expect(btn).toHaveAccessibleDescription("Tick jobs first");
   });
 
   it("E2E-013-01: default Fill, plain set to Submit; caps shown with reasons; Start opens batch progress", { timeout: 30_000 }, async () => {
-    const { api, router } = setup("/jobs?sel=pl,ta,li,lg,fl");
+    const { api, router } = setup("/jobs?tab=saved&view=table&sel=pl,ta,li,lg,fl");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -106,7 +106,7 @@ describe("Start pipeline (REQ-117)", () => {
   });
 
   it("review header checkbox unticks only the shown rows; review stays open for the rest", async () => {
-    const { router } = setup("/jobs?sel=pl,ta,zz");
+    const { router } = setup("/jobs?tab=saved&view=table&sel=pl,ta,zz");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -116,7 +116,7 @@ describe("Start pipeline (REQ-117)", () => {
   });
 
   it("unticking every job closes the review; ticking again doesn't reopen it; Back refocuses Start pipeline", async () => {
-    setup("/jobs?sel=pl");
+    setup("/jobs?tab=saved&view=table&sel=pl");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     let sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -133,7 +133,7 @@ describe("Start pipeline (REQ-117)", () => {
   });
 
   it("Start says why it can't start when every ticked job is excluded", async () => {
-    setup("/jobs?sel=fl");
+    setup("/jobs?tab=saved&view=table&sel=fl");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -141,7 +141,7 @@ describe("Start pipeline (REQ-117)", () => {
   });
 
   it("filters the review rows from a column menu, with a removable chip (REQ-120)", async () => {
-    setup("/jobs?sel=pl,ta,li");
+    setup("/jobs?tab=saved&view=table&sel=pl,ta,li");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -156,7 +156,7 @@ describe("Start pipeline (REQ-117)", () => {
   });
 
   it("Tier A row's default reads Fill when all go to Submit", async () => {
-    setup("/jobs?sel=ta");
+    setup("/jobs?tab=saved&view=table&sel=ta");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);
@@ -166,7 +166,7 @@ describe("Start pipeline (REQ-117)", () => {
 
   it("readiness cap links to Profile", async () => {
     notReady = true;
-    setup("/jobs?sel=pl");
+    setup("/jobs?tab=saved&view=table&sel=pl");
     const user = userEvent.setup();
     await user.click(await screen.findByRole("button", { name: "Start pipeline" }, opts));
     const sheet = await screen.findByRole("region", { name: "Review pipeline" }, opts);

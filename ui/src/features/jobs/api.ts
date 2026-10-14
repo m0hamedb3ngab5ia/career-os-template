@@ -163,3 +163,31 @@ export function useSelectJobs() {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
   });
 }
+
+export interface UiState {
+  tour_done?: boolean;
+  jobs_view?: ViewKey;
+}
+
+/** data/ui_state.json via GET/PUT /api/ui-state (shared with the first-run tour; PUT merges). */
+export function useUiState() {
+  return useQuery({ queryKey: ["ui-state"], queryFn: () => apiFetch<UiState>("/api/ui-state"), staleTime: Infinity });
+}
+
+export function useRememberView() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (jobs_view: ViewKey) => apiSend<UiState>("PUT", "/api/ui-state", { jobs_view }),
+    onSuccess: (s) => qc.setQueryData(["ui-state"], s),
+  });
+}
+
+/** Board drag: POST /api/jobs/{id}/status. The server's refusal text rides on the thrown error. */
+export function useMoveJob() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (v: { jobId: string; status: string }) =>
+      apiSend<{ job_id: string }>("POST", `/api/jobs/${encodeURIComponent(v.jobId)}/status`, { status: v.status }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
