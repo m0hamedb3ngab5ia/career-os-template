@@ -174,3 +174,9 @@ Decision: (1) Tracker merges into Jobs; no Pipeline nav item, `/pipeline` → `/
 Why: jobs are the heart of the app; Today must show them for time to value (DEC-011). Separate Pipeline page duplicated Jobs status tabs (Trim list). Score needs a visible reason to be trusted.
 Rejected: tracker as its own top-level page (one more nav item, same data); labelled sub-scores now (new scoring work, not needed for user test); colour per stage lane (noise, no meaning).
 Changes: REQ-071, REQ-072 amended; REQ-074, REQ-122 deprecated; new REQ-127..132, UC-015/016, FLOW-005; mockup `mockups/jobs-today.html`.
+### DEC-023 Scoring budget: free pre-score, ranked queue, caps
+Reasoned by: human (Q-031 answer 2026-10-14; prefilter, unscored view, defaults chosen 2026-10-14) + agent (accepted): keyword pre-score instead of `resume match`, which needs a paid score first
+Decision: (1) every job gets a deterministic keyword `prescore` at scan (REQ-133). (2) Auto-scoring ranks by prescore, fresh before stale (>21 d), skips below `min_prescore` (REQ-134). (3) Caps `per_scan` 150, `per_day` 300 in `pipeline.yaml: scoring` (REQ-135). (4) Unscored jobs visible in a Not scored tab with Score now (REQ-136/137).
+Why: 750-job backlog took ~10 h of plan quota; Recommended hid unscored jobs.
+Rejected: `resume match` as prefilter (needs score.json skills); recency-only order (scores poor fits); cheap-LLM triage (still one call per job); hide unscored (good jobs invisible).
+Changes: new USR-038, REQ-133..137, UC-017, FLOW-006; REQ-128 amended (fourth tab); IA Jobs tabs; runs presets keep wall-clock limits.

@@ -110,6 +110,9 @@ user_requirements:
   USR-037:
     status: approved
     provenance: confirmed
+  USR-038:
+    status: proposed
+    provenance: confirmed
 requirements:
   REQ-001:
     status: proposed
@@ -727,6 +730,41 @@ requirements:
     - USR-013
     tests:
     - E2E-016-05
+  REQ-133:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-038
+    tests:
+    - E2E-017-01
+  REQ-134:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-038
+    tests:
+    - E2E-017-02
+  REQ-135:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-038
+    tests:
+    - E2E-017-03
+  REQ-136:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-038
+    tests:
+    - E2E-017-05
+  REQ-137:
+    status: proposed
+    provenance: confirmed
+    user_requirements:
+    - USR-038
+    tests:
+    - E2E-017-04
 use_cases:
   UC-001:
     status: approved
@@ -819,6 +857,14 @@ use_cases:
     - REQ-129
     - REQ-130
     - REQ-132
+  UC-017:
+    status: draft
+    requirements:
+    - REQ-133
+    - REQ-134
+    - REQ-135
+    - REQ-136
+    - REQ-137
 flows:
   FLOW-001:
     status: approved
@@ -847,6 +893,10 @@ flows:
     use_cases:
     - UC-015
     - UC-016
+  FLOW-006:
+    status: draft
+    use_cases:
+    - UC-017
 tasks:
   TASK-001:
     status: done
@@ -1108,3 +1158,29 @@ tasks:
     use_cases:
     - UC-014
     - UC-016
+  TASK-038:
+    status: todo
+    requirements:
+    - REQ-133
+    use_cases:
+    - UC-017
+  TASK-039:
+    status: todo
+    requirements:
+    - REQ-134
+    - REQ-135
+    use_cases:
+    - UC-017
+  TASK-040:
+    status: todo
+    requirements:
+    - REQ-137
+    use_cases:
+    - UC-017
+  TASK-041:
+    status: todo
+    requirements:
+    - REQ-136
+    - REQ-128
+    use_cases:
+    - UC-017

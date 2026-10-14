@@ -132,3 +132,11 @@ Links: REQ-127 REQ-131 REQ-102 UC-014 UC-015 FLOW-005 · Area: frontend · After
 
 ### TASK-037 /pipeline redirect + nav + tour
 Links: REQ-129 REQ-121 UC-014 UC-016 · Area: full · After: TASK-035 · Done when: `/pipeline` → `/jobs?tab=applied&view=board` (308); Pipeline nav item removed; tour steps name the new nav; `GET /api/pipeline` removed once the Board no longer reads it; route test enumerates the redirect
+### TASK-038 Keyword pre-score (REQ-133)
+Links: REQ-133 UC-017 · Area: backend · Done when: `prescore` set on scout insert + backfill for unscored jobs; pure function in `match.py` reusing `terms.term_hit`; unit tests (E2E-017-01 integration via recorded scout fixture)
+### TASK-039 Ranked queue + per-scan/per-day caps (REQ-134, REQ-135)
+Links: REQ-134 REQ-135 UC-017 · Area: backend · After: TASK-038 · Done when: `pipeline.yaml: scoring {per_scan, per_day, stale_days, min_prescore}` with (Recommended) defaults in `examples/config` + config validation + doctor; score run orders queue, stops at caps with message, `--dry-run` shows queue/cap/ETA; E2E-017-02/03
+### TASK-040 Score now without ticking (REQ-137)
+Links: REQ-137 UC-017 FLOW-006 · Area: backend+api · Done when: `run score --job` no longer sets `selected`; `POST /api/jobs/score` (ids) starts the run; OpenAPI regenerated; E2E-017-04
+### TASK-041 Jobs › Not scored tab (REQ-136)
+Links: REQ-136 REQ-128 UC-017 FLOW-006 · Area: frontend · After: TASK-038, TASK-040, TASK-037 (same Jobs files) · Done when: tab + count, card per IA, Score now/selected, failure + empty states, UI snapshots; E2E-017-05

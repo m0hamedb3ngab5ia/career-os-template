@@ -259,6 +259,14 @@ Technical detail: 03_REQUIREMENTS.md + 03b_REQUIREMENTS_USER_FLOWS.md (REQ-NNN),
 - Why: new users know where to start and never wonder what comes next
 - Later: details of the tour steps can be expanded.
 
+### USR-038 Score many jobs without using up my plan
+- When a scan finds hundreds of jobs, the app does not spend hours or my whole Claude plan scoring all of them.
+- It first checks every job for free against my résumé skills and target titles, then fully scores only the best ones, up to a limit per scan and per day.
+- Older postings are scored last, but never thrown away.
+- Jobs that were not scored still show up in Jobs, with their quick match, and I can score any of them with one click.
+- Why: a big backlog took about 10 hours to score, and unscored jobs were invisible
+- Source: Q-031 (answered 2026-10-14)
+
 ## Map to technical requirements
 <!-- trace:map -->
 | user requirement | status | technical REQs |
@@ -300,4 +308,5 @@ Technical detail: 03_REQUIREMENTS.md + 03b_REQUIREMENTS_USER_FLOWS.md (REQ-NNN),
 | USR-035 Always know what to do on each page | approved | REQ-119 |
 | USR-036 Tables that work like a spreadsheet | approved | REQ-120, REQ-129 |
 | USR-037 First-time guide and a clear next step | approved | REQ-121, REQ-122, REQ-131 |
+| USR-038 Score many jobs without using up my plan | proposed | REQ-133, REQ-134, REQ-135, REQ-136, REQ-137 |
 <!-- /trace:map -->
