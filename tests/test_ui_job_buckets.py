@@ -134,3 +134,32 @@ def test_malformed_score_drops_that_rows_reasons_not_500(idx, data):
     (Store(data["settings"]).job_dir(jid) / "score.json").write_text(json.dumps({"required_skills": 5}))
     rows = jobs_svc.with_reasons(data["settings"], [{"job_id": jid}])
     assert rows[0]["reasons"] is None
+
+
+def test_started_pick_stays_until_prepared(idx, data):
+    # Codex #193 P1: Prepare ticks the job (selected=1), which drops it from Recommended; Today keeps it while its run
+    # is in flight or failed, and lets it go once prepared.
+    first = today_svc.top_picks(idx, NOW, closed=CLOSED)[0]["job_id"]
+    Store(data["settings"]).set_status(first, "scored")  # not prepared yet
+    Store(data["settings"]).set_selected([first], True)
+    idx.rebuild()
+    assert first not in [p["job_id"] for p in today_svc.top_picks(idx, NOW, closed=CLOSED)]
+    kept = [p["job_id"] for p in today_svc.top_picks(idx, NOW, closed=CLOSED, keep=[first])]
+    assert first in kept and len(kept) <= today_svc.TOP_PICKS
+    Store(data["settings"]).set_status(first, "needs_review")
+    idx.rebuild()
+    assert first not in [p["job_id"] for p in today_svc.top_picks(idx, NOW, closed=CLOSED, keep=[first])]
+
+
+def test_started_ids_running_and_failed_prepare(data):
+    from careeros.runs.failures import Failures
+    from careeros.runs.store import RunStore
+
+    Failures(RunStore(data["settings"])).record("prepare", "j-failed", "error", "boom", "r1", NOW)
+    Failures(RunStore(data["settings"])).record("score", "j-scorefail", "error", "boom", "r1", NOW)
+
+    class RC:
+        def current(self):
+            return {"state": "running", "kind": "prepare", "current_job": "j-run", "queue": [{"job_id": "j-q"}]}
+
+    assert today_svc.started_ids(data["settings"], RC()) == {"j-failed", "j-run", "j-q"}

@@ -259,9 +259,9 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
               safety: list[str] | None = None, category: list[str] | None = None, q: str | None = None,
               location: str | None = None, sort: str = DEFAULT_SORT, cursor: str | None = None, limit: int = 100,
               tab: str | None = None, closed: list[str] | None = None, values: dict[str, list[str]] | None = None,
-              ranges: dict[str, tuple[Any, Any]] | None = None) -> JobsPage:
+              ranges: dict[str, tuple[Any, Any]] | None = None, job_ids: list[str] | None = None) -> JobsPage:
     clause, params = _where(status=status, tier=tier, safety=safety, category=category, q=q, location=location,
-                            tab=tab, closed=closed, values=values, ranges=ranges)
+                            tab=tab, closed=closed, values=values, ranges=ranges, job_ids=job_ids)
     try:
         offset = int(cursor) if cursor else 0
     except ValueError:
