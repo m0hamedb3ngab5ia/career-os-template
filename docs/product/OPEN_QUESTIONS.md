@@ -185,3 +185,10 @@
 - Recommended: drop it; setup card's disappearance + Top picks on Today is the signal.
 - Answer (2026-10-13, user): Recommended as written: drop it.
 - Status: answered
+
+### Q-031 Scoring budget for a large job backlog
+- Links: REQ-104, REQ-128, DEC-022
+- Context: LLM scoring costs one headless Claude call per job (~50 s, plan quota). A 750-job backlog took ~10 h. Recommended shows only scored jobs, so unscored jobs are invisible until scored.
+- Options: (a) cap: score only the top N new jobs per scan (e.g. 150), ranked by recency + company priority; (b) two-stage: free deterministic match (`resume match`) on every job, LLM-score only jobs above a threshold; (c) on demand: score when the user opens or saves a job; (d) daily budget that scales with plan usage.
+- Recommended: (b) + (a): deterministic prefilter on all, LLM-score the top N per scan within a daily cap; the rest wait or score on demand.
+- Status: open
