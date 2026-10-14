@@ -83,7 +83,8 @@ describe("List master-detail", () => {
     expect(await screen.findByRole("heading", { name: "Borealis", level: 2 })).toBeInTheDocument();
     expect(screen.getByRole("link", { name: /Acme/ })).toBeInTheDocument();
     await router.navigate(-1);
-    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs"));
+    // Wide List with no job open falls back to the first job (a1) rather than an empty pane.
+    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/a1"));
     await waitFor(() => expect(screen.queryByRole("heading", { name: "Borealis", level: 2 })).not.toBeInTheDocument());
   });
 
