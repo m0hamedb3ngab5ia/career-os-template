@@ -3,7 +3,8 @@ import { Link } from "react-router";
 import { Button, ButtonLink } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { useMeta } from "../../api/meta";
-import { errorText, usePipeline, useSetStatus, useStartPipeline } from "../job-detail/api";
+import { errorText, usePipeline, useResetFailures, useSetStatus, useStartPipeline } from "../job-detail/api";
+import { formatRelative } from "../../lib/format";
 import type { components } from "../../api/schema.gen";
 import styles from "./Today.module.css";
 
@@ -50,13 +51,18 @@ function PickCard({ pick: p }: { pick: Pick }) {
   const undoSeconds = useMeta().data?.ui?.undo_seconds;
   const start = useStartPipeline(id);
   const setStatus = useSetStatus(id);
+  const reset = useResetFailures(id);
   const pipe = usePipeline(id, start.isSuccess);
   const [skipped, setSkipped] = useState(false);
   const failure = pipe.data?.failures?.kind === "prepare" ? pipe.data.failures : null;
   const blocked = failure ? null : pipe.data?.blocked_reason;
   const newRun = start.isSuccess && start.data.run_id !== failure?.last_run;
-  const preparing = Boolean(pipe.data?.active_run_id) || start.isPending || newRun;
-  const runIt = () => start.mutate({ action: "start" }, { onError: (e) => toast.show({ message: `Couldn’t start: ${errorText(e)}` }) });
+  const preparing = Boolean(pipe.data?.active_run_id) || reset.isPending || start.isPending || newRun;
+  const startIt = () => start.mutate({ action: "start" }, { onError: (e) => toast.show({ message: `Couldn’t start: ${errorText(e)}` }) });
+  // Out of attempts: runs skip the job until its failures are reset, so Retry resets first (else always 409).
+  const runIt = () => failure?.excluded
+    ? reset.mutate("prepare", { onSuccess: startIt, onError: (e) => toast.show({ message: `Couldn’t reset: ${errorText(e)}` }) })
+    : startIt();
 
   function skip() {
     setStatus.mutate({ status: "skipped" }, {
@@ -82,7 +88,7 @@ function PickCard({ pick: p }: { pick: Pick }) {
         <span className={styles.fit} aria-label={`Fit ${p.fit ?? "unknown"}`}>{p.fit ?? "–"}</span>
         <span className={styles.grow}>
           <span className={styles.strong}>{p.title}</span>
-          <span className={styles.caption}>{[p.company, p.location].filter(Boolean).join(" · ")}</span>
+          <span className={styles.caption}>{[p.company, p.location, formatRelative(p.found_at)].filter(Boolean).join(" · ")}</span>
           <span className={styles.caption}>{reasonsLine(p.reasons)}</span>
         </span>
       </Link>

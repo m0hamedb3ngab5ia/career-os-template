@@ -2,6 +2,7 @@ import { screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { TodayPage } from "./TodayPage";
+import { formatRelative } from "../../lib/format";
 import userEvent from "@testing-library/user-event";
 import { defaultRoutes, mockApi, NOW, renderWithApp, status, today, type Routes } from "./testing";
 
@@ -108,6 +109,23 @@ describe("TodayPage", () => {
     expect(await screen.findByRole("button", { name: /^Prepare/ })).toBeInTheDocument();
     const posts = calls.filter((c) => c.path === "/api/jobs/j1/status").map((c) => c.body);
     expect(posts).toEqual([{ status: "skipped" }, { status: "scored" }]);
+  });
+
+  it("each pick shows its age from found_at (REQ-130)", async () => {
+    picksSetup();
+    expect(await screen.findByText(`Acme · Remote · ${formatRelative("2026-09-24", NOW)}`)).toBeInTheDocument();
+  });
+
+  it("out-of-attempts Retry resets the prepare failures, then starts the run (Codex #193)", async () => {
+    const failures = { kind: "prepare", count: 3, max_attempts: 3, last_outcome: "timeout", last_detail: "Claude timed out", last_run: "r0", excluded: true };
+    const { calls } = picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ failures, blocked_reason: "Failed 3 times" }),
+      "POST /api/jobs/j1/failures/reset": { job_id: "j1", cleared: ["prepare"], resolved: [] },
+      "POST /api/jobs/j1/pipeline": { run_id: "r2", kind: "prepare" } });
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === "POST");
+    expect(posts.map((c) => c.path)).toEqual(["/api/jobs/j1/failures/reset", "/api/jobs/j1/pipeline"]);
+    expect(posts[0]!.body).toMatchObject({ kind: "prepare" });
   });
 
   it("failed prepare shows the cause and Retry starts a new run (E2E-015-04)", async () => {
