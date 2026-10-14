@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import sqlite3
 from datetime import datetime, timezone, tzinfo
-from typing import Any
+from typing import Any, Collection
 
 from typing_extensions import TypedDict
 
@@ -72,22 +72,42 @@ TOP_PICKS = 5
 TOP_PICK_DAYS = 14
 
 
-def top_picks(ix: Any, now: datetime, *, closed: list[str], n: int = TOP_PICKS) -> list[JobListItem]:
+def top_picks(ix: Any, now: datetime, *, closed: list[str], n: int = TOP_PICKS,
+              keep: Collection[str] = ()) -> list[JobListItem]:
     """REQ-127: the first `n` of the Jobs Recommended tab (same clause, fit first), new (found in the last
-    TOP_PICK_DAYS days) and tier A/B. Fewer qualify → fewer cards (Q-025)."""
+    TOP_PICK_DAYS days) and tier A/B. Fewer qualify → fewer cards (Q-025). Prepare ticks a job (selected=1), which
+    takes it off Recommended: jobs in `keep` (started_ids) stay while not yet prepared (status found/scored), so
+    their card can show progress, the failure and Retry."""
     from datetime import timedelta
 
     from careeros.ui.services import jobs
 
     since = (now - timedelta(days=TOP_PICK_DAYS)).date().isoformat()
-    return jobs.list_jobs(ix, tab="recommended", closed=closed, sort="-fit", limit=n, tier=["A", "B"],
-                          ranges={"found_at": (since, None)})["items"]
+    kw: dict[str, Any] = dict(closed=closed, sort="-fit", limit=n, tier=["A", "B"], ranges={"found_at": (since, None)})
+    kept = jobs.list_jobs(ix, tab="saved", status=["found", "scored"], job_ids=list(keep), **kw)["items"] \
+        if keep else []
+    rec = jobs.list_jobs(ix, tab="recommended", **kw)["items"]
+    return sorted([*kept, *rec][:n], key=lambda r: -(r["fit"] or 0))
+
+
+def started_ids(settings: Any, rc: Any) -> set[str]:
+    """Jobs whose prepare run is in flight or queued, or whose last prepare failed (runs/failures.py)."""
+    from careeros.runs.failures import Failures
+    from careeros.runs.store import RunStore
+
+    pre = "prepare:"
+    ids = {k[len(pre):] for k, e in Failures(RunStore(settings))._load().items()
+           if k.startswith(pre) and e.get("count")}
+    run = rc.current() or {}
+    if run.get("state") == "running" and run.get("kind") == "prepare":
+        ids |= {j for j in (run.get("current_job"), *(q.get("job_id") for q in run.get("queue") or [])) if j}
+    return ids
 
 
 def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
-          soon_hours: int = 48, closed: list[str] | None = None) -> Today:
+          soon_hours: int = 48, closed: list[str] | None = None, keep: Collection[str] = ()) -> Today:
     from careeros.ui.services.jobs import with_reasons
 
-    picks = with_reasons(settings, top_picks(ix, now, closed=closed or []))
+    picks = with_reasons(settings, top_picks(ix, now, closed=closed or [], keep=keep))
     return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now),
             "top_picks": picks}

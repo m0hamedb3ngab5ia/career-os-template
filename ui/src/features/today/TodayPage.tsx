@@ -11,8 +11,8 @@ import { errorText, useToday, useTodayStatus } from "./api";
 import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
 import { PausedBanner } from "./PausedBanner";
-import { useReadiness } from "../profile/api";
-import { ButtonLink } from "../../kit/Button";
+import { SetupCard, useSetupOpen } from "./SetupCard";
+import { TopPicks } from "./TopPicks";
 import { formatWhen } from "../../lib/dates";
 import styles from "./Today.module.css";
 import type { ActionItem, PipelineColumn, RunRow } from "./types";
@@ -23,6 +23,7 @@ export function TodayPage() {
   const status = useTodayStatus();
   const today = useToday();
   const s = status.data;
+  const setupOpen = useSetupOpen();
   const batchId = useSearchParams()[0].get("batch") ?? undefined;
   const batch = useBatch(batchId);
   // Unknown/failed batch: say so and show every task; still loading: show none (not a false "Nothing needs you").
@@ -48,7 +49,8 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        <SetupBanner />
+        {setupOpen ? <SetupCard /> : null}
+        {setupOpen === false ? <TopPicks picks={today.data?.top_picks ?? []} /> : null}
         {batchId ? (
           <p className={styles.batchNote}>
             Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}
@@ -79,18 +81,6 @@ function headline(actions: ActionItem[]): string {
 }
 
 const plural = (n: number, word: string) => `${formatCount(n)} ${word}${n === 1 ? "" : "s"}`;
-
-/** "Finish setup: N required items remaining", only while setup blocks runs. */
-function SetupBanner() {
-  const left = useReadiness().data?.items?.filter((i) => i.must && !i.done).length ?? 0;
-  if (!left) return null;
-  return (
-    <div className={`${styles.panel} ${styles.oneLine}`} role="status">
-      <span>Finish setup: {plural(left, "required item")} remaining</span>
-      <ButtonLink to="/profile" variant="primary">Finish setup</ButtonLink>
-    </div>
-  );
-}
 
 /** Outcome of a finished run in plain words; null = not worth showing (running, housekeeping). */
 export function outcome(r: RunRow): string | null {

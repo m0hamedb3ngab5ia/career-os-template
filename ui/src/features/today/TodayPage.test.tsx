@@ -2,7 +2,9 @@ import { screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { TodayPage } from "./TodayPage";
-import { defaultRoutes, mockApi, NOW, renderWithApp, status, type Routes } from "./testing";
+import { formatRelative } from "../../lib/format";
+import userEvent from "@testing-library/user-event";
+import { defaultRoutes, mockApi, NOW, renderWithApp, status, today, type Routes } from "./testing";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -56,17 +58,96 @@ describe("TodayPage", () => {
     expect(within(section).getByRole("link", { name: "View pipeline" })).toHaveAttribute("href", "/pipeline");
   });
 
-  it("shows the setup banner only while required items are left", async () => {
-    const item = (id: string, must: boolean, done: boolean) => ({ id, label: id, must, done, fix_link: null });
-    setup({ "GET /api/readiness": { ready: false, items: [item("a", true, false), item("b", true, false), item("c", false, false), item("d", true, true)] } });
-    expect(await screen.findByText("Finish setup: 2 required items remaining")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Finish setup" })).toHaveAttribute("href", "/profile");
+  const item = (id: string, must: boolean, done: boolean, fix = "/profile") => ({ id, label: `Item ${id}`, must, done, fix_link: fix });
+  const pick = (id: string, over = {}) => ({ job_id: id, title: `Role ${id}`, company: "Acme", location: "Remote", fit: 88, tier: "A",
+    found_at: "2026-09-24", reasons: { covered: 7, total: 10, missing: ["Go", "Kubernetes", "Rust"] }, ...over });
+  const ready = { ready: true, items: [item("a", true, true)] };
+
+  it("setup card (REQ-131): ring, one primary button to the first open item, show all", async () => {
+    // E2E-015-05
+    setup({ "GET /api/readiness": { ready: false, items: [item("a", true, true), item("b", true, false, "/profile#b"), item("c", true, false), item("d", true, true), item("e", true, true), item("f", false, false)] } });
+    const card = (await screen.findByRole("heading", { name: "Finish setup" })).closest("section")!;
+    expect(within(card).getByText("3/5")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Finish setup" })).toHaveAttribute("href", "/profile#b");
+    expect(within(card).queryByText("To do: Item b")).not.toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Show all (5)" }));
+    expect(within(card).getByText("To do: Item b")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Top picks/ })).not.toBeInTheDocument();
   });
 
-  it("hides the setup banner when setup is complete", async () => {
-    setup({ "GET /api/readiness": { ready: true, items: [{ id: "a", label: "a", must: true, done: true, fix_link: null }] } });
-    await screen.findByRole("heading", { name: "Job search" });
-    expect(screen.queryByText(/Finish setup/)).not.toBeInTheDocument();
+  it("no setup card once every must-have is done; Top picks band instead (E2E-015-01, E2E-014-02)", async () => {
+    setup({ "GET /api/readiness": ready, "GET /api/today": { ...today, top_picks: [pick("j1"), pick("j2", { fit: 70, reasons: null })] } });
+    const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
+    expect(screen.queryByRole("heading", { name: "Finish setup" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Next step" })).not.toBeInTheDocument();
+    const links = within(band).getAllByRole("link").slice(1); // [0] = "All jobs"
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/jobs/j1", "/jobs/j2"]);
+    expect(within(band).getByText("7/10 skills · missing: Go, Kubernetes, +1")).toBeInTheDocument();
+    expect(within(band).getByText("Match pending")).toBeInTheDocument();
+    expect(within(band).getByText("88")).toBeInTheDocument();
+  });
+
+  const pstate = (over = {}) => ({ stage: "scored", next_action: "start", next_kind: "prepare", active_run_id: null, failures: null, ...over });
+  const picksSetup = (routes: Routes = {}) =>
+    setup({ "GET /api/readiness": ready, "GET /api/today": { ...today, top_picks: [pick("j1")] }, "GET /api/jobs/j1/pipeline": pstate(), ...routes });
+
+  it("Prepare starts one prepare run for that job; card shows Preparing… (E2E-015-02)", async () => {
+    const { calls } = picksSetup({ "POST /api/jobs/j1/pipeline": { run_id: "r1", kind: "prepare" } });
+    await userEvent.click(await screen.findByRole("button", { name: /^Prepare/ }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === "POST");
+    expect(posts.map((c) => c.path)).toEqual(["/api/jobs/j1/pipeline"]);
+    expect(posts[0]!.body).toMatchObject({ action: "start" });
+    expect(screen.queryByRole("button", { name: /^Prepare/ })).not.toBeInTheDocument();
+  });
+
+  it("Skip then Undo brings the card back with the status unchanged (E2E-015-03)", async () => {
+    const { calls } = picksSetup({ "POST /api/jobs/j1/status": { status: "skipped", previous: "scored" } });
+    await userEvent.click(await screen.findByRole("button", { name: /^Skip/ }));
+    expect(screen.queryByText("Role j1")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    expect(await screen.findByRole("button", { name: /^Prepare/ })).toBeInTheDocument();
+    const posts = calls.filter((c) => c.path === "/api/jobs/j1/status").map((c) => c.body);
+    expect(posts).toEqual([{ status: "skipped" }, { status: "scored" }]);
+  });
+
+  it("each pick shows its age from found_at (REQ-130)", async () => {
+    picksSetup();
+    expect(await screen.findByText(`Acme · Remote · ${formatRelative("2026-09-24", NOW)}`)).toBeInTheDocument();
+  });
+
+  it("out-of-attempts Retry resets the prepare failures, then starts the run (Codex #193)", async () => {
+    const failures = { kind: "prepare", count: 3, max_attempts: 3, last_outcome: "timeout", last_detail: "Claude timed out", last_run: "r0", excluded: true };
+    const { calls } = picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ failures, blocked_reason: "Failed 3 times" }),
+      "POST /api/jobs/j1/failures/reset": { job_id: "j1", cleared: ["prepare"], resolved: [] },
+      "POST /api/jobs/j1/pipeline": { run_id: "r2", kind: "prepare" } });
+    await userEvent.click(await screen.findByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === "POST");
+    expect(posts.map((c) => c.path)).toEqual(["/api/jobs/j1/failures/reset", "/api/jobs/j1/pipeline"]);
+    expect(posts[0]!.body).toMatchObject({ kind: "prepare" });
+  });
+
+  it("failed prepare shows the cause and Retry starts a new run (E2E-015-04)", async () => {
+    const failures = { kind: "prepare", count: 1, max_attempts: 3, last_outcome: "timeout", last_detail: "Claude timed out", last_run: "r0", excluded: false };
+    const { calls } = picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ failures }), "POST /api/jobs/j1/pipeline": { run_id: "r2", kind: "prepare" } });
+    expect(await screen.findByText(/Claude timed out/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/jobs/j1/pipeline"]);
+  });
+
+  it("blocked prepare is disabled and shows the reason (UC-015 fail)", async () => {
+    picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ blocked_reason: "No master résumé" }) });
+    expect(await screen.findByText(/No master résumé/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Prepare/ })).toBeDisabled();
+  });
+
+  it("Top picks empty state links to the Jobs page", async () => {
+    setup({ "GET /api/readiness": ready });
+    const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
+    expect(within(band).getByText("No new picks right now")).toBeInTheDocument();
+    expect(within(band).getByRole("link", { name: "Browse all jobs" })).toHaveAttribute("href", "/jobs");
   });
 
   it("shows loading placeholders before data arrives", () => {
