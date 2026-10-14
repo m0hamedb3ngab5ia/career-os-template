@@ -87,19 +87,20 @@ def test_response_rate_breakdown(data, idx):
 
 def test_tabs_count_each_view(data, idx):
     tabs = {t["key"]: t for t in jobs_svc.tabs(idx, closed(data))}
-    assert list(tabs) == ["active", "review", "applied", "tier_a", "all"]
-    assert tabs["all"]["count"] == 8 and tabs["review"]["count"] == 1
-    assert tabs["applied"]["count"] == 2            # applied + interview
-    assert tabs["active"]["count"] == 6             # not rejected / skipped
-    assert tabs["tier_a"]["count"] == 2 and tabs["tier_a"]["label"] == "Tier A"
-    assert {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), q="hooli")}["all"] == 1
+    assert list(tabs) == ["recommended", "saved", "applied"]
+    assert tabs["recommended"]["count"] == 0        # fixture jobs carry no `selected` flag: all count as ticked
+    assert tabs["saved"]["count"] == 4              # ticked, not skipped, not applied-or-later
+    assert tabs["applied"]["count"] == 3            # applied + interview + rejected (Closed stage)
+    assert {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), q="hooli")}["applied"] == 1
     by_loc = {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), location="REMOTE")}
-    assert by_loc["all"] == 1 and by_loc["applied"] == 0
+    assert by_loc["applied"] == 0 and by_loc["saved"] == 1
 
 
 def test_list_by_tab_and_next_action(data, idx):
     page = jobs_svc.list_jobs(idx, tab="applied", closed=closed(data))
-    assert {j["company"] for j in page["items"]} == {"Hooli", "Stark Industries"}
+    assert {j["company"] for j in page["items"]} == {"Hooli", "Stark Industries", "Wayne Enterprises"}
+    assert jobs_svc.list_jobs(idx, tab="active", closed=closed(data))["total"] == 0     # old key -> recommended
+    assert jobs_svc.list_jobs(idx, tab="review", closed=closed(data))["total"] == 1     # old key -> saved + needs_review
     rows = {j["company"]: j for j in jobs_svc.list_jobs(idx)["items"]}
     assert rows["Umbrella Labs"]["next_action"] == "Review and submit"
     assert rows["Hooli"]["next_action"] is None          # its only item is done
@@ -120,7 +121,7 @@ def test_export_xlsx_selected_rows_and_columns(data, idx):
 def test_export_xlsx_by_filter_and_bad_input(data, idx):
     raw = jobs_svc.export_xlsx(idx, tab="applied", closed=closed(data))
     rows = list(load_workbook(io.BytesIO(raw)).active.iter_rows(values_only=True))
-    assert len(rows) == 3 and "Next action" in rows[0]
+    assert len(rows) == 4 and "Next action" in rows[0]
     rows = list(load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, location="remote", closed=closed(data)))).active
                 .iter_rows(values_only=True))
     assert len(rows) == 2 and rows[1][rows[0].index("Company")] == "Globex"

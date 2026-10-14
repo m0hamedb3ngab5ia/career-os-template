@@ -144,7 +144,7 @@ def test_catch_up_run_and_dismiss(client, data, popen):
 
 def test_tabs_and_tab_filter(client):
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs").json()["tabs"]}
-    assert tabs == {"active": 6, "review": 1, "applied": 2, "tier_a": 2, "all": 8}
+    assert tabs == {"recommended": 0, "saved": 4, "applied": 3}
     page = client.get("/api/jobs", params={"tab": "review"}).json()
     assert [j["company"] for j in page["items"]] == ["Umbrella Labs"]
     assert page["items"][0]["next_action"] == "Review and submit"
@@ -161,7 +161,7 @@ def test_export_streams_an_xlsx_without_touching_the_tracker(client, data):
     rows = list(load_workbook(io.BytesIO(r.content)).active.iter_rows(values_only=True))
     assert rows == [("JobID", "Company", "Status"), (data["jobs"]["applied"], "Hooli", "applied")]
     r = client.post("/api/jobs/export", json={"tab": "applied"}, headers=H)
-    assert len(list(load_workbook(io.BytesIO(r.content)).active.iter_rows())) == 3
+    assert len(list(load_workbook(io.BytesIO(r.content)).active.iter_rows())) == 4
     assert tr.stat().st_mtime_ns == before
     assert client.post("/api/jobs/export", json={"columns": ["nope"]}, headers=H).status_code == 400
 

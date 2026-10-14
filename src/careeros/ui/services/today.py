@@ -13,6 +13,7 @@ from typing_extensions import TypedDict
 
 from careeros.config import ConfigError
 from careeros.ui.services.actions import ActionItem
+from careeros.ui.services.jobs import JobListItem
 
 PRIORITY = {"H": 0, "M": 1, "L": 2}
 
@@ -26,6 +27,7 @@ class PrepareQueue(TypedDict):
 class Today(TypedDict):
     actions: list[ActionItem]
     prepare_queue: PrepareQueue
+    top_picks: list[JobListItem]
 
 
 def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[ActionItem]:
@@ -66,6 +68,26 @@ def prepare_queue(settings: Any, ix: Any, now: datetime) -> PrepareQueue:
     return {"total": len(ranked), "error": None}
 
 
+TOP_PICKS = 5
+TOP_PICK_DAYS = 14
+
+
+def top_picks(ix: Any, now: datetime, *, closed: list[str], n: int = TOP_PICKS) -> list[JobListItem]:
+    """REQ-127: the first `n` of the Jobs Recommended tab (same clause, fit first), new (found in the last
+    TOP_PICK_DAYS days) and tier A/B. Fewer qualify → fewer cards (Q-025)."""
+    from datetime import timedelta
+
+    from careeros.ui.services import jobs
+
+    since = (now - timedelta(days=TOP_PICK_DAYS)).date().isoformat()
+    return jobs.list_jobs(ix, tab="recommended", closed=closed, sort="-fit", limit=n, tier=["A", "B"],
+                          ranges={"found_at": (since, None)})["items"]
+
+
 def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
-          soon_hours: int = 48) -> Today:
-    return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now)}
+          soon_hours: int = 48, closed: list[str] | None = None) -> Today:
+    from careeros.ui.services.jobs import with_reasons
+
+    picks = with_reasons(settings, top_picks(ix, now, closed=closed or []))
+    return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now),
+            "top_picks": picks}

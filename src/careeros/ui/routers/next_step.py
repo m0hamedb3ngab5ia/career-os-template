@@ -37,10 +37,10 @@ def next_step(c=Depends(ctx)) -> NextStep:
     from careeros import readiness
     from careeros.runs import batches
     from careeros.ui.config import load_ui_config
-    from careeros.ui.services.jobs import _tab_clause
+    from careeros.ui.services.jobs import _in
 
-    where, params = _tab_clause("active", load_ui_config(c.settings).closed)
+    out, params = _in("status", load_ui_config(c.settings).closed or [""])   # open jobs (old "active" tab)
     row = c.index.query("SELECT COUNT(*) AS n, COALESCE(SUM(selected), 0) AS t FROM jobs"
-                        + (f" WHERE {where}" if where else ""), params)[0]
+                        f" WHERE status IS NULL OR NOT {out}", params)[0]
     running = next((b for b in batches.list_ids(c.settings) if batches.running(c.settings, b)), None)
     return pick(readiness.items(c.settings.root), jobs=row["n"], ticked=row["t"], running_batch=running)

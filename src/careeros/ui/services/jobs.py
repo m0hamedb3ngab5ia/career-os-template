@@ -7,7 +7,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from typing_extensions import TypedDict
+from typing_extensions import NotRequired, TypedDict
 
 from careeros.store import _is_finder_copy
 
@@ -55,8 +55,15 @@ class JobRow(TypedDict):
     injection: str | None    # REQ-109: uncleared injection reasons; None = not flagged or "I checked it"
 
 
+class Reasons(TypedDict):
+    covered: int         # REQ-130 "<covered>/<total> skills · missing: <top 2>, +n", best résumé's required skills
+    total: int
+    missing: list[str]   # required first, then preferred
+
+
 class JobListItem(JobRow):
     next_action: str | None      # the highest-priority open Action Item's "what"
+    reasons: NotRequired[Reasons | None]   # GET /api/jobs only; None = "Match pending"
 
 
 class JobsPage(TypedDict):
@@ -145,10 +152,14 @@ def _like(q: str) -> str:
     return "%" + q.lower().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
 
 
-# Jobs screen tabs: key -> label. "active" leaves out the closed statuses (fixed board columns, DEFAULT_COLUMNS), "applied" is
-# everything after applying.
-TABS = (("active", "Active"), ("review", "Needs review"), ("applied", "Applied"), ("tier_a", "Tier A"), ("all", "All"))
+# Jobs screen tabs (DEC-022, docs/product/09_ARCHITECTURE.md "Delta 2026-10-13" Buckets): key -> label.
+TABS = (("recommended", "Recommended"), ("saved", "Saved"), ("applied", "Applied"))
 APPLIED_STATUSES = ("applied", "screening", "interview", "offer")
+AFTER_APPLY = (*APPLIED_STATUSES, "rejected", "withdrawn", "ghosted")   # Applied tab, incl. its Closed stage (Q-028)
+# Old tab keys (saved URLs) -> (new tab, extra clause): never a 400. needs_review jobs are prepared, so ticked.
+OLD_TABS: dict[str, tuple[str, str | None, list[Any]]] = {
+    "active": ("recommended", None, []), "all": ("recommended", None, []),
+    "tier_a": ("recommended", "tier = ?", ["A"]), "review": ("saved", "status = ?", ["needs_review"])}
 _NEXT_ACTION = ("(SELECT a.what FROM action_items a WHERE a.job_id = jobs.job_id AND a.done = 0 ORDER BY "
                 "CASE a.priority WHEN 'H' THEN 0 WHEN 'M' THEN 1 WHEN 'L' THEN 2 ELSE 3 END, a.created LIMIT 1)")
 # Export columns: key -> header. JobID always comes first.
@@ -161,19 +172,28 @@ DEFAULT_EXPORT = ("company", "title", "location", "tier", "fit", "status", "safe
 MAX_EXPORT = 5000
 
 
+def _in(col: str, vals: Any) -> tuple[str, list[Any]]:
+    return f"{col} IN ({','.join('?' * len(vals))})", list(vals)
+
+
 def _tab_clause(tab: str | None, closed: list[str] | None) -> tuple[str | None, list[Any]]:
-    if tab in (None, "", "all"):
+    if tab in (None, ""):
         return None, []
-    if tab == "active":
-        cl = list(closed or [])
-        return (f"(status IS NULL OR status NOT IN ({','.join('?' * len(cl))}))", cl) if cl else (None, [])
-    if tab == "review":
-        return "status = ?", ["needs_review"]
-    if tab == "applied":
-        return f"status IN ({','.join('?' * len(APPLIED_STATUSES))})", list(APPLIED_STATUSES)
-    if tab == "tier_a":
-        return "tier = ?", ["A"]
-    raise ValueError(f"tab must be one of {', '.join(k for k, _ in TABS)}, got {tab!r}")
+    extra, extra_params = None, []
+    if tab in OLD_TABS:
+        tab, extra, extra_params = OLD_TABS[tab]
+    applied, a_params = _in("status", AFTER_APPLY)
+    if tab == "recommended":
+        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY}))
+        clause, params = f"fit IS NOT NULL AND selected = 0 AND (status IS NULL OR NOT {out})", ex
+    elif tab == "saved":
+        out, ex = _in("status", ("skipped", *AFTER_APPLY))
+        clause, params = f"selected = 1 AND (status IS NULL OR NOT {out})", ex
+    elif tab == "applied":
+        clause, params = applied, a_params
+    else:
+        raise ValueError(f"tab must be one of {', '.join(k for k, _ in TABS)}, got {tab!r}")
+    return (f"{clause} AND {extra}", [*params, *extra_params]) if extra else (clause, params)
 
 
 def _where(*, status: list[str] | None = None, tier: list[str] | None = None, safety: list[str] | None = None,
@@ -253,6 +273,45 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
                     f"ORDER BY {_order(sort)} LIMIT ? OFFSET ?", [*params, limit, offset])
     nxt = offset + len(rows)
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
+
+
+def _resume_texts(settings: Any) -> list[tuple[dict[str, Any], str]]:
+    """Every résumé's latest text, once per request; an unreadable résumé is left out (its rows lose nothing else)."""
+    from careeros import resumes
+
+    out = []
+    for r in resumes.list_resumes(settings.root):
+        try:
+            out.append((r, resumes.version(settings.root, r["rid"], r["latest"])["text"]))
+        except (OSError, ValueError, LookupError):
+            continue
+    return out
+
+
+def _reasons(m: dict[str, Any]) -> Reasons | None:
+    if not m.get("scored") or not m.get("resumes"):
+        return None
+    g = m["resumes"][0]["groups"]   # best first
+    req = g["required"]
+    return {"covered": len(req["hit"]), "total": len(req["hit"]) + len(req["missing"]),
+            "missing": req["missing"] + g["preferred"]["missing"]}
+
+
+def with_reasons(settings: Any, rows: list[Any], matcher: Any = None) -> list[Any]:
+    """REQ-130 reasons line on the rows given (one page / N top picks), computed on read: `match.matches` is
+    deterministic and its résumé inputs change after scoring. ponytail: no cache; add one keyed on (score.json
+    mtime, résumé version ids) if a timed request on a ~750-job copy is slow."""
+    from careeros import match
+
+    matcher = matcher or match.matches
+    texts = _resume_texts(settings)
+    for r in rows:
+        d = job_dir_for(settings, r["job_id"])
+        try:
+            r["reasons"] = _reasons(matcher(settings, d, texts=texts)) if d else None
+        except (OSError, ValueError):   # unreadable score/posting: row still listed, no reasons line
+            r["reasons"] = None
+    return rows
 
 
 def tabs(ix: Any, closed: list[str], q: str | None = None, location: str | None = None, **filters: Any) -> list[JobsTab]:

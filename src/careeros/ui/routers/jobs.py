@@ -74,9 +74,11 @@ def list_jobs(status: list[str] = Query(default=[]), tier: list[str] = Query(def
               cols: dict[str, Any] = Depends(column_filters)) -> svc.JobsPage:
     from careeros.ui.config import load_ui_config
 
-    return svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q,
+    page = svc.list_jobs(c.index, status=status, tier=tier, safety=safety, category=category, q=q,
                          location=location, sort=sort, cursor=cursor, limit=limit or load_ui_config(c.settings).page_size, tab=tab,
                          closed=_closed(c), **cols)
+    svc.with_reasons(c.settings, page["items"])   # REQ-130: this page's rows only
+    return page
 
 
 @router.get("/jobs/tabs")

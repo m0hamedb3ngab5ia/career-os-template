@@ -1,29 +1,19 @@
 {
   "tabs": [
     {
-      "count": 6,
-      "key": "active",
-      "label": "Active"
+      "count": 0,
+      "key": "recommended",
+      "label": "Recommended"
     },
     {
-      "count": 1,
-      "key": "review",
-      "label": "Needs review"
+      "count": 4,
+      "key": "saved",
+      "label": "Saved"
     },
     {
-      "count": 2,
+      "count": 3,
       "key": "applied",
       "label": "Applied"
-    },
-    {
-      "count": 2,
-      "key": "tier_a",
-      "label": "Tier A"
-    },
-    {
-      "count": 8,
-      "key": "all",
-      "label": "All"
     }
   ]
 }
