@@ -14,7 +14,7 @@ interface UiState {
 /** One step per main nav item + Start pipeline (REQ-121, ≤8). `selector` points at a page control when it is on
  *  screen (the Jobs page), else the step points at its nav item. */
 export const TOUR_STEPS: { to: string; title: string; text: string; selector?: string }[] = [
-  { to: "/", title: "Today", text: "What needs you now: tasks, running batches and your next step." },
+  { to: "/", title: "Today", text: "What needs you now: setup, top picks and what needs you." },
   { to: "/jobs", title: "Jobs", text: "Every job found. Tick the ones you want to work on." },
   { to: "/jobs", selector: '[data-tour="start-pipeline"]', title: "Start pipeline", text: "Tick jobs, then Start pipeline to choose how far each one goes: prepare, fill or submit." },
   { to: "/pipeline", title: "Pipeline", text: "Where each application stands, from found to offer." },

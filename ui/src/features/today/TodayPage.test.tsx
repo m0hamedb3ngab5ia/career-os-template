@@ -2,7 +2,8 @@ import { screen, within } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { TodayPage } from "./TodayPage";
-import { defaultRoutes, mockApi, NOW, renderWithApp, status, type Routes } from "./testing";
+import userEvent from "@testing-library/user-event";
+import { defaultRoutes, mockApi, NOW, renderWithApp, status, today, type Routes } from "./testing";
 
 beforeEach(() => {
   vi.useFakeTimers({ toFake: ["Date"] });
@@ -56,17 +57,40 @@ describe("TodayPage", () => {
     expect(within(section).getByRole("link", { name: "View pipeline" })).toHaveAttribute("href", "/pipeline");
   });
 
-  it("shows the setup banner only while required items are left", async () => {
-    const item = (id: string, must: boolean, done: boolean) => ({ id, label: id, must, done, fix_link: null });
-    setup({ "GET /api/readiness": { ready: false, items: [item("a", true, false), item("b", true, false), item("c", false, false), item("d", true, true)] } });
-    expect(await screen.findByText("Finish setup: 2 required items remaining")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Finish setup" })).toHaveAttribute("href", "/profile");
+  const item = (id: string, must: boolean, done: boolean, fix = "/profile") => ({ id, label: `Item ${id}`, must, done, fix_link: fix });
+  const pick = (id: string, over = {}) => ({ job_id: id, title: `Role ${id}`, company: "Acme", location: "Remote", fit: 88, tier: "A",
+    found_at: "2026-09-24", reasons: { covered: 7, total: 10, missing: ["Go", "Kubernetes", "Rust"] }, ...over });
+  const ready = { ready: true, items: [item("a", true, true)] };
+
+  it("setup card (REQ-131): ring, one primary button to the first open item, show all", async () => {
+    // E2E-015-05
+    setup({ "GET /api/readiness": { ready: false, items: [item("a", true, true), item("b", true, false, "/profile#b"), item("c", true, false), item("d", true, true), item("e", true, true), item("f", false, false)] } });
+    const card = (await screen.findByRole("heading", { name: "Finish setup" })).closest("section")!;
+    expect(within(card).getByText("3/5")).toBeInTheDocument();
+    expect(within(card).getByRole("link", { name: "Finish setup" })).toHaveAttribute("href", "/profile#b");
+    expect(within(card).queryByText("To do: Item b")).not.toBeInTheDocument();
+    await userEvent.click(within(card).getByRole("button", { name: "Show all (5)" }));
+    expect(within(card).getByText("To do: Item b")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: /Top picks/ })).not.toBeInTheDocument();
   });
 
-  it("hides the setup banner when setup is complete", async () => {
-    setup({ "GET /api/readiness": { ready: true, items: [{ id: "a", label: "a", must: true, done: true, fix_link: null }] } });
-    await screen.findByRole("heading", { name: "Job search" });
-    expect(screen.queryByText(/Finish setup/)).not.toBeInTheDocument();
+  it("no setup card once every must-have is done; Top picks band instead (E2E-015-01, E2E-014-02)", async () => {
+    setup({ "GET /api/readiness": ready, "GET /api/today": { ...today, top_picks: [pick("j1"), pick("j2", { fit: 70, reasons: null })] } });
+    const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
+    expect(screen.queryByRole("heading", { name: "Finish setup" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Next step" })).not.toBeInTheDocument();
+    const links = within(band).getAllByRole("link").slice(1); // [0] = "All jobs"
+    expect(links.map((l) => l.getAttribute("href"))).toEqual(["/jobs/j1", "/jobs/j2"]);
+    expect(within(band).getByText("7/10 skills · missing: Go, Kubernetes, +1")).toBeInTheDocument();
+    expect(within(band).getByText("Match pending")).toBeInTheDocument();
+    expect(within(band).getByText("88")).toBeInTheDocument();
+  });
+
+  it("Top picks empty state links to the Jobs page", async () => {
+    setup({ "GET /api/readiness": ready });
+    const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
+    expect(within(band).getByText("No new picks right now")).toBeInTheDocument();
+    expect(within(band).getByRole("link", { name: "Browse all jobs" })).toHaveAttribute("href", "/jobs");
   });
 
   it("shows loading placeholders before data arrives", () => {

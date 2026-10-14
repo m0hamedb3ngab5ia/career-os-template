@@ -16,7 +16,6 @@ import { groupAnswers } from "./answerLabels";
 import styles from "./Profile.module.css";
 import { ReadinessSummary } from "./ReadinessCard";
 import { MasterSyncPanel, ResumeFeedback } from "./ResumePanels";
-import { JustReadyNextStep } from "../today/NextStepCard";
 
 /** Loading / error (with Try again) / empty states shared by every section. */
 export function Loaded<T>({ q, empty, children }: { q: { data?: T; isPending: boolean; isError: boolean; error: unknown; refetch: () => unknown }; empty: (d: T) => boolean; children: (d: T) => ReactNode }) {
@@ -149,7 +148,6 @@ export function ProfilePage() {
     <Page title="Profile" subtitle="Information CareerOS uses when applying for jobs.">
       {failed ? <p role="alert" className={styles.banner}>{errorText(failed.error)}</p> : null}
       <div className={styles.col}>
-        <JustReadyNextStep />
         <ReadinessSummary />
         <Section id="resumes" title="Résumés" intro="Source of truth for tailored résumés." aside={<FilePick primary label="Add résumé" accept=".pdf,.docx" pending={addResume.isPending} onFiles={(f) => f[0] && addResume.mutate(f[0])} />}>
           <Loaded q={resumes} empty={(d) => !d.resumes.length}>
