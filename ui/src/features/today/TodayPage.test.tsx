@@ -86,6 +86,39 @@ describe("TodayPage", () => {
     expect(within(band).getByText("88")).toBeInTheDocument();
   });
 
+  const pstate = (over = {}) => ({ stage: "scored", next_action: "start", next_kind: "prepare", active_run_id: null, failures: null, ...over });
+  const picksSetup = (routes: Routes = {}) =>
+    setup({ "GET /api/readiness": ready, "GET /api/today": { ...today, top_picks: [pick("j1")] }, "GET /api/jobs/j1/pipeline": pstate(), ...routes });
+
+  it("Prepare starts one prepare run for that job; card shows Preparing… (E2E-015-02)", async () => {
+    const { calls } = picksSetup({ "POST /api/jobs/j1/pipeline": { run_id: "r1", kind: "prepare" } });
+    await userEvent.click(await screen.findByRole("button", { name: /^Prepare/ }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    const posts = calls.filter((c) => c.method === "POST");
+    expect(posts.map((c) => c.path)).toEqual(["/api/jobs/j1/pipeline"]);
+    expect(posts[0]!.body).toMatchObject({ action: "start" });
+    expect(screen.queryByRole("button", { name: /^Prepare/ })).not.toBeInTheDocument();
+  });
+
+  it("Skip then Undo brings the card back with the status unchanged (E2E-015-03)", async () => {
+    const { calls } = picksSetup({ "POST /api/jobs/j1/status": { status: "skipped", previous: "scored" } });
+    await userEvent.click(await screen.findByRole("button", { name: /^Skip/ }));
+    expect(screen.queryByText("Role j1")).not.toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: "Undo" }));
+    expect(await screen.findByRole("button", { name: /^Prepare/ })).toBeInTheDocument();
+    const posts = calls.filter((c) => c.path === "/api/jobs/j1/status").map((c) => c.body);
+    expect(posts).toEqual([{ status: "skipped" }, { status: "scored" }]);
+  });
+
+  it("failed prepare shows the cause and Retry starts a new run (E2E-015-04)", async () => {
+    const failures = { kind: "prepare", count: 1, max_attempts: 3, last_outcome: "timeout", last_detail: "Claude timed out", last_run: "r0", excluded: false };
+    const { calls } = picksSetup({ "GET /api/jobs/j1/pipeline": pstate({ failures }), "POST /api/jobs/j1/pipeline": { run_id: "r2", kind: "prepare" } });
+    expect(await screen.findByText(/Claude timed out/)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Retry" }));
+    expect(await screen.findByText("Preparing…")).toBeInTheDocument();
+    expect(calls.filter((c) => c.method === "POST").map((c) => c.path)).toEqual(["/api/jobs/j1/pipeline"]);
+  });
+
   it("Top picks empty state links to the Jobs page", async () => {
     setup({ "GET /api/readiness": ready });
     const band = (await screen.findByRole("heading", { name: "Top picks" })).closest("section")!;
