@@ -1159,7 +1159,7 @@ tasks:
     - UC-014
     - UC-016
   TASK-038:
-    status: todo
+    status: done
     requirements:
     - REQ-133
     use_cases:

@@ -520,14 +520,15 @@ def test_selected_and_injection_flags_are_indexed(data):
     ix.close()
 
 
-def test_prescore_backfilled_for_every_job_and_stored_value_wins(idx, data):
+def test_prescore_backfilled_for_every_job_and_recomputed_over_stale_stored(idx, data):
     """REQ-133: jobs scouted before TASK-038 have no stored prescore; the index computes it (no Claude call)."""
     jobs = _jobs(idx)
     assert all(isinstance(r["prescore"], int) and 0 <= r["prescore"] <= 100 for r in jobs.values())
     jid = data["jobs"]["found"]
     p = data["settings"].paths["jobs_dir"] / jid / "posting.json"
     posting = json.loads(p.read_text())
-    posting.setdefault("raw", {})["prescore"] = 42
+    want = _jobs(idx)[jid]["prescore"]
+    posting.setdefault("raw", {})["prescore"] = 42 if want != 42 else 43  # stale scout-time value
     p.write_text(json.dumps(posting))
     idx.update_jobs([jid])
-    assert _jobs(idx)[jid]["prescore"] == 42
+    assert _jobs(idx)[jid]["prescore"] == want

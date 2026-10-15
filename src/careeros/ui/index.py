@@ -339,11 +339,9 @@ class Index:
         return changed
 
     def _prescore(self, posting: dict[str, Any]) -> int | None:
-        """Stored scout-time prescore, else computed here: the backfill for jobs scouted before REQ-133 (pure,
-        no file write, no Claude call; the schema bump to 7 re-indexes every job once)."""
+        """Always recomputed against current master skills (REQ-133: changes when skills change); pure, no file
+        write, no Claude call. Also the backfill: the schema bump to 7 re-indexes every job once."""
         raw = posting.get("raw") if isinstance(posting.get("raw"), dict) else {}
-        if isinstance(raw.get("prescore"), int) and not isinstance(raw["prescore"], bool):
-            return raw["prescore"]
         from careeros.match import prescore_for
 
         return prescore_for(self.settings, {**posting, "raw": raw}) if posting else None

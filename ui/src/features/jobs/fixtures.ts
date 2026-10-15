@@ -32,6 +32,7 @@ export function job(over: Partial<JobListItem> & { job_id: string }): JobListIte
     company: "Northwind Labs",
     selected: 1,
     injection: null,
+    prescore: null,
     title: "Software Engineer",
     location: "Springfield",
     ats: "greenhouse",
