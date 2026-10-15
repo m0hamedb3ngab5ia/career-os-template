@@ -27,3 +27,14 @@ def test_run_prepare_job_still_ticks_E2E_017_04(root, home, fake_bin):
     store.set_selected(ids, False)
     cli(root, env_for(root, home, fake_bin), "run", "prepare", "--job", ids[0])
     assert store.is_selected(ids[0])
+
+
+@pytest.mark.parametrize("kind", ["prepare", "apply"])
+def test_run_prepare_apply_reject_repeated_job_E2E_017_04(root, home, fake_bin, kind):
+    ids = add_jobs(root, 2)
+    store = Store(Settings.load(root))
+    store.set_selected(ids, False)
+    r = cli(root, env_for(root, home, fake_bin), "run", kind, "--job", ids[0], "--job", ids[1])
+    assert r.returncode == 2
+    assert "takes one job id" in r.stderr
+    assert not store.is_selected(ids[0]) and not store.is_selected(ids[1])
