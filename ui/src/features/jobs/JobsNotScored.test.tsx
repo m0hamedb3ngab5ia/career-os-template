@@ -17,7 +17,7 @@ const TABS = { tabs: [
   { key: "recommended", label: "Recommended", count: 42 }, { key: "notscored", label: "Not scored", count: 3 },
   { key: "saved", label: "Saved", count: 3 }, { key: "applied", label: "Applied", count: 2 }] };
 
-function setup(rows = ROWS, extra: Record<string, unknown> = {}) {
+function setup(rows = ROWS, extra: Record<string, unknown> = {}, path = "/jobs?tab=notscored") {
   const api = mockApi({
     "GET /api/status": {}, "GET /api/meta": META,
     "GET /api/jobs": () => ({ items: rows, total: rows.length, next_cursor: null }),
@@ -27,7 +27,7 @@ function setup(rows = ROWS, extra: Record<string, unknown> = {}) {
     "GET /api/settings/runs": { values: { "scoring.min_prescore": 20, "scoring.stale_days": 21 } },
     ...extra,
   });
-  return { api, ...renderApp("/jobs?tab=notscored") };
+  return { api, ...renderApp(path) };
 }
 
 beforeEach(() => vi.stubGlobal("scrollTo", vi.fn()));
@@ -129,6 +129,14 @@ describe("Jobs › Not scored (REQ-136, E2E-017-05)", () => {
 
   it("empty state says every job is scored", async () => {
     setup([]);
+    expect(await screen.findByText("Every job is scored")).toBeInTheDocument();
+  });
+
+  it("empty state with column filters says filters hide jobs, not that every job is scored", async () => {
+    setup([], {}, "/jobs?tab=notscored&f.company=Acme");
+    expect(await screen.findByText("No jobs match these filters")).toBeInTheDocument();
+    expect(screen.queryByText("Every job is scored")).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Clear filters" }));
     expect(await screen.findByText("Every job is scored")).toBeInTheDocument();
   });
 

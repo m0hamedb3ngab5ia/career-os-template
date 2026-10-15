@@ -308,6 +308,17 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       >
         Try a company, role or location, or another tab.
       </EmptyState>
+    ) : Object.values(filters).some(Boolean) ? (
+      <EmptyState
+        title="No jobs match these filters"
+        action={
+          <Button size="small" onClick={() => update({ filters: {} }, true)}>
+            Clear filters
+          </Button>
+        }
+      >
+        Filters from another tab still apply here.
+      </EmptyState>
     ) : (
       <EmptyState
         title={tab === "notscored" ? "Every job is scored" : "No jobs here yet"}
