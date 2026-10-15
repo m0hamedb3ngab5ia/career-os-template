@@ -293,10 +293,6 @@ export interface paths {
     /** Meta */
     get: operations["meta_api_meta_get"];
   };
-  "/api/pipeline": {
-    /** Board */
-    get: operations["board_api_pipeline_get"];
-  };
   "/api/profile/answers": {
     /** List Answers */
     get: operations["list_answers_api_profile_answers_get"];
@@ -636,20 +632,6 @@ export interface components {
       /** Soon */
       soon: number;
     };
-    /** ActionHint */
-    ActionHint: {
-      /** Due */
-      due: string | null;
-      /** Due Reason */
-      due_reason: string | null;
-      /**
-       * Kind
-       * @constant
-       */
-      kind: "action";
-      /** Type */
-      type: string;
-    };
     /**
      * ActionItem
      * @description One Action Item as /api/actions and Today's "Needs you" list return it (the OpenAPI shape).
@@ -980,23 +962,6 @@ export interface components {
       /** Why */
       why: string;
     };
-    /** Board */
-    Board: {
-      /** Applications */
-      applications: components["schemas"]["Card"][];
-      closed: components["schemas"]["Closed"];
-      /** Funnel */
-      funnel: components["schemas"]["FunnelStage"][];
-      options: components["schemas"]["BoardOptions"];
-      submitted: components["schemas"]["Submitted"];
-    };
-    /** BoardOptions */
-    BoardOptions: {
-      /** Categories */
-      categories: string[];
-      /** Locations */
-      locations: components["schemas"]["LocationOption"][];
-    };
     /** Body_open_application_api_jobs__job_id__application_open_post */
     Body_open_application_api_jobs__job_id__application_open_post: {
       /**
@@ -1009,39 +974,6 @@ export interface components {
     CancelBody: {
       /** Run Id */
       run_id?: string | null;
-    };
-    /** Card */
-    Card: {
-      /** Category */
-      category: string | null;
-      /** Company */
-      company: string | null;
-      /** Fit */
-      fit: number | null;
-      /** Found At */
-      found_at: string | null;
-      /** Hint */
-      hint: components["schemas"]["ActionHint"] | components["schemas"]["SafetyHint"] | components["schemas"]["NotScoredHint"] | components["schemas"]["TierAHint"] | components["schemas"]["QaFailedHint"] | null;
-      /** Job Id */
-      job_id: string;
-      /** Location */
-      location: string | null;
-      /** Override */
-      override: string | null;
-      /** Qa Passed */
-      qa_passed: boolean | null;
-      /** Qa Score */
-      qa_score: number | null;
-      /** Safety */
-      safety: string | null;
-      /** Status */
-      status: string;
-      /** Tier */
-      tier: string | null;
-      /** Title */
-      title: string | null;
-      /** Updated At */
-      updated_at: string | null;
     };
     /** CatchUp */
     CatchUp: {
@@ -1135,15 +1067,6 @@ export interface components {
        * @default
        */
       note?: string;
-    };
-    /** Closed */
-    Closed: {
-      /** By Status */
-      by_status: {
-        [key: string]: number;
-      };
-      /** Count */
-      count: number;
     };
     /** ClosedCount */
     ClosedCount: {
@@ -1625,13 +1548,6 @@ export interface components {
        */
       reason?: string;
     };
-    /** FunnelStage */
-    FunnelStage: {
-      /** Count */
-      count: number;
-      /** Status */
-      status: string;
-    };
     /** GroupSchema */
     GroupSchema: {
       /** Advanced */
@@ -2057,13 +1973,6 @@ export interface components {
       /** Lessons */
       lessons: components["schemas"]["Lesson"][];
     };
-    /** LocationOption */
-    LocationOption: {
-      /** Count */
-      count: number;
-      /** Value */
-      value: string;
-    };
     /** MarkBody */
     MarkBody: {
       /** Degree */
@@ -2207,14 +2116,6 @@ export interface components {
       tags?: string[];
       /** Text */
       text: string;
-    };
-    /** NotScoredHint */
-    NotScoredHint: {
-      /**
-       * Kind
-       * @constant
-       */
-      kind: "not_scored";
     };
     /** NoteBody */
     NoteBody: {
@@ -2404,14 +2305,6 @@ export interface components {
       type: "master" | "variant" | "other" | "tailored";
       /** Versions */
       versions: components["schemas"]["Version"][];
-    };
-    /** QaFailedHint */
-    QaFailedHint: {
-      /**
-       * Kind
-       * @constant
-       */
-      kind: "qa_failed";
     };
     /** QuietHours */
     QuietHours: {
@@ -2881,16 +2774,6 @@ export interface components {
       /** Recommendations */
       recommendations: components["schemas"]["Recommendation"][];
     };
-    /** SafetyHint */
-    SafetyHint: {
-      /**
-       * Kind
-       * @constant
-       */
-      kind: "safety";
-      /** Text */
-      text: string;
-    };
     /** Sample */
     Sample: {
       /** Name */
@@ -3172,21 +3055,6 @@ export interface components {
       snapshots: components["schemas"]["StorageSnapshot"][];
       /** Total */
       total: number;
-    };
-    /** Submitted */
-    Submitted: {
-      /** Count */
-      count: number;
-      /** Since */
-      since: string;
-    };
-    /** TierAHint */
-    TierAHint: {
-      /**
-       * Kind
-       * @constant
-       */
-      kind: "tier_a";
     };
     /** TileRow */
     TileRow: {
@@ -4943,31 +4811,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Meta"];
-        };
-      };
-    };
-  };
-  /** Board */
-  board_api_pipeline_get: {
-    parameters: {
-      query?: {
-        tier?: string[];
-        category?: string[];
-        safety?: string[];
-        location?: string[];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Board"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };

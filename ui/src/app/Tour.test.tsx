@@ -51,8 +51,9 @@ afterEach(() => vi.unstubAllGlobals());
 
 describe("first-run tour (REQ-121)", () => {
   it("points at main nav items plus Start pipeline, at most 8 steps", () => {
-    expect(TOUR_STEPS.map((s) => s.title)).toEqual(["Today", "Jobs", "Start pipeline", "Pipeline", "Inbox", "Profile", "Settings"]);
-    expect(TOUR_STEPS.find((s) => s.title === "Start pipeline")!.selector).toBe('[data-tour="start-pipeline"]');
+    expect(TOUR_STEPS.map((s) => s.title)).toEqual(["Today", "Jobs", "Start pipeline", "Inbox", "Profile", "Settings"]);
+    expect(TOUR_STEPS.find((s) => s.title === "Start pipeline")!.text).toContain("Jobs › Saved");
+    expect(TOUR_STEPS.some((s) => s.to === "/pipeline")).toBe(false);
     expect(TOUR_STEPS.length).toBeLessThanOrEqual(8);
   });
 
@@ -134,6 +135,6 @@ describe("tour announcements", () => {
       expect(l).toHaveLength(1);
       return l[0]!;
     });
-    expect(live).toHaveTextContent("Step 1 of 7");
+    expect(live).toHaveTextContent("Step 1 of 6");
   });
 });

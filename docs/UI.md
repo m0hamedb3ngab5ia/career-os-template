@@ -343,7 +343,6 @@ TestClient (no network, no browser render).
 |---|---|---|
 | Full reindex (fresh `careeros.db`) | 1.75 s | 30 s |
 | `GET /api/jobs` | 2 ms | 1 s |
-| `GET /api/pipeline` | 3 ms | 1 s |
 | `GET /api/today` | 454 ms | 1 s |
 | `GET /api/contacts` | 55 ms | 1 s |
 | `GET /api/inbox` | 51 ms | 1 s |

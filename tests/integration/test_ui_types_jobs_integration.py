@@ -33,7 +33,6 @@ ENDPOINTS = {
     "job_review": "/api/jobs/{review}",
     "job_interview": "/api/jobs/{interview}",
     "job_applied": "/api/jobs/{applied}",
-    "pipeline": "/api/pipeline",
 }
 
 

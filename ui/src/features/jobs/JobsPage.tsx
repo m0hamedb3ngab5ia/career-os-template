@@ -408,7 +408,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               </>
             ) : null}
           </div>
-          <span data-tour="start-pipeline" hidden={tab !== "saved"}>
+          <span hidden={tab !== "saved"}>
             {nSel > 0 ? (
               <Button ref={startRef} size="small" variant="primary" onClick={() => setReviewing(true)}>
                 Start pipeline

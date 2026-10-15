@@ -44,6 +44,11 @@ afterEach(() => {
 });
 
 describe("AppShell", () => {
+  it("E2E-016-01: /pipeline redirects to the Jobs Applied board", async () => {
+    const { router } = renderAt("/pipeline");
+    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe("/jobs?tab=applied&view=board"));
+  });
+
   it("applies the saved ui.theme to <html>; system follows the OS", async () => {
     const meta = (theme: string) => ({ ui: { theme, undo_seconds: 8, page_size: 50 } });
     const { unmount } = renderAt("/", {}, meta("light"));
@@ -60,7 +65,6 @@ describe("AppShell", () => {
     expect(links).toEqual([
       "Today",
       "Jobs",
-      "Pipeline",
       "Inbox",
       "Profile",
       "Settings",

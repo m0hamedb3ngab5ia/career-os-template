@@ -35,7 +35,7 @@ from typing import Any
 
 REPO = Path(__file__).resolve().parents[1]
 SYNTHETIC_MARKER = ".ui-perf-synthetic"
-SCREENS = ("/api/jobs", "/api/pipeline", "/api/today", "/api/contacts", "/api/inbox", "/api/runs")
+SCREENS = ("/api/jobs", "/api/today", "/api/contacts", "/api/inbox", "/api/runs")
 LIMITS_MS = {"screen": 1000, "reindex": 30_000, "burst": 5000}
 FLOW = ["found", "scored", "queued", "prepared", "needs_review", "applied", "screening", "interview"]
 # status -> weight: most jobs sit early in the funnel, a long tail reaches interviews
