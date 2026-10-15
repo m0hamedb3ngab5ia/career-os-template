@@ -451,14 +451,6 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
                                            "`careeros run` reads the live event stream and its final result event"))
         else:
             out.append(Check(PASS, "runs", f"runs config ok (preset {cfg.preset}); headless: {' '.join(cmd[:2])} ..."))
-    try:
-        sched = load_schedule(p)
-    except ConfigError as e:
-        out.append(Check(FAIL, "schedule", str(e)))
-    else:
-        on = [k for k, j in sched.jobs.items() if j.enabled]
-        out.append(Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} "
-                                           "(install: careeros schedule install)"))
     from careeros.runs.scoring import load_scoring_config
 
     try:
@@ -468,6 +460,14 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
     else:
         out.append(Check(PASS, "scoring", f"scoring ok: {sc['per_scan']} per run, {sc['per_day']} per day, "
                                           f"stale after {sc['stale_days']} d, quick match >= {sc['min_prescore']}"))
+    try:
+        sched = load_schedule(p)
+    except ConfigError as e:
+        out.append(Check(FAIL, "schedule", str(e)))
+    else:
+        on = [k for k, j in sched.jobs.items() if j.enabled]
+        out.append(Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} "
+                                           "(install: careeros schedule install)"))
     from careeros.runs.advisor import load_advisor_config
 
     try:

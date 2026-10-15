@@ -107,7 +107,11 @@
     },
     "pipeline:schedule.scout_quiet_hours": false,
     "pipeline:schedule.tick_minutes": 15,
-    "pipeline:schedule.timezone": "local"
+    "pipeline:schedule.timezone": "local",
+    "pipeline:scoring.min_prescore": 20,
+    "pipeline:scoring.per_day": 300,
+    "pipeline:scoring.per_scan": 150,
+    "pipeline:scoring.stale_days": 21
   },
   "files": {
     "pipeline": "config/pipeline.yaml"
@@ -611,6 +615,102 @@
           }
         ],
         "title": "Ranking"
+      },
+      {
+        "advanced": false,
+        "help": "Auto-scoring takes the best quick matches first, fresh before older postings. Score now ignores these.",
+        "id": "<id>",
+        "items": [
+          {
+            "control": "number",
+            "default": 150,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "scoring.per_scan",
+            "label": "Jobs per score run",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "jobs"
+          },
+          {
+            "control": "number",
+            "default": 300,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "scoring.per_day",
+            "label": "Score attempts per day",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "jobs"
+          },
+          {
+            "control": "number",
+            "default": 21,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "scoring.stale_days",
+            "label": "Older posting after",
+            "locked": false,
+            "max": null,
+            "min": 1,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": "days"
+          },
+          {
+            "control": "number",
+            "default": 20,
+            "file": "pipeline",
+            "help": "",
+            "id": "<id>",
+            "integer": true,
+            "key": "scoring.min_prescore",
+            "label": "Lowest quick match to auto-score",
+            "locked": false,
+            "max": 100,
+            "min": 0,
+            "note": "",
+            "nullable": false,
+            "options": [],
+            "personal": false,
+            "readonly": false,
+            "recommended": true,
+            "step": null,
+            "strict_options": true,
+            "unit": ""
+          }
+        ],
+        "title": "Scoring budget"
       },
       {
         "advanced": true,
@@ -1355,7 +1455,11 @@
     },
     "pipeline:schedule.scout_quiet_hours": false,
     "pipeline:schedule.tick_minutes": 15,
-    "pipeline:schedule.timezone": "local"
+    "pipeline:schedule.timezone": "local",
+    "pipeline:scoring.min_prescore": 20,
+    "pipeline:scoring.per_day": 300,
+    "pipeline:scoring.per_scan": 150,
+    "pipeline:scoring.stale_days": 21
   },
   "version": "<version>",
   "warnings": {}

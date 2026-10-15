@@ -15,6 +15,7 @@ from careeros.doctor import KNOWN_ATS
 from careeros.config import ATS_WITH_SLUG, ConfigError
 from careeros.runs import advisor, policy, schedule
 from careeros.runs import config as runs_cfg
+from careeros.runs.scoring import DEFAULT_SCORING
 from careeros.safety import ghost
 from careeros.ui import config as ui_cfg
 from careeros.ui.settings_schema.model import Field, Group, Policy, Section
@@ -141,6 +142,7 @@ def _personal(file: str, key: str, control: str, label: str, help: str = "", **k
 
 
 R = runs_cfg.DEFAULT_RANKING
+SC = DEFAULT_SCORING
 TO = runs_cfg.DEFAULT_TIMEOUTS
 G = ghost.DEFAULTS
 RET = retention.DEFAULTS
@@ -430,6 +432,13 @@ SECTIONS: tuple[Section, ...] = (
             _num(P, "runs.ranking.retry_bonus", "Retry bonus", R["retry_bonus"], hi=100, control="slider",
                  unit="points"),
         ), help="Which jobs go first. No Claude involved.", advanced=True),
+        Group("scoring", "Scoring budget", (
+            _num(P, "scoring.per_scan", "Jobs per score run", SC["per_scan"], lo=1, unit="jobs"),
+            _num(P, "scoring.per_day", "Score attempts per day", SC["per_day"], lo=1, unit="jobs"),
+            _num(P, "scoring.stale_days", "Older posting after", SC["stale_days"], lo=1, unit="days"),
+            _num(P, "scoring.min_prescore", "Lowest quick match to auto-score", SC["min_prescore"], hi=100),
+        ), help="Auto-scoring takes the best quick matches first, fresh before older postings. "
+                "Score now ignores these."),
         Group("retry", "Retry", (
             _num(P, "runs.retry.max_attempts", "Attempts per job", policy.DEFAULT_RETRY["max_attempts"], lo=1,
                  help="2 = retry once."),

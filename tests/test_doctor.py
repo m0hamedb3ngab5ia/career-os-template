@@ -560,7 +560,7 @@ def test_check_runs_passes_on_the_example_pipeline():
 
     cfg = yaml.safe_load((EXAMPLE_REPO / "config" / "pipeline.yaml").read_text())
     checks = check_runs(cfg)
-    assert [(c.level, c.name) for c in checks] == [(PASS, "runs"), (PASS, "schedule")]
+    assert [(c.level, c.name) for c in checks] == [(PASS, "runs"), (PASS, "scoring"), (PASS, "schedule")]
 
 
 def test_check_runs_fails_on_old_cron_schedule():
