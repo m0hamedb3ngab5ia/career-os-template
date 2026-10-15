@@ -550,3 +550,20 @@ def test_prescore_follows_master_skills_edit_without_reindex(idx, data):
     idx.sync()
     after = _jobs(idx)[jid]["prescore"]
     assert after != before and after >= 50
+
+
+def test_skills_edit_reindexes_other_jobs_on_partial_update(idx, data):
+    """REQ-133: a skills change seen by a partial update_jobs (watcher) still refreshes every job's prescore."""
+    import yaml
+
+    s = data["settings"]
+    a, b = data["jobs"]["found"], data["jobs"]["review"]
+    idx.sync()
+    before = _jobs(idx)[b]["prescore"]
+    posting = json.loads((s.paths["jobs_dir"] / b / "posting.json").read_text())
+    master = s.paths["profile"]
+    prof = yaml.safe_load(master.read_text())
+    prof["skills"] = {"core": [posting["title"]]}
+    master.write_text(yaml.safe_dump(prof))
+    idx.update_jobs([a])
+    assert _jobs(idx)[b]["prescore"] != before

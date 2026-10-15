@@ -184,11 +184,18 @@ def run_scout(
     signals = load_signals(s)
     summary = ScoutSummary()
 
-    for jid in list(st.iter_job_ids()):  # REQ-133: backfill raw.prescore into stored, unscored jobs (data/ is canonical)
-        old = st.load_posting(jid)
-        if old and "prescore" not in old.raw and not (st.job_dir(jid) / "score.json").exists():
-            old.raw["prescore"] = prescore_for(s, old.model_dump())
-            st.save_posting(old)
+    for jid in [] if only else list(st.iter_job_ids()):  # REQ-133: backfill raw.prescore (data/ is canonical)
+        try:
+            if (st.job_dir(jid) / "score.json").exists():
+                continue
+            doc = st._read(jid, "posting.json")
+            raw = doc.get("raw") if isinstance(doc, dict) else None
+            if not isinstance(doc, dict) or not isinstance(raw, dict) or "prescore" in raw:
+                continue
+            raw["prescore"] = prescore_for(s, doc)
+            st._write(jid, "posting.json", doc)  # only raw.prescore changes: no model round trip, no re-scan
+        except Exception as e:  # noqa: BLE001 - one bad job must not abort the scout run
+            log(f"[scout] prescore backfill skipped {jid}: {e}")
 
     for board in s.boards:
         company = str(board.get("company", "?"))

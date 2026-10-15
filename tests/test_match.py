@@ -114,3 +114,25 @@ def test_scout_backfills_prescore_into_posting_json_for_unscored_jobs_only(tmp_p
     got = {j: json.loads((st.job_dir(j) / "posting.json").read_text())["raw"] for j in ("old-unscored", "old-scored")}
     assert isinstance(got["old-unscored"]["prescore"], int)
     assert "prescore" not in got["old-scored"]
+
+
+def test_scout_backfill_skips_corrupt_posting_and_still_backfills_valid(tmp_path):
+    """A corrupt posting.json must not abort scout (REQ-133 backfill is best-effort per job)."""
+    from conftest import make_temp_root
+
+    from careeros.config import Settings
+    from careeros.models import Posting
+    from careeros.scout import run_scout
+    from careeros.store import Store
+
+    s = Settings.load(make_temp_root(tmp_path / "repo"))
+    st = Store(s)
+    for jid in ("a-bad", "b-good"):
+        st.save_posting(Posting(job_id=jid, company="Acme", title="Engineer", location="Remote", ats="greenhouse",
+                                url="https://x/" + jid, description_text="python sql", raw={}))
+    (st.job_dir("a-bad") / "posting.json").write_text("{not json")
+    s.companies["boards"] = []
+    logs: list[str] = []
+    run_scout(s, st, log=logs.append)
+    assert isinstance(json.loads((st.job_dir("b-good") / "posting.json").read_text())["raw"]["prescore"], int)
+    assert any("a-bad" in m for m in logs)

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -321,6 +322,8 @@ class Index:
         changed = []
         with self._lock:
             force = self._skills_changed()
+            if force:  # partial callers (watcher, reindex) pass a few ids; every job's prescore is stale
+                job_ids = list(dict.fromkeys([*job_ids, *self._job_ids()]))
             for jid in job_ids:
                 if not jid or _is_finder_copy(jid) or "/" in jid or jid.startswith((".", "_")):
                     continue
@@ -348,7 +351,8 @@ class Index:
 
         try:
             profile = _load_yaml(self.settings.paths["profile"])
-        except Exception:  # noqa: BLE001 - unreadable master: keep the settings we have
+        except Exception as e:  # noqa: BLE001 - unreadable master: keep the settings we have
+            logging.getLogger(__name__).warning("prescore skills check skipped, master unreadable: %s", e)
             return False
         h = hashlib.sha1(json.dumps(profile.get("skills") or {}, sort_keys=True, default=str).encode()).hexdigest()
         if h == self.get_meta("prescore_skills_hash"):
