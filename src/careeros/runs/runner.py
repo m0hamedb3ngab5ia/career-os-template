@@ -499,6 +499,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 echo: Callable[[str], None] = lambda s: None, retry_ids: set[str] | None = None,
                 skip_ids: dict[str, str] | None = None,
                 extra_stop: Callable[[], tuple[str, str] | None] | None = None,
+                run_fields: dict[str, Any] | None = None,
                 after_attempt: Callable[[dict[str, Any]], None] | None = None,
                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,
                 finalize: Callable[[dict[str, Any]], None] | None = None,
@@ -537,7 +538,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
     except locks.LockBusy as e:
         raise RunBusy(e.holder) from None
     try:
-        run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False,
+        run = rs.new_run(kind, trigger, budget.to_dict(), t_now, run_id=rid, dry_run=False, **(run_fields or {}),
                          cmd=build_command(cfg, f"/{SKILLS[kind]} <job_dir>", kind=kind),
                          counters={"candidates": len(ranked), "attempted": 0, "ok": 0, "failed": 0, "locked": 0,
                                    "gated": 0},
