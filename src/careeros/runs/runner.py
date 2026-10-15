@@ -252,6 +252,7 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
     retry_ids, skip_ids = retry_ids or set(), skip_ids or {}
     cands: list[Candidate] = []
     excluded: list[dict[str, Any]] = []
+    meta: dict[str, tuple[int | None, datetime | None]] = {}  # REQ-134: (prescore, posted_at) for the score queue
     for r in records:
         jid, status, score = r.job_id, r.status, r.score
         if not r.exists:
@@ -280,15 +281,23 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
             excluded.append({"job_id": jid, "reason": skip_ids[jid]})
             continue
         fit = score.get("fit")
+        qm = (p.raw or {}).get("prescore")
+        posted_at = _parse_dt(p.first_published or p.posted_at or p.fetched_at)
+        meta[jid] = (qm if isinstance(qm, int) and not isinstance(qm, bool) else None, posted_at)
         cands.append(Candidate(
             job_id=jid, company=p.company, title=p.title, status=status,
-            posted_at=_parse_dt(p.first_published or p.posted_at or p.fetched_at),
+            posted_at=posted_at,
             closes_at=posting_closes_at(p), dream=settings.is_dream(p.company),
             fit=int(fit) if isinstance(fit, (int, float)) and not isinstance(fit, bool) else None,
             retry=jid in retry_ids))
     ranked = rank(cands, cfg.ranking, now, stage=kind)
     if kind == "prepare":
         ranked = fit_first_within_company(ranked)
+    if kind == "score" and not explicit:  # REQ-134; `--job` / Score now ignore order and cutoff
+        from careeros.runs.scoring import DEFAULT_SCORING, order_queue
+
+        ranked, below = order_queue(ranked, meta, now, cfg.scoring or DEFAULT_SCORING)
+        excluded += below
     return ranked, excluded
 
 

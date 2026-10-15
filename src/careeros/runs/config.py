@@ -107,6 +107,7 @@ class RunsConfig:
     headless_cmd: list[str] = field(default_factory=lambda: list(DEFAULT_HEADLESS_CMD))
     allowed_tools: list[str] = field(default_factory=lambda: list(DEFAULT_ALLOWED_TOOLS))
     model: str | None = None
+    scoring: dict[str, int] = field(default_factory=dict)  # pipeline.yaml: scoring (runs/scoring.py, REQ-134/135)
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -229,6 +230,9 @@ def load_runs_config(settings: Any) -> RunsConfig:
         raise _err("llm.model_hint must be a model name or null")
     cfg.model = model or None
     from careeros.runs.policy import AutoSubmitPolicy, load_prepare_config, load_retry_config
+    from careeros.runs.scoring import load_scoring_config
+
+    cfg.scoring = load_scoring_config(pipeline.get("scoring"))
 
     load_retry_config(raw)
     load_prepare_config(raw)

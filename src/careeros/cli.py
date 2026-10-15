@@ -1309,6 +1309,9 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
         b = rec["budget"]
         print(f"dry run: {kind} would take {len(rec['selected'])} of {rec['candidates']} candidate(s) "
               f"(preset {b['preset']}: max {b['max_jobs']} jobs, {b['max_minutes']:g} min)")
+        if rec.get("scoring"):
+            from careeros.runs.scoring import dry_run_line
+            print(dry_run_line(rec["scoring"]))  # REQ-135: queue size, cap left, ETA
         _print_queue(rec["selected"], len(rec["selected"]))
         if rec["excluded"]:
             print(f"excluded: " + ", ".join(f"{e['job_id']} ({e['reason']})" for e in rec["excluded"][:10]))

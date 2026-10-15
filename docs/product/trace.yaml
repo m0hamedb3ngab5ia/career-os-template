@@ -1165,7 +1165,7 @@ tasks:
     use_cases:
     - UC-017
   TASK-039:
-    status: todo
+    status: done
     requirements:
     - REQ-134
     - REQ-135
