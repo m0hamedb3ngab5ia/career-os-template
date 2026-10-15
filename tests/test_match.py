@@ -56,3 +56,32 @@ def test_unscored_job_gives_no_score_and_a_hint(tmp_path, score_json):  # PR #13
     out = match.matches(Settings(root=tmp_path), jd)
     assert out["scored"] is False and out["best"] is None and out["resumes"] == []
     assert "careeros run score --job j1" in out["hint"]
+
+
+# --- keyword pre-score (REQ-133, TASK-038; DEC-023) -------------------------------------------------------
+def test_accept_133_prescore_six_of_ten_master_skills():
+    text = "We use Python, Go, Kafka, AWS, Docker and Redis every day."
+    assert match.prescore(text, REQ, []) == 60
+    assert match.prescore(text, REQ, []) == match.prescore(text, REQ, [])  # deterministic
+
+
+def test_prescore_adds_category_title_keywords():
+    text = "Backend Engineer. We use Python, Go, Kafka, AWS, Docker and Redis."
+    assert match.prescore(text, REQ, ["backend engineer", "sde"]) == 68  # 0.8*0.6 + 0.2*1
+    assert match.prescore("Nothing relevant here.", REQ, ["backend engineer"]) == 0
+    assert match.prescore("Backend engineer", [], ["backend engineer"]) == 100  # no master skills: keywords only
+    assert match.prescore("anything", [], []) == 0
+
+
+def test_prescore_for_uses_master_skill_groups_category_and_synonyms():
+    from types import SimpleNamespace
+
+    s = SimpleNamespace(
+        profile={"skills": {"programming": ["Python", "Go"], "tools": ["Kafka", "Docker"]}},
+        pipeline={"match": {"synonyms": {"Go": ["Golang"]}}},
+        title_keywords=lambda: {"swe_backend": ["backend engineer"], "data": ["data engineer"]})
+    posting = {"title": "Backend Engineer", "description_text": "Golang and Python services.",
+               "raw": {"prefilter_category": "swe_backend"}}
+    assert match.prescore_for(s, posting) == 60  # 0.8*2/4 + 0.2*1
+    assert match.prescore_for(s, {**posting, "raw": {"prefilter_category": "data"}}) == 40
+    assert match.prescore_for(s, {**posting, "raw": {}}) == 50  # category unknown: skills only

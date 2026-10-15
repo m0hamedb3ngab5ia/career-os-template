@@ -5,6 +5,7 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from careeros.config import ConfigError, Settings, get_settings
+from careeros.match import prescore_for
 from careeros.models import Posting
 from careeros.safety import registry
 from careeros.safety.ghost import check_ghost, history_key, load_signals
@@ -246,6 +247,7 @@ def run_scout(
                     res.filtered_ghost += 1
                     continue
             p.raw["prefilter_category"] = cat
+            p.raw["prescore"] = prescore_for(s, p.model_dump())  # REQ-133: keyword pre-score, no Claude call
             st.save_posting(p)
             st.append_log(p.job_id, f"found via {ats}/{slug}; prefilter category={cat}", component="scout")
             res.stored += 1
