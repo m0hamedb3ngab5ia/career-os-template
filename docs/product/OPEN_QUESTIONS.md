@@ -186,6 +186,12 @@
 - Answer (2026-10-13, user): Recommended as written: drop it.
 - Status: answered
 
+### Q-030 What counts as "Needs you" (REQ-132 amber)
+- Links: REQ-132, REQ-128
+- Context: amber = needs you, but which jobs qualify is unspecified.
+- Answer (2026-10-14, user): both: job waiting for the user's review (prepared / filled, not yet submitted) OR job with an open Action Item.
+- Status: answered
+
 ### Q-031 Scoring budget for a large job backlog
 - Links: REQ-104, REQ-128, DEC-022
 - Context: LLM scoring costs one headless Claude call per job (~50 s, plan quota). A 750-job backlog took ~10 h. Recommended shows only scored jobs, so unscored jobs are invisible until scored.
