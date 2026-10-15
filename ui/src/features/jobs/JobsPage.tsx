@@ -192,19 +192,11 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
     );
   // REQ-137 Score now / Score selected: one score run for exactly these jobs; failure keeps the buttons live and offers Retry.
   const scorer = useScoreJobs();
-  const [scoring, setScoring] = useState<Set<string>>(new Set());
-  const [scoreFail, setScoreFail] = useState<{ ids: string[]; message: string } | null>(null);
-  const scoreJobs = (ids: string[]) => {
-    setScoreFail(null);
-    setScoring((s) => new Set([...s, ...ids]));
-    scorer.mutate(ids, {
+  const { scoring, failure: scoreFail } = scorer;
+  const scoreJobs = (ids: string[]) =>
+    scorer.score(ids, {
       onSuccess: () => toast.show({ message: `Scoring ${formatCount(ids.length)} ${ids.length === 1 ? "job" : "jobs"}. Progress is in Runs.` }),
-      onError: (e) => {
-        setScoring((s) => new Set([...s].filter((x) => !ids.includes(x))));
-        setScoreFail({ ids, message: errorText(e) });
-      },
     });
-  };
   const captionId = useId();
   const panelId = useId();
 

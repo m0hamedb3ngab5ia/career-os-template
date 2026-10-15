@@ -1,6 +1,9 @@
-import { keepPreviousData, useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useEffect } from "react";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
 import type { JobFacets, JobListItem, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync, ViewKey } from "./types";
+import { runKeys } from "../runs/api";
+import type { RunDetail } from "../runs/types";
 import { FILTERS, type FilterField, type Filters } from "./urlState";
 
 export interface FilterParams {
@@ -164,13 +167,52 @@ export function useSelectJobs() {
   });
 }
 
-/** REQ-137 Score now: one score run over exactly these jobs; never ticks them. */
+export interface ScoreFailure { ids: string[]; message: string }
+interface ScoreState { runs: { runId: string; ids: string[] }[]; starting: string[]; failure: ScoreFailure | null }
+const SCORE_KEY = ["scoreJobs"];
+const NO_SCORE: ScoreState = { runs: [], starting: [], failure: null };
+
+/** REQ-137 Score now: one score run over exactly these jobs; never ticks them. Owns the "Scoring…" state: a job
+ * stays scoring until its run ends (polled, like useStepRun), then the list refreshes; a job the run did not score
+ * (start refused, run failed or gone) comes back in `failure` so the caller can offer Retry. State lives in the
+ * query cache, so leaving the page keeps watching. */
 export function useScoreJobs() {
   const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (ids: string[]) => apiSend<{ run_id: string; kind: string }>("POST", "/api/jobs/score", { job_ids: ids }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  const state = useQuery({ queryKey: SCORE_KEY, queryFn: () => NO_SCORE, enabled: false, initialData: NO_SCORE,
+    staleTime: Infinity, gcTime: Infinity }).data;
+  const edit = (f: (s: ScoreState) => ScoreState) => qc.setQueryData<ScoreState>(SCORE_KEY, (s) => f(s ?? NO_SCORE));
+  const polls = useQueries({
+    queries: state.runs.map((r) => ({
+      queryKey: runKeys.detail(r.runId),
+      queryFn: () => apiFetch<RunDetail>(`/api/runs/${encodeURIComponent(r.runId)}`),
+      refetchInterval: 1000,
+      retry: 3,
+    })),
   });
+  useEffect(() => {
+    state.runs.forEach((r, i) => {
+      const p = polls[i];
+      const run = p?.data;
+      if (!p || (!p.isError && (!run || run.state === "running"))) return;
+      const ok = new Set((run?.attempts ?? []).filter((a) => a.outcome === "ok").map((a) => a.job_id));
+      const failed = r.ids.filter((id) => !ok.has(id));
+      const why = run?.attempts.find((a) => failed.includes(a.job_id ?? "") && a.detail)?.detail || run?.detail
+        || (p.error instanceof Error ? p.error.message : "") || `Scoring stopped${run?.stop_reason ? ` (${run.stop_reason})` : ""}`;
+      edit((s) => ({ ...s, runs: s.runs.filter((x) => x.runId !== r.runId),
+        failure: failed.length ? { ids: failed, message: why } : s.failure }));
+      void qc.invalidateQueries({ queryKey: ["jobs"] });
+    });
+  });
+  const start = useMutation({
+    mutationFn: (ids: string[]) => apiSend<{ run_id: string; kind: string }>("POST", "/api/jobs/score", { job_ids: ids }),
+    onMutate: (ids) => edit((s) => ({ ...s, failure: null, starting: [...s.starting, ...ids] })),
+    onSuccess: (r, ids) => edit((s) => ({ ...s, starting: s.starting.filter((x) => !ids.includes(x)),
+      runs: [...s.runs, { runId: r.run_id, ids }] })),
+    onError: (e, ids) => edit((s) => ({ ...s, starting: s.starting.filter((x) => !ids.includes(x)),
+      failure: { ids, message: e instanceof Error ? e.message : "Something went wrong" } })),
+  });
+  const scoring = new Set([...state.starting, ...state.runs.flatMap((r) => r.ids)]);
+  return { score: start.mutate, isPending: start.isPending, scoring, failure: state.failure };
 }
 
 export interface UiState {

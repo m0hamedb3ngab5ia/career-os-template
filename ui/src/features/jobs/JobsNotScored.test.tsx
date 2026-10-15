@@ -88,6 +88,25 @@ describe("Jobs › Not scored (REQ-136, E2E-017-05)", () => {
     await waitFor(() => expect(screen.queryByRole("alert")).not.toBeInTheDocument());
   });
 
+  it("a score run that fails after it starts puts the card back to Score now with the error and Retry", async () => {
+    const run = (state: string) => ({ id: "r-score-1", kind: "score", state, status: state, stop_reason: state === "failed" ? "error" : null,
+      detail: state === "failed" ? "RuntimeError: claude crashed" : "", log: "", attempts: [], started_at: daysAgo(0), ended_at: null, trigger: "ui" });
+    let state = "running";
+    const { api } = setup(ROWS, { "GET /api/runs/r-score-1": () => run(state) });
+    const user = userEvent.setup();
+    const card = (await screen.findByRole("link", { name: /Example Corp/ })).closest("li")!;
+    await user.click(within(card).getByRole("button", { name: "Score now" }));
+    expect(await within(card).findByRole("button", { name: "Scoring…" })).toBeDisabled();
+    await waitFor(() => expect(api.callsTo("GET /api/runs/r-score-1").length).toBeGreaterThan(0));
+    const listCalls = api.callsTo("GET /api/jobs").length;
+    state = "failed";
+    expect(await within(card).findByRole("button", { name: "Score now" }, { timeout: 3000 })).toBeEnabled();
+    const alert = await screen.findByRole("alert");
+    expect(alert).toHaveTextContent("RuntimeError: claude crashed");
+    expect(within(alert).getByRole("button", { name: "Retry" })).toBeEnabled();
+    await waitFor(() => expect(api.callsTo("GET /api/jobs").length).toBeGreaterThan(listCalls));
+  });
+
   it("reasons follow scoring.min_prescore / stale_days from Settings (TASK-039 config)", async () => {
     setup(ROWS, { "GET /api/settings/runs": { values: { "scoring.min_prescore": 10, "scoring.stale_days": 60 } } });
     await screen.findByRole("link", { name: /Example Corp/ });
