@@ -68,7 +68,7 @@ def test_jobs_list_filters_and_paging(client):
     assert [j["location"] for j in remote["items"]] == ["Remote"]
     assert client.get("/api/jobs", params={"location": "new york"}).json()["total"] == 7
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"location": "remote"}).json()["tabs"]}
-    assert tabs == {"recommended": 0, "saved": 1, "applied": 0}
+    assert tabs == {"recommended": 0, "notscored": 0, "saved": 1, "applied": 0}
     xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
                        json={"location": "remote", "sort": "-fit", "columns": ["company"]})
     assert xlsx.status_code == 200
@@ -100,7 +100,7 @@ def test_jobs_column_filters_facets_tabs_and_export(client):
     assert loc_facet == {"field": "location", "values": [{"value": "Remote", "count": 1}]}
     assert client.get("/api/jobs/facets", params={"field": "url"}).status_code == 400
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs", params={"fit_min": 85}).json()["tabs"]}
-    assert tabs == {"recommended": 0, "saved": 2, "applied": 1}
+    assert tabs == {"recommended": 0, "notscored": 0, "saved": 2, "applied": 1}
     xlsx = client.post("/api/jobs/export", headers={"x-careeros": "1"},
                        json={"company": ["Hooli"], "fit_min": 80, "columns": ["company"]})
     assert xlsx.status_code == 200

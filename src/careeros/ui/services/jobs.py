@@ -12,7 +12,7 @@ from typing_extensions import NotRequired, TypedDict
 
 from careeros.store import _is_finder_copy
 
-SORTS = ("fit", "company", "location", "status", "tier", "found_at", "applied_at", "updated_at")
+SORTS = ("fit", "prescore", "company", "location", "status", "tier", "found_at", "applied_at", "updated_at")
 DEFAULT_SORT = "-fit"
 MAX_LIMIT = 1000
 JOB_ID_RE = re.compile(r"^[A-Za-z0-9][A-Za-z0-9_-]{0,63}$")
@@ -156,7 +156,7 @@ def _like(q: str) -> str:
 
 
 # Jobs screen tabs (DEC-022, docs/product/09_ARCHITECTURE.md "Delta 2026-10-13" Buckets): key -> label.
-TABS = (("recommended", "Recommended"), ("saved", "Saved"), ("applied", "Applied"))
+TABS = (("recommended", "Recommended"), ("notscored", "Not scored"), ("saved", "Saved"), ("applied", "Applied"))
 APPLIED_STATUSES = ("applied", "screening", "interview", "offer")
 AFTER_APPLY = (*APPLIED_STATUSES, "rejected", "withdrawn", "ghosted")   # Applied tab, incl. its Closed stage (Q-028)
 # Old tab keys (saved URLs) -> (new tab, extra clause): never a 400. needs_review jobs are prepared, so ticked.
@@ -189,6 +189,9 @@ def _tab_clause(tab: str | None, closed: list[str] | None) -> tuple[str | None, 
     if tab == "recommended":
         out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY}))
         clause, params = f"fit IS NOT NULL AND selected = 0 AND (status IS NULL OR NOT {out})", ex
+    elif tab == "notscored":   # REQ-136: unscored, unticked, not skipped / applied / closed
+        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY}))
+        clause, params = f"fit IS NULL AND selected = 0 AND (status IS NULL OR NOT {out})", ex
     elif tab == "saved":
         out, ex = _in("status", ("skipped", *AFTER_APPLY))
         clause, params = f"selected = 1 AND (status IS NULL OR NOT {out})", ex

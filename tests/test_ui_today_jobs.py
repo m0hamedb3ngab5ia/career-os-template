@@ -87,7 +87,7 @@ def test_response_rate_breakdown(data, idx):
 
 def test_tabs_count_each_view(data, idx):
     tabs = {t["key"]: t for t in jobs_svc.tabs(idx, closed(data))}
-    assert list(tabs) == ["recommended", "saved", "applied"]
+    assert list(tabs) == ["recommended", "notscored", "saved", "applied"]
     assert tabs["recommended"]["count"] == 0        # fixture jobs carry no `selected` flag: all count as ticked
     assert tabs["saved"]["count"] == 4              # ticked, not skipped, not applied-or-later
     assert tabs["applied"]["count"] == 3            # applied + interview + rejected (Closed stage)
