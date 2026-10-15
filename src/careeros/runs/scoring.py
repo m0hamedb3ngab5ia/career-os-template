@@ -1,7 +1,7 @@
 """Auto-scoring queue and budget (DEC-023, REQ-134, REQ-135): `pipeline.yaml: scoring`.
 
 Order: fresh postings before stale ones (older than `stale_days`), then quick match (`raw.prescore`, REQ-133)
-desc, then the run ranking (newest first, dream / deadline bonuses). Jobs below `min_prescore` are not
+desc, then newest posted/found, then the run ranking. Jobs below `min_prescore` are not
 auto-scored; a job with no prescore yet is queued. Caps: `per_scan` jobs per run, `per_day` attempts per local
 day, counted from runs marked `daily_scoring`. `--job` / Score now runs skip all of this."""
 from __future__ import annotations
@@ -41,8 +41,11 @@ def order_queue(ranked: list[dict[str, Any]], meta: dict[str, tuple[int | None, 
                                                            f"{scfg['min_prescore']})"})
         else:
             queue.append(r)
-    queue.sort(key=lambda r: (bool(meta[r["job_id"]][1] and meta[r["job_id"]][1] < stale_at),
-                              -(r["prescore"] if r["prescore"] is not None else -1), r["rank"]))
+    def key(r: dict[str, Any]) -> tuple:
+        posted = meta[r["job_id"]][1]
+        return (bool(posted and posted < stale_at), -(r["prescore"] if r["prescore"] is not None else -1),
+                -posted.timestamp() if posted else 0, r["rank"])  # REQ-134: ties go newest posted/found first
+    queue.sort(key=key)
     for i, r in enumerate(queue, 1):
         r["rank"] = i
     return queue, below

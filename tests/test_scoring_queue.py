@@ -137,3 +137,28 @@ def test_runs_config_without_scoring_block_uses_defaults(settings, store):
     rec = run_batch(settings, "score", budget_for(cfg, "score", max_jobs=5, max_minutes=600), cfg=cfg,
                     invoke=inv, now=lambda: NOW)
     assert len(inv.calls) == 1 and rec["daily_scoring"] is True
+
+
+def test_req_134_equal_quick_match_newest_posting_first_not_rank_bonus():
+    from careeros.runs.scoring import order_queue
+    ranked = [{"job_id": "old-dream", "rank": 1}, {"job_id": "new", "rank": 2}]  # dream bonus put the older one first
+    meta = {"old-dream": (50, NOW - timedelta(days=5)), "new": (50, NOW - timedelta(days=1))}
+    queue, _ = order_queue(ranked, meta, NOW, DEFAULT_SCORING)
+    assert [r["job_id"] for r in queue] == ["new", "old-dream"]
+
+
+class _Boom(BaseException):
+    pass
+
+
+def test_req_135_a_run_that_raises_still_counts_toward_per_day(settings, store):
+    job(store, 1, 80)
+    inner = FakeInvoke(settings)
+
+    def boom(*a, **k):
+        inner(*a, **k)
+        raise _Boom()
+    with pytest.raises(_Boom):
+        score_run(settings, invoke=boom)
+    (saved,) = RunStore(settings).list_runs("score")
+    assert saved.get("daily_scoring") is True

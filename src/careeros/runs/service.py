@@ -210,6 +210,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
                       doctor=doctor, now=now, clock=clock, cancel=cancel, echo=echo,
                       retry_ids=fails.retry_ids(kind, max_attempts), skip_ids=fails.exhausted(kind, max_attempts),
                       extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt,
+                      run_fields={"daily_scoring": True} if daily else None,  # saved even if the run raises
                       finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()),
                       job_ids=job_ids, force=force, run_id=run_id, force_tailor=force_tailor)
     if daily and dry_run:
@@ -221,8 +222,6 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
                           "eta_minutes": None if avg is None else round(take * avg / 60)}
     if not dry_run:
         run["warnings"] = warnings
-        if daily:
-            run["daily_scoring"] = True
         rs = RunStore(settings)
         rs.save_run(run)
         for w in warnings:
