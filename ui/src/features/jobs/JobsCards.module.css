@@ -121,3 +121,26 @@
   font-size: var(--fs-caption);
 }
 .refused { margin: 0; padding: var(--space-2) var(--space-4); color: var(--red); }
+
+.quick {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  min-width: 56px;
+  color: var(--sec);
+  font-size: var(--fs-caption);
+}
+.quickNum {
+  font-size: var(--fs-body, 14px);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  color: var(--label);
+}
+.failure {
+  display: flex;
+  gap: var(--space-3);
+  align-items: center;
+  padding: var(--space-2) var(--space-4);
+  color: var(--red);
+  font-size: var(--fs-caption);
+}

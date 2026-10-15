@@ -13,27 +13,28 @@ import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useJobFacets, useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
+import { useJobFacets, useExportJobs, useSelectJobs, useScoreJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsBoard } from "./JobsBoard";
 import { JobDetailPage } from "../job-detail/JobDetailPage";
-import { JobsList } from "./JobsCards";
+import { JobsList, NotScoredList } from "./JobsCards";
+import cardStyles from "./JobsCards.module.css";
 import { JobsTable } from "./JobsTable";
 import { StartPipeline } from "./StartPipeline";
 import { useStepRun } from "../runs/useStepRun";
 import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
-import { STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
+import { DEFAULT_SORT, STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
 import type { StageKey, TabKey, ViewKey } from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
 const SEARCH_DEBOUNCE_MS = 250;
 
 // Fallback labels until GET /api/jobs/tabs answers (the server's labels win).
-const TAB_LABELS: Record<TabKey, string> = { recommended: "Recommended", saved: "Saved", applied: "Applied" };
+const TAB_LABELS: Record<TabKey, string> = { recommended: "Recommended", notscored: "Not scored", saved: "Saved", applied: "Applied" };
 // Footer noun: "Showing 12 of 59 recommended jobs".
-const TAB_NOUNS: Record<TabKey, string> = { recommended: "recommended jobs", saved: "saved jobs", applied: "applied jobs" };
+const TAB_NOUNS: Record<TabKey, string> = { recommended: "recommended jobs", notscored: "unscored jobs", saved: "saved jobs", applied: "applied jobs" };
 const VIEW_LABELS: Record<ViewKey, string> = { list: "List", table: "Table", board: "Board" };
 
 function errorText(e: unknown): string {
@@ -175,7 +176,9 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
   const stageFacets = useJobFacets("status", { tab, q, location, filters: { ...filters, status: undefined } }, tab === "applied");
   const stageCount = (statuses: string[]) =>
     stageFacets.data ? (stageFacets.data.values ?? []).filter((v) => statuses.includes(String(v.value))).reduce((n, v) => n + v.count, 0) : null;
-  const list = useJobsList({ ...filterParams, sort, limit: pageSize }, !meta.isPending);
+  // Unscored jobs have no fit: best quick match first (REQ-136).
+  const listSort = tab === "notscored" && sort === DEFAULT_SORT ? "-prescore" : sort;
+  const list = useJobsList({ ...filterParams, sort: listSort, limit: pageSize }, !meta.isPending);
   const tabs = useJobsTabs({ tab, q, location, filters });
   const exporter = useExportJobs();
   const pick = useSelectJobs();
@@ -187,6 +190,21 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         onError: (e) => toast.show({ message: errorText(e) }),
       },
     );
+  // REQ-137 Score now / Score selected: one score run for exactly these jobs; failure keeps the buttons live and offers Retry.
+  const scorer = useScoreJobs();
+  const [scoring, setScoring] = useState<Set<string>>(new Set());
+  const [scoreFail, setScoreFail] = useState<{ ids: string[]; message: string } | null>(null);
+  const scoreJobs = (ids: string[]) => {
+    setScoreFail(null);
+    setScoring((s) => new Set([...s, ...ids]));
+    scorer.mutate(ids, {
+      onSuccess: () => toast.show({ message: `Scoring ${formatCount(ids.length)} ${ids.length === 1 ? "job" : "jobs"}. Progress is in Runs.` }),
+      onError: (e) => {
+        setScoring((s) => new Set([...s].filter((x) => !ids.includes(x))));
+        setScoreFail({ ids, message: errorText(e) });
+      },
+    });
+  };
   const captionId = useId();
   const panelId = useId();
 
@@ -195,7 +213,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
   const { hasNextPage, isFetchingNextPage, fetchNextPage } = list;
   const paged = usePaged(rows, {
     total,
-    resetKey: JSON.stringify([filterParams, sort]),
+    resetKey: JSON.stringify([filterParams, listSort]),
     onNeedMore: useCallback(() => {
       if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
     }, [hasNextPage, isFetchingNextPage, fetchNextPage]),
@@ -300,7 +318,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       </EmptyState>
     ) : (
       <EmptyState
-        title="No jobs here yet"
+        title={tab === "notscored" ? "Every job is scored" : "No jobs here yet"}
         action={
           tab === "recommended" ? (
             <Link to="/automation">Open Automation</Link>
@@ -313,9 +331,13 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       >
         {tab === "recommended"
           ? "Scout adds postings here. Run scout from Automation or the command line."
+          : tab === "notscored"
+          ? "New postings from scout wait here until they are scored."
           : "Nothing in this tab right now. Other tabs may have jobs."}
       </EmptyState>
     );
+  } else if (tab === "notscored") {
+    body = <NotScoredList rows={paged.pageItems} selected={selected} onToggle={onToggle} scoring={scoring} onScore={scoreJobs} />;
   } else if (mode === "list") {
     body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} current={jobId} />;
   } else if (mode === "board") {
@@ -396,12 +418,20 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
             {nSel > 0 ? (
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
-                <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
-                  Tick for pipeline
-                </Button>
-                <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(false)}>
-                  Untick
-                </Button>
+                {tab === "notscored" ? (
+                  <Button size="small" variant="primary" onClick={() => scoreJobs([...selected])}>
+                    Score selected
+                  </Button>
+                ) : (
+                  <>
+                    <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
+                      Tick for pipeline
+                    </Button>
+                    <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(false)}>
+                      Untick
+                    </Button>
+                  </>
+                )}
                 <Button size="small" onClick={() => setSelected([])}>
                   Clear selection
                 </Button>
@@ -474,6 +504,14 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
           aria-busy={list.isFetching || undefined}
           className={styles.card}
         >
+          {tab === "notscored" && scoreFail ? (
+            <div role="alert" className={cardStyles.failure}>
+              <span>Scoring failed · {scoreFail.message}</span>
+              <Button size="small" onClick={() => scoreJobs(scoreFail.ids)}>
+                Retry
+              </Button>
+            </div>
+          ) : null}
           {body}
           {rows.length > 0 ? (
             <div className={styles.footer}>
