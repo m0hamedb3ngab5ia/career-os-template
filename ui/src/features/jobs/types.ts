@@ -11,7 +11,7 @@ export type JobsTab = Schemas["JobsTab"];
 export type JobsTabs = Schemas["JobsTabs"];
 export type JobFacets = Schemas["JobFacets"];
 
-export type TabKey = "recommended" | "saved" | "applied";
+export type TabKey = "recommended" | "notscored" | "saved" | "applied";
 export type StageKey = "applied" | "screening" | "interview" | "offer" | "closed";
 export type ViewKey = "list" | "table" | "board";
 

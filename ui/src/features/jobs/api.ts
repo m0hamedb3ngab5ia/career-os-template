@@ -164,6 +164,15 @@ export function useSelectJobs() {
   });
 }
 
+/** REQ-137 Score now: one score run over exactly these jobs; never ticks them. */
+export function useScoreJobs() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (ids: string[]) => apiSend<{ run_id: string; kind: string }>("POST", "/api/jobs/score", { job_ids: ids }),
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["jobs"] }),
+  });
+}
+
 export interface UiState {
   tour_done?: boolean;
   jobs_view?: ViewKey;

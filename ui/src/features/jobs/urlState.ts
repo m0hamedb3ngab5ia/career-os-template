@@ -3,14 +3,14 @@ import { useSearchParams } from "react-router";
 import type { StageKey, TabKey, ViewKey } from "./types";
 
 // Jobs view state lives in the query string (docs/UI.md "URL state"):
-//   ?tab=recommended|saved|applied  &stage=applied|screening|interview|offer|closed (Applied tab)  &view=list|table|board  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
+//   ?tab=recommended|notscored|saved|applied  &stage=applied|screening|interview|offer|closed (Applied tab)  &view=list|table|board  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
 //   &cols=<hidden column keys>  &sel=<selected job ids>
 //   &f.<field>=v1,v2 (column value filter; literal commas in a value are backslash-escaped so they survive the
 //   split; URLSearchParams itself percent-encodes the rest, so values aren't double-encoded)  &f.<field>=min..max (number
 //   or ISO date range, either side may be empty). Fields: see FILTERS.
 // Defaults are left out so /jobs stays clean.
 
-export const TABS: TabKey[] = ["recommended", "saved", "applied"];
+export const TABS: TabKey[] = ["recommended", "notscored", "saved", "applied"];
 export const DEFAULT_TAB: TabKey = "recommended";
 export const VIEWS: ViewKey[] = ["list", "table", "board"];
 export const DEFAULT_VIEW: ViewKey = "list";
@@ -27,7 +27,7 @@ export function effectiveView(view: ViewKey | "", remembered: ViewKey | undefine
   const v = view || remembered || DEFAULT_VIEW;
   return v === "board" && tab !== "applied" ? DEFAULT_VIEW : v;
 }
-export const SORT_KEYS = ["fit", "company", "location", "status", "tier", "found_at", "applied_at", "updated_at"] as const;
+export const SORT_KEYS = ["fit", "prescore", "company", "location", "status", "tier", "found_at", "applied_at", "updated_at"] as const;
 export type SortKey = (typeof SORT_KEYS)[number];
 export const DEFAULT_SORT = "-fit";
 /** Columns the chooser can hide (the checkbox and Company always show). */
