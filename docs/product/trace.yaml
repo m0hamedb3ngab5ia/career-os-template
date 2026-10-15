@@ -111,7 +111,7 @@ user_requirements:
     status: approved
     provenance: confirmed
   USR-038:
-    status: proposed
+    status: approved
     provenance: confirmed
 requirements:
   REQ-001:
@@ -731,35 +731,35 @@ requirements:
     tests:
     - E2E-016-05
   REQ-133:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-038
     tests:
     - E2E-017-01
   REQ-134:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-038
     tests:
     - E2E-017-02
   REQ-135:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-038
     tests:
     - E2E-017-03
   REQ-136:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-038
     tests:
     - E2E-017-05
   REQ-137:
-    status: proposed
+    status: approved
     provenance: confirmed
     user_requirements:
     - USR-038
@@ -858,7 +858,7 @@ use_cases:
     - REQ-130
     - REQ-132
   UC-017:
-    status: draft
+    status: approved
     requirements:
     - REQ-133
     - REQ-134
@@ -894,7 +894,7 @@ flows:
     - UC-015
     - UC-016
   FLOW-006:
-    status: draft
+    status: approved
     use_cases:
     - UC-017
 tasks:

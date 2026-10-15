@@ -308,5 +308,5 @@ Technical detail: 03_REQUIREMENTS.md + 03b_REQUIREMENTS_USER_FLOWS.md (REQ-NNN),
 | USR-035 Always know what to do on each page | approved | REQ-119 |
 | USR-036 Tables that work like a spreadsheet | approved | REQ-120, REQ-129 |
 | USR-037 First-time guide and a clear next step | approved | REQ-121, REQ-122, REQ-131 |
-| USR-038 Score many jobs without using up my plan | proposed | REQ-133, REQ-134, REQ-135, REQ-136, REQ-137 |
+| USR-038 Score many jobs without using up my plan | approved | REQ-133, REQ-134, REQ-135, REQ-136, REQ-137 |
 <!-- /trace:map -->
