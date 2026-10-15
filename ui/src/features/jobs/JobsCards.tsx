@@ -3,6 +3,7 @@ import { Button } from "../../kit/Button";
 import { StatusChip } from "../../kit/chips";
 import { formatCount, formatDate } from "../../lib/format";
 import styles from "./JobsCards.module.css";
+import { useSection } from "../settings/api";
 import { reasonsLine } from "./reasons";
 import type { JobListItem, TabKey } from "./types";
 
@@ -71,15 +72,21 @@ export function JobsList({ rows, tab, selected, onToggle, current }: ListProps) 
   );
 }
 
-// REQ-136 reasons. Defaults of scoring.min_prescore / scoring.stale_days (TASK-039); the UI does not read that config yet.
-export const MIN_PRESCORE = 30;
-export const STALE_DAYS = 21;
+// REQ-136 reasons follow pipeline.yaml `scoring` (TASK-039), read from Settings › Runs; these are its defaults until it loads.
+const SCORING_DEFAULTS = { minPrescore: 20, staleDays: 21 };
+type ScoringCfg = typeof SCORING_DEFAULTS;
+
+function useScoringCfg(): ScoringCfg {
+  const v = useSection("runs").data?.values ?? {};
+  const num = (x: unknown, d: number) => (typeof x === "number" ? x : d);
+  return { minPrescore: num(v["scoring.min_prescore"], SCORING_DEFAULTS.minPrescore), staleDays: num(v["scoring.stale_days"], SCORING_DEFAULTS.staleDays) };
+}
 
 /** Why an unscored job is still unscored: below the quick-match cutoff, an older posting (scored after newer ones), else queued. */
-export function notScoredReason(j: JobListItem, now = Date.now()): string {
-  if (j.prescore != null && j.prescore < MIN_PRESCORE) return `Below cutoff (${MIN_PRESCORE})`;
+export function notScoredReason(j: JobListItem, cfg: ScoringCfg = SCORING_DEFAULTS, now = Date.now()): string {
+  if (j.prescore != null && j.prescore < cfg.minPrescore) return `Below cutoff (${cfg.minPrescore})`;
   const found = j.found_at ? Date.parse(j.found_at) : NaN;
-  if (!Number.isNaN(found) && now - found > STALE_DAYS * 86_400_000) return "Older posting, scored after newer ones";
+  if (!Number.isNaN(found) && now - found > cfg.staleDays * 86_400_000) return "Older posting, scored after newer ones";
   return "Queued";
 }
 
@@ -95,6 +102,7 @@ interface NotScoredProps {
 /** REQ-136 card: Quick match (labelled, never styled like the fit score) + title · company · place + reason + Score now. */
 export function NotScoredList({ rows, selected, onToggle, scoring, onScore }: NotScoredProps) {
   const { search } = useLocation();
+  const cfg = useScoringCfg();
   return (
     <ul className={styles.list} aria-label="Jobs">
       {rows.map((j) => {
@@ -111,7 +119,7 @@ export function NotScoredList({ rows, selected, onToggle, scoring, onScore }: No
                 {j.company || j.job_id} <span className={styles.role}>{j.title}</span>
               </Link>
               <span className={styles.meta}>{[j.location, j.found_at ? formatDate(j.found_at) : ""].filter(Boolean).join(" · ")}</span>
-              <span className={styles.reasons}>{notScoredReason(j)}</span>
+              <span className={styles.reasons}>{notScoredReason(j, cfg)}</span>
             </span>
             <Button size="small" disabled={busy} onClick={() => onScore([j.job_id])}>
               {busy ? "Scoring…" : "Score now"}

@@ -419,7 +419,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
                 {tab === "notscored" ? (
-                  <Button size="small" variant="primary" onClick={() => scoreJobs([...selected])}>
+                  <Button size="small" variant="primary" disabled={scorer.isPending} onClick={() => scoreJobs([...selected])}>
                     Score selected
                   </Button>
                 ) : (
@@ -449,6 +449,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               </UnavailableButton>
             )}
           </span>
+          {tab === "notscored" ? null : (<>
           <SegmentedControl label="View" value={mode} onValueChange={(v) => chooseView(v as ViewKey)}>
             {VIEWS.filter((v) => v !== "board" || tab === "applied").map((v) => (
               <SegmentedControl.Option key={v} value={v}>
@@ -474,6 +475,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               ))}
             </Menu.Content>
           </Menu>
+          </>)}
           <Button
             size="small"
             icon={<Download size={14} strokeWidth={1.7} aria-hidden="true" />}
