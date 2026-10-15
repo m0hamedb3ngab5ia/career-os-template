@@ -1,6 +1,8 @@
 """Résumé match score (REQ-111, DEC-003): deterministic weighted term coverage."""
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from careeros import match
@@ -85,3 +87,30 @@ def test_prescore_for_uses_master_skill_groups_category_and_synonyms():
     assert match.prescore_for(s, posting) == 60  # 0.8*2/4 + 0.2*1
     assert match.prescore_for(s, {**posting, "raw": {"prefilter_category": "data"}}) == 40
     assert match.prescore_for(s, {**posting, "raw": {}}) == 50  # category unknown: skills only
+
+
+def test_scout_backfills_prescore_into_posting_json_for_unscored_jobs_only(tmp_path):
+    """REQ-133: data/ is canonical, so scout writes raw.prescore into an existing unscored job's posting.json."""
+    from conftest import make_temp_root
+
+    from careeros.config import Settings
+    from careeros.models import Posting
+    from careeros.scout import run_scout
+    from careeros.store import Store
+
+    root = make_temp_root(tmp_path / "repo")
+    s = Settings.load(root)
+    st = Store(s)
+
+    def mk(jid):
+        st.save_posting(Posting(job_id=jid, company="Acme", title="Engineer", location="Remote", ats="greenhouse",
+                                url="https://x/" + jid, description_text="python sql", raw={}))
+
+    mk("old-unscored")
+    mk("old-scored")
+    (st.job_dir("old-scored") / "score.json").write_text("{}")
+    s.companies["boards"] = []  # no network: only the backfill pass runs
+    run_scout(s, st, log=lambda m: None)
+    got = {j: json.loads((st.job_dir(j) / "posting.json").read_text())["raw"] for j in ("old-unscored", "old-scored")}
+    assert isinstance(got["old-unscored"]["prescore"], int)
+    assert "prescore" not in got["old-scored"]

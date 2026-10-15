@@ -316,9 +316,11 @@ class Index:
 
     def update_jobs(self, job_ids: Iterable[str]) -> list[str]:
         """Re-index these jobs when their files changed; a job whose folder (or posting.json) is gone is removed.
-        Returns the ids whose rows changed."""
+        Returns the ids whose rows changed. A change to the master skills prescore uses (profile/master.yaml
+        `skills`, which no job's signature covers) reloads the profile and re-indexes every job."""
         changed = []
         with self._lock:
+            force = self._skills_changed()
             for jid in job_ids:
                 if not jid or _is_finder_copy(jid) or "/" in jid or jid.startswith((".", "_")):
                     continue
@@ -330,13 +332,30 @@ class Index:
                     continue
                 sig = _dir_sig(d)
                 row = self.query("SELECT sig FROM jobs WHERE job_id = ?", (jid,))
-                if row and row[0]["sig"] == sig:
+                if row and row[0]["sig"] == sig and not force:
                     continue
                 self._index_job(jid, d, sig)
                 changed.append(jid)
             if changed:
                 self.set_meta("indexed_at", _now())
         return changed
+
+    def _skills_changed(self) -> bool:
+        """True (and the profile reloaded) when the master skills differ from those the stored prescores used."""
+        import hashlib
+
+        from careeros.config import _load_yaml
+
+        try:
+            profile = _load_yaml(self.settings.paths["profile"])
+        except Exception:  # noqa: BLE001 - unreadable master: keep the settings we have
+            return False
+        h = hashlib.sha1(json.dumps(profile.get("skills") or {}, sort_keys=True, default=str).encode()).hexdigest()
+        if h == self.get_meta("prescore_skills_hash"):
+            return False
+        self.settings.profile = profile
+        self.set_meta("prescore_skills_hash", h)
+        return True
 
     def _prescore(self, posting: dict[str, Any]) -> int | None:
         """Always recomputed against current master skills (REQ-133: changes when skills change); pure, no file

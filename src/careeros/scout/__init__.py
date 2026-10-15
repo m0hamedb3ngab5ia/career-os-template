@@ -184,6 +184,12 @@ def run_scout(
     signals = load_signals(s)
     summary = ScoutSummary()
 
+    for jid in list(st.iter_job_ids()):  # REQ-133: backfill raw.prescore into stored, unscored jobs (data/ is canonical)
+        old = st.load_posting(jid)
+        if old and "prescore" not in old.raw and not (st.job_dir(jid) / "score.json").exists():
+            old.raw["prescore"] = prescore_for(s, old.model_dump())
+            st.save_posting(old)
+
     for board in s.boards:
         company = str(board.get("company", "?"))
         ats = str(board.get("ats", "")).lower()
