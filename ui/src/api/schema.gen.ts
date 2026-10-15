@@ -137,6 +137,13 @@ export interface paths {
      */
     get: operations["job_facets_api_jobs_facets_get"];
   };
+  "/api/jobs/score": {
+    /**
+     * Score Jobs
+     * @description REQ-137 Score now: one score run over exactly these jobs; never ticks them. Unknown id -> 404, nothing started.
+     */
+    post: operations["score_jobs_api_jobs_score_post"];
+  };
   "/api/jobs/select": {
     /**
      * Select Jobs
@@ -2987,6 +2994,11 @@ export interface components {
         [key: string]: string | null;
       };
     };
+    /** ScoreBody */
+    ScoreBody: {
+      /** Job Ids */
+      job_ids: string[];
+    };
     /** SectionData */
     SectionData: {
       /** Defaults */
@@ -4078,6 +4090,31 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["JobFacets"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Score Jobs
+   * @description REQ-137 Score now: one score run over exactly these jobs; never ticks them. Unknown id -> 404, nothing started.
+   */
+  score_jobs_api_jobs_score_post: {
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ScoreBody"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["PipelineStarted"];
         };
       };
       /** @description Validation Error */

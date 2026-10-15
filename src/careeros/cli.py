@@ -1264,10 +1264,13 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
 
     s = _settings(args)
     cfg = load_runs_config(s)
-    job_ids = [args.job] if args.job else None
-    if args.job and not args.dry_run and Store(s).exists(args.job):
-        Store(s).set_selected(job_ids, True)  # REQ-104: an explicit --job counts as ticking it
-    max_jobs = args.max_jobs if args.max_jobs is not None or not job_ids else 1
+    job_ids = args.job or None
+    if job_ids and len(job_ids) > 1 and kind != "score":
+        print(f"run {kind}: --job takes one job id", file=sys.stderr)
+        return 2
+    if kind != "score" and job_ids and not args.dry_run and Store(s).exists(job_ids[0]):
+        Store(s).set_selected(job_ids, True)  # REQ-104: --job ticks it for prepare/apply; REQ-137: never for score
+    max_jobs = args.max_jobs if args.max_jobs is not None or not job_ids else len(job_ids)
     try:
         budget = budget_for(cfg, kind, preset=args.preset, max_jobs=max_jobs, max_minutes=args.max_minutes)
     except ValueError as e:
@@ -1859,8 +1862,8 @@ def _run_budget_args(p: argparse.ArgumentParser) -> None:
     p.add_argument("--max-jobs", type=int, help="override the preset's job count")
     p.add_argument("--max-minutes", type=float, help="override the preset's wall-clock minutes")
     p.add_argument("--dry-run", action="store_true", help="rank and show what would run, with the reasons; run nothing")
-    p.add_argument("--job", metavar="JOB_ID", help="run this one job only (exit 2 with the reason if it is not a "
-                                                  "candidate); locks, pruned and the company gate still apply")
+    p.add_argument("--job", metavar="JOB_ID", action="append", help="run this one job only (exit 2 with the reason "
+                   "if it is not a candidate; repeatable for score); locks, pruned and the company gate still apply")
     p.add_argument("--force", action="store_true", help="with --job: rerun a job that is already scored/prepared")
     p.add_argument("--force-tailor", action="store_true", help=argparse.SUPPRESS)  # DEC-021 "Tailor instead"
     p.add_argument("--trigger", choices=("manual", "schedule", "catch_up"), default="manual", help=argparse.SUPPRESS)

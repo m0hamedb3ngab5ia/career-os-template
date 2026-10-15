@@ -408,6 +408,24 @@ def _rc(request: Request, c: Any) -> RunControl:
     return factory(c.settings)
 
 
+class ScoreBody(BaseModel):
+    job_ids: list[str] = Field(min_length=1, max_length=svc.MAX_EXPORT)
+
+
+@router.post("/jobs/score")
+def score_jobs(body: ScoreBody, request: Request, c=Depends(ctx)) -> PipelineStarted:
+    """REQ-137 Score now: one score run over exactly these jobs; never ticks them. Unknown id -> 404, nothing started."""
+    from careeros.store import Store
+
+    store = Store(c.settings)
+    missing = [j for j in body.job_ids if not store.exists(j)]
+    if missing:
+        raise HTTPException(404, f"job(s) not found: {', '.join(missing[:20])}")
+    with refusals():
+        out = _rc(request, c).start("score", job_ids=body.job_ids)
+    return PipelineStarted(run_id=out["run_id"], kind="score")
+
+
 @router.get("/jobs/{job_id}/pipeline")
 def job_pipeline(job_id: str, request: Request, c=Depends(ctx)) -> pipe.PipelineState:
     """The job's stage, the one next action (Start / Continue / Approve & continue), why it is blocked, what a

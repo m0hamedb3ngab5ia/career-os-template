@@ -1048,3 +1048,20 @@ def test_resume_edit_accepts_an_annotation_item(rc):  # TASK-030 "Apply comment"
     assert out["kind"] == "resume_edit" and out["run_id"]
     with pytest.raises(ValueError):
         rc.start_step("resume_edit", resume="r1", item="x1")
+
+
+def test_start_score_job_ids_spawns_one_run_for_exactly_those_jobs_without_ticking_E2E_017_04(rc):
+    a, b, c = add_jobs(rc.settings, 3)
+    store = Store(rc.settings)
+    assert not any(store.is_selected(j) for j in (a, b, c))
+    out = rc.start("score", job_ids=[a, b])
+    cmd = FakePopen.calls[0]["cmd"]
+    assert cmd[3:] == ["run", "score", "--job", a, "--job", b, "--run-id", out["run_id"], "--json"]
+    assert not any(store.is_selected(j) for j in (a, b, c))  # REQ-137: Score now never ticks
+
+
+def test_start_job_ids_is_score_only_E2E_017_04(rc):
+    a = add_jobs(rc.settings, 1)[0]
+    with pytest.raises(ValueError):
+        rc.start("prepare", job_ids=[a])
+    assert not FakePopen.calls

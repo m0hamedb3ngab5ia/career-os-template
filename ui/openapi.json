@@ -8026,6 +8026,24 @@
         "title": "ScheduleState",
         "type": "object"
       },
+      "ScoreBody": {
+        "properties": {
+          "job_ids": {
+            "items": {
+              "type": "string"
+            },
+            "maxItems": 5000,
+            "minItems": 1,
+            "title": "Job Ids",
+            "type": "array"
+          }
+        },
+        "required": [
+          "job_ids"
+        ],
+        "title": "ScoreBody",
+        "type": "object"
+      },
       "SectionData": {
         "properties": {
           "defaults": {
@@ -11028,6 +11046,48 @@
           }
         },
         "summary": "Job Facets",
+        "tags": [
+          "jobs"
+        ]
+      }
+    },
+    "/api/jobs/score": {
+      "post": {
+        "description": "REQ-137 Score now: one score run over exactly these jobs; never ticks them. Unknown id -> 404, nothing started.",
+        "operationId": "score_jobs_api_jobs_score_post",
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ScoreBody"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PipelineStarted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Score Jobs",
         "tags": [
           "jobs"
         ]
