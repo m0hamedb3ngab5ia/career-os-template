@@ -54,7 +54,7 @@ def test_buckets(idx, data):
 
 def test_counts_equal_rows(idx):
     counts = {t["key"]: t["count"] for t in jobs_svc.tabs(idx, CLOSED)}
-    assert list(counts) == ["recommended", "saved", "applied"]
+    assert list(counts) == ["recommended", "notscored", "saved", "applied"]
     for key, n in counts.items():
         assert jobs_svc.list_jobs(idx, tab=key, closed=CLOSED, limit=jobs_svc.MAX_LIMIT)["total"] == n
         assert len(jobs_svc.list_jobs(idx, tab=key, closed=CLOSED, limit=jobs_svc.MAX_LIMIT)["items"]) == n
@@ -163,3 +163,10 @@ def test_started_ids_running_and_failed_prepare(data):
             return {"state": "running", "kind": "prepare", "current_job": "j-run", "queue": [{"job_id": "j-q"}]}
 
     assert today_svc.started_ids(data["settings"], RC()) == {"j-failed", "j-run", "j-q"}
+
+
+def test_notscored_tab_is_unscored_unticked_unskipped_by_quick_match(idx, data):
+    """REQ-136: unscored, not ticked, not skipped; sorts by quick match."""
+    rows = jobs_svc.list_jobs(idx, tab="notscored", closed=CLOSED, sort="-prescore", limit=jobs_svc.MAX_LIMIT)["items"]
+    assert rows and all(r["fit"] is None and r["selected"] == 0 and r["status"] != "skipped" for r in rows)
+    assert [t["key"] for t in jobs_svc.tabs(idx, CLOSED)] == ["recommended", "notscored", "saved", "applied"]

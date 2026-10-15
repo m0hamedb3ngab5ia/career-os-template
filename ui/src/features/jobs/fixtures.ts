@@ -64,6 +64,7 @@ export const JOBS: JobListItem[] = [
 export const TABS_REPLY = {
   tabs: [
     { key: "recommended", label: "Recommended", count: 59 },
+    { key: "notscored", label: "Not scored", count: 12 },
     { key: "saved", label: "Saved", count: 3 },
     { key: "applied", label: "Applied", count: 41 },
   ],

@@ -6,6 +6,11 @@
       "label": "Recommended"
     },
     {
+      "count": 0,
+      "key": "notscored",
+      "label": "Not scored"
+    },
+    {
       "count": 4,
       "key": "saved",
       "label": "Saved"

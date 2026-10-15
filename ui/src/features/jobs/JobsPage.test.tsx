@@ -95,6 +95,8 @@ describe("Jobs screen", () => {
     expect(screen.getByRole("tab", { name: "Saved (3)" })).toHaveAttribute("tabindex", "-1");
     active.focus();
     await user.keyboard("{ArrowRight}");
+    expect(screen.getByRole("tab", { name: "Not scored (12)" })).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
     const review = screen.getByRole("tab", { name: "Saved (3)" });
     expect(review).toHaveFocus();
     expect(review).toHaveAttribute("aria-selected", "true");

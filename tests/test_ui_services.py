@@ -219,7 +219,7 @@ def test_facets_count_under_the_other_filters(idx):
 
 def test_tabs_and_export_honour_column_filters(idx):
     t = {x["key"]: x["count"] for x in jobs_svc.tabs(idx, [], values={"company": ["Hooli", "Globex"]})}
-    assert t == {"recommended": 0, "saved": 1, "applied": 1}   # fixture jobs carry no flag = ticked
+    assert t == {"recommended": 0, "notscored": 0, "saved": 1, "applied": 1}   # fixture jobs carry no flag = ticked
     from openpyxl import load_workbook
     import io
     wb = load_workbook(io.BytesIO(jobs_svc.export_xlsx(idx, ranges={"fit": (85, None)})))
