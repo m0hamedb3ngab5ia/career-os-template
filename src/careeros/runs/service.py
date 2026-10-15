@@ -190,9 +190,9 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
     if daily:
         from dataclasses import replace
 
-        from careeros.runs.scoring import avg_attempt_s, scored_today
+        from careeros.runs.scoring import DEFAULT_SCORING, avg_attempt_s, scored_today
 
-        scfg, past = cfg.scoring, RunStore(settings).list_runs("score")
+        scfg, past = cfg.scoring or DEFAULT_SCORING, RunStore(settings).list_runs("score")
         left = max(0, scfg["per_day"] - scored_today(past, now()))
         budget = replace(budget, max_jobs=min(budget.max_jobs, scfg["per_scan"]))
         done_now = [0]

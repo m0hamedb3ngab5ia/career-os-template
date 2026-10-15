@@ -125,3 +125,15 @@ def test_doctor_flags_a_bad_scoring_block():
 
     assert any(c.level == FAIL and c.name == "scoring" for c in check_runs({"scoring": {"per_day": "lots"}}))
     assert any(c.name == "scoring" and c.level != FAIL for c in check_runs({}))
+
+
+def test_runs_config_without_scoring_block_uses_defaults(settings, store):
+    from dataclasses import replace
+
+    job(store, 1, 80)
+    settings.pipeline = {**settings.pipeline, "runs": {"preflight_doctor": False}}
+    cfg = replace(load_runs_config(settings), scoring={})  # e.g. RunsConfig() built directly
+    inv = FakeInvoke(settings)
+    rec = run_batch(settings, "score", budget_for(cfg, "score", max_jobs=5, max_minutes=600), cfg=cfg,
+                    invoke=inv, now=lambda: NOW)
+    assert len(inv.calls) == 1 and rec["daily_scoring"] is True
