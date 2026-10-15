@@ -459,6 +459,15 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
         on = [k for k, j in sched.jobs.items() if j.enabled]
         out.append(Check(PASS, "schedule", f"schedule ok: {', '.join(on) or 'nothing'} "
                                            "(install: careeros schedule install)"))
+    from careeros.runs.scoring import load_scoring_config
+
+    try:
+        sc = load_scoring_config(pipeline.get("scoring"))
+    except ConfigError as e:
+        out.append(Check(FAIL, "scoring", str(e)))
+    else:
+        out.append(Check(PASS, "scoring", f"scoring ok: {sc['per_scan']} per run, {sc['per_day']} per day, "
+                                          f"stale after {sc['stale_days']} d, quick match >= {sc['min_prescore']}"))
     from careeros.runs.advisor import load_advisor_config
 
     try:

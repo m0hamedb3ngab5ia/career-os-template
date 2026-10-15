@@ -186,14 +186,43 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
     if kind == "prepare":
         if load_prepare_config(cfg.raw)["stop_at_daily_cap"]:
             extra_stop = daily_cap_stop(settings)
+    daily = kind == "score" and not job_ids  # REQ-135: --job / Score now neither count nor stop at the caps
+    if daily:
+        from dataclasses import replace
+
+        from careeros.runs.scoring import avg_attempt_s, scored_today
+
+        scfg, past = cfg.scoring, RunStore(settings).list_runs("score")
+        left = max(0, scfg["per_day"] - scored_today(past, now()))
+        budget = replace(budget, max_jobs=min(budget.max_jobs, scfg["per_scan"]))
+        done_now = [0]
+        after_job = after
+
+        def after(att: dict[str, Any]) -> None:  # noqa: F811 - counts this run's attempts toward per_day
+            done_now[0] += 1
+            after_job(att)
+
+        def extra_stop() -> tuple[str, str] | None:
+            if done_now[0] >= left:
+                return "daily_cap", f"daily scoring limit reached ({scfg['per_day']}); next run tomorrow"
+            return None
     run = execute_run(settings, kind, budget, cfg=cfg, trigger=trigger, dry_run=dry_run, invoke=invoke,
                       doctor=doctor, now=now, clock=clock, cancel=cancel, echo=echo,
                       retry_ids=fails.retry_ids(kind, max_attempts), skip_ids=fails.exhausted(kind, max_attempts),
                       extra_stop=extra_stop, after_attempt=after, pre_attempt=pre_attempt,
                       finalize=lambda r: pause_after_usage_limit(settings, cfg, r, now()),
                       job_ids=job_ids, force=force, run_id=run_id, force_tailor=force_tailor)
+    if daily and dry_run:
+        take = min(len(run["selected"]), left)
+        avg = avg_attempt_s(past)
+        run["selected"] = run["selected"][:take]
+        run["scoring"] = {"queue": run["candidates"], "per_scan": scfg["per_scan"], "per_day": scfg["per_day"],
+                          "left_today": left, "take": take,
+                          "eta_minutes": None if avg is None else round(take * avg / 60)}
     if not dry_run:
         run["warnings"] = warnings
+        if daily:
+            run["daily_scoring"] = True
         rs = RunStore(settings)
         rs.save_run(run)
         for w in warnings:
