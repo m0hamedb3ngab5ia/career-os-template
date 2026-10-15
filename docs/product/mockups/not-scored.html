@@ -1,0 +1,22 @@
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Jobs Not Scored</title>
+<!-- Static wireframe for DEC-023: Jobs › Not scored tab (REQ-136, REQ-137, FLOW-006). Fictional data only. -->
+<style>
+:root{--bg:#fff;--group:#f0f2f5;--card:#fff;--sep:#dadce0;--label:#1d1d1f;--sec:#5f6368;--accent:#0b57d0;--red:#b3261e;--grey:#80868b}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#1f1f1f;--group:#131314;--card:#2d2e30;--sep:#444746;--label:#e3e3e3;--sec:#a8abaf;--accent:#a8c7fa;--red:#f2b8b5;--grey:#9aa0a6}}
+*{box-sizing:border-box}body{margin:0;background:var(--group);color:var(--label);font:14px/1.45 system-ui;padding:16px}
+.tabs{display:flex;gap:16px;border-bottom:1px solid var(--sep);margin:8px 0 12px;flex-wrap:wrap}.tabs a{padding:8px 0;color:var(--sec);text-decoration:none}
+.tabs a[aria-current]{color:var(--label);border-bottom:2px solid var(--accent);font-weight:600}
+.bar{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;color:var(--sec)}
+.card{background:var(--card);border-radius:8px;padding:12px;margin-bottom:8px;display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center}
+.qm{font-size:12px;color:var(--sec);text-align:center;min-width:56px}.qm b{display:block;font-size:16px;color:var(--label)}
+.meta{color:var(--sec)}.why{font-size:12px;color:var(--sec)}.fail{color:var(--red);font-size:12px}
+button{font:inherit;padding:6px 12px;border-radius:6px;border:1px solid var(--sep);background:var(--bg);color:var(--accent)}
+@media (max-width:480px){.card{grid-template-columns:auto 1fr}.card button{grid-column:1/-1}}
+</style></head><body>
+<h1>Jobs</h1>
+<nav class="tabs"><a href="#">Recommended (42)</a><a href="#" aria-current="page">Not scored (412)</a><a href="#">Saved (3)</a><a href="#">Applied (2)</a></nav>
+<div class="bar"><span>Scored first: best quick match, newest postings. 120 of 300 scored today.</span><button>Score selected</button></div>
+<div class="card"><input type="checkbox" aria-label="Select"><div><div class="qm"></div><strong>Platform Engineer</strong> · Example Corp<div class="meta">Remote · 2 d</div><div class="why">Quick match 81 · Queued (#4)</div></div><button>Score now</button></div>
+<div class="card"><input type="checkbox" aria-label="Select"><div><strong>Data Engineer</strong> · Sample Labs<div class="meta">Berlin · 30 d</div><div class="why">Quick match 74 · Older posting, scored after newer ones</div></div><button disabled>Scoring…</button></div>
+<div class="card"><input type="checkbox" aria-label="Select"><div><strong>Sales Engineer</strong> · Demo Inc<div class="meta">London · 1 d</div><div class="why">Quick match 18 · Below cutoff (30)</div><div class="fail">Scoring failed · <a href="#">Retry</a> · <a href="#">See run</a></div></div><button>Score now</button></div>
+</body></html>

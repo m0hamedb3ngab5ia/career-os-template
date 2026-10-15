@@ -95,3 +95,7 @@ flowchart TD
   F --> G
 ```
 What to notice: every dead end has one button (preferences, Find jobs now, Add résumé, Retry). Setup open never hides picks; it only blocks fill/submit (REQ-103), not prepare.
+### FLOW-006 Score an unscored job
+UC-017 · Start: Jobs › Not scored
+1 card shows Quick match + reason 2 Score now → button becomes "Scoring…" (run in Runs) 3 done → toast "Scored 78 · see in Recommended" with link; card leaves tab
+Failure: run fails → card shows "Scoring failed · Retry" + Runs link; daily cap does not block Score now (P-ids: P3 feedback, P9 recovery)

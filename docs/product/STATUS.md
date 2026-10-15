@@ -1,6 +1,7 @@
 # Status
 
 ## Now
+- Lane: Feature — scoring budget (Q-031, DEC-023: USR-038, REQ-133..137, UC-017, FLOW-006, mockup `mockups/not-scored.html`, TASK-038..041). Stage: gate approved 2026-10-14; Build: TASK-038 + TASK-040 in parallel, then 039, then 041 after TASK-037. Stream: ttv-user-test
 - Lane: Feature — §2 Jobs on Today (DEC-022: REQ-127..132, UC-015/016, FLOW-005, mockup `mockups/jobs-today.html`). Stream: ttv-user-test
 - Stage: combined gate approved 2026-10-13 (Q-024..029 answered); next arch delta + new TASKs for needs-review TASK-013/015/017/019/020
 - Also: Feature — onboarding + profile (USR-002..004, 022..027) + injection guard, résumé reuse, check a job (USR-033, 031, 028)
@@ -13,6 +14,7 @@
 | gate | status | date |
 |---|---|---|
 | Audit triage | pending | |
+| Scoring budget spec+IA+UI (Feature, DEC-023) | approved | 2026-10-14 |
 | Onboarding+profile spec (Feature) | approved | 2026-10-04 |
 | §2 Jobs on Today spec+IA+UI (Feature, DEC-022) | approved | 2026-10-13 |
 | Résumé workspace spec (Feature, DEC-012) | approved | 2026-10-12 |

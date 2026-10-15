@@ -158,6 +158,7 @@ Failure: run fails → card stays: "Couldn't prepare: <cause>" + one fix (Retry 
 ### REQ-128 Jobs tabs with counts
 `/jobs` tabs Recommended · Saved · Applied, each with count. Recommended = scored, not ticked, not skipped, not applied. Saved = ticked (REQ-104 `selected`), not applied yet, incl. preparing / prepared / filled; Start pipeline (REQ-117) lives here and runs on Saved. Applied = applied or later; stage sub-tabs Applied · Screening · Interview · Offer · Closed with counts (status mapping Q-028). Save = tick, Unsave = untick. Tab + stage in URL (`?tab=&stage=`).
 Given 3 ticked, 2 applied (1 at interview) · When open `/jobs` · Then Saved (3), Applied (2), Applied › Interview (1).
+Amendment (DEC-023, proposed 2026-10-14): fourth tab Not scored (REQ-136) after Recommended; `?tab=notscored`.
 ### REQ-129 Jobs views: List, Table, Board
 View toggle List | Table; Applied tab adds Board. `view=` in URL, last choice remembered (`ui.jobs_view`). List (default) = master-detail: compact cards (REQ-130) left, detail right, selected job = `/jobs/:id` (tab/view query kept), back/forward works; <900px list only, job opens full page. Table = REQ-120 unchanged. Board = Applied jobs in stage columns (sub-tabs as columns); card opens detail. Replaces Pipeline page (REQ-074).
 Given `/pipeline` · When open · Then `/jobs?tab=applied&view=board`.
@@ -172,3 +173,18 @@ Given all must-haves done · When open Today · Then no setup card.
 ### REQ-132 Colour only for meaning; status = dot + word
 Status everywhere (cards, rows, board, tabs) = dot + word, never colour alone. Colour only: amber = needs you, red = blocked / failed, green = Ready / Applied / Offer, and the word always names the stage ("Ready", "Applied · Interview", "Offer"); Applied-tab cards add a small stage progress line (Applied → Screening → Interview → Offer); everything else neutral. Cards carry a 3px left edge stripe in the status colour (neutral = no stripe). Contrast ≥4.5:1 both themes.
 Given card "Needs you" · Then amber dot + word + amber stripe. Given card "Saved" · Then grey dot + word, no stripe.
+### REQ-133 Keyword pre-score on every job (no LLM)
+Deterministic 0–100 `prescore` per job from raw description text: master résumé skills (`profile/master.yaml` skills) + the job's category `title_keywords` (REQ-020 weights not used). Uses `careeros.terms` hit rules (same as QA/match). Computed when scout stores a job; backfilled for existing unscored jobs on first run. Zero Claude calls. Changes only when the job text or master skills change.
+Given a new job whose text names 6 of 10 master skills · When scout stores it · Then `prescore` set, no headless call made.
+### REQ-134 Score queue order + cutoff
+Auto-scoring picks unscored jobs by `prescore` desc, then newest posted/found. Postings older than `scoring.stale_days` (default 21) go after all fresh ones, never dropped. Jobs below `scoring.min_prescore` are not auto-scored (stay Not scored, REQ-136). Explicit `--job X` / Score now (REQ-137) ignore order and cutoff.
+Given fresh jobs prescore 80, 40 and a 30-day-old job prescore 90 · When a score run takes 2 · Then the 80 and 40 jobs.
+### REQ-135 Scoring budget: per scan and per day
+Auto-scoring (scheduled run or batch `run score`) scores at most `scoring.per_scan` (default 150) jobs per run and `scoring.per_day` (default 300) per local day, counted from run attempts. Daily cap reached → run ends "daily scoring limit reached (300); next run tomorrow", exit 0, rest stay queued. Score now and `--job X` don't count against or stop at the cap. `run score --dry-run` shows queue size, cap left, ETA.
+Given 280 scored today, per_day 300 · When scheduled score run starts with 150 queued · Then 20 scored, run ends with the limit message.
+### REQ-136 Jobs "Not scored" tab
+Jobs tabs add **Not scored (n)** after Recommended: unscored, not ticked, not skipped. Card = "Quick match <prescore>" (labelled, not the fit score) + title · company · place · age + "Queued" / "Below cutoff" / "Older posting" reason + Score now. Bulk select → Score selected. Scored job leaves the tab for Recommended.
+Given 400 unscored, 150 queued · When open Not scored · Then count 400, each card shows quick match + reason + Score now.
+### REQ-137 Score now (on demand)
+Score now on a job (card, detail, bulk) starts a score run for those jobs only (`run score --job`), visible in Runs; does not tick the job (fixes current `--job` side effect for scoring only). Done → job shows its fit score in Recommended.
+Given an unscored job · When Score now · Then one score run for it, job not ticked, appears in Recommended when done.

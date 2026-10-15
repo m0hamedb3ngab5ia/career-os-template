@@ -158,3 +158,14 @@ E2E-016-02: Given List view When click a job Then URL `/jobs/:id`, detail pane s
 E2E-016-03: Given 3 ticked, 2 applied (1 interview) When open `/jobs` Then Saved (3), Applied (2), Interview (1).
 E2E-016-04: Given view Table When reload Then Table still selected.
 E2E-016-05: Given a Needs-you job and a Saved job When shown Then amber dot + "Needs you" + amber stripe; grey dot + "Saved", no stripe.
+### UC-017 Score a large backlog within budget
+REQs: REQ-133, REQ-134, REQ-135, REQ-136, REQ-137 · Actor: candidate; scheduler · Trigger: scan stores many jobs
+Main: 1 scout stores jobs, each gets a quick match 2 scheduled score run takes top `per_scan` by quick match, fresh first 3 run stops at per-scan or daily cap 4 scored jobs appear in Recommended 5 rest stay in Not scored with a reason
+Alt: candidate opens Not scored → Score now on one or many · daily cap hit → resumes next day
+Failure: score call fails → job stays queued, run stops after `max_consecutive_failures` (existing runs config)
+Outcome: best jobs scored first; plan quota bounded; nothing hidden
+E2E-017-01: Given 10 new jobs When scout stores them Then each has a prescore and no headless call ran.
+E2E-017-02: Given queue of 5 (2 stale), per_scan 3 When score run Then the 3 freshest-highest scored, stale ones last.
+E2E-017-03: Given per_day reached When scheduled score run Then 0 scored, message "daily scoring limit reached", exit 0.
+E2E-017-04: Given unscored job When Score now Then it is scored, not ticked, shows in Recommended.
+E2E-017-05: Given 4 unscored When open `/jobs?tab=notscored` Then tab count 4, cards show "Quick match" + reason + Score now.
