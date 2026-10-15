@@ -57,6 +57,26 @@ def recorded_http(monkeypatch):
     return requested
 
 
+def test_E2E_017_01_scout_stores_prescore_without_headless_calls(temp_root: Path, recorded_http, monkeypatch):
+    """E2E-017-01 (REQ-133): every job scout stores carries a keyword prescore; no `claude -p` ran."""
+    def no_subprocess(*a, **k):
+        raise AssertionError(f"headless/subprocess call during scout: {a[:1]}")
+
+    monkeypatch.setattr(subprocess, "run", no_subprocess)
+    monkeypatch.setattr(subprocess, "Popen", no_subprocess)
+    targets = yaml.safe_load((temp_root / "config" / "targets.yaml").read_text())
+    targets["scout"] = {"filters": {"ghost": False}}
+    (temp_root / "config" / "targets.yaml").write_text(yaml.safe_dump(targets))
+    s = Settings.load(temp_root)
+    summary = run_scout(s, Store(s), log=lambda m: None)
+    assert summary.totals["stored"] >= 3
+    postings = [json.loads(f.read_text()) for f in (temp_root / "data" / "jobs").glob("*/posting.json")]
+    assert len(postings) == summary.totals["stored"]
+    scores = [p["raw"]["prescore"] for p in postings]
+    assert all(isinstance(x, int) and 0 <= x <= 100 for x in scores)
+    assert any(x > 0 for x in scores)  # recorded postings name some example master skills
+
+
 def _cli(root: Path, home: Path, *args: str) -> subprocess.CompletedProcess:
     return subprocess.run([PY, "-m", "careeros.cli", "--root", str(root), *args], capture_output=True, text=True,
                           env=subprocess_env(root, home), timeout=120)

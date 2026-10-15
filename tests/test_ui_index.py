@@ -518,3 +518,52 @@ def test_selected_and_injection_flags_are_indexed(data):
     ix.update_jobs([jid])
     assert _jobs(ix)[jid]["injection"] is None
     ix.close()
+
+
+def test_prescore_backfilled_for_every_job_and_recomputed_over_stale_stored(idx, data):
+    """REQ-133: jobs scouted before TASK-038 have no stored prescore; the index computes it (no Claude call)."""
+    jobs = _jobs(idx)
+    assert all(isinstance(r["prescore"], int) and 0 <= r["prescore"] <= 100 for r in jobs.values())
+    jid = data["jobs"]["found"]
+    p = data["settings"].paths["jobs_dir"] / jid / "posting.json"
+    posting = json.loads(p.read_text())
+    want = _jobs(idx)[jid]["prescore"]
+    posting.setdefault("raw", {})["prescore"] = 42 if want != 42 else 43  # stale scout-time value
+    p.write_text(json.dumps(posting))
+    idx.update_jobs([jid])
+    assert _jobs(idx)[jid]["prescore"] == want
+
+
+def test_prescore_follows_master_skills_edit_without_reindex(idx, data):
+    """REQ-133: editing profile/master.yaml skills changes the prescore on the next sync (no --reindex)."""
+    import yaml
+
+    s = data["settings"]
+    jid = data["jobs"]["found"]
+    idx.sync()
+    before = _jobs(idx)[jid]["prescore"]
+    posting = json.loads((s.paths["jobs_dir"] / jid / "posting.json").read_text())
+    master = s.paths["profile"]
+    prof = yaml.safe_load(master.read_text())
+    prof["skills"] = {"core": [posting["title"]]}  # a skill the job's own title names -> full skills coverage
+    master.write_text(yaml.safe_dump(prof))
+    idx.sync()
+    after = _jobs(idx)[jid]["prescore"]
+    assert after != before and after >= 50
+
+
+def test_skills_edit_reindexes_other_jobs_on_partial_update(idx, data):
+    """REQ-133: a skills change seen by a partial update_jobs (watcher) still refreshes every job's prescore."""
+    import yaml
+
+    s = data["settings"]
+    a, b = data["jobs"]["found"], data["jobs"]["review"]
+    idx.sync()
+    before = _jobs(idx)[b]["prescore"]
+    posting = json.loads((s.paths["jobs_dir"] / b / "posting.json").read_text())
+    master = s.paths["profile"]
+    prof = yaml.safe_load(master.read_text())
+    prof["skills"] = {"core": [posting["title"]]}
+    master.write_text(yaml.safe_dump(prof))
+    idx.update_jobs([a])
+    assert _jobs(idx)[b]["prescore"] != before

@@ -28,7 +28,8 @@ NUMBER_COLUMNS = ("fit", "qa_score")
 DATE_COLUMNS = ("found_at", "applied_at", "closes_at")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
-               "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at", "selected", "injection")
+               "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at", "selected", "injection",
+               "prescore")
 
 
 # Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable (qa_passed is the index's 0/1
@@ -54,6 +55,7 @@ class JobRow(TypedDict):
     closes_at: str | None
     selected: int | None     # REQ-104: 1 = ticked for prepare/apply (a missing flag counts as ticked)
     injection: str | None    # REQ-109: uncleared injection reasons; None = not flagged or "I checked it"
+    prescore: int | None     # REQ-133: keyword pre-score 0-100 ("Quick match"), not the fit score
 
 
 class Reasons(TypedDict):

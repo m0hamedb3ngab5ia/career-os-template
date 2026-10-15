@@ -54,6 +54,33 @@ def score(text: str, required: list[str], preferred: list[str], title: str,
             "missing": groups["required"]["missing"] + groups["preferred"]["missing"]}
 
 
+PRESCORE_WEIGHTS = (0.8, 0.2)  # master-skill coverage, category title keyword hit
+
+
+def prescore(text: str, skills: list[str], title_keywords: list[str],
+             synonyms: dict[str, list[str]] | None = None) -> int:
+    """Keyword pre-score 0-100 (REQ-133, DEC-023): share of master skills named in the raw job text, plus whether
+    any of the job's category title_keywords appears; weights renormalised over non-empty groups. No LLM."""
+    syn = synonyms or {}
+    skills = list(dict.fromkeys(str(x).strip() for x in skills or [] if str(x).strip()))
+    groups = [(w, cov) for w, terms, cov in (
+        (PRESCORE_WEIGHTS[0], skills, lambda: sum(_hit(x, text, syn) for x in skills) / len(skills)),
+        (PRESCORE_WEIGHTS[1], title_keywords, lambda: float(any(term_hit(k, text) for k in title_keywords))),
+    ) if terms]
+    total = sum(w for w, _ in groups)
+    return round(100 * sum(w * cov() for w, cov in groups) / total) if total else 0
+
+
+def prescore_for(settings: Any, posting: dict[str, Any]) -> int:
+    """`prescore` for a posting dict: master.yaml `skills` groups + its prefilter category's title_keywords."""
+    sk = (settings.profile or {}).get("skills") or {}
+    skills = [x for v in (sk.values() if isinstance(sk, dict) else []) if isinstance(v, list) for x in v]
+    cat = (posting.get("raw") or {}).get("prefilter_category")
+    kws = settings.title_keywords().get(cat) or [] if cat else []
+    text = f"{posting.get('title') or ''}\n{posting.get('description_text') or ''}"
+    return prescore(text, skills, kws, (settings.pipeline.get("match") or {}).get("synonyms") or {})
+
+
 def _json(p: Path) -> dict[str, Any]:
     try:
         d = json.loads(p.read_text(encoding="utf-8"))

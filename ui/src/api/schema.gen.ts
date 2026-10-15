@@ -1854,6 +1854,8 @@ export interface components {
       location: string | null;
       /** Next Action */
       next_action: string | null;
+      /** Prescore */
+      prescore: number | null;
       /** Qa Passed */
       qa_passed: number | null;
       /** Qa Score */
@@ -1896,6 +1898,8 @@ export interface components {
       job_id: string;
       /** Location */
       location: string | null;
+      /** Prescore */
+      prescore: number | null;
       /** Qa Passed */
       qa_passed: number | null;
       /** Qa Score */

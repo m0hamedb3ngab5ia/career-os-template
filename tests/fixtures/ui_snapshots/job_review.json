@@ -89,6 +89,7 @@
     "injection": null,
     "job_id": "<job:review>",
     "location": "New York, NY",
+    "prescore": 0,
     "qa_passed": 1,
     "qa_score": 8.2,
     "safety": "review",

@@ -14,6 +14,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import logging
 import os
 import sqlite3
 import threading
@@ -25,8 +26,8 @@ from careeros import untrusted
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 6   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail;
-#                      6: jobs.selected, jobs.injection
+SCHEMA_VERSION = 7   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail;
+#                      6: jobs.selected, jobs.injection; 7: jobs.prescore (REQ-133)
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -34,7 +35,7 @@ CREATE TABLE jobs (
     job_id TEXT PRIMARY KEY, company TEXT, title TEXT, location TEXT, ats TEXT, url TEXT, apply_url TEXT,
     category TEXT, fit INTEGER, tier TEXT, status TEXT, safety TEXT, qa_passed INTEGER, qa_score REAL,
     found_at TEXT, applied_at TEXT, updated_at TEXT, closes_at TEXT, pruned INTEGER, sig TEXT,
-    selected INTEGER, injection TEXT);
+    selected INTEGER, injection TEXT, prescore INTEGER);
 CREATE INDEX jobs_status ON jobs(status);
 CREATE TABLE candidates (
     job_id TEXT PRIMARY KEY, status TEXT, score TEXT, has_score INTEGER, prepared_ok INTEGER, posting TEXT,
@@ -316,9 +317,13 @@ class Index:
 
     def update_jobs(self, job_ids: Iterable[str]) -> list[str]:
         """Re-index these jobs when their files changed; a job whose folder (or posting.json) is gone is removed.
-        Returns the ids whose rows changed."""
+        Returns the ids whose rows changed. A change to the master skills prescore uses (profile/master.yaml
+        `skills`, which no job's signature covers) reloads the profile and re-indexes every job."""
         changed = []
         with self._lock:
+            force = self._skills_changed()
+            if force:  # partial callers (watcher, reindex) pass a few ids; every job's prescore is stale
+                job_ids = list(dict.fromkeys([*job_ids, *self._job_ids()]))
             for jid in job_ids:
                 if not jid or _is_finder_copy(jid) or "/" in jid or jid.startswith((".", "_")):
                     continue
@@ -330,13 +335,39 @@ class Index:
                     continue
                 sig = _dir_sig(d)
                 row = self.query("SELECT sig FROM jobs WHERE job_id = ?", (jid,))
-                if row and row[0]["sig"] == sig:
+                if row and row[0]["sig"] == sig and not force:
                     continue
                 self._index_job(jid, d, sig)
                 changed.append(jid)
             if changed:
                 self.set_meta("indexed_at", _now())
         return changed
+
+    def _skills_changed(self) -> bool:
+        """True (and the profile reloaded) when the master skills differ from those the stored prescores used."""
+        import hashlib
+
+        from careeros.config import _load_yaml
+
+        try:
+            profile = _load_yaml(self.settings.paths["profile"])
+        except Exception as e:  # noqa: BLE001 - unreadable master: keep the settings we have
+            logging.getLogger(__name__).warning("prescore skills check skipped, master unreadable: %s", e)
+            return False
+        h = hashlib.sha1(json.dumps(profile.get("skills") or {}, sort_keys=True, default=str).encode()).hexdigest()
+        if h == self.get_meta("prescore_skills_hash"):
+            return False
+        self.settings.profile = profile
+        self.set_meta("prescore_skills_hash", h)
+        return True
+
+    def _prescore(self, posting: dict[str, Any]) -> int | None:
+        """Always recomputed against current master skills (REQ-133: changes when skills change); pure, no file
+        write, no Claude call. Also the backfill: the schema bump to 7 re-indexes every job once."""
+        raw = posting.get("raw") if isinstance(posting.get("raw"), dict) else {}
+        from careeros.match import prescore_for
+
+        return prescore_for(self.settings, {**posting, "raw": raw}) if posting else None
 
     def _index_job(self, jid: str, d: Path, sig: str) -> None:
         posting = _obj(d / "posting.json")
@@ -354,13 +385,13 @@ class Index:
         injection = ("; ".join(map(str, reasons)) or "suspected") if untrusted.blocked(flags) else None
         self._delete_job(jid)
         self.con.execute(
-            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (jid, posting.get("company"), posting.get("title"), posting.get("location"), posting.get("ats"),
              posting.get("url"), posting.get("apply_url"), score.get("category"),
              fit if isinstance(fit, int) and not isinstance(fit, bool) else None, score.get("tier"),
              status.get("status") or "found", safety.get("verdict"), qa_passed, qa_score, found_at, applied_at,
              status.get("updated_at"), posting.get("closes_at"), int(bool(posting.get("pruned"))), sig,
-             int(bool(flags.get("selected", True))), injection))
+             int(bool(flags.get("selected", True))), injection, self._prescore(posting)))
         self.con.execute("INSERT INTO candidates VALUES (?,?,?,?,?,?,?)",
                          (jid, status.get("status") or "found", json.dumps(candidate_score(score)),
                           int(bool(score) or (d / "score.json").exists()),
