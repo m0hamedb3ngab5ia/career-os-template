@@ -314,7 +314,7 @@ Old tab keys in a saved URL â†’ map to the nearest new tab (review/tier_a/all â†
 
 ### Settings
 - `ui.jobs_view` (list / table / board) in `data/ui_state.json` via existing `GET/PUT /api/ui-state` (atomic write, same as `tour_done`).
-- `/pipeline` route: 308 to `/jobs?tab=applied&view=board`; `GET /api/pipeline` kept until the Board reads from `/api/jobs?tab=applied`, then removed.
+- `/pipeline` route: 308 to `/jobs?tab=applied&view=board`; `GET /api/pipeline` removed (TASK-037); the Board reads `/api/jobs?tab=applied`.
 
 ### Failure + recovery
 | failure | effect | recovery |

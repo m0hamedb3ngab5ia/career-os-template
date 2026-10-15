@@ -68,49 +68,6 @@
         "title": "ActionHead",
         "type": "object"
       },
-      "ActionHint": {
-        "properties": {
-          "due": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Due"
-          },
-          "due_reason": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Due Reason"
-          },
-          "kind": {
-            "const": "action",
-            "title": "Kind",
-            "type": "string"
-          },
-          "type": {
-            "title": "Type",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind",
-          "type",
-          "due",
-          "due_reason"
-        ],
-        "title": "ActionHint",
-        "type": "object"
-      },
       "ActionItem": {
         "description": "One Action Item as /api/actions and Today's \"Needs you\" list return it (the OpenAPI shape).",
         "properties": {
@@ -1254,66 +1211,6 @@
         "title": "BatchJob",
         "type": "object"
       },
-      "Board": {
-        "properties": {
-          "applications": {
-            "items": {
-              "$ref": "#/components/schemas/Card"
-            },
-            "title": "Applications",
-            "type": "array"
-          },
-          "closed": {
-            "$ref": "#/components/schemas/Closed"
-          },
-          "funnel": {
-            "items": {
-              "$ref": "#/components/schemas/FunnelStage"
-            },
-            "title": "Funnel",
-            "type": "array"
-          },
-          "options": {
-            "$ref": "#/components/schemas/BoardOptions"
-          },
-          "submitted": {
-            "$ref": "#/components/schemas/Submitted"
-          }
-        },
-        "required": [
-          "funnel",
-          "submitted",
-          "applications",
-          "closed",
-          "options"
-        ],
-        "title": "Board",
-        "type": "object"
-      },
-      "BoardOptions": {
-        "properties": {
-          "categories": {
-            "items": {
-              "type": "string"
-            },
-            "title": "Categories",
-            "type": "array"
-          },
-          "locations": {
-            "items": {
-              "$ref": "#/components/schemas/LocationOption"
-            },
-            "title": "Locations",
-            "type": "array"
-          }
-        },
-        "required": [
-          "categories",
-          "locations"
-        ],
-        "title": "BoardOptions",
-        "type": "object"
-      },
       "Body_open_application_api_jobs__job_id__application_open_post": {
         "properties": {
           "refill": {
@@ -1340,192 +1237,6 @@
           }
         },
         "title": "CancelBody",
-        "type": "object"
-      },
-      "Card": {
-        "properties": {
-          "category": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Category"
-          },
-          "company": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Company"
-          },
-          "fit": {
-            "anyOf": [
-              {
-                "type": "integer"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Fit"
-          },
-          "found_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Found At"
-          },
-          "hint": {
-            "anyOf": [
-              {
-                "$ref": "#/components/schemas/ActionHint"
-              },
-              {
-                "$ref": "#/components/schemas/SafetyHint"
-              },
-              {
-                "$ref": "#/components/schemas/NotScoredHint"
-              },
-              {
-                "$ref": "#/components/schemas/TierAHint"
-              },
-              {
-                "$ref": "#/components/schemas/QaFailedHint"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Hint"
-          },
-          "job_id": {
-            "title": "Job Id",
-            "type": "string"
-          },
-          "location": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Location"
-          },
-          "override": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Override"
-          },
-          "qa_passed": {
-            "anyOf": [
-              {
-                "type": "boolean"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qa Passed"
-          },
-          "qa_score": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Qa Score"
-          },
-          "safety": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Safety"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          },
-          "tier": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Tier"
-          },
-          "title": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Title"
-          },
-          "updated_at": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Updated At"
-          }
-        },
-        "required": [
-          "job_id",
-          "company",
-          "title",
-          "location",
-          "category",
-          "fit",
-          "tier",
-          "status",
-          "safety",
-          "qa_passed",
-          "qa_score",
-          "found_at",
-          "updated_at",
-          "override",
-          "hint"
-        ],
-        "title": "Card",
         "type": "object"
       },
       "CatchUp": {
@@ -1817,27 +1528,6 @@
           }
         },
         "title": "ClearBody",
-        "type": "object"
-      },
-      "Closed": {
-        "properties": {
-          "by_status": {
-            "additionalProperties": {
-              "type": "integer"
-            },
-            "title": "By Status",
-            "type": "object"
-          },
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          }
-        },
-        "required": [
-          "count",
-          "by_status"
-        ],
-        "title": "Closed",
         "type": "object"
       },
       "ClosedCount": {
@@ -3308,24 +2998,6 @@
           }
         },
         "title": "FlagBody",
-        "type": "object"
-      },
-      "FunnelStage": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "status": {
-            "title": "Status",
-            "type": "string"
-          }
-        },
-        "required": [
-          "status",
-          "count"
-        ],
-        "title": "FunnelStage",
         "type": "object"
       },
       "GroupSchema": {
@@ -5049,24 +4721,6 @@
         "title": "Lessons",
         "type": "object"
       },
-      "LocationOption": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "value": {
-            "title": "Value",
-            "type": "string"
-          }
-        },
-        "required": [
-          "value",
-          "count"
-        ],
-        "title": "LocationOption",
-        "type": "object"
-      },
       "MarkBody": {
         "properties": {
           "degree": {
@@ -5463,20 +5117,6 @@
           "text"
         ],
         "title": "NewLesson",
-        "type": "object"
-      },
-      "NotScoredHint": {
-        "properties": {
-          "kind": {
-            "const": "not_scored",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind"
-        ],
-        "title": "NotScoredHint",
         "type": "object"
       },
       "NoteBody": {
@@ -5999,20 +5639,6 @@
           "n"
         ],
         "title": "Published",
-        "type": "object"
-      },
-      "QaFailedHint": {
-        "properties": {
-          "kind": {
-            "const": "qa_failed",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind"
-        ],
-        "title": "QaFailedHint",
         "type": "object"
       },
       "QuietHours": {
@@ -7598,25 +7224,6 @@
         "title": "RunsAdvice",
         "type": "object"
       },
-      "SafetyHint": {
-        "properties": {
-          "kind": {
-            "const": "safety",
-            "title": "Kind",
-            "type": "string"
-          },
-          "text": {
-            "title": "Text",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind",
-          "text"
-        ],
-        "title": "SafetyHint",
-        "type": "object"
-      },
       "Sample": {
         "properties": {
           "name": {
@@ -8558,38 +8165,6 @@
           "config"
         ],
         "title": "StorageView",
-        "type": "object"
-      },
-      "Submitted": {
-        "properties": {
-          "count": {
-            "title": "Count",
-            "type": "integer"
-          },
-          "since": {
-            "title": "Since",
-            "type": "string"
-          }
-        },
-        "required": [
-          "count",
-          "since"
-        ],
-        "title": "Submitted",
-        "type": "object"
-      },
-      "TierAHint": {
-        "properties": {
-          "kind": {
-            "const": "tier_a",
-            "title": "Kind",
-            "type": "string"
-          }
-        },
-        "required": [
-          "kind"
-        ],
-        "title": "TierAHint",
         "type": "object"
       },
       "TileRow": {
@@ -12907,91 +12482,6 @@
         "summary": "Meta",
         "tags": [
           "meta"
-        ]
-      }
-    },
-    "/api/pipeline": {
-      "get": {
-        "operationId": "board_api_pipeline_get",
-        "parameters": [
-          {
-            "in": "query",
-            "name": "tier",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "type": "string"
-              },
-              "title": "Tier",
-              "type": "array"
-            }
-          },
-          {
-            "in": "query",
-            "name": "category",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "type": "string"
-              },
-              "title": "Category",
-              "type": "array"
-            }
-          },
-          {
-            "in": "query",
-            "name": "safety",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "type": "string"
-              },
-              "title": "Safety",
-              "type": "array"
-            }
-          },
-          {
-            "in": "query",
-            "name": "location",
-            "required": false,
-            "schema": {
-              "default": [],
-              "items": {
-                "type": "string"
-              },
-              "title": "Location",
-              "type": "array"
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/Board"
-                }
-              }
-            },
-            "description": "Successful Response"
-          },
-          "422": {
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            },
-            "description": "Validation Error"
-          }
-        },
-        "summary": "Board",
-        "tags": [
-          "pipeline"
         ]
       }
     },

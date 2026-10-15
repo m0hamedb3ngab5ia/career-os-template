@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from fastapi import FastAPI, Request
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, Response
+from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse, Response
 
 from careeros.config import ConfigError, Settings
 from careeros.ui.events import Broker
@@ -119,7 +119,7 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import actions, contacts, events, health, inbox, jobs, meta, pipeline, runs, status
+    from careeros.ui.routers import actions, contacts, events, health, inbox, jobs, meta, runs, status
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -150,7 +150,7 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     async def bad_config(_: Request, e: ConfigError) -> JSONResponse:
         return JSONResponse({"detail": str(e)}, status_code=503)
 
-    for r in (health, meta, status, jobs, events, runs, actions, pipeline):
+    for r in (health, meta, status, jobs, events, runs, actions):
         app.include_router(r.router, prefix="/api")
     from careeros.ui.routers import settings as settings_r, storage as storage_r  # Settings + Storage slice
     for r in (settings_r, storage_r):
@@ -174,6 +174,10 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:
         return JSONResponse({"detail": f"no such endpoint: /api/{rest}"}, status_code=404)
+
+    @app.get("/pipeline", include_in_schema=False)
+    async def pipeline_moved() -> Response:  # DEC-022: the Pipeline page became Jobs › Applied › Board
+        return RedirectResponse("/jobs?tab=applied&view=board", status_code=308)
 
     @app.get("/{path:path}", include_in_schema=False)
     async def frontend(path: str) -> Response:

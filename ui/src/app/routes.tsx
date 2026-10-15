@@ -10,7 +10,8 @@ export const routes: RouteObject[] = [
     element: <AppShell />,
     children: [
       { index: true, element: <TodayPage /> },
-      { path: "pipeline", lazy: () => import("../features/pipeline/PipelinePage").then((m) => ({ Component: m.PipelinePage })) },
+      // DEC-022: the Pipeline page became Jobs › Applied › Board (REQ-129); the server also 308s /pipeline.
+      { path: "pipeline", loader: () => redirect("/jobs?tab=applied&view=board") },
       { path: "pipeline/batch/:id", lazy: () => import("../features/pipeline/batch/Progress").then((m) => ({ Component: m.BatchProgressPage })) },
       { path: "jobs", lazy: () => import("../features/jobs/JobsPage").then((m) => ({ Component: m.JobsPage })) },
       { path: "jobs/:jobId", lazy: () => import("../features/jobs/JobsRoute").then((m) => ({ Component: m.JobsRoute })) },

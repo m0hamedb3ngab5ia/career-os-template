@@ -11,13 +11,12 @@ interface UiState {
   tour_done: boolean;
 }
 
-/** One step per main nav item + Start pipeline (REQ-121, ≤8). `selector` points at a page control when it is on
- *  screen (the Jobs page), else the step points at its nav item. */
+/** One step per main nav item + Start pipeline (REQ-121, ≤8). Every step points at its nav item: the Start pipeline
+ *  control is only on screen in Jobs › Saved, so that step points at Jobs and names the tab. */
 export const TOUR_STEPS: { to: string; title: string; text: string; selector?: string }[] = [
   { to: "/", title: "Today", text: "What needs you now: setup, top picks and what needs you." },
-  { to: "/jobs", title: "Jobs", text: "Every job found. Tick the ones you want to work on." },
-  { to: "/jobs", selector: '[data-tour="start-pipeline"]', title: "Start pipeline", text: "Tick jobs, then Start pipeline to choose how far each one goes: prepare, fill or submit." },
-  { to: "/pipeline", title: "Pipeline", text: "Where each application stands, from found to offer." },
+  { to: "/jobs", title: "Jobs", text: "Every job found. The Applied tab’s Board shows where each application stands." },
+  { to: "/jobs", title: "Start pipeline", text: "In Jobs › Saved, tick jobs, then Start pipeline to choose how far each one goes: prepare, fill or submit." },
   { to: "/inbox", title: "Inbox", text: "Replies from companies, sorted so you see what matters first." },
   { to: "/profile", title: "Profile", text: "Your résumés, saved answers and writing samples, plus the checklist to finish before applying." },
   { to: "/settings", title: "Settings", text: "Searches, limits and schedule. “How to use” here replays this tour." },

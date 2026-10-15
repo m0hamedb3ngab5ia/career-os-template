@@ -170,7 +170,7 @@ Bulk done/reopen, answer, due, block/unblock company, mark-safe + undo.
 observed · Evidence: routers/actions.py:65-147 · Tests: tests/test_ui_actions_service.py
 ### REQ-074 Pipeline + batch builder
 Deprecated 2026-10-13 (DEC-022): Pipeline page folded into Jobs › Applied › Board (REQ-129). `/pipeline` redirects to `/jobs?tab=applied&view=board`. Batch progress `/pipeline/batch/:id` stays (REQ-117).
-observed · Evidence: routers/pipeline.py, batches.py · Tests: tests/test_ui_pipeline_service.py
+observed · Evidence: batches.py, app.py (`/pipeline` 308) · Tests: tests/test_ui_pipeline_redirect.py
 ### REQ-075 Automation (runs) page
 Runs list/detail/stream, steps, cancel/pause/resume/catch-up, schedule control.
 observed · Evidence: routers/runs.py · Tests: tests/test_ui_runs_service.py, test_ui_runs_view.py
