@@ -217,19 +217,29 @@ class RunControl:
 
     def start(self, kind: str, preset: str | None = None, max_jobs: int | None = None,
               max_minutes: float | None = None, dry_run: bool = False, *, job_id: str | None = None,
-              force: bool = False, force_tailor: bool = False) -> dict[str, Any]:
-        """Start a score or prepare batch (same as `careeros run <kind> ...`), or with `job_id` one job's
+              force: bool = False, force_tailor: bool = False,
+              job_ids: list[str] | None = None) -> dict[str, Any]:
+        """`job_ids` (score only, REQ-137 Score now): one run over exactly those jobs, never ticking them.
+        Start a score or prepare batch (same as `careeros run <kind> ...`), or with `job_id` one job's
         score / prepare / apply run (`careeros run <kind> --job <id> [--force]`, run id chosen here and returned
         as `run_id`). A dry run ranks and returns the selection in-process: it never calls Claude and takes no
         lock, so there is nothing to detach. JobNotRunnable (the runner's own reasons) before anything is
         spawned when the job is not a candidate; Tier A is never submitted (the run stages it for review)."""
         from careeros.runs.config import budget_for, load_runs_config
 
+        if job_ids:
+            if kind != "score" or job_id:
+                raise ValueError("job_ids is for score runs only")
+            if not all(re.fullmatch(r"\w[\w.-]*", j) for j in job_ids):
+                raise ValueError("bad job id")
+            job_id = job_ids[0]
+            max_jobs = len(job_ids)
+        ids = job_ids or ([job_id] if job_id else None)
         kinds = JOB_KINDS if job_id else BATCH_KINDS
         if kind not in kinds:
             raise ValueError(f"unknown run kind {kind!r}; use {' or '.join(kinds)}")
         cfg = load_runs_config(self.settings)
-        if job_id:
+        if job_id and not job_ids:
             max_jobs = 1
         budget_for(cfg, kind, preset=preset, max_jobs=max_jobs, max_minutes=max_minutes)  # ValueError on bad input
         if dry_run:
@@ -237,7 +247,7 @@ class RunControl:
 
             return run_batch(self.settings, kind, budget_for(cfg, kind, preset=preset, max_jobs=max_jobs,
                                                              max_minutes=max_minutes), cfg=cfg, dry_run=True,
-                             job_ids=[job_id] if job_id else None, force=force)
+                             job_ids=ids, force=force)
         if kind == "apply":  # REQ-103: NotReady (409) before anything is spawned
             from careeros.readiness import require_ready
 
@@ -254,10 +264,10 @@ class RunControl:
             from careeros.store import Store
 
             store = Store(self.settings)
-            untick = store.exists(job_id) and not store.is_selected(job_id)
-            if untick:
+            untick = kind != "score" and store.exists(job_id) and not store.is_selected(job_id)
+            if untick:  # REQ-137: scoring never ticks
                 store.set_selected([job_id], True)  # REQ-104: running one job ticks it
-            ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=[job_id], force=force,
+            ranked, excluded = select_candidates(self.settings, kind, cfg, self.now(), job_ids=ids, force=force,
                                                  skip_ids=skip)
             if not ranked:
                 if untick:  # refused: the tick never happened (REQ-114 "no run = unticked")
@@ -273,8 +283,8 @@ class RunControl:
         if max_minutes is not None:
             argv += ["--max-minutes", f"{max_minutes:g}"]
         if job_id:
-            argv += ["--job", job_id, *(["--force"] if force else []), *(["--force-tailor"] if force_tailor else []),
-                     "--run-id", run_id]
+            argv += [x for j in ids for x in ("--job", j)]
+            argv += [*(["--force"] if force else []), *(["--force-tailor"] if force_tailor else []), "--run-id", run_id]
         out = {"kind": kind, **self.spawn(run_id or kind, [*argv, "--json"])}
         return {**out, "run_id": run_id} if job_id else out
 

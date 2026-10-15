@@ -357,3 +357,25 @@ def test_refused_job_run_leaves_the_job_unticked(client, data, fakes):
     with pytest.raises(JobNotRunnable):
         fakes.factory(data["settings"]).start("prepare", job_id=jid)
     assert store.is_selected(jid)
+
+
+def test_jobs_score_starts_one_unticked_score_run_E2E_017_04(client, fakes, data):
+    from careeros.store import Store
+
+    store = Store(data["settings"])
+    ids = [data["jobs"]["found"]]
+    store.set_selected(ids, False)
+    r = client.post("/api/jobs/score", json={"job_ids": ids}, headers=W)
+    assert r.status_code == 200, r.text
+    body = r.json()
+    assert body["kind"] == "score" and body["run_id"]
+    cmd = fakes.spawned[0]
+    assert cmd[-1] == "--json" and cmd[cmd.index("score") + 1:].count("--job") == len(ids)
+    assert body["run_id"] in cmd
+    assert not any(store.is_selected(j) for j in ids)
+
+
+def test_jobs_score_unknown_id_is_404_and_starts_nothing_E2E_017_04(client, fakes):
+    r = client.post("/api/jobs/score", json={"job_ids": ["nope"]}, headers=W)
+    assert r.status_code == 404 and "nope" in r.text and not fakes.spawned
+    assert client.post("/api/jobs/score", json={"job_ids": []}, headers=W).status_code == 422
