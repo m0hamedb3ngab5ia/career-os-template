@@ -105,18 +105,37 @@ def _guard(doc: dict[str, Any], text: str) -> None:
             raise ImportRefused(f"{at} not in the uploaded text: {s!r}")
 
 
+_FILLER = set("a an the of in on at to for and or with by from as & jan feb mar apr may jun jul aug sep sept oct nov "
+               "dec january february march april june july august september october november december present "
+               "current now today".split())  # joiners, plus date words a structured résumé stores normalised
+
+
+def _words(s: str) -> list[str]:
+    return re.findall(r"[^\W_]+", s.casefold())
+
+
+def _title(line: str) -> bool:
+    """A heading: a short, capitalised, unpunctuated, glyph-less line ("Leadership & Additional Experience")."""
+    words = line.split()
+    return (0 < len(words) <= 5 and not re.search(r"[\d.,:;!?|()]", line) and line[:1] not in _BULLETS + "*-"
+            and all(w[:1].isupper() or w.casefold() in _FILLER for w in words))
+
+
 def _dropped(doc: dict[str, Any], text: str) -> list[dict[str, Any]]:
-    """Whole v1 lines the structured résumé doesn't carry ("Not carried over", E2E-001-04); headers skipped."""
-    leaves = [_key(s) for _, s in _leaves(doc)]
+    """v1 lines the structured résumé doesn't carry ("Not carried over", E2E-001-04); headings skipped. A line is
+    carried when (a bullet) none or (any other line) ≤20% of its content words (minus joiners and date words) are absent from the doc's words, its
+    leaves and keys (labels like "GPA:"): entries split into fields and list items wrapped across lines count."""
+    have = {w for at, s in _leaves(doc) for w in _words(f"{at} {s}")}
     out = []
     for line in text.splitlines():
+        raw = " ".join(line.split())
         k = _key(line).lstrip(_GLYPHS)
-        if not k or _header(k, doc) or any(_has(x, k) for x in leaves):
+        if not k or _header(k, doc) or _title(raw):
             continue
-        for x in leaves:
-            k = re.sub(rf"(?<!\w){re.escape(x)}(?!\w)", " ", k)
-        if re.search(r"\w", k):
-            out.append({"id": f"d{len(out) + 1}", "text": " ".join(line.split()).lstrip(_GLYPHS), "restored": False})
+        words = [w for w in _words(k) if w not in _FILLER]
+        miss = sum(w not in have for w in words)  # a bullet is carried verbatim (the guard), so any new word drops it
+        if miss and (raw[:1] in _BULLETS + "*-" or 5 * miss > len(words)):
+            out.append({"id": f"d{len(out) + 1}", "text": raw.lstrip(_GLYPHS), "restored": False})
     return out
 
 

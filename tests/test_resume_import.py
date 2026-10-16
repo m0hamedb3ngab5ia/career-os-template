@@ -141,6 +141,47 @@ def test_dropped_skips_headers_and_compares_whole_lines():
     assert [d["text"] for d in imp._dropped(doc, text)] == ["Built the thing twice"]
 
 
+_DOC3 = {"identity": {"name": "Sam Lee"},
+         "experience": [{"company": "Acme Labs", "title": "Lead iOS Engineer", "start": "2025-11",
+                         "tech": ["Swift", "SwiftUI", "Combine"],
+                         "bullets": [{"text": "Shipped the offline sync engine"}]}],
+         "projects": [{"name": "Autonomous Rover Project", "tech": ["C++"], "start": "2023-01", "end": "2023-05"}],
+         "education": [{"school": "State University", "degree": "Bachelor of Science", "field": "Computer Science",
+                        "gpa": "3.7", "coursework": ["Data Structures", "Machine Learning", "Linear Algebra",
+                                                     "Operating Systems"],
+                        "activities": ["Robotics Club", "Chess Club"]}],
+         "leadership": [{"org": "Robotics Club", "title": "Captain"}],
+         "skills": [{"category": "Languages", "items": ["Java", "Python"]},
+                    {"category": "Testing & CI", "items": ["pytest", "XCTest"]},
+                    {"category": "Engineering Tools", "items": ["Git", "Docker"]}]}
+
+
+@pytest.mark.parametrize("line", [
+    "Acme Labs, Lead iOS Engineer | Swift, SwiftUI, Combine Nov 2025 – Present",  # header split into fields
+    "Autonomous Rover Project | C++ Jan – May 2023",
+    "Bachelor of Science in Computer Science, GPA: 3.7",  # label is a doc key
+    "Relevant Coursework: Data Structures, Machine",  # list item wrapped across lines
+    "Learning, Linear Algebra, Operating Systems",
+    "Activities: Robotics Club, Chess Club",
+    "Leadership & Additional Experience",  # title-like heading not in _HEAD
+    "Languages: Java, Python",
+    "Testing & CI : pytest, XCTest",
+    "Engineering Tools : Git, Docker",
+])
+def test_dropped_ignores_lines_carried_as_fields(line: str):
+    assert imp._dropped(_DOC3, f"Sam Lee\n{line}\n• Shipped the offline sync engine\n") == []
+
+
+@pytest.mark.parametrize("line", [
+    "• Volunteered at food bank weekly, organizing 40 drivers",  # missing bullet
+    "Mentored interns on Swift testing practices",  # mostly novel words, a few covered
+    "Hobbies: chess",
+    "• Shipped the offline sync engine twice",  # one novel word in a short line
+])
+def test_dropped_still_flags_missing_lines(line: str):
+    assert [d["text"] for d in imp._dropped(_DOC3, f"Sam Lee\n{line}\n")] == [line.lstrip("• ")]
+
+
 def test_restore_after_crash_before_import_json_does_not_double_add(tmp_path: Path, monkeypatch):
     from careeros.runs import atomic
 
