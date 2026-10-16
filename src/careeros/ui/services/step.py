@@ -292,7 +292,7 @@ def run_import(settings: Settings, rid: str, run_skill: Any = None, run_id: str 
         from careeros.runs.service import run_skill
     resume_import.set_state(settings.root, rid, "running", run=run_id, pid=os.getpid())
     try:
-        rec = run_skill(settings, "extract_master", f"extract-master {rid}", run_id=run_id)
+        rec = run_skill(settings, "extract_master", f"extract-master {rid}", run_id=run_id, lock="import")
     except Exception as e:  # noqa: BLE001 - busy runner, claude missing: recorded as a failed import
         rec = {"id": run_id, "stop_reason": "error", "detail": str(e)}
     st = resume_import.load(settings.root, rid)

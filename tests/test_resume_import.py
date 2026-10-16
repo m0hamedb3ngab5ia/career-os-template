@@ -177,7 +177,8 @@ def test_run_import_loser_leaves_winner_and_dead_run_reads_failed(tmp_path: Path
     monkeypatch.setattr("careeros.tracker.add_action", lambda *a, **kw: added.append(a))
     settings = type("S", (), {"root": root})()
 
-    def busy(s, kind, prompt, run_id=None):
+    def busy(s, kind, prompt, run_id=None, lock=None):
+        assert lock == "import"  # own lock: a 2nd upload's import queues behind the 1st instead of failing
         imp.set_state(root, rid, "running", run="winner")  # the other fast Retry took over import.json
         return {"id": run_id, "stop_reason": "busy"}
     step.run_import(settings, rid, run_skill=busy, run_id="loser")
@@ -262,3 +263,4 @@ def test_save_refuses_malformed_shape(tmp_path: Path, bad):  # Codex MUST: shape
     with pytest.raises(imp.ImportRefused, match="malformed"):
         imp.save(root, rid, {"schema_version": 1, **bad})
     assert [v["n"] for v in resumes.get(root, rid)["versions"]] == [1]
+

@@ -5,7 +5,7 @@ import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
-import { retryImport, useProfileWrite, useResumeMeta, useResumes } from "../profile/api";
+import { retryImport, useImport, useProfileWrite, useResumeMeta, useResumes } from "../profile/api";
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput } from "./fields";
 import { History } from "./History";
@@ -360,18 +360,22 @@ function skillRows(doc: Doc): { label: string; path: (string | number)[]; items:
 /** An upload from before the editor has no structured version yet: run the import (DEC-019), then load the draft. */
 function MakeEditable({ rid, onReady }: { rid: string; onReady: () => void }) {
   const start = useProfileWrite(retryImport);
-  // ponytail: re-asks for the draft every 3 s while the import runs; poll the import run instead if this gets slow
+  const imp = useImport(rid);
+  const refetchImport = imp.refetch;
+  // ponytail: re-asks for the draft and the import state every 3 s while the import runs; fine for a one-minute run
   useEffect(() => {
     if (!start.isSuccess) return;
-    const t = window.setInterval(onReady, 3000);
+    const t = window.setInterval(() => { onReady(); void refetchImport(); }, 3000);
     return () => window.clearInterval(t);
-  }, [start.isSuccess, onReady]);
-  if (start.isSuccess) return <p role="status" className={styles.muted}>Making this résumé editable… this takes about a minute.</p>;
+  }, [start.isSuccess, onReady, refetchImport]);
+  const failed = start.isSuccess && imp.data?.state === "failed" && imp.dataUpdatedAt > start.submittedAt;
+  if (start.isSuccess && !failed) return <p role="status" className={styles.muted}>Making this résumé editable… this takes about a minute.</p>;
   return (
     <p className={styles.muted}>
       This résumé was uploaded before the editor existed, so it has no editable version yet.{" "}
-      <Button size="small" variant="primary" pending={start.isPending} pendingLabel="Starting…" onClick={() => start.mutate(rid)}>Make editable</Button>
+      <Button size="small" variant="primary" pending={start.isPending} pendingLabel="Starting…" onClick={() => start.mutate(rid)}>{failed ? "Try again" : "Make editable"}</Button>
       {start.isError ? <span role="alert" className={styles.alert}> {errorText(start.error)}</span> : null}
+      {failed ? <span role="alert" className={styles.alert}> Couldn’t make it editable{imp.data?.reason ? `: ${imp.data.reason}` : ""}.</span> : null}
     </p>
   );
 }

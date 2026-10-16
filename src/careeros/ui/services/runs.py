@@ -347,7 +347,11 @@ class RunControl:
                                "skill is finished and Gmail is logged in")
             self._check_can_start()  # a headless skill call: the runner lock and pause apply
         elif kind in ("extract_master", "learn_voice"):  # run id here, so the UI can follow the run
-            self._check_can_start()
+            if kind == "extract_master" and resume:  # DEC-019 import: own lock, queues behind another import
+                if self.rs.pause_state(self.now()):
+                    raise Paused("runs are paused; resume them first")
+            else:
+                self._check_can_start()
             rid = f"{self.now().astimezone().strftime('%Y%m%d-%H%M%S')}-{kind}-{os.urandom(2).hex()}"
             if resume and (kind != "extract_master" or not re.fullmatch(r"[a-z0-9][a-z0-9-]*", resume)):
                 raise ValueError(f"bad résumé id {resume!r} for {kind}")
