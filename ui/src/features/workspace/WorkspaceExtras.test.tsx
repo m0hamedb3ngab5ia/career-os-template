@@ -164,3 +164,47 @@ describe("Workspace extras", () => {
     expect(await screen.findByLabelText("Résumé draft")).toBeInTheDocument();
   });
 });
+
+describe("Comment card highlight", () => {
+  const marked = () => Array.from(document.querySelectorAll("[id^='t-'][data-on]")).map((e) => e.id);
+
+  it("selecting a card highlights its target and scrolls to it; selecting it again clears it", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    api();
+    renderRoutes(routes, "/resumes/cv");
+    const card = await screen.findByRole("button", { name: "Impact" });
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "true");
+    expect(marked()).toEqual(["t-experience-1.b1"]);
+    expect(scroll).toHaveBeenCalled();
+    fireEvent.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    expect(marked()).toEqual([]);
+  });
+
+  it("a bridged comment (no target) highlights every field matching its quote, case/whitespace-insensitive", async () => {
+    const old = { id: "f1", kind: "comment", author: "ai", status: "open", target_id: null, base: " BUILT\n  it ", proposed: null, text: "Projects: vague", replies: [], at: null };
+    api({
+      "GET /api/profile/resumes/cv/draft": { rev: 3, resume: { ...DOC, summary: "I built it twice" }, draft: true },
+      "GET /api/profile/resumes/cv/annotations": [old],
+    });
+    renderRoutes(routes, "/resumes/cv");
+    fireEvent.click(await screen.findByRole("button", { name: "Projects: vague" }));
+    expect(marked().sort()).toEqual(["t-projects-1.b1", "t-summary"]);
+  });
+
+  it("a card with neither target nor matchable quote still selects, with no highlight", async () => {
+    const lone = { id: "f2", kind: "comment", author: "ai", status: "open", target_id: null, base: null, proposed: null, text: "General: tighten", replies: [], at: null };
+    api({ "GET /api/profile/resumes/cv/annotations": [lone, { ...lone, id: "f3", base: "not in the résumé", text: "Other" }] });
+    renderRoutes(routes, "/resumes/cv");
+    const card = await screen.findByRole("button", { name: "General: tighten" });
+    fireEvent.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(screen.getByRole("button", { name: "Other" }));
+    expect(screen.getByRole("button", { name: "Other" })).toHaveAttribute("aria-pressed", "true");
+    expect(card).toHaveAttribute("aria-pressed", "false");
+    expect(marked()).toEqual([]);
+  });
+});

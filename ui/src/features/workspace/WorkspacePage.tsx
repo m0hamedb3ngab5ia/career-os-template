@@ -11,7 +11,7 @@ import { Field, ListInput } from "./fields";
 import { History } from "./History";
 import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
-import { cap, type Entry, SKIP, sectionOrder, setAt, targetOrder } from "./doc";
+import { cap, type Entry, norm, SKIP, sectionOrder, setAt, targetOrder, targetTexts } from "./doc";
 import styles from "./Workspace.module.css";
 
 /** /resumes/:rid — the résumé draft: edit in place, act on suggestions, autosave, Done = one new version. */
@@ -24,7 +24,8 @@ function Workspace() {
   const anns = useAnnotations(rid);
   const save = useAutosave(rid);
   const [doc, setDoc] = useState<Doc | null>(null);
-  const [active, setActive] = useState<string | null>(null);
+  const [active, setActive] = useState<string | null>(null);  // the focused field's target id
+  const [picked, setPicked] = useState<string | null>(null);  // the selected card's annotation id (wins over `active`)
   const [tab, setTab] = useState<"doc" | "ats">("doc");
   const [history, setHistory] = useState(false);
   // FLOW-001: Next replaces Done while the master is still a draft; ?onboarding=1 forces the first-run flow for testing.
@@ -136,14 +137,29 @@ function Workspace() {
   const pos = (a: Annotation) => { const i = order.indexOf(a.target_id ?? ""); return i < 0 ? order.length : i; };
   const cards = open.slice().sort((a, b) => pos(a) - pos(b));
   const onTarget = (id: string) => open.filter((a) => a.target_id === id);
+  const texts = targetTexts(doc);
+  /** Fields a card points at: its target, else (bridged feedback items have none) every field holding its quote. */
+  const hits = (a: Annotation): string[] => {
+    if (a.target_id) return [a.target_id];
+    const q = norm(a.base);
+    return q ? texts.filter(([, t]) => norm(t).includes(q)).map(([id]) => id) : [];
+  };
+  const sel = open.find((a) => a.id === picked);
+  const lit = sel ? hits(sel) : active ? [active] : [];
+  /** Select a card (toggle unless `keep`): highlight its passages and scroll the first into view. */
+  const pick = (a: Annotation, keep = false) => {
+    if (picked === a.id) { if (!keep) setPicked(null); return; }
+    setPicked(a.id);
+    if (!keep) document.getElementById(`t-${hits(a)[0]}`)?.scrollIntoView?.({ block: "center" });
+  };
 
   /** A field the annotations can point at: highlight, inline suggestion preview, focus pairs it with its card. */
   const target = (id: string, child: ReactNode) => {
     const here = onTarget(id);
     const sugg = here.find((a) => a.kind === "suggestion" && a.proposed);
     return (
-      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={active === id || undefined}
-        onFocus={() => setActive(id)}>
+      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={lit.includes(id) || undefined}
+        onFocus={() => { setActive(id); setPicked(null); }}>
         {child}
         {sugg ? <p className={styles.sugg}><del>{sugg.base}</del> <ins>{sugg.proposed}</ins></p> : null}
       </div>
@@ -243,7 +259,7 @@ function Workspace() {
         {history
           ? <History rid={rid} flush={save.flush} lock={setAccepting} onClose={() => setHistory(false)}
               onReverted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} />
-          : <Margin rid={rid} cards={cards} active={active} setActive={setActive}
+          : <Margin rid={rid} cards={cards} on={(a) => (sel ? sel.id === a.id : active !== null && active === a.target_id)} pick={pick}
               onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} flush={save.flush} lock={setAccepting}
               refresh={refresh} />}
       </div>)}
@@ -255,8 +271,8 @@ function Workspace() {
 interface MarginProps {
   rid: string;
   cards: Annotation[];
-  active: string | null;
-  setActive: (id: string) => void;
+  on: (a: Annotation) => boolean;
+  pick: (a: Annotation, keep?: boolean) => void;
   onAccepted: (d: { rev: number; resume: Doc }) => void;
   flush: () => Promise<boolean>;
   lock: (b: boolean) => void;
@@ -264,7 +280,7 @@ interface MarginProps {
 }
 
 /** Margin cards, each placed level with its target (pushed down to avoid overlap); stacked on narrow screens. */
-function Margin({ rid, cards, active, setActive, onAccepted, flush, lock, refresh }: MarginProps) {
+function Margin({ rid, cards, on, pick, onAccepted, flush, lock, refresh }: MarginProps) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const aside = ref.current;
@@ -281,13 +297,13 @@ function Margin({ rid, cards, active, setActive, onAccepted, flush, lock, refres
   });
   return (
     <aside ref={ref} className={styles.margin} aria-label="Suggestions">
-      {cards.map((a) => <Card key={a.id} rid={rid} a={a} on={active === a.target_id} setActive={setActive}
+      {cards.map((a) => <Card key={a.id} rid={rid} a={a} on={on(a)} pick={pick}
         onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh} />)}
     </aside>
   );
 }
 
-function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "active"> & { a: Annotation; on: boolean }) {
+function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "on"> & { a: Annotation; on: boolean }) {
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
   const [failed, setFailed] = useState("");
@@ -322,9 +338,10 @@ function Card({ rid, a, on, setActive, onAccepted, flush, lock, refresh }: Omit<
   const tid = `card-${a.id}`;
   return (
     <article className={styles.card} data-on={on || undefined} data-for={a.target_id ?? ""} aria-labelledby={tid}
-      onFocus={() => a.target_id && setActive(a.target_id)}>
+      onFocus={(e) => { if ((e.target as Element).closest("form")) pick(a, true); }}
+      onClick={(e) => { if (!(e.target as Element).closest("form, button")) pick(a); }}>
       <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggests` : `${who} commented`}</p>
-      <p id={tid}>{a.text}</p>
+      <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
       {(a.replies ?? []).map((r, i) => (
         <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>
       ))}
