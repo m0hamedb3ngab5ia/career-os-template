@@ -23,10 +23,14 @@ export function sectionOrder(doc: Doc): string[] {
   return types.filter((t) => [...ENTRY_SECTIONS, "skills"].includes(t) && has(t));
 }
 
-/** Annotation targets in document order: summary, then every bullet. Cards follow this order. */
-export function targetOrder(doc: Doc): string[] {
-  const ids = ["summary"];
-  for (const t of sectionOrder(doc)) for (const e of (ENTRY_SECTIONS.includes(t) ? (doc[t] as Entry[]) : [])) for (const b of e.bullets ?? []) if (b.id) ids.push(b.id);
-  return ids;
+/** Annotation targets with their text, in document order: summary, then every bullet. Cards follow this order. */
+export function targetTexts(doc: Doc): [string, string][] {
+  const out: [string, string][] = [["summary", String(doc.summary ?? "")]];
+  for (const t of sectionOrder(doc)) for (const e of (ENTRY_SECTIONS.includes(t) ? (doc[t] as Entry[]) : [])) for (const b of e.bullets ?? []) if (b.id) out.push([b.id, b.text ?? ""]);
+  return out;
 }
+export const targetOrder = (doc: Doc): string[] => targetTexts(doc).map(([id]) => id);
+
+/** Text for case/whitespace-insensitive matching ("" for none). */
+export const norm = (s: unknown): string => (typeof s === "string" ? s.toLowerCase().replace(/\s+/g, " ").trim() : "");
 

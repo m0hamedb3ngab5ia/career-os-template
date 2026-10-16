@@ -24,6 +24,10 @@
   padding: var(--space-2) var(--space-3); transition: top 0.2s; }
 .card[data-on] { outline: 2px solid var(--accent); }
 .card p { margin: var(--space-1) 0; }
+/* The comment text doubles as the card's select toggle: reads as text, selection shows as the card outline. */
+.pick { display: block; width: 100%; margin: var(--space-1) 0; padding: 0; font: inherit; color: inherit; text-align: left;
+  background: none; border: 0; border-radius: var(--r-control); cursor: pointer; }
+.pick:focus-visible { outline: 2px solid var(--focus); outline-offset: 1px; }
 .reply { border-top: 1px solid var(--sep); padding-top: var(--space-1); }
 .replyForm { display: flex; flex-direction: column; gap: var(--space-1); margin-top: var(--space-2); }
 .input { font: inherit; border: 1px solid var(--sep); border-radius: var(--r-control); padding: 4px 6px; background: var(--bg); color: var(--label); }
