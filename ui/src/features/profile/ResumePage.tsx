@@ -21,7 +21,7 @@ export function ResumePage() {
       <div className={styles.col}>
         <section className={styles.card} aria-labelledby="sugg-h">
           <h2 id="sugg-h" className={styles.h2}>Suggestions</h2>
-          <ResumeFeedback rid={rid} latest={latest} />
+          <ResumeFeedback rid={rid} />
         </section>
         <NotCarriedOver rid={rid} />
         <section id="versions" className={styles.card} aria-labelledby="ver-h">

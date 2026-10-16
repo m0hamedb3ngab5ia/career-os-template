@@ -102,7 +102,7 @@ function ResumeCard({ r, blurb }: { r: Row; blurb: string }) {
             onCancel={() => setAsking(false)} onConfirm={() => del.mutate(r.rid, { onSettled: () => setAsking(false) })} />
         </div>
       ) : null}
-      <ResumeFeedback rid={r.rid} latest={r.latest} master={r.type === "master"} />
+      <ResumeFeedback rid={r.rid} master={r.type === "master"} />
       {r.type === "master" ? <MasterSyncPanel rid={r.rid} /> : null}
     </li>
   );
