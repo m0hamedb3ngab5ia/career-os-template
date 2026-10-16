@@ -5,7 +5,7 @@ import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
-import { useResumeMeta, useResumes } from "../profile/api";
+import { retryImport, useProfileWrite, useResumeMeta, useResumes } from "../profile/api";
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput } from "./fields";
 import { History } from "./History";
@@ -126,6 +126,8 @@ function Workspace() {
   const back = <Link to="/profile#resumes">Back to Profile</Link>;
   const title = meta.data?.name ?? "Résumé";
   const failed = draft.error ?? anns.error;
+  if (failed && /no structured version/.test(errorText(failed)))
+    return <Page title={title} subtitle={back}><MakeEditable rid={rid} onReady={() => void draft.refetch()} /></Page>;
   if (failed) return <Page title={title} subtitle={back}><p role="alert" className={styles.alert}>Couldn’t load: {errorText(failed)}</p></Page>;
   if (!doc) return <Page title={title} subtitle={back} busy><p className={styles.muted}>Loading…</p></Page>;
 
@@ -353,4 +355,23 @@ function skillRows(doc: Doc): { label: string; path: (string | number)[]; items:
   const groups = doc.skill_groups as { label?: string; items?: string[] }[] | undefined;
   if (groups?.length) return groups.map((g, i) => ({ label: g.label ?? `group ${i + 1}`, path: ["skill_groups", i, "items"], items: g.items ?? [] }));
   return Object.entries((doc.skills as Record<string, string[]>) ?? {}).map(([k, v]) => ({ label: k, path: ["skills", k], items: v }));
+}
+
+/** An upload from before the editor has no structured version yet: run the import (DEC-019), then load the draft. */
+function MakeEditable({ rid, onReady }: { rid: string; onReady: () => void }) {
+  const start = useProfileWrite(retryImport);
+  // ponytail: re-asks for the draft every 3 s while the import runs; poll the import run instead if this gets slow
+  useEffect(() => {
+    if (!start.isSuccess) return;
+    const t = window.setInterval(onReady, 3000);
+    return () => window.clearInterval(t);
+  }, [start.isSuccess, onReady]);
+  if (start.isSuccess) return <p role="status" className={styles.muted}>Making this résumé editable… this takes about a minute.</p>;
+  return (
+    <p className={styles.muted}>
+      This résumé was uploaded before the editor existed, so it has no editable version yet.{" "}
+      <Button size="small" variant="primary" pending={start.isPending} pendingLabel="Starting…" onClick={() => start.mutate(rid)}>Make editable</Button>
+      {start.isError ? <span role="alert" className={styles.alert}> {errorText(start.error)}</span> : null}
+    </p>
+  );
 }

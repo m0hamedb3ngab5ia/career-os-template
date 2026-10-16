@@ -1,0 +1,1 @@
+import{_ as e,y as t}from"./Button-Cm4kfz0g.js";import{JobsPage as n,n as r,t as i}from"./JobsPage-T_v3QaUV.js";var a=t();function o(){let{jobId:t}=e();return t&&!r()?(0,a.jsx)(i,{}):(0,a.jsx)(n,{jobId:t})}export{o as JobsRoute};
