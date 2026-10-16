@@ -990,7 +990,8 @@ def cmd_resume_annotate(args: argparse.Namespace) -> int:
             if args.kind == "comment" and args.proposed is not None:
                 raise ValueError("a comment takes --text, not --proposed")
             out = ann.create(root, args.rid, kind=args.kind, target_id=args.target, text=args.text or "",
-                             proposed=args.proposed, author="ai", run=os.environ.get("CAREEROS_RUN_ID"))
+                             proposed=args.proposed, author="ai", run=os.environ.get("CAREEROS_RUN_ID"),
+                             quote=args.quote)
         else:
             out = ann.reply(root, args.rid, args.aid, args.text, author="ai", run=os.environ.get("CAREEROS_RUN_ID"))
     except (OSError, ValueError, LookupError, store.Refused) as e:
@@ -2089,6 +2090,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--target", help="bullet id or top-level text field (required for a suggestion)")
     sp.add_argument("--proposed", help="suggestion: the replacement text")
     sp.add_argument("--text", help="comment text / a suggestion's reason")
+    sp.add_argument("--quote", help="the exact span of --target this is about (needs --target; must be in its text, "
+                    "case/whitespace-insensitive); the UI highlights it")
     sp.set_defaults(fn=cmd_resume_annotate)
     sp = rss.add_parser("annotate-reply", help="AI reply on an annotation (author=ai)")
     sp.add_argument("rid")

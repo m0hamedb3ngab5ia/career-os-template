@@ -7,11 +7,11 @@ import { useToast } from "../../kit/Toast";
 import { errorText } from "../today/api";
 import { retryImport, useImport, useProfileWrite, useResumeMeta, useResumes } from "../profile/api";
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
-import { Field, ListInput } from "./fields";
+import { Field, ListInput, Quote } from "./fields";
 import { History } from "./History";
 import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
-import { cap, type Entry, norm, SKIP, sectionOrder, setAt, targetOrder, targetTexts } from "./doc";
+import { cap, type Entry, SKIP, sectionOrder, setAt, spans, targetOrder, targetTexts } from "./doc";
 import styles from "./Workspace.module.css";
 
 /** /resumes/:rid — the résumé draft: edit in place, act on suggestions, autosave, Done = one new version. */
@@ -26,6 +26,14 @@ function Workspace() {
   const [doc, setDoc] = useState<Doc | null>(null);
   const [active, setActive] = useState<string | null>(null);  // the focused field's target id
   const [picked, setPicked] = useState<string | null>(null);  // the selected card's annotation id (wins over `active`)
+  // A just-picked card's [annotation id, first field]: once that pick has rendered, scroll its mark (or field) into view.
+  const scrollTo = useRef<[string, string] | null>(null);
+  useEffect(() => {
+    if (!scrollTo.current || scrollTo.current[0] !== picked) return;
+    const el = document.getElementById(`t-${scrollTo.current[1]}`);
+    scrollTo.current = null;
+    if (el) (el.querySelector("mark") ?? el).scrollIntoView?.({ block: "center" });
+  });
   const [tab, setTab] = useState<"doc" | "ats">("doc");
   const [history, setHistory] = useState(false);
   // FLOW-001: Next replaces Done while the master is still a draft; ?onboarding=1 forces the first-run flow for testing.
@@ -138,19 +146,24 @@ function Workspace() {
   const cards = open.slice().sort((a, b) => pos(a) - pos(b));
   const onTarget = (id: string) => open.filter((a) => a.target_id === id);
   const texts = targetTexts(doc);
-  /** Fields a card points at: its target, else (bridged feedback items have none) every field holding its quote. */
-  const hits = (a: Annotation): string[] => {
-    if (a.target_id) return [a.target_id];
-    const q = norm(a.base);
-    return q ? texts.filter(([, t]) => norm(t).includes(q)).map(([id]) => id) : [];
+  /** [field, quote to mark inline | null = whole field] a card points at: its target (inline when its quote is still
+   * there), else (bridged feedback items have no target) every field holding its quote. */
+  const hits = (a: Annotation): [string, string | null][] => {
+    const q = quoteOf(a);
+    if (a.target_id) {
+      const t = texts.find(([id]) => id === a.target_id)?.[1] ?? "";
+      return [[a.target_id, q && spans(t, q).length ? q : null]];
+    }
+    return q ? texts.filter(([, t]) => spans(t, q).length).map(([id]) => [id, q]) : [];
   };
   const sel = open.find((a) => a.id === picked);
-  const lit = sel ? hits(sel) : active ? [active] : [];
-  /** Select a card (toggle unless `keep`): highlight its passages and scroll the first into view. */
+  const lit = new Map<string, string | null>(sel ? hits(sel) : active ? [[active, null]] : []);
+  /** Select a card (toggle unless `keep`): highlight its passages and scroll the first into view (after render). */
   const pick = (a: Annotation, keep = false) => {
     if (picked === a.id) { if (!keep) setPicked(null); return; }
     setPicked(a.id);
-    if (!keep) document.getElementById(`t-${hits(a)[0]}`)?.scrollIntoView?.({ block: "center" });
+    const first = hits(a)[0]?.[0];
+    if (!keep && first) scrollTo.current = [a.id, first];
   };
 
   /** A field the annotations can point at: highlight, inline suggestion preview, focus pairs it with its card. */
@@ -158,9 +171,9 @@ function Workspace() {
     const here = onTarget(id);
     const sugg = here.find((a) => a.kind === "suggestion" && a.proposed);
     return (
-      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={lit.includes(id) || undefined}
+      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={(lit.has(id) && !lit.get(id)) || undefined}
         onFocus={() => { setActive(id); setPicked(null); }}>
-        {child}
+        <Quote.Provider value={lit.get(id) ?? null}>{child}</Quote.Provider>
         {sugg ? <p className={styles.sugg}><del>{sugg.base}</del> <ins>{sugg.proposed}</ins></p> : null}
       </div>
     );
@@ -268,6 +281,9 @@ function Workspace() {
   );
 }
 
+/** The words a card is anchored on: its `quote`, or a bridged feedback item's quote (`base`, no target). */
+const quoteOf = (a: Annotation): string | null => a.quote ?? (a.target_id ? null : a.base) ?? null;
+
 interface MarginProps {
   rid: string;
   cards: Annotation[];
@@ -341,6 +357,7 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
       onFocus={(e) => { if ((e.target as Element).closest("form")) pick(a, true); }}
       onClick={(e) => { if (!(e.target as Element).closest("form, button")) pick(a); }}>
       <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggests` : `${who} commented`}</p>
+      {quoteOf(a) ? <p className={styles.quote}>“{quoteOf(a)}”</p> : null}
       <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
       {(a.replies ?? []).map((r, i) => (
         <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>

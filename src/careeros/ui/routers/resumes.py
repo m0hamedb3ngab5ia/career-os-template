@@ -174,6 +174,7 @@ class Annotation(BaseModel):  # DEC-016
     kind: Literal["suggestion", "comment"]
     target_id: str | None = None
     base: str | None = None
+    quote: str | None = None  # the exact span of the target it's about (CLI --quote); the UI highlights it
     author: Author
     status: Literal["open", "accepted", "rejected", "outdated"]
     proposed: str | None = None

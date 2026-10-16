@@ -167,6 +167,7 @@ describe("Workspace extras", () => {
 
 describe("Comment card highlight", () => {
   const marked = () => Array.from(document.querySelectorAll("[id^='t-'][data-on]")).map((e) => e.id);
+  const marks = () => Array.from(document.querySelectorAll("[id^='t-'] mark")).map((m) => [m.closest("[id^='t-']")!.id, m.textContent]).sort();
 
   it("selecting a card highlights its target and scrolls to it; selecting it again clears it", async () => {
     const scroll = vi.fn();
@@ -192,7 +193,34 @@ describe("Comment card highlight", () => {
     });
     renderRoutes(routes, "/resumes/cv");
     fireEvent.click(await screen.findByRole("button", { name: "Projects: vague" }));
-    expect(marked().sort()).toEqual(["t-projects-1.b1", "t-summary"]);
+    expect(marks()).toEqual([["t-projects-1.b1", "Built it"], ["t-summary", "built it"]]);
+    expect(marked()).toEqual([]);  // inline spans, not whole fields
+  });
+
+  it("a quoted comment highlights exactly the quoted words inline, scrolls to them, shows the quote on the card", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const q = { ...SUGG, id: "q1", kind: "comment", proposed: null, quote: "ON  billing", text: "Which system?" };
+    api({ "GET /api/profile/resumes/cv/annotations": [q] });
+    renderRoutes(routes, "/resumes/cv");
+    const card = await screen.findByRole("button", { name: "Which system?" });
+    expect(card.closest("article")).toHaveTextContent("“ON billing”");
+    expect(marks()).toEqual([]);
+    fireEvent.click(card);
+    expect(marks()).toEqual([["t-experience-1.b1", "on billing"]]);
+    expect(marked()).toEqual([]);
+    expect((scroll.mock.contexts[0] as Element).tagName).toBe("MARK");
+    fireEvent.click(card);
+    expect(marks()).toEqual([]);
+  });
+
+  it("a quote the target no longer holds falls back to highlighting the whole target", async () => {
+    const q = { ...SUGG, id: "q2", kind: "comment", proposed: null, quote: "payments", text: "Stale" };
+    api({ "GET /api/profile/resumes/cv/annotations": [q] });
+    renderRoutes(routes, "/resumes/cv");
+    fireEvent.click(await screen.findByRole("button", { name: "Stale" }));
+    expect(marked()).toEqual(["t-experience-1.b1"]);
+    expect(marks()).toEqual([]);
   });
 
   it("a card with neither target nor matchable quote still selects, with no highlight", async () => {

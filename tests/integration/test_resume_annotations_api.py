@@ -156,6 +156,14 @@ def test_cli_writes_annotations_as_ai(tmp_path: Path, capsys):  # review-resume 
     assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
                      "--proposed", "y"]) == 1  # a comment proposes nothing
     assert "error:" in capsys.readouterr().err
+    assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
+                     "--quote", "the THING"]) == 0
+    assert json.loads(capsys.readouterr().out)["quote"] == "the THING"
+    assert cli.main([*r, "annotate", rid, "comment", "--text", "x", "--quote", "thing"]) == 1  # no target
+    assert "--quote needs --target" in capsys.readouterr().err
+    assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
+                     "--quote", "not there"]) == 1
+    assert "not in experience-1.b1" in capsys.readouterr().err
 
 
 def test_e2e_002_05_accepts_and_edit_stay_one_draft(tmp_path: Path):

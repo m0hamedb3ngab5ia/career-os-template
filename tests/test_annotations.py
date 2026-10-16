@@ -280,3 +280,21 @@ def test_step_counts_only_this_runs_annotations(tmp_path: Path):  # TASK-033b: a
 
     rec = run_resume_skill(S, "resume_edit", rid, u["id"], run_skill=this_run_replies, run_id="mine2")
     assert rec["stop_reason"] == "completed"
+
+
+def test_quote_anchors_the_exact_span(tmp_path: Path):  # Docs-style anchored comment
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="experience-1.b1", text="which one?",
+                   quote="  the BILLING\n service ", author="ai")
+    assert c["quote"] == "the BILLING service" and c["base"] == "Built the billing service"
+    assert ann.list_items(tmp_path, rid)[0]["quote"] == "the BILLING service"
+    assert ann.create(tmp_path, rid, kind="comment", target_id="summary", text="x")["quote"] is None
+
+
+@pytest.mark.parametrize("target,quote", [(None, "billing"), ("experience-1.b1", "payments"),
+                                          ("experience-1.b1", "   ")])
+def test_quote_needs_a_target_holding_it(tmp_path: Path, target, quote):  # the skill is untrusted input
+    rid = _resume(tmp_path)
+    with pytest.raises(ValueError, match="quote"):
+        ann.create(tmp_path, rid, kind="comment", target_id=target, text="x", quote=quote, author="ai")
+    assert ann.list_items(tmp_path, rid) == []

@@ -24,6 +24,7 @@ absent from the current draft or the user's replies, and never make a claim stro
 verb: supported → led): the accept guard refuses it.
 
 - `.venv/bin/careeros resume annotate <rid> suggestion --target <id> --proposed "<new text>" --text "re <aid>: <why>"`
+  (+ `--quote "<exact span it changes>"` when narrower than the whole field)
 - then `.venv/bin/careeros resume annotate-reply <rid> <aid> "Proposed <new id>: <one line>"`.
 - Nothing to change, or the request needs a fact not in the résumé: only reply and say why.
 

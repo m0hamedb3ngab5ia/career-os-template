@@ -3,7 +3,8 @@
 profile/resumes/<rid>/annotations.json  {items: [{id, kind: suggestion|comment, target_id, base, author: user|ai,
 status: open|accepted|rejected|outdated, proposed, text, replies: [{text, author, at, run?}], at, run?}]}
 `run` = the writing run's id (CLI under CAREEROS_RUN_ID), absent for user/HTTP writes.
-`target_id` = a draft bullet id or a top-level text field (e.g. summary); `base` = its text when made. `outdated` is
+`target_id` = a draft bullet id or a top-level text field (e.g. summary); `base` = its text when made; `quote` = the
+exact span of the target the item is about (Docs-style anchor; case/whitespace-insensitive substring, checked on create). `outdated` is
 computed on read (open item whose target no longer holds `base`), never stored. Accept = a user action: base check
 (409, both texts), then one draft change via the TASK-029 write path. AI suggestion: zero-fabrication guard (422),
 change author=ai, bullet `origin` cleared (DEC-018 amendment: an AI text is never user-written). User suggestion:
@@ -104,18 +105,26 @@ def list_items(root: Path, rid: str, run: str | None = None) -> list[dict[str, A
 
 
 def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str = "", proposed: str | None = None,
-           author: str = "user", run: str | None = None) -> dict[str, Any]:
+           author: str = "user", run: str | None = None, quote: str | None = None) -> dict[str, Any]:
     if kind not in KINDS or author not in ("user", "ai"):
         raise ValueError("kind must be suggestion|comment and author user|ai")
     if kind == "suggestion" and (not isinstance(proposed, str) or not proposed.strip() or target_id is None):
         raise ValueError("a suggestion needs a target_id and non-empty proposed text")
     if kind == "comment" and not text.strip():
         raise ValueError("a comment needs text")
+    if quote is not None:
+        quote = " ".join(quote.split())
+        if not quote:
+            raise ValueError("--quote is empty")
+        if target_id is None:
+            raise ValueError("--quote needs --target (the field or bullet holding the quoted text)")
     with store._locked(root):
         base = None if target_id is None else _target(store.get_draft(root, rid)["resume"], target_id)[0]
+        if quote is not None and quote.casefold() not in " ".join(str(base or "").split()).casefold():
+            raise ValueError(f"--quote {quote!r} is not in {target_id}'s current text {base!r}")
         items = _load(root, rid)
-        it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "author": author,
-              "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
+        it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "quote": quote,
+              "author": author, "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
               "text": text.strip(), "replies": [], "at": store._now(), **({"run": run} if run else {})}
         _save(root, rid, [*items, it])
         return it

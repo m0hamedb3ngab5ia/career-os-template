@@ -1,4 +1,5 @@
-import { useLayoutEffect, useRef, useState } from "react";
+import { createContext, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
+import { spans } from "./doc";
 import styles from "./Workspace.module.css";
 
 /** Firefox/Safari lack CSS `field-sizing: content`; there JS sizes the field instead (feature-detected once). */
@@ -16,10 +17,27 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
     else el.size = Math.max(value.length + 1, 4);
   });
   const common = { "aria-label": label, readOnly: locked, className: styles.field, value, ref };
-  return multi
+  const control = multi
     ? <textarea {...common} rows={1} onChange={(e) => onChange(e.target.value)} />
     : <input {...common} onChange={(e) => onChange(e.target.value)} />;
+  const hit = spans(value, useContext(Quote));
+  if (!hit.length) return control;
+  // Text sits in a native textarea/input (editing, caret, IME stay native), which can't style a range. So a mirror
+  // with the same box and font renders the text transparent behind it, with <mark> over the quoted words.
+  const parts: ReactNode[] = [];
+  let at = 0;
+  for (const [a, b] of hit) { parts.push(value.slice(at, a), <mark key={a}>{value.slice(a, b)}</mark>); at = b; }
+  parts.push(value.slice(at));
+  return (
+    <span className={styles.hl} data-multi={multi || undefined}>
+      <span aria-hidden className={`${styles.field} ${styles.mirror}`}>{parts}</span>
+      {control}
+    </span>
+  );
 }
+
+/** The quote to highlight inline in the Field(s) below (a selected comment's anchored words). */
+export const Quote = createContext<string | null>(null);
 
 /** String list (skills, stack, coursework…): comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
 export function ListInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {

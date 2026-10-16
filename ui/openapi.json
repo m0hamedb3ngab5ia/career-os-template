@@ -588,6 +588,17 @@
             ],
             "title": "Proposed"
           },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
           "replies": {
             "default": [],
             "items": {
@@ -5898,6 +5909,17 @@
               }
             ],
             "title": "Proposed"
+          },
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
           },
           "replies": {
             "default": [],

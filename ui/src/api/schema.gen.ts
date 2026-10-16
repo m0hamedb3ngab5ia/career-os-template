@@ -777,6 +777,8 @@ export interface components {
       kind: "suggestion" | "comment";
       /** Proposed */
       proposed?: string | null;
+      /** Quote */
+      quote?: string | null;
       /**
        * Replies
        * @default []
@@ -2395,6 +2397,8 @@ export interface components {
       kind: "suggestion" | "comment";
       /** Proposed */
       proposed?: string | null;
+      /** Quote */
+      quote?: string | null;
       /**
        * Replies
        * @default []

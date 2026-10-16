@@ -34,3 +34,11 @@ export const targetOrder = (doc: Doc): string[] => targetTexts(doc).map(([id]) =
 /** Text for case/whitespace-insensitive matching ("" for none). */
 export const norm = (s: unknown): string => (typeof s === "string" ? s.toLowerCase().replace(/\s+/g, " ").trim() : "");
 
+
+/** [start, end) of every case/whitespace-insensitive match of `quote` in `text` (none for an empty quote). */
+export function spans(text: string, quote: unknown): [number, number][] {
+  const words = norm(quote).split(" ").filter(Boolean);
+  if (!words.length) return [];
+  const re = new RegExp(words.map((w) => w.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("\\s+"), "gi");
+  return Array.from(text.matchAll(re), (m) => [m.index, m.index + m[0].length]);
+}
