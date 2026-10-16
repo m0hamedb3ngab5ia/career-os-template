@@ -25,6 +25,12 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
 export function ListInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {
   const [text, setText] = useState(value.join(", "));
   const parse = (t: string) => t.split(",").map((x) => x.trim()).filter(Boolean);
-  if (parse(text).join("\n") !== value.join("\n")) setText(value.join(", "));  // doc replaced (accept/undo/revert): resync
+  // Resync only when the value prop changes (accept/undo/revert), never on every render: items with commas don't round-trip.
+  const key = value.join("\n");
+  const [seen, setSeen] = useState(key);
+  if (key !== seen) {
+    setSeen(key);
+    if (parse(text).join("\n") !== key) setText(value.join(", "));
+  }
   return <Field label={label} locked={locked} value={text} onChange={(t) => { setText(t); onChange(parse(t)); }} />;
 }
