@@ -20,13 +20,15 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
   const control = multi
     ? <textarea {...common} rows={1} onChange={(e) => onChange(e.target.value)} />
     : <input {...common} onChange={(e) => onChange(e.target.value)} />;
-  const hit = spansOf(value, useContext(Quote));
+  const { on, faint } = useContext(Quote);
+  const hit = spansOf(value, [...on, ...faint]);
   if (!hit.length) return control;
+  const sel = spansOf(value, on);
   // Text sits in a native textarea/input (editing, caret, IME stay native), which can't style a range. So a mirror
   // with the same box and font renders the text transparent behind it, with <mark> over the quoted words.
   const parts: ReactNode[] = [];
   let at = 0;
-  for (const [a, b] of hit) { parts.push(value.slice(at, a), <mark key={a}>{value.slice(a, b)}</mark>); at = b; }
+  for (const [a, b] of hit) { parts.push(value.slice(at, a), <mark key={a} data-on={sel.some(([c, d]) => c < b && a < d) || undefined}>{value.slice(a, b)}</mark>); at = b; }
   parts.push(value.slice(at));
   return (
     <span className={styles.hl} data-multi={multi || undefined}>
@@ -36,8 +38,8 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
   );
 }
 
-/** The quotes to highlight inline in the Field(s) below (a selected comment's anchored words). */
-export const Quote = createContext<readonly string[]>([]);
+/** The quotes to mark inline in the Field(s) below: `on` = the selected comment's words, `faint` = every other comment's. */
+export const Quote = createContext<{ on: readonly string[]; faint: readonly string[] }>({ on: [], faint: [] });
 
 /** String list (skills, stack, coursework…): comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
 export function ListInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {

@@ -167,7 +167,7 @@ describe("Workspace extras", () => {
 
 describe("Comment card highlight", () => {
   const marked = () => Array.from(document.querySelectorAll("[id^='t-'][data-on]")).map((e) => e.id);
-  const marks = () => Array.from(document.querySelectorAll("[id^='t-'] mark")).map((m) => [m.closest("[id^='t-']")!.id, m.textContent]).sort();
+  const marks = () => Array.from(document.querySelectorAll("[id^='t-'] mark[data-on]")).map((m) => [m.closest("[id^='t-']")!.id, m.textContent]).sort();
 
   it("selecting a card highlights its target and scrolls to it; selecting it again clears it", async () => {
     const scroll = vi.fn();
@@ -206,6 +206,9 @@ describe("Comment card highlight", () => {
     const card = await screen.findByRole("button", { name: "Which system?" });
     expect(card.closest("article")).toHaveTextContent("“ON billing”");
     expect(marks()).toEqual([]);
+    // Unselected: only the quoted words get a faint mark, never the whole bullet (Docs-style).
+    expect(Array.from(document.querySelectorAll("[id^='t-'] mark")).map((m) => m.textContent)).toEqual(["on billing"]);
+    expect(document.querySelector("[data-marked]")).toBeNull();
     fireEvent.click(card);
     expect(marks()).toEqual([["t-experience-1.b1", "on billing"]]);
     expect(marked()).toEqual([]);

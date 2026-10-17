@@ -164,6 +164,13 @@ function Workspace() {
   for (const [id, q] of sel ? hits(sel) : active ? [[active, null] as [string, null]] : []) {
     lit.set(id, [...(lit.get(id) ?? []), ...(q ? [q] : [])]);
   }
+  // Every open comment's passages, Docs-style: quoted words get a faint inline mark; only a passage with no quote
+  // (whole-field comment, stale quote) tints the whole field.
+  const faint = new Map<string, string[]>();
+  const whole = new Set<string>();
+  for (const a of open) for (const [id, q] of hits(a)) {
+    if (q) faint.set(id, [...(faint.get(id) ?? []), q]); else whole.add(id);
+  }
   /** Select a card (toggle unless `keep`): highlight its passages and scroll the first into view (after render). */
   const pick = (a: Annotation, keep = false) => {
     if (picked === a.id) { if (!keep) setPicked(null); return; }
@@ -177,9 +184,9 @@ function Workspace() {
     const here = onTarget(id);
     const sugg = here.find((a) => a.kind === "suggestion" && a.proposed);
     return (
-      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={(lit.has(id) && !lit.get(id)!.length) || undefined}
+      <div id={`t-${id}`} className={styles.target} data-marked={whole.has(id) || undefined} data-on={(lit.has(id) && !lit.get(id)!.length) || undefined}
         onFocus={() => { setActive(id); setPicked(null); }}>
-        <Quote.Provider value={lit.get(id) ?? NONE}>{child}</Quote.Provider>
+        <Quote.Provider value={{ on: lit.get(id) ?? NONE, faint: faint.get(id) ?? NONE }}>{child}</Quote.Provider>
         {sugg ? <p className={styles.sugg}><del>{sugg.base}</del> <ins>{sugg.proposed}</ins></p> : null}
       </div>
     );
