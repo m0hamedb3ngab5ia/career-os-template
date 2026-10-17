@@ -26,9 +26,13 @@
 .mirror mark[data-on] { background: color-mix(in srgb, var(--orange) 35%, transparent); box-shadow: inset 0 -2px var(--orange); }
 .quote { margin: var(--space-1) 0; padding-left: var(--space-2); border-left: 3px solid var(--orange); color: var(--sec);
   font-size: var(--fs-caption); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
-.sugg { margin: 0 4px; font-size: var(--fs-caption); }
-.sugg del { color: var(--red); }
-.sugg ins { color: var(--green); text-decoration: none; }
+/* An open suggestion, in place: the diff shows until the field is focused, then the plain textarea takes over. */
+.diff { display: block; white-space: pre-wrap; overflow-wrap: break-word; cursor: text; }
+.diff del { color: var(--red); }
+.diff ins { color: var(--green); text-decoration: none; }
+.diff del + ins { margin-left: 0.25em; }
+.hl[data-sugg]:not(:focus-within) > textarea { position: absolute; inset: 0; opacity: 0; }
+.hl[data-sugg]:focus-within > .diff, .hl:not([data-sugg]) > .diff { display: none; }
 .margin { position: relative; }
 .resolvedToggle { margin-bottom: var(--space-2); }
 .card[data-resolved] { opacity: 0.65; background: var(--bg); }

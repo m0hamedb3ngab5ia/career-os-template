@@ -1,10 +1,11 @@
-/** The part of `a` a suggestion replaces and what replaces it: whole words, the shared start and end cut to "…"
- * (the field above already shows them), so the inline diff strikes only what changes. */
+/** Split a suggestion into the text it keeps and the words it changes (whole words; whitespace kept as is), so the
+ * field can strike only the changed words in place, Docs-style. before + del + after = a; before + ins + after = b. */
 export function changedSpan(a: string, b: string): { before: string; del: string; ins: string; after: string } {
-  const x = a.split(/\s+/).filter(Boolean), y = b.split(/\s+/).filter(Boolean);
+  const x = a.split(/(\s+)/), y = b.split(/(\s+)/);
   let i = 0;
   while (i < x.length && i < y.length && x[i] === y[i]) i++;
   let j = 0;
   while (j < x.length - i && j < y.length - i && x[x.length - 1 - j] === y[y.length - 1 - j]) j++;
-  return { before: i ? "…" : "", del: x.slice(i, x.length - j).join(" "), ins: y.slice(i, y.length - j).join(" "), after: j ? "…" : "" };
+  return { before: x.slice(0, i).join(""), del: x.slice(i, x.length - j).join(""), ins: y.slice(i, y.length - j).join(""),
+    after: x.slice(x.length - j).join("") };
 }

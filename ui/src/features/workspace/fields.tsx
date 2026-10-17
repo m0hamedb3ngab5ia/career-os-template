@@ -1,4 +1,5 @@
 import { createContext, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
+import { changedSpan } from "./changedSpan";
 import { spansOf } from "./doc";
 import styles from "./Workspace.module.css";
 
@@ -21,7 +22,21 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
   const control = <textarea {...common} rows={1} data-single={multi ? undefined : true}
     onKeyDown={multi ? undefined : (e) => { if (e.key === "Enter") e.preventDefault(); }}
     onChange={(e) => onChange(multi ? e.target.value : e.target.value.replace(/\s*\n+\s*/g, " "))} />;
-  const { on, faint } = useContext(Quote);
+  const { on, faint, sugg } = useContext(Quote);
+  if (sugg) {
+    // An open suggestion shows in the text itself (struck words, then the new ones) until the field is focused;
+    // focusing reveals the plain editable text. The diff is visual only: the textarea stays the accessible field.
+    // Same element tree once typing makes the text differ from `base` (no diff then), so the textarea keeps focus.
+    const c = sugg.base === value ? changedSpan(value, sugg.proposed) : { before: value, del: "", ins: "", after: "" };
+    return (
+      <span className={styles.hl} data-multi={multi || undefined} data-sugg={sugg.base === value || undefined}>
+        <span aria-hidden className={`${styles.field} ${styles.diff}`} onMouseDown={(e) => { e.preventDefault(); ref.current?.focus(); }}>
+          {c.before}{c.del ? <del>{c.del}</del> : null}{c.ins ? <ins>{c.ins}</ins> : null}{c.after}
+        </span>
+        {control}
+      </span>
+    );
+  }
   const hit = spansOf(value, [...on, ...faint]);
   if (!hit.length) return control;
   const sel = spansOf(value, on);
@@ -40,7 +55,7 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
 }
 
 /** The quotes to mark inline in the Field(s) below: `on` = the selected comment's words, `faint` = every other comment's. */
-export const Quote = createContext<{ on: readonly string[]; faint: readonly string[] }>({ on: [], faint: [] });
+export const Quote = createContext<{ on: readonly string[]; faint: readonly string[]; sugg?: { base: string; proposed: string } }>({ on: [], faint: [] });
 
 /** String list (skills, stack, coursework…): comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
 export function ListInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {

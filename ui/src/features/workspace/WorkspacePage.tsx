@@ -1,5 +1,4 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { changedSpan } from "./changedSpan";
 import { type FormEvent, type KeyboardEvent as ReactKeyEvent, type ReactNode, useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router";
 import { Page } from "../../app/PageHeader";
@@ -189,8 +188,7 @@ function Workspace() {
     return (
       <div id={`t-${id}`} className={styles.target} data-marked={whole.has(id) || undefined} data-on={(lit.has(id) && !lit.get(id)!.length) || undefined}
         onFocus={() => { setActive(id); setPicked(null); }}>
-        <Quote.Provider value={{ on: lit.get(id) ?? NONE, faint: faint.get(id) ?? NONE }}>{child}</Quote.Provider>
-        {sugg ? <SuggDiff base={String(sugg.base ?? "")} proposed={sugg.proposed!} /> : null}
+        <Quote.Provider value={{ on: lit.get(id) ?? NONE, faint: faint.get(id) ?? NONE, sugg: sugg ? { base: String(sugg.base ?? ""), proposed: sugg.proposed! } : undefined }}>{child}</Quote.Provider>
       </div>
     );
   };
@@ -375,11 +373,6 @@ function Margin({ rid, cards, resolvedCount, showResolved, onToggleResolved, on,
 }
 
 /** A rejected/accepted card: muted and read-only. A resolved one can be reopened; an accepted one is reverted in History. */
-function SuggDiff({ base, proposed }: { base: string; proposed: string }) {
-  const c = changedSpan(base, proposed);
-  return <p className={styles.sugg}>{c.before}{c.del ? <del>{c.del}</del> : null}{c.del && c.ins ? " " : null}{c.ins ? <ins>{c.ins}</ins> : null}{c.after}</p>;
-}
-
 /** How a decided item ended (server `resolution`); legacy rejected items carry none. */
 const OUTCOME: Record<string, string> = { applied: "Applied", edited: "Fixed by you", dismissed: "Dismissed" };
 const outcome = (a: Annotation) => OUTCOME[a.resolution ?? (a.status === "accepted" ? "applied" : "")] ?? "Resolved";

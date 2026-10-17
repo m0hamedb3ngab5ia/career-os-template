@@ -49,6 +49,12 @@ describe("WorkspacePage", () => {
     expect(screen.getByRole("textbox", { name: "Experience 1 company" })).toHaveValue("Initech");
     expect(screen.getByRole("textbox", { name: "Experience 1 bullet 2" })).toHaveValue("Wrote docs");
     const inline = container.querySelector("#t-experience-1\\.b1")!;
+    // Docs-style: the change is shown inside the field's own text, not on a line below it; the field stays editable
+    const field = screen.getByRole("textbox", { name: "Experience 1 bullet 1" });
+    expect(field.parentElement).not.toBe(inline);
+    expect(field.parentElement!.querySelector("del")).toHaveTextContent("Worked on billing");
+    expect(inline.querySelectorAll("del")).toHaveLength(1);
+    expect(field).toHaveValue("Worked on billing");
     expect(inline.querySelector("del")).toHaveTextContent("Worked on billing");
     expect(inline.querySelector("ins")).toHaveTextContent("Fixed billing export bugs");
     const cards = within(screen.getByRole("complementary", { name: "Suggestions" })).getAllByRole("article");
