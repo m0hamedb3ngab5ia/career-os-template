@@ -499,6 +499,12 @@ def reject_annotation(rid: str, aid: str, c=Depends(ctx)) -> Annotation:
         return Annotation(**ann.reject(c.settings.root, rid, aid))
 
 
+@router.post("/profile/resumes/{rid}/annotations/{aid}/reopen")
+def reopen_annotation(rid: str, aid: str, c=Depends(ctx)) -> Annotation:
+    with _refusals():
+        return Annotation(**ann.reopen(c.settings.root, rid, aid))
+
+
 @router.post("/profile/resumes/{rid}/publish")
 def publish_resume(rid: str, body: PublishIn, request: Request, c=Depends(ctx)) -> Published:
     """Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version."""

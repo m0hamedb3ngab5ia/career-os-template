@@ -44,6 +44,7 @@ export const useApplyRun = (rid: string, runId: string | null) => {
 
 export const accept = (rid: string, aid: string) => apiSend<Draft>("POST", `${ann(rid, aid)}/accept`);
 export const reject = (rid: string, aid: string) => apiSend<Annotation>("POST", `${ann(rid, aid)}/reject`);
+export const reopen = (rid: string, aid: string) => apiSend<Annotation>("POST", `${ann(rid, aid)}/reopen`);
 export const reply = (rid: string, aid: string, text: string, apply: boolean) =>
   apiSend<Replied>("POST", `${ann(rid, aid)}/replies`, { text, apply });
 export const publish = (rid: string, key: string) => apiSend<Published>("POST", `${base(rid)}/publish`, { key });

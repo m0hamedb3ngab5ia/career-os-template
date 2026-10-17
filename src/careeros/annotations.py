@@ -220,6 +220,18 @@ def reject(root: Path, rid: str, aid: str) -> dict[str, Any]:
         return it
 
 
+def reopen(root: Path, rid: str, aid: str) -> dict[str, Any]:
+    """Undo a reject/resolve (Docs "Reopen"). Accepted ones are not reopened: revert the change in History."""
+    with store._locked(root):
+        items = _load(root, rid)
+        it = _get(items, aid)
+        if it["status"] != "rejected":
+            raise store.Refused(f"annotation {aid} is {it['status']}, only a rejected one can be reopened")
+        it["status"] = "open"
+        _save(root, rid, items)
+        return it
+
+
 def accept(root: Path, rid: str, aid: str) -> dict[str, Any]:
     """Apply an open suggestion to the draft as one change by its author. Returns get_draft's shape.
     AI suggestion: zero-fabrication guard, change author=ai, bullet `origin` cleared. User suggestion: the user's

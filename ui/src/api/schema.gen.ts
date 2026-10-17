@@ -359,6 +359,10 @@ export interface paths {
     /** Reject Annotation */
     post: operations["reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post"];
   };
+  "/api/profile/resumes/{rid}/annotations/{aid}/reopen": {
+    /** Reopen Annotation */
+    post: operations["reopen_annotation_api_profile_resumes__rid__annotations__aid__reopen_post"];
+  };
   "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
     /**
      * Reply Annotation
@@ -5143,6 +5147,29 @@ export interface operations {
   };
   /** Reject Annotation */
   reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Annotation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Reopen Annotation */
+  reopen_annotation_api_profile_resumes__rid__annotations__aid__reopen_post: {
     parameters: {
       path: {
         rid: string;

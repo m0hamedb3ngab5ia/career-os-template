@@ -63,6 +63,11 @@ def test_annotations_api(tmp_path: Path):
         r = c.post(f"{url}/{bad}/reject", headers=W)
         assert r.status_code == 200 and r.json()["status"] == "rejected"
         assert c.post(f"{url}/{bad}/reject", headers=W).status_code == 409
+        assert c.post(f"{url}/{good}/reopen", headers=W).status_code == 409  # accepted
+        r = c.post(f"{url}/{bad}/reopen", headers=W)
+        assert r.status_code == 200 and r.json()["status"] == "open"
+        assert c.post(f"{url}/{bad}/reopen", headers=W).status_code == 409  # already open
+        assert c.post(f"{url}/{bad}/reject", headers=W).status_code == 200
         st = {i["id"]: i["status"] for i in c.get(url).json()}
         assert st == {good: "accepted", bad: "rejected", late: "outdated", com: "outdated"}
         assert c.post(f"{url}/zz/accept", headers=W).status_code == 404

@@ -9,7 +9,7 @@ import { retryImport, useImport, useProfileWrite, useResumeMeta, useResumes } fr
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput, Quote } from "./fields";
 import { History } from "./History";
-import { accept, type Annotation, type Doc, publish, reject, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
+import { accept, type Annotation, type Doc, publish, reject, reopen, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
 import { cap, type Entry, SKIP, sectionOrder, setAt, spans, targetOrder, targetTexts } from "./doc";
 import styles from "./Workspace.module.css";
@@ -25,6 +25,7 @@ function Workspace() {
   const save = useAutosave(rid);
   const [doc, setDoc] = useState<Doc | null>(null);
   const [active, setActive] = useState<string | null>(null);  // the focused field's target id
+  const [showResolved, setShowResolved] = useState(false);
   const [picked, setPicked] = useState<string | null>(null);  // the selected card's annotation id (wins over `active`)
   // A just-picked card's [annotation id, first field]: once that pick has rendered, scroll its mark (or field) into view.
   const scrollTo = useRef<[string, string] | null>(null);
@@ -143,7 +144,8 @@ function Workspace() {
   const open = (anns.data ?? []).filter((a) => a.status === "open");
   const order = targetOrder(doc);
   const pos = (a: Annotation) => { const i = order.indexOf(a.target_id ?? ""); return i < 0 ? order.length : i; };
-  const cards = open.slice().sort((a, b) => pos(a) - pos(b));
+  const resolved = (anns.data ?? []).filter((a) => a.status === "rejected" || a.status === "accepted");
+  const cards = (showResolved ? [...open, ...resolved] : open).sort((a, b) => pos(a) - pos(b));
   const onTarget = (id: string) => open.filter((a) => a.target_id === id);
   const texts = targetTexts(doc);
   /** [field, quote to mark inline | null = whole field] a card points at: each anchor's target (inline when its quote
@@ -158,7 +160,7 @@ function Workspace() {
     }
     return q ? texts.filter(([, t]) => spans(t, q).length).map(([id]) => [id, q]) : [];
   };
-  const sel = open.find((a) => a.id === picked);
+  const sel = (anns.data ?? []).find((a) => a.id === picked);
   // field -> quotes to mark inline; an empty list = highlight the whole field
   const lit = new Map<string, string[]>();
   for (const [id, q] of sel ? hits(sel) : active ? [[active, null] as [string, null]] : []) {
@@ -285,7 +287,7 @@ function Workspace() {
         {history
           ? <History rid={rid} flush={save.flush} lock={setAccepting} onClose={() => setHistory(false)}
               onReverted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} />
-          : <Margin rid={rid} cards={cards} on={(a) => (sel ? sel.id === a.id : active !== null && active === a.target_id)} pick={pick}
+          : <Margin rid={rid} cards={cards} resolvedCount={resolved.length} showResolved={showResolved} onToggleResolved={() => setShowResolved((v) => !v)} on={(a) => (sel ? sel.id === a.id : active !== null && active === a.target_id)} pick={pick}
               onAccepted={(d) => { setDoc(d.resume); save.setRev(d.rev); key.current = null; resetUndo(); }} flush={save.flush} lock={setAccepting}
               refresh={refresh} />}
       </div>)}
@@ -312,6 +314,9 @@ const SHOWN = 3;
 interface MarginProps {
   rid: string;
   cards: Annotation[];
+  resolvedCount: number;
+  showResolved: boolean;
+  onToggleResolved: () => void;
   on: (a: Annotation) => boolean;
   pick: (a: Annotation, keep?: boolean) => void;
   onAccepted: (d: { rev: number; resume: Doc }) => void;
@@ -321,7 +326,7 @@ interface MarginProps {
 }
 
 /** Margin cards, each placed level with its target (pushed down to avoid overlap); stacked on narrow screens. */
-function Margin({ rid, cards, on, pick, onAccepted, flush, lock, refresh }: MarginProps) {
+function Margin({ rid, cards, resolvedCount, showResolved, onToggleResolved, on, pick, onAccepted, flush, lock, refresh }: MarginProps) {
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const aside = ref.current;
@@ -337,14 +342,42 @@ function Margin({ rid, cards, on, pick, onAccepted, flush, lock, refresh }: Marg
     aside.style.minHeight = `${bottom}px`;
   });
   return (
-    <aside ref={ref} className={styles.margin} aria-label="Suggestions">
-      {cards.map((a) => <Card key={a.id} rid={rid} a={a} on={on(a)} pick={pick}
-        onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh} />)}
-    </aside>
+    <div>
+      {resolvedCount ? (
+        <Button size="small" className={styles.resolvedToggle} aria-pressed={showResolved} onClick={onToggleResolved}>
+          {showResolved ? "Hide" : "Show"} resolved ({resolvedCount})
+        </Button>
+      ) : null}
+      <aside ref={ref} className={styles.margin} aria-label="Suggestions">
+        {cards.map((a) => a.status === "open"
+          ? <Card key={a.id} rid={rid} a={a} on={on(a)} pick={pick} onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh} />
+          : <ResolvedCard key={a.id} rid={rid} a={a} on={on(a)} pick={pick} refresh={refresh} />)}
+      </aside>
+    </div>
   );
 }
 
-function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "on"> & { a: Annotation; on: boolean }) {
+/** A rejected/accepted card: muted and read-only. A resolved one can be reopened; an accepted one is reverted in History. */
+function ResolvedCard({ rid, a, on, pick, refresh }: { rid: string; a: Annotation; on: boolean; pick: (a: Annotation, keep?: boolean) => void; refresh: () => void }) {
+  const undo = useMutation({ mutationFn: () => reopen(rid, a.id), onSettled: refresh });
+  const who = a.author === "ai" ? "Claude" : "You";
+  const tid = `card-${a.id}`;
+  return (
+    <article className={styles.card} data-resolved data-on={on || undefined} data-for={a.target_id ?? ""} aria-labelledby={tid}
+      onClick={(e) => { if (!(e.target as Element).closest("button")) pick(a); }}>
+      <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggested` : `${who} commented`} · <b>{a.status === "accepted" ? "Accepted" : "Resolved"}</b></p>
+      {quotesOf(a).slice(0, SHOWN).map((q, i) => <p key={i} className={styles.quote}>“{q}”</p>)}
+      <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
+      {(a.replies ?? []).map((r, i) => (
+        <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>
+      ))}
+      {a.status === "rejected" ? <div className={styles.actions}><span className={styles.grow} /><Button size="small" disabled={undo.isPending} onClick={() => undo.mutate()}>Reopen</Button></div> : null}
+      {undo.isError ? <p role="alert" className={styles.alert}>{errorText(undo.error)}</p> : null}
+    </article>
+  );
+}
+
+function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "on" | "resolvedCount" | "showResolved" | "onToggleResolved"> & { a: Annotation; on: boolean }) {
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
   const [failed, setFailed] = useState("");

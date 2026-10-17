@@ -27,6 +27,19 @@ def _bullet(doc: dict, bid: str) -> dict:
     return next(b for e in doc["experience"] for b in e["bullets"] if b["id"] == bid)
 
 
+def test_reopen_only_rejected(tmp_path: Path):
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="too vague")
+    with pytest.raises(resumes.Refused):
+        ann.reopen(tmp_path, rid, c["id"])  # still open
+    ann.reject(tmp_path, rid, c["id"])
+    assert ann.reopen(tmp_path, rid, c["id"])["status"] == "open"
+    s = ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="Dev", text="x")
+    ann.accept(tmp_path, rid, s["id"])
+    with pytest.raises(resumes.Refused):
+        ann.reopen(tmp_path, rid, s["id"])  # accepted: revert via History
+
+
 def test_create_list_reply_reject(tmp_path: Path):
     rid = _resume(tmp_path)
     s = ann.create(tmp_path, rid, kind="suggestion", target_id="experience-1.b1", proposed="Built billing",

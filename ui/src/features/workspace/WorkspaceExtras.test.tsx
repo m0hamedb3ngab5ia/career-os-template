@@ -42,6 +42,37 @@ describe("Workspace extras", () => {
     expect(await screen.findByText("1 open suggestion")).toBeInTheDocument();
   });
 
+  it("Show resolved lists rejected and accepted cards read-only; Reopen re-opens a rejected one", async () => {
+    const REJ = { ...SUGG, id: "a2", status: "rejected", text: "Rejected idea" };
+    const ACC = { ...SUGG, id: "a3", status: "accepted", text: "Accepted idea" };
+    let list = [SUGG, REJ, ACC];
+    const calls = api({
+      "GET /api/profile/resumes/cv/annotations": () => list,
+      "POST /api/profile/resumes/cv/annotations/a2/reopen": () => { list = [SUGG, { ...REJ, status: "open" }, ACC]; return { ...REJ, status: "open" }; },
+    });
+    renderRoutes(routes, "/resumes/cv");
+    const toggle = await screen.findByRole("button", { name: "Show resolved (2)" });
+    expect(screen.queryByText("Rejected idea")).toBeNull();
+    fireEvent.click(toggle);
+    const rej = screen.getByText("Rejected idea").closest("article") as HTMLElement;
+    const acc = screen.getByText("Accepted idea").closest("article") as HTMLElement;
+    expect(within(rej).getByText("Resolved")).toBeInTheDocument();
+    expect(within(acc).getByText("Accepted")).toBeInTheDocument();
+    expect(within(acc).queryByRole("button", { name: "Reopen" })).toBeNull();
+    expect(within(rej).queryByRole("textbox")).toBeNull();
+    expect(screen.getByRole("button", { name: "Hide resolved (2)" })).toBeInTheDocument();
+    fireEvent.click(within(rej).getByRole("button", { name: "Reopen" }));
+    await waitFor(() => expect(calls.some((c) => c.url.endsWith("/a2/reopen"))).toBe(true));
+    expect(await screen.findByRole("button", { name: /Show resolved \(1\)|Hide resolved \(1\)/ })).toBeInTheDocument();
+  });
+
+  it("hides the Show resolved toggle when nothing is resolved", async () => {
+    api();
+    renderRoutes(routes, "/resumes/cv");
+    await screen.findByText("1 open suggestion");
+    expect(screen.queryByRole("button", { name: /resolved/ })).toBeNull();
+  });
+
   it("ATS view tab shows the server-rendered plain text and hides the editor", async () => {
     api({ "GET /api/profile/resumes/cv/draft/text": "Alex Example\n- Worked on billing\n" });
     renderRoutes(routes, "/resumes/cv");
