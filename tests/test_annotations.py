@@ -218,6 +218,7 @@ def test_review_run_writing_annotations_is_done(tmp_path: Path):  # review-resum
 def test_review_and_edit_runs_cannot_write_files():  # DEC-016: annotations only via the CLI, no direct draft edit
     from careeros.runs.config import KIND_ONLY_TOOLS
     narrow = ["Read", "Bash(.venv/bin/careeros resume annotations *)", "Bash(.venv/bin/careeros resume annotate *)",
+              "Bash(.venv/bin/careeros resume anchor *)",
               "Bash(.venv/bin/careeros resume annotate-reply *)", "Bash(.venv/bin/careeros resume list *)"]  # not every careeros command (e.g. apply-edit)
     for kind in ("review", "resume_edit"):
         assert KIND_ONLY_TOOLS[kind] == narrow
@@ -298,3 +299,28 @@ def test_quote_needs_a_target_holding_it(tmp_path: Path, target, quote):  # the 
     with pytest.raises(ValueError, match="quote"):
         ann.create(tmp_path, rid, kind="comment", target_id=target, text="x", quote=quote, author="ai")
     assert ann.list_items(tmp_path, rid) == []
+
+
+def test_anchor_sets_target_and_quote_on_an_unanchored_comment(tmp_path: Path):  # backfill old AI comments
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id=None, text="vague", author="ai")
+    ann.reply(tmp_path, rid, c["id"], "which?")
+    out = ann.anchor(tmp_path, rid, c["id"], target_id="experience-1.b1", quote=" billing  SERVICE ")
+    assert (out["target_id"], out["quote"], out["base"]) == ("experience-1.b1", "billing SERVICE",
+                                                              "Built the billing service")
+    got = ann.list_items(tmp_path, rid)[0]
+    assert (got["text"], got["status"], [r["text"] for r in got["replies"]]) == ("vague", "open", ["which?"])
+
+
+@pytest.mark.parametrize("aid,target,quote,err", [("a9", "experience-1.b1", "billing", LookupError),
+                                                  ("a1", "experience-1.b1", "payments", ValueError),
+                                                  ("a1", "nope", "billing", LookupError),
+                                                  ("a2", "experience-1.b1", "billing", ValueError)])
+def test_anchor_refuses_unknown_bad_quote_or_already_anchored(tmp_path: Path, aid, target, quote, err):
+    rid = _resume(tmp_path)
+    ann.create(tmp_path, rid, kind="comment", target_id=None, text="x", author="ai")
+    ann.create(tmp_path, rid, kind="comment", target_id="summary", text="y", author="ai")  # a2: already anchored
+    before = ann.list_items(tmp_path, rid)
+    with pytest.raises(err):
+        ann.anchor(tmp_path, rid, aid, target_id=target, quote=quote)
+    assert ann.list_items(tmp_path, rid) == before
