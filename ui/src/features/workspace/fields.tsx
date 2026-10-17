@@ -7,19 +7,20 @@ const nativeSizing = typeof CSS !== "undefined" && typeof CSS.supports === "func
 
 interface FieldProps { label: string; value: string; locked: boolean; multi?: boolean; onChange: (v: string) => void }
 
-/** A document-looking text field: textarea grows with its text, input with its width. */
+/** A document-looking text field: textarea grows with its text (single-line ones also in width, up to the page). */
 export function Field({ label, value, locked, multi, onChange }: FieldProps) {
-  const ref = useRef<HTMLTextAreaElement & HTMLInputElement>(null);
+  const ref = useRef<HTMLTextAreaElement>(null);
   useLayoutEffect(() => {
     const el = ref.current;
     if (nativeSizing || !el) return;
-    if (multi) { el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`; }
-    else el.size = Math.max(value.length + 1, 4);
+    el.style.height = "auto"; el.style.height = `${el.scrollHeight}px`;
+    if (!multi) el.style.width = `${Math.max(value.length + 1, 4)}ch`;  // wraps once it hits max-width: 100%
   });
   const common = { "aria-label": label, readOnly: locked, className: styles.field, value, ref };
-  const control = multi
-    ? <textarea {...common} rows={1} onChange={(e) => onChange(e.target.value)} />
-    : <input {...common} onChange={(e) => onChange(e.target.value)} />;
+  // Single-line fields are textareas too, so a long value wraps inside the page; newlines are refused.
+  const control = <textarea {...common} rows={1} data-single={multi ? undefined : true}
+    onKeyDown={multi ? undefined : (e) => { if (e.key === "Enter") e.preventDefault(); }}
+    onChange={(e) => onChange(multi ? e.target.value : e.target.value.replace(/\s*\n+\s*/g, " "))} />;
   const { on, faint } = useContext(Quote);
   const hit = spansOf(value, [...on, ...faint]);
   if (!hit.length) return control;

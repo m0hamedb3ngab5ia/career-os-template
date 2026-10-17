@@ -330,16 +330,31 @@ function Margin({ rid, cards, resolvedCount, showResolved, onToggleResolved, on,
   const ref = useRef<HTMLElement>(null);
   useLayoutEffect(() => {
     const aside = ref.current;
-    if (!aside || getComputedStyle(aside).position !== "relative") return;
-    let bottom = 0;
-    for (const el of Array.from(aside.children) as HTMLElement[]) {
-      const t = document.getElementById(`t-${el.dataset.for}`);
-      const want = t ? t.getBoundingClientRect().top - aside.getBoundingClientRect().top : bottom;
-      const top = Math.max(want, bottom);
-      el.style.top = `${top}px`;
-      bottom = top + el.offsetHeight + 8;
-    }
-    aside.style.minHeight = `${bottom}px`;
+    if (!aside) return;
+    const place = () => {
+      if (getComputedStyle(aside).position !== "relative") return;
+      const base = aside.getBoundingClientRect().top;
+      // Stack in document order (not creation order), else a card aligned low leaves a gap above later, higher ones.
+      const items = (Array.from(aside.children) as HTMLElement[]).map((el, i) => {
+        const t = document.getElementById(`t-${el.dataset.for}`);
+        return { el, i, want: t ? t.getBoundingClientRect().top - base : Infinity };
+      }).sort((x, y) => x.want - y.want || x.i - y.i);
+      let bottom = 0;
+      for (const { el, want } of items) {
+        const top = Math.max(want === Infinity ? bottom : want, bottom);
+        el.style.top = `${top}px`;
+        bottom = top + el.offsetHeight + 8;
+      }
+      aside.style.minHeight = `${bottom}px`;
+    };
+    place();
+    // The text reflows without a React render (fields auto-size, fonts load, window resizes): re-place then too.
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(place);
+    const page = aside.parentElement?.parentElement;
+    if (page) ro.observe(page);
+    for (const el of Array.from(aside.children)) ro.observe(el);
+    return () => ro.disconnect();
   });
   return (
     <div>
