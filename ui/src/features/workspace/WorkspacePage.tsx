@@ -365,7 +365,8 @@ function Margin({ rid, cards, resolvedCount, showResolved, onToggleResolved, on,
       ) : null}
       <aside ref={ref} className={styles.margin} aria-label="Suggestions">
         {cards.map((a) => a.status === "open"
-          ? <Card key={a.id} rid={rid} a={a} on={on(a)} pick={pick} onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh} />
+          ? <Card key={a.id} rid={rid} a={a} on={on(a)} pick={pick} onAccepted={onAccepted} flush={flush} lock={lock} refresh={refresh}
+              waiting={cards.filter((k) => k.parent === a.id && k.status === "open").length} />
           : <ResolvedCard key={a.id} rid={rid} a={a} on={on(a)} pick={pick} refresh={refresh} />)}
       </aside>
     </div>
@@ -373,6 +374,10 @@ function Margin({ rid, cards, resolvedCount, showResolved, onToggleResolved, on,
 }
 
 /** A rejected/accepted card: muted and read-only. A resolved one can be reopened; an accepted one is reverted in History. */
+/** How a decided item ended (server `resolution`); legacy rejected items carry none. */
+const OUTCOME: Record<string, string> = { applied: "Applied", edited: "Fixed by you", dismissed: "Dismissed" };
+const outcome = (a: Annotation) => OUTCOME[a.resolution ?? (a.status === "accepted" ? "applied" : "")] ?? "Resolved";
+
 function ResolvedCard({ rid, a, on, pick, refresh }: { rid: string; a: Annotation; on: boolean; pick: (a: Annotation, keep?: boolean) => void; refresh: () => void }) {
   const undo = useMutation({ mutationFn: () => reopen(rid, a.id), onSettled: refresh });
   const who = a.author === "ai" ? "Claude" : "You";
@@ -380,7 +385,7 @@ function ResolvedCard({ rid, a, on, pick, refresh }: { rid: string; a: Annotatio
   return (
     <article className={styles.card} data-resolved data-on={on || undefined} data-for={a.target_id ?? ""} aria-labelledby={tid}
       onClick={(e) => { if (!(e.target as Element).closest("button")) pick(a); }}>
-      <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggested` : `${who} commented`} · <b>{a.status === "accepted" ? "Accepted" : "Resolved"}</b></p>
+      <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggested` : `${who} commented`} · <b>{outcome(a)}</b></p>
       {quotesOf(a).slice(0, SHOWN).map((q, i) => <p key={i} className={styles.quote}>“{q}”</p>)}
       <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
       {(a.replies ?? []).map((r, i) => (
@@ -440,16 +445,16 @@ function ReplyRow({ rid, aid, r, refresh }: { rid: string; aid: string; r: Recor
   );
 }
 
-function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "on" | "resolvedCount" | "showResolved" | "onToggleResolved"> & { a: Annotation; on: boolean }) {
+/** `waiting`: this comment's open child suggestions (from an earlier Apply); it resolves itself once they're decided. */
+function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh, waiting = 0 }: Omit<MarginProps, "cards" | "on" | "resolvedCount" | "showResolved" | "onToggleResolved"> & { a: Annotation; on: boolean; waiting?: number }) {
   const [text, setText] = useState("");
-  const [apply, setApply] = useState(false);
   const [failed, setFailed] = useState("");
-  const [runId, setRunId] = useState<string | null>(null);  // the Apply-comment re-draft run being followed
+  const [runId, setRunId] = useState<string | null>(null);  // the Apply re-draft run being followed
   const follow = useApplyRun(rid, runId);
   useEffect(() => { if (follow.ended) refresh(); }, [follow.ended, refresh]);  // its suggestions/replies show up
   const sent = useRef("");  // the text actually submitted: the input may change while the send is pending  // reply text whose send failed: the reply may exist server-side, so no resend until edited
   const act = useMutation({
-    mutationFn: async (what: "accept" | "reject" | "reply") => {
+    mutationFn: async (what: "accept" | "reject" | "reply" | "apply") => {
       if (what === "accept") {
         lock(true);  // typing during the request would be overwritten by the accepted doc
         try {
@@ -458,13 +463,12 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
         } finally { lock(false); }
       } else if (what === "reject") await reject(rid, a.id);
       else {
-        const r = await reply(rid, a.id, text.trim(), apply);
+        const r = await reply(rid, a.id, text.trim(), what === "apply");  // Apply: unsent reply text = instructions
         if (r.run_id) setRunId(r.run_id);
         setText("");
-        setApply(false);
       }
     },
-    onError: (_e, what) => { if (what === "reply") setFailed(sent.current); },
+    onError: (_e, what) => { if (what !== "accept" && what !== "reject") setFailed(sent.current); },
     onSettled: refresh,
   });
   const submit = (e: FormEvent) => {
@@ -485,9 +489,9 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
       {runId && !follow.ended ? <p className={styles.muted} role="status">Claude is revising…</p> : null}
       {runId && follow.ended && follow.failed ? <p role="alert" className={styles.alert}>Claude couldn’t revise this: {follow.error}. Your comment is saved.</p> : null}
       {runId && follow.ended && !follow.failed && follow.written ? <p className={styles.muted} role="status">Claude added {follow.written.length} {follow.written.length === 1 ? "response" : "responses"}.</p> : null}
+      {waiting ? <p className={styles.muted}>{waiting} suggestion{waiting === 1 ? "" : "s"} to review</p> : null}
       <form className={styles.replyForm} onSubmit={submit}>
         <input aria-label="Reply" placeholder="Reply…" className={styles.input} value={text} onChange={(e) => setText(e.target.value)} />
-        <label className={styles.muted}><input type="checkbox" checked={apply} onChange={(e) => setApply(e.target.checked)} /> Apply comment (Claude revises this)</label>
         <div className={styles.actions}>
           <Button type="submit" size="small" disabled={!text.trim() || text.trim() === failed || act.isPending}>Send</Button>
           <span className={styles.grow} />
@@ -496,7 +500,14 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
               <Button size="small" variant="primary" disabled={act.isPending} onClick={() => act.mutate("accept")}>Accept</Button>
               <Button size="small" disabled={act.isPending} onClick={() => act.mutate("reject")}>Reject</Button>
             </>
-          ) : <Button size="small" disabled={act.isPending} onClick={() => act.mutate("reject")}>Resolve</Button>}
+          ) : (
+            <>
+              <Button size="small" variant="primary" disabled={act.isPending || waiting > 0 || (!!runId && !follow.ended)}
+                title="Claude turns this comment into suggestions you accept or reject; reply text above goes along as instructions"
+                onClick={() => { sent.current = text.trim(); act.mutate("apply"); }}>Apply</Button>
+              <Button size="small" disabled={act.isPending} title="Mark done: you fixed it yourself, or it doesn't apply" onClick={() => act.mutate("reject")}>Resolve</Button>
+            </>
+          )}
         </div>
       </form>
       {act.isError ? <p role="alert" className={styles.alert}>{errorText(act.error)}</p> : null}

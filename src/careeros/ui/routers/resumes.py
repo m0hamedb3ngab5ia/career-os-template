@@ -165,8 +165,8 @@ class AnnotationIn(BaseModel):
 
 
 class Reply(BaseModel):
-    text: str
-    apply: bool = False  # "Apply comment": also queue an AI re-draft run (edit-resume) that only proposes/replies
+    text: str = ""  # may be empty only with `apply` (the Apply button with no instructions)
+    apply: bool = False  # "Apply": also queue an AI re-draft run (edit-resume) that only proposes/replies
 
 
 class ReplyEdit(BaseModel):
@@ -192,6 +192,8 @@ class Annotation(BaseModel):  # DEC-016
     replies: list[dict[str, Any]] = []
     at: str | None = None
     run: str | None = None  # the run that wrote it (TASK-033b); replies carry their own `run`
+    resolution: Literal["applied", "edited", "dismissed"] | None = None  # how a decided item ended (None: legacy)
+    parent: str | None = None  # the comment an Apply run answered with this suggestion
 
 
 class PublishIn(BaseModel):  # DEC-017
@@ -462,7 +464,7 @@ def revert_change(rid: str, cid: str, c=Depends(ctx)) -> Draft:
 @router.get("/profile/resumes/{rid}/annotations")
 def list_annotations(rid: str, run: str | None = None, c=Depends(ctx)) -> list[Annotation]:
     """DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
-    that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b)."""
+    that run created or replied to: poll it with the run's state after Apply's `run_id` (TASK-033b)."""
     with _refusals():
         store.get(c.settings.root, rid)
         return [Annotation(**i) for i in ann.list_items(c.settings.root, rid, run=run)]
@@ -476,10 +478,14 @@ def create_annotation(rid: str, body: AnnotationIn, c=Depends(ctx)) -> Annotatio
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/replies")
 def reply_annotation(rid: str, aid: str, body: Reply, request: Request, c=Depends(ctx)) -> Replied:
-    """User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
-    The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action."""
+    """User reply. `apply` = "Apply": queue a resume_edit run (409/422 if it can't start; the reply is kept); with
+    `apply` the text may be empty (no reply stored). The run writes AI suggestions (`parent` = this item) or a reply,
+    never the draft (DEC-016); accepting stays the user's action."""
     with _refusals():
-        out = Replied(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
+        if body.apply and not body.text.strip():
+            out = Replied(**ann._get(ann.list_items(c.settings.root, rid), aid))
+        else:
+            out = Replied(**ann.reply(c.settings.root, rid, aid, body.text, author="user"))
     if body.apply:
         try:
             out.run_id = _start(request, c, "resume_edit", rid, aid).run_id
@@ -492,7 +498,7 @@ def reply_annotation(rid: str, aid: str, body: Reply, request: Request, c=Depend
 
 @router.patch("/profile/resumes/{rid}/annotations/{aid}/replies/{reply_id}")
 def edit_annotation_reply(rid: str, aid: str, reply_id: str, body: ReplyEdit, c=Depends(ctx)) -> Annotation:
-    """Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409."""
+    """Edit the user's own reply; Claude's, or one an "Apply" run already picked up, -> 409."""
     with _refusals():
         return Annotation(**ann.edit_reply(c.settings.root, rid, aid, reply_id, body.text))
 

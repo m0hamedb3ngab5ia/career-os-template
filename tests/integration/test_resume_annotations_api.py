@@ -124,6 +124,10 @@ def test_reply_with_apply_queues_an_ai_redraft_run(tmp_path: Path):  # "Apply co
         assert started == [("resume_edit", {"resume": rid, "item": aid})]
         assert c.post(f"{url}/zz/replies", json={"text": "x", "apply": True}, headers=W).status_code == 404
         assert len(started) == 1
+        r = c.post(f"{url}/{aid}/replies", json={"text": " ", "apply": True}, headers=W)  # Apply, no instructions
+        assert r.status_code == 200 and r.json()["run_id"] == "run-1" and len(r.json()["replies"]) == 2
+        assert c.post(f"{url}/{aid}/replies", json={"text": " "}, headers=W).status_code == 422
+        started.clear()
 
         def busy(self, kind, **kw):
             raise RuntimeError("runner busy")
@@ -160,6 +164,14 @@ def test_cli_writes_annotations_as_ai(tmp_path: Path, capsys):  # review-resume 
     assert cli.main([*r, "annotate", rid, "comment", "--target", "nope", "--text", "x"]) == 1
     assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
                      "--proposed", "y"]) == 1  # a comment proposes nothing
+    capsys.readouterr()
+    assert cli.main([*r, "annotate", rid, "comment", "--text", "tighten"]) == 0
+    p = json.loads(capsys.readouterr().out)["id"]
+    assert cli.main([*r, "annotate", rid, "suggestion", "--target", "experience-1.b1", "--proposed", "Built",
+                     "--text", "x", "--parent", p]) == 0
+    assert json.loads(capsys.readouterr().out)["parent"] == p
+    assert cli.main([*r, "annotate", rid, "suggestion", "--target", "experience-1.b1", "--proposed", "Built",
+                     "--text", "x", "--parent", "zz"]) == 1  # no such comment
     assert "error:" in capsys.readouterr().err
     assert cli.main([*r, "annotate", rid, "comment", "--target", "experience-1.b1", "--text", "x",
                      "--quote", "the THING"]) == 0

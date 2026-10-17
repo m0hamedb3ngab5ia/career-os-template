@@ -14,6 +14,11 @@ computed on read (open item whose target no longer holds `base`), never stored. 
 change author=ai, bullet `origin` cleared (DEC-018 amendment: an AI text is never user-written). User suggestion:
 no guard, change author=user. feedback.json items (the old review items) not yet stored are read as comments
 (feedback.json is never written); they're saved on the next write.
+`resolution` (decided items, set here, never by the caller): applied = accepted suggestion; dismissed = rejected
+suggestion, or a comment resolved with its passages unchanged; edited = a comment resolved after its passages changed
+("fixed by you"); absent = unanchored comment or a legacy item. Reopen clears it. `parent` = the comment an Apply run
+answered with this suggestion (edit-resume); once every child is decided the parent resolves itself: applied if one
+was accepted, else dismissed.
 """
 from __future__ import annotations
 
@@ -147,8 +152,9 @@ def list_items(root: Path, rid: str, run: str | None = None) -> list[dict[str, A
 
 def create(root: Path, rid: str, *, kind: str, target_id: str | None = None, text: str = "", proposed: str | None = None,
            author: str = "user", run: str | None = None, quote: str | None = None,
-           anchors: list[tuple[str | None, str | None]] | None = None) -> dict[str, Any]:
-    """`anchors` [(target_id, quote)] replaces target_id/quote (the first pair becomes them); a comment only."""
+           anchors: list[tuple[str | None, str | None]] | None = None, parent: str | None = None) -> dict[str, Any]:
+    """`anchors` [(target_id, quote)] replaces target_id/quote (the first pair becomes them); a comment only.
+    `parent`: an existing comment this suggestion answers (LookupError if none, ValueError if not a comment)."""
     if anchors:
         if target_id is not None or quote is not None:
             raise ValueError("pass anchors or target_id/quote, not both")
@@ -165,10 +171,13 @@ def create(root: Path, rid: str, *, kind: str, target_id: str | None = None, tex
         checked = _checked(root, rid, anchors or [(target_id, quote)])
         base, quote = checked[0][0], checked[0][1]["quote"]
         items = _load(root, rid)
+        if parent is not None and _get(items, parent)["kind"] != "comment":
+            raise ValueError(f"parent {parent!r} is not a comment")
         it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "quote": quote,
               "anchors": [a for _, a in checked if a["target_id"] is not None],
               "author": author, "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
-              "text": text.strip(), "replies": [], "at": store._now(), **({"run": run} if run else {})}
+              "text": text.strip(), "replies": [], "at": store._now(), **({"run": run} if run else {}),
+              **({"parent": parent} if parent else {})}
         _save(root, rid, [*items, it])
         return it
 
@@ -212,7 +221,7 @@ def reply(root: Path, rid: str, aid: str, text: str, *, author: str = "user", ru
 
 
 def lock_replies(root: Path, rid: str, aid: str, run: str) -> None:
-    """"Apply comment" started `run`: Claude reads every user reply so far, so those can't be edited/deleted any more."""
+    """"Apply" started `run`: Claude reads every user reply so far, so those can't be edited/deleted any more."""
     with store._locked(root):
         items = _load(root, rid)
         for r in _get(items, aid)["replies"]:
@@ -260,6 +269,10 @@ def reject(root: Path, rid: str, aid: str) -> dict[str, Any]:
         if it["status"] != "open":
             raise store.Refused(f"annotation {aid} is {it['status']}")
         it["status"] = "rejected"
+        it["resolution"] = "dismissed" if it["kind"] == "suggestion" else _comment_resolution(root, rid, it)
+        if it["resolution"] is None:
+            del it["resolution"]
+        _settle_parent(items, it)
         _save(root, rid, items)
         return it
 
@@ -272,6 +285,7 @@ def reopen(root: Path, rid: str, aid: str) -> dict[str, Any]:
         if it["status"] != "rejected":
             raise store.Refused(f"annotation {aid} is {it['status']}, only a rejected one can be reopened")
         it["status"] = "open"
+        it.pop("resolution", None)
         _save(root, rid, items)
         return it
 
@@ -307,6 +321,38 @@ def accept(root: Path, rid: str, aid: str) -> dict[str, Any]:
             if ai:
                 bullet.pop("origin", None)
         out = store._commit(d, prev, doc, latest, "ai" if ai else "user")
-        it["status"] = "accepted"
+        it["status"], it["resolution"] = "accepted", "applied"
+        _settle_parent(items, it)
         _save(root, rid, items)
         return out
+
+
+def _comment_resolution(root: Path, rid: str, it: dict[str, Any]) -> str | None:
+    """edited if any anchored passage changed since the comment (first: `base`; others: their quote), else dismissed."""
+    anchors = _anchors(it)
+    if not anchors:
+        return None
+    try:
+        doc = store.get_draft(root, rid)["resume"]
+    except LookupError:
+        return None
+    for n, a in enumerate(anchors):
+        try:
+            cur = _target(doc, a["target_id"])[0]
+        except LookupError:
+            return "edited"
+        if (cur != it["base"]) if n == 0 else (a.get("quote") is not None and a["quote"].casefold()
+                                                not in " ".join(str(cur or "").split()).casefold()):
+            return "edited"
+    return "dismissed"
+
+
+def _settle_parent(items: list[dict[str, Any]], it: dict[str, Any]) -> None:
+    """`it` was just decided: resolve its parent once no sibling is still open."""
+    pid = it.get("parent")
+    parent = next((i for i in items if i["id"] == pid), None)
+    kids = [i for i in items if i.get("parent") == pid]
+    if parent is None or parent["status"] != "open" or any(k["status"] == "open" for k in kids):
+        return
+    parent["status"] = "rejected"
+    parent["resolution"] = "applied" if any(k["status"] == "accepted" for k in kids) else "dismissed"

@@ -609,6 +609,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
           "proposed": {
             "anyOf": [
               {
@@ -639,6 +650,22 @@
             },
             "title": "Replies",
             "type": "array"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  "applied",
+                  "edited",
+                  "dismissed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
           },
           "run": {
             "anyOf": [
@@ -5939,6 +5966,17 @@
             "title": "Kind",
             "type": "string"
           },
+          "parent": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Parent"
+          },
           "proposed": {
             "anyOf": [
               {
@@ -5969,6 +6007,22 @@
             },
             "title": "Replies",
             "type": "array"
+          },
+          "resolution": {
+            "anyOf": [
+              {
+                "enum": [
+                  "applied",
+                  "edited",
+                  "dismissed"
+                ],
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resolution"
           },
           "run": {
             "anyOf": [
@@ -6036,13 +6090,11 @@
             "type": "boolean"
           },
           "text": {
+            "default": "",
             "title": "Text",
             "type": "string"
           }
         },
-        "required": [
-          "text"
-        ],
         "title": "Reply",
         "type": "object"
       },
@@ -13016,7 +13068,7 @@
     },
     "/api/profile/resumes/{rid}/annotations": {
       "get": {
-        "description": "DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those\nthat run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).",
+        "description": "DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those\nthat run created or replied to: poll it with the run's state after Apply's `run_id` (TASK-033b).",
         "operationId": "list_annotations_api_profile_resumes__rid__annotations_get",
         "parameters": [
           {
@@ -13283,7 +13335,7 @@
     },
     "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
       "post": {
-        "description": "User reply. `apply` = \"Apply comment\": queue a resume_edit run (409/422 if it can't start; the reply is kept).\nThe run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.",
+        "description": "User reply. `apply` = \"Apply\": queue a resume_edit run (409/422 if it can't start; the reply is kept); with\n`apply` the text may be empty (no reply stored). The run writes AI suggestions (`parent` = this item) or a reply,\nnever the draft (DEC-016); accepting stays the user's action.",
         "operationId": "reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post",
         "parameters": [
           {
@@ -13403,7 +13455,7 @@
         ]
       },
       "patch": {
-        "description": "Edit the user's own reply; Claude's, or one an \"Apply comment\" run already picked up, -> 409.",
+        "description": "Edit the user's own reply; Claude's, or one an \"Apply\" run already picked up, -> 409.",
         "operationId": "edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch",
         "parameters": [
           {

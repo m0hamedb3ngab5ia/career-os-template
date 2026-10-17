@@ -110,7 +110,7 @@ describe("WorkspacePage", () => {
     expect(puts(calls).map((c) => (c.body as { resume: typeof DOC }).resume.summary)).toEqual(["X", "X"]);
   });
 
-  it("accepts, rejects and replies (Apply comment) on cards", async () => {
+  it("accepts, rejects and applies (reply text as instructions) on cards", async () => {
     const accepted = { ...DOC, experience: [{ ...DOC.experience[0], bullets: [{ id: "experience-1.b1", text: "Fixed billing export bugs" }, DOC.experience[0]!.bullets[1]!] }] };
     const calls = api({
       "POST /api/profile/resumes/cv/annotations/a1/accept": { rev: 4, resume: accepted, draft: true },
@@ -123,8 +123,7 @@ describe("WorkspacePage", () => {
     expect(await screen.findByRole("textbox", { name: "Experience 1 bullet 1" })).toHaveValue("Fixed billing export bugs");
     const comment = screen.getByRole("article", { name: /Name the stack/ });
     fireEvent.change(within(comment).getByRole("textbox", { name: "Reply" }), { target: { value: "Use Python" } });
-    fireEvent.click(within(comment).getByRole("checkbox", { name: /Apply comment/ }));
-    fireEvent.click(within(comment).getByRole("button", { name: "Send" }));
+    fireEvent.click(within(comment).getByRole("button", { name: "Apply" }));
     await tick(0);
     fireEvent.click(within(comment).getByRole("button", { name: "Resolve" }));
     await tick(0);
@@ -297,13 +296,12 @@ describe("WorkspacePage", () => {
     renderRoutes(routes, "/resumes/cv");
     const comment = await screen.findByRole("article", { name: /Name the stack/ });
     fireEvent.change(within(comment).getByRole("textbox", { name: "Reply" }), { target: { value: "Use Python" } });
-    fireEvent.click(within(comment).getByRole("checkbox", { name: /Apply comment/ }));
-    fireEvent.click(within(comment).getByRole("button", { name: "Send" }));
+    fireEvent.click(within(comment).getByRole("button", { name: "Apply" }));
     await tick(0);
     return comment;
   };
 
-  it("Apply comment follows the run, then lists what it wrote", async () => {
+  it("Apply follows the run, then lists what it wrote", async () => {
     let n = 0;
     const comment = await applyAndSend({
       "GET /api/runs/r1": () => (++n < 2 ? { state: "running" } : { state: "done", stop_reason: "completed" }),
@@ -314,17 +312,39 @@ describe("WorkspacePage", () => {
     expect(await within(comment).findByText(/Claude added/)).toBeInTheDocument();
   });
 
-  it("Apply comment: a failed run shows an error", async () => {
+  it("Apply: a failed run shows an error", async () => {
     const comment = await applyAndSend({ "GET /api/runs/r1": { state: "failed", stop_reason: "error", detail: "no suggestion written" } });
     await tick(1500);
     expect(await within(comment).findByRole("alert")).toHaveTextContent("no suggestion written");
   });
 
-  it("Apply comment: a done run that stopped as failed shows an error, not 0 responses", async () => {
+  it("Apply: a done run that stopped as failed shows an error, not 0 responses", async () => {
     const comment = await applyAndSend({ "GET /api/runs/r1": { state: "done", stop_reason: "failed", detail: "proposed nothing" } });
     await tick(1500);
     expect(await within(comment).findByRole("alert")).toHaveTextContent("proposed nothing");
     expect(within(comment).queryByText(/Claude added/)).toBeNull();
+  });
+
+  it("Apply with no reply text; a comment waiting on its suggestions says so and can't be applied again", async () => {
+    const calls = api({
+      "GET /api/profile/resumes/cv/annotations": [COMM, { ...SUGG, parent: "a2" }],
+      "POST /api/profile/resumes/cv/annotations/a2/replies": { ...COMM, run_id: "r1" },
+    });
+    renderRoutes(routes, "/resumes/cv");
+    const comment = await screen.findByRole("article", { name: /Name the stack/ });
+    expect(within(comment).getByText("1 suggestion to review")).toBeInTheDocument();
+    expect(within(comment).getByRole("button", { name: "Apply" })).toBeDisabled();
+    expect(within(comment).getByRole("button", { name: "Resolve" })).toHaveAttribute("title", expect.stringMatching(/fixed it yourself/));
+    expect(calls.filter((c) => c.method === "POST")).toHaveLength(0);
+  });
+
+  it("Apply sends no text when the reply box is empty", async () => {
+    const calls = api({ "POST /api/profile/resumes/cv/annotations/a2/replies": { ...COMM, run_id: "r1" } });
+    renderRoutes(routes, "/resumes/cv");
+    const comment = await screen.findByRole("article", { name: /Name the stack/ });
+    fireEvent.click(within(comment).getByRole("button", { name: "Apply" }));
+    await tick(0);
+    expect(calls.find((c) => c.method === "POST")!.body).toEqual({ text: "", apply: true });
   });
 
   it("onboarding: Next replaces Done and publishes as master", async () => {

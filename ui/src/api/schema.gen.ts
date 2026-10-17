@@ -340,7 +340,7 @@ export interface paths {
     /**
      * List Annotations
      * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
-     * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
+     * that run created or replied to: poll it with the run's state after Apply's `run_id` (TASK-033b).
      */
     get: operations["list_annotations_api_profile_resumes__rid__annotations_get"];
     /** Create Annotation */
@@ -366,8 +366,9 @@ export interface paths {
   "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
     /**
      * Reply Annotation
-     * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
-     * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+     * @description User reply. `apply` = "Apply": queue a resume_edit run (409/422 if it can't start; the reply is kept); with
+     * `apply` the text may be empty (no reply stored). The run writes AI suggestions (`parent` = this item) or a reply,
+     * never the draft (DEC-016); accepting stays the user's action.
      */
     post: operations["reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post"];
   };
@@ -376,7 +377,7 @@ export interface paths {
     delete: operations["delete_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__delete"];
     /**
      * Edit Annotation Reply
-     * @description Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409.
+     * @description Edit the user's own reply; Claude's, or one an "Apply" run already picked up, -> 409.
      */
     patch: operations["edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch"];
   };
@@ -800,6 +801,8 @@ export interface components {
        * @enum {string}
        */
       kind: "suggestion" | "comment";
+      /** Parent */
+      parent?: string | null;
       /** Proposed */
       proposed?: string | null;
       /** Quote */
@@ -811,6 +814,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Resolution */
+      resolution?: ("applied" | "edited" | "dismissed") | null;
       /** Run */
       run?: string | null;
       /**
@@ -2425,6 +2430,8 @@ export interface components {
        * @enum {string}
        */
       kind: "suggestion" | "comment";
+      /** Parent */
+      parent?: string | null;
       /** Proposed */
       proposed?: string | null;
       /** Quote */
@@ -2436,6 +2443,8 @@ export interface components {
       replies?: {
           [key: string]: unknown;
         }[];
+      /** Resolution */
+      resolution?: ("applied" | "edited" | "dismissed") | null;
       /** Run */
       run?: string | null;
       /** Run Id */
@@ -2460,8 +2469,11 @@ export interface components {
        * @default false
        */
       apply?: boolean;
-      /** Text */
-      text: string;
+      /**
+       * Text
+       * @default
+       */
+      text?: string;
     };
     /** ReplyEdit */
     ReplyEdit: {
@@ -5078,7 +5090,7 @@ export interface operations {
   /**
    * List Annotations
    * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
-   * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
+   * that run created or replied to: poll it with the run's state after Apply's `run_id` (TASK-033b).
    */
   list_annotations_api_profile_resumes__rid__annotations_get: {
     parameters: {
@@ -5207,8 +5219,9 @@ export interface operations {
   };
   /**
    * Reply Annotation
-   * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
-   * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
+   * @description User reply. `apply` = "Apply": queue a resume_edit run (409/422 if it can't start; the reply is kept); with
+   * `apply` the text may be empty (no reply stored). The run writes AI suggestions (`parent` = this item) or a reply,
+   * never the draft (DEC-016); accepting stays the user's action.
    */
   reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post: {
     parameters: {
@@ -5263,7 +5276,7 @@ export interface operations {
   };
   /**
    * Edit Annotation Reply
-   * @description Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409.
+   * @description Edit the user's own reply; Claude's, or one an "Apply" run already picked up, -> 409.
    */
   edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch: {
     parameters: {

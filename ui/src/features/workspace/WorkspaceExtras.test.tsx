@@ -45,25 +45,29 @@ describe("Workspace extras", () => {
   it("Show resolved lists rejected and accepted cards read-only; Reopen re-opens a rejected one", async () => {
     const REJ = { ...SUGG, id: "a2", status: "rejected", text: "Rejected idea" };
     const ACC = { ...SUGG, id: "a3", status: "accepted", text: "Accepted idea" };
-    let list = [SUGG, REJ, ACC];
+    const FIX = { ...SUGG, id: "a4", kind: "comment", proposed: null, status: "rejected", resolution: "edited", text: "Fixed idea" };
+    const DIS = { ...SUGG, id: "a5", status: "rejected", resolution: "dismissed", text: "Dismissed idea" };
+    let list = [SUGG, REJ, ACC, FIX, DIS];
     const calls = api({
       "GET /api/profile/resumes/cv/annotations": () => list,
-      "POST /api/profile/resumes/cv/annotations/a2/reopen": () => { list = [SUGG, { ...REJ, status: "open" }, ACC]; return { ...REJ, status: "open" }; },
+      "POST /api/profile/resumes/cv/annotations/a2/reopen": () => { list = [SUGG, { ...REJ, status: "open" }, ACC, FIX, DIS]; return { ...REJ, status: "open" }; },
     });
     renderRoutes(routes, "/resumes/cv");
-    const toggle = await screen.findByRole("button", { name: "Show resolved (2)" });
+    const toggle = await screen.findByRole("button", { name: "Show resolved (4)" });
     expect(screen.queryByText("Rejected idea")).toBeNull();
     fireEvent.click(toggle);
     const rej = screen.getByText("Rejected idea").closest("article") as HTMLElement;
     const acc = screen.getByText("Accepted idea").closest("article") as HTMLElement;
-    expect(within(rej).getByText("Resolved")).toBeInTheDocument();
-    expect(within(acc).getByText("Accepted")).toBeInTheDocument();
+    expect(within(rej).getByText("Resolved")).toBeInTheDocument();  // legacy: no resolution stored
+    expect(within(acc).getByText("Applied")).toBeInTheDocument();
+    expect(within(screen.getByText("Fixed idea").closest("article") as HTMLElement).getByText("Fixed by you")).toBeInTheDocument();
+    expect(within(screen.getByText("Dismissed idea").closest("article") as HTMLElement).getByText("Dismissed")).toBeInTheDocument();
     expect(within(acc).queryByRole("button", { name: "Reopen" })).toBeNull();
     expect(within(rej).queryByRole("textbox")).toBeNull();
-    expect(screen.getByRole("button", { name: "Hide resolved (2)" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Hide resolved (4)" })).toBeInTheDocument();
     fireEvent.click(within(rej).getByRole("button", { name: "Reopen" }));
     await waitFor(() => expect(calls.some((c) => c.url.endsWith("/a2/reopen"))).toBe(true));
-    expect(await screen.findByRole("button", { name: /Show resolved \(1\)|Hide resolved \(1\)/ })).toBeInTheDocument();
+    expect(await screen.findByRole("button", { name: /Show resolved \(3\)|Hide resolved \(3\)/ })).toBeInTheDocument();
   });
 
   it("hides the Show resolved toggle when nothing is resolved", async () => {
@@ -173,8 +177,7 @@ describe("Workspace extras", () => {
     renderRoutes(routes, "/resumes/cv");
     const reply = await screen.findByRole("textbox", { name: "Reply" });
     fireEvent.change(reply, { target: { value: "Use Python" } });
-    fireEvent.click(screen.getByRole("checkbox", { name: /Apply comment/ }));
-    fireEvent.click(screen.getByRole("button", { name: "Send" }));
+    fireEvent.click(screen.getByRole("button", { name: "Apply" }));
     await tick(2500);
     const n = () => calls.filter((c) => c.method === "GET" && c.url.endsWith("/annotations")).length;
     const before = n();

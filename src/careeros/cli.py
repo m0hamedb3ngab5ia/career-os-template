@@ -996,7 +996,7 @@ def cmd_resume_annotate(args: argparse.Namespace) -> int:
                 raise ValueError("--quote needs --target (one --target X --quote Y pair per passage)")
             pairs = list(zip(ts, qs)) if len(ts) > 1 else [(ts[0] if ts else None, qs[0] if qs else None)]
             out = ann.create(root, args.rid, kind=args.kind, text=args.text or "", proposed=args.proposed,
-                             author="ai", run=os.environ.get("CAREEROS_RUN_ID"), anchors=pairs)
+                             author="ai", run=os.environ.get("CAREEROS_RUN_ID"), anchors=pairs, parent=args.parent)
         elif c == "anchor":
             if len(args.target) != len(args.quote or []):
                 raise ValueError("anchor takes --target X --quote Y pairs (one --quote per --target)")
@@ -2102,6 +2102,8 @@ def build_parser() -> argparse.ArgumentParser:
     sp.add_argument("--text", help="comment text / a suggestion's reason")
     sp.add_argument("--quote", action="append", help="the exact span of the --target before it (needs --target; "
                     "must be in its text, case/whitespace-insensitive); the UI highlights it")
+    sp.add_argument("--parent", help="suggestion: the comment id an Apply run is answering (edit-resume); the "
+                    "comment resolves itself once all its suggestions are decided")
     sp.set_defaults(fn=cmd_resume_annotate)
     sp = rss.add_parser("anchor", help="add anchors (exact spans) to a comment: repeat --target X --quote Y per "
                         "passage; never moves/removes existing anchors, duplicates ignored; text/status/replies "

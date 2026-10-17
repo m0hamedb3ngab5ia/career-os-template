@@ -265,7 +265,7 @@ def run_resume_skill(settings: Settings, kind: str, rid: str, item: str | None, 
     applying = any(i["id"] == item and i["state"] == "open" for i in resume_feedback.load(root, rid)["items"])
     rec = run_skill(settings, "resume_edit", f"edit-resume {rid} {item}", run_id=run_id, lock=f"resume-{rid}")
     if item and item.startswith("a") and rec.get("stop_reason") == "completed" \
-            and proposed_nothing(item):  # Apply comment: no new annotation and no reply
+            and proposed_nothing(item):  # Apply: no new annotation and no reply
         rec = _fail_run(settings, rec, NO_ANNOTATIONS)
     if not (item and item.startswith("a")):  # DEC-017: annotation runs only propose/reply, a version is the user's (Done)
         resume_feedback.check_edit_run(root, rid, item, before)  # only guarded apply-edit versions may land

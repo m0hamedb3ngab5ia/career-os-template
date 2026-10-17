@@ -416,3 +416,44 @@ def test_legacy_reply_without_id_is_not_editable(tmp_path: Path):
     (tmp_path / "profile/resumes" / rid / "annotations.json").write_text(json.dumps(items))
     with pytest.raises(LookupError):
         ann.edit_reply(tmp_path, rid, c["id"], "", "x")
+
+
+def test_resolution_applied_dismissed_edited_and_reopen_clears(tmp_path: Path):
+    rid = _resume(tmp_path)
+    s = ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="Dev", text="x")
+    ann.accept(tmp_path, rid, s["id"])
+    r = ann.create(tmp_path, rid, kind="suggestion", target_id="mine", proposed="Ran it", text="x")
+    keep = ann.create(tmp_path, rid, kind="comment", target_id="mine", text="fine?")
+    fix = ann.create(tmp_path, rid, kind="comment", target_id="experience-1.b1", quote="billing", text="say which")
+    whole = ann.create(tmp_path, rid, kind="comment", text="overall tone")
+    d = resumes.get_draft(tmp_path, rid)
+    _bullet(d["resume"], "experience-1.b1")["text"] = "Built the payments service"
+    resumes.put_draft(tmp_path, rid, d["resume"], rev=d["rev"], author="user")
+    for a in (r, keep, fix, whole):
+        ann.reject(tmp_path, rid, a["id"])
+    got = {i["id"]: i.get("resolution") for i in ann.list_items(tmp_path, rid)}
+    assert got == {s["id"]: "applied", r["id"]: "dismissed", keep["id"]: "dismissed", fix["id"]: "edited",
+                   whole["id"]: None}  # unanchored: nothing to compare, the UI says "Resolved"
+    assert "resolution" not in ann.reopen(tmp_path, rid, keep["id"])
+
+
+def test_child_suggestions_settle_their_parent(tmp_path: Path):
+    rid = _resume(tmp_path)
+    p = ann.create(tmp_path, rid, kind="comment", text="tighten the bullets")
+    a = ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="Dev", text="x", parent=p["id"])
+    b = ann.create(tmp_path, rid, kind="suggestion", target_id="mine", proposed="Ran it", text="x", parent=p["id"])
+    assert a["parent"] == p["id"]
+    ann.reject(tmp_path, rid, a["id"])
+    assert ann.list_items(tmp_path, rid)[0]["status"] == "open"  # b still undecided
+    ann.accept(tmp_path, rid, b["id"])
+    parent = ann.list_items(tmp_path, rid)[0]
+    assert (parent["status"], parent["resolution"]) == ("rejected", "applied")
+    q = ann.create(tmp_path, rid, kind="comment", text="other")
+    c = ann.create(tmp_path, rid, kind="suggestion", target_id="experience-1.b1", proposed="Built it", text="x",
+                   parent=q["id"])
+    ann.reject(tmp_path, rid, c["id"])
+    assert next(i for i in ann.list_items(tmp_path, rid) if i["id"] == q["id"])["resolution"] == "dismissed"
+    with pytest.raises(LookupError):
+        ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="X", text="x", parent="nope")
+    with pytest.raises(ValueError):
+        ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="X", text="x", parent=a["id"])
