@@ -146,18 +146,24 @@ function Workspace() {
   const cards = open.slice().sort((a, b) => pos(a) - pos(b));
   const onTarget = (id: string) => open.filter((a) => a.target_id === id);
   const texts = targetTexts(doc);
-  /** [field, quote to mark inline | null = whole field] a card points at: its target (inline when its quote is still
-   * there), else (bridged feedback items have no target) every field holding its quote. */
+  /** [field, quote to mark inline | null = whole field] a card points at: each anchor's target (inline when its quote
+   * is still there), else (bridged feedback items have no target) every field holding its quote. */
   const hits = (a: Annotation): [string, string | null][] => {
     const q = quoteOf(a);
     if (a.target_id) {
-      const t = texts.find(([id]) => id === a.target_id)?.[1] ?? "";
-      return [[a.target_id, q && spans(t, q).length ? q : null]];
+      return anchorsOf(a).map(({ target_id: id, quote }) => {
+        const t = texts.find(([f]) => f === id)?.[1] ?? "";
+        return [id, quote && spans(t, quote).length ? quote : null];
+      });
     }
     return q ? texts.filter(([, t]) => spans(t, q).length).map(([id]) => [id, q]) : [];
   };
   const sel = open.find((a) => a.id === picked);
-  const lit = new Map<string, string | null>(sel ? hits(sel) : active ? [[active, null]] : []);
+  // field -> quotes to mark inline; an empty list = highlight the whole field
+  const lit = new Map<string, string[]>();
+  for (const [id, q] of sel ? hits(sel) : active ? [[active, null] as [string, null]] : []) {
+    lit.set(id, [...(lit.get(id) ?? []), ...(q ? [q] : [])]);
+  }
   /** Select a card (toggle unless `keep`): highlight its passages and scroll the first into view (after render). */
   const pick = (a: Annotation, keep = false) => {
     if (picked === a.id) { if (!keep) setPicked(null); return; }
@@ -171,9 +177,9 @@ function Workspace() {
     const here = onTarget(id);
     const sugg = here.find((a) => a.kind === "suggestion" && a.proposed);
     return (
-      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={(lit.has(id) && !lit.get(id)) || undefined}
+      <div id={`t-${id}`} className={styles.target} data-marked={here.length > 0 || undefined} data-on={(lit.has(id) && !lit.get(id)!.length) || undefined}
         onFocus={() => { setActive(id); setPicked(null); }}>
-        <Quote.Provider value={lit.get(id) ?? null}>{child}</Quote.Provider>
+        <Quote.Provider value={lit.get(id) ?? NONE}>{child}</Quote.Provider>
         {sugg ? <p className={styles.sugg}><del>{sugg.base}</del> <ins>{sugg.proposed}</ins></p> : null}
       </div>
     );
@@ -283,6 +289,18 @@ function Workspace() {
 
 /** The words a card is anchored on: its `quote`, or a bridged feedback item's quote (`base`, no target). */
 const quoteOf = (a: Annotation): string | null => a.quote ?? (a.target_id ? null : a.base) ?? null;
+/** Every passage a card points at: its `anchors` (a comment on several passages), else its one target + quote. */
+const anchorsOf = (a: Annotation): { target_id: string; quote: string | null }[] =>
+  a.anchors?.length ? a.anchors.map((x) => ({ target_id: x.target_id, quote: x.quote ?? null }))
+    : a.target_id ? [{ target_id: a.target_id, quote: quoteOf(a) }] : [];
+/** The quotes a card lists (first 3 shown, the rest counted). */
+const quotesOf = (a: Annotation): string[] => {
+  const qs = anchorsOf(a).map((x) => x.quote).filter((q): q is string => !!q);
+  const q = quoteOf(a);
+  return qs.length ? qs : q ? [q] : [];
+};
+const NONE: readonly string[] = [];
+const SHOWN = 3;
 
 interface MarginProps {
   rid: string;
@@ -357,7 +375,8 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
       onFocus={(e) => { if ((e.target as Element).closest("form")) pick(a, true); }}
       onClick={(e) => { if (!(e.target as Element).closest("form, button")) pick(a); }}>
       <p className={styles.muted}>{a.kind === "suggestion" ? `${who} suggests` : `${who} commented`}</p>
-      {quoteOf(a) ? <p className={styles.quote}>“{quoteOf(a)}”</p> : null}
+      {quotesOf(a).slice(0, SHOWN).map((q, i) => <p key={i} className={styles.quote}>“{q}”</p>)}
+      {quotesOf(a).length > SHOWN ? <p className={styles.muted}>+{quotesOf(a).length - SHOWN} more</p> : null}
       <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
       {(a.replies ?? []).map((r, i) => (
         <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>

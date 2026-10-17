@@ -757,8 +757,20 @@ export interface components {
       /** Window Days */
       window_days: number;
     };
+    /** Anchor */
+    Anchor: {
+      /** Quote */
+      quote?: string | null;
+      /** Target Id */
+      target_id: string;
+    };
     /** Annotation */
     Annotation: {
+      /**
+       * Anchors
+       * @default []
+       */
+      anchors?: components["schemas"]["Anchor"][];
       /** At */
       at?: string | null;
       /**
@@ -2379,6 +2391,11 @@ export interface components {
     };
     /** Replied */
     Replied: {
+      /**
+       * Anchors
+       * @default []
+       */
+      anchors?: components["schemas"]["Anchor"][];
       /** At */
       at?: string | null;
       /**

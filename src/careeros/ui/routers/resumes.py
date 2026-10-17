@@ -169,12 +169,18 @@ class Reply(BaseModel):
     apply: bool = False  # "Apply comment": also queue an AI re-draft run (edit-resume) that only proposes/replies
 
 
+class Anchor(BaseModel):
+    target_id: str
+    quote: str | None = None
+
+
 class Annotation(BaseModel):  # DEC-016
     id: str
     kind: Literal["suggestion", "comment"]
     target_id: str | None = None
     base: str | None = None
     quote: str | None = None  # the exact span of the target it's about (CLI --quote); the UI highlights it
+    anchors: list[Anchor] = []  # every passage a comment points at (first = target_id/quote); the UI marks them all
     author: Author
     status: Literal["open", "accepted", "rejected", "outdated"]
     proposed: str | None = None

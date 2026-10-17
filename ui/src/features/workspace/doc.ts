@@ -35,6 +35,18 @@ export const targetOrder = (doc: Doc): string[] => targetTexts(doc).map(([id]) =
 export const norm = (s: unknown): string => (typeof s === "string" ? s.toLowerCase().replace(/\s+/g, " ").trim() : "");
 
 
+/** Sorted, non-overlapping spans of every quote in `quotes` (a comment marking several passages of one field). */
+export function spansOf(text: string, quotes: readonly unknown[]): [number, number][] {
+  const all = quotes.flatMap((q) => spans(text, q)).sort((x, y) => x[0] - y[0]);
+  const out: [number, number][] = [];
+  for (const [a, b] of all) {
+    const last = out.at(-1);
+    if (last && a <= last[1]) last[1] = Math.max(last[1], b);
+    else out.push([a, b]);
+  }
+  return out;
+}
+
 /** [start, end) of every case/whitespace-insensitive match of `quote` in `text` (none for an empty quote). */
 export function spans(text: string, quote: unknown): [number, number][] {
   const words = norm(quote).split(" ").filter(Boolean);

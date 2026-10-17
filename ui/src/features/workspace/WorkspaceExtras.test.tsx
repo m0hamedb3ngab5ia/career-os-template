@@ -214,6 +214,28 @@ describe("Comment card highlight", () => {
     expect(marks()).toEqual([]);
   });
 
+  it("a comment on several passages marks every one inline, scrolls to the first, lists 3 quotes + more", async () => {
+    const scroll = vi.fn();
+    Element.prototype.scrollIntoView = scroll;
+    const anchors = [{ target_id: "experience-1.b1", quote: "billing" }, { target_id: "summary", quote: "BACKEND" },
+      { target_id: "projects-1.b1", quote: "built" }, { target_id: "experience-1.b1", quote: "worked" }];
+    const q = { ...SUGG, id: "m1", kind: "comment", proposed: null, quote: "billing", anchors, text: "Everywhere" };
+    api({ "GET /api/profile/resumes/cv/annotations": [q] });
+    renderRoutes(routes, "/resumes/cv");
+    const card = await screen.findByRole("button", { name: "Everywhere" });
+    const art = card.closest("article")!;
+    expect(art).toHaveTextContent("“billing”");
+    expect(art).toHaveTextContent("“BACKEND”");
+    expect(art).toHaveTextContent("“built”");
+    expect(art).not.toHaveTextContent("“worked”");
+    expect(art).toHaveTextContent("+1 more");
+    fireEvent.click(card);
+    expect(marks()).toEqual([["t-experience-1.b1", "Worked"], ["t-experience-1.b1", "billing"],
+      ["t-projects-1.b1", "Built"], ["t-summary", "Backend"]]);
+    expect(marked()).toEqual([]);
+    expect((scroll.mock.contexts[0] as Element).closest("[id^='t-']")!.id).toBe("t-experience-1.b1");
+  });
+
   it("a quote the target no longer holds falls back to highlighting the whole target", async () => {
     const q = { ...SUGG, id: "q2", kind: "comment", proposed: null, quote: "payments", text: "Stale" };
     api({ "GET /api/profile/resumes/cv/annotations": [q] });

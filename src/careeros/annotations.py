@@ -5,7 +5,10 @@ status: open|accepted|rejected|outdated, proposed, text, replies: [{text, author
 `run` = the writing run's id (CLI under CAREEROS_RUN_ID), absent for user/HTTP writes.
 `target_id` = a draft bullet id or a top-level text field (e.g. summary); `base` = its text when made; `quote` = the
 exact span of the target the item is about (Docs-style anchor; case/whitespace-insensitive substring, checked on create
-and on `anchor`, which backfills target_id + quote on an unanchored item). `outdated` is
+and on `anchor`). A comment may point at several passages: `anchors` = [{target_id, quote}], every one checked;
+`target_id`/`quote`/`base` stay the FIRST anchor (outdated + accept logic unchanged). Suggestions keep one anchor.
+Items stored before `anchors` read as their single anchor (or [] when unanchored). `anchor` only ADDS anchors to a
+comment (duplicates ignored), never moves or removes one. `outdated` is
 computed on read (open item whose target no longer holds `base`), never stored. Accept = a user action: base check
 (409, both texts), then one draft change via the TASK-029 write path. AI suggestion: zero-fabrication guard (422),
 change author=ai, bullet `origin` cleared (DEC-018 amendment: an AI text is never user-written). User suggestion:
@@ -83,6 +86,25 @@ def _base_and_quote(root: Path, rid: str, target_id: str | None, quote: str | No
     return base, quote
 
 
+def _anchors(it: dict[str, Any]) -> list[dict[str, Any]]:
+    if "anchors" in it:
+        return it["anchors"]
+    return [{"target_id": it["target_id"], "quote": it.get("quote")}] if it.get("target_id") is not None else []
+
+
+def _checked(root: Path, rid: str, pairs: list[tuple[str | None, str | None]]) -> list[tuple[Any, dict[str, Any]]]:
+    """[(base, {target_id, quote})] for every pair, each validated (ValueError/LookupError on the first bad one)."""
+    out = []
+    for tid, q in pairs:
+        base, q = _base_and_quote(root, rid, tid, q)
+        out.append((base, {"target_id": tid, "quote": q}))
+    return out
+
+
+def _key(a: dict[str, Any]) -> tuple[Any, Any]:
+    return a["target_id"], (a["quote"] or "").casefold()
+
+
 def _get(items: list[dict[str, Any]], aid: str) -> dict[str, Any]:
     it = next((i for i in items if i["id"] == aid), None)
     if it is None:
@@ -110,6 +132,8 @@ def list_items(root: Path, rid: str, run: str | None = None) -> list[dict[str, A
     except LookupError:  # no structured version: nothing to compare against
         return items
     for it in items:
+        it["anchors"] = _anchors(it)
+    for it in items:
         if it["status"] == "open" and it.get("target_id") is not None:
             try:
                 cur = _target(doc, it["target_id"])[0]
@@ -120,8 +144,16 @@ def list_items(root: Path, rid: str, run: str | None = None) -> list[dict[str, A
     return items
 
 
-def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str = "", proposed: str | None = None,
-           author: str = "user", run: str | None = None, quote: str | None = None) -> dict[str, Any]:
+def create(root: Path, rid: str, *, kind: str, target_id: str | None = None, text: str = "", proposed: str | None = None,
+           author: str = "user", run: str | None = None, quote: str | None = None,
+           anchors: list[tuple[str | None, str | None]] | None = None) -> dict[str, Any]:
+    """`anchors` [(target_id, quote)] replaces target_id/quote (the first pair becomes them); a comment only."""
+    if anchors:
+        if target_id is not None or quote is not None:
+            raise ValueError("pass anchors or target_id/quote, not both")
+        if len(anchors) > 1 and kind != "comment":
+            raise ValueError("a suggestion has one anchor (one --target/--quote pair)")
+        target_id, quote = anchors[0]
     if kind not in KINDS or author not in ("user", "ai"):
         raise ValueError("kind must be suggestion|comment and author user|ai")
     if kind == "suggestion" and (not isinstance(proposed, str) or not proposed.strip() or target_id is None):
@@ -129,25 +161,39 @@ def create(root: Path, rid: str, *, kind: str, target_id: str | None, text: str 
     if kind == "comment" and not text.strip():
         raise ValueError("a comment needs text")
     with store._locked(root):
-        base, quote = _base_and_quote(root, rid, target_id, quote)
+        checked = _checked(root, rid, anchors or [(target_id, quote)])
+        base, quote = checked[0][0], checked[0][1]["quote"]
         items = _load(root, rid)
         it = {"id": _next_id(items), "kind": kind, "target_id": target_id, "base": base, "quote": quote,
+              "anchors": [a for _, a in checked if a["target_id"] is not None],
               "author": author, "status": "open", "proposed": proposed.strip() if kind == "suggestion" else None,
               "text": text.strip(), "replies": [], "at": store._now(), **({"run": run} if run else {})}
         _save(root, rid, [*items, it])
         return it
 
 
-def anchor(root: Path, rid: str, aid: str, *, target_id: str, quote: str) -> dict[str, Any]:
-    """Anchor an unanchored annotation (old AI comments: target_id null) on `quote` inside `target_id`; `base` becomes
-    the target's current text so it isn't outdated. Never moves an anchored one; text/status/replies unchanged."""
+def anchor(root: Path, rid: str, aid: str, pairs: list[tuple[str, str]]) -> dict[str, Any]:
+    """ADD anchors (target_id, quote) to a comment: every pair checked first (all or nothing), duplicates ignored,
+    existing anchors never moved or removed. An unanchored comment's first new anchor becomes its target_id/quote,
+    `base` = that target's current text (so it isn't outdated). Text/status/replies unchanged."""
+    if not pairs:
+        raise ValueError("anchor needs at least one --target/--quote pair")
     with store._locked(root):
         items = _load(root, rid)
         it = _get(items, aid)
-        if it.get("target_id") is not None:
-            raise ValueError(f"{aid} is already anchored on {it['target_id']!r}; anchor never moves an annotation")
-        it["base"], it["quote"] = _base_and_quote(root, rid, target_id, quote)
-        it["target_id"] = target_id
+        if it["kind"] != "comment":
+            raise ValueError(f"{aid} is a suggestion; a suggestion keeps its one anchor")
+        checked = _checked(root, rid, pairs)
+        have = _anchors(it)
+        seen = {_key(a) for a in have}
+        for base, a in checked:
+            if _key(a) in seen:
+                continue
+            seen.add(_key(a))
+            if not have and it.get("target_id") is None:
+                it["base"], it["quote"], it["target_id"] = base, a["quote"], a["target_id"]
+            have = [*have, a]
+        it["anchors"] = have
         _save(root, rid, items)
         return it
 

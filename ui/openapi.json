@@ -533,8 +533,40 @@
         "title": "AdvisorLimits",
         "type": "object"
       },
+      "Anchor": {
+        "properties": {
+          "quote": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Quote"
+          },
+          "target_id": {
+            "title": "Target Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "target_id"
+        ],
+        "title": "Anchor",
+        "type": "object"
+      },
       "Annotation": {
         "properties": {
+          "anchors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Anchor"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
           "at": {
             "anyOf": [
               {
@@ -5857,6 +5889,14 @@
       },
       "Replied": {
         "properties": {
+          "anchors": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/Anchor"
+            },
+            "title": "Anchors",
+            "type": "array"
+          },
           "at": {
             "anyOf": [
               {

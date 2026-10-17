@@ -989,11 +989,18 @@ def cmd_resume_annotate(args: argparse.Namespace) -> int:
         elif c == "annotate":
             if args.kind == "comment" and args.proposed is not None:
                 raise ValueError("a comment takes --text, not --proposed")
-            out = ann.create(root, args.rid, kind=args.kind, target_id=args.target, text=args.text or "",
-                             proposed=args.proposed, author="ai", run=os.environ.get("CAREEROS_RUN_ID"),
-                             quote=args.quote)
+            ts, qs = args.target or [], args.quote or []
+            if len(ts) > 1 and len(qs) != len(ts):
+                raise ValueError("several --target need one --quote each (--target X --quote Y pairs)")
+            if len(qs) > max(len(ts), 1):
+                raise ValueError("--quote needs --target (one --target X --quote Y pair per passage)")
+            pairs = list(zip(ts, qs)) if len(ts) > 1 else [(ts[0] if ts else None, qs[0] if qs else None)]
+            out = ann.create(root, args.rid, kind=args.kind, text=args.text or "", proposed=args.proposed,
+                             author="ai", run=os.environ.get("CAREEROS_RUN_ID"), anchors=pairs)
         elif c == "anchor":
-            out = ann.anchor(root, args.rid, args.aid, target_id=args.target, quote=args.quote)
+            if len(args.target) != len(args.quote or []):
+                raise ValueError("anchor takes --target X --quote Y pairs (one --quote per --target)")
+            out = ann.anchor(root, args.rid, args.aid, list(zip(args.target, args.quote)))
         else:
             out = ann.reply(root, args.rid, args.aid, args.text, author="ai", run=os.environ.get("CAREEROS_RUN_ID"))
     except (OSError, ValueError, LookupError, store.Refused) as e:
@@ -2089,18 +2096,22 @@ def build_parser() -> argparse.ArgumentParser:
                         "status open; never edits the draft)")
     sp.add_argument("rid")
     sp.add_argument("kind", choices=("suggestion", "comment"))
-    sp.add_argument("--target", help="bullet id or top-level text field (required for a suggestion)")
+    sp.add_argument("--target", action="append", help="bullet id or top-level text field (required for a "
+                    "suggestion); a comment about several passages repeats --target X --quote Y once per passage")
     sp.add_argument("--proposed", help="suggestion: the replacement text")
     sp.add_argument("--text", help="comment text / a suggestion's reason")
-    sp.add_argument("--quote", help="the exact span of --target this is about (needs --target; must be in its text, "
-                    "case/whitespace-insensitive); the UI highlights it")
+    sp.add_argument("--quote", action="append", help="the exact span of the --target before it (needs --target; "
+                    "must be in its text, case/whitespace-insensitive); the UI highlights it")
     sp.set_defaults(fn=cmd_resume_annotate)
-    sp = rss.add_parser("anchor", help="anchor an unanchored annotation (no target) on an exact span; refuses one "
-                        "already anchored; text/status/replies unchanged")
+    sp = rss.add_parser("anchor", help="add anchors (exact spans) to a comment: repeat --target X --quote Y per "
+                        "passage; never moves/removes existing anchors, duplicates ignored; text/status/replies "
+                        "unchanged")
     sp.add_argument("rid")
     sp.add_argument("aid")
-    sp.add_argument("--target", required=True, help="bullet id or top-level text field holding the span")
-    sp.add_argument("--quote", required=True, help="the exact span (case/whitespace-insensitive); the UI highlights it")
+    sp.add_argument("--target", action="append", required=True, help="bullet id or top-level text field holding "
+                    "the span")
+    sp.add_argument("--quote", action="append", help="the exact span (case/whitespace-insensitive); the UI "
+                    "highlights it")
     sp.set_defaults(fn=cmd_resume_annotate)
     sp = rss.add_parser("annotate-reply", help="AI reply on an annotation (author=ai)")
     sp.add_argument("rid")

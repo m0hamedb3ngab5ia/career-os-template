@@ -1,5 +1,5 @@
 import { createContext, type ReactNode, useContext, useLayoutEffect, useRef, useState } from "react";
-import { spans } from "./doc";
+import { spansOf } from "./doc";
 import styles from "./Workspace.module.css";
 
 /** Firefox/Safari lack CSS `field-sizing: content`; there JS sizes the field instead (feature-detected once). */
@@ -20,7 +20,7 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
   const control = multi
     ? <textarea {...common} rows={1} onChange={(e) => onChange(e.target.value)} />
     : <input {...common} onChange={(e) => onChange(e.target.value)} />;
-  const hit = spans(value, useContext(Quote));
+  const hit = spansOf(value, useContext(Quote));
   if (!hit.length) return control;
   // Text sits in a native textarea/input (editing, caret, IME stay native), which can't style a range. So a mirror
   // with the same box and font renders the text transparent behind it, with <mark> over the quoted words.
@@ -36,8 +36,8 @@ export function Field({ label, value, locked, multi, onChange }: FieldProps) {
   );
 }
 
-/** The quote to highlight inline in the Field(s) below (a selected comment's anchored words). */
-export const Quote = createContext<string | null>(null);
+/** The quotes to highlight inline in the Field(s) below (a selected comment's anchored words). */
+export const Quote = createContext<readonly string[]>([]);
 
 /** String list (skills, stack, coursework…): comma-separated text, stored as string[] (kept as typed so "a, " isn't eaten). */
 export function ListInput({ label, value, locked, onChange }: { label: string; value: string[]; locked: boolean; onChange: (a: string[]) => void }) {

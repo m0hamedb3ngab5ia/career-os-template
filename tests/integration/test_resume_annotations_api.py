@@ -169,8 +169,21 @@ def test_cli_writes_annotations_as_ai(tmp_path: Path, capsys):  # review-resume 
     assert cli.main([*r, "anchor", rid, c["id"], "--target", "experience-1.b1", "--quote", "the thing"]) == 0
     a = json.loads(capsys.readouterr().out)
     assert (a["target_id"], a["quote"], a["text"]) == ("experience-1.b1", "the thing", "whole doc")
-    assert cli.main([*r, "anchor", rid, c["id"], "--target", "experience-1.b1", "--quote", "thing"]) == 1
-    assert "already anchored" in capsys.readouterr().err
+    assert cli.main([*r, "anchor", rid, c["id"], "--target", "experience-1.b1", "--quote", "THE thing",
+                     "--target", "experience-1.b1", "--quote", "built"]) == 0  # adds; a duplicate is ignored
+    a = json.loads(capsys.readouterr().out)
+    assert a["anchors"] == [{"target_id": "experience-1.b1", "quote": "the thing"},
+                            {"target_id": "experience-1.b1", "quote": "built"}] and a["target_id"] == "experience-1.b1"
+    assert cli.main([*r, "anchor", rid, c["id"], "--target", "experience-1.b1"]) == 1  # unpaired
+    assert "pairs" in capsys.readouterr().err
+    assert cli.main([*r, "annotate", rid, "comment", "--text", "two places", "--target", "experience-1.b1",
+                     "--quote", "built", "--target", "experience-1.b1", "--quote", "thing"]) == 0
+    m = json.loads(capsys.readouterr().out)
+    assert [x["quote"] for x in m["anchors"]] == ["built", "thing"] and m["quote"] == "built"
+    assert cli.main([*r, "annotate", rid, "comment", "--text", "x", "--target", "experience-1.b1",
+                     "--target", "experience-1.b1", "--quote", "thing"]) == 1  # 2 targets, 1 quote
+    assert cli.main([*r, "annotate", rid, "suggestion", "--proposed", "y", "--target", "experience-1.b1",
+                     "--quote", "built", "--target", "experience-1.b1", "--quote", "thing"]) == 1  # one anchor only
 
 
 def test_e2e_002_05_accepts_and_edit_stay_one_draft(tmp_path: Path):

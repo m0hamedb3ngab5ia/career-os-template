@@ -305,7 +305,7 @@ def test_anchor_sets_target_and_quote_on_an_unanchored_comment(tmp_path: Path): 
     rid = _resume(tmp_path)
     c = ann.create(tmp_path, rid, kind="comment", target_id=None, text="vague", author="ai")
     ann.reply(tmp_path, rid, c["id"], "which?")
-    out = ann.anchor(tmp_path, rid, c["id"], target_id="experience-1.b1", quote=" billing  SERVICE ")
+    out = ann.anchor(tmp_path, rid, c["id"], [("experience-1.b1", " billing  SERVICE ")])
     assert (out["target_id"], out["quote"], out["base"]) == ("experience-1.b1", "billing SERVICE",
                                                               "Built the billing service")
     got = ann.list_items(tmp_path, rid)[0]
@@ -315,12 +315,59 @@ def test_anchor_sets_target_and_quote_on_an_unanchored_comment(tmp_path: Path): 
 @pytest.mark.parametrize("aid,target,quote,err", [("a9", "experience-1.b1", "billing", LookupError),
                                                   ("a1", "experience-1.b1", "payments", ValueError),
                                                   ("a1", "nope", "billing", LookupError),
-                                                  ("a2", "experience-1.b1", "billing", ValueError)])
-def test_anchor_refuses_unknown_bad_quote_or_already_anchored(tmp_path: Path, aid, target, quote, err):
+                                                  ("a3", "experience-1.b1", "billing", ValueError)])
+def test_anchor_refuses_unknown_bad_quote_or_a_suggestion(tmp_path: Path, aid, target, quote, err):
     rid = _resume(tmp_path)
     ann.create(tmp_path, rid, kind="comment", target_id=None, text="x", author="ai")
-    ann.create(tmp_path, rid, kind="comment", target_id="summary", text="y", author="ai")  # a2: already anchored
+    ann.create(tmp_path, rid, kind="comment", target_id="summary", text="y", author="ai")
+    ann.create(tmp_path, rid, kind="suggestion", target_id="summary", proposed="Dev", author="ai")  # a3: one anchor
     before = ann.list_items(tmp_path, rid)
     with pytest.raises(err):
-        ann.anchor(tmp_path, rid, aid, target_id=target, quote=quote)
+        ann.anchor(tmp_path, rid, aid, [(target, quote)])
+    assert ann.list_items(tmp_path, rid) == before
+
+
+def test_comment_anchors_on_several_passages(tmp_path: Path):  # "highlight every place they mention"
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", text="same claim twice", author="ai",
+                   anchors=[("experience-1.b1", " BILLING service"), ("mine", "billing"), ("summary", None)])
+    assert c["anchors"] == [{"target_id": "experience-1.b1", "quote": "BILLING service"},
+                            {"target_id": "mine", "quote": "billing"}, {"target_id": "summary", "quote": None}]
+    assert (c["target_id"], c["quote"], c["base"]) == ("experience-1.b1", "BILLING service", "Built the billing service")
+    assert ann.list_items(tmp_path, rid)[0]["anchors"] == c["anchors"]
+
+
+@pytest.mark.parametrize("kind,anchors", [("comment", [("summary", "Engineer"), ("mine", "payments")]),
+                                          ("comment", [("summary", "Engineer"), ("nope", "x")]),
+                                          ("suggestion", [("summary", "Engineer"), ("mine", "billing")])])
+def test_several_anchors_are_all_checked_and_suggestions_keep_one(tmp_path: Path, kind, anchors):
+    rid = _resume(tmp_path)
+    with pytest.raises((ValueError, LookupError)):
+        ann.create(tmp_path, rid, kind=kind, text="x", proposed="p", author="ai", anchors=anchors)
+    assert ann.list_items(tmp_path, rid) == []
+
+
+def test_old_items_read_with_their_single_anchor(tmp_path: Path):  # stored before `anchors` existed
+    rid = _resume(tmp_path)
+    ann.create(tmp_path, rid, kind="comment", target_id="summary", quote="engineer", text="x", author="ai")
+    ann.create(tmp_path, rid, kind="comment", target_id=None, text="whole doc", author="ai")
+    p = tmp_path / "profile" / "resumes" / rid / "annotations.json"
+    raw = json.loads(p.read_text())
+    for i in raw["items"]:
+        i.pop("anchors", None)
+    p.write_text(json.dumps(raw))
+    assert [i["anchors"] for i in ann.list_items(tmp_path, rid)] == [[{"target_id": "summary", "quote": "engineer"}], []]
+
+
+def test_anchor_adds_passages_never_moves_or_removes(tmp_path: Path):
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="summary", quote="Engineer", text="x", author="ai")
+    out = ann.anchor(tmp_path, rid, c["id"], [("experience-1.b1", "billing"), ("summary", " ENGINEER "),
+                                             ("mine", "billing")])
+    assert out["anchors"] == [{"target_id": "summary", "quote": "Engineer"},
+                              {"target_id": "experience-1.b1", "quote": "billing"}, {"target_id": "mine", "quote": "billing"}]
+    assert (out["target_id"], out["quote"], out["base"]) == ("summary", "Engineer", "Engineer")
+    before = ann.list_items(tmp_path, rid)
+    with pytest.raises(ValueError):  # one bad pair: nothing added
+        ann.anchor(tmp_path, rid, c["id"], [("experience-1.b1", "Built"), ("mine", "payments")])
     assert ann.list_items(tmp_path, rid) == before

@@ -19,10 +19,13 @@ and `.venv/bin/careeros`, one command per call (no pipes, `&&`, `;`); anything e
 
 ## 2. Anchor old comments
 
-For each open AI comment in `items` with no `target_id` that is about a specific passage, run
-`.venv/bin/careeros resume anchor <rid> <aid> --target <bullet id | field> --quote "<shortest exact span>"`, copied
-from that target's current text. Leave whole-document comments (length, layout, PDF/ATS parsing) unanchored. Never
-re-annotate them; exit 1 (quote not in the text, already anchored) → fix once or skip.
+For each open AI comment in `items` that is about specific passages and is not yet anchored at every one of them
+(`anchors` lists the ones it has), run one call with one pair per missing passage:
+`.venv/bin/careeros resume anchor <rid> <aid> --target <bullet id | field> --quote "<shortest exact span>"
+[--target <id> --quote "<span>"]...`, each quote copied from its target's current text. A comment that names several
+bullets or fields (e.g. "three bullets start with Built") gets a pair for every passage it mentions. `anchor` only
+adds (duplicates ignored). Leave whole-document comments (length, layout, PDF/ATS parsing) unanchored. Never
+re-annotate them; exit 1 (quote not in the text, unpaired --target) → fix once or skip.
 
 ## 3. Find issues
 
@@ -36,7 +39,9 @@ missing contact), typo.
 - A problem with no single-line fix → **comment**: `--text` = `<section>: <issue>. <how to fix>`.
 - Every comment about a specific passage MUST pass `--target <bullet id | field>` and `--quote "<shortest exact
   span it is about>"`, copied from that target's current text (the UI highlights it). Only whole-document comments
-  (overall length, layout, PDF/ATS parsing: columns, tables) omit both.
+  (overall length, layout, PDF/ATS parsing: columns, tables) omit both. A comment about several passages repeats
+  the pair once per passage (`--target A --quote "…" --target B --quote "…"`) so the UI highlights every one.
+  A suggestion has exactly one pair.
 - `--proposed` uses only facts already in the résumé. Never add a number, employer, title, date or tool that is not
   in the text, nor a stronger claim (supported → led): the accept guard refuses it.
 
@@ -44,8 +49,8 @@ missing contact), typo.
 
 One call per annotation:
 `.venv/bin/careeros resume annotate <rid> suggestion --target <id> --proposed "<new text>" --text "<issue>"` or
-`.venv/bin/careeros resume annotate <rid> comment --text "<issue and fix>" --target <id> --quote "<exact span>"`
-(whole-document comment: `--text` only). Exit 1 → read the error (unknown target, empty text, quote not in the
+`.venv/bin/careeros resume annotate <rid> comment --text "<issue and fix>" --target <id> --quote "<exact span>"
+[--target <id> --quote "<span>"]...` (whole-document comment: `--text` only). Exit 1 → read the error (unknown target, empty text, quote not in the
 target's text), fix it and retry once.
 
 Nothing to fix: still save one comment (`--text "No issues found"`); a review with zero annotations counts as failed.
