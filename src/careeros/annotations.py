@@ -19,6 +19,7 @@ from __future__ import annotations
 
 import copy
 import json
+import uuid
 from pathlib import Path
 from typing import Any
 
@@ -204,7 +205,50 @@ def reply(root: Path, rid: str, aid: str, text: str, *, author: str = "user", ru
     with store._locked(root):
         items = _load(root, rid)
         it = _get(items, aid)
-        it["replies"].append({"text": text.strip(), "author": author, "at": store._now(), **({"run": run} if run else {})})
+        it["replies"].append({"id": uuid.uuid4().hex[:8], "text": text.strip(), "author": author, "at": store._now(),
+                              **({"run": run} if run else {})})
+        _save(root, rid, items)
+        return it
+
+
+def lock_replies(root: Path, rid: str, aid: str, run: str) -> None:
+    """"Apply comment" started `run`: Claude reads every user reply so far, so those can't be edited/deleted any more."""
+    with store._locked(root):
+        items = _load(root, rid)
+        for r in _get(items, aid)["replies"]:
+            if r.get("author") == "user":
+                r.setdefault("picked_up", run)
+        _save(root, rid, items)
+
+
+def _own_reply(it: dict[str, Any], reply_id: str) -> dict[str, Any]:
+    """The user's own reply Claude hasn't picked up. Legacy replies have no id, so they are never found (read-only)."""
+    r = next((r for r in it["replies"] if reply_id and r.get("id") == reply_id), None)
+    if r is None:
+        raise LookupError(f"no reply {reply_id!r}")
+    if r.get("author") != "user":
+        raise store.Refused("only your own replies can be changed")
+    if r.get("picked_up"):
+        raise store.Refused("Claude already picked this reply up")
+    return r
+
+
+def edit_reply(root: Path, rid: str, aid: str, reply_id: str, text: str) -> dict[str, Any]:
+    if not text.strip():
+        raise ValueError("a reply needs text")
+    with store._locked(root):
+        items = _load(root, rid)
+        it = _get(items, aid)
+        _own_reply(it, reply_id)["text"] = text.strip()
+        _save(root, rid, items)
+        return it
+
+
+def delete_reply(root: Path, rid: str, aid: str, reply_id: str) -> dict[str, Any]:
+    with store._locked(root):
+        items = _load(root, rid)
+        it = _get(items, aid)
+        it["replies"].remove(_own_reply(it, reply_id))
         _save(root, rid, items)
         return it
 

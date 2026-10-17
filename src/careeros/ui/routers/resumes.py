@@ -169,6 +169,10 @@ class Reply(BaseModel):
     apply: bool = False  # "Apply comment": also queue an AI re-draft run (edit-resume) that only proposes/replies
 
 
+class ReplyEdit(BaseModel):
+    text: str
+
+
 class Anchor(BaseModel):
     target_id: str
     quote: str | None = None
@@ -479,9 +483,24 @@ def reply_annotation(rid: str, aid: str, body: Reply, request: Request, c=Depend
     if body.apply:
         try:
             out.run_id = _start(request, c, "resume_edit", rid, aid).run_id
+            ann.lock_replies(c.settings.root, rid, aid, out.run_id)
+            out = Replied(**next(i for i in ann.list_items(c.settings.root, rid) if i["id"] == aid), run_id=out.run_id)
         except HTTPException as e:
             raise HTTPException(e.status_code, f"reply saved; {e.detail}") from None
     return out
+
+
+@router.patch("/profile/resumes/{rid}/annotations/{aid}/replies/{reply_id}")
+def edit_annotation_reply(rid: str, aid: str, reply_id: str, body: ReplyEdit, c=Depends(ctx)) -> Annotation:
+    """Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409."""
+    with _refusals():
+        return Annotation(**ann.edit_reply(c.settings.root, rid, aid, reply_id, body.text))
+
+
+@router.delete("/profile/resumes/{rid}/annotations/{aid}/replies/{reply_id}")
+def delete_annotation_reply(rid: str, aid: str, reply_id: str, c=Depends(ctx)) -> Annotation:
+    with _refusals():
+        return Annotation(**ann.delete_reply(c.settings.root, rid, aid, reply_id))
 
 
 @router.post("/profile/resumes/{rid}/annotations/{aid}/accept")

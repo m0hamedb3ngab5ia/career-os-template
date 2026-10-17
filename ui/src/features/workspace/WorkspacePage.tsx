@@ -9,7 +9,7 @@ import { retryImport, useImport, useProfileWrite, useResumeMeta, useResumes } fr
 import { NextButton, NotCarriedOver } from "../profile/ImportPanels";
 import { Field, ListInput, Quote } from "./fields";
 import { History } from "./History";
-import { accept, type Annotation, type Doc, publish, reject, reopen, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
+import { accept, type Annotation, deleteReply, type Doc, editReply, publish, reject, reopen, reply, useAnnotations, useApplyRun, useAtsText, useDraft, wsKeys } from "./api";
 import { useAutosave } from "./useAutosave";
 import { cap, type Entry, SKIP, sectionOrder, setAt, spans, targetOrder, targetTexts } from "./doc";
 import styles from "./Workspace.module.css";
@@ -377,6 +377,54 @@ function ResolvedCard({ rid, a, on, pick, refresh }: { rid: string; a: Annotatio
   );
 }
 
+/** One reply. The user's own, not yet picked up by an Apply-comment run (and with an id), can be edited or deleted. */
+function ReplyRow({ rid, aid, r, refresh }: { rid: string; aid: string; r: Record<string, unknown>; refresh: () => void }) {
+  const [mode, setMode] = useState<"view" | "edit" | "confirm">("view");
+  const [text, setText] = useState("");
+  const id = typeof r.id === "string" ? r.id : "";
+  const mine = r.author === "user" && id !== "";
+  const save = useMutation({ mutationFn: () => editReply(rid, aid, id, text.trim()), onSuccess: () => setMode("view"), onSettled: refresh });
+  const del = useMutation({ mutationFn: () => deleteReply(rid, aid, id), onSettled: refresh });
+  const busy = save.isPending || del.isPending;
+  const who = <b>{r.author === "ai" ? "Claude" : "You"}:</b>;
+  if (!mine) return <p className={styles.reply}>{who} {String(r.text ?? "")}</p>;
+  if (r.picked_up) return <p className={styles.reply}>{who} {String(r.text ?? "")} <span className={styles.muted}>· Claude has picked this up</span></p>;
+  const err = save.isError ? save.error : del.isError ? del.error : null;
+  return (
+    <div className={styles.reply}>
+      {mode === "edit" ? (
+        <form className={styles.replyForm} onSubmit={(e) => { e.preventDefault(); if (text.trim() && !busy) save.mutate(); }}>
+          <input aria-label="Edit reply" className={styles.input} value={text} autoFocus onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === "Escape") { e.stopPropagation(); setMode("view"); } }} />
+          <div className={styles.actions}>
+            <Button type="submit" size="small" disabled={!text.trim() || busy}>Save</Button>
+            <Button size="small" disabled={busy} onClick={() => setMode("view")}>Cancel</Button>
+          </div>
+        </form>
+      ) : (
+        <>
+          <p>{who} {String(r.text ?? "")}</p>
+          <div className={styles.actions}>
+            {mode === "confirm" ? (
+              <>
+                <span className={styles.muted}>Delete this reply?</span>
+                <Button size="small" disabled={busy} onClick={() => del.mutate()}>Delete</Button>
+                <Button size="small" disabled={busy} onClick={() => setMode("view")}>Keep</Button>
+              </>
+            ) : (
+              <>
+                <Button size="small" onClick={() => { setText(String(r.text ?? "")); save.reset(); setMode("edit"); }}>Edit</Button>
+                <Button size="small" onClick={() => { del.reset(); setMode("confirm"); }}>Delete</Button>
+              </>
+            )}
+          </div>
+        </>
+      )}
+      {err ? <p role="alert" className={styles.alert}>{errorText(err)}</p> : null}
+    </div>
+  );
+}
+
 function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<MarginProps, "cards" | "on" | "resolvedCount" | "showResolved" | "onToggleResolved"> & { a: Annotation; on: boolean }) {
   const [text, setText] = useState("");
   const [apply, setApply] = useState(false);
@@ -418,9 +466,7 @@ function Card({ rid, a, on, pick, onAccepted, flush, lock, refresh }: Omit<Margi
       {quotesOf(a).slice(0, SHOWN).map((q, i) => <p key={i} className={styles.quote}>“{q}”</p>)}
       {quotesOf(a).length > SHOWN ? <p className={styles.muted}>+{quotesOf(a).length - SHOWN} more</p> : null}
       <button type="button" id={tid} className={styles.pick} aria-pressed={on} onClick={() => pick(a)}>{a.text}</button>
-      {(a.replies ?? []).map((r, i) => (
-        <p key={i} className={styles.reply}><b>{r.author === "ai" ? "Claude" : "You"}:</b> {String(r.text ?? "")}</p>
-      ))}
+      {(a.replies ?? []).map((r, i) => <ReplyRow key={String(r.id ?? i)} rid={rid} aid={a.id} r={r} refresh={refresh} />)}
       {runId && !follow.ended ? <p className={styles.muted} role="status">Claude is revising…</p> : null}
       {runId && follow.ended && follow.failed ? <p role="alert" className={styles.alert}>Claude couldn’t revise this: {follow.error}. Your comment is saved.</p> : null}
       {runId && follow.ended && !follow.failed && follow.written ? <p className={styles.muted} role="status">Claude added {follow.written.length} {follow.written.length === 1 ? "response" : "responses"}.</p> : null}

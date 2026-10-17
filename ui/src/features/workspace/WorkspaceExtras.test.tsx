@@ -183,6 +183,39 @@ describe("Workspace extras", () => {
     expect(n()).toBe(before);
   });
 
+  it("own unlocked replies can be edited and deleted; Claude's and picked-up ones are locked", async () => {
+    const C = { ...SUGG, id: "a2", kind: "comment", author: "user", proposed: null, text: "Name the stack" };
+    const R: Record<string, unknown>[] = [
+      { id: "r1", author: "user", text: "mine free" },
+      { id: "r2", author: "user", text: "mine locked", picked_up: "run-1" },
+      { id: "r3", author: "ai", text: "claude says" },
+      { author: "user", text: "legacy" },
+    ];
+    let list = [{ ...C, replies: R }];
+    const calls = api({
+      "GET /api/profile/resumes/cv/annotations": () => list,
+      "PATCH /api/profile/resumes/cv/annotations/a2/replies/r1": (c: Call) => { list = [{ ...C, replies: [{ ...R[0], text: (c.body as { text: string }).text }, ...R.slice(1)] }]; return list[0]; },
+      "DELETE /api/profile/resumes/cv/annotations/a2/replies/r1": () => { list = [{ ...C, replies: R.slice(1) }]; return list[0]; },
+    });
+    renderRoutes(routes, "/resumes/cv");
+    await screen.findByText(/mine free/);
+    expect(screen.getAllByRole("button", { name: "Edit" })).toHaveLength(1);  // only the free one
+    expect(screen.getByText(/Claude has picked this up/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    const box = screen.getByRole("textbox", { name: "Edit reply" });
+    fireEvent.keyDown(box, { key: "Escape" });  // cancels
+    expect(screen.queryByRole("textbox", { name: "Edit reply" })).toBeNull();
+    fireEvent.click(screen.getByRole("button", { name: "Edit" }));
+    fireEvent.change(screen.getByRole("textbox", { name: "Edit reply" }), { target: { value: "mine edited" } });
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+    await screen.findByText(/mine edited/);
+    expect(calls.find((c) => c.method === "PATCH")?.body).toEqual({ text: "mine edited" });
+    fireEvent.click(screen.getByRole("button", { name: "Delete" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Delete" }));  // inline confirm
+    await waitFor(() => expect(screen.queryByText(/mine edited/)).toBeNull());
+    expect(calls.some((c) => c.method === "DELETE")).toBe(true);
+  });
+
   it("tabs are wired to panels and switch with the arrow keys", async () => {
     api({ "GET /api/profile/resumes/cv/draft/text": "Alex Example\n" });
     renderRoutes(routes, "/resumes/cv");

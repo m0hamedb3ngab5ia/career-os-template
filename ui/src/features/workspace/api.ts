@@ -47,6 +47,10 @@ export const reject = (rid: string, aid: string) => apiSend<Annotation>("POST", 
 export const reopen = (rid: string, aid: string) => apiSend<Annotation>("POST", `${ann(rid, aid)}/reopen`);
 export const reply = (rid: string, aid: string, text: string, apply: boolean) =>
   apiSend<Replied>("POST", `${ann(rid, aid)}/replies`, { text, apply });
+export const editReply = (rid: string, aid: string, id: string, text: string) =>
+  apiSend<Annotation>("PATCH", `${ann(rid, aid)}/replies/${encodeURIComponent(id)}`, { text });
+export const deleteReply = (rid: string, aid: string, id: string) =>
+  apiSend<Annotation>("DELETE", `${ann(rid, aid)}/replies/${encodeURIComponent(id)}`);
 export const publish = (rid: string, key: string) => apiSend<Published>("POST", `${base(rid)}/publish`, { key });
 
 /** One line of draft.changes.jsonl (DEC-015): `before`/`after` are nodes (bullet {id,text,..}) or plain values. */

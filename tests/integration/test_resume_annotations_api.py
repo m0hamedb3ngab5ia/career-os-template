@@ -215,3 +215,34 @@ def test_e2e_002_05_accepts_and_edit_stay_one_draft(tmp_path: Path):
     assert [b["text"] for b in bullets] == ["Built the thing", "Ran thing"]
     assert out["resume"]["summary"] == "Backend engineer"
     assert len(resumes.get(root, rid)["versions"]) == 1
+
+
+def test_reply_edit_delete_routes_and_apply_lock(tmp_path: Path):
+    pytest.importorskip("fastapi")
+    from fastapi.testclient import TestClient
+
+    root, rid, app = _app(tmp_path)
+
+    class RC:
+        def __init__(self, settings):
+            pass
+
+        def start_step(self, kind, **kw):
+            return {"run_id": "run-1"}
+
+    app.state.run_control = RC
+    W = {"X-CareerOS": "1"}
+    url = f"/api/profile/resumes/{rid}/annotations"
+    with TestClient(app) as c:
+        aid = c.post(url, json={"kind": "comment", "target_id": "experience-1.b1", "text": "vague"}, headers=W).json()["id"]
+        rep = c.post(f"{url}/{aid}/replies", json={"text": "first"}, headers=W).json()["replies"][0]["id"]
+        r = c.patch(f"{url}/{aid}/replies/{rep}", json={"text": "edited"}, headers=W)
+        assert r.status_code == 200 and r.json()["replies"][0]["text"] == "edited"
+        assert c.patch(f"{url}/{aid}/replies/zz", json={"text": "x"}, headers=W).status_code == 404
+        applied = c.post(f"{url}/{aid}/replies", json={"text": "go", "apply": True}, headers=W).json()
+        assert applied["run_id"] == "run-1" and all(x["picked_up"] == "run-1" for x in applied["replies"])
+        assert c.patch(f"{url}/{aid}/replies/{rep}", json={"text": "late"}, headers=W).status_code == 409
+        assert c.delete(f"{url}/{aid}/replies/{rep}", headers=W).status_code == 409
+        later = c.post(f"{url}/{aid}/replies", json={"text": "later"}, headers=W).json()["replies"][-1]["id"]
+        d = c.delete(f"{url}/{aid}/replies/{later}", headers=W)
+        assert d.status_code == 200 and len(d.json()["replies"]) == 2

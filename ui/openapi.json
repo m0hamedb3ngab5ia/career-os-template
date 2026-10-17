@@ -6046,6 +6046,19 @@
         "title": "Reply",
         "type": "object"
       },
+      "ReplyEdit": {
+        "properties": {
+          "text": {
+            "title": "Text",
+            "type": "string"
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "title": "ReplyEdit",
+        "type": "object"
+      },
       "ResetFailuresBody": {
         "properties": {
           "kind": {
@@ -13325,6 +13338,135 @@
           }
         },
         "summary": "Reply Annotation",
+        "tags": [
+          "resumes"
+        ]
+      }
+    },
+    "/api/profile/resumes/{rid}/annotations/{aid}/replies/{reply_id}": {
+      "delete": {
+        "operationId": "delete_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__delete",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reply_id",
+            "required": true,
+            "schema": {
+              "title": "Reply Id",
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Delete Annotation Reply",
+        "tags": [
+          "resumes"
+        ]
+      },
+      "patch": {
+        "description": "Edit the user's own reply; Claude's, or one an \"Apply comment\" run already picked up, -> 409.",
+        "operationId": "edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "rid",
+            "required": true,
+            "schema": {
+              "title": "Rid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "aid",
+            "required": true,
+            "schema": {
+              "title": "Aid",
+              "type": "string"
+            }
+          },
+          {
+            "in": "path",
+            "name": "reply_id",
+            "required": true,
+            "schema": {
+              "title": "Reply Id",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplyEdit"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Annotation"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            },
+            "description": "Validation Error"
+          }
+        },
+        "summary": "Edit Annotation Reply",
         "tags": [
           "resumes"
         ]

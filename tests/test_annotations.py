@@ -384,3 +384,35 @@ def test_anchor_adds_passages_never_moves_or_removes(tmp_path: Path):
     with pytest.raises(ValueError):  # one bad pair: nothing added
         ann.anchor(tmp_path, rid, c["id"], [("experience-1.b1", "Built"), ("mine", "payments")])
     assert ann.list_items(tmp_path, rid) == before
+
+
+def test_edit_delete_own_unlocked_reply_only(tmp_path: Path):
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="vague")
+    ann.reply(tmp_path, rid, c["id"], "mine")
+    ann.reply(tmp_path, rid, c["id"], "claude says", author="ai")
+    mine, claude = ann.list_items(tmp_path, rid)[0]["replies"]
+    assert mine["id"] and mine["id"] != claude["id"]
+    assert ann.edit_reply(tmp_path, rid, c["id"], mine["id"], " better ")["replies"][0]["text"] == "better"
+    with pytest.raises(resumes.Refused):  # Claude's reply is never editable
+        ann.delete_reply(tmp_path, rid, c["id"], claude["id"])
+    with pytest.raises(LookupError):
+        ann.edit_reply(tmp_path, rid, c["id"], "nope", "x")
+    ann.lock_replies(tmp_path, rid, c["id"], "run-1")  # Apply comment started: picked up
+    for f in (lambda: ann.edit_reply(tmp_path, rid, c["id"], mine["id"], "late"),
+              lambda: ann.delete_reply(tmp_path, rid, c["id"], mine["id"])):
+        with pytest.raises(resumes.Refused):
+            f()
+    ann.reply(tmp_path, rid, c["id"], "newer")  # a later reply is unlocked
+    new = ann.list_items(tmp_path, rid)[0]["replies"][-1]
+    assert [r["text"] for r in ann.delete_reply(tmp_path, rid, c["id"], new["id"])["replies"]] == ["better", "claude says"]
+
+
+def test_legacy_reply_without_id_is_not_editable(tmp_path: Path):
+    rid = _resume(tmp_path)
+    c = ann.create(tmp_path, rid, kind="comment", target_id="summary", text="vague")
+    items = json.loads((tmp_path / "profile/resumes" / rid / "annotations.json").read_text())
+    items["items"][0]["replies"].append({"text": "old", "author": "user"})
+    (tmp_path / "profile/resumes" / rid / "annotations.json").write_text(json.dumps(items))
+    with pytest.raises(LookupError):
+        ann.edit_reply(tmp_path, rid, c["id"], "", "x")

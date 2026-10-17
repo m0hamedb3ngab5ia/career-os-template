@@ -371,6 +371,15 @@ export interface paths {
      */
     post: operations["reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post"];
   };
+  "/api/profile/resumes/{rid}/annotations/{aid}/replies/{reply_id}": {
+    /** Delete Annotation Reply */
+    delete: operations["delete_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__delete"];
+    /**
+     * Edit Annotation Reply
+     * @description Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409.
+     */
+    patch: operations["edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch"];
+  };
   "/api/profile/resumes/{rid}/draft": {
     /** Get Draft */
     get: operations["get_draft_api_profile_resumes__rid__draft_get"];
@@ -2451,6 +2460,11 @@ export interface components {
        * @default false
        */
       apply?: boolean;
+      /** Text */
+      text: string;
+    };
+    /** ReplyEdit */
+    ReplyEdit: {
       /** Text */
       text: string;
     };
@@ -5213,6 +5227,62 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Replied"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Delete Annotation Reply */
+  delete_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__delete: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+        reply_id: string;
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Annotation"];
+        };
+      };
+      /** @description Validation Error */
+      422: {
+        content: {
+          "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Edit Annotation Reply
+   * @description Edit the user's own reply; Claude's, or one an "Apply comment" run already picked up, -> 409.
+   */
+  edit_annotation_reply_api_profile_resumes__rid__annotations__aid__replies__reply_id__patch: {
+    parameters: {
+      path: {
+        rid: string;
+        aid: string;
+        reply_id: string;
+      };
+    };
+    requestBody: {
+      content: {
+        "application/json": components["schemas"]["ReplyEdit"];
+      };
+    };
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Annotation"];
         };
       };
       /** @description Validation Error */
