@@ -184,3 +184,45 @@ def test_pdf_kerned_words_and_ligatures_clean():
     assert "Skills: AWS, Python, Docker" in text
     assert "Tools: Tableau, Terraform" in text
     assert "Built offline workflows for financial staff." in text
+
+
+def make_bold_runs_pdf(path: Path, lines: list[list[tuple[str, str]]]) -> Path:
+    """One page; each line is [(font, text), ...] runs shown back to back, font "R" regular or "B" bold."""
+    pypdf = pytest.importorskip("pypdf")
+    from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
+
+    w = pypdf.PdfWriter()
+    page = w.add_blank_page(width=612, height=792)
+    fonts = {}
+    for key, base in (("R", "/Helvetica"), ("B", "/Helvetica-Bold")):
+        fonts[NameObject(f"/{key}")] = w._add_object(DictionaryObject({
+            NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"),
+            NameObject("/BaseFont"): NameObject(base)}))
+    page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject(fonts)})
+    ops = []
+    for i, runs in enumerate(lines):  # each run placed absolutely, a little wider than its glyphs, like TeX output
+        x = 40
+        for f, t in runs:
+            esc = t.replace("(", r"\(").replace(")", r"\)")
+            ops.append(f"BT /{f} 9 Tf 1 0 0 1 {x} {760 - 14 * i} Tm ({esc}) Tj ET")
+            x += 6 * len(t)
+    cs = DecodedStreamObject()
+    cs.set_data("\n".join(ops).encode("latin-1"))
+    page[NameObject("/Contents")] = w._add_object(cs)
+    with path.open("wb") as fh:
+        w.write(fh)
+    return path
+
+
+@pytest.mark.unit
+def test_pdf_bold_run_boundaries_add_no_space_before_punctuation(tmp_path):
+    """pypdf opens a gap at a font switch; it must not land before , . ; : ) ] or after ( [."""
+    pdf = make_bold_runs_pdf(tmp_path / "r.pdf", [
+        [("R", "Built "), ("B", "Python services"), ("R", ", "), ("B", "Redis"), ("R", " and a queue.")],
+        [("R", "A dashboard ("), ("B", "Vue, Go"), ("R", ") for ops "), ("B", "teams"), ("R", ".")],
+        [("B", "Tools & Languages"), ("R", ": Go; "), ("B", "C# .NET"), ("R", "; "), ("B", "SQL")],
+    ])
+    lines = extract_text(pdf).splitlines()
+    assert lines[0] == "Built Python services, Redis and a queue."
+    assert lines[1] == "A dashboard (Vue, Go) for ops teams."
+    assert lines[2] == "Tools & Languages: Go; C# .NET; SQL"

@@ -44,6 +44,9 @@ missing contact), typo.
   A suggestion has exactly one pair.
 - `--proposed` uses only facts already in the résumé. Never add a number, employer, title, date or tool that is not
   in the text, nor a stronger claim (supported → led): the accept guard refuses it.
+- Import/extraction artifacts are not résumé feedback: a space before `,` `.` `:` `)` or after `(`, broken or
+  substituted characters, merged or split lines/words. They come from reading the file, not from the candidate.
+  Never comment on them and never count them as typos.
 
 ## 4. Save
 

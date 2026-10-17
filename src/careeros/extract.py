@@ -47,7 +47,33 @@ def pdf_page_text(page: Any) -> str:
         fixed = DecodedStreamObject()
         fixed.set_data(KERN_RE.sub(b"", contents.get_data()))
         page[NameObject("/Contents")] = fixed
-    return (page.extract_text() or "").translate(LIGATURES)
+    runs: list[str] = []
+    page.extract_text(visitor_text=lambda t, *_: runs.append(t))
+    return join_runs(runs).translate(LIGATURES)
+
+
+_TIGHT_RE = re.compile(r" +(?=[,.;:!?](?:\s|$)|[)\]])")  # gap before closing punctuation (".NET" keeps its space)
+
+
+def join_runs(runs: list[str]) -> str:
+    """Join pypdf text runs; a run boundary (font switch, e.g. bold) is where pypdf opens a gap it measured wrong.
+
+    At a boundary only, drop the run's leading spaces when they precede , . ; : ! ? ) ] or follow ( [ or an
+    existing space ("microservices , Kafka", "( React", "Libraries :"), and collapse a doubled leading gap to one
+    space. Spaces inside a run are the source's.
+    """
+    out, pending = "", ""
+    for run in runs:
+        run, pending = pending + run, ""
+        if run and not run.strip(" "):  # a gap-only run: decide once the next run shows what follows
+            pending = run
+            continue
+        if run.startswith(" ") and (_TIGHT_RE.match(run) or out.endswith(("(", "[", " "))):
+            run = run.lstrip(" ")
+        elif run.startswith("  "):  # pypdf's gap on top of the run's own space
+            run = " " + run.lstrip(" ")
+        out += run
+    return out + pending
 
 
 def _pdf(path: Path) -> tuple[str, list[str]]:
