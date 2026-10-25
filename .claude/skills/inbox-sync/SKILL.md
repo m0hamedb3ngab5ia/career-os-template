@@ -1,6 +1,6 @@
 ---
 name: inbox-sync
-description: Sync Gmail with the job tracker. For every applied/screening/interview job, search Gmail for company mail newer than the apply date, classify (confirmation, rejection, interview_invite, assessment, offer, recruiter_outreach), update tracker status via the careeros CLI or data/sync_updates.json, push-notify and add Action Items on interviews, assessments and offers, and catch untracked recruiter outreach.
+description: Sync Gmail with the job tracker. Searches company mail for every applied/screening/interview job, classifies it (confirmation, rejection, interview, assessment, offer, recruiter outreach), updates tracker status, adds Action Items. Use for inbox sync, checking replies, or recruiter mail.
 ---
 
 # inbox-sync

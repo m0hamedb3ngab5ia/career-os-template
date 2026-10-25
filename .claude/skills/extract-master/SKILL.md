@@ -1,6 +1,6 @@
 ---
 name: extract-master
-description: Propose a profile/master.yaml update from the master résumé (REQ-099). Reads the master résumé's latest extracted text, writes a full proposed master.yaml and hands it to `careeros resume propose-master`; the candidate approves or rejects the diff in Profile › Résumés. Never writes profile/master.yaml itself.
+description: Propose a profile/master.yaml update from the master résumé (REQ-099). Writes a full proposed master.yaml and hands it to `careeros resume propose-master`; the candidate approves the diff. Use after a résumé is marked master. Never writes master.yaml itself.
 ---
 
 # extract-master
