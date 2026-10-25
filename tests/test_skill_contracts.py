@@ -347,7 +347,7 @@ def test_score_job_uses_three_verdicts_and_reason_codes():
 def test_apply_job_fills_flagged_answers_in_assisted_mode_and_stops_only_without_an_answer():
     """Assisted mode (Tier A / CAREEROS_AUTO_SUBMIT=0): a needs_review answer is filled and flagged for the
     candidate, not a STOP; sensitive / salary_freeform / unknown with no answer still stop with the field blank."""
-    fill = _skill("apply-job").split("## 3. Fill", 1)[1].split("\n## 4.", 1)[0]
+    fill = (SKILL_DIR / "apply-job" / "references" / "fill-fields.md").read_text(encoding="utf-8")
     assert "CAREEROS_AUTO_SUBMIT=0" in fill and "`needs_review: true`" in fill and "Review & submit" in fill
     stop = fill.split("Otherwise (`answer` null", 1)[1]
     for cls in ("sensitive", "salary_freeform", "unknown"):
@@ -497,5 +497,6 @@ def test_apply_job_reads_lessons_first_and_records_them_last():
     assert text.index("careeros learn list") < text.index("## 2. Open and detect")
     assert "careeros learn lesson" in text and text.index("careeros learn lesson") > text.index("## 7. Always, last")
     assert '"learned": [...]' in text
-    assert "company=<posting company>" in text
-    assert "exact form question verbatim" in text and "action done <id> --answer" in text
+    fill = (ROOT / ".claude" / "skills" / "apply-job" / "references" / "fill-fields.md").read_text()
+    assert "company=<posting company>" in fill
+    assert "exact form question verbatim" in fill and "action done <id> --answer" in fill
