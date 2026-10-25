@@ -70,33 +70,12 @@ directly from this skill; every tracker read/write goes through the `careeros` C
 
 ### 1b. Safety gate (before any form fill)
 
-Code: `src/careeros/safety/` (scam, company risk, ghost jobs). Every check yields a reason code, a level
-and evidence; the verdict is **pass**, **review** or **block** (`skip` for dead postings).
+**Read `.claude/skills/apply-job/references/safety-gate.md` before opening the form** (full steps, block list, redirect flag). Always apply, never optional:
+- Before the browser: `.venv/bin/careeros safety check <job_id>`; read `safety.json` `verdict`. block (exit 3) / skip (exit 4): stop, `RESULT` `outcome: failed`. review: assisted mode only, never auto-submit. pass: `auto_submit_allowed` feeds the preconditions.
+- On every form page: `echo '<JSON labels>' | .venv/bin/careeros safety fields <job_id> --labels-json - --page-url <url>`. Exit 3: enter nothing further, `s.step("safety_gate", False, ...)`, save, `RESULT` `outcome: failed`, close the tab.
+- Redirect to a non-ATS, non-company domain: stop and `careeros safety flag`.
+- The gate is never overridden from this skill.
 
-1. Posting gate, before opening the browser: `.venv/bin/careeros safety check <job_id>`, then read
-   `safety.json`:
-   - `verdict` block (exit 3) or skip (exit 4): stop. The CLI already opened the Action Item / set the
-     status. Print `RESULT` with `outcome: failed`, reason `safety <verdict>: <codes>`.
-   - `verdict` review: continue in assisted mode only (`auto_submit` false; stop before submit with a
-     `review` Action Item naming the review codes). Never auto-submit a review job.
-   - `verdict` pass: `auto_submit_allowed` feeds the preconditions table.
-2. Field gate, on every page/step of the form: collect every visible field label, placeholder and upload
-   prompt after `read_page`, then
-   `echo '<JSON list of labels>' | .venv/bin/careeros safety fields <job_id> --labels-json - --page-url <current url>`.
-   Exit 3 (block): SSN / national ID, date of birth, bank numbers, passport or ID uploads, driver's
-   license, mother's maiden name (allowed only once status is `offer`); any fee or card number; passwords,
-   security questions or codes for another account (creating a password or entering an emailed code on the
-   ATS's own domain is normal); remote-access software. Work-authorization questions are normal.
-3. A redirect to a domain other than the apply URL's, the company's or a known ATS: stop and run
-   `careeros safety flag "<company>" --domain <host> --confidence medium --reason "redirect to <host>" --evidence <url>`.
-
-On exit 3 from step 2:
-1. Do not enter anything further.
-2. `s.step("safety_gate", False, "<first flag line>")`, save the session, print `RESULT` with
-   `outcome: failed`, reason `safety block: <codes>`, then close the tab.
-
-The user reviews the item by hand; the gate is never overridden from inside this skill (clearing a
-company is `careeros safety clear <company> --note ...`, run by the user).
 
 Start the session record:
 
@@ -128,69 +107,13 @@ toggle, a page that needs a portfolio link). Follow them; they never override a 
 
 ## 2a. Login (when the ATS asks to sign in)
 
-Logins come only from the credentials store (`.venv/bin/careeros creds get`, file `paths.credentials`, default
-`~/.careeros/credentials.yaml`, outside the repo). Site key = the ATS (`workday`, `greenhouse`, `lever`, `ashby`) or
-a per-tenant key the candidate chose (`.venv/bin/careeros creds list` shows them, no secrets).
-
-1. `.venv/bin/careeros creds get <site> --json` → `username`, `notes`, `has_password`. Unknown site or `has_password: false`
-   → STOP, Action Item type `laptop_required` ("add a login: `.venv/bin/careeros creds set <site> --username ...`"), needs laptop.
-2. Type the username. For the password field only: `.venv/bin/careeros creds get <site> --reveal` and type its output
-   straight into the field. Never print, echo, quote or summarise it; never put it in `record_field`,
-   `--answers-json`, `s.step`, `log.md`, `posting.json`, `status.json`, screenshots taken with it visible
-   (mask the field first) or the RESULT line. Credentials are never copied into `data/jobs/` or `profile/`.
-3. Login rejected, MFA or a one-time code → STOP (section 6 rules), Action Item; never retry more than once.
+Read `.claude/skills/apply-job/references/login.md` when the ATS asks to sign in. Always apply: logins only from `.venv/bin/careeros creds get`; never print, record or log a password; rejected login, MFA or one-time code means STOP.
 
 ## 3. Fill
 
-Follow the ATS flow in `adapters.md` exactly. Sources for values:
+Follow the ATS flow in `adapters.md` exactly.
 
-- Identity: `profile/master.yaml: identity` (split name on first space for first/last).
-- Résumé: `file_upload` with `<job_dir>/resume.pdf`. After upload, verify the filename is shown. Two
-  failures → Action Item type `other` "file upload failed", status needs_review, stop.
-- Cover letter: paste `cover_letter.txt` into the manual-entry textarea; upload `cover_letter.pdf`
-  only where no textarea exists. Skip entirely when tier says `if_required` and the field is optional.
-- Every other field, by label text:
-
-```python
-from careeros.apply.questions import answer_for, classify_question
-hit = answer_for(label, "profile/standard_answers.yaml", required=<field is marked required>, company=<posting company>)
-```
-
-  `company=` tries the answers learned for this company (`company_answers` block) before the general list.
-
-  `answer_for` minimizes personal data: an optional street-address field stays blank; only a required
-  one gets the street. Phone and email are the only other contact data given. A `sensitive` label never
-  gets an answer (the field gate above already stopped the run).
-
-  - hit with an answer → fill it. Apply the `note` rules from the YAML (referral name from
-    Contacts tab; `previously_applied` = Yes if tracker shows this company applied).
-  - hit with `None` answer (salary): if the control is a dropdown of ranges, pick the lowest bucket
-    whose floor >= `config/targets.yaml: candidate.salary_dropdown_floor_usd`; if that key is missing,
-    or the control is freeform, STOP → Action Item type `salary`, status needs_review.
-  - no hit: `classify_question(label)`:
-    - `eeo` → section 4.
-    - `legal` → STOP, Action Item type `question` ("legal question not in standard answers: <label>"). Never guess.
-      Every `question` / `salary` Action Item's text must contain the exact form question verbatim (`<class>:
-      <question>` or `... : <label>`): `careeros action done <id> --answer "<text>"` learns the answer from it.
-    - `essay` / `unknown` / `standard` → look up the `answers.json` entry (a JSON list) whose `question`,
-      whitespace-collapsed and lower-cased, equals the label normalized the same way. Missing → run
-      `/answer-question <job_dir> "<label>" --limit <maxlength>` per
-      `.claude/skills/answer-question/SKILL.md`. If it returns `needs_review` with a non-null `answer`
-      (class `standard` / `essay`, e.g. tier A flags every answer) and `auto_submit` is false (assisted mode,
-      `CAREEROS_AUTO_SUBMIT=0`): fill that best-effort answer, keep `needs_review: true` on its `answers.json`
-      entry and list the question in the "Review & submit" Action Item text (section 5) so the candidate checks
-      it before submitting. Otherwise (`answer` null: class `sensitive`, `salary_freeform` or `unknown` with
-      nothing to fill; or `auto_submit` true) → STOP, leave the field blank, screenshot, Action Item type
-      `question`, status needs_review.
-  - Respect `maxlength`; an over-limit answer is a STOP (type `question`).
-- After filling any field, record what went in: `s.record_field(label, value, source)` with `source` one of
-  `profile`, `standard`, `eeo`, `essay`, `salary`, `upload` (for uploads the value is the file name). These
-  values are kept in the as-submitted snapshot (section 5). Secrets are never recorded: do not pass a
-  password (e.g. the Workday account password), a verification or one-time code, a security question
-  answer, a token or an API key to `record_field` or `--answers-json`, and never write them in `s.step`
-  notes, `log.md` or the RESULT line. As a backstop, `record_field` and `freeze` store `<redacted>` for any
-  label matching `careeros.apply.session.is_secret_label`.
-- After each page/step in multi-page flows: screenshot, `s.step`.
+Read `.claude/skills/apply-job/references/fill-fields.md` before filling any field (value sources, `answer_for` / `classify_question` branches, `record_field`). Always apply: never type anything outside the profile, standard answers, `answers.json` or `cover_letter.txt`; legal / sensitive / unknown-salary questions STOP with an Action Item; never record secrets.
 
 ## 4. EEO
 

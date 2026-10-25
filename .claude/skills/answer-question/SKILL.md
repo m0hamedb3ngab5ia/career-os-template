@@ -1,6 +1,6 @@
 ---
 name: answer-question
-description: Answer one application-form question for a job dir. Uses profile/standard_answers.yaml verbatim when a match pattern hits; drafts essay-style answers in the candidate's voice from profile bullet/narrative ids; refuses (needs_review) legal, sensitive, or freeform salary questions. Appends to answers.json.
+description: Answer one application-form question for a job dir. Uses standard_answers.yaml verbatim on a match, drafts essays in the candidate's voice from profile ids, refuses (needs_review) legal, sensitive or freeform salary questions. Appends to answers.json.
 ---
 
 # answer-question

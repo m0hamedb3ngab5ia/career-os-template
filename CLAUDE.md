@@ -34,13 +34,9 @@ Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMM
 - `profile/voice/samples/` empty until candidate adds samples → cover letters `voice_verified: false`.
 
 ## Testing (TDD), required for every code PR
-- Red → green → refactor. Failing test first, same PR as fix/feature. Bug fix = repro test first.
-- Unit tests (`@pytest.mark.unit`, pure, fakes for IO) always; integration (`@pytest.mark.integration`, `tests/integration/`) when crossing a boundary: CLI via subprocess on temp repo root, scout → store → tracker with recorded HTTP fixtures, render.py → real PDF, qa over full job dir, applier vs `examples/profile/`.
-- Tests read only repo (`examples/`, `tests/fixtures/`) + tmp; never `profile/`, `config/`, `data/`, `$HOME` (CI has none). No network (recorded fixtures). LaTeX tests `skipif` no engine.
-- Exempt: SKILL.md-only / docs-only PRs. Python a skill calls is not exempt.
-- Run: `.venv/bin/python -m pytest -q` (all), `-m unit`, `-m integration`. CI runs both unit and integration on every PR. Parallel (`-n auto` in addopts); one test / debugger: `.venv/bin/python -m pytest -n0 tests/x.py::t`. While coding: touched tests only (path / `-k`).
-- Before pushing code PR: full `pytest -q` locally; CI full suite is gate. Never `gh pr merge --auto` before `/review` is clean (`None.` or findings accepted); merging is the lead's call, not a builder agent's. Before merging private sync PR: full `pytest -q` locally.
-- CI shards PR runs (`CAREEROS_TEST_SHARD`/`CAREEROS_TEST_SHARDS`, hash of node ID, `tests/conftest.py`); required `pytest` check aggregates. Reproduce a shard locally with same env vars.
+Read `docs/TESTING.md` before writing or running tests (failing test first; unit vs integration; run commands; CI shards).
+- Private repo: local full `.venv/bin/python -m pytest -q` is the gate before pushing a code PR or merging a sync PR.
+- CI exists only in this public template. The private career-os repo has none: there, local full `pytest -q` is the gate and CI/`pytest`-check steps are skipped.
 
 ## Git / PR workflow
 - Never push to `main`. One branch per change (`feat/…`, `fix/…`, `docs/…`); `gh pr create`. Stacked PRs ok: `--base` = parent branch; GitHub retargets children on parent merge.
@@ -48,11 +44,8 @@ Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMM
 - `--admin` can't skip protection: after review, wait for `pytest`, then `gh pr merge --squash` (or `--auto`).
 - UI bundle conflicts: never hand-merge `src/careeros/ui/static/`; `git checkout origin/main -- src/careeros/ui/static`, rebuild, update UI snapshots. Merge UI PRs one at a time.
 
-## Response format
-Reply finishing work ends with `**Next:**`: top 3–5 concrete steps, split "you" (inputs/decisions candidate owes) / "me" (what I do on go-ahead).
-
 ## Learning
-Evidence `.agent/LESSONS.md`, decisions `.agent/DECISIONS.md`: search, don't load whole. Record/promote per `~/.agent-learning/PROTOCOL.md` (or the `learn` skill). Promoted rules go here; AGENTS.md points here.
+Lessons `.agent/LESSONS.md`, decisions `.agent/DECISIONS.md` (search, don't load whole); promoted rules go here.
 
 ## Product system (`/product`; how-to `docs/product/README.md`)
 Any task touching product behaviour:
@@ -63,4 +56,4 @@ Any task touching product behaviour:
 - PR body: `Implements: REQ-… UC-…` / `Verification: E2E-…`. Status `verified` only via `/product verify`.
 
 ## Work docs
-Stream = `docs/work/<slug>/` (README Brief+Status, `handoffs/YYYY-MM-DD-NN.md` (versioned, never deleted)); fresh agent reads README + newest handoff only. Branch `work/<slug>`. Requirements stay in `docs/product/` (link IDs). Map `~/Code/WORK.md` (`/docs`).
+Streams in `docs/work/<slug>/`; branch `work/<slug>`; requirements stay in `docs/product/` (link IDs).
