@@ -41,15 +41,13 @@ Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMM
 - Run: `.venv/bin/python -m pytest -q` (all), `-m unit`, `-m integration`. CI runs both unit and integration on every PR. Parallel (`-n auto` in addopts); one test / debugger: `.venv/bin/python -m pytest -n0 tests/x.py::t`. While coding: touched tests only (path / `-k`).
 - Before pushing code PR: full `pytest -q` locally; CI full suite is gate. Never `gh pr merge --auto` before `/review` is clean (`None.` or findings accepted); merging is the lead's call, not a builder agent's. Before merging private sync PR: full `pytest -q` locally.
 - CI shards PR runs (`CAREEROS_TEST_SHARD`/`CAREEROS_TEST_SHARDS`, hash of node ID, `tests/conftest.py`); required `pytest` check aggregates. Reproduce a shard locally with same env vars.
+- CI exists only in this public template. The private career-os repo has none: there, local full `pytest -q` is the gate and CI/`pytest`-check steps are skipped.
 
 ## Git / PR workflow
 - Never push to `main`. One branch per change (`feat/…`, `fix/…`, `docs/…`); `gh pr create`. Stacked PRs ok: `--base` = parent branch; GitHub retargets children on parent merge.
 - Review: `/review <PR>` (Claude + Codex parallel, merged findings; `--post` comments). Merge only after `None.` or findings consciously accepted.
 - `--admin` can't skip protection: after review, wait for `pytest`, then `gh pr merge --squash` (or `--auto`).
 - UI bundle conflicts: never hand-merge `src/careeros/ui/static/`; `git checkout origin/main -- src/careeros/ui/static`, rebuild, update UI snapshots. Merge UI PRs one at a time.
-
-## Response format
-Reply finishing work ends with `**Next:**`: top 3–5 concrete steps, split "you" (inputs/decisions candidate owes) / "me" (what I do on go-ahead).
 
 ## Learning
 Evidence `.agent/LESSONS.md`, decisions `.agent/DECISIONS.md`: search, don't load whole. Record/promote per `~/.agent-learning/PROTOCOL.md` (or the `learn` skill). Promoted rules go here; AGENTS.md points here.
