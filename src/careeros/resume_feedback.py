@@ -232,7 +232,7 @@ def _refuse_rule_text(root: Path, text: str) -> None:
         raise ValueError("a rule is general: no numbers")
     path = root / "profile" / "confidential_terms.yaml"
     try:
-        cfg = (yaml.safe_load(path.read_text(encoding="utf-8")) or {}) if path.exists() else {}
+        cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
         if any(term_in_text(str(t).strip(), text) for t in cfg.get("terms") or [] if str(t).strip()) \
                 or any(re.search(str(p), text) for p in cfg.get("patterns") or []):
             raise ValueError("rule contains a confidential term")

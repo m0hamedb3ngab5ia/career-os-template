@@ -223,6 +223,8 @@ def _rules(root: Path) -> str:
 
 
 def test_add_rule_creates_file_groups_by_heading_and_dedupes(tmp_path: Path):
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile" / "confidential_terms.yaml").write_text("terms: []\n", encoding="utf-8")
     assert fb.add_rule(tmp_path, "Bullets", "Lead with the result.")["added"] is True
     assert fb.add_rule(tmp_path, "Entries", "Cut entries that add nothing.")["added"] is True
     assert fb.add_rule(tmp_path, "Bullets", "Name the tools.")["added"] is True
@@ -237,6 +239,12 @@ def test_add_rule_refuses_unsafe_text(tmp_path: Path, rule: str):
     (tmp_path / "profile" / "confidential_terms.yaml").write_text("terms: [Zephyr]\npatterns: ['ABC-\\d']\n", encoding="utf-8")
     with pytest.raises(ValueError):
         fb.add_rule(tmp_path, "Bullets", rule)
+    assert not (tmp_path / "profile" / "resume_feedback.md").exists()
+
+
+def test_add_rule_refuses_when_confidential_file_is_missing(tmp_path: Path):
+    with pytest.raises(ValueError, match="confidential_terms.yaml"):
+        fb.add_rule(tmp_path, "Bullets", "Lead with the result.")
     assert not (tmp_path / "profile" / "resume_feedback.md").exists()
 
 
