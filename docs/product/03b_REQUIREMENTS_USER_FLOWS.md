@@ -188,3 +188,7 @@ Given 400 unscored, 150 queued · When open Not scored · Then count 400, each c
 ### REQ-137 Score now (on demand)
 Score now on a job (card, detail, bulk) starts a score run for those jobs only (`run score --job`), visible in Runs; does not tick the job (fixes current `--job` side effect for scoring only). Done → job shows its fit score in Recommended.
 Given an unscored job · When Score now · Then one score run for it, job not ticked, appears in Recommended when done.
+### REQ-138 Résumé feedback is durable and enforced
+Candidate feedback on a résumé is saved as general rules in optional `profile/resume_feedback.md` (copied from `examples/profile/`; missing file = no extra rules, never an error). tailor-resume, review-resume and edit-resume read it before writing or judging bullets; it outranks `_shared/resume_writing_rules.md`, never the Hard rules. QA hard-fails what a script can catch: `thin_experience_entry` (an experience entry with < 2 bullets; projects exempt) and `repeated_employer` (same company not adjacent). Adjacent same-company entries render as one company heading with one role line (own dates) per role, in PDF, .tex and resume.txt.
+Given an experience entry with one bullet · When QA runs · Then `thin_experience_entry` fails naming the entry.
+Given two adjacent Acme roles · When rendered · Then "Acme" appears once, each role keeps its dates.

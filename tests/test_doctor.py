@@ -625,3 +625,11 @@ def test_check_runs_still_validates_the_schedule_when_headless_warns():
     checks = check_runs({"llm": {"headless_cmd": ["claude", "-p", "--output-format", "json"]},
                          "schedule": {"scout": "0 7 * * *"}})
     assert {(c.name, c.level) for c in checks} >= {("runs", WARN), ("schedule", FAIL)}
+
+
+def test_resume_feedback_example_is_not_leftover_example_data(tmp_path: Path):
+    root = fresh(tmp_path)
+    assert (root / "profile" / "resume_feedback.md").is_file()  # init copies it
+    assert "resume_feedback" not in text_of(doctor(root), FAIL)
+    (root / "profile" / "resume_feedback.md").unlink()           # missing = no extra rules, never an error
+    assert "resume_feedback" not in text_of(doctor(root), FAIL) + text_of(doctor(root), WARN)

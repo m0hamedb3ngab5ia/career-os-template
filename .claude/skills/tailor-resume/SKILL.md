@@ -35,6 +35,9 @@ description: Build a one-page tailored resume for a scored job dir from profile/
 - `profile/master.yaml`.
 - `config/categories.yaml` -> `bullet_priority` for `score.category`, and `resume_template`.
 - `config/qa.yaml` -> `resume.hard.section_order`, `resume.soft.keyword_coverage_min`.
+- `profile/resume_feedback.md` if it exists (the candidate's own résumé-writing rules from earlier sessions; a
+  missing file means no extra rules). Follow it before writing or judging bullets: it outranks
+  `resume_writing_rules.md` but never the Hard rules in CLAUDE.md (no fabrication, frozen numbers, confidential terms).
 - `.claude/skills/_shared/resume_writing_rules.md`: how a strong bullet reads, which bullet and variant to
   prefer, and its OVERRIDE (never estimate a number; a bullet without one gets a metric question).
 - `templates/resume/resume_schema.md` (the JSON shape `render.py` expects) and `templates/resume/<resume_template>.tex`.
