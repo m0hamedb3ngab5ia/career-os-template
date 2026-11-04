@@ -215,3 +215,41 @@ def test_successful_redraft_keeps_no_reason(tmp_path: Path, rid: str):  # re-dra
     run_resume_skill(type("S", (), {"root": tmp_path})(), "resume_edit", rid, fid, run_skill=ok)
     it = fb.load(tmp_path, rid)["items"][0]
     assert it["state"] == "open" and it["reason"] is None
+
+
+# REQ-138: edit-resume runs headless, so the durable rule file is written through a guarded CLI call.
+def _rules(root: Path) -> str:
+    return (root / "profile" / "resume_feedback.md").read_text(encoding="utf-8")
+
+
+def test_add_rule_creates_file_groups_by_heading_and_dedupes(tmp_path: Path):
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile" / "confidential_terms.yaml").write_text("terms: []\n", encoding="utf-8")
+    assert fb.add_rule(tmp_path, "Bullets", "Lead with the result.")["added"] is True
+    assert fb.add_rule(tmp_path, "Entries", "Cut entries that add nothing.")["added"] is True
+    assert fb.add_rule(tmp_path, "Bullets", "Name the tools.")["added"] is True
+    assert fb.add_rule(tmp_path, "Entries", " lead with THE result. ")["added"] is False  # same rule, any heading
+    assert _rules(tmp_path) == ("# Résumé feedback\n\n## Bullets\n- Lead with the result.\n- Name the tools.\n\n"
+                                "## Entries\n- Cut entries that add nothing.\n")
+
+
+@pytest.mark.parametrize("rule", ["", "  ", "two\nlines", "Say 30 people", "x" * 301, "Never name Zephyr here", "See ABC-1"])
+def test_add_rule_refuses_unsafe_text(tmp_path: Path, rule: str):
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile" / "confidential_terms.yaml").write_text("terms: [Zephyr]\npatterns: ['ABC-\\d']\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        fb.add_rule(tmp_path, "Bullets", rule)
+    assert not (tmp_path / "profile" / "resume_feedback.md").exists()
+
+
+def test_add_rule_refuses_when_confidential_file_is_missing(tmp_path: Path):
+    with pytest.raises(ValueError, match="confidential_terms.yaml"):
+        fb.add_rule(tmp_path, "Bullets", "Lead with the result.")
+    assert not (tmp_path / "profile" / "resume_feedback.md").exists()
+
+
+def test_add_rule_fails_closed_on_broken_confidential_file(tmp_path: Path):
+    (tmp_path / "profile").mkdir()
+    (tmp_path / "profile" / "confidential_terms.yaml").write_text("terms: [\n", encoding="utf-8")
+    with pytest.raises(ValueError):
+        fb.add_rule(tmp_path, "Bullets", "Lead with the result.")

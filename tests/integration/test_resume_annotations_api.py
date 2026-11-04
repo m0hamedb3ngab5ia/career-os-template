@@ -182,3 +182,13 @@ def test_e2e_002_05_accepts_and_edit_stay_one_draft(tmp_path: Path):
     assert [b["text"] for b in bullets] == ["Built the thing", "Ran thing"]
     assert out["resume"]["summary"] == "Backend engineer"
     assert len(resumes.get(root, rid)["versions"]) == 1
+
+
+def test_rule_add_cli_writes_the_rule_file_and_refuses_numbers(tmp_path):  # REQ-138
+    from careeros import cli
+    root = make_temp_root(tmp_path / "repo")
+    (root / "profile" / "resume_feedback.md").unlink(missing_ok=True)
+    r = ["--root", str(root), "resume", "rule-add"]
+    assert cli.main([*r, "Bullets", "Lead with the result."]) == 0
+    assert "- Lead with the result." in (root / "profile" / "resume_feedback.md").read_text(encoding="utf-8")
+    assert cli.main([*r, "Bullets", "Say 30 people"]) == 1

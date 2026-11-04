@@ -16,7 +16,7 @@ from careeros.qa_ext.consistency import check_cross_doc, parse_numbers
 pytestmark = pytest.mark.unit
 
 PROFILE = yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text())
-RESUME_IDS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"]
+RESUME_IDS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"]
 
 OUTREACH = {
     "job_id": "t1", "company": "Ledgerline",
@@ -122,7 +122,7 @@ def test_disabled_by_config(tmp_path: Path) -> None:
 # --- 1. letter_experiences_on_resume ------------------------------------------------------------------
 
 def test_letter_cites_entry_dropped_from_resume(tmp_path: Path) -> None:
-    ck = run(make_job(tmp_path, resume_ids=["acme.1", "acme.2", "initech_intern.1"]))
+    ck = run(make_job(tmp_path, resume_ids=["acme.1", "acme.2", "initech_intern.1", "initech_intern.2"]))
     chk = by_name(ck, "letter_experiences_on_resume")
     assert chk["ok"] is False and chk["level"] == "soft"
     assert "widgetizer.1" in chk["detail"] and "widgetizer" in chk["detail"]
@@ -309,8 +309,8 @@ def test_percent_consistency(tmp_path: Path, phrase: str, hard_ok: bool, soft_fa
 
 def test_bullet_not_on_resume_uses_profile_reference(tmp_path: Path) -> None:
     ck = run(make_job(tmp_path, answers=answer(
-        "At Initech I profiled data quality and documented lineage across 31 SQL tables with Python checks.",
-        ids=("initech_intern.2",))))
+        "At Widgetizer I wrote 16 XCTest suites for the Swift sync and offline logic.",
+        ids=("widgetizer.2",))))
     chk = by_name(ck, "numbers_consistent")
     assert chk["ok"] is False
     assert ck.extras["consistency"]["number_mismatches"][0]["reference"] == "profile"

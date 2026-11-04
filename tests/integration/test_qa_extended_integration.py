@@ -15,7 +15,7 @@ from test_qa import COVER_LETTER
 pytestmark = pytest.mark.integration
 
 HAS_ENGINE = bool((shutil.which("tectonic") and tectonic_cache()) or shutil.which("pdflatex"))  # offline only
-BULLETS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"]
+BULLETS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"]
 EXTENDED = ("wrong_company", "letter_experiences_on_resume", "employer_title_consistent", "numbers_consistent",
             "outreach_manual_contacts", "linkedin_draft_only", "linkedin_note_length", "email_autosend_verified",
             "thank_you_manual", "outreach_word_counts", "outreach_cold_limit")

@@ -46,6 +46,31 @@ candidate never stated, "find related metrics"). None of that applies in career-
    fabricated one. QA's `bullet_shape` check only warns; a missing metric never fails a résumé and never
    justifies rewriting a bullet.
 
+## What a bullet says
+
+- **Role, contribution, why it mattered.** A bullet says what the role was, what the candidate contributed and why
+  it mattered. Never a task-by-task or ticket-level list.
+- **An outsider understands it on first read.** Keep the technical evidence (tools, systems) for technical readers
+  and keep the metrics; drop internal names and jargon that only the team knows.
+- **Enough context to help, or cut.** A bullet without enough context to help the reader is cut, even if it has a
+  number. Replace a vague ending with a specific: "wrote the team's guide" says nothing; say what the guide let
+  people do.
+- **Industry terms.** Use the words the industry uses: CVEs for vulnerability fixes, test-driven development for
+  test-first work. Same wording rule as evidence_rules.md: the term must match what the candidate did.
+- **Consulting and client work.** Do not pad it with PR or test counts. Describe the tailored product and the
+  people using it. Do not say work shipped unless the candidate confirmed it (evidence_rules.md rule 6).
+
+## Entries
+
+- **No single-bullet experience entry.** Give every experience entry at least two bullets or cut it (QA hard check
+  `thin_experience_entry`; projects are exempt). Cut entries that add nothing for the target job.
+- **Same employer twice: one company heading.** Keep the entries adjacent in `experience` (QA hard check
+  `repeated_employer`); `render.py` prints one bold company line, then one italic role line per role with its own
+  dates at the right, then that role's bullets.
+- **Candidate feedback outranks this file.** `profile/resume_feedback.md` (optional, per candidate) holds rules the
+  candidate gave in earlier sessions. Read it first; where it disagrees with this file, it wins, except for the Hard
+  rules in CLAUDE.md and evidence_rules.md.
+
 ## Formulas
 
 Use these when writing or reviewing bullets in `profile/master.yaml` (the only place bullet text is

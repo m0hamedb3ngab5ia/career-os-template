@@ -46,7 +46,7 @@ Tools & Platforms: PostgreSQL, Kafka, Docker, AWS, Airflow, Git
 
 RESUME_JSON = build_resume_json(
     yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text()),
-    ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
+    ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"], job_id="t1")
 
 COVER_LETTER = """---
 company: Ledgerline
@@ -1015,7 +1015,7 @@ def _estimate_job(tmp_path: Path, root: Path, resume_line: str, cover: str | Non
         "Shipped a React and TypeScript dashboard used by 40 analysts to review reconciliation breaks", resume_line),
         cover=cover)
     rj = build_resume_json(yaml.safe_load((root / "profile" / "master.yaml").read_text()),
-                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
+                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"], job_id="t1")
     (job / "resume.json").write_text(json.dumps(rj))
     return job
 
@@ -1096,7 +1096,7 @@ def _bold_root(tmp_path: Path, marked: bool) -> Path:
 def _bold_job(tmp_path: Path, root: Path, **kw) -> Path:
     job = make_job(tmp_path, **kw)
     rj = build_resume_json(yaml.safe_load((root / "profile" / "master.yaml").read_text()),
-                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"], job_id="t1")
+                           ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"], job_id="t1")
     (job / "resume.json").write_text(json.dumps(rj))
     return job
 
@@ -1304,3 +1304,33 @@ def test_untrusted_content_ignores_ordinary_phrasing(tmp_path: Path, text: str) 
     (job / "answers.json").write_text(json.dumps([{"question": "Why us?", "answer": text, "type": "essay"}]))
     c = by_name(run(job), "untrusted_content")
     assert c["ok"], c["detail"]
+
+
+# --- experience shape: thin_experience_entry, repeated_employer ----------------------------------------
+
+def _exp(company: str, n: int, i: int = 1) -> dict:
+    return {"id": f"e{i}", "company": company, "title": "Engineer", "start": "Jan 2020", "end": "Feb 2021",
+            "bullets": [{"id": f"e{i}.{k}", "text": "x"} for k in range(n)]}
+
+
+def test_thin_experience_entry_fails_and_names_entry(tmp_path: Path) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[_exp("Acme", 2), _exp("Initech", 1, 2)])
+    c = by_name(run(job), "thin_experience_entry")
+    assert c["ok"] is False and "Initech" in c["detail"] and "Acme" not in c["detail"]
+
+
+def test_thin_experience_entry_passes_with_two_and_ignores_projects(tmp_path: Path) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[_exp("Acme", 2)],
+                       projects=[{"id": "p", "name": "P", "bullets": [{"id": "p.1", "text": "x"}]}])
+    assert by_name(run(job), "thin_experience_entry")["ok"] is True
+
+
+@pytest.mark.parametrize("order,ok", [
+    (["Acme", "acme ", "Initech"], True),      # adjacent, case/space-insensitive
+    (["Acme", "Initech", "ACME"], False),      # split by another employer
+    (["Acme", "Initech"], True),
+])
+def test_repeated_employer_requires_adjacent(tmp_path: Path, order: list, ok: bool) -> None:
+    job = _resume_with(make_job(tmp_path), experience=[_exp(c, 2, i) for i, c in enumerate(order)])
+    c = by_name(run(job), "repeated_employer")
+    assert c["ok"] is ok, c["detail"]

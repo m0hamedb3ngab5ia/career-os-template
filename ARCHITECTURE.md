@@ -99,7 +99,8 @@ in `src/careeros/qa_ext/` and read the Checker's shared inputs (`pipeline_cfg`, 
 spans (tech names, metrics). `src/careeros/markup.py` (`strip_bold`, `bold_spans`, `validate_bold`) is the one
 parser: `templates/resume/render.py` turns each span into `\textbf{}` (escaping inside it) and writes resume.txt
 plain; every truth / number / tool / keyword / consistency check compares stripped text, so markers never change a
-verdict. `bold_markup` (hard) rejects invalid markup and `**` outside bullet text / summary in resume.json, and any
+verdict. `thin_experience_entry` (hard: every `experience` entry has >= 2 bullets) and `repeated_employer` (hard:
+same-company entries adjacent, rendered as one heading). `bold_markup` (hard) rejects invalid markup and `**` outside bullet text / summary in resume.json, and any
 `**` in resume.txt; `no_markdown_bold` (hard) rejects `**` in answers and outreach and a stray `**` in the cover
 letter; balanced bold in a letter is only the soft `cover_letter_bold`. `careeros doctor` FAILs on invalid markup
 in master.yaml.

@@ -35,6 +35,9 @@ description: Build a one-page tailored resume for a scored job dir from profile/
 - `profile/master.yaml`.
 - `config/categories.yaml` -> `bullet_priority` for `score.category`, and `resume_template`.
 - `config/qa.yaml` -> `resume.hard.section_order`, `resume.soft.keyword_coverage_min`.
+- `profile/resume_feedback.md` if it exists (the candidate's own résumé-writing rules from earlier sessions; a
+  missing file means no extra rules). Follow it before writing or judging bullets: it outranks
+  `resume_writing_rules.md` but never the Hard rules in CLAUDE.md (no fabrication, frozen numbers, confidential terms).
 - `.claude/skills/_shared/resume_writing_rules.md`: how a strong bullet reads, which bullet and variant to
   prefer, and its OVERRIDE (never estimate a number; a bullet without one gets a metric question).
 - `templates/resume/resume_schema.md` (the JSON shape `render.py` expects) and `templates/resume/<resume_template>.tex`.
@@ -49,8 +52,10 @@ line wraps), and 20 bullets / 608 words spills to 2 pages. The `pdf_page_count` 
 is the source of truth: aim for the safe target, and let the loop decide.
 
 Procedure:
-1. Experience entries: include ALL non-placeholder experience entries in reverse-chronological order
-   (newest `start` first; entries with `start: null` last) up to the budget of 4, regardless of tag.
+1. Experience entries: include ALL experience entries with at least 2 eligible bullets, in reverse-chronological
+   order (newest `start` first; entries with `start: null` last) up to the budget of 4, regardless of tag. Keep
+   same-company roles adjacent: place the group by its newest role, newest first inside it (QA `repeated_employer`).
+   Omit an entry with fewer than 2 eligible bullets and note it in `profile_gaps` (QA `thin_experience_entry`).
    Skip placeholder-only entries (note `profile_gaps`). Tags do not decide inclusion; they decide
    bullet count (step 2) and project selection (step 1b).
    1b. Projects: pick up to 3 by relevance: first projects whose `tags` include `score.category`, then
@@ -59,8 +64,8 @@ Procedure:
    first slot; the rest follow the relevance order above), even if that exceeds the 3-project cap:
    the cap grows to fit every pinned project (`careeros doctor` allows at most 2 pinned projects).
 2. Bullet count per entry: tag-matched entries (entry `tags` include `score.category`, or `stack`
-   overlaps >= 2 `required_skills`) get 3-4 bullets; other entries get 1-2. Always include at least
-   1 bullet per included entry. Bullets flagged `resume_pin: true` are always selected for their entry;
+   overlaps >= 2 `required_skills`) get 3-4 bullets; other experience entries get 2. Always include at
+   least 2 bullets per included experience entry and 1 per project. Bullets flagged `resume_pin: true` are always selected for their entry;
    they count toward the entry's budget (a pin displaces the least relevant non-pinned bullet rather than
    adding one). Pins are selected even when that exceeds the entry's bullet budget: the
    budget grows to the pin count (a 1-2 bullet entry with 2 pins gets exactly those 2, and nothing else;
@@ -150,17 +155,17 @@ never edit a number to make it pass) and re-render. Max 2 fix loops; then leave 
 the first applicable step below, re-render, re-run QA, and repeat until 1 page. Record every swap or
 drop in `meta.dropped_for_fit`. Invariants at every step: never drop a project's descriptive bullet,
 never drop a `resume_pin: true` bullet (the loop may only short-swap a pinned bullet, i.e. switch it to
-`variants.short`; it never drops or replaces it), never drop an entry's last bullet (entries stay at >= 1
-bullet), never drop an entry.
+`variants.short`; it never drops or replaces it), keep every experience entry at >= 2 bullets and every project at >= 1,
+never drop an entry.
 
 1. Short-variant swap: if any included bullet has `variants.short` in the profile and the long text
    is in use, swap it to the short variant (least relevant bullet first). This is a fit step, not a
    drop, and comes before removing any bullet.
 2. Non-tag-matched entries: drop the lowest-relevance bullet of the least relevant non-tag-matched
-   entry, until every non-tag-matched entry is at 1 bullet.
-3. Tag-matched entries: only once all non-tag-matched entries are at 1 bullet, drop the
+   entry, until every non-tag-matched entry is at its minimum (2 bullets; projects 1).
+3. Tag-matched entries: only once all non-tag-matched entries are at their minimum, drop the
    lowest-relevance bullet from a tag-matched entry (lowest relevance to `required_skills`, metric-only
-   bullets last), one at a time, until each tag-matched entry is at its minimum (1 bullet; for
+   bullets last), one at a time, until each tag-matched entry is at its minimum (2 bullets; for
    projects, the descriptive bullet).
 4. Only then: drop `education.activities`, then trim `coursework` to 4, then set `summary` to null.
 

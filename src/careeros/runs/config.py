@@ -59,7 +59,9 @@ KIND_ONLY_TOOLS: dict[str, list[str]] = {
     # DEC-016: review/edit runs only read and write annotations through the CLI; no Write = no direct draft edit
     # (`annotate *` needs the space, so it does not match `annotate-reply`; chained commands are refused under dontAsk)
     "review": ANNOTATION_TOOLS,
-    "resume_edit": ANNOTATION_TOOLS,
+    # only edit: its input is the candidate's own comment. A review run reads an uploaded file, third-party text
+    # that must never become a standing rule.
+    "resume_edit": [*ANNOTATION_TOOLS, "Bash(.venv/bin/careeros resume rule-add *)"],
 }
 # Extra CLI flags per run kind: headless `claude -p` loads the claude-in-chrome MCP only with --chrome.
 KIND_FLAGS: dict[str, list[str]] = {"apply": ["--chrome"]}

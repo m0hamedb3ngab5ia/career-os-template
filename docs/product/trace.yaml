@@ -765,6 +765,11 @@ requirements:
     - USR-038
     tests:
     - E2E-017-04
+  REQ-138:
+    status: approved
+    provenance: confirmed
+    tests:
+    - tests/test_qa.py::test_thin_experience_entry_fails_and_names_entry
 use_cases:
   UC-001:
     status: approved

@@ -219,8 +219,8 @@ def test_review_and_edit_runs_cannot_write_files():  # DEC-016: annotations only
     from careeros.runs.config import KIND_ONLY_TOOLS
     narrow = ["Read", "Bash(.venv/bin/careeros resume annotations *)", "Bash(.venv/bin/careeros resume annotate *)",
               "Bash(.venv/bin/careeros resume annotate-reply *)", "Bash(.venv/bin/careeros resume list *)"]  # not every careeros command (e.g. apply-edit)
-    for kind in ("review", "resume_edit"):
-        assert KIND_ONLY_TOOLS[kind] == narrow
+    assert KIND_ONLY_TOOLS["review"] == narrow
+    assert KIND_ONLY_TOOLS["resume_edit"] == [*narrow, "Bash(.venv/bin/careeros resume rule-add *)"]  # REQ-138
 
 
 def test_completed_runs_without_new_ai_annotations_fail(tmp_path: Path):  # a "done" run must have proposed something

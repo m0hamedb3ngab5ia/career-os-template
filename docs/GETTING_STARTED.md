@@ -65,6 +65,8 @@ Replace the value; delete the comment once the line holds your real value. Lines
 | 7 | `config/categories.yaml` → `bullet_priority` | replace `acme, initech_intern, widgetizer` with your own entry ids, most relevant first | 1 min |
 | 8 | `profile/confidential_terms.yaml` | your employer's internal codenames (or `terms: []`, `patterns: []`) | 1 min |
 
+Optional: `profile/resume_feedback.md` holds your own résumé-writing rules; the résumé skills read it and add to it when you correct a résumé.
+
 Later, when you have time: put 2-5 letters or emails you wrote in `profile/voice/samples/` and run
 `/learn-voice` in Claude Code, so cover letters sound like you.
 

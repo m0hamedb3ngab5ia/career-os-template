@@ -15,10 +15,13 @@ import re
 from pathlib import Path
 from typing import Any
 
+import yaml
+
 from careeros import resumes as store
 from careeros.qa import WORD_RE, number_tokens
 from careeros.qa_ext.consistency import DEFAULT_SENIORITY_WORDS
 from careeros.runs.atomic import write_text
+from careeros.terms import term_in_text
 
 # a rewrite may not upgrade the claim (REQ-095: supported -> led): verb stems + their whole-word forms, plus seniority
 # words. Whole words only, so 'ledger' never hides 'led' and 'directory' is no claim.
@@ -219,3 +222,44 @@ def check_edit_run(root: Path, rid: str, fid: str, before: int) -> list[int]:
 def edit(root: Path, rid: str, text: str) -> dict[str, Any]:
     """Hand edit (REQ-097): new version author=user, previous versions unchanged, no guard."""
     return store.add_text(root, rid, text, author="user", source="edit")
+
+
+def _refuse_rule_text(root: Path, text: str) -> None:
+    """A rule is general and safe to keep forever: one short line, no numbers, no confidential term. Fails closed."""
+    if not text or "\n" in text or len(text) > 300:
+        raise ValueError("a rule is one line of at most 300 characters")
+    if any(c.isdigit() for c in text):
+        raise ValueError("a rule is general: no numbers")
+    path = root / "profile" / "confidential_terms.yaml"
+    try:
+        cfg = yaml.safe_load(path.read_text(encoding="utf-8")) or {}
+        if any(term_in_text(str(t).strip(), text) for t in cfg.get("terms") or [] if str(t).strip()) \
+                or any(re.search(str(p), text) for p in cfg.get("patterns") or []):
+            raise ValueError("rule contains a confidential term")
+    except (yaml.YAMLError, re.error, AttributeError, OSError) as e:
+        raise ValueError(f"cannot check {path.name}: {e}") from e
+
+
+def add_rule(root: str | Path, heading: str, rule: str) -> dict[str, Any]:
+    """Append one general rule to profile/resume_feedback.md under `heading` (REQ-138), for runs that cannot write
+    files. The same rule under any heading is a no-op. Returns {added, heading, rule}."""
+    root, heading, rule = Path(root), " ".join(heading.split()), rule.strip()
+    if not heading:
+        raise ValueError("heading is required")
+    _refuse_rule_text(root, heading)
+    _refuse_rule_text(root, rule)
+    path = root / "profile" / "resume_feedback.md"
+    text = path.read_text(encoding="utf-8") if path.exists() else "# Résumé feedback\n"
+    lines = text.rstrip("\n").split("\n")
+    if any(ln.startswith("- ") and ln[2:].strip().lower() == rule.lower() for ln in lines):
+        return {"added": False, "heading": heading, "rule": rule}
+    if f"## {heading}" in lines:
+        at = lines.index(f"## {heading}") + 1
+        while at < len(lines) and not lines[at].startswith("#") and lines[at].strip():
+            at += 1
+        lines.insert(at, f"- {rule}")
+    else:
+        lines += ["", f"## {heading}", f"- {rule}"]
+    path.parent.mkdir(parents=True, exist_ok=True)
+    write_text(path, "\n".join(lines) + "\n")
+    return {"added": True, "heading": heading, "rule": rule}

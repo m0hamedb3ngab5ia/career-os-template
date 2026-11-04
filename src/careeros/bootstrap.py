@@ -22,6 +22,7 @@ EDIT_HINTS: tuple[tuple[str, str], ...] = (
     ("profile/standard_answers.yaml", "every `answer` (work auth, school, links, phone, address) and the `eeo:` block"),
     ("profile/confidential_terms.yaml", "your employer's internal codenames / id patterns (QA hard-fails on them)"),
     ("profile/voice/samples/", "2-5 self-written letters or emails, then run /learn-voice"),
+    ("profile/resume_feedback.md", "optional: your résumé-writing rules; résumé skills read it (edit or delete)"),
     ("config/targets.yaml", "candidate (level, graduation, min_base_usd, salary_dropdown_floor_usd), location"),
     ("config/companies.yaml", "dream_list, already_applied, blocklist (put your current employer there), boards"),
     ("config/categories.yaml", "bullet_priority: entry ids from your master.yaml"),
