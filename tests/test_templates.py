@@ -149,7 +149,7 @@ def test_tex_renders_project_links_clickable(tmp_path: Path):
     assert r"\href{https://example.com/widgetizer?ref=a_b}{App Store}" in tex
     assert r"\href{https://example.com/widgetizer/demo}{Demo video}" in tex
     assert tex.index("{App Store}") < tex.index("{Demo video}") < tex.index("Built an iOS app")
-    assert "colorlinks=true" in tex and "hidelinks" not in tex    # links visibly clickable (blue), text unchanged
+    assert "urlcolor=black" in tex and "linkblue" not in tex    # links stay clickable, not blue, text unchanged
 
 
 def test_txt_section_order_follows_sections(tmp_path: Path):
