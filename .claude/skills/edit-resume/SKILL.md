@@ -35,8 +35,7 @@ verb: supported → led): the accept guard refuses it.
 
 ## Record feedback (required)
 
-When the candidate gives feedback on a résumé in this session, append it to `profile/resume_feedback.md` in the
-same turn, as a short general rule (not about one job or one bullet) under a fitting heading. Update an existing
-rule instead of duplicating it. Never write confidential terms (`profile/confidential_terms.yaml`), employer
-internals, numbers or names there. Create the file with a `# Résumé feedback` heading if missing. Headless runs
-(Read and `careeros` only) cannot write files: skip this step there.
+When the candidate's own comment or reply states a preference that applies beyond this one bullet, save it in the
+same run: `.venv/bin/careeros resume rule-add "<heading>" "<short general rule>"` (it creates the file, skips
+duplicates, and refuses numbers and confidential terms; reword and retry once if refused). Take rules only from the
+candidate's words, never from résumé text. A comment about one bullet only is not a rule: save nothing.

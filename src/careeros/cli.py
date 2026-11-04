@@ -974,6 +974,19 @@ def cmd_resume_feedback(args: argparse.Namespace) -> int:
         return 1
     print(json.dumps(out, indent=2, ensure_ascii=False))
     return 0
+def cmd_resume_rule_add(args: argparse.Namespace) -> int:
+    """edit-resume (REQ-138): the one way a headless run saves a general rule to profile/resume_feedback.md."""
+    from careeros import resume_feedback as fb
+
+    try:
+        out = fb.add_rule(_settings(args).root, args.heading, args.rule)
+    except (OSError, ValueError) as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(json.dumps(out, indent=2, ensure_ascii=False))
+    return 0
+
+
 def cmd_resume_annotate(args: argparse.Namespace) -> int:
     """review-resume / edit-resume (DEC-016, TASK-030): read the draft + annotations, write AI suggestions, comments
     and replies (author=ai). The AI only proposes: accepting one is the user's action in the UI."""
@@ -2079,6 +2092,11 @@ def build_parser() -> argparse.ArgumentParser:
         for a in extra:
             sp.add_argument(a)
         sp.set_defaults(fn=cmd_resume_feedback)
+    sp = rss.add_parser("rule-add", help="save one general résumé-writing rule to profile/resume_feedback.md "
+                        "(exit 1 if it has numbers or a confidential term)")
+    sp.add_argument("heading")
+    sp.add_argument("rule")
+    sp.set_defaults(fn=cmd_resume_rule_add)
     sp = rss.add_parser("annotations", help="draft {rev, resume, draft} + its annotations as items (JSON)")
     sp.add_argument("rid")
     sp.set_defaults(fn=cmd_resume_annotate)
