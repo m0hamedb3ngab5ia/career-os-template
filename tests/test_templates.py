@@ -487,3 +487,36 @@ def test_example_profile_bullets_carry_bold_markers():
     spans = [s for t in texts for s in bold_spans(t)]
     assert len(spans) >= 6
     assert any(any(c.isdigit() for c in s) for s in spans) and "Python" in spans
+
+
+def _grouped_resume(tmp_path: Path) -> Path:
+    prof = yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text())
+    d = build_resume_json(prof, ["acme.1", "acme.2", "initech_intern.1", "initech_intern.2"])
+    first, second = d["experience"]
+    second.update(company=first["company"], location=first["location"], title="Associate Engineer")
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(d))
+    return p
+
+
+def test_adjacent_same_company_renders_one_heading(tmp_path: Path) -> None:
+    tex = resume.render(_grouped_resume(tmp_path), pdf=False).read_text()
+    assert tex.count(r"\employer{Acme}") == 1
+    assert r"\role{Software Engineer}" in tex and r"\role{Associate Engineer}" in tex
+    assert r"\entry{Acme}" not in tex
+    assert "Associate Engineer" in tex and tex.index("Software Engineer") < tex.index("Associate Engineer")
+
+
+def test_single_role_entries_render_as_before(tmp_path: Path) -> None:
+    prof = yaml.safe_load((EXAMPLE_REPO / "profile" / "master.yaml").read_text())
+    p = tmp_path / "resume.json"
+    p.write_text(json.dumps(build_resume_json(prof, ["acme.1", "acme.2", "initech_intern.1", "initech_intern.2"])))
+    tex = resume.render(p, pdf=False).read_text()
+    assert r"\entry{Acme}" in tex and r"\entry{Initech}" in tex
+    assert r"\employer{" not in tex.split(r"\begin{document}")[1]
+
+
+def test_resume_txt_shows_company_once_for_grouped_roles(tmp_path: Path) -> None:
+    txt = resume.render_txt(_grouped_resume(tmp_path)).read_text()
+    assert txt.count("Acme") == 1
+    assert "Associate Engineer" in txt and "Software Engineer" in txt

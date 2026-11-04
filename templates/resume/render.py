@@ -125,6 +125,24 @@ def escape_tree(node: Any) -> Any:
     return node
 
 
+def group_experience(entries: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Adjacent entries with the same company (case-insensitive, trimmed) become one group: one company
+    heading, one role line per entry. `location` is the shared location when every role has the same one,
+    else "" (each role then carries its own)."""
+    groups: list[dict[str, Any]] = []
+    for e in entries:
+        key = str(e.get("company", "")).strip().lower()
+        if groups and key and groups[-1]["key"] == key:
+            groups[-1]["roles"].append(e)
+        else:
+            groups.append({"key": key, "company": e.get("company", ""), "roles": [e]})
+    for g in groups:
+        locs = {str(r.get("location", "")).strip() for r in g["roles"]}
+        g["location"] = locs.pop() if len(locs) == 1 else ""
+        g["multi"] = len(g["roles"]) > 1
+    return groups
+
+
 # --- data loading -------------------------------------------------------------
 
 def load_resume(path: Path) -> dict[str, Any]:
@@ -301,6 +319,7 @@ def render(resume_json_path: str | Path, template: str | None = None, pdf: bool 
         for k in ("company", "title", "team", "location", "start", "end"):
             e.setdefault(k, "")
         e.setdefault("bullets", [])
+    ctx["experience_groups"] = group_experience(ctx["experience"])
     for p in ctx["projects"]:
         for k in ("name", "date", "link", "link_raw"):
             p.setdefault(k, "")
@@ -346,12 +365,23 @@ def render_txt(resume_json_path: str | Path) -> Path:
         t = sec.get("type")
         if t == "experience" and d["experience"]:
             lines.append("EXPERIENCE")
-            for e in d["experience"]:
-                lines.append(_line(e.get("company", ""), f"{e.get('start', '')} - {e.get('end', '')}"))
-                sub = e.get("title", "") + (f", {e['team']}" if e.get("team") else "")
-                lines.append(_line(sub, e.get("location", "")))
-                lines += [f"- {strip_bold(b['text'])}" for b in e.get("bullets", [])]
-                lines.append("")
+            for g in group_experience(d["experience"]):
+                if not g["multi"]:
+                    e = g["roles"][0]
+                    lines.append(_line(e.get("company", ""), f"{e.get('start', '')} - {e.get('end', '')}"))
+                    sub = e.get("title", "") + (f", {e['team']}" if e.get("team") else "")
+                    lines.append(_line(sub, e.get("location", "")))
+                    lines += [f"- {strip_bold(b['text'])}" for b in e.get("bullets", [])]
+                    lines.append("")
+                    continue
+                lines.append(_line(g["company"], g["location"]))
+                for e in g["roles"]:
+                    sub = e.get("title", "") + (f", {e['team']}" if e.get("team") else "")
+                    if not g["location"] and e.get("location"):
+                        sub += f", {e['location']}"
+                    lines.append(_line(sub, f"{e.get('start', '')} - {e.get('end', '')}"))
+                    lines += [f"- {strip_bold(b['text'])}" for b in e.get("bullets", [])]
+                    lines.append("")
         elif t == "projects" and d["projects"]:
             lines.append("PROJECTS")
             for p in d["projects"]:

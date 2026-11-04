@@ -17,7 +17,7 @@ from careeros.markup import bold_spans, strip_bold
 pytestmark = pytest.mark.integration
 
 HAS_ENGINE = bool((shutil.which("tectonic") and tectonic_cache()) or shutil.which("pdflatex"))  # offline only
-BULLETS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "widgetizer.1"]
+BULLETS = ["acme.1", "acme.2", "acme.3", "initech_intern.1", "initech_intern.2", "widgetizer.1"]
 
 
 @pytest.fixture

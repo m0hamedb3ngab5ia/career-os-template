@@ -27,6 +27,9 @@ Output schema (dict / JSON):
       # hard check `estimate_marked`: a number marked "~" in an `estimate: true` bullet keeps its "~" (or, in prose,
       #   about/approximately/roughly/around) wherever an artifact citing that bullet shows it
       # hard check `example_identity`: the example candidate's name/email in resume.txt or cover_letter.md
+      # hard check `thin_experience_entry`: every resume.json `experience` entry has at least 2 bullets (projects exempt)
+      # hard check `repeated_employer`: entries with the same company (case-insensitive, trimmed) are adjacent in
+      #   `experience`, because adjacent ones render as one company heading with one role line each
       # hard check `bold_markup`: resume.json `**bold**` markup valid and only in bullet text / summary; resume.txt
       #   carries no markers. Every truth/number/tool/keyword check compares bullet text with markers stripped.
       # hard check `no_markdown_bold`: no `**` in answers.json / outreach.json text, no stray (unbalanced) `**` in
@@ -1077,6 +1080,27 @@ class Checker:
         self.add("entry_headers", "hard", not problems,
                  "entry headers match profile" if not problems else "; ".join(problems))
 
+    def check_experience_shape(self) -> None:
+        """Hard `thin_experience_entry` (>= 2 bullets per experience entry; projects exempt) and hard
+        `repeated_employer` (same company entries adjacent, so they render as one heading)."""
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        if rj is None:
+            self.skip("thin_experience_entry", "hard", "resume.json missing")
+            self.skip("repeated_employer", "hard", "resume.json missing")
+            return
+        entries = [e for e in rj.get("experience") or [] if isinstance(e, dict)]
+        thin = [f"{e.get('company') or e.get('id') or '<unnamed>'}"
+                f"{' (' + str(e['title']) + ')' if e.get('title') else ''}: {len(e.get('bullets') or [])} bullet(s)"
+                for e in entries if len(e.get("bullets") or []) < 2]
+        self.add("thin_experience_entry", "hard", not thin,
+                 "every experience entry has >= 2 bullets" if not thin
+                 else "give each entry at least two bullets or cut it: " + "; ".join(thin))
+        names = [str(e.get("company") or "").strip().lower() for e in entries]
+        split = sorted({n for i, n in enumerate(names) if n and n in names[:i] and names[i - 1] != n})
+        self.add("repeated_employer", "hard", not split,
+                 "same-company entries are adjacent" if not split
+                 else "move entries of the same company next to each other: " + ", ".join(split))
+
     def check_skills_traced(self) -> None:
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         skills = (rj or {}).get("skills")
@@ -1466,6 +1490,7 @@ class Checker:
         self.check_bullet_fidelity()
         self.check_tweak_cap()
         self.check_entry_headers()
+        self.check_experience_shape()
         self.check_skills_traced()
         self.check_section_order()
         self.check_standard_answers()
