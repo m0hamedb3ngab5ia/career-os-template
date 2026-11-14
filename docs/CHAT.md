@@ -28,6 +28,6 @@ New chat skills (DEC-024):
 - `/advice`: paste outside advice, get a verdict adopt / park / reject with evidence; logged to `.agent/ADVICE.md`.
 - `/today`: the dashboard in chat, read-only.
 - `/interview-prep <id>`: writes `interview_prep.md` in the job folder from `profile/master.yaml` bullet ids.
-- `/score-job` now also writes `gaps[]` (posting requirements with no evidence in master.yaml).
+- `/score-job` now also writes `gaps[]` (stated requirements the profile does not evidence, plus logistics (start date, relocation, on-site)).
 
 Hard rules still apply in chat: no fabricated résumé facts, no guessed legal or salary answers, nothing submitted for Tier A.
