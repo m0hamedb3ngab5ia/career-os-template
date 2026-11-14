@@ -1,0 +1,109 @@
+import { act, fireEvent, render, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
+import { ToastProvider, useToast } from "./Toast";
+
+function Trigger({ onUndo, seconds }: { onUndo?: () => void; seconds?: number }) {
+  const toast = useToast();
+  return <button onClick={() => toast.show({ message: "Marked Ramp done.", onUndo, seconds })}>go</button>;
+}
+
+describe("Toast", () => {
+  it("announces through a polite live region and offers Undo", () => {
+    vi.useFakeTimers();
+    const onUndo = vi.fn();
+    render(
+      <ToastProvider>
+        <Trigger onUndo={onUndo} />
+      </ToastProvider>,
+    );
+    const region = screen.getByRole("status");
+    expect(region).toHaveAttribute("aria-live", "polite");
+    act(() => screen.getByText("go").click());
+    expect(region).toHaveTextContent("Marked Ramp done.");
+    act(() => screen.getByRole("button", { name: "Undo" }).click());
+    expect(onUndo).toHaveBeenCalledOnce();
+    expect(region).not.toHaveTextContent("Marked Ramp done.");
+    vi.useRealTimers();
+  });
+
+  it("dismisses itself after the configured seconds (provider default 8)", () => {
+    vi.useFakeTimers();
+    render(
+      <ToastProvider defaultSeconds={8}>
+        <Trigger />
+      </ToastProvider>,
+    );
+    act(() => screen.getByText("go").click());
+    act(() => vi.advanceTimersByTime(7900));
+    expect(screen.getByRole("status")).toHaveTextContent("Marked Ramp done.");
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByRole("status")).not.toHaveTextContent("Marked Ramp done.");
+    vi.useRealTimers();
+  });
+
+  it("a per-toast seconds overrides the default", () => {
+    vi.useFakeTimers();
+    render(
+      <ToastProvider>
+        <Trigger seconds={2} />
+      </ToastProvider>,
+    );
+    act(() => screen.getByText("go").click());
+    act(() => vi.advanceTimersByTime(2100));
+    expect(screen.getByRole("status")).not.toHaveTextContent("Marked Ramp done.");
+    vi.useRealTimers();
+  });
+
+  it("pauses while focused and resumes after blur", () => {
+    vi.useFakeTimers();
+    render(
+      <ToastProvider>
+        <Trigger onUndo={() => undefined} />
+      </ToastProvider>,
+    );
+    act(() => screen.getByText("go").click());
+    const undo = screen.getByRole("button", { name: "Undo" });
+    act(() => undo.focus());
+    act(() => vi.advanceTimersByTime(10_000));
+    expect(screen.getByRole("status")).toHaveTextContent("Marked Ramp done.");
+    act(() => undo.blur());
+    act(() => vi.advanceTimersByTime(8100));
+    expect(screen.getByRole("status")).not.toHaveTextContent("Marked Ramp done.");
+    vi.useRealTimers();
+  });
+
+  it("pauses while hovered, keeping the time that was left", () => {
+    vi.useFakeTimers();
+    render(
+      <ToastProvider>
+        <Trigger />
+      </ToastProvider>,
+    );
+    act(() => screen.getByText("go").click());
+    act(() => vi.advanceTimersByTime(5000));
+    const toast = screen.getByText("Marked Ramp done.").parentElement!;
+    act(() => fireEvent.mouseEnter(toast));
+    act(() => vi.advanceTimersByTime(20_000));
+    expect(screen.getByRole("status")).toHaveTextContent("Marked Ramp done.");
+    act(() => fireEvent.mouseLeave(toast));
+    act(() => vi.advanceTimersByTime(2900));
+    expect(screen.getByRole("status")).toHaveTextContent("Marked Ramp done.");
+    act(() => vi.advanceTimersByTime(200));
+    expect(screen.getByRole("status")).not.toHaveTextContent("Marked Ramp done.");
+    vi.useRealTimers();
+  });
+
+  it("returns focus to where it was when a focused toast goes away", () => {
+    render(
+      <ToastProvider>
+        <Trigger onUndo={() => undefined} />
+      </ToastProvider>,
+    );
+    const go = screen.getByText("go");
+    act(() => go.focus());
+    act(() => go.click());
+    act(() => screen.getByRole("button", { name: "Undo" }).focus());
+    act(() => screen.getByRole("button", { name: "Undo" }).click());
+    expect(go).toHaveFocus();
+  });
+});
