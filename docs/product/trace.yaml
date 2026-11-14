@@ -830,22 +830,22 @@ requirements:
     status: implemented
     provenance: confirmed
     tests:
-    - .claude/skills/advice/SKILL.md
+    - test_advice_skill_contract
   REQ-140:
     status: implemented
     provenance: confirmed
     tests:
-    - .claude/skills/today/SKILL.md
+    - test_today_skill_contract
   REQ-141:
     status: implemented
     provenance: confirmed
     tests:
-    - .claude/skills/interview-prep/SKILL.md
+    - test_interview_prep_skill_contract
   REQ-142:
     status: implemented
     provenance: confirmed
     tests:
-    - .claude/skills/score-job/SKILL.md
+    - test_score_job_does_not_saturate_on_generic_postings_and_lists_gaps
 use_cases:
   UC-001:
     status: approved
