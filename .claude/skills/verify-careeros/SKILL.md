@@ -1,6 +1,6 @@
 ---
 name: verify-careeros
-description: Drive and prove the career-os local web UI (`careeros ui`, FastAPI + static bundle on 127.0.0.1) and its CLI on a disposable fictional-candidate copy. Use to confirm a change works in the real app (Today, Jobs, Profile › Résumés, Settings), not just in tests.
+description: Drive and prove the career-os local web UI (`careeros ui`, FastAPI + static bundle on 127.0.0.1) and its CLI on a disposable fictional-candidate copy. Use to confirm a change works in the real app (Today and Jobs only; everything else is chat and CLI, see docs/CHAT.md), not just in tests.
 ---
 
 # Verify career-os
@@ -50,12 +50,12 @@ Playwright Python (`pip install -e '.[ui]'`, `playwright install chromium`): own
 PYTHONPATH=.claude/skills/verify-careeros $PY/python - <<X
 from drive import session
 with session("$EV") as (page, step):
-    step("open", lambda: page.goto("/profile#resumes"), "text=Add résumé")
-    step("upload", lambda: page.set_input_files("input[type=file]", "tests/fixtures/voice_sample.docx"), "text=voice_sample · master", click=True)
+    step("open", lambda: page.goto("/jobs"), "text=Jobs")
+    step("today", lambda: page.goto("/"), "text=Today")
 X
 ```
 
-`set_input_files` fills the real file input, so uploads go through the page. First visit may show a tour: `page.get_by_text("Skip tour").click()` when present. Prefer ARIA/visible text. `page.goto` takes root-relative paths (`base_url` is :8799). Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Run the step script per feature recipe, then read `$EV/steps.jsonl`, apply the feature's `## UX checks`, and report slow steps and principle failures (cite P-ids from the UX checklist).
+The UI is a read-only dashboard (DEC-024): Today and Jobs (table, board, ticking). Résumé, profile, settings, runs and job-detail flows are chat/CLI: verify them with the `careeros` commands in docs/CHAT.md, not the browser. First visit may show a tour: `page.get_by_text("Skip tour").click()` when present. Prefer ARIA/visible text. `page.goto` takes root-relative paths (`base_url` is :8799). Routes: `/` Today, `/jobs`, `/jobs/<id>`, `/profile#resumes`, `/settings/<section>`, `/automation`, `/actions`, `/pipeline`. Run the step script per feature recipe, then read `$EV/steps.jsonl`, apply the feature's `## UX checks`, and report slow steps and principle failures (cite P-ids from the UX checklist).
 
 ## Drive (dev mode)
 

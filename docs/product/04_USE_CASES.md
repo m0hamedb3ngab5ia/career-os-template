@@ -23,6 +23,7 @@ What to notice: scheduler touches only the gate and job selection; every other s
 UC-006 sits in front of all apply paths, manual or scheduled.
 
 ### UC-001 Upload résumé, get review
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume add`, `/review-resume <rid>`. Intent unchanged.
 REQs: REQ-093, REQ-094 · Pre: `careeros init` done · Trigger: drop file on Profile › Résumés
 Main: 1 validate type/size 2 store v1 author=user (read-only original) 3 convert → v2 (REQ-124) 4 start review run on v2 5 workspace shows progress 6 feedback cards beside résumé
 Alt: user leaves page → review continues; Résumés row shows "reviewing", reopen shows result
@@ -34,6 +35,7 @@ E2E-001-03: Given upload When conversion adds a date absent from v1 Then no v2, 
 E2E-001-04: Given converter drops one v1 line When workspace opens Then "Not carried over" lists it; Restore adds it to draft.
 
 ### UC-002 Improve résumé
+> UI retired 2026-11-14 (DEC-024): replaced by `/edit-resume`, chat edits. Intent unchanged.
 REQs: REQ-095, REQ-096, REQ-097 · Pre: UC-001 done · Trigger: Apply / Comment / Edit on a résumé
 Main: hover card → quote highlighted · Accept → guarded rewrite replaces quote in draft (inline diff) · Reject · Revert from History · Edit in place → draft (autosaved) · Next/Done → one vN+1, per-change authors (REQ-125, REQ-126)
 Fail: guard finds new number/employer/tool → version not created, item shows reason
@@ -47,6 +49,7 @@ E2E-002-03: Given v2 When manual edit + Done Then v3 author=user.
 E2E-002-04: Given v1 "supported migration" When rewrite says "led migration" Then no v2, item open with reason.
 
 ### UC-003 Check ATS read, set master
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude for the ATS read; `/extract-master`. Intent unchanged.
 REQs: REQ-098, REQ-099 · Trigger: open ATS view / "Make master"
 Main: ATS view: text + fields + warnings · Make master → old master → `variant` → master.yaml diff proposed → user approves → written atomically
 Alt: user rejects diff → master flag set, master.yaml untouched, readiness item stays open
@@ -55,6 +58,7 @@ E2E-003-01: Given same PDF twice When ATS view Then identical output.
 E2E-003-02: Given A master When mark B master Then A=`variant`, diff proposed, master.yaml unchanged until approve.
 
 ### UC-004 Résumé history
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume list`. Intent unchanged.
 REQs: REQ-100 · Trigger: open résumé
 Main: list résumés → versions (author, time, source) → open any → delete old version
 Fail: delete latest master version / master résumé → refused with reason
@@ -62,6 +66,7 @@ E2E-004-01: Given v1..v3 When delete v2 Then v1,v3 remain; delete v3 of master r
 E2E-004-02: Given v2,v3 When open v3 in version history + "Show changes" Then removed text struck through, added text in AI colour; "Restore this version" makes it the draft.
 
 ### UC-005 Writing samples
+> UI retired 2026-11-14 (DEC-024): replaced by `profile/voice/samples/`, `/learn-voice`. Intent unchanged.
 REQs: REQ-101 · Trigger: upload/remove on Profile › Writing samples
 Main: store sample → learn-voice runs in background → list updated → future cover letters `voice_verified: true`
 Alt: remove last sample → learned style cleared, `voice_verified: false`
@@ -83,6 +88,7 @@ E2E-007-01: Given 10 jobs, 3 ticked When `run prepare` Then exactly those 3 prep
 E2E-007-02: Given ticked job When untick Then `tick` never schedules it.
 
 ### UC-008 Preview + complete fill
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros apply plan|fill`. Intent unchanged.
 REQs: REQ-105, REQ-106 · Pre: job prepared, ready (UC-006) · Trigger: "Preview fill" on job
 Main: plan table → edit values → unknown fields asked (fill/skip optional) → save-to-profile per answer → Fill
 Alt: CLI/scheduled run hits unknown field → Action Item, job paused
@@ -91,12 +97,14 @@ E2E-008-01: Given plan When edit "Notice period" + Fill Then fill_summary read-b
 E2E-008-02: Given unknown required field When answered with save on Then standard_answers has it, next plan auto-fills.
 
 ### UC-009 Manage profile
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude to edit `profile/master.yaml`, `config/*.yaml`. Intent unchanged.
 REQs: REQ-107 · Trigger: open Profile
 Main: sections résumés, samples, saved answers (view/edit/delete), learned (lessons, voice), readiness
 Fail: YAML write fails → error, file unchanged (atomic)
 E2E-009-01: Given 12 saved answers When delete one Then YAML has 11 and next plan no longer uses it.
 
 ### UC-010 Check a found job
+> UI retired 2026-11-14 (DEC-024): replaced by paste the posting in chat; `/score-job`. Intent unchanged.
 REQs: REQ-114, REQ-115, REQ-116, REQ-111 · Trigger: Jobs › Check a job
 Main: 1 paste/upload JD 2 scan (REQ-109) 3 fit + per-résumé match 4 best ≥ threshold → "use this résumé"
 Alt: none ≥ threshold → offer tailor → result ≥ threshold → use it
@@ -120,6 +128,7 @@ E2E-012-01: Given recorded posting with hidden "ignore previous instructions" Wh
 E2E-012-02: Given fake tailor output containing an unknown URL When qa runs Then hard fail `untrusted_content`.
 
 ### UC-013 Start pipeline with a stop point per job
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros batch create|run`, `/prepare-job`. Intent unchanged.
 REQs: REQ-117, REQ-118, REQ-120 · Pre: jobs ticked (UC-007) · Trigger: Jobs list "Start pipeline"
 Main: 1 review sheet lists ticked jobs, "Go as far as" Fill for all 2 user changes some rows 3 caps shown with reasons 4 Start → batch → progress
 Alt: readiness open → fill/submit rows capped at Prepare; flagged posting → excluded
@@ -129,6 +138,7 @@ E2E-013-01: Given ticked jobs (Tier A, LinkedIn Easy Apply, LinkedIn-found with 
 E2E-013-02: Given `POST /api/batches` with stops {tierA: submit} When run Then Tier A never submitted, reason in batch file.
 
 ### UC-014 First run and next step
+> UI partly retired 2026-11-14 (DEC-024): tour and Next step retired; replaced by `docs/GETTING_STARTED.md`. Intent unchanged.
 REQs: REQ-119, REQ-121, REQ-131 (REQ-122 deprecated, DEC-022) · Trigger: first UI open; Today page
 Main: 1 tour runs once 2 user skips or finishes 3 Today shows setup card until done, then Top picks (UC-015) 4 one click goes there
 Alt: Settings "How to use" restarts the tour

@@ -236,7 +236,7 @@ lifts it. State: `data/runs/schedule.json` (last tick, last run per job).
 **History.** `data/runs/<run_id>/run.json` (kind, trigger, budget, counters, stop reason, timings),
 `attempts/NNN.json` (job, stage, rank, why, session id, outcome, RESULT) + `NNN.stream.jsonl` (raw events),
 `run.log`; `queue-<kind>.json` is the latest ranking. Files are canonical and written atomically; a SQLite index
-for the UI is future work (`docs/UI.md`). `careeros run list|show|status` read them.
+for the UI is future work (the web UI is now a read-only Today + Jobs dashboard, DEC-024, `docs/CHAT.md`). `careeros run list|show|status` read them.
 
 **Storage and advisor.** `careeros storage [--json] [--snapshot]` reports bytes by category (postings,
 résumés/PDFs, screenshots, run logs, tracker, other) and disk free; a snapshot line is appended to
