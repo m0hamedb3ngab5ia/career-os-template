@@ -30,6 +30,8 @@ def get_master_proposal(c=Depends(ctx)) -> MasterProposal:
 def approve_master_proposal(c=Depends(ctx)) -> MasterProposal:
     try:
         return MasterProposal(**master_sync.approve(c.settings.root))
+    except LookupError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
     except (master_sync.Invalid, ValueError) as e:
         raise HTTPException(422, str(e)) from None
 
@@ -38,5 +40,7 @@ def approve_master_proposal(c=Depends(ctx)) -> MasterProposal:
 def reject_master_proposal(c=Depends(ctx)) -> MasterProposal:
     try:
         return MasterProposal(**master_sync.reject(c.settings.root))
+    except LookupError as e:
+        raise HTTPException(404, str(e).strip("'\"")) from None
     except (master_sync.Invalid, ValueError) as e:
         raise HTTPException(422, str(e)) from None
