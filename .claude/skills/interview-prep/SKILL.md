@@ -20,7 +20,7 @@ description: Write interview_prep.md for one job dir. Maps each posting requirem
    bullets never. Cite the ids on each line: `(bullet: <id>)`. Add no detail the bullets do not state.
 5. For each `missing_skills` entry and each skill-type `gaps[]` entry (stated interview focus, domain experience): write
    "no evidence in profile", then 2 to 3 concrete things to study or practise. For logistics gaps (start date, relocation,
-   on-site days, clearance): list them under "Confirm with the employer", no study items. Never an invented story, and
+   on-site days, clearance): list them under "Confirm with the employer", no study items. The note is never an invented story, and
    never stretch an unrelated bullet to cover a gap.
 6. 5 questions to ask the employer, specific to the posting (team, scope, how success is measured).
 7. Write `JOB/interview_prep.md`: sections Company type, Likely questions, STAR outlines, Gaps and what to study,
