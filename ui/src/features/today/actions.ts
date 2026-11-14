@@ -84,8 +84,8 @@ export function taskRow(a: ActionItem): TaskRow {
   const bullet = /\badd real (\w+?)(?:_\w+)? bullets/i.exec(b.head);
   if (bullet || (profile && /placeholder/i.test(a.what))) {
     const emp = bullet?.[1] ?? (a.company && !a.job_id ? a.company : "");
-    return row(`Add ${emp ? `${emp.replace(/^./, (c) => c.toUpperCase())} ` : ""}experience to your profile`, "", "Open", "/profile");
+    return row(`Add ${emp ? `${emp.replace(/^./, (c) => c.toUpperCase())} ` : ""}experience to your profile`, "", "", null);
   }
-  if (profile) return row(plain(b.head) || "Fill a gap in your profile", "", "Open", "/profile");
+  if (profile) return row(plain(b.head) || "Fill a gap in your profile", "", "", null);
   return row(plain(b.head) || "Finish a task", plain(b.more[0] ?? a.detail ?? ""), "Open", job);
 }

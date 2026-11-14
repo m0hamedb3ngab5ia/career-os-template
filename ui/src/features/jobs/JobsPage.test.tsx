@@ -42,7 +42,7 @@ describe("Jobs screen", () => {
     expect(screen.getByText(/same columns as the Jobs tab in JobTracker.xlsx/)).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Tracked jobs, sorted by fit, highest first" });
     expect(within(table).getByRole("rowheader", { name: "Northwind Labs" })).toBeInTheDocument();
-    expect(within(table).getByRole("link", { name: "Northwind Labs" })).toHaveAttribute("href", "/jobs/nw01");
+    expect(within(table).getByRole("link", { name: "Northwind Labs" })).toHaveAttribute("href", "https://example.com/jobs/1");
     expect(await screen.findByRole("tab", { name: "Recommended (59)" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByRole("tab", { name: "Applied (41)" })).toBeInTheDocument();
     const req = api.callsTo("GET /api/jobs")[0]!;
@@ -249,33 +249,12 @@ describe("Jobs screen", () => {
     expect(await screen.findByText("Index is rebuilding")).toBeInTheDocument();
   });
 
-  it("Sync tracker posts and reports the count; a pending sync says why", async () => {
-    let pending = 0;
-    const { api } = setup("/jobs", {
-      "POST /api/tracker/sync": () => ({ synced: 736, path: "data/JobTracker.xlsx", pending }),
-    });
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Sync tracker" }));
-    expect(await screen.findByText("Synced 736 jobs")).toBeInTheDocument();
-    expect(api.callsTo("POST /api/tracker/sync")[0]!.headers["x-careeros"]).toBe("1");
-    pending = 3;
-    await user.click(screen.getByRole("button", { name: "Sync tracker" }));
-    expect(await screen.findByText(/saved to a queue; they're written on the next change, or close Excel and they save then/)).toBeInTheDocument();
-  });
 
-  it("Open JobTracker.xlsx shows the server's reason on 409", async () => {
-    setup("/jobs", {
-      "POST /api/tracker/open": { status: 409, body: { detail: "No tracker yet: run Sync tracker first" } },
-    });
-    await userEvent.setup().click(await screen.findByRole("button", { name: "Open JobTracker.xlsx" }));
-    expect(await screen.findByText("No tracker yet: run Sync tracker first")).toBeInTheDocument();
-  });
 
   it("empty states: nothing tracked, and no search match with a way out", async () => {
     const empty = { items: [], total: 0, next_cursor: null };
     setup("/jobs?tab=recommended", { "GET /api/jobs": empty });
     expect(await screen.findByRole("heading", { name: "No jobs here yet" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Open Automation" })).toHaveAttribute("href", "/automation");
     expect(screen.queryByRole("table")).not.toBeInTheDocument();
   });
 

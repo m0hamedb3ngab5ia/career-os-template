@@ -1,4 +1,4 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockApi, type Call } from "../../test/apiMock";
@@ -36,9 +36,6 @@ function setup(path: string, rows = ROWS, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => vi.stubGlobal("scrollTo", vi.fn()));
 afterEach(() => vi.unstubAllGlobals());
-
-const wide = (on: boolean) =>
-  vi.stubGlobal("matchMedia", (q: string) => ({ matches: on, media: q, addEventListener() {}, removeEventListener() {} }));
 
 describe("Applied stage sub-tabs", () => {
   it("shows Applied · Screening · Interview · Offer · Closed with counts, Closed = rejected + withdrawn, not ghosted", async () => {

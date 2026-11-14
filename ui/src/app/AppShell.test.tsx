@@ -65,9 +65,8 @@ describe("AppShell", () => {
     expect(links).toEqual([
       "Today",
       "Jobs",
-      "Profile",
     ]);
-    for (const g of ["Job search", "More"]) expect(within(nav).getByText(g)).toBeInTheDocument();
+    for (const g of ["Job search"]) expect(within(nav).getByText(g)).toBeInTheDocument();
   });
 
   it("marks the current section and shows its page heading", async () => {
@@ -141,7 +140,7 @@ describe("AppShell", () => {
     });
 
     it("elsewhere the box starts empty", async () => {
-      renderAt("/profile?q=globex");
+      renderAt("/nope?q=globex");
       // the Profile route is lazy-loaded, so the shell appears once it resolves
       const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
       expect(box).toHaveValue("");
