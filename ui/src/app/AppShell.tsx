@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Search, Sun, Table2, UserRound, Zap } from "lucide-react";
+import { Search, Sun, Table2, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
@@ -25,12 +25,6 @@ const NAV: { group: string; items: NavItem[] }[] = [
     items: [
       { to: "/", label: "Today", icon: Sun, end: true, count: (s) => s.counts?.action_items_open },
       { to: "/jobs", label: "Jobs", icon: Table2 },
-    ],
-  },
-  {
-    group: "More",
-    items: [
-      { to: "/profile", label: "Profile", icon: UserRound },
     ],
   },
 ];

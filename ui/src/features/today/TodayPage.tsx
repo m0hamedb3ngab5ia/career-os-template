@@ -8,8 +8,6 @@ import { useNow } from "../../lib/useNow";
 import { errorText, useToday, useTodayStatus } from "./api";
 import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
-import { PausedBanner } from "./PausedBanner";
-import { SetupCard, useSetupOpen } from "./SetupCard";
 import { TopPicks } from "./TopPicks";
 import { formatWhen } from "../../lib/dates";
 import styles from "./Today.module.css";
@@ -21,13 +19,11 @@ export function TodayPage() {
   const status = useTodayStatus();
   const today = useToday();
   const s = status.data;
-  const setupOpen = useSetupOpen();
   const subtitle = today.data ? `${formatLongDate(now)} · ${headline(today.data.actions ?? [])}` : formatLongDate(now);
 
   return (
     <Page title="Today" subtitle={subtitle}>
       <div className={styles.stack}>
-        {s?.paused ? <PausedBanner paused={s.paused} now={now} /> : null}
         {status.isError ? (
           <div className={styles.panel}>
             <EmptyState
@@ -42,8 +38,7 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        {setupOpen ? <SetupCard /> : null}
-        {setupOpen === false ? <TopPicks picks={today.data?.top_picks ?? []} /> : null}
+        <TopPicks picks={today.data?.top_picks ?? []} />
         <NeedsYou />
         {s ? <RecentActivity runs={s.recent_runs ?? []} now={now} /> : null}
         {s ? <JobSearch columns={s.pipeline?.columns ?? []} /> : null}
