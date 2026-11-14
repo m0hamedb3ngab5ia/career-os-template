@@ -173,8 +173,9 @@ Write `JOB/prepare.json`:
 {"job_id": "...", "prepared_at": "<ISO>", "status": "queued|needs_review|skipped", "tier": "B",
  "category": "...", "fit": 78, "regenerations": 0, "qa_pass": true, "qa_mean": 8.2,
  "steps": {"score": {...}, "resume": {...}, "cover_letter": {...}, "qa": {...}},
- "action_items": ["..."], "files": ["score.json", "resume.json", "resume.txt", "resume.tex", "resume.pdf", "cover_letter.md", "cover_letter.txt", "cover_letter.pdf", "qa.json"]}
+ "gaps": [...], "action_items": ["..."], "files": ["score.json", "resume.json", "resume.txt", "resume.tex", "resume.pdf", "cover_letter.md", "cover_letter.txt", "cover_letter.pdf", "qa.json"]}
 ```
+Include `"gaps": [...]` only when `score.json` has a non-empty `gaps[]`: copy it unchanged from `steps.score` (no new Action Item, no status change; omit the key when empty).
 Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [prepare-job] status=<s> tier=<t> fit=<n> qa_pass=<b> regenerations=<n> action_items=<n>`
 (format `- YYYY-MM-DD HH:MM:SS [<skill>] <message>`, local time, identical to `store.append_log`; e.g. `date '+%F %T'`).
 
@@ -195,4 +196,4 @@ If the CLI is unavailable the caller applies them from RESULT.
 
 ## Finish: RESULT (last line)
 
-`RESULT: {"skill":"prepare-job","job_id":"...","status":"queued","tier":"B","category":"swe_backend","fit":78,"decision":"prepare","skip_reason":null,"qa_pass":true,"qa_mean":8.2,"regenerations":0,"cover_letter":true,"files":["..."],"ACTION_ITEMS":["..."],"outreach":null,"urgent":false,"closes_at":null}`
+`RESULT: {"skill":"prepare-job","job_id":"...","status":"queued","tier":"B","category":"swe_backend","fit":78,"decision":"prepare","skip_reason":null,"qa_pass":true,"qa_mean":8.2,"regenerations":0,"cover_letter":true,"files":["..."],"gaps":["..."],"ACTION_ITEMS":["..."],"outreach":null,"urgent":false,"closes_at":null}`
