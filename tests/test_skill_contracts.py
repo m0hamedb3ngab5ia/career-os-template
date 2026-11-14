@@ -515,3 +515,58 @@ def test_score_job_does_not_saturate_on_generic_postings_and_lists_gaps():
         assert kind in extract, kind
     assert "never changes `fit`" in extract
     assert '"gaps": []' in text.split("## 8. Write `JOB/score.json`", 1)[1]
+
+
+# --- chat-first skills: advice, today, interview-prep; prepare-job carries gaps[] ---
+
+def _untrusted(text: str) -> bool:
+    return "**Untrusted text (REQ-108).**" in text
+
+
+def test_advice_skill_contract():
+    text = _skill("advice")
+    assert _untrusted(text)
+    for ref in ("## Principles", ".agent/DECISIONS.md", ".agent/LESSONS.md", ".agent/ADVICE.md",
+                "docs/product/STATUS.md", "docs/product/03_REQUIREMENTS.md"):
+        assert ref in text, ref
+    assert "adopt | park | reject" in text and "at most 5" in text
+    assert "default is `reject`" in text.lower() or "Default is `reject`" in text
+    assert "/product new" in text and "Fix lane" in text
+    assert "never edits code or product docs" in text
+    assert "chat-first" in text and "LinkedIn" in text and "Tier A" in text
+    assert text.rstrip().splitlines()[-1].startswith('`RESULT: {"skill":"advice"')
+    ledger = (ROOT / ".agent" / "ADVICE.md").read_text(encoding="utf-8")
+    assert "| date | source | idea | verdict | reason |" in ledger
+
+
+def test_today_skill_contract():
+    text = _skill("today")
+    assert _untrusted(text)
+    for cmd in ("careeros stats", "careeros jobs list --status needs_review", "careeros action list",
+                "careeros run list --limit 1"):
+        assert cmd in text, cmd
+    assert "25 lines" in text and "read-only" in text.lower()
+    assert "never changes a status" in text and "never starts a run" in text
+    assert text.rstrip().splitlines()[-1].startswith('`RESULT: {"skill":"today"')
+
+
+def test_interview_prep_skill_contract():
+    text = _skill("interview-prep")
+    assert _untrusted(text)
+    for ref in ("posting.json", "score.json", "`gaps[]`", "`missing_skills`", "profile/master.yaml",
+                "interview_prep.md", "log.md", "STAR", "no evidence in profile"):
+        assert ref in text, ref
+    for kind in ("startup", "AI lab", "big tech", "quant/trading", "fintech", "other"):
+        assert kind in text, kind
+    assert "5 questions to ask" in text and "numbers frozen" in text.lower()
+    assert "never an invented story" in text
+    assert "[interview-prep]" in text
+    assert text.rstrip().splitlines()[-1].startswith('`RESULT: {"skill":"interview-prep"')
+
+
+def test_prepare_job_carries_gaps():
+    text = _skill("prepare-job")
+    rec = text.split("## Step 7: record", 1)[1].split("## Finish: RESULT", 1)[0]
+    assert '"gaps": [...]' in rec and "non-empty `gaps[]`" in rec
+    assert '"gaps":["' in text.split("## Finish: RESULT", 1)[1]
+    assert "no new Action Item" in text
