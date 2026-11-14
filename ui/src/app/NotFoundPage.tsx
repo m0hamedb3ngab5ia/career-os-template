@@ -1,6 +1,6 @@
-import { Page } from "../../app/PageHeader";
-import { EmptyState } from "../../kit/EmptyState";
-import { ButtonLink } from "../../kit/Button";
+import { Page } from "./PageHeader";
+import { EmptyState } from "../kit/EmptyState";
+import { ButtonLink } from "../kit/Button";
 
 export function NotFoundPage() {
   return (

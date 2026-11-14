@@ -17,7 +17,6 @@ import { Card } from "./Card";
 import { DocumentsCard, QaCard } from "./DocumentsCard";
 import { OverrideMenu, StatusMenu, WithdrawButton } from "./HeaderActions";
 import styles from "./JobDetail.module.css";
-import { PipelineCard } from "./PipelineCard";
 import { PostingCard } from "./PostingCard";
 import { SafetyCard } from "./SafetyCard";
 import { ScoreCard } from "./ScoreCard";
@@ -112,9 +111,7 @@ function Detail({ jobId, detail, embedded }: { jobId: string; detail: JobDetail;
           />
         ) : null}
         {detail.job?.injection ? <InjectionCard jobId={jobId} reasons={detail.job.injection} /> : null}
-        <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline}>
-          <PipelineCard jobId={jobId} />
-        </PostingCard>
+        <PostingCard jobId={jobId} detail={detail} pipeline={meta.data?.pipeline} />
         {/* Work column (act on it) beside a reference sidebar; each column stacks, so cards never leave grid gaps. */}
         <div className={styles.supporting}>
           <div className={styles.col}>

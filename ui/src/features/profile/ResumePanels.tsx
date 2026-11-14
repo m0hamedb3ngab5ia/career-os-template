@@ -1,10 +1,8 @@
 import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
 import { Button } from "../../kit/Button";
 import { Dialog } from "../../kit/Dialog";
 import { TextInput } from "../../kit/inputs";
-import { useResume } from "../runs/api";
 import { errorText } from "../today/api";
 import {
   applyFeedback, approveMaster, refreshMaster, useLearnRun, useMasterRun, retryReview, commentFeedback, dismissFeedback, rejectMaster, useFeedback, useMasterProposal, useProfileWrite, useResumeVersion,
@@ -206,7 +204,6 @@ export function ResumeFeedback({ rid, latest, master }: { rid: string; latest: n
   const mrun = useMasterRun(mp?.state === "stale");
   const readFailed = !!master && mp?.state === "stale" && !mrun.isPending && mrun.data?.runs[0]?.state !== "running";
   const retry = useProfileWrite(retryReview);
-  const resumeRuns = useResume();
   const [shown, setShown] = useState<FeedbackItem[] | null>(null);
   if (!data || (!data.review && !data.items.length)) return null;
   const open = data.items.filter((i) => i.state === "open").length;
@@ -215,13 +212,12 @@ export function ResumeFeedback({ rid, latest, master }: { rid: string; latest: n
   const live = shown?.map((s) => data.items.find((d) => d.id === s.id) ?? s);
   return (
     <div className={styles.full}>
-      {data.review?.state === "running" ? <p role="status" className={styles.muted}>Reviewing this résumé…{data.review.run ? <> <Link to={`/runs/${encodeURIComponent(data.review.run)}`}>See progress</Link></> : null}</p> : null}
+      {data.review?.state === "running" ? <p role="status" className={styles.muted}>Reviewing this résumé…</p> : null}
       {data.review?.state === "failed" && !(readFailed && !/paused/.test(data.review.reason ?? "")) ? (
         <p role="status" className={styles.muted}>
           {data.review.reason ? `The review couldn’t start: ${data.review.reason.replace(/^review run not started: /, "")}.` : "We couldn’t process this résumé."}{" "}
           {/paused/.test(data.review.reason ?? "") ? (
-            <Button size="small" variant="primary" pending={resumeRuns.isPending || retry.isPending} pendingLabel="Starting…"
-              onClick={() => resumeRuns.mutate(undefined, { onSuccess: () => retry.mutate(rid) })}>Resume runs and review</Button>
+            <span>Runs are paused. Ask Claude to resume them, then retry.</span>
           ) : (
             <Button size="small" pending={retry.isPending} pendingLabel="Starting…" onClick={() => retry.mutate(rid)}>Retry</Button>
           )}

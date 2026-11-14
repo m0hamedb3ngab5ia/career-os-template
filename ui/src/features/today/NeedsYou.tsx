@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from "react";
-import { Link } from "react-router";
 import { Button, ButtonLink } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { useToast } from "../../kit/Toast";
@@ -59,9 +58,6 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
         <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className={styles.h2}>
           Needs your attention {today.data ? <span className={`${styles.count} tabular`}>{formatCount(shown.length)}</span> : null}
         </h2>
-        <Link to="/actions" className={styles.headLink}>
-          View all tasks
-        </Link>
       </div>
       {today.isPending ? (
         <div className={styles.skeletonBlock} aria-label="Loading tasks" role="img" />
@@ -106,7 +102,7 @@ function TaskRowItem({ item, onDone }: { item: ActionItem; onDone: (item: Action
             Mark done
           </button>
         )}
-        <ButtonLink to={r.href}>{r.cta}</ButtonLink>
+        {r.href ? <ButtonLink to={r.href}>{r.cta}</ButtonLink> : null}
       </div>
     </li>
   );

@@ -4,7 +4,6 @@ import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
 import { SelectInput, TextInput } from "../../kit/inputs";
 import { useToast } from "../../kit/Toast";
-import { optionLabel } from "../settings/format";
 import { errorText, useApproveFillField, useEditFillField, useFillPlan, useMakeFillPlan, type FillField } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -157,7 +156,7 @@ export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; at
       </span>
     ) : null}>
       {!plan && ats && ats !== "greenhouse" ? (
-        <p>career-os can preview and fill only Greenhouse postings; this one is on {optionLabel(ats)}. Apply on the posting's own page.</p>
+        <p>career-os can preview and fill only Greenhouse postings; this one is on {ats}. Apply on the posting's own page.</p>
       ) : !plan ? (
         <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}{why}</p>
       ) : (

@@ -1,4 +1,4 @@
-import { Download, FileSearch, RotateCw, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
+import { Download, FileSearch, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router";
 import { useWide } from "./useWide";
@@ -20,9 +20,6 @@ import { JobDetailPage } from "../job-detail/JobDetailPage";
 import { JobsList, NotScoredList } from "./JobsCards";
 import cardStyles from "./JobsCards.module.css";
 import { JobsTable } from "./JobsTable";
-import { StartPipeline } from "./StartPipeline";
-import { useStepRun } from "../runs/useStepRun";
-import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
 import { DEFAULT_SORT, STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
@@ -50,19 +47,8 @@ function HeaderActions() {
   const sync = useSyncTracker();
   const open = useOpenTracker();
   const [checking, setChecking] = useState(false);
-  const scout = useStepRun("scout", undefined, (run) => {
-    if (run.stop_reason !== "cancelled") toast.show({ message: run.stop_reason === "completed" ? "Finished looking for jobs." : `Job search stopped: ${run.detail || run.stop_reason}` });
-  });
   return (
     <>
-      <Button
-        icon={<RotateCw size={14} strokeWidth={1.7} aria-hidden="true" />}
-        pending={scout.start.isPending || scout.running}
-        pendingLabel="Finding jobs…"
-        onClick={() => scout.start.mutate(undefined, { onError: (e) => toast.show({ message: `Couldn’t start the job search: ${errorText(e)}` }) })}
-      >
-        Find jobs now
-      </Button>
       <Button variant="primary" icon={<FileSearch size={14} strokeWidth={1.7} aria-hidden="true" />} onClick={() => setChecking(true)}>
         Check a job
       </Button>
@@ -256,17 +242,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
 
   const serverTabs = new Map((tabs.data?.tabs ?? []).map((t) => [t.key, t]));
   const nSel = selected.size;
-  const [reviewing, setReviewing] = useState(false);
-  const startRef = useRef<HTMLButtonElement>(null);
-  const wasReviewing = useRef(false);
-  // Unticking every job ends the review, so ticking the next one doesn't reopen it; Back refocuses Start pipeline.
-  useEffect(() => {
-    if (!nSel) setReviewing(false);
-  }, [nSel]);
-  useEffect(() => {
-    if (wasReviewing.current && !reviewing) startRef.current?.focus();
-    wasReviewing.current = reviewing;
-  }, [reviewing]);
 
   function onExport() {
     const cols = ["job_id", ...columns.map((c) => c.exportField)];
@@ -382,15 +357,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       subtitle="Every tracked posting · same columns as the Jobs tab in JobTracker.xlsx"
       actions={<HeaderActions />}
     >
-      {reviewing && nSel > 0 ? (
-        <StartPipeline
-          ids={[...selected]}
-          rows={rows.filter((r) => selected.has(r.job_id))}
-          onToggle={onToggle}
-          onUntick={(drop) => setSelected([...selected].filter((id) => !drop.includes(id)))}
-          onClose={() => setReviewing(false)}
-        />
-      ) : (
       <div className={styles.stack}>
         <div className={styles.toolbar}>
           <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey, selected: [] })} controls={panelId}>
@@ -441,17 +407,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               </>
             ) : null}
           </div>
-          <span hidden={tab !== "saved"}>
-            {nSel > 0 ? (
-              <Button ref={startRef} size="small" variant="primary" onClick={() => setReviewing(true)}>
-                Start pipeline
-              </Button>
-            ) : (
-              <UnavailableButton size="small" variant="primary" reason="Tick jobs first">
-                Start pipeline
-              </UnavailableButton>
-            )}
-          </span>
           {tab === "notscored" ? null : (<>
           <SegmentedControl label="View" value={mode} onValueChange={(v) => chooseView(v as ViewKey)}>
             {VIEWS.filter((v) => v !== "board" || tab === "applied").map((v) => (
@@ -535,7 +490,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         ) : null}
         </div>
       </div>
-      )}
     </Page>
   );
 }

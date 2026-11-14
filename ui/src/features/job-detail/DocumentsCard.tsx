@@ -1,6 +1,5 @@
-import { useQueryClient } from "@tanstack/react-query";
 import { FileText, FolderOpen } from "lucide-react";
-import { useId, useState } from "react";
+import { useId } from "react";
 import { Button } from "../../kit/Button";
 import { Chip } from "../../kit/chips";
 import { Details } from "../../kit/Details";
@@ -8,7 +7,6 @@ import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatBytes, formatCount, formatDate, formatDecimal } from "../../lib/format";
 import { help } from "./actionHelp";
-import { useStepRun } from "../runs/useStepRun";
 import { errorText, fileUrl, useOpenFolder } from "./api";
 import { Card } from "./Card";
 import styles from "./JobDetail.module.css";
@@ -109,19 +107,8 @@ export function plainQaReason(reason: string): string {
   return fn ? fn(reason.slice(i + 2)) : reason;
 }
 
-export function QaCard({ jobId, qa, nested, resumeChoice }: { jobId: string; qa: Qa | null; nested?: boolean; resumeChoice?: string | null }) {
-  const toast = useToast();
-  const qc = useQueryClient();
-  // DEC-021: QA failed a reused résumé; rerun prepare with a full tailor, then refetch the job (new QA + choice)
-  const tailor = useStepRun("prepare", jobId, (run) => {
-    if (run.stop_reason !== "completed" && run.stop_reason !== "cancelled") toast.show({ message: run.detail || "Tailoring did not finish." });
-    void qc.invalidateQueries({ queryKey: ["job", jobId] });
-  }, "force_tailor=true");
-  const [result, setResult] = useState<QaRun | null>(null);
-  const rerun = useStepRun("qa", jobId, (run) => {
-    if (run.stop_reason === "completed" && run.result) setResult(run.result as unknown as QaRun);
-    else if (run.stop_reason !== "cancelled") toast.show({ message: run.detail || "QA did not finish." });
-  });
+export function QaCard({ qa, nested }: { jobId?: string; qa: Qa | null; nested?: boolean; resumeChoice?: string | null }) {
+  const result: QaRun | null = null;
   const rubric = Object.entries(qa?.rubric ?? {});
   const verdict = qa ? (qa.pass ? <Chip tone="green">Passed</Chip> : <Chip tone="red">Failed</Chip>) : <Chip tone="gray">Not reviewed</Chip>;
   const meanText = [
@@ -170,38 +157,6 @@ export function QaCard({ jobId, qa, nested, resumeChoice }: { jobId: string; qa:
           ) : null}
         </Details>
       ) : null}
-      <div className={styles.buttons}>
-        {qa && !qa.pass && resumeChoice === "reuse" && !tailor.running ? (
-          <Button size="small" disabled={rerun.running} pending={tailor.start.isPending} pendingLabel="Starting…"
-            onClick={() => tailor.start.mutate(undefined, {
-              onSuccess: () => toast.show({ message: "Tailoring started. QA runs again when it finishes." }),
-              onError: (e) => toast.show({ message: errorText(e) }),
-            })}>
-            Tailor instead
-          </Button>
-        ) : null}
-        {rerun.running ? (
-          <>
-            <span className={styles.caption}>Running QA…</span>
-            <Button size="small" onClick={() => rerun.stop()}>
-              Stop
-            </Button>
-          </>
-        ) : (
-          <Button
-            size="small"
-            {...help("rerunQa")}
-            pending={rerun.start.isPending}
-            pendingLabel="Starting…"
-            onClick={() => {
-              setResult(null);
-              rerun.start.mutate(undefined, { onError: (e) => toast.show({ message: errorText(e) }) });
-            }}
-          >
-            Re-run QA
-          </Button>
-        )}
-      </div>
       <div role="status" aria-live="polite">
         {result ? <QaSummary run={result} /> : null}
       </div>

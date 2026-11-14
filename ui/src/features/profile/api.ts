@@ -1,8 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { apiFetch, apiSend } from "../../api/client";
 import type { components } from "../../api/schema.gen";
-import { runKeys } from "../runs/api";
-import type { HistoryPage, RunDetail } from "../runs/types";
 
 export type SavedAnswer = components["schemas"]["SavedAnswer"];
 export type SampleChange = components["schemas"]["SampleChange"];
@@ -78,8 +76,8 @@ export async function uploadSamples(files: File[]): Promise<SampleChange> {
 /** Follow the learn-voice run the last sample change started, until it ends. */
 export const useLearnRun = (id: string | null | undefined) =>
   useQuery({
-    queryKey: runKeys.detail(id ?? ""),
-    queryFn: () => apiFetch<RunDetail>(`/api/runs/${encodeURIComponent(id ?? "")}`),
+    queryKey: ["run", id ?? ""],
+    queryFn: () => apiFetch<components["schemas"]["RunDetail"]>(`/api/runs/${encodeURIComponent(id ?? "")}`),
     enabled: !!id,
     refetchInterval: (q) => (q.state.data && q.state.data.state !== "running" ? false : 1000),
     retry: (n) => n < 30, // the record appears once the spawned step starts
@@ -102,7 +100,7 @@ export const useMasterProposal = (reading: boolean) =>
 export const useMasterRun = (stale: boolean) =>
   useQuery({
     queryKey: ["profile", "master", "run"],
-    queryFn: () => apiFetch<HistoryPage>("/api/runs?kind=extract_master&limit=1"),
+    queryFn: () => apiFetch<components["schemas"]["HistoryPage"]>("/api/runs?kind=extract_master&limit=1"),
     enabled: stale,
     refetchInterval: (q) => (q.state.data?.runs[0]?.state === "running" ? 5000 : false),
   });

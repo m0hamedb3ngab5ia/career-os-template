@@ -3,7 +3,6 @@ import { Button } from "../../kit/Button";
 import { StatusChip } from "../../kit/chips";
 import { formatCount, formatDate } from "../../lib/format";
 import styles from "./JobsCards.module.css";
-import { useSection } from "../settings/api";
 import { reasonsLine } from "./reasons";
 import type { JobListItem, TabKey } from "./types";
 
@@ -72,14 +71,12 @@ export function JobsList({ rows, tab, selected, onToggle, current }: ListProps) 
   );
 }
 
-// REQ-136 reasons follow pipeline.yaml `scoring` (TASK-039), read from Settings › Runs; these are its defaults until it loads.
+// REQ-136 reasons follow pipeline.yaml `scoring` (TASK-039), read from pipeline.yaml; these are its defaults until it loads.
 const SCORING_DEFAULTS = { minPrescore: 20, staleDays: 21 };
 type ScoringCfg = typeof SCORING_DEFAULTS;
 
 function useScoringCfg(): ScoringCfg {
-  const v = useSection("runs").data?.values ?? {};
-  const num = (x: unknown, d: number) => (typeof x === "number" ? x : d);
-  return { minPrescore: num(v["scoring.min_prescore"], SCORING_DEFAULTS.minPrescore), staleDays: num(v["scoring.stale_days"], SCORING_DEFAULTS.staleDays) };
+  return SCORING_DEFAULTS;
 }
 
 /** Why an unscored job is still unscored: below the quick-match cutoff, an older posting (scored after newer ones), else queued. */
