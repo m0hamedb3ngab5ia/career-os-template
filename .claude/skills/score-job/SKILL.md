@@ -156,7 +156,7 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 component in `fit_reasons[]`. Each is a proper sentence a person reads in the UI's "Why" list: capitalized, ends
 with a period, no internal keys or point tallies (never `-> skills_overlap 20/40`), e.g.
 "Skills: 7 of 10 required matched; missing Go, Kafka and Terraform." / "Seniority: early-career role, a match." /
-"Location: remote, allowed."
+"Location: remote, allowed." / with fewer than 3 named skills: "Skills: the posting names too few technologies to score; neutral."
 
 ## 6. Tier
 
