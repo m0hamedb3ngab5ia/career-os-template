@@ -161,25 +161,31 @@ Changed 2026-10-13 (DEC-022), to-be, one column: setup card (REQ-131, only until
 Given setup done, 4 new picks · When open Today · Then order Top picks → Needs you; no setup card, no Next step card.
 observed · Evidence: ui/src/app/routes.tsx:12, routers/today.py · Tests: tests/test_ui_today_jobs.py
 ### REQ-072 Jobs list + detail actions
+> UI partly retired 2026-11-14 (DEC-024): job detail page retired; replaced by `careeros job show <id>`; Jobs list and tick stay. Intent unchanged.
 Tabs, facets, export, files, status/withdraw/submitted/override, safety verify/flag/clear, fill application.
 Changed 2026-10-13 (DEC-022): tabs = REQ-128, views = REQ-129, card = REQ-130; detail actions above unchanged, shown in the detail pane and at `/jobs/:id`. Tracker lives here (no Pipeline page).
 Given `/jobs` · When open · Then Recommended tab, List view, first job's detail in the right pane.
 observed · Evidence: src/careeros/ui/routers/jobs.py · Tests: tests/test_ui_job_pipeline.py
 ### REQ-073 Action Items page
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude what needs you; `careeros action list`, `action done <id>`. Intent unchanged.
 Bulk done/reopen, answer, due, block/unblock company, mark-safe + undo.
 observed · Evidence: routers/actions.py:65-147 · Tests: tests/test_ui_actions_service.py
 ### REQ-074 Pipeline + batch builder
 Deprecated 2026-10-13 (DEC-022): Pipeline page folded into Jobs › Applied › Board (REQ-129). `/pipeline` redirects to `/jobs?tab=applied&view=board`. Batch progress `/pipeline/batch/:id` stays (REQ-117).
 observed · Evidence: batches.py, app.py (`/pipeline` 308) · Tests: tests/test_ui_pipeline_redirect.py
 ### REQ-075 Automation (runs) page
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros run list|show|status|pause`. Intent unchanged.
 Runs list/detail/stream, steps, cancel/pause/resume/catch-up, schedule control.
 observed · Evidence: routers/runs.py · Tests: tests/test_ui_runs_service.py, test_ui_runs_view.py
 ### REQ-076 Settings without YAML
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude to change a value in `config/*.yaml`. Intent unchanged.
 Schema-driven forms per section, diff, reset, ranking preview; storage & advise.
 observed · Evidence: routers/settings.py, storage.py · Tests: tests/test_ui_settings_routes.py, test_settings_schema.py
 ### REQ-077 Contacts + Inbox pages (read + mark)
+> UI retired 2026-11-14 (DEC-024): replaced by `/inbox-sync`, `/find-contacts`, `careeros outreach check`. Intent unchanged.
 observed · Evidence: routers/contacts.py, inbox.py · Tests: tests/test_ui_contacts_inbox.py
 ### REQ-078 Component kit page in prod routes
+> UI retired 2026-11-14 (DEC-024): replaced by none (dev-only page removed). Intent unchanged.
 `/kit` stays, hidden from nav (dev-only) (Q-006).
 confirmed · Evidence: ui/src/app/routes.tsx:28
 ### REQ-079 Phone-width layout + phone companion

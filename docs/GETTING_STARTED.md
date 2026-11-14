@@ -113,21 +113,16 @@ To change what scout keeps:
 
 Opens a browser at `http://127.0.0.1:8765` (loopback only; add `--host` and it refuses to start). `data/careeros.db`
 is a disposable index built from the files above; delete it or pass `--reindex` any time and it rebuilds. One
-screen per stage of the pipeline:
+read-only dashboard with two screens (DEC-024); everything else is done in Claude chat or the CLI, see [docs/CHAT.md](CHAT.md):
 
 | Screen | Shows |
 |---|---|
-| Today | stat row, open Action Items, upcoming runs, missed-run catch-up banner |
-| Jobs | the tracker's Jobs tab as a live, filterable table |
-| Job detail | status, safety verdict, score, documents, apply session, contacts, log |
-| Action Items | every open item, grouped by due date, with a Done control |
-| Pipeline | a board, one column per stage, drag to change status |
-| Runs | live and past scout / score / prepare / inbox-sync runs, with cancel and pause |
-| Contacts | outreach drafts, relationship badges, sent/replied |
-| Inbox | applied jobs with inbox-sync classification and follow-up drafts |
-| Settings | every config file as forms, including Storage & efficiency |
+| Today | what needs you, top picks (read-only) |
+| Jobs | the jobs table and board, with job ticking |
 
-See [docs/UI.md](UI.md) for the full design.
+Retired pages (Job detail, Action Items, Runs, Contacts, Inbox, Settings, Profile, résumé workspace) are covered in CHAT.md.
+
+[docs/UI.md](UI.md) is the earlier full-UI design; Today and Jobs only still apply.
 
 ## 8. Prepare one job
 

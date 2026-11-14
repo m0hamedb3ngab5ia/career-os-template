@@ -1,3 +1,5 @@
+> RETIRED 2026-11-14 (DEC-024): this page was removed from the UI; kept as history. CLI/chat equivalents: docs/CHAT.md.
+
 # Profile › Résumés
 
 A user uploads a PDF or DOCX résumé; it is stored as a versioned résumé (first one becomes master), shown in the Résumés list, parsed into an ATS view, reviewed by an LLM for feedback items, and edited through suggestion apply.

@@ -1,3 +1,5 @@
+> RETIRED 2026-11-14 (DEC-024): this page was removed from the UI; kept as history. CLI/chat equivalents: docs/CHAT.md.
+
 # Settings
 
 Edit config (targets, autonomy, Claude, files, appearance) through forms with a save bar.
