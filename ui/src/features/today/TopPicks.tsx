@@ -1,9 +1,5 @@
-import { useState } from "react";
 import { Link } from "react-router";
-import { Button, ButtonLink } from "../../kit/Button";
-import { useToast } from "../../kit/Toast";
-import { useMeta } from "../../api/meta";
-import { errorText, usePipeline, useResetFailures, useSetStatus, useStartPipeline } from "../job-detail/api";
+import { ButtonLink } from "../../kit/Button";
 import { formatRelative } from "../../lib/format";
 import type { components } from "../../api/schema.gen";
 import styles from "./Today.module.css";
@@ -19,7 +15,7 @@ export function reasonsLine(r: Pick["reasons"]): string {
   return `${head} · missing: ${r.missing.slice(0, 2).join(", ")}${more}`;
 }
 
-/** REQ-127: best-fit new jobs from GET /api/today `top_picks`; a card opens that job. */
+/** REQ-127: best-fit new jobs from GET /api/today `top_picks`; a card opens the posting. */
 export function TopPicks({ picks }: { picks: Pick[] }) {
   return (
     <section className={styles.panel} aria-labelledby="picks-title">
@@ -43,67 +39,25 @@ export function TopPicks({ picks }: { picks: Pick[] }) {
   );
 }
 
-/** One pick: the body opens the job; Prepare starts its one-job run (REQ-127), Skip offers Undo, a failed run shows
- * its cause and Retry. State comes from the Jobs page's own endpoints (GET/POST /api/jobs/{id}/pipeline, /status). */
+/** One pick: read-only. Title links to the posting when it has a URL (external), else plain text. */
 function PickCard({ pick: p }: { pick: Pick }) {
-  const id = p.job_id;
-  const toast = useToast();
-  const undoSeconds = useMeta().data?.ui?.undo_seconds;
-  const start = useStartPipeline(id);
-  const setStatus = useSetStatus(id);
-  const reset = useResetFailures(id);
-  const pipe = usePipeline(id, start.isSuccess);
-  const [skipped, setSkipped] = useState(false);
-  const failure = pipe.data?.failures?.kind === "prepare" ? pipe.data.failures : null;
-  const blocked = failure ? null : pipe.data?.blocked_reason;
-  const newRun = start.isSuccess && start.data.run_id !== failure?.last_run;
-  const preparing = Boolean(pipe.data?.active_run_id) || reset.isPending || start.isPending || newRun;
-  const startIt = () => start.mutate({ action: "start" }, { onError: (e) => toast.show({ message: `Couldn’t start: ${errorText(e)}` }) });
-  // Out of attempts: runs skip the job until its failures are reset, so Retry resets first (else always 409).
-  const runIt = () => failure?.excluded
-    ? reset.mutate("prepare", { onSuccess: startIt, onError: (e) => toast.show({ message: `Couldn’t reset: ${errorText(e)}` }) })
-    : startIt();
-
-  function skip() {
-    setStatus.mutate({ status: "skipped" }, {
-      onSuccess: (res) => {
-        setSkipped(true);
-        toast.show({
-          message: `Skipped ${p.title}.`,
-          seconds: undoSeconds,
-          onUndo: () => setStatus.mutate({ status: res.previous ?? "scored" }, {
-            onSuccess: () => setSkipped(false),
-            onError: (e) => toast.show({ message: `Couldn’t undo: ${errorText(e)}` }),
-          }),
-        });
-      },
-      onError: (e) => toast.show({ message: `Couldn’t skip: ${errorText(e)}` }),
-    });
-  }
-
-  if (skipped) return null;
+  const body = (
+    <>
+      <span className={styles.fit} aria-label={`Fit ${p.fit ?? "unknown"}`}>{p.fit ?? "–"}</span>
+      <span className={styles.grow}>
+        <span className={styles.strong}>{p.title}</span>
+        <span className={styles.caption}>{[p.company, p.location, formatRelative(p.found_at)].filter(Boolean).join(" · ")}</span>
+        <span className={styles.caption}>{reasonsLine(p.reasons)}</span>
+      </span>
+    </>
+  );
   return (
     <li>
-      <Link to={`/jobs/${encodeURIComponent(id)}`} className={styles.pick}>
-        <span className={styles.fit} aria-label={`Fit ${p.fit ?? "unknown"}`}>{p.fit ?? "–"}</span>
-        <span className={styles.grow}>
-          <span className={styles.strong}>{p.title}</span>
-          <span className={styles.caption}>{[p.company, p.location, formatRelative(p.found_at)].filter(Boolean).join(" · ")}</span>
-          <span className={styles.caption}>{reasonsLine(p.reasons)}</span>
-        </span>
-      </Link>
-      <div className={styles.oneLine}>
-        {preparing ? (
-          <span role="status">Preparing…</span>
-        ) : (
-          <>
-            {failure && <span className={styles.caption}>Prepare failed: {failure.last_detail || failure.last_outcome || "unknown cause"}</span>}
-            {blocked && <span className={styles.caption}>{blocked}</span>}
-            <Button variant="primary" size="small" onClick={runIt} disabled={Boolean(blocked)}>{failure ? "Retry" : "Prepare"}</Button>
-            <Button size="small" onClick={skip} pending={setStatus.isPending}>Skip</Button>
-          </>
-        )}
-      </div>
+      {p.url ? (
+        <a href={p.url} target="_blank" rel="noopener noreferrer" className={styles.pick}>{body}</a>
+      ) : (
+        <div className={styles.pick}>{body}</div>
+      )}
     </li>
   );
 }

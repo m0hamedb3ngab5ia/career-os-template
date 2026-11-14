@@ -1,9 +1,8 @@
-import { fireEvent, screen, waitFor, within } from "@testing-library/react";
+import { screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockApi, type Call } from "../../test/apiMock";
 import { renderApp } from "../../test/renderApp";
-import { detail } from "../job-detail/fixtures";
 import { META, TABS_REPLY, job } from "./fixtures";
 
 const ROWS = [
@@ -28,8 +27,6 @@ function setup(path: string, rows = ROWS, extra: Record<string, unknown> = {}) {
     "GET /api/jobs": () => ({ items: rows, total: rows.length, next_cursor: null }),
     "GET /api/jobs/tabs": TABS_REPLY,
     "GET /api/jobs/facets": FACETS,
-    "GET /api/jobs/a1": detail({ posting: { ...detail().posting, company: "Acme" } }),
-    "GET /api/jobs/b2": detail({ posting: { ...detail().posting, company: "Borealis" } }),
     "GET /api/ui-state": { tour_done: true },
     "PUT /api/ui-state": (c: Call) => c.body,
     ...extra,
@@ -39,9 +36,6 @@ function setup(path: string, rows = ROWS, extra: Record<string, unknown> = {}) {
 
 beforeEach(() => vi.stubGlobal("scrollTo", vi.fn()));
 afterEach(() => vi.unstubAllGlobals());
-
-const wide = (on: boolean) =>
-  vi.stubGlobal("matchMedia", (q: string) => ({ matches: on, media: q, addEventListener() {}, removeEventListener() {} }));
 
 describe("Applied stage sub-tabs", () => {
   it("shows Applied · Screening · Interview · Offer · Closed with counts, Closed = rejected + withdrawn, not ghosted", async () => {
@@ -72,30 +66,6 @@ describe("Applied stage sub-tabs", () => {
   });
 });
 
-describe("List master-detail", () => {
-  it("opens a job at /jobs/:id keeping tab/view, with the detail beside the list", async () => {
-    wide(true);
-    const user = userEvent.setup();
-    const { router } = setup("/jobs?tab=applied&view=list");
-    await user.click(await screen.findByRole("link", { name: /Borealis/ }));
-    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/b2"));
-    expect(router.state.location.search).toContain("tab=applied");
-    expect(await screen.findByRole("heading", { name: "Borealis", level: 2 })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /Acme/ })).toBeInTheDocument();
-    await router.navigate(-1);
-    // Wide List with no job open falls back to the first job (a1) rather than an empty pane.
-    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/a1"));
-    await waitFor(() => expect(screen.queryByRole("heading", { name: "Borealis", level: 2 })).not.toBeInTheDocument());
-  });
-
-  it("is a full page under 900px", async () => {
-    wide(false);
-    setup("/jobs/a1?tab=applied");
-    expect(await screen.findByRole("heading", { name: "Acme", level: 1 }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Borealis/ })).not.toBeInTheDocument();
-  });
-});
-
 describe("Needs you", () => {
   it("flags prepared jobs and jobs with an open Action Item, not plain saved ones", async () => {
     setup("/jobs?tab=saved", [
@@ -106,22 +76,6 @@ describe("Needs you", () => {
     expect((await screen.findByRole("link", { name: /Prep/ })).closest("li")).toHaveAttribute("data-needs-you", "true");
     expect(screen.getByRole("link", { name: /Action/ }).closest("li")).toHaveAttribute("data-needs-you", "true");
     expect(screen.getByRole("link", { name: /Plain/ }).closest("li")).not.toHaveAttribute("data-needs-you");
-  });
-});
-
-describe("Board drag to Applied", () => {
-  it("is refused without calling /status: applying goes through /submitted", async () => {
-    const { api } = setup("/jobs?tab=applied&view=board", ROWS, {
-      "POST /api/jobs/b2/status": { job_id: "b2", status: "applied" },
-    });
-    const applied = await screen.findByRole("region", { name: "Applied" });
-    const card = screen.getByText("Borealis").closest("[draggable]")!;
-    const dataTransfer = { setData: vi.fn(), getData: () => "b2", effectAllowed: "" };
-    fireEvent.dragStart(card, { dataTransfer });
-    fireEvent.drop(applied, { dataTransfer });
-    expect(await screen.findByText(/becomes Applied when its application is submitted/)).toBeInTheDocument();
-    expect(api.callsTo("POST /api/jobs/b2/status")).toHaveLength(0);
-    expect(within(screen.getByRole("region", { name: "Interview" })).getByText("Borealis")).toBeInTheDocument();
   });
 });
 
@@ -144,14 +98,5 @@ describe("review fixes", () => {
     await user.click(screen.getByRole("tab", { name: /^Applied/ }));
     await waitFor(() => expect(router.state.location.search).toContain("tab=applied"));
     expect(router.state.location.search).not.toContain("sel=");
-  });
-
-  it("selects the first job on a wide List view with none open, without adding history", async () => {
-    wide(true);
-    const { router } = setup("/jobs?tab=applied&view=list");
-    await waitFor(() => expect(router.state.location.pathname).toBe("/jobs/a1"));
-    expect(router.state.location.search).toContain("tab=applied");
-    await router.navigate(-1);
-    expect(router.state.location.pathname).not.toBe("/jobs");
   });
 });

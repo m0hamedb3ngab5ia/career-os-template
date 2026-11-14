@@ -53,16 +53,16 @@ describe("taskRow", () => {
   });
   it("placeholder-bullet action names the employer from the bullet id, no helper line", () => {
     expect(row({ job_id: "j1", type: "other", what: "Add real acme_ft bullets to your profile" })).toMatchObject({
-      title: "Add Acme experience to your profile", why: "", cta: "Open", href: "/profile" });
+      title: "Add Acme experience to your profile", why: "", cta: "", href: null });
   });
   it("maps known kinds to plain title, why and one CTA", () => {
     expect(row({ job_id: "j1", type: "review", what: "Tier A: review then submit" })).toMatchObject({
       title: "Review Globex application", why: "Approval required before submission.", cta: "Review", href: "/jobs/j1", detected: true });
     expect(row({ job_id: "j1", type: "qa_fail" })).toMatchObject({ title: "Review Globex résumé and cover letter", why: "", cta: "Review", detected: true });
     expect(row({ type: "other", company: "", what: "Connect the Claude-in-Chrome extension" })).toMatchObject({
-      title: "Connect CareerOS to Chrome", why: "Required to continue browser-based applications.", cta: "Connect", href: "/settings" });
+      title: "Connect CareerOS to Chrome", why: "Required to continue browser-based applications.", cta: "Connect", href: null });
     expect(row({ company: "Initech", type: "profile_gap", what: "Bullet b3 is a placeholder" })).toMatchObject({
-      title: "Add Initech experience to your profile", why: "", cta: "Open", href: "/profile" });
+      title: "Add Initech experience to your profile", why: "", cta: "", href: null });
     expect(row({ job_id: "j1", type: "question" })).toMatchObject({ title: "Answer Globex application questions", cta: "Answer", detected: true });
   });
   it("falls back to plain task text, never file paths or commands; undetectable kinds can be marked done", () => {

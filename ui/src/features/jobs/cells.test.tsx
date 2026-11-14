@@ -7,7 +7,7 @@ import { ToastProvider } from "../../kit/Toast";
 import { MemoryRouter } from "react-router";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockApi } from "../../test/apiMock";
-import { renderWithProviders } from "../job-detail/testUtils";
+import { renderWithProviders } from "./testUtils";
 import { COLUMNS } from "./cells";
 import { job } from "./fixtures";
 

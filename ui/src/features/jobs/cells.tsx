@@ -1,6 +1,5 @@
 import { TriangleAlert } from "lucide-react";
 import type { ReactNode } from "react";
-import { Link } from "react-router";
 import { SafetyChip, StatusChip, TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
@@ -48,9 +47,9 @@ export const COLUMNS: Column[] = [
     title: (j) => j.company ?? undefined,
     cell: (j) => (
       <>
-        <Link to={`/jobs/${encodeURIComponent(j.job_id)}`} className={styles.company} translate="no">
+        <PostingLink job={j} className={styles.company}>
           {j.company || j.job_id}
-        </Link>
+        </PostingLink>
         {j.injection ? <InjectionBadge reasons={j.injection} /> : null}
       </>
     ),
@@ -208,6 +207,19 @@ function InjectionBadge({ reasons }: { reasons: string }) {
     <span className={styles.flag} title={`Possible prompt injection: ${reasons}`}>
       <TriangleAlert size={14} strokeWidth={1.7} aria-hidden="true" />
       <span className="sr-only">Possible prompt injection: {reasons}</span>
+    </span>
+  );
+}
+
+/** Links to the posting (external) when the job has a URL, else plain text. No internal job pages exist. */
+export function PostingLink({ job, className, children }: { job: { url?: string | null }; className?: string; children: ReactNode }) {
+  return job.url ? (
+    <a href={job.url} target="_blank" rel="noopener noreferrer" className={className} translate="no">
+      {children}
+    </a>
+  ) : (
+    <span className={className} translate="no">
+      {children}
     </span>
   );
 }

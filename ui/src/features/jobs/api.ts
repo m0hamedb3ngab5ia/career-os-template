@@ -1,9 +1,8 @@
 import { keepPreviousData, useInfiniteQuery, useMutation, useQueries, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useEffect } from "react";
 import { ApiError, apiFetch, apiSend } from "../../api/client";
+import type { components } from "../../api/schema.gen";
 import type { JobFacets, JobListItem, JobsPage, JobsTabs, TabKey, TrackerOpen, TrackerSync, ViewKey } from "./types";
-import { runKeys } from "../runs/api";
-import type { RunDetail } from "../runs/types";
 import { FILTERS, type FilterField, type Filters } from "./urlState";
 
 export interface FilterParams {
@@ -183,8 +182,8 @@ export function useScoreJobs() {
   const edit = (f: (s: ScoreState) => ScoreState) => qc.setQueryData<ScoreState>(SCORE_KEY, (s) => f(s ?? NO_SCORE));
   const polls = useQueries({
     queries: state.runs.map((r) => ({
-      queryKey: runKeys.detail(r.runId),
-      queryFn: () => apiFetch<RunDetail>(`/api/runs/${encodeURIComponent(r.runId)}`),
+      queryKey: ["run", r.runId],
+      queryFn: () => apiFetch<components["schemas"]["RunDetail"]>(`/api/runs/${encodeURIComponent(r.runId)}`),
       refetchInterval: 1000,
       retry: 3,
     })),

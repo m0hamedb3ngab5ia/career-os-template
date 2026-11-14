@@ -1,11 +1,8 @@
-import { Download, FileSearch, RotateCw, FolderOpen, MapPin, RefreshCw, Search, Table2 } from "lucide-react";
+import { Download, MapPin, Search, Table2 } from "lucide-react";
 import { useCallback, useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
-import { Link, useLocation, useNavigate } from "react-router";
-import { useWide } from "./useWide";
 import { Page } from "../../app/PageHeader";
 import { useMeta } from "../../api/meta";
 import { Button } from "../../kit/Button";
-import { CheckJobDialog } from "./CheckJobDialog";
 import { EmptyState } from "../../kit/EmptyState";
 import { Menu } from "../../kit/Menu";
 import { Pager, usePaged } from "../../kit/Pager";
@@ -13,16 +10,11 @@ import { SegmentedControl } from "../../kit/SegmentedControl";
 import { Tabs } from "../../kit/Tabs";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { useJobFacets, useExportJobs, useSelectJobs, useScoreJobs, useJobsList, useJobsTabs, useMoveJob, useOpenTracker, useRememberView, useUiState, useSyncTracker, exportFilters } from "./api";
+import { useJobFacets, useExportJobs, useSelectJobs, useJobsList, useJobsTabs, useRememberView, useUiState, exportFilters } from "./api";
 import { COLUMNS } from "./cells";
 import { JobsBoard } from "./JobsBoard";
-import { JobDetailPage } from "../job-detail/JobDetailPage";
 import { JobsList, NotScoredList } from "./JobsCards";
-import cardStyles from "./JobsCards.module.css";
 import { JobsTable } from "./JobsTable";
-import { StartPipeline } from "./StartPipeline";
-import { useStepRun } from "../runs/useStepRun";
-import { UnavailableButton } from "../../kit/UnavailableButton";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
 import { DEFAULT_SORT, STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
@@ -39,67 +31,6 @@ const VIEW_LABELS: Record<ViewKey, string> = { list: "List", table: "Table", boa
 
 function errorText(e: unknown): string {
   return e instanceof Error ? e.message : "Something went wrong";
-}
-
-function basename(path: string): string {
-  return path.split(/[\\/]/).pop() || path;
-}
-
-function HeaderActions() {
-  const toast = useToast();
-  const sync = useSyncTracker();
-  const open = useOpenTracker();
-  const [checking, setChecking] = useState(false);
-  const scout = useStepRun("scout", undefined, (run) => {
-    if (run.stop_reason !== "cancelled") toast.show({ message: run.stop_reason === "completed" ? "Finished looking for jobs." : `Job search stopped: ${run.detail || run.stop_reason}` });
-  });
-  return (
-    <>
-      <Button
-        icon={<RotateCw size={14} strokeWidth={1.7} aria-hidden="true" />}
-        pending={scout.start.isPending || scout.running}
-        pendingLabel="Finding jobs…"
-        onClick={() => scout.start.mutate(undefined, { onError: (e) => toast.show({ message: `Couldn’t start the job search: ${errorText(e)}` }) })}
-      >
-        Find jobs now
-      </Button>
-      <Button variant="primary" icon={<FileSearch size={14} strokeWidth={1.7} aria-hidden="true" />} onClick={() => setChecking(true)}>
-        Check a job
-      </Button>
-      <CheckJobDialog open={checking} onClose={() => setChecking(false)} />
-      <Button
-        icon={<RefreshCw size={14} strokeWidth={1.7} aria-hidden="true" />}
-        pending={sync.isPending}
-        pendingLabel="Syncing…"
-        onClick={() =>
-          sync.mutate(undefined, {
-            onSuccess: (r) =>
-              toast.show({
-                message: r.pending
-                  ? `Synced ${formatCount(r.synced)} jobs. Excel has the tracker open, so they're saved to a queue; they're written on the next change, or close Excel and they save then.`
-                  : `Synced ${formatCount(r.synced)} jobs`,
-              }),
-            onError: (e) => toast.show({ message: errorText(e) }),
-          })
-        }
-      >
-        Sync tracker
-      </Button>
-      <Button
-        icon={<FolderOpen size={14} strokeWidth={1.7} aria-hidden="true" />}
-        pending={open.isPending}
-        pendingLabel="Opening…"
-        onClick={() =>
-          open.mutate(undefined, {
-            onSuccess: (r) => toast.show({ message: `Opened ${basename(r.path)}` }),
-            onError: (e) => toast.show({ message: errorText(e) }),
-          })
-        }
-      >
-        Open JobTracker.xlsx
-      </Button>
-    </>
-  );
 }
 
 interface FilterFieldProps {
@@ -147,18 +78,14 @@ function FilterField({ value: q, onCommit, name, label, placeholder, icon }: Fil
   );
 }
 
-export function JobsPage({ jobId }: { jobId?: string } = {}) {
+export function JobsPage() {
   const toast = useToast();
-  const navigate = useNavigate();
-  const { search } = useLocation();
-  const wideScreen = useWide();
   const [view, update] = useJobsView();
   const { tab, q, location, sort, stage } = view;
   const columnFilters = view.filters;
   const meta = useMeta();
   const uiState = useUiState();
   const remember = useRememberView();
-  const move = useMoveJob();
   const mode = effectiveView(view.view, uiState.data?.jobs_view, tab);
   const chooseView = (v: ViewKey) => {
     update({ view: v }, true);
@@ -190,13 +117,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         onError: (e) => toast.show({ message: errorText(e) }),
       },
     );
-  // REQ-137 Score now / Score selected: one score run for exactly these jobs; failure keeps the buttons live and offers Retry.
-  const scorer = useScoreJobs();
-  const { scoring, failure: scoreFail } = scorer;
-  const scoreJobs = (ids: string[]) =>
-    scorer.score(ids, {
-      onSuccess: () => toast.show({ message: `Scoring ${formatCount(ids.length)} ${ids.length === 1 ? "job" : "jobs"}. Progress is in Runs.` }),
-    });
   const captionId = useId();
   const panelId = useId();
 
@@ -210,11 +130,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
       if (hasNextPage && !isFetchingNextPage) void fetchNextPage();
     }, [hasNextPage, isFetchingNextPage, fetchNextPage]),
   });
-  // Wide List view always shows a detail pane: open the first job when none is (replace, so Back isn't trapped).
-  const firstId = rows[0]?.job_id;
-  useEffect(() => {
-    if (wideScreen && mode === "list" && !jobId && firstId) navigate({ pathname: `/jobs/${firstId}`, search }, { replace: true });
-  }, [wideScreen, mode, jobId, firstId, navigate, search]);
   const hidden = useMemo(() => new Set(view.hidden), [view.hidden]);
   const columns = useMemo(() => COLUMNS.filter((c) => !hidden.has(c.key)), [hidden]);
   const selectedKey = view.selected.join(",");
@@ -256,17 +171,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
 
   const serverTabs = new Map((tabs.data?.tabs ?? []).map((t) => [t.key, t]));
   const nSel = selected.size;
-  const [reviewing, setReviewing] = useState(false);
-  const startRef = useRef<HTMLButtonElement>(null);
-  const wasReviewing = useRef(false);
-  // Unticking every job ends the review, so ticking the next one doesn't reopen it; Back refocuses Start pipeline.
-  useEffect(() => {
-    if (!nSel) setReviewing(false);
-  }, [nSel]);
-  useEffect(() => {
-    if (wasReviewing.current && !reviewing) startRef.current?.focus();
-    wasReviewing.current = reviewing;
-  }, [reviewing]);
 
   function onExport() {
     const cols = ["job_id", ...columns.map((c) => c.exportField)];
@@ -324,7 +228,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         title={tab === "notscored" ? "Every job is scored" : "No jobs here yet"}
         action={
           tab === "recommended" ? (
-            <Link to="/automation">Open Automation</Link>
+            null
           ) : (
             <Button size="small" onClick={() => update({ tab: "recommended" }, true)}>
               Show recommended jobs
@@ -333,26 +237,20 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
         }
       >
         {tab === "recommended"
-          ? "Scout adds postings here. Run scout from Automation or the command line."
+          ? "Scout adds postings here. Run scout from the command line (careeros scout --sync)."
           : tab === "notscored"
           ? "New postings from scout wait here until they are scored."
           : "Nothing in this tab right now. Other tabs may have jobs."}
       </EmptyState>
     );
   } else if (tab === "notscored") {
-    body = <NotScoredList rows={paged.pageItems} selected={selected} onToggle={onToggle} scoring={scoring} onScore={scoreJobs} />;
+    body = <NotScoredList rows={paged.pageItems} selected={selected} onToggle={onToggle} />;
   } else if (mode === "list") {
-    body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} current={jobId} />;
+    body = <JobsList rows={paged.pageItems} tab={tab} selected={selected} onToggle={onToggle} />;
   } else if (mode === "board") {
     body = (
       <JobsBoard
         rows={paged.pageItems}
-        onMove={(job, status) =>
-          move.mutateAsync({ jobId: job.job_id, status }).catch((e) => {
-            toast.show({ message: `Couldn’t move ${job.company || job.job_id} to ${status}: ${errorText(e)}` });
-            throw e;
-          })
-        }
       />
     );
   } else {
@@ -375,22 +273,11 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
     );
   }
 
-  if (jobId && mode !== "list") return <JobDetailPage />;
   return (
     <Page
       title="Jobs"
       subtitle="Every tracked posting · same columns as the Jobs tab in JobTracker.xlsx"
-      actions={<HeaderActions />}
     >
-      {reviewing && nSel > 0 ? (
-        <StartPipeline
-          ids={[...selected]}
-          rows={rows.filter((r) => selected.has(r.job_id))}
-          onToggle={onToggle}
-          onUntick={(drop) => setSelected([...selected].filter((id) => !drop.includes(id)))}
-          onClose={() => setReviewing(false)}
-        />
-      ) : (
       <div className={styles.stack}>
         <div className={styles.toolbar}>
           <Tabs label="Filter jobs" value={tab} onValueChange={(v) => update({ tab: v as TabKey, selected: [] })} controls={panelId}>
@@ -421,11 +308,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
             {nSel > 0 ? (
               <>
                 <span className="tabular">{formatCount(nSel)} selected</span>
-                {tab === "notscored" ? (
-                  <Button size="small" variant="primary" disabled={scorer.isPending} onClick={() => scoreJobs([...selected])}>
-                    Score selected
-                  </Button>
-                ) : (
+                 {tab === "notscored" ? null : (
                   <>
                     <Button size="small" disabled={pick.isPending} onClick={() => bulkPick(true)}>
                       Tick for pipeline
@@ -441,17 +324,6 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
               </>
             ) : null}
           </div>
-          <span hidden={tab !== "saved"}>
-            {nSel > 0 ? (
-              <Button ref={startRef} size="small" variant="primary" onClick={() => setReviewing(true)}>
-                Start pipeline
-              </Button>
-            ) : (
-              <UnavailableButton size="small" variant="primary" reason="Tick jobs first">
-                Start pipeline
-              </UnavailableButton>
-            )}
-          </span>
           {tab === "notscored" ? null : (<>
           <SegmentedControl label="View" value={mode} onValueChange={(v) => chooseView(v as ViewKey)}>
             {VIEWS.filter((v) => v !== "board" || tab === "applied").map((v) => (
@@ -500,7 +372,7 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
           </Tabs>
         ) : null}
         <FilterChips filters={filters} onFilter={onFilter} onClearAll={() => update({ filters: {} })} />
-        <div className={jobId ? styles.split : undefined}>
+        <div>
         <section
           id={panelId}
           role="tabpanel"
@@ -509,33 +381,18 @@ export function JobsPage({ jobId }: { jobId?: string } = {}) {
           aria-busy={list.isFetching || undefined}
           className={styles.card}
         >
-          {tab === "notscored" && scoreFail ? (
-            <div role="alert" className={cardStyles.failure}>
-              <span>Scoring failed · {scoreFail.message}</span>
-              <Button size="small" onClick={() => scoreJobs(scoreFail.ids)}>
-                Retry
-              </Button>
-            </div>
-          ) : null}
           {body}
           {rows.length > 0 ? (
             <div className={styles.footer}>
               <span className="tabular">
                 {formatCount(total)} {TAB_NOUNS[tab]} · live from data/careeros.db
               </span>
-              <span>Open a job to change its status or add notes</span>
               <Pager paged={paged} label="Jobs" />
             </div>
           ) : null}
         </section>
-        {jobId ? (
-          <aside aria-label="Job detail" className={styles.detail}>
-            <JobDetailPage embedded />
-          </aside>
-        ) : null}
         </div>
       </div>
-      )}
     </Page>
   );
 }
