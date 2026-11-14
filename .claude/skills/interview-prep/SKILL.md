@@ -18,8 +18,10 @@ description: Write interview_prep.md for one job dir. Maps each posting requirem
 4. STAR outline per requirement that has evidence. Pick bullet ids from `skill_evidence` or the best-matching bullets.
    Situation, task, action and result use only those bullets' text; numbers frozen, tools exactly as written, placeholder
    bullets never. Cite the ids on each line: `(bullet: <id>)`. Add no detail the bullets do not state.
-5. For each entry in `gaps[]` and `missing_skills`: write "no evidence in profile", then 2 to 3 concrete things to study
-   or practise. The note is never an invented story, and never stretch an unrelated bullet to cover it.
+5. For each `missing_skills` entry and each skill-type `gaps[]` entry (stated interview focus, domain experience): write
+   "no evidence in profile", then 2 to 3 concrete things to study or practise. For logistics gaps (start date, relocation,
+   on-site days, clearance): list them under "Confirm with the employer", no study items. Never an invented story, and
+   never stretch an unrelated bullet to cover a gap.
 6. 5 questions to ask the employer, specific to the posting (team, scope, how success is measured).
 7. Write `JOB/interview_prep.md`: sections Company type, Likely questions, STAR outlines, Gaps and what to study,
    Questions to ask. Candidate facts only from `profile/master.yaml` by id.
