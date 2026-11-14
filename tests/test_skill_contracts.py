@@ -500,3 +500,18 @@ def test_apply_job_reads_lessons_first_and_records_them_last():
     fill = (ROOT / ".claude" / "skills" / "apply-job" / "references" / "fill-fields.md").read_text()
     assert "company=<posting company>" in fill
     assert "exact form question verbatim" in fill and "action done <id> --answer" in fill
+
+
+def test_score_job_does_not_saturate_on_generic_postings_and_lists_gaps():
+    text = _skill("score-job")
+    extract = text.split("## 4. Extract from the posting", 1)[1].split("\n## 5.", 1)[0]
+    rubric = text.split("## 5. Fit score", 1)[1].split("\n## 6.", 1)[0]
+    # generic engineering practices are not skills: a posting naming none must not score 4 of 4
+    assert "Generic practices" in extract and "never go in `required_skills`" in extract
+    assert "fewer than 3" in rubric and "use 24 (neutral)" in rubric
+    # non-skill requirements the profile does not evidence are listed, never scored and never guessed
+    assert "`gaps[]`" in extract
+    for kind in ("start date", "on-site", "minimum requirement", "interview focus"):
+        assert kind in extract, kind
+    assert "never changes `fit`" in extract
+    assert '"gaps": []' in text.split("## 8. Write `JOB/score.json`", 1)[1]

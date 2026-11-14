@@ -122,6 +122,14 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
   non-placeholder bullet text; allowed synonyms listed there). Record the evidence id in
   `skill_evidence` map `{skill: "skills.programming" | "<bullet id>" | "<entry id>.stack"}`.
 - `missing_skills[]` = required minus matched. NEVER move a skill to matched without an evidence id.
+- Generic practices (code review, debugging, testing, system design, collaboration, communication,
+  problem solving, ownership) never go in `required_skills`: every engineer matches them, so they
+  inflate the overlap. Only named technologies and specific methods count.
+- `gaps[]`: non-skill requirements the posting states that the profile does not evidence or that the
+  candidate must act on, one plain sentence each, quoting the posting's own words. Look for: a start date
+  or availability window, relocation or on-site days, an explicit minimum requirement beyond skills
+  (e.g. years in a domain, a clearance, a degree field), and a stated interview focus the profile is
+  thin on. Empty list when none. A gap never changes `fit` and is never guessed: no posting text, no gap.
 - `industry`: one of `ai_ml, hedge_fund, quant_trading, fintech, developer_tools, infra_cloud,
   consumer, enterprise_saas, healthcare, defense, gambling, adult, mlm, other` from the company
   description and `departments`.
@@ -137,7 +145,7 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 
 | component | max | how |
 |---|---|---|
-| skills_overlap | 40 | `40 * len(matched)/len(required)`; if required is empty use 24 (neutral). Round to int. |
+| skills_overlap | 40 | `40 * len(matched)/len(required)`; if required has fewer than 3 skills use 24 (neutral): too little signal to score. Round to int. |
 | experience_relevance | 30 | Count non-placeholder profile entries (experience + projects) whose `tags` include the category, or whose stack overlaps >= 2 required skills. 0 -> 5, 1 -> 15, 2 -> 22, 3+ -> 30. Subtract 5 if the strongest matching entry is a course project only. |
 | seniority_match | 15 | new_grad or early_career -> 15; mid (2-3 yrs) -> 8; senior+ -> 0 |
 | location_pref | 10 | in `location.preferred` or remote_ok remote -> 10; `preferred_regions` -> 7; elsewhere in US -> 4; allowed non-US -> 2 |
@@ -148,7 +156,7 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 component in `fit_reasons[]`. Each is a proper sentence a person reads in the UI's "Why" list: capitalized, ends
 with a period, no internal keys or point tallies (never `-> skills_overlap 20/40`), e.g.
 "Skills: 7 of 10 required matched; missing Go, Kafka and Terraform." / "Seniority: early-career role, a match." /
-"Location: remote, allowed."
+"Location: remote, allowed." / with fewer than 3 named skills: "Skills: the posting names too few technologies to score; neutral."
 
 ## 6. Tier
 
@@ -201,6 +209,7 @@ If both apply, join the messages with `; `. Entries that mix usable and partial 
   "fit_reasons": ["Skills: 7 of 10 required matched; missing Go, Kafka and Terraform.", "..."], "reasons": ["...same list..."],
   "hard_filter_fails": [],
   "required_skills": [], "nice_to_have_skills": [], "matched_skills": [], "missing_skills": [], "skill_evidence": {},
+  "gaps": [],
   "prestige_tier": null, "prestige": null, "industry": "fintech", "seniority_guess": "new_grad",
   "tier": "C", "decision": "prepare", "skip_reason": null,
   "salary_est": {"min": 135000, "max": 165000, "source": "posting"},
