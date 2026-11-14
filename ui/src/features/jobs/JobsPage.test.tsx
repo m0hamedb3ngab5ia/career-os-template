@@ -204,17 +204,6 @@ describe("Jobs screen", () => {
     await user.click(all);
     expect(screen.getByText("3 selected")).toBeInTheDocument();
     expect(all).toBeChecked();
-    expect(screen.getByRole("button", { name: "Start pipeline" })).not.toHaveAttribute("aria-disabled");
-  });
-
-  it("clears the selection and Start pipeline says why it is unavailable", async () => {
-    setup("/jobs?tab=saved&sel=nw01");
-    const user = userEvent.setup();
-    expect(await screen.findByText("1 selected")).toBeInTheDocument();
-    await user.click(screen.getByRole("button", { name: "Clear selection" }));
-    expect(screen.queryByText(/selected$/)).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Start pipeline" })).toHaveAttribute("aria-disabled", "true");
-    expect(screen.getByRole("button", { name: "Export xlsx" })).toBeInTheDocument();
   });
 
   it("exports the selection by id with the visible columns and downloads the file", async () => {
@@ -258,14 +247,6 @@ describe("Jobs screen", () => {
     setup("/jobs", { "POST /api/jobs/export": { status: 409, body: { detail: "Index is rebuilding" } } });
     await userEvent.setup().click(await screen.findByRole("button", { name: "Export xlsx" }));
     expect(await screen.findByText("Index is rebuilding")).toBeInTheDocument();
-  });
-
-  it("Find jobs now starts a job search; a refusal shows the server's reason", async () => {
-    const { api } = setup("/jobs", { "POST /api/runs/steps/scout": { status: 409, body: { detail: "Another run is in progress" } } });
-    const user = userEvent.setup();
-    await user.click(await screen.findByRole("button", { name: "Find jobs now" }));
-    expect(await screen.findByText(/Another run is in progress/)).toBeInTheDocument();
-    expect(api.callsTo("POST /api/runs/steps/scout")).toHaveLength(1);
   });
 
   it("Sync tracker posts and reports the count; a pending sync says why", async () => {

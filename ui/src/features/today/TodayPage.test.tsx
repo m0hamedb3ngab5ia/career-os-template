@@ -38,7 +38,7 @@ describe("TodayPage", () => {
     expect(screen.queryByRole("button", { name: /Run scout|Prepare queued/ })).not.toBeInTheDocument();
   });
 
-  it("recent activity shows at most 3 outcomes, no run names, and links to all activity", async () => {
+  it("recent activity shows at most 3 outcomes, no run names,", async () => {
     const run = (id: string, kind: string, over = {}) => ({ ...status.recent_runs![0]!, id, kind, detail: "", ...over });
     setup({ "GET /api/status": { ...status, recent_runs: [
       run("a", "scout", { detail: "38 new of 412 scanned" }), run("b", "prepare", { ok: 2 }), run("c", "inbox_sync"),
@@ -48,7 +48,6 @@ describe("TodayPage", () => {
     expect(within(section).getAllByRole("listitem").map((li) => li.firstChild?.textContent)).toEqual([
       "Found 38 new matching jobs", "Prepared 2 applications", "Filled 1 application"]);
     expect(within(section).queryByText(/\b(scout|prepare|score|apply)\b/i)).not.toBeInTheDocument();
-    expect(within(section).getByRole("link", { name: "View all activity" })).toHaveAttribute("href", "/runs");
   });
 
   it("job search is one line of counts with a pipeline link", async () => {

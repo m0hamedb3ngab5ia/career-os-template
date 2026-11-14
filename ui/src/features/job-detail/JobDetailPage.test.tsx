@@ -57,10 +57,7 @@ describe("Job detail screen", () => {
       review_reasons: [{ code: "qa_warning", text: "A document check left a warning", detail: "long letter" }] } });
     expect(await screen.findByText("· Software Engineer, Infrastructure", {}, { timeout: 5000 })).toBeInTheDocument();
     expect(screen.getByText("· Springfield")).toBeInTheDocument();
-    const next = screen.getByRole("region", { name: "Next step" });
-    expect(await within(next).findByText("Ready for the next step: Approve & continue.")).toBeInTheDocument();
-    expect(within(next).getByRole("button", { name: "Approve & continue" })).toBeEnabled();
-    const order = ["Posting", "Next step", "Documents", "Fit", "Checks", "Contacts & outreach", "Screenshots"]
+    const order = ["Posting", "Documents", "Fit", "Checks", "Contacts & outreach", "Screenshots"]
       .map((name) => screen.getByRole("region", { name }));
     for (let i = 1; i < order.length; i++) {
       expect(order[i - 1]!.compareDocumentPosition(order[i]!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();

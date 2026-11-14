@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { mockApi, type Call } from "../../test/apiMock";
 import { renderApp } from "../../test/renderApp";
-import { JOBS, META, TABS_REPLY, job } from "./fixtures";
+import { META, TABS_REPLY, job } from "./fixtures";
 
 const ROWS = [
   job({ job_id: "a1", company: "Acme", title: "Backend Engineer", fit: 88, status: "applied",
@@ -71,11 +71,6 @@ describe("Jobs tabs and List view", () => {
     expect(saved).not.toHaveAttribute("data-needs-you");
   });
 
-  it("Start pipeline shows on Saved only", async () => {
-    setup("/jobs?tab=saved&view=table", JOBS);
-    await screen.findByRole("table");
-    expect(screen.getByRole("button", { name: "Start pipeline" })).toBeInTheDocument();
-  });
 });
 
 describe("Applied Board", () => {

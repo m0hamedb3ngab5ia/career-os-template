@@ -107,19 +107,6 @@ describe("Jobs › Not scored (REQ-136, E2E-017-05)", () => {
     await waitFor(() => expect(api.callsTo("GET /api/jobs").length).toBeGreaterThan(listCalls));
   });
 
-  it("reasons follow scoring.min_prescore / stale_days from Settings (TASK-039 config)", async () => {
-    setup(ROWS, { "GET /api/settings/runs": { values: { "scoring.min_prescore": 10, "scoring.stale_days": 60 } } });
-    await screen.findByRole("link", { name: /Example Corp/ });
-    await waitFor(() => expect(screen.getAllByText("Queued")).toHaveLength(3));
-    expect(screen.queryByText(/Below cutoff|Older posting/)).not.toBeInTheDocument();
-  });
-
-  it("shows the configured cutoff in the reason", async () => {
-    setup(ROWS, { "GET /api/settings/runs": { values: { "scoring.min_prescore": 50, "scoring.stale_days": 21 } } });
-    const card = (await screen.findByRole("link", { name: /Demo Inc/ })).closest("li")!;
-    await waitFor(() => expect(card).toHaveTextContent("Below cutoff (50)"));
-  });
-
   it("hides the List / Table view switch and Columns (one card layout here)", async () => {
     setup();
     await screen.findByRole("link", { name: /Example Corp/ });

@@ -156,7 +156,7 @@ export function FillPlanCard({ jobId, ats, canPlan = true }: { jobId: string; at
       </span>
     ) : null}>
       {!plan && ats && ats !== "greenhouse" ? (
-        <p>career-os can preview and fill only Greenhouse postings; this one is on {ats}. Apply on the posting's own page.</p>
+        <p>career-os can preview and fill only Greenhouse postings; this one is on {ats.charAt(0).toUpperCase() + ats.slice(1)}. Apply on the posting's own page.</p>
       ) : !plan ? (
         <p>See what career-os will type into the application, and answer anything it doesn't know, before it fills. {preview}{why}</p>
       ) : (

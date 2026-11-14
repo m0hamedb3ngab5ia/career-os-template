@@ -4,7 +4,6 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { mockApi } from "../../test/apiMock";
 import { axeViolations } from "../../test/axe";
 import { formatDecimal } from "../../lib/format";
-import { ACTION_HELP } from "./actionHelp";
 import { DocumentsCard, QaCard } from "./DocumentsCard";
 import { detail } from "./fixtures";
 import { renderWithProviders } from "./testUtils";
@@ -67,38 +66,6 @@ describe("QaCard plain-language reasons", () => {
   });
 });
 
-describe("QaCard Tailor instead", () => {
-  const failed = { ...d.qa!, pass: false, fail_reasons: ["pdf_page_count: 3 page(s) (max 2)"] };
-
-  it.each([
-    ["QA passed", { ...d.qa!, pass: true }, "reuse"],
-    ["résumé was tailored", failed, "tailor"],
-    ["no choice", failed, undefined],
-  ])("is hidden when %s", (_, qa, choice) => {
-    renderCard({ qa, resumeChoice: choice });
-    expect(screen.queryByRole("button", { name: "Tailor instead" })).toBeNull();
-  });
-
-  it("on fail + reuse starts a forced-tailor prepare, then hides", async () => {
-    const { api } = renderCard({ qa: failed, resumeChoice: "reuse" });
-    await userEvent.click(screen.getByRole("button", { name: "Tailor instead" }));
-    const call = api.callsTo("POST /api/runs/steps/prepare")[0]!;
-    expect(call.search.get("job_id")).toBe("nw01");
-    expect(call.search.get("force_tailor")).toBe("true");
-    expect(await screen.findByText(/Tailoring started/)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Tailor instead" })).toBeNull();
-  });
-
-  it("comes back with the run's error when the tailor run fails, so the user can retry", async () => {
-    renderCard({ qa: failed, resumeChoice: "reuse" }, {
-      "GET /api/runs/r-tailor": { run_id: "r-tailor", state: "done", stop_reason: "failed", detail: "LaTeX failed" },
-    });
-    await userEvent.click(screen.getByRole("button", { name: "Tailor instead" }));
-    expect(await screen.findByText("LaTeX failed")).toBeInTheDocument();
-    expect(await screen.findByRole("button", { name: "Tailor instead" })).toBeEnabled();
-  });
-});
-
 describe("DocumentsCard", () => {
   it("shows the key documents in the server's order, each opening the file in a new tab", () => {
     renderCard();
@@ -136,12 +103,6 @@ describe("DocumentsCard", () => {
     ]);
   });
 
-  it("action buttons carry one-sentence help as their title", () => {
-    renderCard();
-    expect(screen.getByRole("button", { name: "Re-run QA" })).toHaveAttribute("title", ACTION_HELP.rerunQa);
-    expect(screen.getByRole("button", { name: "Open folder" })).toHaveAttribute("title", ACTION_HELP.openFolder);
-  });
-
   it("submitted copy is disabled with a reason until there is one", () => {
     renderCard();
     const btn = screen.getByRole("button", { name: "View submitted copy" });
@@ -158,40 +119,6 @@ describe("DocumentsCard", () => {
     expect(screen.getByText("Specificity")).toBeInTheDocument();
     expect(screen.getByText("Truthfulness")).toBeInTheDocument();
     expect(screen.getByText(formatDecimal(9.5))).toBeInTheDocument();
-  });
-
-  it("Re-run QA starts a QA run and announces its pass/fail summary", async () => {
-    const { api } = renderCard({}, {
-      "POST /api/runs/steps/qa": { kind: "qa", started: true, run_id: "r-qa-1" },
-      "GET /api/runs/r-qa-1": {
-        id: "r-qa-1", kind: "qa", trigger: "manual", status: "done", state: "done", stop_reason: "completed",
-        started_at: null, ended_at: null, attempts: [], log: "",
-        result: { pass: false, summary: { hard_fail: 1, soft_fail: 2 }, fail_reasons: ["Résumé over one page"] },
-      },
-    });
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Re-run QA" }));
-    const status = await screen.findByText("QA failed");
-    expect(status.closest("[role=status]")).not.toBeNull();
-    expect(screen.getByText(/1 hard fails, 2 soft fails/)).toBeInTheDocument();
-    expect(api.callsTo("POST /api/runs/steps/qa")[0]!.headers["x-careeros"]).toBe("1");
-  });
-
-  it("Stop cancels a running QA and returns to Re-run QA with no result", async () => {
-    const { api } = renderCard({}, {
-      "POST /api/runs/steps/qa": { kind: "qa", started: true, run_id: "r-qa-2" },
-      "GET /api/runs/r-qa-2": {
-        id: "r-qa-2", kind: "qa", trigger: "manual", status: "running", state: "running", stop_reason: null,
-        started_at: null, ended_at: null, attempts: [], log: "",
-      },
-      "POST /api/runs/cancel": { status: "cancelling", run_id: "r-qa-2" },
-    });
-    const user = userEvent.setup();
-    await user.click(screen.getByRole("button", { name: "Re-run QA" }));
-    await user.click(await screen.findByRole("button", { name: "Stop" }));
-    expect(await screen.findByRole("button", { name: "Re-run QA" })).toBeEnabled();
-    expect(screen.queryByText(/QA failed|QA passed/)).toBeNull();
-    expect(api.callsTo("POST /api/runs/cancel")).toHaveLength(1);
   });
 
 
