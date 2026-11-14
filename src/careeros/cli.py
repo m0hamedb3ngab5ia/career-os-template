@@ -940,6 +940,19 @@ def cmd_resume_propose_master(args: argparse.Namespace) -> int:
     print(st["diff"] or "no change from profile/master.yaml")
     print("proposal pending: approve or reject it in Profile › Résumés")
     return 0
+
+
+def cmd_resume_keep_master(args: argparse.Namespace) -> int:
+    """Keep master.yaml as is and mark it synced with the master résumé (closes readiness `master_synced`)."""
+    from careeros import master_sync
+
+    try:
+        master_sync.keep(_settings(args).root)
+    except LookupError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print("master.yaml kept; marked synced with the master résumé")
+    return 0
 def cmd_resume_import_save(args: argparse.Namespace) -> int:
     """extract-master hands an uploaded résumé's resume.json here (DEC-019): guarded, then v2; refused -> failed."""
     from careeros import resume_import
@@ -2076,6 +2089,9 @@ def build_parser() -> argparse.ArgumentParser:
                          "(pending until approved; used by the extract-master skill)")
     rsp.add_argument("file")
     rsp.set_defaults(fn=cmd_resume_propose_master)
+    rsp = rss.add_parser("keep-master", help="keep profile/master.yaml as is: drop any proposal, mark it synced "
+                         "with the master résumé")
+    rsp.set_defaults(fn=cmd_resume_keep_master)
     rsp = rss.add_parser("import-save", help="guard an uploaded résumé's structured resume.json -> v2 (DEC-019; "
                          "used by the extract-master skill)")
     rsp.add_argument("rid")

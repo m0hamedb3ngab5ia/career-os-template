@@ -4,7 +4,9 @@ The extract-master skill writes a full proposed master.yaml via `careeros resume
 profile/master.proposed.yaml. Nothing touches profile/master.yaml until the candidate approves; approve writes the
 proposal verbatim (re-validated), reject moves it to profile/master.rejected.yaml. Readiness `master_synced` is
 open while either file exists, and `stale` when the master résumé (rid, latest version) is not the one the last
-approve recorded in profile/master.synced.json (REQ-102). Validation: the master.yaml schema (doctor) plus a number
+approve recorded in profile/master.synced.json (REQ-102). `keep` closes it without touching master.yaml: the
+candidate decides the hand-edited master.yaml is right as it is (drops any proposal, records the résumé as synced).
+Validation: the master.yaml schema (doctor) plus a number
 guard: every number token in bullet text, bullet variants and summary_variants must already be a number token of the
 master résumé's latest text or the current master.yaml (exact token, not substring).
 """
@@ -144,6 +146,18 @@ def approve(root: Path) -> dict[str, Any]:
         if m := _master(root):  # the résumé (rid, version) master.yaml is now synced from
             write_text(root / SYNCED, json.dumps(_source(m)))
         (root / PROPOSED).unlink()
+        (root / REJECTED).unlink(missing_ok=True)
+    return state(root)
+
+
+def keep(root: Path) -> dict[str, Any]:
+    """Keep profile/master.yaml as is: drop any pending/rejected proposal, mark it synced from the master résumé."""
+    root = Path(root)
+    with _locked(root):
+        if not (m := _master(root)):
+            raise LookupError("no master résumé set: mark one master first")
+        write_text(root / SYNCED, json.dumps(_source(m)))
+        (root / PROPOSED).unlink(missing_ok=True)
         (root / REJECTED).unlink(missing_ok=True)
     return state(root)
 

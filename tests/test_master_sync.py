@@ -66,6 +66,27 @@ def test_reject_keeps_master_and_readiness_open(tmp_path):
     assert _synced(root)
 
 
+def test_keep_current_master_yaml_closes_readiness(tmp_path):
+    """The candidate may decide master.yaml (hand-edited superset) is right and the résumé is not: keep it."""
+    root = _root(tmp_path, "Shipped 3 releases")
+    before = (root / "profile" / "master.yaml").read_text(encoding="utf-8")
+    master_sync.propose(root, _proposal(root, "Shipped 3 releases"))
+    master_sync.reject(root)
+    assert master_sync.keep(root) == {"state": "synced", "diff": ""} and _synced(root)
+    assert (root / "profile" / "master.yaml").read_text(encoding="utf-8") == before
+    assert not (root / master_sync.REJECTED).exists() and not (root / master_sync.PROPOSED).exists()
+    master_sync.propose(root, _proposal(root, "Shipped 3 releases"))  # keep also drops a pending proposal
+    master_sync.keep(root)
+    assert (root / "profile" / "master.yaml").read_text(encoding="utf-8") == before and _synced(root)
+
+
+def test_keep_needs_a_master_resume(tmp_path):
+    root = _root(tmp_path, "x")
+    shutil.rmtree(root / "profile" / "resumes" / "master-0000")
+    with pytest.raises(LookupError):
+        master_sync.keep(root)
+
+
 def test_invented_number_refused(tmp_path):
     root = _root(tmp_path, "Cut latency by 37%")
     with pytest.raises(master_sync.Invalid, match="4173"):
