@@ -118,3 +118,39 @@ def test_plan_problems_unreviewed_ai_draft_blocks():
     assert gh_fill.plan_problems(p) == []
     draft.update(reviewed=False, value=None, skipped=True, required=False)
     assert gh_fill.plan_problems(p) == []
+
+
+def test_pick_scopes_options_to_listbox_the_input_controls():
+    root, inp = MagicMock(), MagicMock()
+    inp.get_attribute.return_value = "react-select-4-listbox"
+    gh_fill._pick(root, inp, "United States", exact=False)
+    root.locator.assert_called_with('[id="react-select-4-listbox"]')
+    scope = root.locator.return_value
+    scope.get_by_role.assert_called_with("option")
+    root.get_by_role.assert_not_called()  # an unscoped option query hits the hidden phone-country list
+
+
+def test_pick_without_aria_controls_falls_back_to_root():
+    root, inp = MagicMock(), MagicMock()
+    inp.get_attribute.return_value = None
+    gh_fill._pick(root, inp, "Yes", exact=True)
+    root.get_by_role.assert_called_with("option", name="Yes", exact=True)
+
+
+def test_fill_one_discipline_list_takes_first_offered(monkeypatch):
+    tried = []
+
+    def fake_pick(root, inp, value, exact):
+        tried.append(value)
+        if value == "Software Engineering":
+            raise LookupError(value)
+
+    monkeypatch.setattr(gh_fill, "_pick", fake_pick)
+    root = MagicMock()
+    root.locator.return_value.locator.return_value.inner_text.return_value = "Computer Science"
+    f = {"field_id": "discipline--0", "type": "select_async", "value": ["Software Engineering", "Computer Science"]}
+    assert gh_fill._fill_one(root, f) is True
+    assert tried == ["Software Engineering", "Computer Science"]
+    monkeypatch.setattr(gh_fill, "_pick", lambda *a, **k: (_ for _ in ()).throw(LookupError("x")))
+    with pytest.raises(LookupError):
+        gh_fill._fill_one(root, f)

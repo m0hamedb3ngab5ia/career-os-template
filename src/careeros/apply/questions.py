@@ -172,6 +172,14 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path,
     return None
 
 
+def answer_prefer(key: str, standard_answers_yaml: str | Path, company: str | None = None) -> list[str]:
+    """Optional `prefer: [keyword, ...]` of the standard entry `key`: option keywords tried in order by a select."""
+    for entry in load_company_answers(standard_answers_yaml, company) + load_standard_answers(standard_answers_yaml):
+        if entry.get("key") == key and entry.get("prefer"):
+            return [str(x) for x in entry["prefer"]]
+    return []
+
+
 _STREET_RE = re.compile(r"\b(street|address line ?1|address 1|mailing address|home address)\b", re.I)
 
 

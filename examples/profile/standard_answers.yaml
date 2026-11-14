@@ -75,9 +75,11 @@ answers:
   - key: previously_applied
     match: ["previously applied", "applied .*before", "worked .*here before", "former employee"]
     answer: "No"                     # reusable default: fine to keep (the applier overrides to Yes from tracker history)
+    prefer: ["have not", "never", "no"]   # optional: option keywords tried in order when no label equals the answer
   - key: referral
     match: ['\breferred', "referral", "how did you hear"]   # \b: "Preferred Name" is not a referral
     answer: "Company careers page"   # reusable default: fine to keep
+    prefer: ["career site", "careers page", "website"]   # optional: matches labels like "<Company>'s Career Site"
     note: "If the Contacts tab has a referrer for this company → use their name."
   - key: non_compete
     match: ["non-compete", "noncompete", "restrictive covenant"]

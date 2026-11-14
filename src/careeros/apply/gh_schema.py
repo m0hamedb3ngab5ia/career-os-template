@@ -17,7 +17,7 @@ import re
 from pathlib import Path
 from typing import Any
 
-from careeros.apply.questions import _label_matches, answer_for, classify_question, load_eeo_answers, select_eeo_option
+from careeros.apply.questions import _label_matches, answer_for, answer_prefer, classify_question, load_eeo_answers, select_eeo_option
 from careeros.scout.base import get_json
 
 API = "https://boards-api.greenhouse.io/v1/boards/{board}/jobs/{job_id}"
@@ -58,13 +58,54 @@ def normalize(data: dict[str, Any]) -> list[dict[str, Any]]:
     return out
 
 
-def pick_option(options: list[str], answer: Any) -> str | None:
-    """Exact label (case-insensitive), else the only whole-word prefix match; else None (ambiguous = review)."""
-    if isinstance(answer, bool):
-        answer = "Yes" if answer else "No"
-    kinds = [(o, _label_matches(o, str(answer))) for o in options]
+def _strict(options: list[str], answer: str) -> str | None:
+    kinds = [(o, _label_matches(o, answer)) for o in options]
     prefix = [o for o, k in kinds if k == "prefix"]
     return next((o for o, k in kinds if k == "exact"), None) or (prefix[0] if len(prefix) == 1 else None)
+
+
+def _words(text: str) -> set[str]:
+    return set(re.findall(r"[a-z0-9]+", text.lower()))
+
+
+def _subset(options: list[str], answer: str) -> str | None:
+    """The only option holding every whole word of `answer` ("Career Site" -> "Acme's Career Site")."""
+    w = _words(answer)
+    hits = [o for o in options if w and w <= _words(o)]
+    return hits[0] if len(hits) == 1 else None
+
+
+def pick_option(options: list[str], answer: Any, prefer: list[str] | tuple[str, ...] = ()) -> str | None:
+    """Exact label (case-insensitive), else the only whole-word prefix match, else each `prefer` keyword in order
+    (same rules), else the only option containing all the answer's whole words; else None (ambiguous = review)."""
+    if isinstance(answer, bool):
+        answer = "Yes" if answer else "No"
+    hit = _strict(options, str(answer))
+    for kw in prefer:
+        hit = hit or _strict(options, kw) or _subset(options, kw)
+    return hit or _subset(options, str(answer))
+
+
+_DEGREES = {"bachelor": "Bachelor's Degree", "master": "Master's Degree", "associate": "Associate's Degree",
+            "phd": "Doctor of Philosophy (Ph.D.)", "doctor": "Doctor of Philosophy (Ph.D.)"}
+_MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
+           "November", "December"]
+
+
+def _degree_label(degree: str) -> str | None:
+    v = degree.strip().lower().replace(".", "")
+    return next((lab for k, lab in _DEGREES.items() if v.startswith(k)), None)
+
+
+def _month(ym: Any) -> str | None:
+    m = re.fullmatch(r"\d{4}-(\d{2})", str(ym or ""))
+    return _MONTHS[int(m[1]) - 1] if m and 1 <= int(m[1]) <= 12 else None
+
+
+def _phone_country(phone: Any) -> str | None:
+    p = str(phone or "").strip()
+    digits = re.sub(r"\D", "", p)
+    return "United States" if p.startswith("+1") or (not p.startswith("+") and len(digits) == 10) else None
 
 
 def _identity(profile: dict[str, Any]) -> dict[str, Any]:
@@ -80,14 +121,23 @@ def _extras(profile: dict[str, Any]) -> list[dict[str, Any]]:
     edu = (profile.get("education") or [{}])[0] or {}
     city = str(i.get("location") or "").split(",")[0].strip() or None
     start = str(edu.get("start") or "")[:4] or None
-    disc = edu.get("discipline") or edu.get("major")
+    end = str(edu.get("end") or "")[:4] or None
+    raw_degree = str(edu.get("degree") or "")
+    degree = _degree_label(raw_degree) or raw_degree or None
+    disc = edu.get("discipline") or edu.get("major")  # a list = ordered fallback, first one offered wins
+    if not disc and "," in raw_degree and _degree_label(raw_degree):  # "Bachelor of Engineering, Software Engineering"
+        disc = raw_degree.split(",", 1)[1].strip() or None
     combined = bool(edu.get("degree")) and not disc  # e.g. "BS Computer Science": never split it by guessing
-    rows = [("country", "Country", "select", i.get("country"), False),
+    country = i.get("country") or _phone_country(i.get("phone"))
+    rows = [("country", "Country", "select", country, bool(i.get("phone")) and not country),
             ("candidate-location", "Location (City)", "select_async", city, False),
             ("school--0", "School", "select_async", edu.get("school"), False),
-            ("degree--0", "Degree", "select_async", edu.get("degree"), combined),
+            ("degree--0", "Degree", "select_async", degree, combined),
             ("discipline--0", "Discipline", "select_async", disc, combined),
-            ("start-year--0", "Start date year", "text", start, False)]
+            ("start-month--0", "Start date month", "select", _month(edu.get("start")), False),
+            ("start-year--0", "Start date year", "text", start, False),
+            ("end-month--0", "End date month", "select", _month(edu.get("end")), False),
+            ("end-year--0", "End date year", "text", end, False)]
     return [{"field_id": fid, "label": label, "type": t, "value": v, "source": "profile" if v else None,
              "needs_review": rev} for fid, label, t, v, rev in rows if v or rev]
 
@@ -106,7 +156,7 @@ def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers
     hit = answer_for(f["label"], answers_path, required=f["required"], company=company)
     if not hit or hit[1] is None:
         return None, None
-    value = pick_option(f["options"], hit[1]) if t in _SELECTS else hit[1]
+    value = pick_option(f["options"], hit[1], answer_prefer(hit[0], answers_path, company)) if t in _SELECTS else hit[1]
     if value is not None and t in ("multiselect", "checkbox_group"):
         value = [value]
     return value, f"standard:{hit[0]}"
