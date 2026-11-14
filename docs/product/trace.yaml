@@ -351,6 +351,8 @@ requirements:
     - E2E-015-01
   REQ-072:
     status: approved
+    ui: partly-retired-chat-first
+    chat: "`careeros job show <id>`; Jobs list and tick stay"
     provenance: confirmed
     user_requirements:
     - USR-013
@@ -358,6 +360,8 @@ requirements:
     - E2E-016-02
   REQ-073:
     status: proposed
+    ui: retired-chat-first
+    chat: "ask Claude what needs you; `careeros action list`, `action done <id>`"
     provenance: observed
     user_requirements:
     - USR-014
@@ -368,21 +372,29 @@ requirements:
     - USR-013
   REQ-075:
     status: proposed
+    ui: retired-chat-first
+    chat: "`careeros run list|show|status|pause`"
     provenance: observed
     user_requirements:
     - USR-018
   REQ-076:
     status: proposed
+    ui: retired-chat-first
+    chat: "ask Claude to change a value in `config/*.yaml`"
     provenance: observed
     user_requirements:
     - USR-018
   REQ-077:
     status: proposed
+    ui: retired-chat-first
+    chat: "`/inbox-sync`, `/find-contacts`, `careeros outreach check`"
     provenance: observed
     user_requirements:
     - USR-016
   REQ-078:
     status: proposed
+    ui: retired-chat-first
+    chat: "none (dev-only page removed)"
     provenance: confirmed
   REQ-079:
     status: proposed
@@ -406,6 +418,8 @@ requirements:
     - USR-020
   REQ-093:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume add <file>`"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -416,6 +430,8 @@ requirements:
     - E2E-001-04
   REQ-094:
     status: approved
+    ui: retired-chat-first
+    chat: "`/review-resume <rid>`"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -424,6 +440,8 @@ requirements:
     - E2E-001-02
   REQ-095:
     status: approved
+    ui: retired-chat-first
+    chat: "`/edit-resume <rid> <aid>`; ask Claude to apply the suggestion"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -436,6 +454,8 @@ requirements:
     - E2E-002-05
   REQ-096:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume annotate-reply`; reply in chat"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -445,6 +465,8 @@ requirements:
     - E2E-002-03
   REQ-097:
     status: approved
+    ui: retired-chat-first
+    chat: "ask Claude to edit the draft in chat"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -455,6 +477,8 @@ requirements:
     - E2E-002-03
   REQ-098:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume feedback <rid>`; ask Claude for the ATS read"
     provenance: confirmed
     user_requirements:
     - USR-003
@@ -463,6 +487,8 @@ requirements:
     - E2E-003-02
   REQ-099:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume list`; `/extract-master`"
     provenance: confirmed
     user_requirements:
     - USR-003
@@ -471,6 +497,8 @@ requirements:
     - E2E-003-02
   REQ-100:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume list`"
     provenance: confirmed
     user_requirements:
     - USR-004
@@ -479,6 +507,8 @@ requirements:
     - E2E-004-02
   REQ-101:
     status: approved
+    ui: retired-chat-first
+    chat: "drop files in `profile/voice/samples/`, run `/learn-voice`"
     provenance: confirmed
     user_requirements:
     - USR-022
@@ -486,6 +516,8 @@ requirements:
     - E2E-005-01
   REQ-102:
     status: approved
+    ui: partly-retired-chat-first
+    chat: "`careeros doctor`"
     provenance: confirmed
     user_requirements:
     - USR-023
@@ -510,6 +542,8 @@ requirements:
     - E2E-007-02
   REQ-105:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros apply plan <job>`, then `apply fill`"
     provenance: confirmed
     user_requirements:
     - USR-025
@@ -518,6 +552,8 @@ requirements:
     - E2E-008-02
   REQ-106:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros action add|list`, `careeros learn answer`"
     provenance: confirmed
     user_requirements:
     - USR-026
@@ -526,6 +562,8 @@ requirements:
     - E2E-008-02
   REQ-107:
     status: approved
+    ui: retired-chat-first
+    chat: "ask Claude to edit `profile/master.yaml`; `/extract-master`; `careeros doctor`"
     provenance: confirmed
     user_requirements:
     - USR-027
@@ -576,6 +614,8 @@ requirements:
     - E2E-011-01
   REQ-114:
     status: approved
+    ui: retired-chat-first
+    chat: "paste the posting in chat; `/score-job`, `/prepare-job`"
     provenance: confirmed
     user_requirements:
     - USR-028
@@ -583,6 +623,8 @@ requirements:
     - E2E-010-01
   REQ-115:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume match <job>`"
     provenance: confirmed
     user_requirements:
     - USR-028
@@ -590,6 +632,8 @@ requirements:
     - E2E-010-01
   REQ-116:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume pick <job>`; `/prepare-job`"
     provenance: confirmed
     user_requirements:
     - USR-028
@@ -597,6 +641,8 @@ requirements:
     - E2E-010-02
   REQ-117:
     status: approved
+    ui: retired-chat-first
+    chat: "`/prepare-job`; `careeros batch create|run`"
     provenance: confirmed
     user_requirements:
     - USR-034
@@ -604,6 +650,8 @@ requirements:
     - E2E-013-01
   REQ-118:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros batch create` (stop point flags)"
     provenance: confirmed
     user_requirements:
     - USR-034
@@ -622,6 +670,8 @@ requirements:
     - USR-036
   REQ-121:
     status: approved
+    ui: retired-chat-first
+    chat: "`docs/GETTING_STARTED.md`, `docs/CHAT.md`"
     provenance: confirmed
     user_requirements:
     - USR-037
@@ -640,6 +690,8 @@ requirements:
     tests: []
   REQ-124:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume add <file>`"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -648,6 +700,8 @@ requirements:
     - E2E-001-04
   REQ-125:
     status: approved
+    ui: retired-chat-first
+    chat: "`/review-resume <rid>`, `/edit-resume`"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -656,6 +710,8 @@ requirements:
     - E2E-002-07
   REQ-126:
     status: approved
+    ui: retired-chat-first
+    chat: "ask Claude to edit and save a version in chat"
     provenance: confirmed
     user_requirements:
     - USR-002
@@ -770,9 +826,31 @@ requirements:
     provenance: confirmed
     tests:
     - tests/test_qa.py::test_thin_experience_entry_fails_and_names_entry
+  REQ-139:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_advice_skill_contract
+  REQ-140:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_today_skill_contract
+  REQ-141:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_interview_prep_skill_contract
+  REQ-142:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_score_job_does_not_saturate_on_generic_postings_and_lists_gaps
 use_cases:
   UC-001:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume add`, `/review-resume <rid>`"
     requirements:
     - REQ-093
     - REQ-094
@@ -780,6 +858,8 @@ use_cases:
     - REQ-125
   UC-002:
     status: approved
+    ui: retired-chat-first
+    chat: "`/edit-resume`, chat edits"
     requirements:
     - REQ-095
     - REQ-096
@@ -788,15 +868,21 @@ use_cases:
     - REQ-126
   UC-003:
     status: approved
+    ui: retired-chat-first
+    chat: "ask Claude for the ATS read; `/extract-master`"
     requirements:
     - REQ-098
     - REQ-099
   UC-004:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros resume list`"
     requirements:
     - REQ-100
   UC-005:
     status: approved
+    ui: retired-chat-first
+    chat: "`profile/voice/samples/`, `/learn-voice`"
     requirements:
     - REQ-101
   UC-006:
@@ -810,15 +896,21 @@ use_cases:
     - REQ-104
   UC-008:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros apply plan|fill`"
     requirements:
     - REQ-105
     - REQ-106
   UC-009:
     status: approved
+    ui: retired-chat-first
+    chat: "ask Claude to edit `profile/master.yaml`, `config/*.yaml`"
     requirements:
     - REQ-107
   UC-010:
     status: approved
+    ui: retired-chat-first
+    chat: "paste the posting in chat; `/score-job`"
     requirements:
     - REQ-111
     - REQ-114
@@ -837,12 +929,16 @@ use_cases:
     - REQ-110
   UC-013:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros batch create|run`, `/prepare-job`"
     requirements:
     - REQ-117
     - REQ-118
     - REQ-120
   UC-014:
     status: approved
+    ui: partly-retired-chat-first
+    chat: "`docs/GETTING_STARTED.md`"
     requirements:
     - REQ-119
     - REQ-121
@@ -873,6 +969,8 @@ use_cases:
 flows:
   FLOW-001:
     status: approved
+    ui: retired-chat-first
+    chat: "`careeros doctor`, `docs/GETTING_STARTED.md`"
     use_cases:
     - UC-001
     - UC-002
@@ -881,14 +979,20 @@ flows:
     - UC-006
   FLOW-002:
     status: approved
+    ui: retired-chat-first
+    chat: "`/review-resume`, `/edit-resume`"
     use_cases:
     - UC-002
   FLOW-003:
     status: approved
+    ui: retired-chat-first
+    chat: "paste the posting in chat; `/score-job`"
     use_cases:
     - UC-010
   FLOW-004:
     status: draft
+    ui: partly-retired-chat-first
+    chat: "`careeros batch create|run`, `/prepare-job`"
     use_cases:
     - UC-007
     - UC-013

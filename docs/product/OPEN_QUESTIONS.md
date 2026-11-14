@@ -199,3 +199,10 @@
 - Recommended: (b) + (a): deterministic prefilter on all, LLM-score the top N per scan within a daily cap; the rest wait or score on demand.
 - Answer (2026-10-14, user): Recommended as written.
 - Status: answered
+
+### Q-032 Retired UI surface: is a trace annotation enough?
+- Links: DEC-024, REQ-073..078, REQ-093..101, REQ-105..107, REQ-114..118, REQ-121, REQ-124..126
+- Context: the product system has no status for "requirement stays, its UI page is gone". `deprecated` would say the intent is dropped, which is wrong here. Used instead: extra trace.yaml keys `ui: retired-chat-first` (or `partly-retired-chat-first`) and `chat: "<replacement>"`, plus a "UI retired" line under each heading. `trace.py` ignores extra keys.
+- Options: (a) keep the annotation; (b) add a real REQ status or a `surface` field to `trace.py`; (c) rewrite each REQ as a chat requirement.
+- Recommended: (a) now, (b) if more surfaces move.
+- Status: open

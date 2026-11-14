@@ -65,34 +65,21 @@ describe("AppShell", () => {
     expect(links).toEqual([
       "Today",
       "Jobs",
-      "Inbox",
-      "Profile",
-      "Settings",
     ]);
-    for (const g of ["Job search", "More"]) expect(within(nav).getByText(g)).toBeInTheDocument();
-  });
-
-  it.each([
-    ["/runs", "/automation"],
-    ["/runs?kind=score", "/automation?kind=score"],
-    ["/runs/r1", "/automation/runs/r1"],
-  ])("redirects the old path %s to %s", async (from, to) => {
-    const { router } = renderAt(from);
-    await waitFor(() => expect(router.state.location.pathname + router.state.location.search).toBe(to));
+    for (const g of ["Job search"]) expect(within(nav).getByText(g)).toBeInTheDocument();
   });
 
   it("marks the current section and shows its page heading", async () => {
-    renderAt("/settings");
-    expect(await screen.findByRole("link", { name: "Settings" })).toHaveAttribute("aria-current", "page");
+    renderAt("/jobs");
+    expect(await screen.findByRole("link", { name: "Jobs" })).toHaveAttribute("aria-current", "page");
     // the screen is a lazy route: allow for its chunk to load
-    expect(await screen.findByRole("heading", { level: 1, name: "Settings" }, { timeout: 4000 })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { level: 1, name: "Jobs" }, { timeout: 4000 })).toBeInTheDocument();
   });
 
   it("shows live counts from /api/status; zero when there is no data yet", async () => {
     renderAt("/", { counts: { jobs: 736, action_items_open: 7, inbox: 0 } });
     const nav = screen.getByRole("navigation", { name: "Sections" });
     expect(await within(nav).findByRole("link", { name: /^Today\s*7$/ })).toBeInTheDocument();
-    expect(within(nav).getByRole("link", { name: /^Inbox\s*0$/ })).toBeInTheDocument();
     expect(within(nav).queryByText("736")).toBeNull(); // Jobs total is not actionable
   });
 
@@ -153,8 +140,8 @@ describe("AppShell", () => {
     });
 
     it("elsewhere the box starts empty", async () => {
-      renderAt("/automation?q=globex");
-      // the Automation route is lazy-loaded, so the shell appears once it resolves
+      renderAt("/nope?q=globex");
+      // the Profile route is lazy-loaded, so the shell appears once it resolves
       const box = await screen.findByRole("searchbox", { name: "Search jobs and companies" }, { timeout: 5000 });
       expect(box).toHaveValue("");
     });
@@ -193,43 +180,35 @@ describe("AppShell route changes", () => {
     const user = userEvent.setup();
     renderAt("/");
     const nav = screen.getByRole("navigation", { name: "Sections" });
-    await user.click(within(nav).getByRole("link", { name: /^Settings/ }));
-    const h1 = await screen.findByRole("heading", { level: 1, name: "Settings" });
+    await user.click(within(nav).getByRole("link", { name: /^Jobs/ }));
+    const h1 = await screen.findByRole("heading", { level: 1, name: "Jobs" });
     const main = screen.getByRole("main");
     await waitFor(() => expect(main).toHaveFocus());
     expect(main.contains(h1)).toBe(true);
-    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Settings");
+    expect(screen.getByTestId("route-announcer")).toHaveTextContent("Jobs");
   });
 
   it("does not announce or move focus on the first load", async () => {
-    renderAt("/automation");
-    await screen.findByRole("heading", { level: 1, name: "Automation" });
+    renderAt("/jobs");
+    await screen.findByRole("heading", { level: 1, name: "Jobs" });
     expect(screen.getByRole("main")).not.toHaveFocus();
     expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
   });
 
   it("leaves focus alone when only the query string changes (e.g. ?sel=)", async () => {
-    const { router } = renderAt("/automation");
-    await screen.findByRole("heading", { level: 1, name: "Automation" });
+    const { router } = renderAt("/jobs");
+    await screen.findByRole("heading", { level: 1, name: "Jobs" });
     const search = screen.getByRole("searchbox", { name: "Search jobs and companies" });
     search.focus();
-    await act(() => router.navigate("/automation?sel=abc"));
+    await act(() => router.navigate("/jobs?sel=abc"));
     expect(search).toHaveFocus();
     expect(screen.getByTestId("route-announcer")).toHaveTextContent("");
   });
 
-  it("waits for a loading page's real title before announcing it (not the placeholder)", async () => {
-    const { router } = renderAt("/automation");
-    await screen.findByRole("heading", { level: 1, name: "Automation" });
-    await act(() => router.navigate("/automation/runs/abc"));
-    const h1 = await screen.findByRole("heading", { level: 1, name: (n) => n !== "Run" && n !== "Automation" });
-    await waitFor(() => expect(screen.getByTestId("route-announcer")).toHaveTextContent(h1.textContent!));
-    expect(screen.getByTestId("route-announcer").textContent).not.toBe("Run");
-  });
 
   it("Ctrl+K focuses the sidebar search off a Mac (Cmd+K does not)", async () => {
     const user = userEvent.setup();
-    renderAt("/automation");
+    renderAt("/jobs");
     const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
     await user.keyboard("{Meta>}k{/Meta}");
     expect(search).not.toHaveFocus();
@@ -242,7 +221,7 @@ describe("AppShell route changes", () => {
     vi.spyOn(navigator, "platform", "get").mockReturnValue("MacIntel");
     try {
       const user = userEvent.setup();
-      renderAt("/automation");
+      renderAt("/jobs");
       const search = await screen.findByRole("searchbox", { name: "Search jobs and companies" });
       expect(search).toHaveAttribute("aria-keyshortcuts", "Meta+K");
       const area = document.body.appendChild(document.createElement("textarea"));
@@ -258,7 +237,7 @@ describe("AppShell route changes", () => {
   });
 
   it("does not pull focus out of an open modal", async () => {
-    renderAt("/automation");
+    renderAt("/jobs");
     await screen.findByRole("searchbox", { name: "Search jobs and companies" });
     const modal = document.body.appendChild(document.createElement("div"));
     modal.setAttribute("aria-modal", "true");

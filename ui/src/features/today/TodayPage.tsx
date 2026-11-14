@@ -1,17 +1,13 @@
-import { Link, useSearchParams } from "react-router";
-import { ApiError } from "../../api/client";
+import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
 import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { formatLongDate } from "../../lib/dates";
 import { formatCount } from "../../lib/format";
 import { useNow } from "../../lib/useNow";
-import { useBatch } from "../pipeline/batch/api";
 import { errorText, useToday, useTodayStatus } from "./api";
 import { groupByJob } from "./actions";
 import { NeedsYou } from "./NeedsYou";
-import { PausedBanner } from "./PausedBanner";
-import { SetupCard, useSetupOpen } from "./SetupCard";
 import { TopPicks } from "./TopPicks";
 import { formatWhen } from "../../lib/dates";
 import styles from "./Today.module.css";
@@ -23,18 +19,11 @@ export function TodayPage() {
   const status = useTodayStatus();
   const today = useToday();
   const s = status.data;
-  const setupOpen = useSetupOpen();
-  const batchId = useSearchParams()[0].get("batch") ?? undefined;
-  const batch = useBatch(batchId);
-  // Unknown/failed batch: say so and show every task; still loading: show none (not a false "Nothing needs you").
-  const jobIds = batchId && !batch.isError ? batch.data?.selected.map((r) => r.job_id) : undefined;
-  const batchMissing = batch.error instanceof ApiError && batch.error.status === 404;
   const subtitle = today.data ? `${formatLongDate(now)} · ${headline(today.data.actions ?? [])}` : formatLongDate(now);
 
   return (
     <Page title="Today" subtitle={subtitle}>
       <div className={styles.stack}>
-        {s?.paused ? <PausedBanner paused={s.paused} now={now} /> : null}
         {status.isError ? (
           <div className={styles.panel}>
             <EmptyState
@@ -49,18 +38,8 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        {setupOpen ? <SetupCard /> : null}
-        {setupOpen === false ? <TopPicks picks={today.data?.top_picks ?? []} /> : null}
-        {batchId ? (
-          <p className={styles.batchNote}>
-            Only jobs in <Link to={`/pipeline/batch/${encodeURIComponent(batchId)}`}>{batch.data?.name || "this batch"}</Link> ·{" "}
-            <Link to="/">Show all</Link>
-            {batch.isError ? (
-              <span role="status"> · {batchMissing ? "Batch not found" : `Couldn’t load the batch: ${errorText(batch.error)}`}, showing all tasks</span>
-            ) : null}
-          </p>
-        ) : null}
-        {batchId && batch.isPending ? null : <NeedsYou jobIds={jobIds} />}
+        <TopPicks picks={today.data?.top_picks ?? []} />
+        <NeedsYou />
         {s ? <RecentActivity runs={s.recent_runs ?? []} now={now} /> : null}
         {s ? <JobSearch columns={s.pipeline?.columns ?? []} /> : null}
       </div>
@@ -107,7 +86,6 @@ function RecentActivity({ runs, now }: { runs: RunRow[]; now: Date }) {
     <section className={styles.panel} aria-labelledby="activity-title">
       <div className={styles.panelHead}>
         <h2 id="activity-title" className={styles.h2}>Recent activity</h2>
-        <Link to="/runs" className={styles.headLink}>View all activity</Link>
       </div>
       {rows.length ? (
         <ul className={styles.plainList}>

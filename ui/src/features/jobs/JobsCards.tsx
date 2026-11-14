@@ -1,9 +1,7 @@
-import { Link, useLocation } from "react-router";
-import { Button } from "../../kit/Button";
 import { StatusChip } from "../../kit/chips";
 import { formatCount, formatDate } from "../../lib/format";
 import styles from "./JobsCards.module.css";
-import { useSection } from "../settings/api";
+import { PostingLink } from "./cells";
 import { reasonsLine } from "./reasons";
 import type { JobListItem, TabKey } from "./types";
 
@@ -15,16 +13,15 @@ export const needsYou = (j: JobListItem) => j.status === "needs_review" || j.sta
 export function CardBody({ job, tab }: { job: JobListItem; tab: TabKey }) {
   const place = [job.title, job.company, job.location].filter(Boolean).join(" · ");
   const pending = !job.reasons;
-  const { search } = useLocation();
   return (
     <>
       <span className={styles.fit} aria-label={job.fit == null ? "No fit score" : `Fit ${job.fit}`}>
         {job.fit == null ? "–" : formatCount(Math.round(job.fit))}
       </span>
       <span className={styles.text}>
-        <Link to={{ pathname: `/jobs/${encodeURIComponent(job.job_id)}`, search }} className={styles.title} translate="no">
+        <PostingLink job={job} className={styles.title}>
           {job.company || job.job_id} <span className={styles.role}>{job.title}</span>
-        </Link>
+        </PostingLink>
         <span className={styles.meta}>{place}</span>
         <span className={pending ? styles.pending : styles.reasons}>{reasonsLine(job.reasons)}</span>
       </span>
@@ -72,14 +69,12 @@ export function JobsList({ rows, tab, selected, onToggle, current }: ListProps) 
   );
 }
 
-// REQ-136 reasons follow pipeline.yaml `scoring` (TASK-039), read from Settings › Runs; these are its defaults until it loads.
+// REQ-136 reasons follow pipeline.yaml `scoring` (TASK-039), read from pipeline.yaml; these are its defaults until it loads.
 const SCORING_DEFAULTS = { minPrescore: 20, staleDays: 21 };
 type ScoringCfg = typeof SCORING_DEFAULTS;
 
 function useScoringCfg(): ScoringCfg {
-  const v = useSection("runs").data?.values ?? {};
-  const num = (x: unknown, d: number) => (typeof x === "number" ? x : d);
-  return { minPrescore: num(v["scoring.min_prescore"], SCORING_DEFAULTS.minPrescore), staleDays: num(v["scoring.stale_days"], SCORING_DEFAULTS.staleDays) };
+  return SCORING_DEFAULTS;
 }
 
 /** Why an unscored job is still unscored: below the quick-match cutoff, an older posting (scored after newer ones), else queued. */
@@ -95,18 +90,14 @@ interface NotScoredProps {
   selected: Set<string>;
   onToggle: (id: string) => void;
   /** Jobs a score run was started for; they leave the tab once scored. */
-  scoring: Set<string>;
-  onScore: (ids: string[]) => void;
 }
 
-/** REQ-136 card: Quick match (labelled, never styled like the fit score) + title · company · place + reason + Score now. */
-export function NotScoredList({ rows, selected, onToggle, scoring, onScore }: NotScoredProps) {
-  const { search } = useLocation();
+/** REQ-136 card: Quick match (labelled, never styled like the fit score) + title · company · place + reason. */
+export function NotScoredList({ rows, selected, onToggle }: NotScoredProps) {
   const cfg = useScoringCfg();
   return (
     <ul className={styles.list} aria-label="Jobs">
       {rows.map((j) => {
-        const busy = scoring.has(j.job_id);
         return (
           <li key={j.job_id} className={styles.card}>
             <input type="checkbox" checked={selected.has(j.job_id)} onChange={() => onToggle(j.job_id)} aria-label={`Select ${j.company || j.job_id}`} />
@@ -115,15 +106,12 @@ export function NotScoredList({ rows, selected, onToggle, scoring, onScore }: No
               <span className={styles.quickNum}>{j.prescore == null ? "–" : formatCount(j.prescore)}</span>
             </span>
             <span className={styles.text}>
-              <Link to={{ pathname: `/jobs/${encodeURIComponent(j.job_id)}`, search }} className={styles.title} translate="no">
+              <PostingLink job={j} className={styles.title}>
                 {j.company || j.job_id} <span className={styles.role}>{j.title}</span>
-              </Link>
+              </PostingLink>
               <span className={styles.meta}>{[j.location, j.found_at ? formatDate(j.found_at) : ""].filter(Boolean).join(" · ")}</span>
               <span className={styles.reasons}>{notScoredReason(j, cfg)}</span>
             </span>
-            <Button size="small" disabled={busy} onClick={() => onScore([j.job_id])}>
-              {busy ? "Scoring…" : "Score now"}
-            </Button>
           </li>
         );
       })}

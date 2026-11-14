@@ -6,51 +6,61 @@ New (Feature lane 2026-10-04, from USR-002..004, 022..027). Gate approved 2026-1
 All uploads + versions live under `profile/` (gitignored, REQ-003). One profile per install (USR-027).
 
 ### REQ-093 Upload résumé
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume add <file>`. Intent unchanged.
 Profile page has a Résumés section; accepts PDF or DOCX ≤5 MB (Q-009); stored with its original file.
 Given Profile page · When user drops `cv.pdf` · Then file stored under `profile/resumes/<rid>/`, v1 (author=user) listed, review starts (REQ-094).
 Failure: wrong type/too big → inline error, nothing stored. Corrupt/unreadable → stored, ATS view (REQ-098) warns "no text found".
 Changed 2026-10-12 (DEC-012): upload = v1 original file, read-only forever; then convert (REQ-124) → v2; review runs on v2. Upload lands in the workspace (REQ-125).
 
 ### REQ-094 Background résumé review with progress
+> UI retired 2026-11-14 (DEC-024): replaced by `/review-resume <rid>`. Intent unchanged.
 Upload starts one headless review run (skill, no API key); UI shows live progress; result = feedback items `{id, section, issue, suggestion}`.
 Given upload done · When review runs · Then progress screen streams steps; on finish feedback list shows; user may leave page and come back.
 Failure: `claude` missing/timeout → review state `failed` + Retry; upload kept. Events: run log like REQ-040.
 
 ### REQ-095 Apply feedback with one click
+> UI retired 2026-11-14 (DEC-024): replaced by `/edit-resume <rid> <aid>`; ask Claude to apply the suggestion. Intent unchanged.
 Changed 2026-10-12 (DEC-012, wireframe). Accept (✓) → AI rewrite of the item's `quote` replaces it in place in the draft (REQ-126), shown as inline suggestion (deleted struck through, inserted in AI colour); card leaves margin → History. Reject (✕) same, text unchanged. Revert from History or ⌘Z. No version per accept.
 Given feedback item · When Accept · Then draft text changed in place, item `accepted` (draft), entry in History, no new version until Next/Done.
 Guard: rewrite may not add numbers, employers, titles, dates or tools absent from the previous version, nor stronger claims (scope, outcome, seniority verb e.g. supported → led) (zero-fabrication, reuse qa fabrication check); violation → rejected, item stays open with reason.
 
 ### REQ-096 Reply on feedback, optional Apply comment
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume annotate-reply`; reply in chat. Intent unchanged.
 Changed 2026-10-12 (Q-023): any card (suggestion or comment) has a reply thread, Google-Docs style. Reply box has checkbox "Apply comment": checked → reply sent to AI as feedback; it re-drafts the suggestion (or turns a comment into a suggestion) and posts a short reply. Unchecked → reply kept as a note, no AI run. Replies kept on the item, join the draft (REQ-126). Re-draft still a suggestion: nothing changes in the résumé until ✓.
 Given suggestion · When user replies "keep the Python line" with Apply comment checked · Then suggestion re-drafted honoring it, thread shows reply + AI reply; résumé text unchanged until ✓.
 Given card · When user replies with Apply comment unchecked · Then reply saved on card; no AI run.
 
 ### REQ-097 Edit résumé by hand
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude to edit the draft in chat. Intent unchanged.
 Changed 2026-10-12: edit text in place in the workspace (structured fields: bullets, headings, contact), never raw LaTeX. Edits join the draft (REQ-126), change tagged author=user. No guard (user owns facts).
 Given v2 · When user edits a bullet + Next/Done · Then v3 holds the edit tagged user, v2 unchanged.
 
 ### REQ-098 ATS view
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume feedback <rid>`; ask Claude for the ATS read. Intent unchanged.
 Per version: plain text an ATS would read + parsed fields (contact, sections, roles+dates, skills) + warnings (images, tables, multi-column, missing contact, unreadable dates). Deterministic, no LLM.
 Given uploaded PDF · When open ATS view · Then extracted text + fields + warnings shown; same input → same output.
 
 ### REQ-099 Résumé roles: master + others
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume list`; `/extract-master`. Intent unchanged.
 Exactly one résumé is `master`; others get a type (`variant` | `other`, Q-011) and a name. Marking master demotes the old one.
 Master feeds `profile/master.yaml`: on set-master (and on each new master version) AI extracts bullets → proposed `master.yaml` diff; user approves before write (Q-012). Numbers copied verbatim.
 Given 2 résumés · When mark B master · Then A becomes `variant`, master.yaml diff proposed from B.
 
 ### REQ-100 Résumé list + version history
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume list`. Intent unchanged.
 List all résumés (name, type, latest version, date). Per résumé: versions with author user|ai, time, source (upload/edit/feedback id). Open any version (view + ATS view). Delete non-latest versions; latest of master can't be deleted; deleting a whole résumé allowed unless master.
 Given master v1..v3 · When delete v1 · Then v2,v3 remain · When delete v3 · Then refused with reason.
 Changed 2026-10-12 (wireframe): in workspace, "All changes saved" opens version history panel: Current + versions newest first; select → read-only view, "Show changes" (inline diff vs previous), "Restore this version" (becomes draft, History cleared). No "Compare with…" (dropped). Any "new version" toast links to that version; never a bare "Applied vN". v1 (original upload) never deletable.
 
 ### REQ-124 Convert upload to structured résumé
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume add <file>`. Intent unchanged.
 After upload, AI converts v1 text into structured résumé (`resume_schema.md` shape: identity, sections, roles, bullets) → v2 author=ai source=convert, rendered with `templates/resume/default.tex` (PDF when LaTeX present) and HTML (REQ-125).
 Guard: v2 may not add numbers, employers, titles, dates or tools absent from v1 text (REQ-095 guard). Dropped text (v1 lines not in v2) listed in a "Not carried over" panel; each line → Restore (adds to draft).
 Given 1-page PDF · When convert · Then v2 structured, guard passes, dropped list shown (may be empty).
 Failure: guard fails or no text → v2 not created, workspace shows v1 read-only + reason + Retry; review still runs on v1 text.
 
 ### REQ-125 Résumé workspace page
+> UI retired 2026-11-14 (DEC-024): replaced by `/review-resume <rid>`, `/edit-resume`. Intent unchanged.
 Changed 2026-10-12 (wireframe `mockups/resume-workspace.html`). Route `/resumes/<rid>`, full page. Header: "← Résumés" (back to Profile › Résumés, no confirm: autosaved) · name · "All changes saved" (REQ-100 history) · "↶ History (n)" · "N open" / "All handled" · one primary: onboarding → "Next: <next checklist step>" (first run: Saved answers), else "Done". Open items never block primary.
 Body: résumé HTML render (our template look, no LaTeX) with inline suggestions; margin cards aligned to their text (Google Docs: active card level with its text, others stack without overlap). Click text ↔ card pairs both; hover card highlights its text. Card text = why, one line. Format-kind items (no quote) at top. AI comments (no rewrite) = yellow, ✓ resolve only.
 Primary click → one version (REQ-126); onboarding also sets master (REQ-099) → next step.
@@ -59,6 +69,7 @@ Given review done with 3 items · When open workspace + click item 2 · Then ite
 Given 2 of 4 items handled · When "Next: Saved answers" · Then new version, résumé master, Saved answers opens, 2 items still open on résumé.
 
 ### REQ-126 Autosaved draft, one version per Next/Done
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude to edit and save a version in chat. Intent unchanged.
 Changed 2026-10-12 (wireframe). Accepts, rejects, resolves, restores and hand edits collect in one draft per résumé, autosaved server-side ("Saving…" → "All changes saved"), survives leaving page/restart. Each change records author (ai|user) + feedback id. History (n) lists handled items (Accepted/Rejected/Resolved/Restored + text), each Revert → item open again, any order; ⌘Z/⌘⇧Z undo/redo last change. No Save, no Discard (Revert / Restore version cover it).
 Next/Done → one version vN+1 with per-change authors (label "you + AI" when mixed); handled items final, open items stay open for later. Leave via "← Résumés" or nav with changes → draft kept, Profile row status "Draft" until Next/Done. No changes → no draft, status unchanged.
 Given draft with 2 accepts + 1 edit · When Done · Then exactly one new version, 3 changes tagged ai, ai, user; toast links to vN+1.
@@ -66,10 +77,12 @@ Given 1 accept · When "← Résumés" · Then row shows "Draft"; reopen → acc
 Given accept then Revert in History · Then suggestion open again, text as before, History (0).
 
 ### REQ-101 Writing samples
+> UI retired 2026-11-14 (DEC-024): replaced by drop files in `profile/voice/samples/`, run `/learn-voice`. Intent unchanged.
 Same Profile page: upload past cover letters / writing (txt, md, pdf, docx ≤5 MB) → `profile/voice/samples/`. List + remove. Any change re-runs `learn-voice` in background → `style_guide.md` Learned section. Cover letters use it; `voice_verified` true iff ≥1 sample.
 Given 0 samples · When upload 2 · Then learn-voice runs once, list shows 2, next cover letter `voice_verified: true`.
 
 ### REQ-102 Readiness checklist
+> UI partly retired 2026-11-14 (DEC-024): Profile card retired, Today card stays; replaced by `careeros doctor`. Intent unchanged.
 `GET /api/readiness` + UI card (Today + Profile) + `careeros doctor` reuse: items `{id, label, must, done, fix_link}`.
 Must-haves (Q-013): master résumé set; master.yaml has no example/placeholder data (doctor); legal/work-auth + salary standard answers set; `claude` installed; master.yaml synced with master résumé (open while a REQ-099 diff is pending or rejected). Nice: ≥1 writing sample, ATS credentials, EEO answers.
 Given fresh install · When open Today · Then checklist shows each item with link; all must-haves done → "Ready to apply".
@@ -85,17 +98,20 @@ Given pre-existing job without `selected` · When `run prepare` · Then it is pr
 Amendment (Q-022, user-approved 2026-10-05): creating a batch counts as selecting its named jobs, like `--job X` (REQ-117).
 
 ### REQ-105 Fill preview + edit
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros apply plan <job>`, then `apply fill`. Intent unchanged.
 Before fill: UI table of the fill plan, per field: label, value, source (saved answer | AI draft | resume | default), required. User edits any value → plan updated (job only); checkbox "save to profile" also writes standard answer (REQ-053).
 AI draft = the job's `/answer-question` draft (`answers.json`) for a freetext field with no saved answer; never for legal/salary/EEO (REQ-014, REQ-030). Draft rows start unreviewed; fill refuses while any is unreviewed (like `needs_input`). Approve or edit marks it reviewed. "Save to profile" defaults off for drafts. CLI/scheduled: one Action Item "review N drafts". (DEC-010)
 Given fill_plan · When user edits "Notice period" · Then fill uses edited value; `fill_summary` read-back matches.
 Given plan with 1 unreviewed AI draft · When fill · Then refused; When user approves it · Then fill uses the draft text.
 
 ### REQ-106 Ask on unknown fields
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros action add|list`, `careeros learn answer`. Intent unchanged.
 Plan field with no answer → `needs_input`; UI (and an Action Item for CLI/scheduled runs) asks: fill or skip. Skip allowed only for optional fields; required unanswered → job not filled. Filled answer saved to profile (REQ-053) unless user unticks save.
 Never guessed: legal/salary/EEO stay hard rules (REQ-014, REQ-030).
 Given plan with unknown required field · When user answers, save on · Then plan filled, `standard_answers.yaml` gains it, next job's plan auto-fills it.
 
 ### REQ-107 Profile page
+> UI retired 2026-11-14 (DEC-024): replaced by ask Claude to edit `profile/master.yaml`; `/extract-master`; `careeros doctor`. Intent unchanged.
 One page, sections: Résumés (REQ-093..100), Writing samples (REQ-101), Saved answers (view/edit/delete `standard_answers.yaml`, incl. per-company + EEO), Learned (apply lessons view/delete, voice style summary), Readiness (REQ-102). All writes atomic via existing writers.
 Given 12 saved answers · When delete one · Then gone from YAML and from future plans.
 
@@ -110,21 +126,26 @@ Given variant "backend" scores 82, threshold 70 · When prepare · Then job uses
 Best < threshold: estimate gain from a tweak (swap/reorder ≤3 bullets from master.yaml by id; numbers frozen). Gain ≥ `thresholds.min_tweak_gain` (default 5) and reaches threshold → tweak, saved as new variant for that job category, reused by later jobs. Else full tailor from master (REQ-021). Never fabricate; only master.yaml bullets.
 Given best 66, tweak estimate 74 · When prepare · Then one variant created, next similar job reuses it without a new run.
 ### REQ-114 Check any job (paste/upload)
+> UI retired 2026-11-14 (DEC-024): replaced by paste the posting in chat; `/score-job`, `/prepare-job`. Intent unchanged.
 Jobs page "Check a job": paste JD text or upload PDF/DOCX/txt (≤5 MB). Creates job `source: manual`, runs REQ-109 scan, REQ-020 fit score, REQ-111 per résumé. LinkedIn etc. text pasted by user allowed (user-side, Q-016).
 Given pasted JD · When submit · Then job listed with fit score + per-résumé match table.
 Result actions (2026-10-05): primary "Prepare application" (ticks the job, starts a prepare run: tailor from master + cover letter + QA) whether best is above or below threshold; secondary "Cancel" (job kept, not ticked). No "Done", "Keep job, no résumé" or separate "Tailor from master" button. Below-threshold keep/discard of the tailored résumé (REQ-116) stays. Match table has a per-résumé "Why this score" toggle: matched (✓) and missing keywords, required vs preferred, minimal; data from `GET /api/jobs/{id}/matches`.
 Given result shown · When Prepare application · Then job ticked and prepare run started; When Cancel · Then job kept, unticked.
 ### REQ-115 Rank my résumés for a job
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume match <job>`. Intent unchanged.
 Job detail: table of every résumé with match score, best highlighted, threshold line, missing skills per résumé.
 Given 3 résumés · When open job · Then sorted by match, best marked, scores = REQ-111.
 ### REQ-116 Below threshold → offer tailor, then report
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros resume pick <job>`; `/prepare-job`. Intent unchanged.
 No résumé ≥ threshold → offer "Tailor from master" (REQ-113/021). Result ≥ threshold → done. Still below → notice "threshold not met: best X, needed Y; missing: …" + ask "Create closest match anyway?" Yes → keep best attempt, marked `below_threshold`; No → discard attempt. Max one tailor run per check.
 Given threshold 70, all résumés < 60, tailored = 64 · When check · Then notice shows 64/70 + missing skills, asks; Yes keeps it flagged.
 
 ### REQ-117 Start pipeline from the Jobs list
+> UI retired 2026-11-14 (DEC-024): replaced by `/prepare-job`; `careeros batch create|run`. Intent unchanged.
 Jobs list "Start pipeline" button, enabled while ≥1 job ticked (REQ-104; disabled reason "Tick jobs first"). Opens a review sheet: one "Go as far as" for all ticked jobs (Prepare / Fill / Submit, default Fill = the user submits), override per row. Caps, each shown with its reason: LinkedIn Easy Apply (apply URL on linkedin.com) → Prepare, the user applies on LinkedIn (hard rule: never automate LinkedIn); a job found on LinkedIn whose apply URL is the company's own ATS follows the chosen stop like any job; Tier A → Fill (never Submit); readiness must-have open (REQ-103) → Prepare + link to Profile; injection flag (REQ-109) → excluded, with a warning icon whose hover (and keyboard focus) tooltip says why it was flagged (the matched rule, e.g. "hidden text asking to ignore instructions"). Start creates one batch (REQ-118) and opens its progress (per-job stage, Pause / Cancel / Retry). Only entry point for multi-job runs in the UI.
 Given 4 ticked (plain, Tier A, LinkedIn Easy Apply, LinkedIn-found with Greenhouse URL) and default Fill · When Start pipeline · Then review shows Fill / Fill (Tier A, no Submit) / Prepare (Easy Apply, reason) / Fill (Submit offered).
 ### REQ-118 Per-job stop point in batches
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros batch create` (stop point flags). Intent unchanged.
 Batch keeps `stop_at` (default for all) plus optional `stops: {job_id: stage}`; driver stops each job at its own stage. CLI `batch create … --stop-at S [--job-stop J=S ...]`; `POST /api/batches` accepts `stops`. Same caps as REQ-117 enforced server-side (a requested Submit on Tier A or fill/submit on LinkedIn Easy Apply is lowered with reason, never trusted from the client). Old batch files without `stops` behave as today. Amends REQ-045: the LinkedIn exclusion applies only to LinkedIn Easy Apply, keyed on the apply URL host, not the source board.
 Given batch stop_at fill, stops {B: prepare, C: submit} · When run · Then A filled, B prepared only, C submitted only if auto-submit verdict allows.
 ### REQ-119 Page guidance line
@@ -134,6 +155,7 @@ Given any route · When rendered · Then header has h1 + non-empty guidance line
 Every list of jobs (Jobs list, pipeline review sheet, batch progress) uses the current Jobs table: column header sort + filter menus, filter chips, pager rows 10/25/50/100, chosen size remembered (`ui.page_size`).
 Given Jobs list · When choose 50 rows and reload · Then 50 rows shown; review sheet uses the same table.
 ### REQ-121 First-run tour
+> UI retired 2026-11-14 (DEC-024): replaced by `docs/GETTING_STARTED.md`, `docs/CHAT.md`. Intent unchanged.
 First open of the UI → short overlay tour, one step per main nav item + Start pipeline (≤8 steps), each pointing at its element with one line. Skip / Esc at any step ends it. Done or skipped → `tour_done: true` in `data/ui_state.json` (per install, not per browser); never shown again automatically. Settings "How to use" restarts it. Keyboard accessible, focus returns to the page.
 Given fresh install · When open UI, skip at step 2, reload · Then no tour; Settings "How to use" shows it from step 1.
 ### REQ-122 Next-step card
@@ -193,3 +215,18 @@ Candidate feedback on a résumé is saved as general rules in optional `profile/
 Given a candidate comment stating a general preference · When edit-resume runs headless · Then `careeros resume rule-add` saves it, refusing numbers and confidential terms; a review run on an upload cannot.
 Given an experience entry with one bullet · When QA runs · Then `thin_experience_entry` fails naming the entry.
 Given two adjacent Acme roles · When rendered · Then "Acme" appears once, each role keeps its dates.
+
+## Chat skills (DEC-024)
+### REQ-139 `advice` skill: verdict on outside advice
+`/advice` takes advice the candidate got (a person, a forum, another model), checks it against the repo, `profile/master.yaml` and the hard rules, and returns a verdict adopt / park / reject with the evidence. Every verdict is appended to `.agent/ADVICE.md`. Never edits profile or config by itself.
+Given advice that would require inventing a résumé fact · When `/advice` runs · Then verdict reject, citing the no-fabrication rule, logged.
+### REQ-140 `today` skill: dashboard in chat
+`/today` prints what Today shows (needs-you jobs, top picks, counts by stage) from the same data as the UI. Read-only: starts no run and changes no file.
+Given two prepared jobs and one open Action Item · When `/today` runs · Then it lists them under needs-you and writes nothing.
+### REQ-141 `interview-prep` skill
+`/interview-prep <job>` writes `JOB/interview_prep.md` for a job at the interview stage: likely questions and talking points, each tied to `profile/master.yaml` bullet ids; no number or claim outside master.yaml.
+Given a job with status interview · When the skill runs · Then `interview_prep.md` exists and every cited bullet id exists in master.yaml.
+### REQ-142 `score-job` records gaps
+`score.json` carries `gaps[]`: posting requirements with no matching master.yaml evidence, one line each, so tailoring and `/interview-prep` can address them. Empty list when none.
+Given a posting asking for a tool absent from master.yaml · When `/score-job` runs · Then `gaps[]` names that tool.
+

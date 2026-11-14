@@ -2,6 +2,7 @@
 Only flows with branching or state. Status in trace.yaml.
 
 ### FLOW-001 First run to ready
+> UI retired 2026-11-14 (DEC-024): replaced by `careeros doctor`, `docs/GETTING_STARTED.md`. Intent unchanged.
 UCs: UC-001, UC-002, UC-003, UC-005, UC-006
 ```mermaid
 flowchart TD
@@ -19,6 +20,7 @@ flowchart TD
 What to notice: the checklist is the hub; every step returns to it, so a user who leaves mid-way resumes at the next open item.
 
 ### FLOW-002 Feedback item lifecycle
+> UI retired 2026-11-14 (DEC-024): replaced by `/review-resume`, `/edit-resume`. Intent unchanged.
 UCs: UC-002
 ```mermaid
 stateDiagram-v2
@@ -38,6 +40,7 @@ What to notice: `accepted` lives only in the autosaved draft (REQ-126); Next/Don
 What to notice: nothing reaches the résumé except via `applied`, and only after the zero-fabrication guard.
 
 ### FLOW-003 Check a job
+> UI retired 2026-11-14 (DEC-024): replaced by paste the posting in chat; `/score-job`. Intent unchanged.
 UCs: UC-010
 ```mermaid
 flowchart TD
@@ -60,6 +63,7 @@ flowchart TD
 What to notice: max one tailor run per check; a flagged posting is still scored but can't be prepared until cleared.
 
 ### FLOW-004 Select jobs → start pipeline
+> UI partly retired 2026-11-14 (DEC-024): Start pipeline button retired, ticking stays; replaced by `careeros batch create|run`, `/prepare-job`. Intent unchanged.
 UCs: UC-007, UC-013, UC-016
 ```mermaid
 flowchart TD

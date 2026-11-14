@@ -105,7 +105,7 @@ Personal lines carry `# INSERT: <what, format, example>`; generic ones say `reus
 .venv/bin/careeros schedule install           # also: schedule status | uninstall; launchd calls `careeros tick`
 .venv/bin/careeros storage [--snapshot]       # bytes by category + disk free
 .venv/bin/careeros advise                     # suggestions; advise apply <id> writes one to config/pipeline.yaml
-.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]  # browser app; install with pip install -e ".[ui]" && .venv/bin/playwright install chromium first
+.venv/bin/careeros ui [--port 8765] [--reindex] [--no-open]  # read-only dashboard (Today + Jobs), everything else is chat: docs/CHAT.md; install with pip install -e ".[ui]" && .venv/bin/playwright install chromium first
 .venv/bin/python -m careeros.qa data/jobs/<id>   # deterministic QA
 ```
 
@@ -125,6 +125,9 @@ Until `init` has run, every command except `init` and `doctor` stops with "run `
 | `/inbox-sync` | Gmail to tracker status updates, push on interview |
 | `/find-contacts` | recruiter or engineer at the company: name, LinkedIn URL, email guess |
 | `/draft-outreach` | LinkedIn note, message, cold email drafts from `templates/outreach/` |
+| `/advice` | verdict adopt / park / reject on outside advice, logged to `.agent/ADVICE.md` |
+| `/today` | the Today dashboard in chat, read-only |
+| `/interview-prep` | `interview_prep.md` for a job, from master.yaml bullet ids |
 | `/learn-voice` | extracts writing patterns from `profile/voice/samples/` into the style guide |
 
 ### Daily loop
@@ -134,7 +137,7 @@ Until `init` has run, every command except `init` and `doctor` stops with "run `
    in the job dir; failures become Action Items. With the scheduler installed, steps 1 and 2 happen on their own.
 3. Apply session (Chrome open, Claude in Chrome extension on): `/apply-job data/jobs/<id>` per job.
 4. `/inbox-sync` reads Gmail and moves statuses (screening, interview, rejected), pushes on interviews.
-5. Work the Action Items tab in the tracker (`careeros action list`).
+5. Work the Action Items (`careeros action list`, or ask Claude "what needs me?"). The web UI is only a Today + Jobs dashboard; chat equivalents for everything else: [docs/CHAT.md](docs/CHAT.md).
 
 ### Autonomy tiers (`config/targets.yaml`)
 
@@ -236,7 +239,7 @@ src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, quest
 .claude/skills Claude Code skills (table above)
 data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx,
                runs/ (<run_id>/run.json + run.log + attempts/, queue, schedule and scheduler logs)   [gitignored]
-docs/          GETTING_STARTED.md, CODE_REVIEW_PROMPT.md, UI.md
+docs/          GETTING_STARTED.md, CHAT.md, CODE_REVIEW_PROMPT.md, UI.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```
 

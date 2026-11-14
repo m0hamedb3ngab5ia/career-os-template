@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { Inbox, Search, Settings, Sun, Table2, UserRound, Zap } from "lucide-react";
+import { Search, Sun, Table2, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
@@ -9,7 +9,6 @@ import type { StatusSummary } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
 import { useNow } from "../lib/useNow";
 import styles from "./AppShell.module.css";
-import { Tour } from "./Tour";
 
 interface NavItem {
   to: string;
@@ -19,21 +18,13 @@ interface NavItem {
   end?: boolean;
 }
 
-// Sidebar groups and counts from design doc 2.1; max 6 items (REQ-119/IA). Runs open from Today, Contacts from a job. All tasks (/actions) is linked from Today, not the nav.
+// Sidebar groups and counts from design doc 2.1; max 6 items (REQ-119/IA). Chat-first: runs, inbox, contacts, settings live in chat skills and the CLI.
 const NAV: { group: string; items: NavItem[] }[] = [
   {
     group: "Job search",
     items: [
       { to: "/", label: "Today", icon: Sun, end: true, count: (s) => s.counts?.action_items_open },
       { to: "/jobs", label: "Jobs", icon: Table2 },
-      { to: "/inbox", label: "Inbox", icon: Inbox, count: (s) => s.counts?.inbox },
-    ],
-  },
-  {
-    group: "More",
-    items: [
-      { to: "/profile", label: "Profile", icon: UserRound },
-      { to: "/settings", label: "Settings", icon: Settings },
     ],
   },
 ];
@@ -212,7 +203,6 @@ export function AppShell() {
       <main ref={main} id="main" tabIndex={-1} className={styles.main}>
         <Outlet />
       </main>
-      <Tour />
     </div>
   );
 }
