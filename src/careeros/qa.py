@@ -1127,11 +1127,41 @@ class Checker:
                  "same-company entries are adjacent" if not split
                  else "move entries of the same company next to each other: " + ", ".join(split))
 
+    @staticmethod
+    def _skill_items(rj: Any) -> list[Any]:
+        skills = (rj or {}).get("skills")
+        terms = [t for vals in (skills.values() if isinstance(skills, dict) else []) for t in (vals or [])]
+        return terms + [t for g in ((rj or {}).get("skill_groups") or []) if isinstance(g, dict)
+                        for t in (g.get("items") or [])]
+
+    def check_skills_evidenced(self) -> None:
+        """Hard: a skills-section item the POSTING mentions must appear in at least one bullet (experience/
+        project, `**` stripped). Items the posting does not mention are not checked. Judgement: exact terms only
+        (no GitHub~Git synonyms); an item is split on "/" and parentheses, so "C/C++" is C and C++, and
+        "AWS (Athena, Glue)" is AWS, Athena and Glue; the item counts as asked for / shown when ANY part is."""
+        rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
+        items = [str(t) for t in self._skill_items(rj)]
+        post = (str(self.posting.get("title", "")) + " " + str(self.posting.get("description_text", ""))
+                if isinstance(self.posting, dict) else "").strip()
+        if not items or not post:
+            self.skip("skills_evidenced", "hard", "no skills section or no posting text")
+            return
+        bullets = " \n".join(str(b.get("text", "")).replace("**", "") for b in _all_bullets(rj))
+        missing = []
+        for item in items:
+            parts = [p.strip() for p in re.split(r"[/(),]", item) if p.strip()] or [item.strip()]
+            asked = [p for p in parts if term_hit(p, post)]
+            if asked and not any(term_hit(p, bullets) for p in asked):
+                missing.append(item)
+        self.add("skills_evidenced", "hard", not missing,
+                 "every posting-relevant skill is shown in a bullet" if not missing else
+                 "; ".join(f"{m} listed and asked for by the posting, but no bullet shows it: add a master bullet "
+                           "that uses it or drop it from skills" for m in missing))
+
     def check_skills_traced(self) -> None:
         rj = self.resume_json if isinstance(self.resume_json, dict) and "__parse_error__" not in self.resume_json else None
         skills = (rj or {}).get("skills")
-        terms = [t for vals in (skills.values() if isinstance(skills, dict) else []) for t in (vals or [])]
-        terms += [t for g in ((rj or {}).get("skill_groups") or []) if isinstance(g, dict) for t in (g.get("items") or [])]
+        terms = self._skill_items(rj)
         if not terms:
             self.skip("skills_traced", "hard", "resume.json has no skills")
             return
@@ -1518,6 +1548,7 @@ class Checker:
         self.check_entry_headers()
         self.check_experience_shape()
         self.check_skills_traced()
+        self.check_skills_evidenced()
         self.check_section_order()
         self.check_standard_answers()
         self.check_numbers()

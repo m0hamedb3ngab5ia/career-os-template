@@ -88,6 +88,8 @@ Procedure:
    (`resume_writing_rules.md`, OVERRIDE rule 2) in `meta.metric_questions` unless
    `profile.metric_questions` already has one for that id. Never add or guess a number; never edit
    `profile/master.yaml` from this skill.
+   Skills evidence: each skills item the posting asks for needs a chosen bullet that uses it, or drop it from
+   `skills` (`resume_writing_rules.md`, "Skills must be shown in use").
 3. Education: always every `education[]` entry (most recent first); include `gpa`; include up to 6 `coursework` items, prioritizing ones
    that echo posting terms (e.g. Database Systems, Machine Learning); include `activities` only if the
    budget allows.

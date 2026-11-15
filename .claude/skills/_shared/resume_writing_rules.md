@@ -166,3 +166,9 @@ unsupported even with a cited id.
 4. Display order within an entry: the project's descriptive bullet first, then the strongest
    formula-complete bullets (verb + what + scale + tech), then the rest.
 5. For every included bullet with no number and no scale word, propose a metric question (OVERRIDE rule 2).
+
+## Skills must be shown in use
+
+Every skills-section item the posting asks for must be shown in use in a bullet on the same page: pick a
+master bullet (by id) that uses it, or remove it from this résumé's skills list. Never invent usage. Extra
+skills the posting does not mention may stay. QA hard check `skills_evidenced` enforces this.
