@@ -71,7 +71,7 @@ code, level, evidence URLs and timestamp. Levels are configurable per code in `t
 - **info** only lowers confidence: `GHOST_OLD_POST` (30+ days), `GHOST_RECENT_LAYOFFS`, a freeze that does
   not cover the role. 3 fit points each; never changes the decision.
 - Company priority changes the review threshold, never a fraud judgment: a dream company is never skipped
-  (skip becomes review, with a `ghost_job` Action Item), but its Block flags still block.
+  (skip becomes review; prepare-job raises one `ghost_job` item per company via `careeros safety ghost-items`), but its Block flags still block.
 
 **Hiring signals.** When `data/company_signals.json` has no entry for the company or `checked_at` is over
 30 days old, WebSearch `"<company>" layoffs OR "hiring freeze" <this year>` and record only what a dated,
