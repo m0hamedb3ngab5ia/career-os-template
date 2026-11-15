@@ -68,19 +68,21 @@ def raise_ghost_items(s: Settings, today: date | None = None) -> list[str]:
 
 
 def close_stale_ghost_items(s: Settings, today: date | None = None, dry_run: bool = False) -> dict[str, int]:
-    """Mark done (with a note, never delete) open per-job ghost items the current rule would not raise."""
+    """Mark done (with a note, never delete) every open per-job ghost item: the old format. A job the rule still
+    flags is `covered`: the per-company item `raise_ghost_items` adds next lists it."""
     store, tr, hist = Store(s), Tracker(settings=s), Store(s).load_history()
-    closed = kept = 0
+    closed = covered = 0
     for it in tr.list_action_items(open_only=True):
         jid = str(it.get("JobID") or "")
         if it.get("Type") != TYPE or not jid:
             continue
         p = _worthy(s, store, jid)
-        if p and _review_reasons(s, store, p, today, hist):
-            kept += 1
-            continue
+        still = bool(p and _review_reasons(s, store, p, today, hist))
         closed += 1
+        covered += still
         if not dry_run:
-            tr.mark_action_done(str(it["ID"]), note="Closed: no longer raised (job not worth preparing, or the "
-                                "ghost rule no longer flags it). Ghost items are now one per company.")
-    return {"closed": closed, "kept": kept}
+            tr.mark_action_done(str(it["ID"]), note=(
+                "Closed: listed on this company's company item instead (ghost items are now one per company)."
+                if still else "Closed: no longer raised (job not worth preparing, or the ghost rule no longer "
+                "flags it). Ghost items are now one per company."))
+    return {"closed": closed, "covered": covered}
