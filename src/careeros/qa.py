@@ -49,6 +49,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import difflib
 import re
 import sys
 from pathlib import Path
@@ -192,6 +193,24 @@ def number_tokens(text: str) -> set[str]:
         if tok:
             out.add(tok)
     return out
+
+
+def _best_line(sources: list[str], lines: list[str], min_ratio: float = 0.5) -> str | None:
+    """The résumé line that renders one of a bullet's `sources` (master text or a declared variant, each compared on
+    its own; markdown, `**` and `~` stripped), or None below `min_ratio` word overlap."""
+    def words(t: str) -> list[str]:
+        return re.findall(r"[a-z0-9]+", re.sub(r"[*~]", "", t).lower())
+    best, best_r = None, 0.0
+    for src in sources:
+        bw = words(src)
+        for ln in lines:
+            lw = words(ln)
+            if not lw or not bw:
+                continue
+            r = difflib.SequenceMatcher(None, bw, lw, autojunk=False).ratio()
+            if r > best_r:
+                best, best_r = ln, r
+    return best if best_r >= min_ratio else None
 
 
 def _count_words(text: str) -> int:
@@ -832,16 +851,21 @@ class Checker:
             est = [b for b in sorted(ids) if (self.profile.bullets.get(b) or {}).get("estimate") is True]
             if not est:
                 continue
-            exact = number_tokens(" ".join(ESTIMATE_RE.sub("", self.profile.bullet_text(b))
-                                           for b in ids if b not in est))
+            exact = {t.rstrip("+") for t in number_tokens(" ".join(
+                ESTIMATE_RE.sub("", self.profile.bullet_text(b)) for b in ids if b not in est))}
+            lines = [ln for ln in text.splitlines() if ln.strip()]
             hedge = r"(?:~\s*" + ("|(?:" + "|".join(HEDGE_WORDS) + r")\s+" if prose else "") + r")$"
             for bid in est:
                 for num in dict.fromkeys(m.rstrip(".,") for m in ESTIMATE_RE.findall(self.profile.bullet_text(bid))):
                     n_est += 1
-                    if num.lower() in exact:
+                    if num.lower().rstrip("+") in exact:
                         continue
-                    for m in re.finditer(r"(?<![\d.,$])" + re.escape(num) + r"(?![\d])", text):
-                        if not re.search(hedge, text[max(0, m.start() - 20):m.start()], re.I):
+                    scope = text
+                    if not prose:   # résumé: only the line(s) rendering this bullet; no match -> whole text (strict)
+                        line = _best_line(self.profile.bullet_sources(bid), lines)
+                        scope = line if line is not None else text
+                    for m in re.finditer(r"(?<![\d.,$])" + re.escape(num) + r"(?![\d])", scope):
+                        if not re.search(hedge, scope[max(0, m.start() - 20):m.start()], re.I):
                             problems.append(f"{fname}: {bid} estimate {num} shown without ~")
                             break
         self.add(name, "hard", not problems,

@@ -1058,6 +1058,38 @@ def test_estimate_without_tilde_in_resume_fails(tmp_path: Path) -> None:
     assert res["pass"] is False
 
 
+def _with_extra_line(job: Path, line: str) -> Path:
+    f = job / "resume.txt"
+    f.write_text(f.read_text().rstrip("\n") + "\n" + line + "\n")
+    return job
+
+
+def test_estimate_checked_only_on_its_own_resume_line(tmp_path: Path) -> None:
+    """A bare "40" or "40+" in an unrelated line must not fail a correctly hedged estimate bullet."""
+    root = _estimate_root(tmp_path)
+    job = _with_extra_line(_estimate_job(tmp_path / "a", root, EST_TEXT), "Reviewed 40+ unrelated controls in 40 days")
+    c = by_name(run_deterministic(job, root=root), "estimate_marked")
+    assert c["ok"], c["detail"]
+
+
+def test_estimate_tilde_dropped_still_fails_with_other_lines_present(tmp_path: Path) -> None:
+    root = _estimate_root(tmp_path)
+    job = _with_extra_line(_estimate_job(tmp_path / "a", root, EST_TEXT.replace("~40", "40")), "Reviewed ~40 other things")
+    c = by_name(run_deterministic(job, root=root), "estimate_marked")
+    assert not c["ok"] and "acme.2 estimate 40 shown without ~" in c["detail"]
+
+
+def test_estimate_number_stated_as_plus_by_other_cited_bullet_is_exempt_in_prose(tmp_path: Path) -> None:
+    root = _estimate_root(tmp_path)
+    m = yaml.safe_load((root / "profile" / "master.yaml").read_text())
+    m["experience"][0]["bullets"][0]["text"] = "Audited 40+ reconciliation controls across the platform"
+    (root / "profile" / "master.yaml").write_text(yaml.safe_dump(m, sort_keys=False))
+    cover = COVER_LETTER.replace("bullet_ids_used: [acme.1,", "bullet_ids_used: [acme.2, acme.1,").replace(
+        "Both jobs were about", "I audited 40+ controls. Both jobs were about")
+    c = by_name(run_deterministic(_estimate_job(tmp_path / "a", root, EST_TEXT, cover=cover), root=root), "estimate_marked")
+    assert c["ok"], c["detail"]
+
+
 @pytest.mark.parametrize("phrase,ok", [("about 40 analysts", True), ("~40 analysts", True), ("40 analysts", False)])
 def test_estimate_in_cover_letter_needs_a_hedge(tmp_path: Path, phrase: str, ok: bool) -> None:
     root = _estimate_root(tmp_path)
@@ -1355,3 +1387,13 @@ def test_repeated_employer_requires_adjacent(tmp_path: Path, order: list, ok: bo
     job = _resume_with(make_job(tmp_path), experience=[_exp(c, 2, i) for i, c in enumerate(order)])
     c = by_name(run(job), "repeated_employer")
     assert c["ok"] is ok, c["detail"]
+
+
+def test_best_line_matches_a_short_variant_on_its_own():
+    """A short declared variant must match its résumé line even though the master text is much longer."""
+    from careeros.qa import _best_line
+    master = ("Led the migration of the billing ledger to an event-driven pipeline across four teams, cutting nightly "
+              "batch time from ~6 hours to 40 minutes and retiring two legacy schedulers")
+    short = "Cut nightly batch time from ~6 hours to 40 minutes"
+    lines = ["- Cut nightly batch time from ~6 hours to 40 minutes", "- Mentored 6 interns over 2 summers"]
+    assert _best_line([master, short], lines) == lines[0]
