@@ -36,6 +36,7 @@ from careeros.runs.config import Budget, RunsConfig, load_runs_config
 from careeros.runs.headless import HARD_STOPS, HeadlessResult, build_command, classify, parse_result_line
 from careeros.runs.headless import untrusted as wrap_untrusted
 from careeros.runs.headless import invoke as default_invoke
+from careeros.runs.prefilter import dry_run_prefiltered, prefilter_attempt
 from careeros.runs.ranking import Candidate, fit_first_within_company, rank
 from careeros.runs.store import RunStore, iso
 from careeros.store import Store
@@ -363,6 +364,8 @@ class _Loop:
 
     def attempt(self, item: dict[str, Any]) -> dict[str, Any]:
         jid = item["job_id"]
+        if self.kind == "score" and (done := prefilter_attempt(self, item)):  # hard filters in code: no session
+            return done
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
         posting = self.store._read(jid, "posting.json") or {}
         if self.kind in ("score", "prepare"):  # REQ-108: the posting text is data, never instructions
@@ -477,9 +480,12 @@ class _Loop:
             except locks.LockBusy as e:
                 self._locked(item, e)
                 continue
-            streak, stop = self._tally(att, streak)
-            if stop:
-                return stop
+            if att["outcome"] == "prefiltered":  # decided in code: no session, no budget slot, no streak change
+                self.c["prefiltered"] = self.c.get("prefiltered", 0) + 1
+            else:
+                streak, stop = self._tally(att, streak)
+                if stop:
+                    return stop
             locks.refresh(self.rs.runner_lock_path, self.lock_token, self.lock_ttl, now=self.now())
         return self._completed()
 
@@ -550,8 +556,11 @@ class _Loop:
                 except locks.LockBusy as e:
                     self._locked(item, e)
                     continue
-                streak, stop = self._tally(att, streak)
-                result_stop = result_stop or stop
+                if att["outcome"] == "prefiltered":  # decided in code: not tallied, frees its max_jobs slot
+                    self.c["prefiltered"] = self.c.get("prefiltered", 0) + 1
+                else:
+                    streak, stop = self._tally(att, streak)
+                    result_stop = result_stop or stop
                 locks.refresh(self.rs.runner_lock_path, self.lock_token, self.lock_ttl, now=self.now())
 
         with ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"careeros-{self.kind}") as pool:
@@ -561,11 +570,18 @@ class _Loop:
                     settle(wait(running, return_when=FIRST_COMPLETED).done)
                 if result_stop:
                     break
+                while running and self.c["attempted"] + len(running) >= self.budget.max_jobs and not result_stop:
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)  # a prefiltered job frees its slot
+                if result_stop:
+                    break
                 if self.c["attempted"] + len(running) >= self.budget.max_jobs:
                     launch_stop = "budget"
                     break
                 launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
-                if launch_stop:
+                while launch_stop and launch_stop[0] == "daily_cap" and running and not result_stop:
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)  # prefiltered jobs give their slot back
+                    launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
+                if launch_stop or result_stop:
                     break
                 if self._held_back(item):
                     continue
@@ -610,8 +626,10 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
     else:
         rs.write_queue(kind, ranked, excluded, t_now)
     if dry_run:
+        pre = dry_run_prefiltered(settings, Store(settings), ranked) if kind == "score" else {}
         return {"dry_run": True, "kind": kind, "budget": budget.to_dict(), "candidates": len(ranked),
-                "selected": ranked[:budget.max_jobs], "excluded": excluded}
+                "selected": [r for r in ranked if r["job_id"] not in pre][:budget.max_jobs], "excluded": excluded,
+                "prefiltered": [{"job_id": j, "why": f} for j, f in pre.items()]}
     if invoke is None:
         def invoke(cmd, cwd, env, timeout_s, stream_path):  # noqa: E306
             return default_invoke(cmd, cwd, env, timeout_s, stream_path, cancel=cancel)
