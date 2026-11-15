@@ -134,3 +134,71 @@ def test_non_usd_salary_is_not_compared_with_the_usd_floor(settings):
     settings.targets.setdefault("candidate", {})["min_base_usd"] = 90000
     assert "salary_below_min" not in hard_filters(settings, _posting(salary_max=60000, salary_currency="GBP"))
     assert "salary_below_min" in hard_filters(settings, _posting(salary_max=60000, salary_currency="USD"))
+
+
+# ---- location_nonpreferred: decisive only when thresholds.min_fit_nonpreferred_location > 100 ----
+
+def _never(settings, preferred=("New York NY", "Boston MA"), regions=("Northeast US",), **extra):
+    settings.targets["thresholds"]["min_fit_nonpreferred_location"] = 101
+    loc = settings.targets["location"]
+    loc.update(preferred=list(preferred), preferred_regions=list(regions), remote_ok=True, **extra)
+    return settings
+
+
+@pytest.mark.parametrize("location,skipped", [
+    ("Austin, TX", True),
+    ("Austin, Texas", True),
+    ("San Francisco, CA; Austin, TX", True),
+    ("Boston, MA", False),                      # preferred city
+    ("Cambridge, MA", False),                   # same state as a preferred city: leave to the skill
+    ("Albany, NY", False),
+    ("Pittsburgh, PA", False),                  # Northeast US region
+    ("Austin, TX | Newark, NJ", False),         # one location is in a preferred region
+    ("Remote - US", False),                     # remote_ok
+    ("Austin, TX (Remote)", False),
+    ("London, UK", False),                      # not a US state: unparseable, skill decides
+    ("", False),
+    ("Austin, TX; Somewhere", False),           # one part unparseable
+])
+def test_location_nonpreferred(settings: Settings, location, skipped):
+    _never(settings)
+    fails = hard_filters(settings, _posting(location=location))
+    assert (fails == ["location_nonpreferred"]) is skipped and (skipped or fails == [])
+
+
+def test_location_check_off_when_threshold_not_above_100(settings: Settings):
+    _never(settings)
+    settings.targets["thresholds"]["min_fit_nonpreferred_location"] = 100
+    assert hard_filters(settings, _posting(location="Austin, TX")) == []
+
+
+def test_pay_exempts_the_location_skip(settings: Settings):
+    _never(settings)
+    settings.targets["thresholds"]["any_location_min_base_usd"] = 150000
+    assert hard_filters(settings, _posting(location="Austin, TX", salary_min=160000)) == []
+    assert hard_filters(settings, _posting(location="Austin, TX", salary_min=100000)) == ["location_nonpreferred"]
+
+
+def test_remote_not_ok_does_not_exempt(settings: Settings):
+    _never(settings)
+    settings.targets["location"]["remote_ok"] = False
+    assert hard_filters(settings, _posting(location="Austin, TX", remote=True)) == ["location_nonpreferred"]
+
+
+def test_unmapped_region_is_undecidable(settings: Settings):
+    _never(settings, regions=("US",))           # whole US preferred
+    assert hard_filters(settings, _posting(location="Austin, TX")) == []
+    _never(settings, regions=("Narnia",))
+    assert hard_filters(settings, _posting(location="Austin, TX")) == []
+
+
+def test_cli_location_skip_writes_score(tmp_path):
+    root, d = _job(tmp_path, location="Austin, TX")
+    s = Settings.load(root)
+    s.targets["thresholds"]["min_fit_nonpreferred_location"] = 101
+    s.targets["location"].update(preferred=["Boston MA"], preferred_regions=[], remote_ok=True)
+    import yaml
+    (root / "config" / "targets.yaml").write_text(yaml.safe_dump(s.targets))
+    assert main(["--root", str(root), "job", "filters", "job000000001"]) == 3
+    sc = json.loads((d / "score.json").read_text())
+    assert sc["skip_reason"] == "location_nonpreferred" and "Location" in sc["fit_reasons"][0]

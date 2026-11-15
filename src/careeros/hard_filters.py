@@ -11,6 +11,7 @@ already applied, safety, prestige).
 | `location_blocked` | targets.yaml location.blocked_countries (scout filter `location`) |
 | `yoe_gt_<n>`       | a required (not preferred) minimum years of experience > seniority.max_years_required (default 3) |
 | `salary_below_min` | posted salary_max (USD or no currency) < candidate.min_base_usd |
+| `location_nonpreferred` | thresholds.min_fit_nonpreferred_location > 100 (never wanted) and every posting location is a US state outside `location.preferred` / `preferred_regions`; not remote when remote_ok, not pay-exempt; unparseable = no fail |
 
 Not a fail: `pay_exempts_location` (see `pay_exempts_location`), reported by `job filters`.
 """
@@ -48,6 +49,64 @@ def max_years(settings: Settings) -> int:
     return int((settings.targets.get("seniority") or {}).get("max_years_required", 3))
 
 
+_STATES = {
+    "AL": "alabama", "AK": "alaska", "AZ": "arizona", "AR": "arkansas", "CA": "california", "CO": "colorado",
+    "CT": "connecticut", "DE": "delaware", "DC": "district of columbia", "FL": "florida", "GA": "georgia",
+    "HI": "hawaii", "ID": "idaho", "IL": "illinois", "IN": "indiana", "IA": "iowa", "KS": "kansas",
+    "KY": "kentucky", "LA": "louisiana", "ME": "maine", "MD": "maryland", "MA": "massachusetts",
+    "MI": "michigan", "MN": "minnesota", "MS": "mississippi", "MO": "missouri", "MT": "montana",
+    "NE": "nebraska", "NV": "nevada", "NH": "new hampshire", "NJ": "new jersey", "NM": "new mexico",
+    "NY": "new york", "NC": "north carolina", "ND": "north dakota", "OH": "ohio", "OK": "oklahoma",
+    "OR": "oregon", "PA": "pennsylvania", "RI": "rhode island", "SC": "south carolina", "SD": "south dakota",
+    "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont", "VA": "virginia", "WV": "west virginia",
+    "WI": "wisconsin", "WY": "wyoming"}  # no "washington" name: state or D.C.? "Seattle, WA" still parses by code
+# `location.preferred_regions` entries that name US states. "US" itself = every state; any other entry
+# (ISO country code, unknown name) makes the check undecidable.
+REGION_STATES = {
+    "northeast us": "ME NH VT MA RI CT NY NJ PA".split(),
+    "midwest us": "OH MI IN IL WI MN IA MO ND SD NE KS".split(),
+    "southeast us": "DE MD DC VA WV NC SC GA FL KY TN AL MS AR LA".split(),
+    "southwest us": "TX OK NM AZ".split(),
+    "west us": "WA OR CA NV ID MT WY UT CO AK HI".split(),
+}
+_STATE_CODE = re.compile(r"(?:,|\s)\s*([A-Z]{2})\b(?!\.)")
+
+
+def _state_of(segment: str) -> str | None:
+    for code in _STATE_CODE.findall(segment):
+        if code in _STATES:
+            return code
+    low = segment.lower()
+    for code, name in _STATES.items():
+        if re.search(rf"(?<![a-z]){name}(?![a-z])", low):
+            return code
+    return None
+
+
+def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
+    """True only when the non-preferred-location rule is decisive (min fit above 100 = never wanted) and the
+    posting is clearly outside the candidate's places. Anything unclear returns False: the skill decides."""
+    t, loc = settings.targets.get("thresholds") or {}, settings.targets.get("location") or {}
+    if (t.get("min_fit_nonpreferred_location") or 0) <= 100 or pay_exempts_location(settings, posting):
+        return False
+    text = str(posting.get("location") or "")
+    if loc.get("remote_ok", True) and (posting.get("remote") is True or re.search(r"\bremote\b", text, re.I)):
+        return False
+    ok: set[str] = set()
+    for city in loc.get("preferred") or []:  # "Boston MA": the whole state counts, "Cambridge, MA" is close enough
+        st = str(city).split()[-1].upper() if str(city).split() else ""
+        if st in _STATES:
+            ok.add(st)
+    for region in loc.get("preferred_regions") or []:
+        key = str(region).strip().lower()
+        if key in ("us", "usa", "united states") or key not in REGION_STATES:
+            return False
+        ok.update(REGION_STATES[key])
+    segments = [x for x in re.split(r"[;|\n]| or ", text) if x.strip()]
+    states = [_state_of(x) for x in segments]
+    return bool(states) and all(states) and not ok.intersection(states)
+
+
 def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
     from careeros.models import Posting
     from careeros.scout import Prefilter, scout_config
@@ -69,6 +128,8 @@ def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
     usd = str(p.salary_currency or "USD").upper() == "USD"  # explicit other currency: not comparable, leave to the skill
     if usd and isinstance(p.salary_max, (int, float)) and floor and p.salary_max < floor:
         fails.append("salary_below_min")
+    if location_nonpreferred(settings, posting):
+        fails.append("location_nonpreferred")
     return fails
 
 
@@ -87,6 +148,28 @@ def reasons(settings: Settings, posting: dict[str, Any], fails: list[str]) -> li
     text = {"company_blocked": "Company: on the blocklist.",
             "title_senior": "Seniority: the title names a level above the target (seniority.exclude_title_keywords).",
             "location_blocked": "Location: in a blocked country.",
+            "location_nonpreferred": "Location: outside the preferred places and non-preferred locations are never "
+                                     "wanted (thresholds.min_fit_nonpreferred_location above 100).",
             "salary_below_min": f"Salary: posted maximum {posting.get('salary_max')} is below the minimum base."}
     return [text.get(f) or f"Experience: requires {yrs}+ years, above the {max_years(settings)}-year limit; "
             "a dealbreaker, so fit is not scored." for f in fails]
+
+
+def write_skip(settings: Settings, job_id: str, posting: dict[str, Any], fails: list[str], store: Any = None) -> dict:
+    """Write the skip score.json + log line for a hard-filter fail (shared by `job filters` and the score run);
+    returns the result dict."""
+    from careeros.models import now_iso
+    from careeros.scout import Prefilter
+    from careeros.store import Store
+
+    store = store or Store(settings)
+    cat = Prefilter(settings).title_category(str(posting.get("title") or "")) or "unknown"
+    res = {"skill": "score-job", "job_id": job_id, "category": cat, "fit": 0, "tier": None, "decision": "skip",
+           "skip_reason": fails[0], "hard_filter_fails": fails,
+           "pay_exempts_location": pay_exempts_location(settings, posting)}
+    why = reasons(settings, posting, fails)
+    store._write(job_id, "score.json", {**res, "company": posting.get("company"), "title": posting.get("title"),
+                                        "fit_breakdown": {}, "fit_reasons": why, "reasons": why,
+                                        "scored_at": now_iso()})
+    store.append_log(job_id, f"category={cat} fit=0 tier=None decision=skip {fails[0]}", component="score-job")
+    return res

@@ -341,3 +341,20 @@ def test_parallel_score_runs_fake_claude_calls_at_the_same_time(root, home, fake
     show = json.loads(cli(root, env, "run", "show", runs[0]["id"], "--json").stdout)
     assert sorted(a["job_id"] for a in show["attempts"]) == sorted(ids)
     assert [a["n"] for a in show["attempts"]] == [1, 2, 3, 4, 5, 6] and runs[0]["stop_reason"] == "completed"
+=======
+def test_prefiltered_job_never_spawns_claude(root, home, fake_bin, tmp_path):
+    ids = add_jobs(root, 2)
+    p = root / "data" / "jobs" / ids[0] / "posting.json"
+    p.write_text(json.dumps({**json.loads(p.read_text()), "description_text": "Requires 8+ years of experience. " * 20}))
+    argv_log = tmp_path / "argv.jsonl"
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(argv_log))
+    dry = cli(root, env, "run", "score", "--dry-run")
+    assert dry.returncode == 0 and "prefiltered" in dry.stdout and ids[0] in dry.stdout
+    r = cli(root, env, "run", "score", "--json")
+    assert r.returncode == 0, r.stderr
+    calls = [json.loads(line) for line in argv_log.read_text().splitlines()]
+    assert len(calls) == 1 and ids[1] in json.dumps(calls[0]) and ids[0] not in json.dumps(calls[0])
+    assert status_of(root, ids[0]) == "skipped"
+    assert json.loads((root / "data" / "jobs" / ids[0] / "score.json").read_text())["skip_reason"] == "yoe_gt_3"
+    assert json.loads(r.stdout)["counters"]["prefiltered"] == 1
+>>>>>>> c0c9a4a (WIP: location_nonpreferred + write_skip + failing prefilter tests)

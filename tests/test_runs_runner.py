@@ -783,3 +783,38 @@ def test_sec01_unknown_company_never_gets_webfetch_to_a_posting_chosen_domain(se
     tools = _tools(_capture_run(settings, store, "prepare", company="Exfilco", url="https://exfilco.com/jobs/1",
                                 apply_url="https://exfilco.com/x?leak=1"))
     assert not [t for t in tools if "exfilco" in t]
+
+
+# ---- hard-filter prefilter: obvious misses never spawn a claude session ----
+
+YOE = "You bring 8+ years of experience shipping production services. " * 3
+
+def test_prefiltered_job_is_skipped_without_a_spawn(settings, store):
+    bad = add_job(store, 1, hours_old=50, description_text=YOE)
+    good = add_job(store, 2, hours_old=60)
+    inv = FakeInvoke(settings)
+    rec = run(settings, inv, max_jobs=1)
+    assert [c["job_id"] for c in inv.calls] == [good]  # the prefiltered job used no budget slot
+    assert store.get_status(bad) == "skipped" and store.get_status(good) == "scored"
+    sc = json.loads((store.job_dir(bad) / "score.json").read_text())
+    assert sc["decision"] == "skip" and sc["fit"] == 0 and sc["skip_reason"] == "yoe_gt_3"
+    atts = {a["job_id"]: a for a in RunStore(settings).load_attempts(rec["id"])}
+    assert atts[bad]["outcome"] == "prefiltered" and atts[good]["outcome"] == "ok"
+    c = rec["counters"]
+    assert c["prefiltered"] == 1 and c["attempted"] == 1 and c["failed"] == 0
+
+
+def test_prefiltered_jobs_do_not_count_as_failures(settings, store):
+    ids = [add_job(store, i, hours_old=50 + i, description_text=YOE) for i in range(1, 6)]
+    inv = FakeInvoke(settings)
+    rec = run(settings, inv, max_consecutive_failures=2)
+    assert inv.calls == [] and rec["stop_reason"] == "completed" and rec["counters"]["prefiltered"] == 5
+    assert all(store.get_status(j) == "skipped" for j in ids)
+
+
+def test_dry_run_lists_prefiltered_jobs(settings, store):
+    bad = add_job(store, 1, hours_old=50, description_text=YOE)
+    good = add_job(store, 2, hours_old=60)
+    rec = run(settings, FakeInvoke(settings), dry_run=True)
+    assert [r["job_id"] for r in rec["selected"]] == [good]
+    assert [(r["job_id"], r["why"]) for r in rec["prefiltered"]] == [(bad, ["yoe_gt_3"])]

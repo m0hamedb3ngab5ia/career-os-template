@@ -729,9 +729,7 @@ def cmd_job_unlock(args: argparse.Namespace) -> int:
 
 
 def cmd_job_filters(args: argparse.Namespace) -> int:
-    from careeros.hard_filters import hard_filters, pay_exempts_location, reasons
-    from careeros.models import now_iso
-    from careeros.scout import Prefilter
+    from careeros.hard_filters import hard_filters, pay_exempts_location, write_skip
 
     s = _settings(args)
     store = Store(s)
@@ -740,21 +738,11 @@ def cmd_job_filters(args: argparse.Namespace) -> int:
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
     fails = hard_filters(s, posting)
-    pay = pay_exempts_location(s, posting)
-    res = {"skill": "score-job", "job_id": args.job_id, "category": "unknown", "fit": 0, "tier": None,
-           "decision": "skip", "skip_reason": fails[0] if fails else None, "hard_filter_fails": fails,
-           "pay_exempts_location": pay}
     if not fails:
-        print(json.dumps({"job_id": args.job_id, "hard_filter_fails": [], "pay_exempts_location": pay}))
+        print(json.dumps({"job_id": args.job_id, "hard_filter_fails": [],
+                          "pay_exempts_location": pay_exempts_location(s, posting)}))
         return 0
-    res["category"] = Prefilter(s).title_category(str(posting.get("title") or "")) or "unknown"
-    why = reasons(s, posting, fails)
-    store._write(args.job_id, "score.json", {**res, "company": posting.get("company"), "title": posting.get("title"),
-                                             "fit_breakdown": {}, "fit_reasons": why, "reasons": why,
-                                             "scored_at": now_iso()})
-    store.append_log(args.job_id, f"category={res['category']} fit=0 tier=None decision=skip {fails[0]}",
-                     component="score-job")
-    print(json.dumps(res))
+    print(json.dumps(write_skip(s, args.job_id, posting, fails, store)))
     return 3
 
 
