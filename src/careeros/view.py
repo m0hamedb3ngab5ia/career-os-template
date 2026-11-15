@@ -178,6 +178,7 @@ def _search(s) -> str:
     cat, ind = t.get("categories") or {}, t.get("industries") or {}
     bl = co.get("blocklist") or {}
     age = (t.get("scout") or {}).get("max_post_age_days")
+    grad_age = (t.get("scout") or {}).get("new_grad_max_post_age_days")
     modes = loc.get("work_modes") or ["remote", "hybrid", "onsite"]
     fit = (t.get("thresholds") or {}).get("min_fit_to_prepare")
     nfit = (t.get("thresholds") or {}).get("min_fit_nonpreferred_location")
@@ -190,6 +191,8 @@ def _search(s) -> str:
     nice = lambda xs: _list([str(x).replace("_", " ") for x in xs or []])  # noqa: E731
     rows = [
         ["Posted within", f"Last {age} days" if age else "Any age", "Only jobs posted in the last 14 days"],
+        ["New-grad roles posted within", f"Last {grad_age} days" if grad_age else "Same as above",
+         "Keep new-grad roles posted in the last 60 days"],
         ["Work mode", ", ".join(m.replace("onsite", "on-site") for m in modes), "Only remote and hybrid jobs"],
         ["Minimum salary", f"${salary:,}" if isinstance(salary, int) else "Not set", "My minimum salary is $120,000"],
         ["Visa sponsorship", "Needed" if cand.get("needs_sponsorship") else "Not needed", "I need visa sponsorship"],

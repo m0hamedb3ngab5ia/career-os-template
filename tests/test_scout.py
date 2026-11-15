@@ -209,6 +209,10 @@ def test_prefilter_new_grad_max_post_age_days(example_settings):
         assert pf.check(grad(t, 45))[0], t  # new-grad titles get the longer window
         assert pf.check(grad(t, 70))[1:2] == ("age",), t
     assert pf.check(grad("Software Engineer", 45))[1:2] == ("age",)  # everything else keeps 14 days
+    sc["max_post_age_days"] = None  # general window off: the new-grad window still applies to new-grad titles
+    assert Prefilter(example_settings).check(grad("Software Engineer, New Grad", 70))[1:2] == ("age",)
+    assert Prefilter(example_settings).check(grad("Software Engineer", 400))[0]
+    sc["max_post_age_days"] = 14
     sc.pop("new_grad_max_post_age_days")
     assert Prefilter(example_settings).check(grad("Software Engineer, New Grad", 45))[1:2] == ("age",)  # unset = same
 

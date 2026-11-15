@@ -176,7 +176,7 @@ class Prefilter:
         """Posted more than `scout.max_post_age_days` ago by the posting's own dates (no date = kept); new-grad
         titles use `scout.new_grad_max_post_age_days` (campus roles stay open for months)."""
         known = [d for d in (_d(p.posted_at), _d(p.first_published)) if d]
-        cap = self.new_grad_max_age if self.max_age and NEW_GRAD.search(p.title or "") else self.max_age
+        cap = self.new_grad_max_age if NEW_GRAD.search(p.title or "") else self.max_age
         return bool(cap and known and (date.today() - min(known)).days > cap)
 
     def work_mode(self, p: Posting) -> str | None:

@@ -68,11 +68,12 @@ def test_view_search_tab_lists_filters_and_funnel(temp_root):
     d = temp_root / "data" / "views"
     page = (d / "search.html").read_text(encoding="utf-8")
     assert 'href="search.html"' in (d / "jobs.html").read_text(encoding="utf-8") and "<script" not in page and "<form" not in page
-    for what in ("Posted within", "Work mode", "Minimum salary", "Blocked companies", "Senior titles skipped",
+    for what in ("Posted within", "New-grad roles posted within", "Work mode", "Minimum salary", "Blocked companies", "Senior titles skipped",
                  "Also OK job types", "Job types skipped", "Preferred countries", "Allowed countries",
                  "Lowest fit outside preferred places", "Industries never applied to", "Company names skipped",
                  "Job boards searched", "Search filters turned off"):
         assert what in page
+    assert "Keep new-grad roles posted in the last 60 days" in page
     assert "Only jobs posted in the last 14 days" in page and "Any age" in page  # value now + sentence to say
     assert "1,200" in page and "35" in page and "Nov 14, 2026" in page and "Blocked countries" in page
     assert "careeros" not in page.split("<body>")[1]  # plain words, no commands
