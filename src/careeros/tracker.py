@@ -605,8 +605,8 @@ class Tracker:
             out.append(d)
         return out
 
-    def mark_action_done(self, id: str) -> bool | None:
-        """True = marked, False = no such id, None = tracker locked and the op was queued."""
+    def mark_action_done(self, id: str, note: str | None = None) -> bool | None:
+        """True = marked, False = no such id, None = tracker locked and the op was queued. `note` is appended to Detail."""
         def fn(wb: Workbook) -> bool:
             ws = wb["Action Items"]
             hdr = _header_index(ws)
@@ -615,9 +615,12 @@ class Tracker:
                 return False
             _put(ws, r, hdr["Done"], "Y")
             _put(ws, r, hdr["DoneDate"], _today())
+            if note:
+                old = ws.cell(row=r, column=hdr["Detail"]).value
+                _put(ws, r, hdr["Detail"], f"{old}\n{note}" if old else note)  # keep the original detail
             return True
 
-        return self._mutate("mark_action_done", {"id": id}, fn)
+        return self._mutate("mark_action_done", {"id": id, **({"note": note} if note else {})}, fn)
 
     def reopen_action(self, id: str) -> bool | None:
         """Undo `mark_action_done` (the UI's Undo toast). True = reopened, False = no such id, None = queued."""

@@ -321,6 +321,9 @@ SECTIONS: tuple[Section, ...] = (
                  unit="days"),
             _num(T, "safety.ghost.layoff_window_days", "Layoffs count for", G["layoff_window_days"], lo=1,
                  unit="days"),
+            _num(T, "safety.ghost.thin_description_chars", "Thin description under", G["thin_description_chars"], lo=1,
+                 unit="characters", help="A very old post is only worth a review item when it also looks weak: a "
+                 "description this short plus no pay range, or a closing date that has passed."),
             DREAM_FLAG_ONLY,
         ), advanced=True),
         Group("levels", "Check levels", (

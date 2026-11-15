@@ -41,7 +41,9 @@ company or country, salary under the minimum) ends scoring as skip with fit 0. O
 You confirm, then submit.
 
 **Plain code:** scout, prefilter (`targets.yaml: scout.filters`, seniority, blocked countries, ghost jobs), safety
-and scam gate, caps, ranking, retries, the fill plan. AI runs only in score, prepare, QA and essay answers.
+and scam gate, caps, ranking, retries, the fill plan. Ghost checks only open an Action Item (one per dream company,
+via `careeros safety ghost-items`) for scored jobs worth preparing; a very old post needs a weak description or no
+pay range too, not just age. AI runs only in score, prepare, QA and essay answers.
 
 **Knobs:**
 - How many: `pipeline.yaml: runs.preset` (small, medium, large, max, custom) and `runs.presets.*`;
