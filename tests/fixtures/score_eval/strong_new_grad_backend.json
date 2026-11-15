@@ -1,0 +1,22 @@
+{
+  "expect": {
+    "decision": "prepare",
+    "fit": [
+      70,
+      95
+    ],
+    "why": "new-grad backend role naming the candidate's own stack, preferred city, boosted industry"
+  },
+  "posting": {
+    "job_id": "evaljob000001",
+    "company": "Ledgerline Payments",
+    "title": "Software Engineer, New Grad (Backend)",
+    "location": "New York, NY",
+    "ats": "greenhouse",
+    "ats_job_id": "eval1",
+    "url": "https://boards.greenhouse.io/example/jobs/1",
+    "description_text": "Ledgerline Payments builds payment infrastructure for small businesses (fintech).\nAbout the role: join our backend team as a new-grad software engineer.\nYou have: a BS in Computer Science (2025 or 2026 graduates); internship experience building REST APIs.\nOur stack: Python, FastAPI, PostgreSQL, Kafka, Docker and AWS.\nYou will build microservices that move money reliably.",
+    "salary_min": 130000,
+    "salary_max": 160000
+  }
+}

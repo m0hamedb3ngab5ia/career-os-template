@@ -34,8 +34,9 @@ Done when `careeros doctor` shows no FAIL.
 ## 2. Applying (repeat)
 
 **You say:** "find jobs", "score and prepare the best ones", "fill the form for job X", "submit it". **Claude does:**
-`careeros scout --sync` finds jobs, then the prefilter (code) drops obvious misses. `/score-job` gives
-category, fit and tier. `/prepare-job <id>` tailors the résumé, writes the letter, runs QA. `careeros apply plan
+`careeros scout --sync` finds jobs, then the prefilter (code) drops obvious misses. `/score-job` first runs the
+hard filters in code (`careeros job filters`): a dealbreaker (too many required years, a senior title, a blocked
+company or country, salary under the minimum) ends scoring as skip with fit 0. Otherwise it gives category, fit and tier. `/prepare-job <id>` tailors the résumé, writes the letter, runs QA. `careeros apply plan
 <id>` builds `fill_plan.json`; `careeros apply fill <id>` stages the form in the browser and never submits.
 You confirm, then submit.
 

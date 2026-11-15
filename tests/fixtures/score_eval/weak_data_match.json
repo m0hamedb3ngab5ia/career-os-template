@@ -1,0 +1,20 @@
+{
+  "expect": {
+    "decision": "skip",
+    "fit": [
+      0,
+      60
+    ],
+    "why": "data role on a stack the candidate lacks, in a non-preferred city"
+  },
+  "posting": {
+    "job_id": "evaljob000004",
+    "company": "Prairie Grain Analytics",
+    "title": "Data Engineer",
+    "location": "Dallas, TX",
+    "ats": "greenhouse",
+    "ats_job_id": "eval4",
+    "url": "https://boards.greenhouse.io/example/jobs/4",
+    "description_text": "Prairie Grain Analytics builds agriculture market data products.\nRequired: Scala, Apache Spark, Hadoop, Snowflake, dbt and Databricks; experience with Terraform.\nEntry-level candidates with strong Scala are welcome.\nOn-site in Dallas five days a week."
+  }
+}

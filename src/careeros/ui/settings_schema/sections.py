@@ -265,6 +265,8 @@ SECTIONS: tuple[Section, ...] = (
                   ["senior", "sr.", "staff", "principal", "lead", "manager", "director", "head of", "vp",
                    "vice president", "distinguished", "architect", "fellow", "intern", "internship", "co-op", "phd",
                    "postdoc", "chief"]),
+            _num(T, "seniority.max_years_required", "Most years of experience a role may require", 3, hi=30,
+                 unit="years", help="score-job skips a posting that requires more (checked in code)."),
             _tags(T, "categories.primary", "Primary categories",
                   ["swe_backend", "swe_fullstack", "data_engineering", "swe_platform"],
                   help="Category ids from categories.yaml.", options_from="categories"),

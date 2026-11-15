@@ -1,0 +1,19 @@
+{
+  "expect": {
+    "fit": [
+      30,
+      85
+    ],
+    "why": "L-030: a vague posting with almost no named technologies must not saturate at 90+"
+  },
+  "posting": {
+    "job_id": "evaljob000002",
+    "company": "Brightfield Labs",
+    "title": "Software Engineer",
+    "location": "Remote - US",
+    "ats": "greenhouse",
+    "ats_job_id": "eval2",
+    "url": "https://boards.greenhouse.io/example/jobs/2",
+    "description_text": "Brightfield Labs is growing fast. We are looking for a Software Engineer who loves solving problems.\nYou will write clean code, collaborate with teammates, review code and debug issues.\nYou have: strong problem solving skills, good communication, experience with modern programming languages and cloud platforms.\nWe value ownership and curiosity."
+  }
+}

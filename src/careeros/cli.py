@@ -726,6 +726,34 @@ def cmd_job_unlock(args: argparse.Namespace) -> int:
     return 0 if ok else 1
 
 
+def cmd_job_filters(args: argparse.Namespace) -> int:
+    from careeros.hard_filters import hard_filters, reasons
+    from careeros.models import now_iso
+    from careeros.scout import Prefilter
+
+    s = _settings(args)
+    store = Store(s)
+    posting = store._read(args.job_id, "posting.json")
+    if not posting:
+        print(f"job {args.job_id} not found", file=sys.stderr)
+        return 1
+    fails = hard_filters(s, posting)
+    res = {"skill": "score-job", "job_id": args.job_id, "category": "unknown", "fit": 0, "tier": None,
+           "decision": "skip", "skip_reason": fails[0] if fails else None, "hard_filter_fails": fails}
+    if not fails:
+        print(json.dumps({"job_id": args.job_id, "hard_filter_fails": []}))
+        return 0
+    res["category"] = Prefilter(s).title_category(str(posting.get("title") or "")) or "unknown"
+    why = reasons(s, posting, fails)
+    store._write(args.job_id, "score.json", {**res, "company": posting.get("company"), "title": posting.get("title"),
+                                             "fit_breakdown": {}, "fit_reasons": why, "reasons": why,
+                                             "scored_at": now_iso()})
+    store.append_log(args.job_id, f"category={res['category']} fit=0 tier=None decision=skip {fails[0]}",
+                     component="score-job")
+    print(json.dumps(res))
+    return 3
+
+
 def cmd_job_check(args: argparse.Namespace) -> int:
     """Exit 0 = free (or a stale lock anyone may take), 6 = held."""
     from careeros.runs import locks
@@ -2030,6 +2058,9 @@ def build_parser() -> argparse.ArgumentParser:
     jfz.add_argument("--answers-json", help="file or - (stdin): [{label, value, source}] or {label: value}")
     _lock_args(jfz)
     jfz.set_defaults(fn=cmd_job_freeze)
+    jhf = jbs.add_parser("filters", help="score-job hard filters in code; a fail writes a skip score.json (exit 3)")
+    jhf.add_argument("job_id")
+    jhf.set_defaults(fn=cmd_job_filters)
     jci = jbs.add_parser("clear-injection", help="I checked it: allow prepare/apply on a job flagged as a "
                                                    "possible prompt injection (flags.json)")
     jci.add_argument("job_id")

@@ -1,0 +1,23 @@
+{
+  "expect": {
+    "decision": "skip",
+    "fit": [
+      0,
+      0
+    ],
+    "fails": [
+      "yoe_gt_3"
+    ],
+    "why": "6+ years required: the code prefilter must end scoring (decision skip, fit 0)"
+  },
+  "posting": {
+    "job_id": "evaljob000003",
+    "company": "Northpeak AI",
+    "title": "Machine Learning Engineer",
+    "location": "San Francisco, CA",
+    "ats": "greenhouse",
+    "ats_job_id": "eval3",
+    "url": "https://boards.greenhouse.io/example/jobs/3",
+    "description_text": "Northpeak AI trains ranking models for e-commerce search.\nRequirements: 6+ years of experience building production machine learning systems.\nPython, PyTorch, Spark and Kubernetes. Experience leading model launches end to end."
+  }
+}

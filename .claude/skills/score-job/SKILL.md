@@ -32,18 +32,23 @@ If `posting.json` has `pruned: true` (retention cut the description to a preview
 
 ## 2. Hard filters (any hit => decision `skip`)
 
+**Code filters first.** Run `.venv/bin/careeros job filters <job_id>`. It checks the deterministic rules in code
+(`src/careeros/hard_filters.py`): `company_blocked` (blocklist), `title_senior` (`seniority.exclude_title_keywords`),
+`location_blocked` (`location.blocked_countries`), `yoe_gt_<n>` (a required minimum years of experience above
+`seniority.max_years_required`, default 3) and `salary_below_min`.
+- Exit 3: a dealbreaker. It already wrote `JOB/score.json` (decision `skip`, fit 0, tier null, `skip_reason`) and the
+  log line. Do nothing else: print `RESULT: <its JSON line>` and stop. Do not compute a fit.
+- Exit 0: none hit. Never re-derive those five rules yourself; check only the judgment rules below.
+
 Add one string per hit to `hard_filter_fails`, wording exactly:
 
 | fail string | rule |
 |---|---|
+| `location_blocked` | on-site in a country not in `allowed_countries` (`"*"` = any); blocked countries are the code filter's |
 | `sponsorship_required` | posting says sponsorship is unavailable AND candidate `needs_sponsorship: true` (currently false, so only flag if the posting REQUIRES a non-US work status, e.g. "must hold EU work permit"). Do not flag "we do not sponsor" for a US citizen. |
 | `clearance_required` | mentions active/required security clearance, TS/SCI, "must be able to obtain a clearance" |
-| `location_blocked` | job country in `location.blocked_countries`, or on-site in a country not in `allowed_countries` (`"*"` = any) |
 | `industry_blocked` | industry (see step 4) in `industries.blocked` or `companies.blocklist.industries` |
-| `company_blocked` | company matches `blocklist.companies` or any `blocklist.name_patterns` substring (case-insensitive) |
-| `yoe_gt_3` | minimum required years of professional experience explicitly > 3 (e.g. "5+ years"). Internship-only requirements never trigger this. |
 | `title_excluded` | category resolves to one with `excluded: true` |
-| `salary_below_min` | `salary_max` is a number and `< candidate.min_base_usd`. Unknown salary = allowed. |
 | `already_applied_recent` | (company, role family) in `companies.already_applied` with date < 90 days ago |
 | `safety_block` / `safety_skip` | the safety verdict (below) is `block` or `skip` |
 
@@ -66,7 +71,7 @@ code, level, evidence URLs and timestamp. Levels are configurable per code in `t
 - **info** only lowers confidence: `GHOST_OLD_POST` (30+ days), `GHOST_RECENT_LAYOFFS`, a freeze that does
   not cover the role. 3 fit points each; never changes the decision.
 - Company priority changes the review threshold, never a fraud judgment: a dream company is never skipped
-  (skip becomes review, with a `ghost_job` Action Item), but its Block flags still block.
+  (skip becomes review; prepare-job raises one `ghost_job` item per company via `careeros safety ghost-items`), but its Block flags still block.
 
 **Hiring signals.** When `data/company_signals.json` has no entry for the company or `checked_at` is over
 30 days old, WebSearch `"<company>" layoffs OR "hiring freeze" <this year>` and record only what a dated,
