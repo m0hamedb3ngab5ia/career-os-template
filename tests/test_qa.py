@@ -259,6 +259,27 @@ def test_number_audit_skips_standard_answers(tmp_path: Path) -> None:
     assert [o["number"] for o in res["orphan_numbers"]] == ["99"]
 
 
+def test_number_audit_ignores_digits_in_urls(tmp_path: Path) -> None:
+    url = "https://apps.example.com/xx/app/demo-app/id1234567890"
+    txt = RESUME_TXT.replace("review reconciliation breaks", f"review reconciliation breaks ({url})")
+    res = run(make_job(tmp_path, resume_txt=txt))
+    assert by_name(res, "number_audit:resume.txt")["ok"], by_name(res, "number_audit:resume.txt")["detail"]
+    txt = RESUME_TXT.replace("review reconciliation breaks", "review reconciliation breaks (www.example.com/p/987654 example.org/a.b/55)")
+    assert by_name(run(make_job(tmp_path / "b", resume_txt=txt)), "number_audit:resume.txt")["ok"]
+
+
+def test_number_audit_still_flags_real_number_next_to_url(tmp_path: Path) -> None:
+    txt = RESUME_TXT.replace("40 analysts", "400 analysts").replace(
+        "review reconciliation breaks", "review reconciliation breaks (https://apps.example.com/id1234567890)")
+    detail = by_name(run(make_job(tmp_path, resume_txt=txt)), "number_audit:resume.txt")["detail"]
+    assert "400" in detail and "1234567890" not in detail
+
+
+def test_number_tokens_skips_urls() -> None:
+    assert number_tokens("see https://x.example.com/id123 and www.example.com/9 then 7%") == {"7%"}
+    assert number_tokens("Python 3.12 on example.com/a1") == {"3.12"}
+
+
 def test_number_tokens() -> None:
     assert number_tokens("Managed 1,000+ records, 20%. $5,000 prize, 12K LOC, 0-100%") == {
         "1,000+", "20%", "$5,000", "12k", "0", "100%"}

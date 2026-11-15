@@ -67,6 +67,8 @@ from careeros.terms import term_hit, term_in_text as _term_in_text
 
 NUM_RE = re.compile(r"\$?\d[\d,\.]*[%KkMx+]?")
 WORD_RE = re.compile(r"[A-Za-z][A-Za-z0-9+#\./-]*")
+# URL-ish tokens (scheme://, www., or a whitespace-free token with a letter, "." and "/"): their digits are ids, not claims
+URL_RE = re.compile(r"(?:\b[a-z][a-z0-9+.-]*://|\bwww\.)\S+|(?=\S*[A-Za-z])(?=\S*\.)(?=\S*/)\S+", re.I)
 EM_DASH = "—"
 PLACEHOLDER_RE = re.compile(r"\[(FILL IN|OPEN\b)", re.I)
 
@@ -185,7 +187,7 @@ def split_frontmatter(md: str) -> tuple[dict[str, Any], str]:
 
 def number_tokens(text: str) -> set[str]:
     out = set()
-    for m in NUM_RE.finditer(text or ""):
+    for m in NUM_RE.finditer(URL_RE.sub(" ", text or "")):
         tok = m.group(0).rstrip(".,").lower()
         if tok:
             out.add(tok)
