@@ -31,6 +31,10 @@ description: Build a one-page tailored resume for a scored job dir from profile/
 
 ## 1. Read
 
+First run `.venv/bin/careeros resume shortlist <job_id> --json` and start from it: its bullet ids are the draft selection
+(pins, minimums and budget already applied). You may swap a bullet for flow or impact with a one-line reason in
+`meta`; ids stay master ids and every rule below still holds. Drop from `skills` any item in `skills_without_evidence`.
+
 - `JOB/posting.json`, `JOB/score.json` (category, required_skills, matched_skills, skill_evidence).
 - `profile/master.yaml`.
 - `config/categories.yaml` -> `bullet_priority` for `score.category`, and `resume_template`.

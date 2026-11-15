@@ -358,8 +358,8 @@ SECTIONS: tuple[Section, ...] = (
                         "Old post"),)),
     Section("scout", "Scout", (
         Group("sources", "Sources", (
-            _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby"],
-                  options=("greenhouse", "lever", "ashby"), strict=True),
+            _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby", "handshake"],
+                  options=("greenhouse", "lever", "ashby", "handshake"), strict=True),
             _num(T, "scout.max_post_age_days", "Skip postings older than", None, unit="days", lo=1, nullable=True,
                  help="Empty keeps any age. Uses the posting's own dates."),
             _num(T, "scout.new_grad_max_post_age_days", "Skip new-grad postings older than", None, unit="days",
@@ -430,7 +430,10 @@ SECTIONS: tuple[Section, ...] = (
             _num(P, "runs.parallel.score", "Jobs scored at once", 1, lo=1,
                  help="1 (Recommended) scores one job at a time. 3 suits a Max plan: score runs finish about "
                       "3x faster, but each job is its own Claude session, so usage limits arrive sooner. "
-                      "Prepare and apply always run one job at a time."),
+                      "Apply always runs one job at a time."),
+            _num(P, "runs.parallel.prepare", "Jobs prepared at once", 1, lo=1,
+                 help="1 (Recommended) prepares one job at a time. 2-3 speeds up batches; jobs of the same "
+                      "company are never prepared together, so the company limit stays exact."),
             Field(P, "runs.on_usage_limit", "select", "When Claude hits your usage limit",
                   default=runs_cfg.RunsConfig.on_usage_limit, options=runs_cfg.ON_USAGE_LIMIT,
                   help="The run stops and says so. Stop: the next scheduled run tries again. "

@@ -53,3 +53,9 @@ Scope: repo
 Occurrences: 1
 Confidence: high
 Status: promoted (CLAUDE.md#Git / PR workflow)
+
+- 2026-10-12 Overwrote an existing handoff: picked NN from the stale main checkout, wrote with `cat >` in a fresh origin/main worktree. Rule: compute handoff NN by `ls handoffs/` inside the worktree you write in; create with `set -o noclobber` (`>`) so an existing file errors.
+
+- 2026-11-15 Code prefilters that skip jobs before Claude scores them (user worry: they get it wrong). Rule: when in doubt, never skip (a wrong skip loses a job; a wrong pass costs one Claude call). Location checks decide by parsed US state (region names like "Northeast US" in config expand to states; a posting saying only "Northeast"/"East Coast", a city with no state, "Multiple locations" or "US" → don't skip); multi-location skips only if every location fails; remote/hybrid never skipped on location; missing pay never a skip reason alone; skip notes start "prefilter:" with the parsed values. Before enabling or changing a prefilter, compare it against existing Claude score.json decisions: any job Claude chose "prepare" that the prefilter skips is a bug, ship only at 0. Pass these rules to any agent building or changing a prefilter.
+
+- 2026-11-15 `careeros run score --force --job X` silently skips a job whose status is `skipped` ("status skipped; not started", exit 0). To rescore: `careeros job status X found --note "rescore: <why>"` first, then dry-run to confirm it is a candidate (the run's age filter still applies).

@@ -1353,9 +1353,11 @@ class Checker:
         cover_text = ""
         if self.cover_md is not None:
             cover_text = " " + re.sub(r"\s+", " ", self.cover_body.lower()) + " "
+        from careeros.match import _hit  # same matcher as the bullet shortlist: term_hit + match.synonyms
+        syn = (self.pipeline_cfg.get("match") or {}).get("synonyms") or {}
         hit, miss, cover_mentions = [], [], []
         for s in req:
-            if term_hit(s, text):
+            if _hit(s, text, syn):
                 hit.append(s)
             else:
                 miss.append(s)

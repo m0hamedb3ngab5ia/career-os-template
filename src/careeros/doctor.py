@@ -42,7 +42,7 @@ PASS, WARN, FAIL = "pass", "warn", "fail"
 
 CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
 PROFILE_FILES = ("master", "standard_answers", "confidential_terms")
-KNOWN_ATS = {"greenhouse", "lever", "ashby", "custom"}
+KNOWN_ATS = {"greenhouse", "lever", "ashby", "handshake", "custom"}
 # The key set skills and the applier rely on (profile/standard_answers.yaml). Extra keys are fine.
 STANDARD_KEYS = (
     "work_authorization", "sponsorship", "citizenship", "over_18", "relocate", "remote_hybrid", "start_date",

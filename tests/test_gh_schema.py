@@ -311,3 +311,32 @@ def test_plan_prefer_comes_from_the_entry_that_matched(tmp_path):
                "options": OFFERS}]
     row = build_plan(fields, profile=PROFILE, answers_path=ans, company="Acme", files={})["fields"][0]
     assert row["value"] is None  # general entry answered; the company entry's prefer must not leak in
+
+
+def test_transcript_upload_uses_the_saved_transcript(tmp_path):
+    ans = tmp_path / "sa.yaml"
+    ans.write_text("answers: []\n")
+    fields = [{"field_id": "question_9", "label": "Please upload your most recent transcript.", "type": "file",
+               "required": True, "options": []}]
+    f = build_plan(fields, profile=PROFILE, answers_path=ans, files={"transcript": "/tmp/t.pdf"})["fields"][0]
+    assert f["value"] == "/tmp/t.pdf" and f["source"] == "file"
+
+
+def _emp(**exp_kw):
+    exp = {**PROFILE["experience"][0], **exp_kw}
+    return _by_id(build_plan([], profile={**PROFILE, "experience": [exp]}, answers_path=ANSWERS, files={})["fields"])
+
+
+def test_extras_employment_current_role_ticks_box_and_skips_end_date():
+    f = _emp(company="Acme", title="Developer", title_form="Software Engineer", start="2026-07", end="present")
+    assert f["company-name-0"]["value"] == "Acme" and f["title-0"]["value"] == "Software Engineer"
+    assert f["start-date-month-0"]["value"] == "July" and f["start-date-year-0"]["value"] == "2026"
+    assert f["current-role-0_1"]["type"] == "checkbox" and f["current-role-0_1"]["value"] is True
+    assert "end-date-month-0" not in f and "end-date-year-0" not in f
+
+
+def test_extras_employment_past_role_has_end_date_and_no_box():
+    f = _emp(company="Acme", title="Developer", start="2024-01", end="2025-03")
+    assert f["title-0"]["value"] == "Developer"
+    assert f["end-date-month-0"]["value"] == "March" and f["end-date-year-0"]["value"] == "2025"
+    assert "current-role-0_1" not in f

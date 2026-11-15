@@ -5,15 +5,23 @@ STAGE ONLY: never clicks submit; the user reviews and submits. Playwright is the
 from __future__ import annotations
 
 import json
+import re
 import sys
 import time
 from pathlib import Path
 from typing import Any
 
-from careeros.apply import browser
+from careeros.apply import ashby_fill, browser
 from careeros.apply.session import ApplySession
 
 EMBED = "https://job-boards.greenhouse.io/embed/job_app?for={board}&token={token}"
+# Required ("*") labelled inputs still empty after the fill: text with no value, a react-select with nothing picked.
+EMPTY_REQUIRED_JS = """f => [...f.querySelectorAll('label')].filter(l => /\\*\\s*$/.test(l.textContent) && l.htmlFor)
+  .filter(l => { const e = document.getElementById(l.htmlFor); if (!e || e.disabled || e.type === 'file' || e.type === 'hidden') return false;
+    if (e.getAttribute('role') === 'combobox') { const c = e.closest('[class*=select__control]');
+      return !(c && c.querySelector('[class*=single-value],[class*=multi-value]')); }
+    return e.type === 'checkbox' ? false : !e.value; })
+  .map(l => l.textContent.replace(/\\*\\s*$/, '').trim())"""
 IFRAME = 'iframe#grnhse_iframe, iframe[src*="/embed/job_app"]'  # company careers pages embed the GH form
 
 
@@ -38,13 +46,24 @@ def preflight() -> None:
             raise MissingPlaywright("Playwright's Chromium is missing: playwright install chromium")
 
 
+_CONSENT = re.compile(r"privacy|terms and conditions|terms of (use|service)|code of conduct|arbitration|acknowledg"
+                      r"|consent|^i (agree|understand|confirm|acknowledge)", re.I)
+
+
+def consent_fields(plan: dict[str, Any]) -> list[dict[str, Any]]:
+    """Unanswered consent/acknowledgement fields: the candidate accepts these, never the filler. They don't block
+    a fill; they stay blank for the user to tick before Submit."""
+    return [f for f in plan["fields"] if f.get("value") in (None, "", []) and _CONSENT.search(str(f.get("label")))]
+
+
 def plan_problems(plan: dict[str, Any]) -> list[str]:
     """Reasons the plan must not be filled: sensitive fields, legal/salary/EEO pauses with no answer, or a required
     field nobody answered yet (REQ-106: needs input; only optional fields may be skipped), or an AI draft the user
     has not approved or edited (REQ-105)."""
     if plan.get("blocked"):
         return [f"blocked (sensitive field): {'; '.join(plan['blocked'])}"]
-    empty = [f for f in plan["fields"] if f.get("value") in (None, "", [])]
+    consents = {id(f) for f in consent_fields(plan)}
+    empty = [f for f in plan["fields"] if f.get("value") in (None, "", []) and id(f) not in consents]
     return ([f"unanswered ({f['source']}): {f['label']}" for f in empty
              if str(f.get("source")).startswith("pause:") and not f.get("skipped")]
             + [f"needs input (required): {f['label']}" for f in empty
@@ -54,6 +73,8 @@ def plan_problems(plan: dict[str, Any]) -> list[str]:
 
 
 def job_url(plan: dict[str, Any]) -> str:
+    if plan.get("ats") == "ashby":
+        return plan["apply_url"]
     return EMBED.format(board=plan["board"], token=plan["ats_job_id"])
 
 
@@ -102,8 +123,13 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
         return loc.input_value() == str(v)
     if t == "file":  # job-boards swaps the input for a filename chip once a file is picked: read that back
         loc.set_input_files(v)
-        root.get_by_text(Path(v).name).first.wait_for()
+        root.get_by_text(Path(v).name).first.wait_for(timeout=30_000)  # upload + resume parse can be slow
         return True
+    if t == "checkbox":  # e.g. employment "Current role"
+        loc.check()
+        return loc.is_checked()
+    if t == "checkbox_group" and root.locator(f'input[id="{fid}"][aria-autocomplete]').count():  # API says checkboxes, job-boards renders a react-select multiselect
+        t = "multiselect"
     if t == "checkbox_group":
         box = root.locator(f'fieldset:has(input[type=checkbox][name="{fid}"], input[type=checkbox][name="{fid}[]"], '
                            f'input[type=checkbox][id^="{fid}_"])')
@@ -120,6 +146,7 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
                         v, picked = cand, True
                         break
                     except LookupError:
+                        loc.press("Escape")  # a failed async search closes the menu: reset before the next one
                         continue
                 else:
                     raise LookupError(f"none of {v!r} offered")
@@ -144,7 +171,12 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
     page.set_default_timeout(10_000)
     page.goto(url or job_url(plan))
     page.wait_for_load_state()
-    root = page.frame_locator(IFRAME).first if page.locator(IFRAME).count() else page
+    ashby = plan.get("ats") == "ashby"
+    root = page.frame_locator(IFRAME).first if not ashby and page.locator(IFRAME).count() else page
+    try:  # the form is rendered client-side: wait for it before deciding a field is "not on this form"
+        root.locator(ashby_fill.ready_selector() if ashby else '[id="email"]').first.wait_for()
+    except Exception:
+        pass
     filled, failed, skipped = 0, [], []
     hispanic = next((f.get("value") for f in plan["fields"] if f["field_id"] == "hispanic_ethnicity"), "No")
     for f in plan["fields"]:
@@ -155,8 +187,14 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
             if f["type"] != "hidden":
                 skipped.append(f["label"])
             continue
+        absent = (not ashby_fill.wrapper(root, f["field_id"]).count()) if ashby else (
+            f.get("source") == "profile" and f["type"] not in ("file", "checkbox_group")
+            and not root.locator(f'[id="{f["field_id"]}"]').count())
+        if absent:
+            skipped.append(f"{f['label']} (not on this form)")  # e.g. education_config hides school/dates
+            continue
         try:
-            ok, err = _fill_one(root, f), "read-back mismatch"
+            ok, err = (ashby_fill.fill_one if ashby else _fill_one)(root, f), "read-back mismatch"
         except Exception as e:  # Playwright timeout/strict-mode errors: record and keep filling the rest
             ok, err = False, str(e).splitlines()[0][:200]
         if ok:
@@ -164,6 +202,12 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
         else:
             failed.append({"field_id": f["field_id"], "label": f["label"], "error": err})
     summary = {"filled": filled, "failed": failed, "skipped": skipped, "fill_s": round(time.monotonic() - t0, 1)}
+    try:  # catch whole sections the plan never knew about (employment, consent selects)
+        empty = root.locator("body" if ashby else "form").first.evaluate(
+            ashby_fill.EMPTY_REQUIRED_JS if ashby else EMPTY_REQUIRED_JS)
+        summary["empty_required"] = empty if isinstance(empty, list) else []
+    except Exception as e:
+        print(f"empty-required check skipped: {str(e).splitlines()[0][:200]}", file=sys.stderr)
     try:  # proof only: a slow full-page capture (background tab) must not fail a filled form
         page.screenshot(path=str(ApplySession.screenshot_dir(job_dir) / "fill.png"), full_page=True)
     except Exception as e:

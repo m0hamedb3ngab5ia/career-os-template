@@ -48,7 +48,9 @@ company_domains: {}    # e.g. {"Two Sigma": twosigma.com, "Example Corp": [examp
 # data/company_signals.json; entries here win. kind: freeze (skip) | layoffs (flag) | none (clears).
 hiring_signals: []     # e.g. [{company: Example Corp, kind: layoffs, date: 2026-08-01, source: "https://..."}]
 
-boards:                # reusable default: fine to keep. Scout sources. ats: greenhouse | lever | ashby | custom (no adapter yet; skipped)
+boards:                # reusable default: fine to keep. Scout sources. ats: greenhouse | lever | ashby | handshake | custom (no adapter yet; skipped)
+  # Handshake (optional): sign in once in the apply browser (`careeros apply fill` opens it at 127.0.0.1:9223), then uncomment.
+  # - {company: Handshake, ats: handshake, slug: handshake, pages: 3, queries: [software engineer, new grad software engineer]}
   # --- AI ---
   - {company: Anthropic,        ats: greenhouse, slug: anthropic}
   - {company: OpenAI,           ats: ashby,      slug: openai}

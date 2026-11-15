@@ -85,9 +85,10 @@ runs:                                      # reusable default: fine to keep. `ca
   job_timeout_minutes: {score: 10, prepare: 45, apply: 30, inbox_sync: 20}   # (Recommended) one skill call is killed after this
   stop_on_timeout: true                    # true (Recommended): a hung call usually means a prompt or auth wait
   max_consecutive_failures: 3              # 3 (Recommended): stop after this many failed jobs in a row
-  parallel:                                # jobs a run works on at once (prepare and apply always run one at a time)
+  parallel:                                # jobs a run works on at once (apply always runs one at a time)
     score: 1                               # 1 (Recommended): one at a time | 3 is a good fit on a Max plan: ~3x faster
                                            # score runs, but each job is its own Claude session, so usage limits hit sooner
+    prepare: 1                             # (Recommended: 1; 2-3 speeds up batches) never two jobs of one company at once
   preflight_doctor: true                   # true (Recommended): never run on example data or a broken setup
   ranking:                                 # which jobs go first (no LLM). `careeros run score --dry-run` shows why
     freshness_weight: 60                   # 60 (Recommended): freshness dominates
@@ -179,6 +180,7 @@ scoring:                                   # reusable default: fine to keep. Aut
 match:                                     # reusable default: fine to keep. `careeros resume match <job>`
   synonyms:                                # spellings counted as the same skill (match score, DEC-003)
     kubernetes: [k8s]
+    service-oriented architecture: [microservices, microservice, soa]   # also QA keyword_coverage
     javascript: [js]
     typescript: [ts]
     postgresql: [postgres]

@@ -462,7 +462,7 @@ class _Loop:
             return "time_budget", f"{elapsed / 60:.0f} of {self.budget.max_minutes} min used"
         return None
 
-    def go(self, ranked: list[dict[str, Any]], extra_stop: Callable[[], tuple[str, str] | None] | None = None,
+    def go(self, ranked: list[dict[str, Any]], extra_stop: Callable[..., tuple[str, str] | None] | None = None,
            ) -> tuple[str, str]:
         self.t_start = self.clock()
         # `--job` runs stay sequential: a refused or locked job must raise before any later job is touched
@@ -502,7 +502,8 @@ class _Loop:
 
     def _held_back(self, item: dict[str, Any]) -> bool:
         """True when the job is passed over before launch (pre_attempt gate, unticked); `--job` raises instead."""
-        held_back = self.pre_attempt(item) if self.pre_attempt else None
+        with self._mu:  # gate check + slot arithmetic never interleave with a worker's status/tracker write
+            held_back = self.pre_attempt(item) if self.pre_attempt else None
         if not held_back and self.kind != "score" and not self.explicit \
                 and not self.store.is_selected(item["job_id"]):
             held_back = "not selected"  # REQ-104: unticked while the run was working on an earlier job
@@ -539,16 +540,30 @@ class _Loop:
             return streak, ("consecutive_failures", f"{streak} failures in a row (last: {outcome}: {att['detail']})")
         return streak, None
 
-    def _go_parallel(self, ranked: list[dict[str, Any]], extra_stop: Callable[[], tuple[str, str] | None] | None,
+    def _go_parallel(self, ranked: list[dict[str, Any]], extra_stop: Callable[..., tuple[str, str] | None] | None,
                      workers: int) -> tuple[str, str]:
-        """`runs.parallel.<kind>: N` (score only): up to N attempts at once. Launch decisions (budget, pause/cancel,
+        """`runs.parallel.<kind>: N` (score, prepare): up to N attempts at once. Launch decisions (budget, pause/cancel,
         time budget, extra_stop, gates) stay in this thread, before each launch, counting jobs in flight toward
         max_jobs. A stop ends launching; jobs in flight finish and are recorded. Results are tallied here as they
-        finish (ties in launch order), so counters and the stop rules see one attempt at a time."""
+        finish (ties in launch order), so counters and the stop rules see one attempt at a time.
+        Prepare: two jobs of one company never run together (the launcher waits for the first to finish before it
+        gate-checks the second), so the company gate's slot check never races a prepare that is about to take the
+        slot; `extra_stop` is told how many are in flight, so the daily cap counts them as ready."""
         from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
 
         running: dict[Future, tuple[int, dict[str, Any]]] = {}
         streak, result_stop, launch_stop = 0, None, None
+        policy = None
+        if self.kind == "prepare":
+            from careeros.company_policy import Policy
+            policy = Policy.from_settings(self.s)
+
+        def co_key(item: dict[str, Any]) -> str:
+            return policy.company_key(item.get("company") or "") if policy else ""
+
+        def stop_now() -> tuple[str, str] | None:
+            settle([f for f in running if f.done()])  # a finished job is no longer "in flight"
+            return self.stop_before_next() or (extra_stop(len(running)) if extra_stop else None)
 
         def settle(done: Iterable[Future]) -> None:
             nonlocal streak, result_stop
@@ -571,6 +586,8 @@ class _Loop:
                 settle([f for f in running if f.done()])
                 while len(running) >= workers and not result_stop:
                     settle(wait(running, return_when=FIRST_COMPLETED).done)
+                while policy and not result_stop and any(co_key(r[1]) == co_key(item) for r in running.values()):
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)  # same company: one at a time
                 if result_stop:
                     break
                 while running and self.c["attempted"] + len(running) >= self.budget.max_jobs and not result_stop:
@@ -580,10 +597,10 @@ class _Loop:
                 if self.c["attempted"] + len(running) >= self.budget.max_jobs:
                     launch_stop = "budget"
                     break
-                launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
+                launch_stop = stop_now()
                 while launch_stop and launch_stop[0] == "daily_cap" and running and not result_stop:
                     settle(wait(running, return_when=FIRST_COMPLETED).done)  # prefiltered jobs give their slot back
-                    launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
+                    launch_stop = stop_now()
                 if launch_stop or result_stop:
                     break
                 if self._held_back(item):
@@ -604,7 +621,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
                 clock: Callable[[], float] = time.monotonic, cancel: threading.Event | None = None,
                 echo: Callable[[str], None] = lambda s: None, retry_ids: set[str] | None = None,
                 skip_ids: dict[str, str] | None = None,
-                extra_stop: Callable[[], tuple[str, str] | None] | None = None,
+                extra_stop: Callable[..., tuple[str, str] | None] | None = None,
                 run_fields: dict[str, Any] | None = None,
                 after_attempt: Callable[[dict[str, Any]], None] | None = None,
                 pre_attempt: Callable[[dict[str, Any]], str | None] | None = None,

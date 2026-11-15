@@ -324,6 +324,13 @@ def test_keyword_coverage_word_boundaries_and_resume_only(tmp_path: Path) -> Non
     assert "missing: Go, Ruby" in chk["detail"]
 
 
+def test_keyword_coverage_counts_match_synonyms(tmp_path: Path) -> None:
+    # pipeline.yaml match.synonyms: microservices work evidences a "service-oriented architecture" requirement
+    txt = RESUME_TXT + "\n- Built event-driven microservices in Java\n"
+    res = run(make_job(tmp_path, resume_txt=txt, required=["Service-oriented architecture"]))
+    assert res["keyword_coverage"] == 1.0, by_name(res, "keyword_coverage")["detail"]
+
+
 def test_keyword_coverage_cover_letter_mentions_not_counted(tmp_path: Path) -> None:
     cover = COVER_LETTER.replace("Happy to walk", "I haven't used Go or Ruby in production yet. Happy to walk")
     res = run(make_job(tmp_path, cover=cover, required=["Go", "Ruby", "SQL", "Python", "Kafka"]))

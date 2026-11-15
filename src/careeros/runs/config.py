@@ -73,7 +73,7 @@ RUN_KEYS = ("preset", "presets", "custom", "job_timeout_minutes", "max_consecuti
             "preflight_doctor", "ranking", "required_mcp_servers", "usage_limit_patterns", "auth_patterns",
             "retry", "prepare", "auto_submit", "job_lock_minutes", "on_usage_limit", "scout_waits_for_batch",
             "lock_wait_s", "parallel")
-PARALLEL_KINDS = ("score",)  # prepare stays sequential (its company-slot gate depends on order); apply is one job
+PARALLEL_KINDS = ("score", "prepare")  # prepare: never two jobs of one company at once; apply is one job
 # What a run does when Claude reports the subscription usage limit (careeros.runs.service):
 # stop (Recommended) = stop, the next scheduled run tries again; pause = stop and pause all runs until you resume.
 ON_USAGE_LIMIT = ("stop", "pause")
@@ -111,7 +111,7 @@ class RunsConfig:
     allowed_tools: list[str] = field(default_factory=lambda: list(DEFAULT_ALLOWED_TOOLS))
     model: str | None = None
     scoring: dict[str, int] = field(default_factory=dict)  # pipeline.yaml: scoring (runs/scoring.py, REQ-134/135)
-    parallel: dict[str, int] = field(default_factory=lambda: {"score": 1})  # runs.parallel: jobs at once per kind
+    parallel: dict[str, int] = field(default_factory=lambda: {"score": 1, "prepare": 1})  # runs.parallel: jobs at once per kind
     raw: dict[str, Any] = field(default_factory=dict)
 
 
@@ -209,7 +209,7 @@ def load_runs_config(settings: Any) -> RunsConfig:
         cfg.lock_wait_s = _num(raw["lock_wait_s"], "runs.lock_wait_s", ge=0)
     par = raw.get("parallel") or {}
     if not isinstance(par, dict):
-        raise _err("runs.parallel must be a mapping {score: N}")
+        raise _err("runs.parallel must be a mapping {score: N, prepare: N}")
     for k, v in par.items():
         if k not in PARALLEL_KINDS:
             raise _err(f"runs.parallel: unknown kind {k!r}; valid: {', '.join(PARALLEL_KINDS)}")

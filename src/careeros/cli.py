@@ -339,6 +339,31 @@ def cmd_company_active(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_company_find_board(args: argparse.Namespace) -> int:
+    """Probe Greenhouse/Ashby/Lever for each company name; print `boards:` lines to paste."""
+    from concurrent.futures import ThreadPoolExecutor
+
+    from careeros.scout.find_board import find_board
+
+    names = list(args.names)
+    if args.file:
+        names += [ln.strip() for ln in Path(args.file).read_text().splitlines() if ln.strip()]
+    known = {str(b.get("company", "")).lower() for b in (_settings(args).boards or [])}
+    todo = [n for n in dict.fromkeys(names) if n.lower() not in known]
+    with ThreadPoolExecutor(8) as ex:
+        hits = list(ex.map(find_board, todo))
+    found = [h for h in hits if h]
+    if args.json:
+        print(json.dumps({"found": found, "missing": [n for n, h in zip(todo, hits) if not h],
+                          "already": len(names) - len(todo)}, indent=2))
+        return 0
+    for h in found:
+        print(f"  - {{company: {h['company']}, ats: {h['ats']}, slug: {h['slug']}}}   # {h['jobs']} jobs")
+    print(f"# {len(found)} found, {len(todo) - len(found)} not on greenhouse/ashby/lever, "
+          f"{len(names) - len(todo)} already in boards", file=sys.stderr)
+    return 0
+
+
 def cmd_company_requeue(args: argparse.Namespace) -> int:
     """Jobs skipped as `company_cap` / `cooldown` whose gate is open now -> status `scored` (re-run
     /prepare-job on them). Other skips, and deferred jobs whose posting retention pruned, are never touched."""
@@ -511,6 +536,7 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
 
     import requests
 
+    from careeros.apply import ashby_schema
     from careeros.apply.gh_schema import build_plan, carry_over, fetch_questions, normalize
     from careeros.runs.locks import _guard
     from careeros.scout.base import BoardNotFound, FetchError
@@ -525,28 +551,41 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         return 1
     if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
         return locked
-    if posting.get("ats") != "greenhouse" or not posting.get("source_slug") or not posting.get("ats_job_id"):
-        print(f"job {args.job_id}: fill plans need a greenhouse posting with source_slug + ats_job_id", file=sys.stderr)
+    ats = posting.get("ats")
+    if ats not in ("greenhouse", "ashby") or not posting.get("source_slug") or not posting.get("ats_job_id"):
+        print(f"job {args.job_id}: fill plans need a greenhouse or ashby posting with source_slug + ats_job_id",
+              file=sys.stderr)
         return 2
     board, ats_id = posting["source_slug"], str(posting["ats_job_id"])
+    if ats == "ashby":
+        fetch, norm, build = ashby_schema.fetch_form, ashby_schema.normalize, ashby_schema.build_plan
+    else:
+        fetch, norm, build = fetch_questions, normalize, build_plan
     try:
         data = (json.loads(Path(args.schema_json).read_text(encoding="utf-8")) if args.schema_json
-                else fetch_questions(board, ats_id))
+                else fetch(board, ats_id))
+        norm_fields = norm(data)
+    except ValueError as e:
+        print(f"job {args.job_id}: {e}", file=sys.stderr)
+        return 1
     except (BoardNotFound, FetchError, requests.RequestException) as e:
         print(f"job {args.job_id}: could not fetch questions for {board}/{ats_id}: {e}", file=sys.stderr)
         return 1
     jd = store.job_dir(args.job_id)
     files = {k: str(jd / f"{k}.pdf") if (jd / f"{k}.pdf").exists() else None for k in ("resume", "cover_letter")}
+    transcript = Path(s.paths["profile"]).parent / "documents" / "transcript.pdf"  # profile/documents/transcript.pdf
+    files["transcript"] = str(transcript) if transcript.exists() else None
     profile = yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}
     try:  # this job's /answer-question drafts (REQ-105); missing or damaged = none
         a = jd / "answers.json"
         drafts = json.loads(a.read_text(encoding="utf-8")) if a.stat().st_size <= 1_000_000 else []
     except (OSError, ValueError):
         drafts = []
-    plan = build_plan(normalize(data), profile=profile, answers_path=s.paths["standard_answers"],
+    plan = build(norm_fields, profile=profile, answers_path=s.paths["standard_answers"],
                       company=posting.get("company") or "", files=files,
                       drafts=drafts if isinstance(drafts, list) else [])
-    plan = {"job_id": args.job_id, "ats": "greenhouse", "board": board, "ats_job_id": ats_id,
+    plan = {"job_id": args.job_id, "ats": ats, "board": board, "ats_job_id": ats_id,
+            **({"apply_url": posting.get("apply_url") or posting.get("url")} if ats == "ashby" else {}),
             "generated_at": datetime.now().astimezone().isoformat(timespec="seconds"), **plan}
     blocked = [f["label"] for f in plan["fields"] if f["source"] == "pause:sensitive"]
     if blocked:  # SSN/bank/passport...: hard stop like the form gate, never auto-filled
@@ -965,6 +1004,37 @@ def cmd_resume_pick(args: argparse.Namespace) -> int:
         return 1
     c = pick(s, d, args.threshold)
     print(json.dumps(c, indent=2, ensure_ascii=False) if args.json else f"{c['action']}: {c['reason']}")
+    return 0
+
+
+def cmd_resume_shortlist(args: argparse.Namespace) -> int:
+    """Deterministic bullet shortlist for tailor-resume -> JOB/bullet_shortlist.json; --compare vs QA-passed résumés."""
+    from careeros import bullet_index
+    from careeros.ui.services.jobs import job_dir_for
+
+    s = _settings(args)
+    if args.compare:
+        out = bullet_index.compare(s, Path(s.paths["jobs_dir"]))
+        if args.json:
+            print(json.dumps(out, indent=2, ensure_ascii=False))
+            return 0
+        for r in out["jobs"]:
+            print(f"{r['job_id']:<24} shortlist {r['shortlist']:.0%} ({r['shortlist_bullets']} bullets)  "
+                  f"résumé {r['resume']:.0%} ({r['resume_bullets']} bullets)")
+        print(f"mean required coverage: shortlist {out['mean_shortlist']}, résumé {out['mean_resume']}; "
+              f"shortlist worse on {len(out['shortlist_worse'])} of {len(out['jobs'])}")
+        return 0
+    d = job_dir_for(s, args.job_id) if args.job_id else None
+    if d is None:
+        print(f"error: no job {args.job_id!r}", file=sys.stderr)
+        return 1
+    out = bullet_index.write(s, d)
+    if args.json:
+        print(json.dumps(out, indent=2, ensure_ascii=False))
+        return 0
+    print(f"{out['totals']['bullets']} bullets, {out['totals']['words']} words -> {d / 'bullet_shortlist.json'}")
+    print(f"uncovered required: {', '.join(out['uncovered']['required']) or 'none'}; "
+          f"skills without evidence: {', '.join(out['skills_without_evidence']) or 'none'}")
     return 0
 
 
@@ -2045,6 +2115,11 @@ def build_parser() -> argparse.ArgumentParser:
     crq.add_argument("--dry-run", action="store_true")
     crq.add_argument("--json", action="store_true")
     crq.set_defaults(fn=cmd_company_requeue)
+    cfb = cos.add_parser("find-board", help="find companies' greenhouse/ashby/lever boards; prints boards: lines")
+    cfb.add_argument("names", nargs="*")
+    cfb.add_argument("--file", help="one company name per line")
+    cfb.add_argument("--json", action="store_true")
+    cfb.set_defaults(fn=cmd_company_find_board)
 
     job = sub.add_parser("job")
     jbs = job.add_subparsers(dest="job_cmd", required=True)
@@ -2163,6 +2238,11 @@ def build_parser() -> argparse.ArgumentParser:
     rsp.add_argument("--threshold", type=_percent, help="override thresholds.min_match (targets.yaml) for this check")
     rsp.add_argument("--json", action="store_true")
     rsp.set_defaults(fn=cmd_resume_pick)
+    rsp = rss.add_parser("shortlist", help="deterministic bullet shortlist for a job -> bullet_shortlist.json (no LLM)")
+    rsp.add_argument("job_id", nargs="?")
+    rsp.add_argument("--compare", action="store_true", help="shortlist vs the existing résumé of every QA-passed job")
+    rsp.add_argument("--json", action="store_true")
+    rsp.set_defaults(fn=cmd_resume_shortlist)
     rsp = rss.add_parser("propose-master", help="validate a proposed master.yaml -> profile/master.proposed.yaml "
                          "(pending until approved; used by the extract-master skill)")
     rsp.add_argument("file")
@@ -2242,7 +2322,7 @@ def build_parser() -> argparse.ArgumentParser:
 
     apl = sub.add_parser("apply", help="application-form helpers")
     apls = apl.add_subparsers(dest="apply_cmd", required=True)
-    app = apls.add_parser("plan", help="greenhouse question schema -> data/jobs/<id>/fill_plan.json")
+    app = apls.add_parser("plan", help="greenhouse/ashby question schema -> data/jobs/<id>/fill_plan.json")
     app.add_argument("job_id")
     app.add_argument("--json", action="store_true", help="print the plan")
     app.add_argument("--schema-json", help="read the questions JSON from this file instead of the boards API")

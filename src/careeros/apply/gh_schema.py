@@ -26,7 +26,7 @@ _TYPES = {"input_text": "text", "textarea": "textarea", "input_file": "file", "i
 # Greenhouse compliance field name -> key in the standard_answers.yaml `eeo:` block
 _EEO = {"gender": "gender", "hispanic_ethnicity": "hispanic_latino", "race": "race_ethnicity",
         "veteran_status": "veteran", "disability_status": "disability"}
-_SELECTS = ("select", "multiselect", "checkbox_group")
+_SELECTS = ("select", "multiselect", "checkbox_group", "boolean")
 _HISPANIC = {"field_id": "hispanic_ethnicity", "label": "Are you Hispanic/Latino?", "type": "select", "required": False,
              "options": ["Yes", "No", "Decline To Self Identify"]}
 
@@ -141,6 +141,15 @@ def _extras(profile: dict[str, Any]) -> list[dict[str, Any]]:
             ("start-year--0", "Start date year", "text", start, False),
             ("end-month--0", "End date month", "select", _month(edu.get("end")), False),
             ("end-year--0", "End date year", "text", end, False)]
+    job = (profile.get("experience") or [{}])[0] or {}  # employment section (only some jobs show it)
+    current = str(job.get("end") or "present").lower() in ("present", "current", "now")
+    rows += [("company-name-0", "Company name", "text", job.get("company"), False),
+             ("title-0", "Title", "text", job.get("title_form") or job.get("title"), False),
+             ("start-date-month-0", "Start date month", "select", _month(job.get("start")), False),
+             ("start-date-year-0", "Start date year", "text", str(job.get("start") or "")[:4] or None, False)]
+    rows += ([("current-role-0_1", "Current role", "checkbox", True, False)] if current and job.get("company") else
+             [("end-date-month-0", "End date month", "select", _month(job.get("end")), False),
+              ("end-date-year-0", "End date year", "text", str(job.get("end") or "")[:4] or None, False)])
     return [{"field_id": fid, "label": label, "type": t, "value": v, "source": "profile" if v else None,
              "needs_review": rev} for fid, label, t, v, rev in rows if v or rev]
 
@@ -151,7 +160,8 @@ def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers
     if t == "hidden":
         return None, None
     if t == "file":
-        return files.get(fid), "file" if files.get(fid) else None
+        key = "transcript" if "transcript" in str(f.get("label")).lower() else fid
+        return files.get(key), "file" if files.get(key) else None
     if fid in ident:
         return ident[fid], "profile" if ident[fid] else None
     if fid in _EEO:
@@ -166,8 +176,10 @@ def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers
 
 
 def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers_path: str | Path,
-               company: str = "", files: dict[str, Any], drafts: list[Any] | None = None) -> dict[str, Any]:
-    ident, eeo, rows = _identity(profile), load_eeo_answers(answers_path), []
+               company: str = "", files: dict[str, Any], drafts: list[Any] | None = None,
+               ident: dict[str, Any] | None = None, extras: bool = True) -> dict[str, Any]:
+    """`ident` (field_id -> profile value) and `extras` (GH-only fields outside the schema) let other ATSs reuse this."""
+    ident, eeo, rows = _identity(profile) if ident is None else ident, load_eeo_answers(answers_path), []
     for f in fields:
         value, source = _fill(f, ident, eeo, Path(answers_path), company, files)
         draft = None
@@ -186,7 +198,7 @@ def build_plan(fields: list[dict[str, Any]], *, profile: dict[str, Any], answers
         if f["options"]:
             row["options"] = f["options"]
         rows.append(row)
-    return {"fields": rows + _extras(profile), "files": files}
+    return {"fields": rows + (_extras(profile) if extras else []), "files": files}
 
 
 def _draft_for(label: str, drafts: list[Any]) -> str | None:

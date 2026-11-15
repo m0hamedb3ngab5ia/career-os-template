@@ -80,11 +80,12 @@ def _selectable(settings: Settings, kind: str, job_id: str) -> bool:
                        selected=store.is_selected(job_id)) is None
 
 
-def daily_cap_stop(settings: Settings) -> Callable[[], tuple[str, str] | None]:
-    def check() -> tuple[str, str] | None:
+def daily_cap_stop(settings: Settings) -> Callable[..., tuple[str, str] | None]:
+    def check(inflight: int = 0) -> tuple[str, str] | None:  # runs.parallel.prepare: jobs in flight will be ready
         cap = current_cap(settings)
         store = Store(settings)
         ready = sum(1 for j in store.iter_job_ids() if store.get_status(j) in READY)
+        ready += inflight
         if ready >= cap["remaining"]:
             return "daily_cap", (f"{ready} application(s) ready to submit; today's cap leaves {cap['remaining']} "
                                  f"({cap['applied']}/{cap['cap']} sent)")
@@ -205,7 +206,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
             done_now[0] += 1  # jobs still in flight count too (runs.parallel.score); a locked job counts as well
             return None
 
-        def extra_stop() -> tuple[str, str] | None:
+        def extra_stop(inflight: int = 0) -> tuple[str, str] | None:
             if done_now[0] >= left:
                 return "daily_cap", f"daily scoring limit reached ({scfg['per_day']}); next run tomorrow"
             return None
