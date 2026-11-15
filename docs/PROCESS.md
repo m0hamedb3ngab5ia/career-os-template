@@ -65,7 +65,7 @@ You say "what's the status?" or "what needs me?"; Claude runs the matching comma
 - `careeros jobs list --status <found|scored|queued|needs_review|applied|...>`; `careeros job show <id>`.
 - The tracker `data/JobTracker.xlsx` (Jobs and Action Items tabs); edit only through the CLI.
 - `/inbox-sync` reads company mail and moves jobs to confirmed, rejected, interview or offer.
-- `careeros view` writes `data/views/status.html`: onboarding checklist, pipeline counts, applied history.
+- "Show me my status": Claude runs `careeros view`, local pages as tabs: Setup checklist (until setup is done, then Documents: résumés, saved answers, writing samples), Jobs (what needs you, jobs by stage), Applications.
 
 ## 4. After applying
 
