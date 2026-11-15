@@ -72,22 +72,23 @@ REGION_STATES = {
 _STATE_CODE = re.compile(r"(?:,|\s)\s*([A-Z]{2})\b(?!\.)")
 
 
-def _state_of(segment: str) -> str | None:
-    for code in _STATE_CODE.findall(segment):
-        if code in _STATES:
-            return code
-    low = segment.lower()
-    for code, name in _STATES.items():
-        if re.search(rf"(?<![a-z]){name}(?![a-z])", low):
-            return code
-    return None
+def _states_in(text: str) -> set[str]:
+    """Every US state named in `text` by 2-letter code or full name."""
+    found = {c for c in _STATE_CODE.findall(text) if c in _STATES}
+    low = text.lower()
+    return found | {c for c, n in _STATES.items() if re.search(rf"(?<![a-z]){n}(?![a-z])", low)}
+
+
+_COUNTRY = re.compile(r"\s*(united states( of america)?|usa|u\.s\.a?\.?|us)\s*", re.I)
 
 
 def posting_states(posting: dict[str, Any]) -> list[str]:
-    """US states of every listed location, [] when any part cannot be parsed (a bare city, "Northeast", "US")."""
-    text = str(posting.get("location") or "")
-    states = [_state_of(x) for x in re.split(r"[;|\n]| or ", text) if x.strip()]
-    return [x for x in states if x] if states and all(states) else []
+    """Union of the US states in every listed location, [] when any part names none (a bare city, "Northeast").
+    A segment that is only the country ("United States") is ignored."""
+    parts = [x for x in re.split(r"[;|\n•/&]| or ", str(posting.get("location") or ""))
+             if x.strip() and not _COUNTRY.fullmatch(x)]
+    sets = [_states_in(x) for x in parts]
+    return sorted(set().union(*sets)) if parts and all(sets) else []
 
 
 def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
@@ -102,9 +103,7 @@ def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
         return False  # hybrid / remote: the skill decides
     ok: set[str] = set()
     for city in loc.get("preferred") or []:  # "Boston MA": the whole state counts, "Cambridge, MA" is close enough
-        st = str(city).split()[-1].upper() if str(city).split() else ""
-        if st in _STATES:
-            ok.add(st)
+        ok |= _states_in(str(city))
     for region in loc.get("preferred_regions") or []:
         key = str(region).strip().lower()
         if key in ("us", "usa", "united states") or key not in REGION_STATES:

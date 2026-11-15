@@ -164,6 +164,11 @@ def _never(settings, preferred=("New York NY", "Boston MA"), regions=("Northeast
     ("Northeast", False), ("East Coast", False), ("Multiple locations", False), ("US", False),
     ("Boston", False), ("Manhattan", False), ("Hoboken", False),   # city without a state
     ("Austin, TX (Hybrid)", False), ("Hybrid", False),
+    ("San Francisco, CA • New York, NY • United States", False),   # union touches preferred NY
+    ("New York, NY (HQ), San Francisco, CA", False),
+    ("San Francisco, CA | New York City, NY", False),
+    ("San Francisco, CA / New York, NY", False), ("San Francisco, CA & Austin, TX", True),
+    ("Austin, TX • United States", True),
     ("Dallas, TX; Austin, TX", True),           # every location outside
 ])
 def test_location_nonpreferred(settings: Settings, location, skipped):
@@ -222,7 +227,7 @@ def test_skip_note_names_prefilter_and_states(tmp_path):
     s = Settings.load(make_temp_root(tmp_path / "r"))
     _never(s)
     why = reasons(s, _posting(location="Austin, TX; Denver, CO"), ["location_nonpreferred"])[0]
-    assert why.startswith("prefilter: location_nonpreferred (TX, CO)")
+    assert why.startswith("prefilter: location_nonpreferred (CO, TX)")
 
 
 def test_prefilter_never_skips_what_claude_prepared(tmp_path):
@@ -234,3 +239,9 @@ def test_prefilter_never_skips_what_claude_prepared(tmp_path):
     assert compare_with_scores(s) == []
     (d / "score.json").write_text(json.dumps({"decision": "prepare"}))
     assert compare_with_scores(s) == ["job000000001"]   # a prefilter bug, surfaced
+
+
+def test_preferred_state_entry_without_a_code(settings: Settings):
+    _never(settings, preferred=("New Jersey (any city)",), regions=())
+    assert hard_filters(settings, _posting(location="Hoboken, NJ")) == []
+    assert hard_filters(settings, _posting(location="Austin, TX")) == ["location_nonpreferred"]
