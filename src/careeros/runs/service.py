@@ -151,14 +151,10 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
     cfg = cfg or load_runs_config(settings)
     retry = load_retry_config(cfg.raw)
     fails = Failures(RunStore(settings))
-    done_now: list[int] = []  # score: launches counted toward per_day (set below)
     max_attempts = retry["max_attempts"]
 
     def after(att: dict[str, Any]) -> None:
         jid, outcome = att["job_id"], att["outcome"]
-        if outcome == "prefiltered" and done_now:  # decided in code, no session: gives back its per_day slot
-            done_now[0] -= 1
-            return
         if outcome == "ok":
             fails.clear(kind, jid)
             return
@@ -199,7 +195,7 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         scfg, past = cfg.scoring or DEFAULT_SCORING, RunStore(settings).list_runs("score")
         left = max(0, scfg["per_day"] - scored_today(past, now()))
         budget = replace(budget, max_jobs=min(budget.max_jobs, scfg["per_scan"]))
-        done_now.append(0)
+        done_now = [0]
 
         def pre_attempt(item: dict[str, Any]) -> str | None:  # noqa: F811 - counts launches toward per_day, so
             done_now[0] += 1  # jobs still in flight count too (runs.parallel.score); a locked job counts as well
