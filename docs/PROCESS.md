@@ -19,8 +19,9 @@ broken YAML, unknown bullet ids, tools. Readiness must-items block applying unti
 
 **You must provide:**
 - Master résumé (file), then approve the `master.yaml` diff: `profile/master.yaml` is the only source of facts.
-- Look approval: open the rendered master résumé, and if it looks right run `careeros resume approve-look`
-  (readiness item `resume_look_approved`). A new master résumé resets it. No job prep before this.
+- Look approval: Claude shows you the rendered master résumé; say "looks good" (or what to change) and Claude
+  runs `careeros resume approve-look` (readiness item `resume_look_approved`). A new master résumé resets it.
+  No job prep before this.
 - `profile/standard_answers.yaml`: work authorization, sponsorship, EEO, pronouns, address, links, and
   how-did-you-hear (with `prefer:` keywords that pick the dropdown option).
 - `config/targets.yaml`: `categories` (roles), `location`, salary floors, `industries`.
@@ -89,5 +90,6 @@ You say it; Claude edits files or runs existing commands (no special commands ex
 ## Pick up in any chat
 
 All state is files: `data/` (jobs, runs), `profile/`, `config/` and the tracker. Nothing lives only in a chat.
-Open any Claude chat in the repo and run `/today` first; it tells you what needs you and what is in flight.
+Open any Claude chat in the repo and say "where are we?"; Claude runs `/today` and tells you what needs you and
+what is in flight.
 For unattended runs and scheduling see GETTING_STARTED.md step 12 and `docs/COMMANDS.md`.
