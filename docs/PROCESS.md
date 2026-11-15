@@ -40,7 +40,7 @@ company or country, salary under the minimum) ends scoring as skip with fit 0. O
 <id>` builds `fill_plan.json`; `careeros apply fill <id>` stages the form in the browser and never submits.
 You confirm, then submit.
 
-**Plain code:** scout, prefilter (`targets.yaml: scout.filters`, seniority, blocked countries, ghost jobs), safety
+**Plain code:** scout, prefilter (`targets.yaml: scout.filters`, seniority, blocked countries, work modes, `scout.max_post_age_days`, ghost jobs), safety
 and scam gate, caps, ranking, retries, the fill plan. Ghost checks only open an Action Item (one per dream company,
 via `careeros safety ghost-items`) for scored jobs worth preparing; a very old post needs a weak description or no
 pay range too, not just age. AI runs only in score, prepare, QA and essay answers.

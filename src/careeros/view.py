@@ -1,8 +1,9 @@
-"""`careeros view`: data/views/<tab>.html (Setup until done, then Documents; Jobs; Applications), self-contained local pages from data already on disk (no AI, no
+"""`careeros view`: data/views/<tab>.html (Setup until done, then Documents; Jobs; Search; Applications), self-contained local pages from data already on disk (no AI, no
 network): onboarding checklist (readiness items), pipeline counts + last run, applied history (newest first, 50)."""
 from __future__ import annotations
 
 import html
+import json
 from collections import Counter
 from pathlib import Path
 
@@ -101,7 +102,7 @@ def _applied_at(store: Store, jid: str, submitted: str | None) -> str:
     return next((h["at"][:10] for h in reversed(hist) if h.get("status") == "applied" and h.get("at")), "")
 
 
-NAMES = {"setup": "Setup", "documents": "Documents", "jobs": "Jobs", "applications": "Applications"}
+NAMES = {"setup": "Setup", "documents": "Documents", "jobs": "Jobs", "search": "Search", "applications": "Applications"}
 KIND = {"master": "Master", "variant": "Variant", "tailored": "Tailored"}
 
 
@@ -161,6 +162,75 @@ def _needs_you(s) -> str:
     return f'<h2>Needs you ({len(items)})</h2><ul class="check">{li}</ul>{more}'
 
 
+FUNNEL = {"blocklist": "Blocked companies", "flagged": "Flagged as scams", "title": "Title doesn't match",
+          "seniority": "Senior titles", "location": "Blocked countries", "work_mode": "Work mode",
+          "age": "Posted too long ago", "ghost": "Likely ghost jobs"}
+
+
+def _list(v) -> str:
+    return ", ".join(str(x) for x in v) if v else "None"
+
+
+def _search(s) -> str:
+    """Every job-search filter, its value now and a sentence to say in chat (static page: nothing to save here)."""
+    t, co = s.targets, s.companies
+    cand, loc, sen = t.get("candidate") or {}, t.get("location") or {}, t.get("seniority") or {}
+    cat, ind = t.get("categories") or {}, t.get("industries") or {}
+    bl = co.get("blocklist") or {}
+    age = (t.get("scout") or {}).get("max_post_age_days")
+    modes = loc.get("work_modes") or ["remote", "hybrid", "onsite"]
+    fit = (t.get("thresholds") or {}).get("min_fit_to_prepare")
+    nfit = (t.get("thresholds") or {}).get("min_fit_nonpreferred_location")
+    salary = cand.get("min_base_usd")
+    years = sen.get("max_years_required")
+    from careeros.scout import scout_config
+    sc = scout_config(s)
+    off = [k for k, on in sc["filters"].items() if not on]
+    nice = lambda xs: _list([str(x).replace("_", " ") for x in xs or []])  # noqa: E731
+    rows = [
+        ["Posted within", f"Last {age} days" if age else "Any age", "Only jobs posted in the last 14 days"],
+        ["Work mode", ", ".join(m.replace("onsite", "on-site") for m in modes), "Only remote and hybrid jobs"],
+        ["Minimum salary", f"${salary:,}" if isinstance(salary, int) else "Not set", "My minimum salary is $120,000"],
+        ["Visa sponsorship", "Needed" if cand.get("needs_sponsorship") else "Not needed", "I need visa sponsorship"],
+        ["Preferred cities", _list(loc.get("preferred")), "I want jobs in Austin TX and Chicago IL"],
+        ["Preferred countries", _list(loc.get("preferred_regions")), "I prefer jobs in the US and Canada"],
+        ["Allowed countries", _list(loc.get("allowed_countries")), "Only jobs in the US"],
+        ["Blocked countries", _list(loc.get("blocked_countries")), "Skip jobs in Germany"],
+        ["Remote jobs", "OK" if loc.get("remote_ok") else "Not OK", "I don't want remote jobs"],
+        ["Senior titles skipped", _list(sen.get("exclude_title_keywords")), "Also skip titles containing \"contract\""],
+        ["Most years of experience asked", f"{years} years" if years else "No limit", "Allow jobs asking up to 5 years"],
+        ["Main job types", nice(cat.get("primary")), "Focus on data engineering jobs"],
+        ["Also OK job types", nice(cat.get("secondary")), "Also consider SRE jobs"],
+        ["Job types skipped", nice(cat.get("excluded")), "Never show me sales engineer jobs"],
+        ["Industries I like", nice(ind.get("boost")), "I like healthtech companies"],
+        ["Industries to avoid", nice(ind.get("blocked")), "Never show me defense jobs"],
+        ["Industries never applied to", nice(bl.get("industries")), "Never apply to gambling companies"],
+        ["Blocked companies", _list(bl.get("companies")), "Never show me jobs at Initech"],
+        ["Company names skipped", _list(bl.get("name_patterns")), "Skip any company with \"casino\" in its name"],
+        ["Dream companies", _list(co.get("dream_list")), "Add Initech to my dream companies"],
+        ["Lowest fit to prepare", f"{fit} of 100" if fit else "Not set", "Only prepare jobs that fit 80 or more"],
+        ["Lowest fit outside preferred places", f"{nfit} of 100" if nfit else "Not set",
+         "Outside my preferred places, only prepare fits of 90 or more"],
+        ["Job boards searched", nice(sc["sources"]), "Stop searching Lever boards"],
+        ["Search filters turned off", nice(off) if off else "None (all on)", "Keep senior roles in the search"],
+    ]
+    table = _table(["Filter", "Now", "Say in chat to change it"], [[a, b, f"\u201c{c}\u201d"] for a, b, c in rows])
+    try:
+        last = json.loads((s.paths["seen_file"].parent / "scout_last.json").read_text(encoding="utf-8"))
+        left, steps = int(last["new"]), []
+        for k, name in FUNNEL.items():
+            n = int((last.get("filtered") or {}).get(k, 0))
+            left -= n
+            steps.append([name, f"\u2212{n:,}" if n else "0", f"{left:,}"])
+        funnel = (f'<h2>What the last search removed</h2><p class="mut">{_e(_date(last.get("at")))}: '
+                  f'{last["new"]:,} new postings, {last["stored"]:,} kept.</p>'
+                  + _table(["Filter", "Removed", "Left"], [["New postings found", "", f'{last["new"]:,}'], *steps]))
+    except (OSError, ValueError, KeyError, TypeError):
+        funnel = '<h2>What the last search removed</h2><p class="mut">No search yet. Ask Claude to find jobs.</p>'
+    return (f'<h1>Search</h1><p class="mut">Your filters now. To change one, tell Claude in chat, '
+            f'for example \u201cOnly jobs posted in the last 14 days\u201d.</p>{table}{funnel}')
+
+
 def render(root: Path) -> dict[str, str]:
     """{page: html} for the three tabs."""
     s = get_settings(Path(root))
@@ -188,9 +258,10 @@ def render(root: Path) -> dict[str, str]:
                     for d, j in applied], raw=(3,)) if applied
             else '<p class="mut">Nothing sent yet.</p>')
     first = "setup" if any(i["must"] and not i["done"] for i in items) else "documents"  # Setup shows until done
-    tabs = [first, "jobs", "applications"]
+    tabs = [first, "jobs", "search", "applications"]
     return {first: _page(first, tabs, setup if first == "setup" else _documents(Path(root), jobs)),
             "jobs": _page("jobs", tabs, f"<h1>Your jobs</h1>{_needs_you(s)}<h2>By stage</h2>{stages}{last_html}"),
+            "search": _page("search", tabs, _search(s)),
             "applications": _page("applications", tabs,
                                   f'<h1>Applications</h1><p class="mut">Newest first, up to {CAP}.</p>{apps}')}
 

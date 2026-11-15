@@ -120,7 +120,8 @@ def _scout(s: Settings, args: argparse.Namespace) -> int:
     print()
     print(f"scout done: fetched={t['fetched']} new={t['new']} stored={t['stored']} "
           f"filtered(title={t['filtered_title']} location={t['filtered_location']} blocklist={t['filtered_blocklist']} "
-          f"flagged={t['filtered_flagged']} ghost={t['filtered_ghost']})")
+          f"flagged={t['filtered_flagged']} ghost={t['filtered_ghost']} "
+          f"work_mode={t['filtered_work_mode']} age={t['filtered_age']})")
     if summary.bad_slugs:
         print("\nbad slugs (404) — fix in config/companies.yaml:")
         for b in summary.bad_slugs:

@@ -176,3 +176,52 @@ def test_scout_defaults_keep_every_filter_on(example_settings):
     assert cfg["sources"] == ["greenhouse", "lever", "ashby"]
     assert all(cfg["filters"].values()) and set(cfg["filters"]) == {
         "blocklist", "flagged", "title", "seniority", "location", "ghost"}
+
+
+def _dated(days_ago, **kw):
+    from datetime import date, timedelta
+    p = _p("Software Engineer", **kw)
+    p.posted_at = (date.today() - timedelta(days=days_ago)).isoformat()
+    return p
+
+
+def test_prefilter_max_post_age_days(example_settings):
+    assert Prefilter(example_settings).check(_dated(400))[0]  # default null = off
+    example_settings.targets.setdefault("scout", {})["max_post_age_days"] = 14
+    pf = Prefilter(example_settings)
+    assert pf.check(_dated(5))[0]
+    assert pf.check(_dated(30))[1:2] == ("age",)
+    assert pf.check(_p("Software Engineer"))[0]  # no date: kept
+
+
+def test_prefilter_work_modes(example_settings):
+    example_settings.targets["location"]["work_modes"] = ["remote", "hybrid"]
+    pf = Prefilter(example_settings)
+    assert pf.check(_p("Software Engineer", raw={"workplaceType": "OnSite"}))[1] == "work_mode"
+    assert pf.check(_p("Software Engineer", location="Austin, TX (On-site)"))[1] == "work_mode"
+    assert pf.check(_p("Software Engineer", raw={"workplaceType": "Hybrid"}))[0]
+    assert pf.check(_p("Software Engineer", location="Remote - US"))[0]
+    assert pf.check(_p("Software Engineer"))[0]  # mode unknown: kept
+    example_settings.targets["location"]["work_modes"] = ["onsite"]
+    assert Prefilter(example_settings).check(_p("Software Engineer", location="Remote - US"))[1] == "work_mode"
+    example_settings.targets["location"]["work_modes"] = ["remote", "hybrid", "onsite"]
+    assert Prefilter(example_settings).check(_p("Software Engineer", raw={"workplaceType": "OnSite"}))[0]
+
+
+def test_run_scout_saves_funnel(settings, monkeypatch):
+    import json
+
+    import careeros.scout as scout_mod
+
+    class Fake:
+        def fetch(self, board):
+            return [_p("Software Engineer", jid="a"), _p("Senior Software Engineer", jid="b"),
+                    _p("Software Engineer", jid="c", raw={"workplaceType": "onsite"})]
+
+    monkeypatch.setattr(scout_mod, "ADAPTERS", {"greenhouse": Fake})
+    settings.companies["boards"] = [{"company": "Acme", "ats": "greenhouse", "slug": "a"}]
+    settings.targets["location"]["work_modes"] = ["remote", "hybrid"]
+    run_scout(settings, Store(settings), log=lambda *_: None)
+    doc = json.loads((settings.paths["seen_file"].parent / "scout_last.json").read_text())
+    assert doc["new"] == 3 and doc["stored"] == 1 and doc["at"]
+    assert doc["filtered"]["seniority"] == 1 and doc["filtered"]["work_mode"] == 1 and doc["filtered"]["location"] == 0

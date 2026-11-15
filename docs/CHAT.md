@@ -6,6 +6,7 @@ The web UI (`careeros ui`) is a read-only dashboard: **Today** and **Jobs** (tab
 
 | You used to click | Say, or run now |
 |---|---|
+| Which filters exist, what each removed | the Search tab of `careeros view`; say e.g. "Only jobs posted in the last 14 days" or "Only remote and hybrid jobs" and Claude edits `config/targets.yaml` |
 | Settings | "change `<key>` in `config/<file>.yaml` to `<value>`"; `careeros doctor` checks the result |
 | Job detail (documents, status, safety, score) | `careeros job show <id>` (`--full`), or "show job `<id>`"; status: `careeros job status <id> <status>` |
 | Job detail › fill plan, apply session | `careeros apply plan <id>`, review `fill_plan.json`, then `careeros apply fill <id>` (Playwright); `/apply-job` for the Chrome path |
