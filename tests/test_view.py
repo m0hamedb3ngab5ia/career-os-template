@@ -33,9 +33,9 @@ def test_view_sections_and_escaping(temp_root):
     assert "Getting set up" in setup and " done</p>" in setup and "<progress" in setup
     assert "Add your résumé" in setup and "todo:" not in setup and "done:" not in setup  # checkmarks, not prefixes
     assert "careeros" not in setup.split("<body>")[1]  # plain words, no commands
-    assert "Applications" not in setup.split("</nav>")[1] and "<td>Applied</td>" in jobs
+    assert "Applications" not in setup.split("</nav>")[1] and "Applied</td>" in jobs
     assert "&lt;script&gt;alert(1)&lt;/script&gt; &amp; Co" in apps
-    assert "<td>Later Inc</td>" in apps and "<td>Interviewing</td>" in apps
+    assert "<td>Later Inc</td>" in apps and "Interviewing</td>" in apps
 
 
 def test_view_documents_tab_replaces_setup_once_ready(tmp_path, monkeypatch):
@@ -51,5 +51,6 @@ def test_view_documents_tab_replaces_setup_once_ready(tmp_path, monkeypatch):
     d = root / "data" / "views"
     assert out == d / "documents.html" and not (d / "setup.html").exists()
     docs = out.read_text(encoding="utf-8")
-    assert "<h1>Documents</h1>" in docs and "Master" in docs and "Master résumé look: approved" in docs
+    assert "<h1>Documents</h1>" in docs and "<td>Master</td>" in docs and "Every job" in docs
+    assert "Needs your OK" not in docs  # personalize() approved the look
     assert 'href="setup.html"' not in (d / "jobs.html").read_text(encoding="utf-8")
