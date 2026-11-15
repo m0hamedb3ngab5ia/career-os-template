@@ -82,12 +82,31 @@ def _states_in(text: str) -> set[str]:
 _COUNTRY = re.compile(r"\s*(united states( of america)?|usa|u\.s\.a?\.?|us)\s*", re.I)
 
 
+_NAME_TO_CODE = {n: c for c, n in _STATES.items()}
+
+
+def _strict_states(segment: str) -> set[str]:
+    """States of a segment that is exactly `City, ST[, City, ST ...]` (state code or full name; parentheticals and
+    country words ignored). Anything else in it (an extra city, free text) returns set(): unparsed."""
+    toks = [t.strip() for t in re.sub(r"\([^)]*\)", "", segment).split(",") if t.strip()]
+    toks = [t for t in toks if not _COUNTRY.fullmatch(t)]
+    out: set[str] = set()
+    if not toks or len(toks) % 2:
+        return set()
+    for city, st in zip(toks[::2], toks[1::2]):
+        code = st.upper() if st.upper() in _STATES else _NAME_TO_CODE.get(st.lower())
+        if not code or city.upper() in _STATES:
+            return set()
+        out.add(code)
+    return out
+
+
 def posting_states(posting: dict[str, Any]) -> list[str]:
-    """Union of the US states in every listed location, [] when any part names none (a bare city, "Northeast").
-    A segment that is only the country ("United States") is ignored."""
+    """Union of the US states in every listed location, [] when any part is not a clean `City, ST` (a bare city,
+    "Northeast", extra words). A segment that is only the country ("United States") is ignored."""
     parts = [x for x in re.split(r"[;|\n•/&]| or ", str(posting.get("location") or ""))
              if x.strip() and not _COUNTRY.fullmatch(x)]
-    sets = [_states_in(x) for x in parts]
+    sets = [_strict_states(x) for x in parts]
     return sorted(set().union(*sets)) if parts and all(sets) else []
 
 

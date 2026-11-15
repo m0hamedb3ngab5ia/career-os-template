@@ -169,6 +169,9 @@ def _never(settings, preferred=("New York NY", "Boston MA"), regions=("Northeast
     ("San Francisco, CA | New York City, NY", False),
     ("San Francisco, CA / New York, NY", False), ("San Francisco, CA & Austin, TX", True),
     ("Austin, TX • United States", True),
+    ("Austin, TX, Boston", False),              # extra city: segment not fully parsed
+    ("Austin, TX, Remote or Boston", False), ("Austin, TX, somewhere in Texas", False),
+    ("Boston, MA, United States", False), ("Austin, TX, USA", True), ("Austin, TX (HQ)", True),
     ("Dallas, TX; Austin, TX", True),           # every location outside
 ])
 def test_location_nonpreferred(settings: Settings, location, skipped):
