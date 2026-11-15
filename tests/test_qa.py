@@ -1397,3 +1397,57 @@ def test_best_line_matches_a_short_variant_on_its_own():
     short = "Cut nightly batch time from ~6 hours to 40 minutes"
     lines = ["- Cut nightly batch time from ~6 hours to 40 minutes", "- Mentored 6 interns over 2 summers"]
     assert _best_line([master, short], lines) == lines[0]
+
+
+# --- skills_evidenced ------------------------------------------------------------
+
+def _evidence_job(tmp_path: Path, post: str, skills: dict, bullets: list[str]) -> Path:
+    job = make_job(tmp_path)
+    p = json.loads((job / "posting.json").read_text())
+    p["description_text"] = post
+    (job / "posting.json").write_text(json.dumps(p))
+    (job / "resume.txt").write_text("EXPERIENCE\n" + "".join(f"- {t.replace('**', '')}\n" for t in bullets))
+    return _resume_with(job, skills=skills, skill_groups=[], experience=[
+        {"id": "acme", "bullets": [{"id": f"acme.{i}", "text": t} for i, t in enumerate(bullets, 1)]}])
+
+
+@pytest.mark.parametrize("bullets,ok,named", [
+    (["Built a service on **Kafka** streams"], False, ["Python"]),   # Rust not in posting: ignored
+    (["Built a Python service on Kafka streams"], True, []),
+])
+def test_skills_evidenced(tmp_path: Path, bullets: list, ok: bool, named: list) -> None:
+    job = _evidence_job(tmp_path, "We need Python and Kafka.", {"x": ["Python", "Kafka", "Rust"]}, bullets)
+    c = by_name(run(job), "skills_evidenced")
+    assert c["ok"] is ok, c["detail"]
+    assert ("Python listed" in c["detail"]) == bool(named) and "Rust" not in c["detail"] and "Kafka listed" not in c["detail"]
+
+
+def test_skills_evidenced_parenthetical(tmp_path: Path) -> None:
+    job = _evidence_job(tmp_path, "Experience with Glue pipelines.", {"x": ["AWS (Athena, Glue)"]},
+                        ["Wrote Glue jobs for reporting"])
+    assert by_name(run(job), "skills_evidenced")["ok"]
+
+
+def test_skills_evidenced_skipped_without_skills(tmp_path: Path) -> None:
+    job = _evidence_job(tmp_path, "We need Python.", {}, ["Built things"])
+    assert by_name(run(job), "skills_evidenced").get("skipped")
+
+
+def test_skills_evidenced_c_does_not_match_c_sharp(tmp_path: Path) -> None:
+    # Codex #239: "C" (from "C/C++") must not be read as asked for by a posting that names C# only
+    job = _evidence_job(tmp_path, "We build in C# and .NET.", {"x": ["C/C++"]}, ["Built a desktop tool"])
+    assert by_name(run(job), "skills_evidenced")["ok"]
+
+
+def test_skills_evidenced_reads_only_the_rendered_page(tmp_path: Path) -> None:
+    # Codex #239: a bullet that resume.json holds but the rendered résumé does not print is not evidence
+    job = _evidence_job(tmp_path, "We need Python.", {"x": ["Python"]}, ["Built a Python service"])
+    (job / "resume.txt").write_text("EXPERIENCE\n- Built a service\n\nSKILLS\nLanguages: Python\n")
+    c = by_name(run(job), "skills_evidenced")
+    assert not c["ok"] and "Python listed" in c["detail"]
+
+
+def test_skills_evidenced_ignores_the_concepts_row(tmp_path: Path) -> None:
+    # concepts ("System Design") are not tools: the rule covers tools and technologies only
+    job = _evidence_job(tmp_path, "Strong system design skills.", {"concepts": ["System Design"]}, ["Built things"])
+    assert by_name(run(job), "skills_evidenced")["ok"]
