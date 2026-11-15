@@ -248,10 +248,10 @@ class RunControl:
             return run_batch(self.settings, kind, budget_for(cfg, kind, preset=preset, max_jobs=max_jobs,
                                                              max_minutes=max_minutes), cfg=cfg, dry_run=True,
                              job_ids=ids, force=force)
-        if kind == "apply":  # REQ-103: NotReady (409) before anything is spawned
-            from careeros.readiness import require_ready
+        if kind in ("apply", "prepare"):  # REQ-103/143: NotReady (409) before anything is spawned
+            from careeros.readiness import PREPARE_GATE, require_ready
 
-            require_ready(self.settings.root)
+            require_ready(self.settings.root, only=PREPARE_GATE if kind == "prepare" else None)
         run_id = None
         if job_id:
             from careeros.runs.runner import JobNotRunnable, new_run_id, select_candidates

@@ -231,9 +231,9 @@ Given a job with status interview · When the skill runs · Then `interview_prep
 Given a posting asking for a tool absent from master.yaml · When `/score-job` runs · Then `gaps[]` names that tool.
 
 ## Process (DEC-024, docs/PROCESS.md)
-### REQ-143 Master résumé look approved before apply
-After onboarding the candidate sees the rendered master résumé and says it looks right; `careeros resume approve-look` records `profile/master.look.json` for that résumé version. Readiness must-item `resume_look_approved` blocks apply until then; a new master version needs a new approval. Prepare is not gated.
-Given an approved look and a new master version · When readiness runs · Then `resume_look_approved` is undone and apply is blocked.
+### REQ-143 Master résumé look approved before prepare and apply
+After onboarding the candidate sees the rendered master résumé and says it looks right; `careeros resume approve-look` records `profile/master.look.json` for that résumé version. Readiness must-item `resume_look_approved` blocks prepare and apply until then (prepare spends tokens tailoring from a résumé the candidate hasn't seen; changed 2026-11-14 by the candidate); a new master version needs a new approval. Scoring is not gated. Prepare checks only this item (`careeros resume look-check`, `run prepare` exit 7); apply checks every must-item.
+Given an approved look and a new master version · When readiness runs · Then `resume_look_approved` is undone and prepare and apply are blocked (exit 7).
 ### REQ-144 Auto-submit is opt-in
 Default config never submits: tiers B/C `auto_submit: false`, `runs.auto_submit` off; Claude fills the form and the candidate submits. Opting in is a config change the candidate asks for in chat (per tier, plus `safety.auto_submit_ats` and `safety.pause_auto_submit`). Tier A never auto-submits.
 Given the example config · When an apply run starts · Then it runs with auto-submit 0.

@@ -116,3 +116,18 @@ def test_approve_look_without_master_raises(tmp_path):
 
     with pytest.raises(LookupError):
         master_sync.approve_look(fresh(tmp_path))
+
+
+def test_prepare_gate_checks_only_the_look(tmp_path, monkeypatch):
+    """REQ-143: prepare spends tokens, so it waits for the look approval; other apply must-haves don't block it."""
+    monkeypatch.setattr(readiness.shutil, "which", which_all)
+    root = personalize(fresh(tmp_path))
+    (root / "profile" / "master.look.json").unlink()
+    with pytest.raises(readiness.NotReady) as e:
+        readiness.require_ready(root, only=readiness.PREPARE_GATE)
+    assert [i["id"] for i in e.value.items] == ["resume_look_approved"]
+    from careeros import master_sync
+    master_sync.approve_look(root)
+    t = root / "config" / "targets.yaml"
+    t.write_text(t.read_text().replace("salary_dropdown_floor_usd:", "old_floor:"))
+    readiness.require_ready(root, only=readiness.PREPARE_GATE)  # salary still open: prepare not blocked

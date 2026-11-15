@@ -25,6 +25,10 @@ anything. Print its FAIL lines, then the final RESULT with `status: skipped`, `s
 and `ACTION_ITEMS: ["setup: fix the careeros doctor FAIL lines (profile still has example data or a tool is missing)"]`.
 This keeps the fictional example candidate (Alex Example) out of every real application.
 
+Look guard (REQ-143): then run `.venv/bin/careeros resume look-check`. Exit 7 means the candidate has not approved how
+the master résumé looks: STOP the same way, `skip_reason: "setup: master résumé look not approved"`,
+`ACTION_ITEMS: ["setup: show the candidate the master résumé PDF; on their yes run careeros resume approve-look"]`.
+
 Job lock (right after the doctor guard): `.venv/bin/careeros job lock <job_id> --owner prepare-job --json`.
 Exit 6 means a run or another session is working on this job: STOP and change nothing (no files, no status);
 print the final RESULT with `status: skipped`, `skip_reason: "locked: <owner from stderr>"`. On exit 0 keep

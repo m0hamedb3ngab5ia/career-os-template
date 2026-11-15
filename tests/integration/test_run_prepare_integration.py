@@ -220,6 +220,9 @@ def test_e2e_011_01_similar_jobs_reuse_one_variant_with_no_tailor(root, env):
     shutil.rmtree(root / "profile" / "resumes")  # personalize()'s stub master has no versions to score
     rid = resumes.add(root, "cv.pdf", b"%PDF-1.4\nx\n", name="backend")["rid"]
     resumes.add_text(root, rid, "Python APIs backend software engineer", author="user", source="edit")
+    resumes.add(root, "master.pdf", b"%PDF-1.4\nx\n", name="master", type="master")
+    from careeros import master_sync
+    master_sync.approve_look(root)  # REQ-143: prepare waits for the look approval
     jobs = [add_job(root, n) for n in range(1, 6)]
     for j in jobs:
         sp = root / "data" / "jobs" / j / "score.json"
