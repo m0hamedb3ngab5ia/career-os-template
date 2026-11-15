@@ -18,6 +18,10 @@ a pass here means the artifacts may be submitted without a human reading them (t
 - `profile/master.yaml` and `profile/voice/style_guide.md` (+ `samples/`).
 - `.claude/skills/_shared/resume_writing_rules.md` (bullet formulas, weak openers, ownership honesty; the
   `bullet_strength` rubric row below scores against it).
+- `.claude/skills/_shared/resume_references.md`: patterns from public senior/backend résumés and how to quantify
+  without inventing numbers (shape guidance only; if `profile/resume_examples/` has files, read its README.md and
+  compare the draft with the approved example(s) for tone, density and quantification; never copy facts from them
+  that are not in `master.yaml`).
 - `JOB/posting.json`, `JOB/score.json`, and whichever exist of `resume.json`, `resume.txt`,
   `cover_letter.md`, `answers.json`, `resume.pdf`, `outreach.json`, `contacts.json`.
 - `JOB/qa.json` if it exists: read `regenerations` (default 0).

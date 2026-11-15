@@ -18,6 +18,11 @@ Also read `profile/resume_feedback.md` if it exists (the candidate's own résum�
 outranks `.claude/skills/_shared/resume_writing_rules.md` but never the Hard rules in CLAUDE.md (no fabrication,
 frozen numbers, confidential terms).
 
+Also read `.claude/skills/_shared/resume_references.md`: patterns from public senior/backend résumés and how to quantify
+  without inventing numbers (shape guidance only; if `profile/resume_examples/` has files, read its README.md and
+  compare the draft with the approved example(s) for tone, density and quantification; never copy facts from them
+  that are not in `master.yaml`).
+
 Item not `open` (accepted, rejected, outdated): do nothing, `RESULT: {"error":"item is <status>"}`.
 
 ## 2. Propose
