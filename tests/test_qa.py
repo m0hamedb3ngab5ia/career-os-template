@@ -265,7 +265,7 @@ def test_number_audit_ignores_digits_in_urls(tmp_path: Path) -> None:
     res = run(make_job(tmp_path, resume_txt=txt))
     assert by_name(res, "number_audit:resume.txt")["ok"], by_name(res, "number_audit:resume.txt")["detail"]
     txt = RESUME_TXT.replace("review reconciliation breaks", "review reconciliation breaks (www.example.com/p/987654 example.org/a.b/55)")
-    assert by_name(run(make_job(tmp_path, resume_txt=txt)), "number_audit:resume.txt")["ok"]
+    assert by_name(run(make_job(tmp_path / "b", resume_txt=txt)), "number_audit:resume.txt")["ok"]
 
 
 def test_number_audit_still_flags_real_number_next_to_url(tmp_path: Path) -> None:
