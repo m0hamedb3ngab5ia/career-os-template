@@ -22,6 +22,7 @@ from careeros.config import Settings
 # "6+ years", "at least 5 years", "5-7 years", "4 years'" followed by "experience" in the same clause
 _YEARS = re.compile(r"(?<![\d.])(\d{1,2})\s*(?:\+|plus)?\s*(?:(?:-|–|to)\s*\d{1,2}\s*\+?)?\s*years?\b'?"
                     r"(?P<tail>[^.;\n]{0,60})", re.I)
+_COMPANY = re.compile(r"\b(we|we've|our|us|has|founded|for)\b", re.I)  # company history, not a requirement
 _OPTIONAL = re.compile(r"\b(prefer\w*|nice to have|bonus|ideally|a plus)\b", re.I)
 
 
@@ -34,7 +35,9 @@ def min_years_required(text: str) -> int | None:
             continue
         for m in _YEARS.finditer(line):
             tail = m.group("tail").lower()
-            if "experience" in tail and "intern" not in tail:
+            if _COMPANY.search(line[max(0, m.start() - 30):m.start()]):  # "Acme has 20 years", "for 10 years we"
+                continue
+            if re.search(r"\bexperience\b", tail) and "intern" not in tail:
                 found.append(int(m.group(1)))
     return max(found) if found else None
 

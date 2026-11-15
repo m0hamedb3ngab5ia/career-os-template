@@ -91,3 +91,13 @@ def test_cli_pass_writes_nothing(tmp_path):
     root, d = _job(tmp_path)
     assert main(["--root", str(root), "job", "filters", "job000000001"]) == 0
     assert not (d / "score.json").exists()
+
+
+@pytest.mark.parametrize("text", [
+    "Acme has 20 years of experience in fintech.",
+    "For 10 years we have built experiences people love.",
+    "Our team brings 15 years of experience to every launch.",
+])
+def test_company_history_is_not_a_years_requirement(text):
+    # a false skip drops a real job silently; when unsure, leave it to the skill
+    assert min_years_required(text) is None
