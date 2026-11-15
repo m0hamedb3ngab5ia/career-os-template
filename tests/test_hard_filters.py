@@ -207,7 +207,7 @@ def test_cli_location_skip_writes_score(tmp_path):
     (root / "config" / "targets.yaml").write_text(yaml.safe_dump(s.targets))
     assert main(["--root", str(root), "job", "filters", "job000000001"]) == 3
     sc = json.loads((d / "score.json").read_text())
-    assert sc["skip_reason"] == "location_nonpreferred" and "Location" in sc["fit_reasons"][0]
+    assert sc["skip_reason"] == "location_nonpreferred" and sc["fit_reasons"][0].startswith("prefilter:")
 
 
 def test_unparseable_pay_does_not_skip_or_exempt(settings: Settings):
