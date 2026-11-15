@@ -142,6 +142,9 @@ scout:
   sources: [greenhouse, lever, ashby]  # ATS adapters to fetch; boards on others are skipped
   max_post_age_days: null              # null (Recommended = off). A number, e.g. 14: scout drops postings first
                                        # published longer ago than that (no date = kept)
+  new_grad_max_post_age_days: null     # null (Recommended = same as max_post_age_days). E.g. 60: new-grad titles
+                                       # (new grad, graduate, entry level, early career, campus, "2027 start") stay
+                                       # open for months, so they get a longer window
   filters:
     blocklist: true                    # companies.yaml blocklist
     flagged: true                      # high-confidence entries in data/flagged_registry.yaml

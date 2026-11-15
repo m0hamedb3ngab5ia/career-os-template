@@ -115,6 +115,9 @@ def scout_config(settings: Settings) -> dict[str, Any]:
     return {"sources": sources, "filters": filters}
 
 
+NEW_GRAD = re.compile(r"\b(new[\s-]*(college[\s-]*)?grad\w*|graduate|university[\s-]*grad\w*|entry[\s-]*level|early[\s-]*career|campus|20\d\d[\s-]*start)\b", re.I)
+
+
 class Prefilter:
     def __init__(self, settings: Settings, flagged: list[dict[str, Any]] | None = None,
                  filters: dict[str, bool] | None = None):
@@ -130,6 +133,8 @@ class Prefilter:
         self.country_aliases = {**COUNTRY_ALIASES, **settings.country_aliases()}
         age = (settings.targets.get("scout") or {}).get("max_post_age_days")
         self.max_age = int(age) if age else None  # null/0 = off
+        grad_age = (settings.targets.get("scout") or {}).get("new_grad_max_post_age_days")
+        self.new_grad_max_age = int(grad_age) if grad_age else self.max_age  # unset = same window
         modes = (settings.targets.get("location") or {}).get("work_modes") or WORK_MODES
         self.work_modes = {_mode(m) for m in modes}
 
@@ -168,9 +173,11 @@ class Prefilter:
         return False
 
     def too_old(self, p: Posting) -> bool:
-        """Posted more than `scout.max_post_age_days` ago by the posting's own dates (no date = kept)."""
+        """Posted more than `scout.max_post_age_days` ago by the posting's own dates (no date = kept); new-grad
+        titles use `scout.new_grad_max_post_age_days` (campus roles stay open for months)."""
         known = [d for d in (_d(p.posted_at), _d(p.first_published)) if d]
-        return bool(self.max_age and known and (date.today() - min(known)).days > self.max_age)
+        cap = self.new_grad_max_age if NEW_GRAD.search(p.title or "") else self.max_age
+        return bool(cap and known and (date.today() - min(known)).days > cap)
 
     def work_mode(self, p: Posting) -> str | None:
         """remote | hybrid | onsite from the ATS field or the location/title words; None = can't tell."""

@@ -362,6 +362,8 @@ SECTIONS: tuple[Section, ...] = (
                   options=("greenhouse", "lever", "ashby"), strict=True),
             _num(T, "scout.max_post_age_days", "Skip postings older than", None, unit="days", lo=1, nullable=True,
                  help="Empty keeps any age. Uses the posting's own dates."),
+            _num(T, "scout.new_grad_max_post_age_days", "Skip new-grad postings older than", None, unit="days",
+                 lo=1, nullable=True, help="Empty uses the limit above. New-grad roles stay open for months."),
             _tags(C, "searches.keywords", "Search phrases", None, personal=True, **UNUSED),
         )),
         Group("filters", "Filters", (
