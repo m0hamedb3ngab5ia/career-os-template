@@ -4,7 +4,6 @@ import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../test/axe";
 import { NumberInput, SelectInput, TagEditor, TextInput } from "./inputs";
-import { Switch } from "./Switch";
 
 describe("NumberInput", () => {
   it("reports numbers, null when empty and NaN for text", async () => {
@@ -102,17 +101,5 @@ describe("SelectInput and TextInput", () => {
     expect(onSel).toHaveBeenCalledWith("if_required");
     await user.type(screen.getByRole("textbox", { name: "Time zone" }), "x");
     expect(onText).toHaveBeenCalledWith("localx");
-  });
-});
-
-describe("Switch describedBy", () => {
-  it("points at its hint", () => {
-    render(
-      <>
-        <Switch checked onCheckedChange={() => undefined} label="Daily digest" describedBy="hint" />
-        <span id="hint">Once a day</span>
-      </>,
-    );
-    expect(screen.getByRole("switch", { name: "Daily digest" })).toHaveAccessibleDescription("Once a day");
   });
 });

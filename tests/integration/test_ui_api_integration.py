@@ -532,7 +532,6 @@ def test_jobs_select_endpoint_sets_flag(client, data):
     assert all(store.is_selected(j) for j in ids)
 
 
-
 def test_jobs_list_shows_selected_and_injection_and_clear(client, data):
     """REQ-104/109: list rows carry `selected` + uncleared injection reasons; POST injection/clear = "I checked it"."""
     from careeros.store import Store
@@ -569,77 +568,6 @@ def _write_plan(data, jid):
     return plan
 
 
-def test_fill_plan_preview_edit_and_save_to_profile(client, data):
-    """REQ-105/106, E2E-008-01/02: the plan table, edits land in fill_plan.json, save-to-profile learns the answer
-    and the next plan auto-fills it; required unanswered blocks the fill, optional ones may be skipped."""
-    import yaml
-
-    from careeros.apply.gh_schema import build_plan
-
-    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
-    h = {"x-careeros": "1"}
-    assert client.get(f"/api/jobs/{jid}/fill-plan").json() == {"plan": None, "problems": []}
-    _write_plan(data, jid)
-    r = client.get(f"/api/jobs/{jid}/fill-plan").json()
-    assert [f["field_id"] for f in r["plan"]["fields"]] == ["email", "q1", "q2", "q3"]
-    assert r["problems"] == ["unanswered (pause:legal): Will you need sponsorship?",
-                             "needs input (required): What is your notice period?"]
-    url = f"/api/jobs/{jid}/fill-plan/fields"
-    assert client.post(f"{url}/q1", headers=h, json={"skip": True}).status_code == 400  # required: no skip
-    assert client.post(f"{url}/q3", headers=h, json={"value": "Maybe", "save": False}).status_code == 400  # not an option
-    assert client.post(f"{url}/nope", headers=h, json={"value": "x"}).status_code == 404
-    r = client.post(f"{url}/q2", headers=h, json={"skip": True}).json()
-    assert r["field"]["skipped"] is True and r["saved"] is False
-    sa = data["settings"].paths["standard_answers"]
-    n = len(yaml.safe_load(open(sa))["answers"])
-    r = client.post(f"{url}/q3", headers=h, json={"value": "No", "save": False}).json()
-    assert r["field"]["value"] == "No" and r["field"]["source"] == "user" and r["saved"] is False
-    r = client.post(f"{url}/q1", headers=h, json={"value": "4 weeks", "save": True}).json()
-    assert r["saved"] is True and r["problems"] == []
-    plan = json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())
-    assert {f["field_id"]: f["value"] for f in plan["fields"]}["q1"] == "4 weeks"
-    answers = yaml.safe_load(open(sa))["answers"]
-    assert len(answers) == n + 1 and answers[-1]["answer"] == "4 weeks"  # save off (q3): job only
-    nxt = build_plan([{"field_id": "q9", "label": "What is your notice period?", "type": "text", "options": [],
-                       "required": True}], profile={}, answers_path=sa, files={})
-    assert nxt["fields"][0]["value"] == "4 weeks"
-
-
-def test_fill_plan_ai_draft_approve_or_edit_then_fill(client, data, monkeypatch):
-    """REQ-105/DEC-010, E2E-008-01 extended: an unreviewed AI draft blocks the fill; Approve keeps the draft text,
-    an edit replaces it; both mark it reviewed. Approve never writes the profile and only works on drafts."""
-    from careeros.apply import gh_fill
-    from careeros.ui.services import job_actions
-
-    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
-    plan = _write_plan(data, jid)
-    plan["fields"] = [f for f in plan["fields"] if f["field_id"] == "email"] + [
-        {"field_id": "d1", "label": "Why us?", "type": "textarea", "value": "The mission.", "source": "ai_draft",
-         "reviewed": False, "needs_review": True, "required": True},
-        {"field_id": "d2", "label": "Notice period", "type": "text", "value": "2 weeks", "source": "ai_draft",
-         "reviewed": False, "needs_review": True, "required": True}]
-    Store(data["settings"])._write(jid, "fill_plan.json", plan)
-    h = {"x-careeros": "1"}
-    monkeypatch.setattr(gh_fill, "preflight", lambda: None)
-    spawned: list = []
-    monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=1))
-    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
-    assert r.status_code == 400 and "unreviewed AI draft: Why us?" in r.json()["detail"] and not spawned
-    sa = data["settings"].paths["standard_answers"]
-    before = open(sa).read()
-    url = f"/api/jobs/{jid}/fill-plan/fields"
-    assert client.post(f"{url}/email/approve", headers=h).status_code == 400  # not a draft
-    r = client.post(f"{url}/d1/approve", headers=h).json()
-    assert r["field"]["reviewed"] is True and r["field"]["value"] == "The mission."
-    assert r["problems"] == ["unreviewed AI draft: Notice period"]
-    r = client.post(f"{url}/d2", headers=h, json={"value": "4 weeks", "save": False}).json()
-    assert r["field"]["source"] == "user" and r["problems"] == [] and open(sa).read() == before
-    r = client.post(f"/api/jobs/{jid}/application/open", headers=h)
-    assert r.status_code == 200 and spawned
-    vals = {f["field_id"]: f["value"] for f in json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())["fields"]}
-    assert vals["d1"] == "The mission." and vals["d2"] == "4 weeks"
-
-
 def test_application_open_refuses_required_needs_input(client, data, monkeypatch):
     """REQ-106: a plan with a required unanswered field is not filled; no fill is spawned."""
     from careeros.apply import gh_fill
@@ -652,83 +580,6 @@ def test_application_open_refuses_required_needs_input(client, data, monkeypatch
     monkeypatch.setattr(job_actions.subprocess, "Popen", lambda argv, **k: spawned.append(argv) or types.SimpleNamespace(pid=1))
     r = client.post(f"/api/jobs/{jid}/application/open", headers={"x-careeros": "1"})
     assert r.status_code == 400 and "needs input (required)" in r.json()["detail"] and not spawned
-
-
-def test_fill_plan_eeo_never_saved_on_reedit(client, data):
-    """MUST: EEO is derived from the field, not its current source; a second edit never writes the profile."""
-    import yaml
-
-    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
-    plan = _write_plan(data, jid)
-    plan["fields"] += [
-        {"field_id": "gender", "label": "Gender", "type": "select", "value": None, "source": "pause:eeo",
-         "needs_review": True, "required": False, "options": ["Male", "Female", "Decline To Self Identify"]},
-        {"field_id": "q7", "label": "What is your race or ethnicity?", "type": "text", "value": "x", "source": "user",
-         "needs_review": False, "required": False}]
-    Store(data["settings"])._write(jid, "fill_plan.json", plan)
-    kinds = {f["field_id"]: f.get("kind") for f in client.get(f"/api/jobs/{jid}/fill-plan").json()["plan"]["fields"]}
-    assert kinds["gender"] == "eeo" and kinds["q7"] == "eeo" and kinds["q2"] != "eeo"
-    sa = data["settings"].paths["standard_answers"]
-    before = open(sa).read()
-    url = f"/api/jobs/{jid}/fill-plan/fields"
-    h = {"x-careeros": "1"}
-    for v in ("Female", "Decline To Self Identify"):
-        r = client.post(f"{url}/gender", headers=h, json={"value": v, "save": True}).json()
-        assert r["saved"] is False and r["field"]["kind"] == "eeo"
-    assert client.post(f"{url}/q7", headers=h, json={"value": "y", "save": True}).json()["saved"] is False
-    assert open(sa).read() == before
-
-
-def test_fill_plan_reedit_saved_answer_updates_profile(client, data):
-    """MUST: re-editing a learned answer, or a row filled from a saved answer, updates that entry (no 400); the
-    next plan fills the new value."""
-    import yaml
-
-    from careeros.apply.gh_schema import build_plan
-
-    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
-    plan = _write_plan(data, jid)
-    plan["fields"].append({"field_id": "q4", "label": "Do you require visa sponsorship?", "type": "text",
-                           "value": "No", "source": "standard:sponsorship", "needs_review": False, "required": True})
-    Store(data["settings"])._write(jid, "fill_plan.json", plan)
-    sa = data["settings"].paths["standard_answers"]
-    url = f"/api/jobs/{jid}/fill-plan/fields"
-    h = {"x-careeros": "1"}
-    assert client.post(f"{url}/q1", headers=h, json={"value": "4 weeks", "save": True}).json()["saved"] is True
-    n = len(yaml.safe_load(open(sa))["answers"])
-    r = client.post(f"{url}/q1", headers=h, json={"value": "6 weeks", "save": True})
-    assert r.status_code == 200 and r.json()["saved"] is True, r.text
-    r = client.post(f"{url}/q4", headers=h, json={"value": "Yes", "save": True})
-    assert r.status_code == 200 and r.json()["saved"] is True, r.text
-    assert len(yaml.safe_load(open(sa))["answers"]) == n
-
-    def nxt(label):
-        return build_plan([{"field_id": "z", "label": label, "type": "text", "options": [], "required": True}],
-                          profile={}, answers_path=sa, files={})["fields"][0]["value"]
-    assert nxt("What is your notice period?") == "6 weeks"
-    assert nxt("Do you require visa sponsorship?") == "Yes"
-
-
-def test_fill_plan_skip_optional_pause_unblocks_and_edits_serialize(client, data):
-    """SHOULD: skipping an optional salary pause unblocks Fill; concurrent row saves all land (locked RMW)."""
-    from concurrent.futures import ThreadPoolExecutor
-
-    from careeros.ui.services import job_actions
-
-    jid = sorted(Store(data["settings"]).iter_job_ids())[0]
-    plan = _write_plan(data, jid)
-    plan["fields"].append({"field_id": "s1", "label": "Desired salary", "type": "text", "value": None,
-                           "source": "pause:salary", "needs_review": True, "required": False})
-    plan["fields"] += [{"field_id": f"t{i}", "label": f"Free text {i}", "type": "text", "value": None,
-                        "source": "unanswered", "needs_review": True, "required": False} for i in range(12)]
-    Store(data["settings"])._write(jid, "fill_plan.json", plan)
-    r = client.post(f"/api/jobs/{jid}/fill-plan/fields/s1", headers={"x-careeros": "1"}, json={"skip": True}).json()
-    assert not any("Desired salary" in p for p in r["problems"])
-    with ThreadPoolExecutor(6) as ex:
-        list(ex.map(lambda i: job_actions.edit_fill_field(data["settings"], jid, f"t{i}", value=f"v{i}", save=False),
-                    range(12)))
-    by = {f["field_id"]: f["value"] for f in json.loads((Store(data["settings"]).job_dir(jid) / "fill_plan.json").read_text())["fields"]}
-    assert all(by[f"t{i}"] == f"v{i}" for i in range(12))
 
 
 def test_application_open_refuses_without_plan(client, data, monkeypatch):

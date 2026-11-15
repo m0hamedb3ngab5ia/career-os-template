@@ -11,14 +11,6 @@ export interface paths {
     /** Add Action */
     post: operations["add_action_api_actions_post"];
   };
-  "/api/actions/bulk-done": {
-    /** Bulk Done */
-    post: operations["bulk_done_api_actions_bulk_done_post"];
-  };
-  "/api/actions/bulk-reopen": {
-    /** Bulk Reopen */
-    post: operations["bulk_reopen_api_actions_bulk_reopen_post"];
-  };
   "/api/actions/{aid}/answer": {
     /**
      * Answer
@@ -26,10 +18,6 @@ export interface paths {
      * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
      */
     post: operations["answer_api_actions__aid__answer_post"];
-  };
-  "/api/actions/{aid}/block-company": {
-    /** Block Company */
-    post: operations["block_company_api_actions__aid__block_company_post"];
   };
   "/api/actions/{aid}/done": {
     /** Done */
@@ -39,64 +27,9 @@ export interface paths {
     /** Set Due */
     post: operations["set_due_api_actions__aid__due_post"];
   };
-  "/api/actions/{aid}/mark-safe": {
-    /** Mark Safe */
-    post: operations["mark_safe_api_actions__aid__mark_safe_post"];
-  };
-  "/api/actions/{aid}/mark-safe/undo": {
-    /** Undo Mark Safe */
-    post: operations["undo_mark_safe_api_actions__aid__mark_safe_undo_post"];
-  };
   "/api/actions/{aid}/reopen": {
     /** Reopen */
     post: operations["reopen_api_actions__aid__reopen_post"];
-  };
-  "/api/actions/{aid}/unblock-company": {
-    /** Unblock Company */
-    post: operations["unblock_company_api_actions__aid__unblock_company_post"];
-  };
-  "/api/advise": {
-    /** Advise */
-    get: operations["advise_api_advise_get"];
-  };
-  "/api/advise/{rec_id}/apply": {
-    /** Advise Apply */
-    post: operations["advise_apply_api_advise__rec_id__apply_post"];
-  };
-  "/api/batches": {
-    /** Create */
-    post: operations["create_api_batches_post"];
-  };
-  "/api/batches/{batch_id}": {
-    /** Detail */
-    get: operations["detail_api_batches__batch_id__get"];
-  };
-  "/api/batches/{batch_id}/cancel": {
-    /** Cancel */
-    post: operations["cancel_api_batches__batch_id__cancel_post"];
-  };
-  "/api/batches/{batch_id}/pause": {
-    /** Pause */
-    post: operations["pause_api_batches__batch_id__pause_post"];
-  };
-  "/api/batches/{batch_id}/retry": {
-    /** Retry */
-    post: operations["retry_api_batches__batch_id__retry_post"];
-  };
-  "/api/batches/{batch_id}/start": {
-    /**
-     * Start
-     * @description Start (or resume) the driver as a detached process; the batch file then shows its progress.
-     */
-    post: operations["start_api_batches__batch_id__start_post"];
-  };
-  "/api/contacts": {
-    /** List Contacts */
-    get: operations["list_contacts_api_contacts_get"];
-  };
-  "/api/contacts/{job_id}/{name}/mark": {
-    /** Mark Contact */
-    post: operations["mark_contact_api_contacts__job_id___name__mark_post"];
   };
   "/api/events": {
     /** Events */
@@ -105,14 +38,6 @@ export interface paths {
   "/api/health": {
     /** Health */
     get: operations["health_api_health_get"];
-  };
-  "/api/inbox": {
-    /** List Inbox */
-    get: operations["list_inbox_api_inbox_get"];
-  };
-  "/api/inbox/{job_id}": {
-    /** Inbox Detail */
-    get: operations["inbox_detail_api_inbox__job_id__get"];
   };
   "/api/jobs": {
     /** List Jobs */
@@ -201,20 +126,6 @@ export interface paths {
     /** Job File */
     get: operations["job_file_api_jobs__job_id__files__name__get"];
   };
-  "/api/jobs/{job_id}/fill-plan": {
-    /** Fill Plan */
-    get: operations["fill_plan_api_jobs__job_id__fill_plan_get"];
-    /** Make Fill Plan */
-    post: operations["make_fill_plan_api_jobs__job_id__fill_plan_post"];
-  };
-  "/api/jobs/{job_id}/fill-plan/fields/{field_id}": {
-    /** Edit Fill Field */
-    post: operations["edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post"];
-  };
-  "/api/jobs/{job_id}/fill-plan/fields/{field_id}/approve": {
-    /** Approve Fill Field */
-    post: operations["approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post"];
-  };
   "/api/jobs/{job_id}/injection/clear": {
     /**
      * Clear Injection
@@ -228,10 +139,6 @@ export interface paths {
      * @description Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003).
      */
     get: operations["job_matches_api_jobs__job_id__matches_get"];
-  };
-  "/api/jobs/{job_id}/open-folder": {
-    /** Open Folder */
-    post: operations["open_folder_api_jobs__job_id__open_folder_post"];
   };
   "/api/jobs/{job_id}/override": {
     /** Set Override */
@@ -263,10 +170,6 @@ export interface paths {
     /** Safety Flag */
     post: operations["safety_flag_api_jobs__job_id__safety_flag_post"];
   };
-  "/api/jobs/{job_id}/safety/verify": {
-    /** Safety Verify */
-    post: operations["safety_verify_api_jobs__job_id__safety_verify_post"];
-  };
   "/api/jobs/{job_id}/status": {
     /** Set Status */
     post: operations["set_status_api_jobs__job_id__status_post"];
@@ -279,29 +182,9 @@ export interface paths {
     /** Withdraw */
     post: operations["withdraw_api_jobs__job_id__withdraw_post"];
   };
-  "/api/learning/lessons": {
-    /** List Lessons */
-    get: operations["list_lessons_api_learning_lessons_get"];
-    /** Add Lesson */
-    post: operations["add_lesson_api_learning_lessons_post"];
-  };
-  "/api/learning/lessons/{lid}": {
-    /** Delete Lesson */
-    delete: operations["delete_lesson_api_learning_lessons__lid__delete"];
-  };
   "/api/meta": {
     /** Meta */
     get: operations["meta_api_meta_get"];
-  };
-  "/api/profile/answers": {
-    /** List Answers */
-    get: operations["list_answers_api_profile_answers_get"];
-  };
-  "/api/profile/answers/{key}": {
-    /** Edit Answer */
-    put: operations["edit_answer_api_profile_answers__key__put"];
-    /** Delete Answer */
-    delete: operations["delete_answer_api_profile_answers__key__delete"];
   };
   "/api/profile/master/proposal": {
     /** Get Master Proposal */
@@ -311,180 +194,9 @@ export interface paths {
     /** Approve Master Proposal */
     post: operations["approve_master_proposal_api_profile_master_proposal_approve_post"];
   };
-  "/api/profile/master/proposal/refresh": {
-    /**
-     * Refresh Master Proposal
-     * @description Re-run extract-master when the last run failed or never started (UI "Re-read").
-     */
-    post: operations["refresh_master_proposal_api_profile_master_proposal_refresh_post"];
-  };
   "/api/profile/master/proposal/reject": {
     /** Reject Master Proposal */
     post: operations["reject_master_proposal_api_profile_master_proposal_reject_post"];
-  };
-  "/api/profile/resumes": {
-    /** List Resumes */
-    get: operations["list_resumes_api_profile_resumes_get"];
-    /** Upload */
-    put: operations["upload_api_profile_resumes_put"];
-  };
-  "/api/profile/resumes/{rid}": {
-    /** Get Resume */
-    get: operations["get_resume_api_profile_resumes__rid__get"];
-    /** Delete Resume */
-    delete: operations["delete_resume_api_profile_resumes__rid__delete"];
-    /** Patch Resume */
-    patch: operations["patch_resume_api_profile_resumes__rid__patch"];
-  };
-  "/api/profile/resumes/{rid}/annotations": {
-    /**
-     * List Annotations
-     * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
-     * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
-     */
-    get: operations["list_annotations_api_profile_resumes__rid__annotations_get"];
-    /** Create Annotation */
-    post: operations["create_annotation_api_profile_resumes__rid__annotations_post"];
-  };
-  "/api/profile/resumes/{rid}/annotations/{aid}/accept": {
-    /**
-     * Accept Annotation
-     * @description User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard
-     * refuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).
-     * User suggestion: no guard, one draft change author=user.
-     */
-    post: operations["accept_annotation_api_profile_resumes__rid__annotations__aid__accept_post"];
-  };
-  "/api/profile/resumes/{rid}/annotations/{aid}/reject": {
-    /** Reject Annotation */
-    post: operations["reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post"];
-  };
-  "/api/profile/resumes/{rid}/annotations/{aid}/replies": {
-    /**
-     * Reply Annotation
-     * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
-     * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
-     */
-    post: operations["reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post"];
-  };
-  "/api/profile/resumes/{rid}/draft": {
-    /** Get Draft */
-    get: operations["get_draft_api_profile_resumes__rid__draft_get"];
-    /**
-     * Put Draft
-     * @description Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422.
-     */
-    put: operations["put_draft_api_profile_resumes__rid__draft_put"];
-  };
-  "/api/profile/resumes/{rid}/draft/changes": {
-    /**
-     * Draft Changes
-     * @description History (DEC-015): draft.changes.jsonl, oldest first.
-     */
-    get: operations["draft_changes_api_profile_resumes__rid__draft_changes_get"];
-  };
-  "/api/profile/resumes/{rid}/draft/changes/{cid}/revert": {
-    /**
-     * Revert Change
-     * @description Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.
-     */
-    post: operations["revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post"];
-  };
-  "/api/profile/resumes/{rid}/draft/text": {
-    /**
-     * Get Draft Text
-     * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
-     */
-    get: operations["get_draft_text_api_profile_resumes__rid__draft_text_get"];
-  };
-  "/api/profile/resumes/{rid}/feedback": {
-    /** Get Feedback */
-    get: operations["get_feedback_api_profile_resumes__rid__feedback_get"];
-  };
-  "/api/profile/resumes/{rid}/feedback/{fid}/apply": {
-    /** Apply Feedback */
-    post: operations["apply_feedback_api_profile_resumes__rid__feedback__fid__apply_post"];
-  };
-  "/api/profile/resumes/{rid}/feedback/{fid}/comment": {
-    /** Comment Feedback */
-    post: operations["comment_feedback_api_profile_resumes__rid__feedback__fid__comment_post"];
-  };
-  "/api/profile/resumes/{rid}/feedback/{fid}/dismiss": {
-    /** Dismiss Feedback */
-    post: operations["dismiss_feedback_api_profile_resumes__rid__feedback__fid__dismiss_post"];
-  };
-  "/api/profile/resumes/{rid}/feedback/{fid}/rewrite": {
-    /**
-     * Rewrite Feedback
-     * @description The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095).
-     */
-    put: operations["rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put"];
-  };
-  "/api/profile/resumes/{rid}/file": {
-    /**
-     * Resume File
-     * @description A version's file (default the latest), inline (UI "View") or as a download named 01_Name_Original.pdf.
-     */
-    get: operations["resume_file_api_profile_resumes__rid__file_get"];
-  };
-  "/api/profile/resumes/{rid}/import": {
-    /** Get Import */
-    get: operations["get_import_api_profile_resumes__rid__import_get"];
-    /** Retry Import */
-    post: operations["retry_import_api_profile_resumes__rid__import_post"];
-  };
-  "/api/profile/resumes/{rid}/import/dropped/{did}/restore": {
-    /** Restore Dropped */
-    post: operations["restore_dropped_api_profile_resumes__rid__import_dropped__did__restore_post"];
-  };
-  "/api/profile/resumes/{rid}/master": {
-    /** Set Master */
-    post: operations["set_master_api_profile_resumes__rid__master_post"];
-  };
-  "/api/profile/resumes/{rid}/publish": {
-    /**
-     * Publish Resume
-     * @description Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version.
-     */
-    post: operations["publish_resume_api_profile_resumes__rid__publish_post"];
-  };
-  "/api/profile/resumes/{rid}/review": {
-    /** Start Review */
-    post: operations["start_review_api_profile_resumes__rid__review_post"];
-  };
-  "/api/profile/resumes/{rid}/text": {
-    /**
-     * Edit Resume
-     * @description REQ-097: hand edit -> new version author=user, no guard.
-     */
-    put: operations["edit_resume_api_profile_resumes__rid__text_put"];
-  };
-  "/api/profile/resumes/{rid}/versions/{n}": {
-    /** Get Version */
-    get: operations["get_version_api_profile_resumes__rid__versions__n__get"];
-    /** Delete Version */
-    delete: operations["delete_version_api_profile_resumes__rid__versions__n__delete"];
-  };
-  "/api/profile/samples": {
-    /** List Samples */
-    get: operations["list_samples_api_profile_samples_get"];
-    /**
-     * Upload Sample
-     * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
-     */
-    put: operations["upload_sample_api_profile_samples_put"];
-  };
-  "/api/profile/samples/learn": {
-    /** Relearn */
-    post: operations["relearn_api_profile_samples_learn_post"];
-  };
-  "/api/profile/samples/{name}": {
-    /** Remove Sample */
-    delete: operations["remove_sample_api_profile_samples__name__delete"];
-  };
-  "/api/prune": {
-    /** Prune */
-    post: operations["prune_api_prune_post"];
   };
   "/api/readiness": {
     /**
@@ -550,35 +262,9 @@ export interface paths {
     /** Schedule Action */
     post: operations["schedule_action_api_schedule__action__post"];
   };
-  "/api/settings": {
-    /** Sections */
-    get: operations["sections_api_settings_get"];
-  };
-  "/api/settings/runs/ranking-preview": {
-    /** Ranking Preview */
-    post: operations["ranking_preview_api_settings_runs_ranking_preview_post"];
-  };
-  "/api/settings/{section}": {
-    /** Read */
-    get: operations["read_api_settings__section__get"];
-    /** Save */
-    put: operations["save_api_settings__section__put"];
-  };
-  "/api/settings/{section}/diff": {
-    /** Diff */
-    post: operations["diff_api_settings__section__diff_post"];
-  };
-  "/api/settings/{section}/reset/{group}": {
-    /** Reset */
-    post: operations["reset_api_settings__section__reset__group__post"];
-  };
   "/api/status": {
     /** Status */
     get: operations["status_api_status_get"];
-  };
-  "/api/storage": {
-    /** Storage */
-    get: operations["storage_api_storage_get"];
   };
   "/api/today": {
     /** Today */
@@ -727,95 +413,6 @@ export interface components {
       /** Message */
       message: string;
     };
-    /**
-     * Advice
-     * @description GET /api/advise: storage and run advice plus every recommendation (storage first).
-     */
-    Advice: {
-      /** Recommendations */
-      recommendations: components["schemas"]["Recommendation"][];
-      runs: components["schemas"]["RunsAdvice"];
-      storage: components["schemas"]["StorageAdvice"];
-    };
-    /** AdvisorConfig */
-    AdvisorConfig: {
-      advisor: components["schemas"]["AdvisorLimits"];
-      storage: components["schemas"]["StorageLimits"];
-    };
-    /** AdvisorLimits */
-    AdvisorLimits: {
-      /** Advise After Days */
-      advise_after_days: number;
-      /** Failure Rate Warn */
-      failure_rate_warn: number;
-      /** Min Runs */
-      min_runs: number;
-      /** Prune Idle Weeks */
-      prune_idle_weeks: number;
-      /** Usage Limit Stops */
-      usage_limit_stops: number;
-      /** Window Days */
-      window_days: number;
-    };
-    /** Annotation */
-    Annotation: {
-      /** At */
-      at?: string | null;
-      /**
-       * Author
-       * @enum {string}
-       */
-      author: "user" | "ai";
-      /** Base */
-      base?: string | null;
-      /** Id */
-      id: string;
-      /**
-       * Kind
-       * @enum {string}
-       */
-      kind: "suggestion" | "comment";
-      /** Proposed */
-      proposed?: string | null;
-      /**
-       * Replies
-       * @default []
-       */
-      replies?: {
-          [key: string]: unknown;
-        }[];
-      /** Run */
-      run?: string | null;
-      /**
-       * Status
-       * @enum {string}
-       */
-      status: "open" | "accepted" | "rejected" | "outdated";
-      /** Target Id */
-      target_id?: string | null;
-      /**
-       * Text
-       * @default
-       */
-      text?: string;
-    };
-    /** AnnotationIn */
-    AnnotationIn: {
-      /**
-       * Kind
-       * @enum {string}
-       */
-      kind: "suggestion" | "comment";
-      /** Proposed */
-      proposed?: string | null;
-      /** Target Id */
-      target_id?: string | null;
-      /**
-       * Text
-       * @default
-       */
-      text?: string;
-    };
     /** Answer */
     Answer: {
       /** Answer */
@@ -827,18 +424,6 @@ export interface components {
        * @default general
        */
       scope?: string;
-    };
-    /** AnswerEdit */
-    AnswerEdit: {
-      /** Answer */
-      answer: string;
-      /** Company */
-      company?: string | null;
-      /**
-       * Eeo
-       * @default false
-       */
-      eeo?: boolean;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -892,76 +477,6 @@ export interface components {
       /** Why */
       why?: string | null;
     };
-    /** Batch */
-    Batch: {
-      /** Created At */
-      created_at?: string | null;
-      /** Dry Run */
-      dry_run: boolean;
-      /** Excluded */
-      excluded: components["schemas"]["Excluded"][];
-      /** Id */
-      id?: string | null;
-      /** Kind */
-      kind: string;
-      /** Name */
-      name?: string | null;
-      /** Reason */
-      reason?: string | null;
-      /** Requested */
-      requested?: string | null;
-      /** Retried */
-      retried?: number | null;
-      /** Selected */
-      selected: components["schemas"]["BatchJob"][];
-      /** Status */
-      status?: string | null;
-      /** Stop At */
-      stop_at: string;
-      /** Stops */
-      stops?: {
-        [key: string]: string;
-      } | null;
-      /** Updated At */
-      updated_at?: string | null;
-    };
-    /** BatchJob */
-    BatchJob: {
-      /** Auto Submit */
-      auto_submit: boolean;
-      /** Cap */
-      cap?: string | null;
-      /** Company */
-      company: string;
-      /** Fit */
-      fit?: number | null;
-      /** Job Id */
-      job_id: string;
-      /** Rank */
-      rank: number;
-      /** Reason */
-      reason?: string | null;
-      /** Result */
-      result?: string | null;
-      /** Score */
-      score: number;
-      /** Stage */
-      stage: string;
-      /** Stages */
-      stages: string[];
-      /** State */
-      state?: string | null;
-      /** Status */
-      status: string;
-      /** Stop At */
-      stop_at?: string | null;
-      /** Submit Reason */
-      submit_reason: string;
-      /** Title */
-      title: string;
-      /** Why */
-      why: string;
-    };
     /** Body_open_application_api_jobs__job_id__application_open_post */
     Body_open_application_api_jobs__job_id__application_open_post: {
       /**
@@ -1002,15 +517,6 @@ export interface components {
       last_missed?: string | null;
       /** Slots */
       slots: number;
-    };
-    /** Changes */
-    Changes: {
-      /** Changes */
-      changes?: {
-        [key: string]: unknown;
-      };
-      /** Version */
-      version?: string | null;
     };
     /** CheckCreated */
     CheckCreated: {
@@ -1084,11 +590,6 @@ export interface components {
       /** Statuses */
       statuses: string[];
     };
-    /** Comment */
-    Comment: {
-      /** Text */
-      text: string;
-    };
     /** ContactPolicy */
     ContactPolicy: {
       /** Detail */
@@ -1102,59 +603,6 @@ export interface components {
       /** Role */
       role: string;
     };
-    /** ContactRow */
-    ContactRow: {
-      /** Company */
-      company: string | null;
-      draft: components["schemas"]["InboxDraft"] | null;
-      /** Email */
-      email: string | null;
-      /** Email Confidence */
-      email_confidence: string | null;
-      /** Job Id */
-      job_id: string;
-      /** Job Status */
-      job_status: string | null;
-      /** Job Title */
-      job_title: string | null;
-      /** Linkedin */
-      linkedin: string | null;
-      /** Linkedin Degree */
-      linkedin_degree: number | null;
-      /** Manual */
-      manual: boolean;
-      /** Manual Detail */
-      manual_detail: string | null;
-      /** Manual Reason */
-      manual_reason: string | null;
-      /** Mode */
-      mode: string;
-      /** Mutuals */
-      mutuals: number | null;
-      /** Name */
-      name: string;
-      /** Replied */
-      replied: string | null;
-      /** Sent */
-      sent: boolean;
-      /** Title */
-      title: string;
-    };
-    /** ContactsPage */
-    ContactsPage: {
-      /** Items */
-      items: components["schemas"]["ContactRow"][];
-      /** Linkedin Drafts */
-      linkedin_drafts: number;
-      policy: components["schemas"]["ContactsPolicy"];
-    };
-    /** ContactsPolicy */
-    ContactsPolicy: {
-      /** Manual If Connected */
-      manual_if_connected: boolean;
-      /** Manual If Mutuals */
-      manual_if_mutuals: boolean;
-    };
     /** Counts */
     Counts: {
       /** Action Items Open */
@@ -1165,27 +613,6 @@ export interface components {
       inbox: number;
       /** Jobs */
       jobs: number;
-    };
-    /** CreateBody */
-    CreateBody: {
-      /**
-       * Dry Run
-       * @default false
-       */
-      dry_run?: boolean;
-      /** Job Ids */
-      job_ids: string[];
-      /** Name */
-      name?: string | null;
-      /**
-       * Stop At
-       * @enum {string}
-       */
-      stop_at: "score" | "prepare" | "fill" | "submit";
-      /** Stops */
-      stops?: ({
-        [key: string]: "score" | "prepare" | "fill" | "submit";
-      }) | null;
     };
     /** CurrentRun */
     CurrentRun: {
@@ -1245,62 +672,12 @@ export interface components {
       /** Warnings */
       warnings?: string[];
     };
-    /** DiskUsage */
-    DiskUsage: {
-      /** Free */
-      free: number;
-      /** Free Pct */
-      free_pct: number;
-      /** Total */
-      total: number;
-    };
-    /** Draft */
-    Draft: {
-      /** Draft */
-      draft: boolean;
-      /** Resume */
-      resume: {
-        [key: string]: unknown;
-      };
-      /** Rev */
-      rev: number;
-    };
-    /** DraftIn */
-    DraftIn: {
-      /**
-       * Author
-       * @enum {string}
-       */
-      author: "user" | "ai";
-      /** Resume */
-      resume: {
-        [key: string]: unknown;
-      };
-      /** Rev */
-      rev: number;
-    };
-    /** Dropped */
-    Dropped: {
-      /** Id */
-      id: string;
-      /** Restored */
-      restored: boolean;
-      /** Text */
-      text: string;
-    };
     /** Due */
     Due: {
       /** Due */
       due?: string | null;
       /** Due Reason */
       due_reason?: string | null;
-    };
-    /** Excluded */
-    Excluded: {
-      /** Job Id */
-      job_id: string;
-      /** Reason */
-      reason: string;
     };
     /** Export */
     Export: {
@@ -1404,102 +781,6 @@ export interface components {
       /** Max Attempts */
       max_attempts: number;
     };
-    /** Feedback */
-    Feedback: {
-      /** Items */
-      items: components["schemas"]["FeedbackItem"][];
-      review?: components["schemas"]["ReviewState"] | null;
-    };
-    /** FeedbackItem */
-    FeedbackItem: {
-      /** Applied V */
-      applied_v?: number | null;
-      /**
-       * Comments
-       * @default []
-       */
-      comments?: {
-          [key: string]: string;
-        }[];
-      /** Id */
-      id: string;
-      /** Issue */
-      issue: string;
-      /**
-       * Kind
-       * @default content
-       * @enum {string}
-       */
-      kind?: "content" | "format";
-      /** Quote */
-      quote?: string | null;
-      /**
-       * Quotes
-       * @default []
-       */
-      quotes?: string[];
-      /** Reason */
-      reason?: string | null;
-      /** Section */
-      section: string;
-      /**
-       * State
-       * @enum {string}
-       */
-      state: "open" | "redrafting" | "applied" | "dismissed";
-      /** Suggestion */
-      suggestion: string;
-      /** V */
-      v: number;
-      /**
-       * Whole
-       * @default false
-       */
-      whole?: boolean;
-    };
-    /** FieldSchema */
-    FieldSchema: {
-      /** Control */
-      control: string;
-      /** Default */
-      default: unknown;
-      /** File */
-      file: string;
-      /** Help */
-      help: string;
-      /** Id */
-      id: string;
-      /** Integer */
-      integer: boolean;
-      /** Key */
-      key: string;
-      /** Label */
-      label: string;
-      /** Locked */
-      locked: boolean;
-      /** Max */
-      max: number | null;
-      /** Min */
-      min: number | null;
-      /** Note */
-      note: string;
-      /** Nullable */
-      nullable: boolean;
-      /** Options */
-      options: unknown[];
-      /** Personal */
-      personal: boolean;
-      /** Readonly */
-      readonly: boolean;
-      /** Recommended */
-      recommended: boolean;
-      /** Step */
-      step: number | null;
-      /** Strict Options */
-      strict_options: boolean;
-      /** Unit */
-      unit: string;
-    };
     /** FileEntry */
     FileEntry: {
       /** Modified */
@@ -1508,21 +789,6 @@ export interface components {
       name: string;
       /** Size */
       size: number;
-    };
-    /** FillFieldBody */
-    FillFieldBody: {
-      /**
-       * Save
-       * @default true
-       */
-      save?: boolean;
-      /**
-       * Skip
-       * @default false
-       */
-      skip?: boolean;
-      /** Value */
-      value?: string | null;
     };
     /** FlagBody */
     FlagBody: {
@@ -1548,19 +814,6 @@ export interface components {
        */
       reason?: string;
     };
-    /** GroupSchema */
-    GroupSchema: {
-      /** Advanced */
-      advanced: boolean;
-      /** Help */
-      help: string;
-      /** Id */
-      id: string;
-      /** Items */
-      items: (components["schemas"]["PolicyItem"] | components["schemas"]["FieldSchema"])[];
-      /** Title */
-      title: string;
-    };
     /** HTTPValidationError */
     HTTPValidationError: {
       /** Detail */
@@ -1572,189 +825,6 @@ export interface components {
       next_cursor: string | null;
       /** Runs */
       runs: components["schemas"]["RunRecord"][];
-    };
-    /** Ids */
-    Ids: {
-      /** Ids */
-      ids: string[];
-    };
-    /** ImportState */
-    ImportState: {
-      /** At */
-      at?: string | null;
-      /**
-       * Dropped
-       * @default []
-       */
-      dropped?: components["schemas"]["Dropped"][];
-      /** N */
-      n?: number | null;
-      /** Reason */
-      reason?: string | null;
-      /** Run */
-      run?: string | null;
-      /** State */
-      state?: string | null;
-    };
-    /** InboxAvailability */
-    InboxAvailability: {
-      /** Available */
-      available: boolean;
-      /** Reason */
-      reason: string;
-    };
-    /** InboxDetail */
-    InboxDetail: {
-      /** Applied At */
-      applied_at: string | null;
-      /** Company */
-      company: string | null;
-      /** Days Since Applied */
-      days_since_applied: number | null;
-      /** Drafts */
-      drafts: components["schemas"]["InboxDraft"][];
-      /** Job Id */
-      job_id: string;
-      last_email: components["schemas"]["InboxEmail"] | null;
-      next: components["schemas"]["InboxNext"];
-      /** Placeholders */
-      placeholders: number;
-      /** Primary */
-      primary: number | null;
-      sending: components["schemas"]["InboxAvailability"];
-      /** Status */
-      status: string;
-      sync: components["schemas"]["InboxAvailability"];
-      /** Thread */
-      thread: components["schemas"]["InboxThreadEvent"][];
-      /** Tier */
-      tier: string | null;
-      /** Title */
-      title: string | null;
-      /** Updated At */
-      updated_at: string | null;
-    };
-    /** InboxDraft */
-    InboxDraft: {
-      /** Body */
-      body: string;
-      /** Channel */
-      channel: string;
-      /** Contact */
-      contact: string;
-      /** Due */
-      due: string | null;
-      /** Followup */
-      followup: boolean;
-      /** Kind */
-      kind: string;
-      /** Linkedin Message */
-      linkedin_message: string | null;
-      /** Linkedin Note */
-      linkedin_note: string | null;
-      /** Manual Reason */
-      manual_reason: string | null;
-      /** Manual Tailor */
-      manual_tailor: boolean;
-      /** Mode */
-      mode: string;
-      /** Placeholders */
-      placeholders: string[];
-      /** Role */
-      role: string;
-      /** Sent */
-      sent: boolean;
-      /** Sent By */
-      sent_by: string | null;
-      /** Sent Date */
-      sent_date: string | null;
-      /** Subject */
-      subject: string | null;
-      /** To */
-      to: string | null;
-      /** Verified */
-      verified: boolean;
-      /** Words */
-      words: number;
-    };
-    /** InboxEmail */
-    InboxEmail: {
-      /** At */
-      at: string | null;
-      /** Class */
-      class: string;
-      /** From */
-      from: string;
-      /** Link */
-      link: string | null;
-      /** Status */
-      status: string;
-    };
-    /** InboxNext */
-    InboxNext: {
-      /** Due */
-      due: string | null;
-      /** Kind */
-      kind: string;
-      /** Mode */
-      mode: string;
-    };
-    /** InboxPage */
-    InboxPage: {
-      /** Items */
-      items: components["schemas"]["InboxRow"][];
-      /** Last Sync */
-      last_sync: string | null;
-      sending: components["schemas"]["InboxAvailability"];
-      sync: components["schemas"]["InboxAvailability"];
-    };
-    /** InboxRow */
-    InboxRow: {
-      /** Applied At */
-      applied_at: string | null;
-      /** Company */
-      company: string | null;
-      /** Days Since Applied */
-      days_since_applied: number | null;
-      /** Drafts */
-      drafts: number;
-      /** Job Id */
-      job_id: string;
-      last_email: components["schemas"]["InboxEmail"] | null;
-      next: components["schemas"]["InboxNext"];
-      /** Placeholders */
-      placeholders: number;
-      /** Status */
-      status: string;
-      /** Tier */
-      tier: string | null;
-      /** Title */
-      title: string | null;
-      /** Updated At */
-      updated_at: string | null;
-    };
-    /** InboxThreadEvent */
-    InboxThreadEvent: {
-      /** At */
-      at: string;
-      /** Class */
-      class?: string;
-      /** Contact */
-      contact?: string;
-      /** From */
-      from?: string;
-      /** Kind */
-      kind?: string;
-      /** Link */
-      link?: string | null;
-      /** Note */
-      note?: string | null;
-      /** Sent By */
-      sent_by?: string | null;
-      /** Status */
-      status?: string | null;
-      /** Type */
-      type: string;
     };
     /** IndexState */
     IndexState: {
@@ -1952,38 +1022,6 @@ export interface components {
       /** Tabs */
       tabs: components["schemas"]["JobsTab"][];
     };
-    /** Lesson */
-    Lesson: {
-      /** Added */
-      added?: string | null;
-      /** Ats */
-      ats?: string | null;
-      /** Company */
-      company?: string | null;
-      /** Id */
-      id: string;
-      /** Job Id */
-      job_id?: string | null;
-      /**
-       * Tags
-       * @default []
-       */
-      tags?: string[];
-      /** Text */
-      text: string;
-    };
-    /** Lessons */
-    Lessons: {
-      /** Lessons */
-      lessons: components["schemas"]["Lesson"][];
-    };
-    /** MarkBody */
-    MarkBody: {
-      /** Degree */
-      degree?: number | null;
-      /** Mutuals */
-      mutuals?: number | null;
-    };
     /** MasterProposal */
     MasterProposal: {
       /** Diff */
@@ -2105,22 +1143,6 @@ export interface components {
       /** What */
       what: string;
     };
-    /** NewLesson */
-    NewLesson: {
-      /** Ats */
-      ats?: string | null;
-      /** Company */
-      company?: string | null;
-      /** Job Id */
-      job_id?: string | null;
-      /**
-       * Tags
-       * @default []
-       */
-      tags?: string[];
-      /** Text */
-      text: string;
-    };
     /** NoteBody */
     NoteBody: {
       /** Note */
@@ -2209,28 +1231,6 @@ export interface components {
       /** Stage */
       stage: string;
     };
-    /**
-     * PolicyItem
-     * @description A locked row: a rule the code enforces whatever the config says.
-     */
-    PolicyItem: {
-      /**
-       * Control
-       * @constant
-       */
-      control: "policy";
-      /** Label */
-      label: string;
-      /**
-       * Locked
-       * @constant
-       */
-      locked: true;
-      /** Value */
-      value: string;
-      /** Why */
-      why: string;
-    };
     /** PrepareQueue */
     PrepareQueue: {
       /** Error */
@@ -2252,63 +1252,6 @@ export interface components {
           [key: string]: number;
         };
       };
-    };
-    /** Preview */
-    Preview: {
-      /**
-       * Kind
-       * @default score
-       */
-      kind?: string;
-      /** Weights */
-      weights?: {
-        [key: string]: unknown;
-      };
-    };
-    /** Projection */
-    Projection: {
-      /** 30D */
-      "30d": number;
-      /** 90D */
-      "90d": number;
-    };
-    /** PruneBody */
-    PruneBody: {
-      /**
-       * Dry Run
-       * @default true
-       */
-      dry_run?: boolean;
-    };
-    /** PublishIn */
-    PublishIn: {
-      /** Key */
-      key: string;
-      /**
-       * Master
-       * @default false
-       */
-      master?: boolean;
-    };
-    /** Published */
-    Published: {
-      /** Category */
-      category?: string | null;
-      /** N */
-      n: number;
-      /** Name */
-      name: string;
-      /** Published */
-      published: boolean;
-      /** Rid */
-      rid: string;
-      /**
-       * Type
-       * @enum {string}
-       */
-      type: "master" | "variant" | "other" | "tailored";
-      /** Versions */
-      versions: components["schemas"]["Version"][];
     };
     /** QuietHours */
     QuietHours: {
@@ -2339,31 +1282,6 @@ export interface components {
       /** Total */
       total: number;
     };
-    /** Recommendation */
-    Recommendation: {
-      change: components["schemas"]["RecommendationChange"] | null;
-      /** Id */
-      id: string;
-      /** Kind */
-      kind: string;
-      /** Severity */
-      severity: string;
-      /** Title */
-      title: string;
-      /** Why */
-      why: string;
-    };
-    /** RecommendationChange */
-    RecommendationChange: {
-      /** File */
-      file: string;
-      /** From */
-      from: unknown;
-      /** Path */
-      path: string;
-      /** To */
-      to: unknown;
-    };
     /** Registry */
     Registry: {
       /** Flagged */
@@ -2374,60 +1292,6 @@ export interface components {
       verified: {
         [key: string]: unknown;
       } | null;
-    };
-    /** Replied */
-    Replied: {
-      /** At */
-      at?: string | null;
-      /**
-       * Author
-       * @enum {string}
-       */
-      author: "user" | "ai";
-      /** Base */
-      base?: string | null;
-      /** Id */
-      id: string;
-      /**
-       * Kind
-       * @enum {string}
-       */
-      kind: "suggestion" | "comment";
-      /** Proposed */
-      proposed?: string | null;
-      /**
-       * Replies
-       * @default []
-       */
-      replies?: {
-          [key: string]: unknown;
-        }[];
-      /** Run */
-      run?: string | null;
-      /** Run Id */
-      run_id?: string | null;
-      /**
-       * Status
-       * @enum {string}
-       */
-      status: "open" | "accepted" | "rejected" | "outdated";
-      /** Target Id */
-      target_id?: string | null;
-      /**
-       * Text
-       * @default
-       */
-      text?: string;
-    };
-    /** Reply */
-    Reply: {
-      /**
-       * Apply
-       * @default false
-       */
-      apply?: boolean;
-      /** Text */
-      text: string;
     };
     /** ResetFailuresBody */
     ResetFailuresBody: {
@@ -2459,97 +1323,6 @@ export interface components {
       responded: number;
       /** Rows */
       rows: components["schemas"]["TileRow"][];
-    };
-    /** RestoreIn */
-    RestoreIn: {
-      /** Entry */
-      entry?: string | null;
-    };
-    /** Resume */
-    Resume: {
-      /** Category */
-      category?: string | null;
-      /** Name */
-      name: string;
-      /** Rid */
-      rid: string;
-      /**
-       * Type
-       * @enum {string}
-       */
-      type: "master" | "variant" | "other" | "tailored";
-      /** Versions */
-      versions: components["schemas"]["Version"][];
-    };
-    /** ResumePatch */
-    ResumePatch: {
-      /** Name */
-      name?: string | null;
-      /** Type */
-      type?: ("master" | "variant" | "other" | "tailored") | null;
-    };
-    /** ResumeRow */
-    ResumeRow: {
-      /** At */
-      at: string;
-      /** Category */
-      category?: string | null;
-      /** Failed Step */
-      failed_step?: ("import" | "review") | null;
-      /** Latest */
-      latest: number;
-      /** Name */
-      name: string;
-      /** Rid */
-      rid: string;
-      /**
-       * Status
-       * @enum {string}
-       */
-      status: "reviewing" | "draft" | "ready" | "failed";
-      /**
-       * Type
-       * @enum {string}
-       */
-      type: "master" | "variant" | "other" | "tailored";
-    };
-    /** ResumeText */
-    ResumeText: {
-      /** Text */
-      text: string;
-    };
-    /** Resumes */
-    Resumes: {
-      /** Resumes */
-      resumes: components["schemas"]["ResumeRow"][];
-    };
-    /** RetryBody */
-    RetryBody: {
-      /** Job Ids */
-      job_ids?: string[] | null;
-    };
-    /** ReviewState */
-    ReviewState: {
-      /** At */
-      at: string;
-      /** Reason */
-      reason?: string | null;
-      /** Run */
-      run?: string | null;
-      /**
-       * State
-       * @enum {string}
-       */
-      state: "running" | "done" | "failed";
-      /** V */
-      v: number;
-    };
-    /** Rewrite */
-    Rewrite: {
-      /** Base */
-      base: number;
-      /** Text */
-      text: string;
     };
     /** RunBudget */
     RunBudget: {
@@ -2647,29 +1420,6 @@ export interface components {
       /** Title */
       title: string | null;
     };
-    /** RunMetrics */
-    RunMetrics: {
-      /** Attempts */
-      attempts: number;
-      /** Avg Job S */
-      avg_job_s: number;
-      /** Budget Used */
-      budget_used: number;
-      /** Failed */
-      failed: number;
-      /** Failure Rate */
-      failure_rate: number;
-      /** P90 Job S */
-      p90_job_s: number;
-      /** Prepare Share */
-      prepare_share?: number | null;
-      /** Runs */
-      runs: number;
-      /** Stops */
-      stops: {
-        [key: string]: number;
-      };
-    };
     /** RunPause */
     RunPause: {
       /** Paused At */
@@ -2765,70 +1515,6 @@ export interface components {
       /** Minutes */
       minutes: number | null;
     };
-    /** RunsAdvice */
-    RunsAdvice: {
-      /** Metrics */
-      metrics: {
-        [key: string]: components["schemas"]["RunMetrics"];
-      };
-      /** Min Runs */
-      min_runs: number;
-      /** Ready */
-      ready: boolean;
-      /** Recommendations */
-      recommendations: components["schemas"]["Recommendation"][];
-    };
-    /** Sample */
-    Sample: {
-      /** Name */
-      name: string;
-      /** Size */
-      size: number;
-    };
-    /** SampleChange */
-    SampleChange: {
-      /** Learn Error */
-      learn_error?: string | null;
-      /** Learn Info */
-      learn_info?: string | null;
-      /** Learn Run */
-      learn_run?: string | null;
-      /** Samples */
-      samples: components["schemas"]["Sample"][];
-    };
-    /** Samples */
-    Samples: {
-      /** Learned */
-      learned: string;
-      /** Samples */
-      samples: components["schemas"]["Sample"][];
-    };
-    /** SavedAnswer */
-    SavedAnswer: {
-      /** Answer */
-      answer?: string | null;
-      /** Company */
-      company?: string | null;
-      /** Key */
-      key: string;
-      /**
-       * Match
-       * @default []
-       */
-      match?: string[];
-      /** Note */
-      note?: string | null;
-      /**
-       * Scope
-       * @enum {string}
-       */
-      scope: "general" | "company" | "eeo";
-    };
-    /** SavedAnswers */
-    SavedAnswers: {
-      /** Answers */
-      answers: components["schemas"]["SavedAnswer"][];
-    };
     /** Schedule */
     Schedule: {
       catch_up: components["schemas"]["CatchUp"] | null;
@@ -2886,61 +1572,6 @@ export interface components {
       /** Job Ids */
       job_ids: string[];
     };
-    /** SectionData */
-    SectionData: {
-      /** Defaults */
-      defaults: {
-        [key: string]: unknown;
-      };
-      /** Files */
-      files: {
-        [key: string]: string;
-      };
-      section: components["schemas"]["SectionSchema"];
-      /** Values */
-      values: {
-        [key: string]: unknown;
-      };
-      /** Version */
-      version: string;
-      /** Warnings */
-      warnings: {
-        [key: string]: components["schemas"]["UnquotedWarning"];
-      };
-    };
-    /** SectionList */
-    SectionList: {
-      /** Sections */
-      sections: components["schemas"]["SectionSummary"][];
-    };
-    /** SectionSchema */
-    SectionSchema: {
-      /** Advanced */
-      advanced: boolean;
-      /** Files */
-      files: string[];
-      /** Groups */
-      groups: components["schemas"]["GroupSchema"][];
-      /** Help */
-      help: string;
-      /** Id */
-      id: string;
-      /** Title */
-      title: string;
-    };
-    /** SectionSummary */
-    SectionSummary: {
-      /** Advanced */
-      advanced: boolean;
-      /** Files */
-      files: string[];
-      /** Help */
-      help: string;
-      /** Id */
-      id: string;
-      /** Title */
-      title: string;
-    };
     /** SelectBody */
     SelectBody: {
       /** Ids */
@@ -2963,13 +1594,6 @@ export interface components {
       max_minutes?: number | null;
       /** Preset */
       preset?: string | null;
-    };
-    /** Started */
-    Started: {
-      /** Kind */
-      kind: string;
-      /** Run Id */
-      run_id?: string | null;
     };
     /** Status */
     Status: {
@@ -2997,68 +1621,6 @@ export interface components {
       note?: string | null;
       /** Status */
       status: string;
-    };
-    /** StorageAdvice */
-    StorageAdvice: {
-      /** Budget */
-      budget?: number;
-      /** Current */
-      current?: number;
-      /** Days */
-      days: number;
-      /** Need Days */
-      need_days: number;
-      projection?: components["schemas"]["Projection"];
-      /** Rate Per Day */
-      rate_per_day?: number;
-      /** Ready */
-      ready: boolean;
-      /** Recommendations */
-      recommendations: components["schemas"]["Recommendation"][];
-    };
-    /** StorageLimits */
-    StorageLimits: {
-      /** Budget Mb */
-      budget_mb: number;
-      /** Disk Free Warn Pct */
-      disk_free_warn_pct: number;
-      /** Warn At Pct */
-      warn_at_pct: number;
-    };
-    /**
-     * StorageSnapshot
-     * @description One line of the snapshots log (appended after each run / prune; older lines may lack keys).
-     */
-    StorageSnapshot: {
-      /** At */
-      at?: string;
-      /** Bytes */
-      bytes?: {
-        [key: string]: number;
-      };
-      disk?: components["schemas"]["DiskUsage"];
-      /** Pruned Bytes */
-      pruned_bytes?: number | null;
-      /** Total */
-      total: number;
-      /** Trigger */
-      trigger?: string;
-    };
-    /**
-     * StorageView
-     * @description GET /api/storage: bytes per category, the disk, the snapshot history and the advisor config.
-     */
-    StorageView: {
-      /** Bytes */
-      bytes: {
-        [key: string]: number;
-      };
-      config: components["schemas"]["AdvisorConfig"];
-      disk: components["schemas"]["DiskUsage"];
-      /** Snapshots */
-      snapshots: components["schemas"]["StorageSnapshot"][];
-      /** Total */
-      total: number;
     };
     /** TileRow */
     TileRow: {
@@ -3111,43 +1673,6 @@ export interface components {
        */
       tour_done?: boolean;
     };
-    /** Unblock */
-    Unblock: {
-      /** Company */
-      company: string;
-      /**
-       * Remove
-       * @default true
-       */
-      remove?: boolean;
-    };
-    /** UndoSafe */
-    UndoSafe: {
-      /** Previous Status */
-      previous_status?: string | null;
-      /** Registry Before */
-      registry_before?: {
-        [key: string]: unknown;
-      } | null;
-    };
-    /** UnquotedWarning */
-    UnquotedWarning: {
-      /** Intended */
-      intended: unknown;
-      /** Message */
-      message: string;
-    };
-    /** Uploaded */
-    Uploaded: {
-      /** Import Run */
-      import_run?: string | null;
-      /** N */
-      n: number;
-      /** Review Run */
-      review_run?: string | null;
-      /** Rid */
-      rid: string;
-    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -3160,69 +1685,6 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
-    };
-    /** VerifyBody */
-    VerifyBody: {
-      /**
-       * Domain
-       * @default
-       */
-      domain?: string;
-      /**
-       * Evidence
-       * @default []
-       */
-      evidence?: string[];
-      /**
-       * Risk
-       * @enum {string}
-       */
-      risk: "low" | "medium" | "high";
-      /**
-       * Signals
-       * @default []
-       */
-      signals?: string[];
-    };
-    /** Version */
-    Version: {
-      /** At */
-      at: string;
-      /** Author */
-      author: string;
-      /**
-       * Label
-       * @default
-       */
-      label?: string;
-      /** N */
-      n: number;
-      /** Source */
-      source: string;
-    };
-    /** VersionDetail */
-    VersionDetail: {
-      /** At */
-      at: string;
-      /** Ats */
-      ats: {
-        [key: string]: unknown;
-      };
-      /** Author */
-      author: string;
-      /**
-       * Label
-       * @default
-       */
-      label?: string;
-      /** N */
-      n: number;
-      /** Rid */
-      rid: string;
-      /** Source */
-      source: string;
-      /** Text */
-      text: string;
     };
   };
   responses: never;
@@ -3287,54 +1749,6 @@ export interface operations {
       };
     };
   };
-  /** Bulk Done */
-  bulk_done_api_actions_bulk_done_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Ids"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Bulk Reopen */
-  bulk_reopen_api_actions_bulk_reopen_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Ids"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /**
    * Answer
    * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
@@ -3349,30 +1763,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["Answer"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Block Company */
-  block_company_api_actions__aid__block_company_post: {
-    parameters: {
-      path: {
-        aid: string;
       };
     };
     responses: {
@@ -3445,309 +1835,11 @@ export interface operations {
       };
     };
   };
-  /** Mark Safe */
-  mark_safe_api_actions__aid__mark_safe_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Undo Mark Safe */
-  undo_mark_safe_api_actions__aid__mark_safe_undo_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UndoSafe"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Reopen */
   reopen_api_actions__aid__reopen_post: {
     parameters: {
       path: {
         aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Unblock Company */
-  unblock_company_api_actions__aid__unblock_company_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Unblock"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Advise */
-  advise_api_advise_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Advice"];
-        };
-      };
-    };
-  };
-  /** Advise Apply */
-  advise_apply_api_advise__rec_id__apply_post: {
-    parameters: {
-      path: {
-        rec_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Create */
-  create_api_batches_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["CreateBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Detail */
-  detail_api_batches__batch_id__get: {
-    parameters: {
-      path: {
-        batch_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Cancel */
-  cancel_api_batches__batch_id__cancel_post: {
-    parameters: {
-      path: {
-        batch_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Pause */
-  pause_api_batches__batch_id__pause_post: {
-    parameters: {
-      path: {
-        batch_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Retry */
-  retry_api_batches__batch_id__retry_post: {
-    parameters: {
-      path: {
-        batch_id: string;
-      };
-    };
-    requestBody?: {
-      content: {
-        "application/json": components["schemas"]["RetryBody"] | null;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Start
-   * @description Start (or resume) the driver as a detached process; the batch file then shows its progress.
-   */
-  start_api_batches__batch_id__start_post: {
-    parameters: {
-      path: {
-        batch_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Batch"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** List Contacts */
-  list_contacts_api_contacts_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["ContactsPage"];
-        };
-      };
-    };
-  };
-  /** Mark Contact */
-  mark_contact_api_contacts__job_id___name__mark_post: {
-    parameters: {
-      path: {
-        job_id: string;
-        name: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["MarkBody"];
       };
     };
     responses: {
@@ -3787,39 +1879,6 @@ export interface operations {
           "application/json": {
             [key: string]: unknown;
           };
-        };
-      };
-    };
-  };
-  /** List Inbox */
-  list_inbox_api_inbox_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["InboxPage"];
-        };
-      };
-    };
-  };
-  /** Inbox Detail */
-  inbox_detail_api_inbox__job_id__get: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["InboxDetail"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -4277,109 +2336,6 @@ export interface operations {
       };
     };
   };
-  /** Fill Plan */
-  fill_plan_api_jobs__job_id__fill_plan_get: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Make Fill Plan */
-  make_fill_plan_api_jobs__job_id__fill_plan_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Edit Fill Field */
-  edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post: {
-    parameters: {
-      path: {
-        job_id: string;
-        field_id: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["FillFieldBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Approve Fill Field */
-  approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post: {
-    parameters: {
-      path: {
-        job_id: string;
-        field_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /**
    * Clear Injection
    * @description REQ-109 "I checked it": the user read a flagged posting; prepare/apply are allowed again.
@@ -4425,30 +2381,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Matches"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Open Folder */
-  open_folder_api_jobs__job_id__open_folder_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
         };
       };
       /** @description Validation Error */
@@ -4627,35 +2559,6 @@ export interface operations {
       };
     };
   };
-  /** Safety Verify */
-  safety_verify_api_jobs__job_id__safety_verify_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["VerifyBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Set Status */
   set_status_api_jobs__job_id__status_post: {
     parameters: {
@@ -4743,71 +2646,6 @@ export interface operations {
       };
     };
   };
-  /** List Lessons */
-  list_lessons_api_learning_lessons_get: {
-    parameters: {
-      query?: {
-        ats?: string | null;
-        company?: string | null;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Lessons"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Add Lesson */
-  add_lesson_api_learning_lessons_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["NewLesson"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Lesson"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Delete Lesson */
-  delete_lesson_api_learning_lessons__lid__delete: {
-    parameters: {
-      path: {
-        lid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Meta */
   meta_api_meta_get: {
     responses: {
@@ -4815,68 +2653,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Meta"];
-        };
-      };
-    };
-  };
-  /** List Answers */
-  list_answers_api_profile_answers_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SavedAnswers"];
-        };
-      };
-    };
-  };
-  /** Edit Answer */
-  edit_answer_api_profile_answers__key__put: {
-    parameters: {
-      path: {
-        key: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["AnswerEdit"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SavedAnswer"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Delete Answer */
-  delete_answer_api_profile_answers__key__delete: {
-    parameters: {
-      query?: {
-        company?: string | null;
-        eeo?: boolean;
-      };
-      path: {
-        key: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -4903,20 +2679,6 @@ export interface operations {
       };
     };
   };
-  /**
-   * Refresh Master Proposal
-   * @description Re-run extract-master when the last run failed or never started (UI "Re-read").
-   */
-  refresh_master_proposal_api_profile_master_proposal_refresh_post: {
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["Started"];
-        };
-      };
-    };
-  };
   /** Reject Master Proposal */
   reject_master_proposal_api_profile_master_proposal_reject_post: {
     responses: {
@@ -4924,858 +2686,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["MasterProposal"];
-        };
-      };
-    };
-  };
-  /** List Resumes */
-  list_resumes_api_profile_resumes_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resumes"];
-        };
-      };
-    };
-  };
-  /** Upload */
-  upload_api_profile_resumes_put: {
-    parameters: {
-      query: {
-        filename: string;
-        name?: string | null;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/octet-stream": string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["Uploaded"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get Resume */
-  get_resume_api_profile_resumes__rid__get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Delete Resume */
-  delete_resume_api_profile_resumes__rid__delete: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      204: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Patch Resume */
-  patch_resume_api_profile_resumes__rid__patch: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ResumePatch"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * List Annotations
-   * @description DEC-016 suggestions + comments; `outdated` = target changed since the annotation's `base`. `run`: only those
-   * that run created or replied to: poll it with the run's state after Apply comment's `run_id` (TASK-033b).
-   */
-  list_annotations_api_profile_resumes__rid__annotations_get: {
-    parameters: {
-      query?: {
-        run?: string | null;
-      };
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Annotation"][];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Create Annotation */
-  create_annotation_api_profile_resumes__rid__annotations_post: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["AnnotationIn"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["Annotation"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Accept Annotation
-   * @description User accept: target changed -> 409 {message, expected, current}. AI suggestion: zero-fabrication guard
-   * refuses -> 422 with the reasons, else one draft change author=ai (bullet `origin` cleared, DEC-018 amendment).
-   * User suggestion: no guard, one draft change author=user.
-   */
-  accept_annotation_api_profile_resumes__rid__annotations__aid__accept_post: {
-    parameters: {
-      path: {
-        rid: string;
-        aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Draft"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Reject Annotation */
-  reject_annotation_api_profile_resumes__rid__annotations__aid__reject_post: {
-    parameters: {
-      path: {
-        rid: string;
-        aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Annotation"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Reply Annotation
-   * @description User reply. `apply` = "Apply comment": queue a resume_edit run (409/422 if it can't start; the reply is kept).
-   * The run writes an AI suggestion or reply, never the draft (DEC-016); accepting stays the user's action.
-   */
-  reply_annotation_api_profile_resumes__rid__annotations__aid__replies_post: {
-    parameters: {
-      path: {
-        rid: string;
-        aid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Reply"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Replied"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get Draft */
-  get_draft_api_profile_resumes__rid__draft_get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Draft"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Put Draft
-   * @description Autosave (DEC-014): stale `rev` -> 409 (reload); AI write setting origin -> 422.
-   */
-  put_draft_api_profile_resumes__rid__draft_put: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["DraftIn"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Draft"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Draft Changes
-   * @description History (DEC-015): draft.changes.jsonl, oldest first.
-   */
-  draft_changes_api_profile_resumes__rid__draft_changes_get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-              [key: string]: unknown;
-            }[];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Revert Change
-   * @description Inverse change author=user; target no longer holds the change's `after` -> 409 {expected, current}.
-   */
-  revert_change_api_profile_resumes__rid__draft_changes__cid__revert_post: {
-    parameters: {
-      path: {
-        rid: string;
-        cid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Draft"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Get Draft Text
-   * @description The ATS view: plain text of the current draft from the same renderer as resume.txt (DEC-020).
-   */
-  get_draft_text_api_profile_resumes__rid__draft_text_get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get Feedback */
-  get_feedback_api_profile_resumes__rid__feedback_get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Feedback"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Apply Feedback */
-  apply_feedback_api_profile_resumes__rid__feedback__fid__apply_post: {
-    parameters: {
-      path: {
-        rid: string;
-        fid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["Started"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Comment Feedback */
-  comment_feedback_api_profile_resumes__rid__feedback__fid__comment_post: {
-    parameters: {
-      path: {
-        rid: string;
-        fid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Comment"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["Started"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Dismiss Feedback */
-  dismiss_feedback_api_profile_resumes__rid__feedback__fid__dismiss_post: {
-    parameters: {
-      path: {
-        rid: string;
-        fid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["FeedbackItem"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Rewrite Feedback
-   * @description The edit-resume skill's rewrite: zero-fabrication guard, 422 with the reasons if refused (REQ-095).
-   */
-  rewrite_feedback_api_profile_resumes__rid__feedback__fid__rewrite_put: {
-    parameters: {
-      path: {
-        rid: string;
-        fid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Rewrite"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Resume File
-   * @description A version's file (default the latest), inline (UI "View") or as a download named 01_Name_Original.pdf.
-   */
-  resume_file_api_profile_resumes__rid__file_get: {
-    parameters: {
-      query?: {
-        v?: number | null;
-        download?: boolean;
-      };
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: never;
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get Import */
-  get_import_api_profile_resumes__rid__import_get: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["ImportState"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Retry Import */
-  retry_import_api_profile_resumes__rid__import_post: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["Started"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Restore Dropped */
-  restore_dropped_api_profile_resumes__rid__import_dropped__did__restore_post: {
-    parameters: {
-      path: {
-        rid: string;
-        did: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["RestoreIn"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Draft"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Set Master */
-  set_master_api_profile_resumes__rid__master_post: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Publish Resume
-   * @description Next/Done (DEC-017): the draft becomes one new version; same key or unchanged draft = no new version.
-   */
-  publish_resume_api_profile_resumes__rid__publish_post: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PublishIn"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Published"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Start Review */
-  start_review_api_profile_resumes__rid__review_post: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["Started"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /**
-   * Edit Resume
-   * @description REQ-097: hand edit -> new version author=user, no guard.
-   */
-  edit_resume_api_profile_resumes__rid__text_put: {
-    parameters: {
-      path: {
-        rid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["ResumeText"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Get Version */
-  get_version_api_profile_resumes__rid__versions__n__get: {
-    parameters: {
-      path: {
-        rid: string;
-        n: number;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["VersionDetail"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Delete Version */
-  delete_version_api_profile_resumes__rid__versions__n__delete: {
-    parameters: {
-      path: {
-        rid: string;
-        n: number;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Resume"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** List Samples */
-  list_samples_api_profile_samples_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["Samples"];
-        };
-      };
-    };
-  };
-  /**
-   * Upload Sample
-   * @description `learn=false`: more files of the same upload follow; the UI then calls POST /profile/samples/learn once.
-   */
-  upload_sample_api_profile_samples_put: {
-    parameters: {
-      query: {
-        filename: string;
-        learn?: boolean;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/octet-stream": string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      201: {
-        content: {
-          "application/json": components["schemas"]["SampleChange"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Relearn */
-  relearn_api_profile_samples_learn_post: {
-    responses: {
-      /** @description Successful Response */
-      202: {
-        content: {
-          "application/json": components["schemas"]["SampleChange"];
-        };
-      };
-    };
-  };
-  /** Remove Sample */
-  remove_sample_api_profile_samples__name__delete: {
-    parameters: {
-      path: {
-        name: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SampleChange"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Prune */
-  prune_api_prune_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["PruneBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
         };
       };
     };
@@ -6081,142 +2991,6 @@ export interface operations {
       };
     };
   };
-  /** Sections */
-  sections_api_settings_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SectionList"];
-        };
-      };
-    };
-  };
-  /** Ranking Preview */
-  ranking_preview_api_settings_runs_ranking_preview_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Preview"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Read */
-  read_api_settings__section__get: {
-    parameters: {
-      path: {
-        section: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["SectionData"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Save */
-  save_api_settings__section__put: {
-    parameters: {
-      path: {
-        section: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Changes"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Diff */
-  diff_api_settings__section__diff_post: {
-    parameters: {
-      path: {
-        section: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Changes"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": unknown;
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Reset */
-  reset_api_settings__section__reset__group__post: {
-    parameters: {
-      path: {
-        section: string;
-        group: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Status */
   status_api_status_get: {
     responses: {
@@ -6224,17 +2998,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Status"];
-        };
-      };
-    };
-  };
-  /** Storage */
-  storage_api_storage_get: {
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": components["schemas"]["StorageView"];
         };
       };
     };

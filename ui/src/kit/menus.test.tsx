@@ -1,72 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
 import { describe, expect, it, vi } from "vitest";
-import { axeViolations } from "../test/axe";
-import { Listbox } from "./Listbox";
 import { Menu } from "./Menu";
-
-const OPTS = [
-  { value: "due", label: "Due date" },
-  { value: "priority", label: "Priority" },
-  { value: "needs", label: "Needs" },
-];
-
-function ControlledListbox({ onChange = () => {} }: { onChange?: (v: string) => void }) {
-  const [v, setV] = useState("due");
-  return (
-    <Listbox
-      label="Group by"
-      value={v}
-      options={OPTS}
-      onValueChange={(x) => {
-        setV(x);
-        onChange(x);
-      }}
-    />
-  );
-}
-
-describe("Listbox", () => {
-  it("names the button with its caption and value, and picks by keyboard", async () => {
-    const user = userEvent.setup();
-    const onChange = vi.fn();
-    render(<ControlledListbox onChange={onChange} />);
-    const btn = screen.getByRole("button", { name: "Group by Due date" });
-    expect(btn).toHaveAttribute("aria-haspopup", "listbox");
-    btn.focus();
-    await user.keyboard("{ArrowDown}");
-    const list = screen.getByRole("listbox", { name: "Group by" });
-    expect(list).toHaveFocus();
-    expect(screen.getByRole("option", { name: "Due date" })).toHaveAttribute("aria-selected", "true");
-    await user.keyboard("{ArrowDown}{Enter}");
-    expect(onChange).toHaveBeenCalledWith("priority");
-    expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("button", { name: "Group by Priority" })).toHaveFocus();
-  });
-
-  it("Escape closes and returns focus; click picks", async () => {
-    const user = userEvent.setup();
-    render(<ControlledListbox />);
-    await user.click(screen.getByRole("button", { name: /Group by/ }));
-    await user.keyboard("{Escape}");
-    expect(screen.queryByRole("listbox")).toBeNull();
-    expect(screen.getByRole("button", { name: /Group by/ })).toHaveFocus();
-    await user.click(screen.getByRole("button", { name: /Group by/ }));
-    await user.click(screen.getByRole("option", { name: "Needs" }));
-    expect(screen.getByRole("button", { name: "Group by Needs" })).toBeInTheDocument();
-  });
-
-  it("inline label reads 'Tier: All' and has no axe violations when open", async () => {
-    const user = userEvent.setup();
-    const { container } = render(
-      <Listbox label="Tier" labelPlacement="inline" value="" options={[{ value: "", label: "All" }]} onValueChange={() => {}} />,
-    );
-    expect(screen.getByRole("button", { name: "Tier: All" })).toBeInTheDocument();
-    await user.click(screen.getByRole("button"));
-    expect(await axeViolations(container)).toEqual([]);
-  }, 20_000);
-});
 
 describe("Menu", () => {
   it("opens on ArrowDown with focus on the first enabled item; arrows skip disabled ones", async () => {

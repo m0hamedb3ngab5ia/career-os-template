@@ -119,7 +119,7 @@ def _static_response(static_dir: Path, path: str) -> Response:
 def create_app(settings: Settings, *, index: Index | None = None, broker: Broker | None = None,
                allowed_hosts: frozenset[str] | set[str] = LOOPBACK, static_dir: Path = STATIC_DIR,
                now: Callable[[], datetime] = _utcnow) -> FastAPI:
-    from careeros.ui.routers import actions, contacts, events, health, inbox, jobs, meta, runs, status
+    from careeros.ui.routers import actions, events, health, jobs, meta, runs, status
 
     app = FastAPI(title="career-os", docs_url="/api/docs", redoc_url=None, openapi_url="/api/openapi.json")
     app.state.ctx = Context(settings, index or Index(settings), broker or Broker(), now)
@@ -152,22 +152,11 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
 
     for r in (health, meta, status, jobs, events, runs, actions):
         app.include_router(r.router, prefix="/api")
-    from careeros.ui.routers import settings as settings_r, storage as storage_r  # Settings + Storage slice
-    for r in (settings_r, storage_r):
-        app.include_router(r.router, prefix="/api")
     from careeros.ui.routers import today, tracker  # Today / Jobs / Job detail slice
     for r in (today, tracker):
         app.include_router(r.router, prefix="/api")
-    app.include_router(contacts.router, prefix="/api")
-    app.include_router(inbox.router, prefix="/api")
-    from careeros.ui.routers import learning  # answers learned once, hurdles remembered
-    app.include_router(learning.router, prefix="/api")
-    from careeros.ui.routers import batches  # batch builder: preview, create, read
-    app.include_router(batches.router, prefix="/api")
     from careeros.ui.routers import resumes  # Profile › Résumés (TASK-007)
     app.include_router(resumes.router, prefix="/api")
-    from careeros.ui.routers import profile  # Profile › Saved answers + Writing samples (TASK-013)
-    app.include_router(profile.router, prefix="/api")
     from careeros.ui.routers import ui_state  # first-run tour flag (TASK-019)
     app.include_router(ui_state.router, prefix="/api")
 

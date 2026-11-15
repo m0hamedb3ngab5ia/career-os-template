@@ -324,13 +324,8 @@ def test_rerun_qa_runs_the_deterministic_checks_and_logs(data):
     assert "qa (deterministic)" in Store(s).read_log(jid)
 
 
-def test_safety_verify_flag_clear_use_the_registry(data):
+def test_safety_flag_clear_use_the_registry(data):
     s, jid = data["settings"], data["jobs"]["review"]
-    e = acts.safety_verify(s, jid, risk="low", signals=["official site", "ATS listing"],
-                           evidence=["https://umbrella.example.com"])
-    assert e["company"] == "Umbrella Labs" and e["risk"] == "low"
-    with pytest.raises(ValueError):
-        acts.safety_verify(s, jid, risk="bogus", signals=[], evidence=[])
     f = acts.safety_flag(s, jid, reason="SCAM_PAYMENT_REQUEST", confidence="medium",
                          evidence=["https://boards.example.com/review"])
     assert f["confidence"] == "medium" and f["state"] == "active"
@@ -345,20 +340,10 @@ def test_safety_verify_flag_clear_use_the_registry(data):
         acts.safety_clear(s, data["jobs"]["found"])
 
 
-def test_open_folder_and_tracker_only_their_own_paths(data, opened):
+def test_open_tracker_opens_its_own_path(data, opened):
     s, jid = data["settings"], data["jobs"]["review"]
-    acts.open_folder(s, jid)
-    assert opened == [["open", str(Store(s).job_dir(jid).resolve())]]
-    with pytest.raises(LookupError):
-        acts.open_folder(s, "../x")
     out = acts.open_tracker(s)
     assert opened[-1] == ["open", str(Tracker(settings=s).path.resolve())] and out["opened"] is True
-
-
-def test_open_refuses_off_macos(data, monkeypatch):
-    monkeypatch.setattr(desktop, "_platform", lambda: "linux")
-    with pytest.raises(desktop.Unsupported):
-        acts.open_folder(data["settings"], data["jobs"]["review"])
 
 
 def test_open_tracker_missing_file(data, opened):

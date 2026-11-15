@@ -1,16 +1,12 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useRef, useState } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import { axeViolations } from "../test/axe";
 import { Button } from "./Button";
-import { ConfirmPanel } from "./ConfirmPanel";
 import { EmptyState } from "./EmptyState";
-import { ExternalLink } from "./ExternalLink";
-import { MarkDoneCircle } from "./MarkDoneCircle";
 import { Popover } from "./Popover";
 import { SegmentedControl } from "./SegmentedControl";
-import { Switch } from "./Switch";
 
 describe("Button", () => {
   it("renders variants and keeps the label with an ellipsis while pending", () => {
@@ -31,26 +27,6 @@ describe("Button", () => {
   it("defaults to type=button so it never submits a form by accident", () => {
     render(<Button>Run scout</Button>);
     expect(screen.getByRole("button")).toHaveAttribute("type", "button");
-  });
-});
-
-describe("Switch", () => {
-  it("names the setting, toggles by click and keyboard", async () => {
-    const user = userEvent.setup();
-    function Demo() {
-      const [on, setOn] = useState(false);
-      return <Switch checked={on} onCheckedChange={setOn} label="Scout schedule" />;
-    }
-    render(<Demo />);
-    const sw = screen.getByRole("switch", { name: "Scout schedule" });
-    expect(sw).toHaveAttribute("aria-checked", "false");
-    await user.click(sw);
-    expect(sw).toHaveAttribute("aria-checked", "true");
-    sw.focus();
-    await user.keyboard(" ");
-    expect(sw).toHaveAttribute("aria-checked", "false");
-    await user.click(screen.getByText("Scout schedule"));
-    expect(sw).toHaveAttribute("aria-checked", "true");
   });
 });
 
@@ -162,86 +138,6 @@ describe("Popover", () => {
     await user.click(screen.getByRole("button", { name: "Applied this week" }));
     await user.click(screen.getByRole("button", { name: "Elsewhere" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
-  });
-});
-
-describe("ConfirmPanel", () => {
-  it("is an alertdialog that focuses the safe choice; Escape cancels", async () => {
-    const user = userEvent.setup();
-    const onCancel = vi.fn();
-    const onConfirm = vi.fn();
-    render(
-      <ConfirmPanel
-        question="Withdraw from Acme? You can’t undo this."
-        cancelLabel="Keep application"
-        confirmLabel="Withdraw"
-        onCancel={onCancel}
-        onConfirm={onConfirm}
-      />,
-    );
-    expect(screen.getByRole("alertdialog", { name: /Withdraw from Acme/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Keep application" })).toHaveFocus();
-    await user.keyboard("{Escape}");
-    expect(onCancel).toHaveBeenCalledOnce();
-    await user.click(screen.getByRole("button", { name: "Withdraw" }));
-    expect(onConfirm).toHaveBeenCalledOnce();
-  });
-});
-
-describe("ConfirmPanel detail", () => {
-  it("adds an optional second line as the accessible description", () => {
-    render(
-      <ConfirmPanel
-        question="Withdraw from Acme?"
-        detail="career-os stops all work on this job."
-        cancelLabel="Keep application"
-        confirmLabel="Withdraw"
-        onCancel={() => undefined}
-        onConfirm={() => undefined}
-      />,
-    );
-    expect(screen.getByRole("alertdialog", { name: "Withdraw from Acme?" })).toHaveAccessibleDescription(
-      "career-os stops all work on this job.",
-    );
-  });
-});
-
-describe("ConfirmPanel pending", () => {
-  it("keeps the outcome on the busy button: Withdraw…", () => {
-    render(
-      <ConfirmPanel
-        question="Withdraw from Acme?"
-        cancelLabel="Keep application"
-        confirmLabel="Withdraw"
-        onCancel={() => undefined}
-        onConfirm={() => undefined}
-        pending
-      />,
-    );
-    const b = screen.getByRole("button", { name: "Withdraw…" });
-    expect(b).toBeDisabled();
-    expect(b).toHaveAttribute("aria-busy", "true");
-  });
-});
-
-describe("MarkDoneCircle", () => {
-  it("is a checkbox named after the item", () => {
-    const onChange = vi.fn();
-    render(<MarkDoneCircle done={false} onDoneChange={onChange} itemName="Ramp LinkedIn note" />);
-    const cb = screen.getByRole("checkbox", { name: "Mark Ramp LinkedIn note done" });
-    expect(cb).toHaveAttribute("aria-checked", "false");
-    fireEvent.click(cb);
-    expect(onChange).toHaveBeenCalledWith(true);
-  });
-});
-
-describe("ExternalLink", () => {
-  it("opens in a new tab safely and says so to screen readers", () => {
-    render(<ExternalLink href="https://example.com/jobs/1">Open posting</ExternalLink>);
-    const a = screen.getByRole("link", { name: /Open posting/ });
-    expect(a).toHaveAttribute("target", "_blank");
-    expect(a).toHaveAttribute("rel", "noopener noreferrer");
-    expect(a).toHaveTextContent("opens in a new tab");
   });
 });
 

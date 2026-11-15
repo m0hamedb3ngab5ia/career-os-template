@@ -74,10 +74,8 @@ def _stable(body, tmp: str, ids: dict[str, str], sizes: bool = False):
 
 PATHS = {
     "runs": "/api/runs", "runs_current": "/api/runs/current", "runs_detail": "/api/runs/{run}",
-    "schedule": "/api/schedule", "storage": "/api/storage", "advise": "/api/advise",
-    "settings": "/api/settings", "settings_runs": "/api/settings/runs",
+    "schedule": "/api/schedule",
     "actions": "/api/actions", "actions_done": "/api/actions?tab=done",
-    "inbox": "/api/inbox", "inbox_detail": "/api/inbox/{job}", "contacts": "/api/contacts",
 }
 
 

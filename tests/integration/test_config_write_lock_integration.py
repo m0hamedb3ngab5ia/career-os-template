@@ -124,68 +124,6 @@ def test_category_fields_offer_the_ids_from_categories_yaml(root):
         assert set(fields[fid]["options"]) == known and fields[fid]["strict_options"] is False
 
 
-def _stub_block_item(monkeypatch, company: str) -> None:
-    from careeros.ui.services import actions as svc
-
-    class _Tracker:
-        def mark_action_done(self, aid):
-            return {"id": aid}
-
-    monkeypatch.setattr(svc, "_scam_item", lambda ix, aid: {"job_id": "job000000001"})
-    monkeypatch.setattr(svc, "_company", lambda settings, it: company)
-    monkeypatch.setattr(svc, "_tracker", lambda settings: _Tracker())
-
-
-def test_block_company_during_a_companies_save_loses_neither_write(root, monkeypatch):
-    from careeros.ui.services import actions as svc
-
-    _stub_block_item(monkeypatch, "Blocked By Action")
-    s = Settings.load(root)
-    read = settings_io.read_section(s, "companies")
-    current = read["values"]["companies:blocklist.companies"] or []
-    real_check = settings_io._check_changes
-    in_window = threading.Event()
-
-    def slow_check(*a, **kw):  # runs under the lock, after the version check: widen the check -> write window
-        in_window.set()
-        time.sleep(0.4)
-        return real_check(*a, **kw)
-
-    monkeypatch.setattr(settings_io, "_check_changes", slow_check)
-    errors: list[BaseException] = []
-
-    def save() -> None:
-        try:
-            settings_io.save_section(Settings.load(root), "companies",
-                                     {"companies:blocklist.companies": [*current, "Added In Settings"]},
-                                     version=read["version"])
-        except BaseException as e:  # noqa: BLE001
-            errors.append(e)
-
-    t = threading.Thread(target=save)
-    t.start()
-    # wait until the save holds the lock past its version check; a fixed sleep let block_company win the lock
-    # first on a loaded CI runner, so the save (correctly) saw a stale version
-    assert in_window.wait(10)
-    svc.block_company(Settings.load(root), None, "a1")
-    t.join(10)
-    assert not errors, errors
-    bl = yaml.safe_load((root / "config" / "companies.yaml").read_text())["blocklist"]["companies"]
-    assert "Added In Settings" in bl and "Blocked By Action" in bl
-
-
-def test_block_company_refuses_while_the_config_lock_is_held(root, monkeypatch):
-    from careeros.ui.services import actions as svc
-
-    _stub_block_item(monkeypatch, "Blocked By Action")
-    monkeypatch.setattr(locks, "CONFIG_LOCK_TIMEOUT_S", 0.2)
-    path = root / "config" / "companies.yaml"
-    before = path.read_text()
-    with locks.config_lock(root), pytest.raises(locks.LockBusy):
-        svc.block_company(Settings.load(root), None, "a1")
-    assert path.read_text() == before
-
-
 def test_targets_reads_and_saves_without_a_categories_file(root):
     s = Settings.load(root)
     (root / "config" / "categories.yaml").unlink(missing_ok=True)

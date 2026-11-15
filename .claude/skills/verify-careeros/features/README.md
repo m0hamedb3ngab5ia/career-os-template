@@ -25,9 +25,5 @@ Maintained source for verifying user-facing behavior. Read it before driving, th
 
 - [Today](./today.md) to-do list and next step.
 - [Jobs](./jobs.md) table, selection, statuses (needs seeded postings).
-- [Profile › Résumés](./profile-resumes.md) upload, ATS data, review feedback, versions. PROVEN (user mode): upload via page, list, files on disk.
-- [Settings](./settings.md) sections and save bar.
 - [Apply fill](./apply-fill.md) stage a form in Chromium (documented, not provable offline).
 
-## Retired UI (DEC-024)
-`profile-resumes.md` and `settings.md` describe pages that no longer exist; use only `today.md` and `jobs.md` for UI proof. Verify the chat/CLI replacements (docs/CHAT.md) through the CLI.
