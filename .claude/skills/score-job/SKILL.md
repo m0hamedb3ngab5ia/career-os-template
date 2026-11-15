@@ -179,6 +179,7 @@ if hard_filter_fails:                 decision=skip, skip_reason=first fail
 elif category excluded/unknown:       decision=skip
 elif tier == "A" and fit >= thresholds.tier_a_min_fit:  decision=prepare  (flag "tier_a_low_fit" in fit_reasons if fit < min_fit_to_prepare)
 elif location not preferred and fit < thresholds.min_fit_nonpreferred_location: decision=skip, skip_reason=location_nonpreferred_low_fit
+    # "not preferred" = location_pref below 7: not in location.preferred, not in preferred_regions, not a remote_ok remote job
 elif fit >= thresholds.min_fit_to_prepare: decision=prepare
 else: decision=skip, skip_reason=below_min_fit
 ```
