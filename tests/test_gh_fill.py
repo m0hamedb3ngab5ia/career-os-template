@@ -154,3 +154,12 @@ def test_fill_one_discipline_list_takes_first_offered(monkeypatch):
     monkeypatch.setattr(gh_fill, "_pick", lambda *a, **k: (_ for _ in ()).throw(LookupError("x")))
     with pytest.raises(LookupError):
         gh_fill._fill_one(root, f)
+
+
+def test_fill_one_country_matches_option_with_dial_code(monkeypatch):
+    calls = []
+    monkeypatch.setattr(gh_fill, "_pick", lambda root, inp, value, exact: calls.append((value, exact)))
+    root = MagicMock()
+    root.locator.return_value.locator.return_value.inner_text.return_value = "United States +1"
+    assert gh_fill._fill_one(root, {"field_id": "country", "type": "select", "value": "United States"}) is True
+    assert calls == [("United States", False)]  # the option reads "United States +1": exact never matches

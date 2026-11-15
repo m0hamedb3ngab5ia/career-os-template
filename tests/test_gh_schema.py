@@ -287,3 +287,27 @@ def test_plan_standard_answer_prefer_from_yaml(tmp_path):
                "options": OFFERS}]
     row = build_plan(fields, profile=PROFILE, answers_path=ans, files={})["fields"][0]
     assert row["value"] == "Acme's Career Site"
+
+
+def test_pick_option_subset_never_adds_a_negation():
+    assert pick_option(["I do not require sponsorship", "Other"], "I require sponsorship") is None
+    assert pick_option(["I don't need a visa", "Other"], "need a visa") is None
+    assert pick_option(["I never worked here", "Other"], "worked here") is None
+    assert pick_option(["I will require sponsorship", "I do not require sponsorship"],
+                       "I require sponsorship") == "I will require sponsorship"
+
+
+@pytest.mark.parametrize("degree", ["Doctor of Medicine", "Doctor of Education, Leadership", "Doctorate in Law"])
+def test_extras_other_doctorates_are_not_phd(degree):
+    assert _extras_for(degree=degree)["degree--0"]["value"] == degree  # typed as is, never claimed as a Ph.D.
+
+
+def test_plan_prefer_comes_from_the_entry_that_matched(tmp_path):
+    ans = tmp_path / "sa.yaml"
+    ans.write_text("answers:\n  - key: referral\n    match: ['how did you hear']\n    answer: Company careers page\n"
+                   "company_answers:\n  Acme:\n    - key: referral\n      match: ['where did you find']\n"
+                   "      answer: LinkedIn\n      prefer: ['job board']\n")
+    fields = [{"field_id": "q1", "label": "How did you hear about us?", "type": "select", "required": True,
+               "options": OFFERS}]
+    row = build_plan(fields, profile=PROFILE, answers_path=ans, company="Acme", files={})["fields"][0]
+    assert row["value"] is None  # general entry answered; the company entry's prefer must not leak in

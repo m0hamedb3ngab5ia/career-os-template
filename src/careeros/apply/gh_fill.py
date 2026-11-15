@@ -125,7 +125,7 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
                     raise LookupError(f"none of {v!r} offered")
             for one in [] if picked else v if isinstance(v, list) else [v]:
                 try:
-                    _pick(root, loc, str(one), exact=t != "select_async")
+                    _pick(root, loc, str(one), exact=t != "select_async" and fid != "country")  # "United States +1"
                 except LookupError:  # "Bachelor of Engineering, X" has no option: pick the fixed label by keyword
                     if not (fid.startswith("degree") and (key := degree_key(str(one)))):
                         raise

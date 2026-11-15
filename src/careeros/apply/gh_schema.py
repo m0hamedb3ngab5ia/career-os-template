@@ -68,10 +68,13 @@ def _words(text: str) -> set[str]:
     return set(re.findall(r"[a-z0-9]+", text.lower()))
 
 
+_NEGATIONS = {"no", "not", "never", "don", "doesn", "didn", "won", "cannot", "without", "non", "neither", "nor"}
+
+
 def _subset(options: list[str], answer: str) -> str | None:
     """The only option holding every whole word of `answer` ("Career Site" -> "Acme's Career Site")."""
-    w = _words(answer)
-    hits = [o for o in options if w and w <= _words(o)]
+    w = _words(answer)  # an option adding "not"/"never" says the opposite: "I do not require sponsorship"
+    hits = [o for o in options if w and w <= _words(o) and not (_words(o) - w) & _NEGATIONS]
     return hits[0] if len(hits) == 1 else None
 
 
@@ -87,7 +90,7 @@ def pick_option(options: list[str], answer: Any, prefer: list[str] | tuple[str, 
 
 
 _DEGREES = {"bachelor": "Bachelor's Degree", "master": "Master's Degree", "associate": "Associate's Degree",
-            "phd": "Doctor of Philosophy (Ph.D.)", "doctor": "Doctor of Philosophy (Ph.D.)"}
+            "phd": "Doctor of Philosophy (Ph.D.)", "doctor of philosophy": "Doctor of Philosophy (Ph.D.)"}
 _MONTHS = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October",
            "November", "December"]
 
@@ -156,7 +159,7 @@ def _fill(f: dict[str, Any], ident: dict[str, Any], eeo: dict[str, Any], answers
     hit = answer_for(f["label"], answers_path, required=f["required"], company=company)
     if not hit or hit[1] is None:
         return None, None
-    value = pick_option(f["options"], hit[1], answer_prefer(hit[0], answers_path, company)) if t in _SELECTS else hit[1]
+    value = pick_option(f["options"], hit[1], answer_prefer(f["label"], answers_path, company)) if t in _SELECTS else hit[1]
     if value is not None and t in ("multiselect", "checkbox_group"):
         value = [value]
     return value, f"standard:{hit[0]}"

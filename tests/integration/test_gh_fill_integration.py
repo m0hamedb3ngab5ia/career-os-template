@@ -98,3 +98,12 @@ def test_fill_maps_degree_to_fixed_label(server: str, tmp_path: Path):
                "value": "Bachelor of Engineering, Mechanical", "source": "profile"}]
     summary, _ = _run(server, tmp_path, "job_app.html", fields)  # no exact option: falls back to "Bachelor's Degree"
     assert summary["filled"] == 1 and summary["failed"] == [], summary
+
+
+def test_fill_education_extras_scoped_to_their_listbox(server: str, tmp_path: Path):
+    f = [("country", "select", "United States"), ("degree--0", "select_async", "Bachelor's Degree"),
+         ("discipline--0", "select_async", ["Software Engineering", "Computer Science"]),  # SE not offered
+         ("start-month--0", "select", "August")]
+    fields = [{"field_id": i, "label": i, "type": t, "value": v, "source": "profile"} for i, t, v in f]
+    summary, _ = _run(server, tmp_path, "job_app.html", fields)
+    assert summary["failed"] == [] and summary["filled"] == 4, summary  # decoy options above the form never picked
