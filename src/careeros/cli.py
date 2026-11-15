@@ -729,7 +729,7 @@ def cmd_job_unlock(args: argparse.Namespace) -> int:
 
 
 def cmd_job_filters(args: argparse.Namespace) -> int:
-    from careeros.hard_filters import hard_filters, reasons
+    from careeros.hard_filters import hard_filters, pay_exempts_location, reasons
     from careeros.models import now_iso
     from careeros.scout import Prefilter
 
@@ -740,10 +740,12 @@ def cmd_job_filters(args: argparse.Namespace) -> int:
         print(f"job {args.job_id} not found", file=sys.stderr)
         return 1
     fails = hard_filters(s, posting)
+    pay = pay_exempts_location(s, posting)
     res = {"skill": "score-job", "job_id": args.job_id, "category": "unknown", "fit": 0, "tier": None,
-           "decision": "skip", "skip_reason": fails[0] if fails else None, "hard_filter_fails": fails}
+           "decision": "skip", "skip_reason": fails[0] if fails else None, "hard_filter_fails": fails,
+           "pay_exempts_location": pay}
     if not fails:
-        print(json.dumps({"job_id": args.job_id, "hard_filter_fails": []}))
+        print(json.dumps({"job_id": args.job_id, "hard_filter_fails": [], "pay_exempts_location": pay}))
         return 0
     res["category"] = Prefilter(s).title_category(str(posting.get("title") or "")) or "unknown"
     why = reasons(s, posting, fails)

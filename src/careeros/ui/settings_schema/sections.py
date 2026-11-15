@@ -284,6 +284,9 @@ SECTIONS: tuple[Section, ...] = (
         Group("thresholds", "Fit thresholds", (
             _num(T, "thresholds.min_fit_to_prepare", "Minimum fit to prepare", 70, hi=100),
             _num(T, "thresholds.min_fit_nonpreferred_location", "Minimum fit outside preferred cities", 85, hi=100),
+            _num(T, "thresholds.any_location_min_base_usd", "Any location if base pay at least", None, unit="USD",
+                 nullable=True, help="A job whose posted minimum base is at least this skips the non-preferred "
+                 "location rule. Blank = off. Unlisted pay never qualifies."),
             Field(T, "thresholds.boost_industry_bonus", "number", "Boost for preferred industries", default=5,
                   min=0, max=100, integer=True, unit="points", **UNUSED),
             _num(T, "thresholds.tier_a_min_fit", "Minimum fit for dream companies", 60, hi=100),

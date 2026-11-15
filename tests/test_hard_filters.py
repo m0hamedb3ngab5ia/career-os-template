@@ -6,7 +6,7 @@ import pytest
 
 from careeros.cli import main
 from careeros.config import Settings
-from careeros.hard_filters import hard_filters, min_years_required
+from careeros.hard_filters import hard_filters, min_years_required, pay_exempts_location
 from careeros.store import Store
 from conftest import make_temp_root
 
@@ -105,6 +105,29 @@ def test_company_history_is_not_a_years_requirement(text):
 
 def test_required_years_survive_a_preferred_clause_on_the_same_line():
     assert min_years_required("5+ years of experience required, 7 years of experience preferred.") == 5
+
+
+@pytest.mark.parametrize("kw,cap,exempt", [
+    ({"salary_min": 150000}, 150000, True),
+    ({"salary_min": 149999, "salary_max": 200000}, 150000, False),
+    ({"salary_max": 200000}, 150000, False),  # only a maximum posted: minimum unknown
+    ({"salary_min": 160000, "salary_currency": "GBP"}, 150000, False),
+    ({"salary_min": 160000}, None, False),
+])
+def test_pay_exempts_location(settings, kw, cap, exempt):
+    settings.targets.setdefault("thresholds", {})["any_location_min_base_usd"] = cap
+    assert pay_exempts_location(settings, _posting(**kw)) is exempt
+
+
+def test_cli_reports_pay_exempts_location(tmp_path, capsys):
+    root, d = _job(tmp_path, salary_min=150000)
+    t = root / "config" / "targets.yaml"
+    import yaml
+    cfg = yaml.safe_load(t.read_text())
+    cfg["thresholds"]["any_location_min_base_usd"] = 150000
+    t.write_text(yaml.safe_dump(cfg))
+    assert main(["--root", str(root), "job", "filters", "job000000001"]) == 0
+    assert json.loads(capsys.readouterr().out.strip().splitlines()[-1])["pay_exempts_location"] is True
 
 
 def test_non_usd_salary_is_not_compared_with_the_usd_floor(settings):
