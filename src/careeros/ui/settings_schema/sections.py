@@ -259,6 +259,9 @@ SECTIONS: tuple[Section, ...] = (
                   help='"*" allows anywhere not blocked.'),
             _tags(T, "location.blocked_countries", "Blocked countries", None, personal=True),
             _personal(T, "location.remote_ok", "switch", "Remote roles are fine"),
+            _tags(T, "location.work_modes", "Work modes to keep", ["remote", "hybrid", "onsite"],
+                  options=("remote", "hybrid", "onsite"), strict=True,
+                  help="Scout drops postings whose work mode is not listed. Unknown mode is kept."),
         )),
         Group("roles", "Roles", (
             _tags(T, "seniority.exclude_title_keywords", "Skip titles containing",
@@ -354,6 +357,8 @@ SECTIONS: tuple[Section, ...] = (
         Group("sources", "Sources", (
             _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby"],
                   options=("greenhouse", "lever", "ashby"), strict=True),
+            _num(T, "scout.max_post_age_days", "Skip postings older than", None, unit="days", lo=1, nullable=True,
+                 help="Empty keeps any age. Uses the posting's own dates."),
             _tags(C, "searches.keywords", "Search phrases", None, personal=True, **UNUSED),
         )),
         Group("filters", "Filters", (

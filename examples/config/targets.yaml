@@ -31,6 +31,8 @@ location:
   allowed_countries: [US, "*"]       # "*" = anywhere else allowed...
   blocked_countries: []              # ...except these ISO codes, e.g. [XX, YY]
   remote_ok: true
+  work_modes: [remote, hybrid, onsite]   # [remote, hybrid, onsite] (Recommended = all): scout drops postings whose work
+                                         # mode is not listed, e.g. [remote, hybrid]. Mode unknown = kept
   # Extra location words per blocked country code (merged over the built-in table in careeros.scout).
   # country_aliases:
   #   DE: [germany, berlin, munich]
@@ -137,6 +139,8 @@ safety:
 # Scout: which job-board sources to fetch and which prefilters to apply. Defaults: all on.
 scout:
   sources: [greenhouse, lever, ashby]  # ATS adapters to fetch; boards on others are skipped
+  max_post_age_days: null              # null (Recommended = off). A number, e.g. 14: scout drops postings first
+                                       # published longer ago than that (no date = kept)
   filters:
     blocklist: true                    # companies.yaml blocklist
     flagged: true                      # high-confidence entries in data/flagged_registry.yaml

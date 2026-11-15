@@ -1,14 +1,17 @@
 from __future__ import annotations
 
+import json
 import re
 from dataclasses import dataclass, field
+from datetime import date, datetime, timezone
 from typing import Any
 
 from careeros.config import ConfigError, Settings, get_settings
 from careeros.match import prescore_for
 from careeros.models import Posting
 from careeros.safety import registry
-from careeros.safety.ghost import check_ghost, history_key, load_signals
+from careeros.runs.atomic import write_text
+from careeros.safety.ghost import _d, check_ghost, history_key, load_signals
 from careeros.safety.registry import is_flagged
 from careeros.safety.scam import apply_levels, verdict
 from careeros.scout.ashby import AshbyAdapter
@@ -51,6 +54,8 @@ class BoardResult:
     filtered_seniority: int = 0
     filtered_flagged: int = 0
     filtered_ghost: int = 0
+    filtered_work_mode: int = 0
+    filtered_age: int = 0
     error: str = ""
     stored_ids: list[str] = field(default_factory=list)
 
@@ -70,7 +75,7 @@ class ScoutSummary:
     @property
     def totals(self) -> dict[str, int]:
         keys = ("fetched", "new", "stored", "filtered_title", "filtered_location", "filtered_blocklist", "filtered_seniority",
-                "filtered_flagged", "filtered_ghost")
+                "filtered_flagged", "filtered_ghost", "filtered_work_mode", "filtered_age")
         return {k: sum(getattr(b, k) for b in self.boards) for k in keys}
 
 
@@ -79,6 +84,13 @@ def _kw_regex(keywords: list[str]) -> re.Pattern[str] | None:
     if not kws:
         return None
     return re.compile(r"(?<![a-z0-9])(?:" + "|".join(re.escape(k) for k in kws) + r")(?![a-z0-9])", re.I)
+
+
+WORK_MODES = ("remote", "hybrid", "onsite")
+
+
+def _mode(word: object) -> str:
+    return re.sub(r"[^a-z]", "", str(word).lower())  # "On-site", "on_site" -> "onsite"
 
 
 SCOUT_FILTERS = ("blocklist", "flagged", "title", "seniority", "location", "ghost")
@@ -116,6 +128,10 @@ class Prefilter:
         self.senior = _kw_regex(settings.seniority_exclude_keywords())
         self.blocked_countries = settings.blocked_countries()
         self.country_aliases = {**COUNTRY_ALIASES, **settings.country_aliases()}
+        age = (settings.targets.get("scout") or {}).get("max_post_age_days")
+        self.max_age = int(age) if age else None  # null/0 = off
+        modes = (settings.targets.get("location") or {}).get("work_modes") or WORK_MODES
+        self.work_modes = {_mode(m) for m in modes}
 
     def title_category(self, title: str) -> str | None:
         t = title.lower()
@@ -151,6 +167,25 @@ class Prefilter:
                     return True
         return False
 
+    def too_old(self, p: Posting) -> bool:
+        """Posted more than `scout.max_post_age_days` ago by the posting's own dates (no date = kept)."""
+        known = [d for d in (_d(p.posted_at), _d(p.first_published)) if d]
+        return bool(self.max_age and known and (date.today() - min(known)).days > self.max_age)
+
+    def work_mode(self, p: Posting) -> str | None:
+        """remote | hybrid | onsite from the ATS field or the location/title words; None = can't tell."""
+        mode = _mode(p.raw.get("workplaceType") or "")
+        if mode in WORK_MODES:
+            return mode
+        text = f"{p.location} {p.title}".lower()
+        for word, found in (("hybrid", "hybrid"), ("on-site", "onsite"), ("onsite", "onsite"), ("remote", "remote")):
+            if word in text:
+                return found
+        return "remote" if p.remote else None
+
+    def mode_blocked(self, p: Posting) -> bool:
+        return not self.work_modes >= set(WORK_MODES) and self.work_mode(p) not in (None, *self.work_modes)
+
     def check(self, p: Posting) -> tuple[bool, str, str | None]:
         """Return (passes, reason, category)."""
         if self.on["blocklist"] and self.s.is_blocklisted(p.company):
@@ -164,6 +199,10 @@ class Prefilter:
             return False, "seniority", cat
         if self.on["location"] and self.location_blocked(p):
             return False, "location", cat
+        if self.mode_blocked(p):
+            return False, "work_mode", cat
+        if self.too_old(p):
+            return False, "age", cat
         return True, "ok", cat
 
 
@@ -270,9 +309,14 @@ def run_scout(
         st.save_seen(seen)
         log(
             f"[scout] {company:<22} {ats:<10} fetched={res.fetched:<4} new={res.new:<4} stored={res.stored:<3} "
-            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority} flagged-{res.filtered_flagged} ghost-{res.filtered_ghost})"
+            f"(title-{res.filtered_title} loc-{res.filtered_location} block-{res.filtered_blocklist} senior-{res.filtered_seniority} flagged-{res.filtered_flagged} ghost-{res.filtered_ghost} mode-{res.filtered_work_mode} old-{res.filtered_age})"
         )
 
+    # The funnel `careeros view` shows (Search tab): what each filter removed from this run's new postings.
+    t = summary.totals
+    write_text(st.seen_file.with_name("scout_last.json"), json.dumps({
+        "at": datetime.now(timezone.utc).isoformat(timespec="seconds"), "fetched": t["fetched"], "new": t["new"],
+        "stored": t["stored"], "filtered": {k[len("filtered_"):]: v for k, v in t.items() if k.startswith("filtered_")}}))
     return summary
 
 
