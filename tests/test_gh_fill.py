@@ -32,6 +32,21 @@ def test_plan_problems_unanswered_pause():
     assert gh_fill.plan_problems(p) == ["unanswered (pause:legal): Need sponsorship?"]
 
 
+def test_plan_problems_required_consent_left_for_the_user():
+    # Consents (privacy, terms, code of conduct, arbitration) are the candidate's to accept: never filled,
+    # never blocking; the rest of the form is filled and the user ticks them before Submit.
+    p = _plan()
+    for i, label in enumerate(["Privacy Statement", "Terms and Conditions", "Interview Code of Conduct",
+                               "Please confirm receipt of the above linked Global Data Privacy Notice and US "
+                               "Arbitration Agreement.", "Privacy Policy Acknowledgement"]):
+        p["fields"].append({"field_id": f"c{i}", "label": label, "type": "select", "value": None,
+                            "source": "unanswered", "required": True})
+    p["fields"].append({"field_id": "q1", "label": "Favourite language?", "type": "text", "value": None,
+                        "source": "unanswered", "required": True})
+    assert gh_fill.plan_problems(p) == ["needs input (required): Favourite language?"]
+    assert [f["label"] for f in gh_fill.consent_fields(p)][:1] == ["Privacy Statement"]
+
+
 def test_job_url():
     assert gh_fill.job_url(_plan()) == "https://job-boards.greenhouse.io/embed/job_app?for=acme&token=123"
 
@@ -84,6 +99,17 @@ def test_fill_survives_screenshot_timeout(tmp_path):
     page.screenshot.side_effect = RuntimeError("Page.screenshot: Timeout 10000ms exceeded.")
     summary = gh_fill.fill({"fields": []}, page, tmp_path, url="http://x")
     assert summary["filled"] == 0 and (tmp_path / "fill_summary.json").is_file()
+
+
+def test_fill_skips_profile_fields_the_form_does_not_show(tmp_path):
+    """A job's education_config can hide school/degree/dates: the planned field is absent from the page, so it is
+    skipped (no 10 s timeout, not a failure)."""
+    page = MagicMock()
+    page.locator.return_value.count.return_value = 0
+    plan = {"fields": [{"field_id": "end-month--0", "label": "End date month", "type": "select", "value": "May",
+                        "source": "profile"}]}
+    summary = gh_fill.fill(plan, page, tmp_path, url="http://x")
+    assert summary["failed"] == [] and summary["skipped"] == ["End date month (not on this form)"]
 
 
 def test_plan_problems_required_needs_input_blocks():
@@ -163,3 +189,50 @@ def test_fill_one_country_matches_option_with_dial_code(monkeypatch):
     root.locator.return_value.locator.return_value.inner_text.return_value = "United States +1"
     assert gh_fill._fill_one(root, {"field_id": "country", "type": "select", "value": "United States"}) is True
     assert calls == [("United States", False)]  # the option reads "United States +1": exact never matches
+
+
+def test_fill_one_discipline_resets_the_menu_before_the_next_candidate(monkeypatch):
+    """A failed async search leaves the menu closed with stale text; Escape before the next candidate."""
+    events = []
+
+    def fake_pick(root, inp, value, exact):
+        events.append(value)
+        if value == "Software Engineering":
+            raise LookupError(value)
+
+    monkeypatch.setattr(gh_fill, "_pick", fake_pick)
+    root = MagicMock()
+    root.locator.return_value.press.side_effect = lambda k: events.append(k)
+    root.locator.return_value.locator.return_value.inner_text.return_value = "Computer Science"
+    f = {"field_id": "discipline--0", "type": "select_async", "value": ["Software Engineering", "Computer Science"]}
+    assert gh_fill._fill_one(root, f) is True
+    assert events[:3] == ["Software Engineering", "Escape", "Computer Science"]
+
+
+def test_fill_one_checks_a_single_checkbox():
+    class Loc:
+        checked = False
+        def check(self): Loc.checked = True
+        def is_checked(self): return Loc.checked
+    class Root:
+        def locator(self, sel): return Loc()
+    assert gh_fill._fill_one(Root(), {"field_id": "current-role-0_1", "type": "checkbox", "value": True})
+
+
+def test_fill_reports_required_fields_left_empty_on_the_page(tmp_path):
+    """A whole section the plan never knew about (e.g. employment) must show up, not pass silently."""
+    page = MagicMock()
+    page.locator.return_value.count.return_value = 0
+    page.locator.return_value.first.evaluate.return_value = ["Company name", "Title"]
+    summary = gh_fill.fill({"fields": []}, page, tmp_path, url="http://x")
+    assert summary["empty_required"] == ["Company name", "Title"]
+
+
+def test_fill_one_checkbox_group_rendered_as_react_select_is_picked(monkeypatch):
+    picked = []
+    monkeypatch.setattr(gh_fill, "_pick", lambda root, loc, v, exact: picked.append(v))
+    monkeypatch.setattr(gh_fill, "matches", lambda *a: True)
+    root = MagicMock()
+    root.locator.return_value.count.return_value = 1
+    assert gh_fill._fill_one(root, {"field_id": "q[]", "type": "checkbox_group", "value": ["Other"]})
+    assert picked == ["Other"]

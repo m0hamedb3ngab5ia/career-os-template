@@ -122,15 +122,15 @@ def test_parallel_daily_cap_counts_jobs_in_flight(settings, store):
     assert len(inv.calls) == 2 and rec["stop_reason"] == "daily_cap"
 
 
-@pytest.mark.parametrize("bad", [{"score": 0}, {"score": 1.5}, {"prepare": 2}, 3])
+@pytest.mark.parametrize("bad", [{"score": 0}, {"score": 1.5}, {"apply": 2}, 3])
 def test_parallel_config_is_validated(settings, bad):
     with pytest.raises(ConfigError):
         cfg_of(settings, parallel=bad)
 
 
 def test_parallel_config_default_is_one(settings):
-    assert cfg_of(settings).parallel == {"score": 1}
-    assert cfg_of(settings, parallel={"score": 3}).parallel == {"score": 3}
+    assert cfg_of(settings).parallel == {"score": 1, "prepare": 1}
+    assert cfg_of(settings, parallel={"score": 3}).parallel == {"score": 3, "prepare": 1}
 
 
 

@@ -633,3 +633,11 @@ def test_resume_feedback_example_is_not_leftover_example_data(tmp_path: Path):
     assert "resume_feedback" not in text_of(doctor(root), FAIL)
     (root / "profile" / "resume_feedback.md").unlink()           # missing = no extra rules, never an error
     assert "resume_feedback" not in text_of(doctor(root), FAIL) + text_of(doctor(root), WARN)
+
+
+def test_schema_accepts_a_handshake_board():
+    load = lambda p: yaml.safe_load(p.read_text())  # noqa: E731
+    cfg = {n: load(EXAMPLE_REPO / "config" / f"{n}.yaml") for n in ("targets", "categories", "companies", "qa", "pipeline")}
+    prof = {n: load(EXAMPLE_REPO / "profile" / f"{n}.yaml") for n in ("master", "standard_answers", "confidential_terms")}
+    cfg["companies"]["boards"] = [{"company": "Handshake", "ats": "handshake", "slug": "handshake"}]
+    assert schema_problems(cfg, prof) == []

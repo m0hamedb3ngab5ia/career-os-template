@@ -1,0 +1,18 @@
+{"data": {"jobPosting": {"id": "00000000-0000-0000-0000-000000000001", "title": "Backend Engineer", "applicationForm": {"sections": [
+ {"title": null, "fieldEntries": [
+  {"isRequired": true, "field": {"type": "String", "path": "_systemfield_name", "title": "Legal Name"}},
+  {"isRequired": true, "field": {"type": "Email", "path": "_systemfield_email", "title": "Email"}},
+  {"isRequired": true, "field": {"type": "Phone", "path": "aaaa0000-0000-0000-0000-000000000001", "title": "Phone Number"}},
+  {"isRequired": true, "field": {"type": "Location", "path": "_systemfield_location", "title": "Where are you currently located?"}},
+  {"isRequired": true, "field": {"type": "File", "path": "_systemfield_resume", "title": "Resume"}},
+  {"isRequired": true, "field": {"type": "Boolean", "path": "aaaa0000-0000-0000-0000-000000000002", "title": "Are you legally authorized to work in the United States?"}},
+  {"isRequired": true, "field": {"type": "Boolean", "path": "aaaa0000-0000-0000-0000-000000000003", "title": "Will you now or in the future require sponsorship for employment visa status?"}},
+  {"isRequired": true, "field": {"type": "Date", "path": "aaaa0000-0000-0000-0000-000000000004", "title": "When can you start a new role?"}},
+  {"isRequired": false, "field": {"type": "LongText", "path": "aaaa0000-0000-0000-0000-000000000005", "title": "What have you built recently?"}},
+  {"isRequired": true, "field": {"type": "MultiValueSelect", "path": "aaaa0000-0000-0000-0000-000000000006", "title": "Arbitration Agreement Acknowledgement",
+    "selectableValues": [{"label": "I acknowledge that I have read the agreement.", "value": "ack"}]}},
+  {"isRequired": true, "field": {"type": "MultiValueSelect", "path": "aaaa0000-0000-0000-0000-000000000007", "title": "What is your location preference?",
+    "selectableValues": [{"label": "Remote - US", "value": "a"}, {"label": "NYC", "value": "b"}]}},
+  {"isRequired": true, "field": {"type": "ValueSelect", "path": "aaaa0000-0000-0000-0000-000000000008", "title": "How did you hear about us?",
+    "selectableValues": [{"label": "Job board", "value": "a"}, {"label": "Referral", "value": "b"}]}}
+ ]}]}}}}

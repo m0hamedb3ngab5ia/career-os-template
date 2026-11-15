@@ -139,7 +139,7 @@ safety:
 
 # Scout: which job-board sources to fetch and which prefilters to apply. Defaults: all on.
 scout:
-  sources: [greenhouse, lever, ashby]  # ATS adapters to fetch; boards on others are skipped
+  sources: [greenhouse, lever, ashby, handshake]  # ATS adapters to fetch; boards on others are skipped
   max_post_age_days: null              # null (Recommended = off). A number, e.g. 14: scout drops postings first
                                        # published longer ago than that (no date = kept)
   new_grad_max_post_age_days: null     # null (Recommended = same as max_post_age_days). E.g. 60: new-grad titles

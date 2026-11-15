@@ -17,6 +17,7 @@ from careeros.safety.scam import apply_levels, verdict
 from careeros.scout.ashby import AshbyAdapter
 from careeros.scout.base import Adapter, BoardNotFound, FetchError
 from careeros.scout.greenhouse import GreenhouseAdapter
+from careeros.scout.handshake import HandshakeAdapter
 from careeros.scout.lever import LeverAdapter
 from careeros.store import Store
 
@@ -24,6 +25,7 @@ ADAPTERS: dict[str, type[Adapter]] = {
     "greenhouse": GreenhouseAdapter,
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
+    "handshake": HandshakeAdapter,  # aggregator: one board, many employers; needs the signed-in apply browser
 }
 
 # Built-in location words per ISO country code, used when that code is in `location.blocked_countries`.
@@ -100,7 +102,7 @@ def scout_config(settings: Settings) -> dict[str, Any]:
     """`targets.yaml: scout` with defaults: every adapter source on, every filter on.
 
     scout:
-      sources: [greenhouse, lever, ashby]   # ATS families to fetch; boards on others are skipped
+      sources: [greenhouse, lever, ashby, handshake]   # ATS families to fetch; boards on others are skipped
       filters:                              # set one to false to keep those postings
         blocklist: true    # companies.yaml blocklist
         flagged: true      # high-confidence entries in data/flagged_registry.yaml
