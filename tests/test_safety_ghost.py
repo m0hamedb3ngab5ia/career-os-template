@@ -194,3 +194,9 @@ def test_thin_description_threshold_is_configurable(example_settings):
     example_settings.targets.setdefault("safety", {}).setdefault("ghost", {})["thin_description_chars"] = 5
     p = _p(description_text="We are hiring an engineer.", **OLD)
     assert verdict(check_ghost(p, None, {}, example_settings, today=TODAY, company_history=HIRING)) == "pass"
+
+
+def test_benefit_amounts_are_not_a_pay_range():
+    from careeros.safety.ghost import _PAY_RE
+    assert not _PAY_RE.search("401k match and a 5k relocation bonus")
+    assert _PAY_RE.search("$120,000 - $140,000") and _PAY_RE.search("salary range: 120k-140k")

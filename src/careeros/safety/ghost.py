@@ -45,7 +45,7 @@ EVERGREEN_RE = re.compile(
 SENIOR_RE = re.compile(r"\b(senior|sr\.?|staff|principal|lead|director|manager|head of|architect|vp)\b", re.I)
 
 
-_PAY_RE = re.compile(r"[$£€]\s?\d|\b\d[\d,.]*\s?k\b|\b(salary|compensation|pay)\s+(range|band)\b", re.I)
+_PAY_RE = re.compile(r"[$£€]\s?\d|\b\d{2,3}k\s?(?:-|–|to)\s?\$?\d{2,3}k\b|\b(salary|compensation|pay)\s+(range|band)\b", re.I)
 
 
 def _weak_signals(p: Posting, today: date, thin_chars: int) -> list[str]:

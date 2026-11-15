@@ -606,7 +606,7 @@ class Tracker:
         return out
 
     def mark_action_done(self, id: str, note: str | None = None) -> bool | None:
-        """True = marked, False = no such id, None = tracker locked and the op was queued. `note` goes in Detail."""
+        """True = marked, False = no such id, None = tracker locked and the op was queued. `note` is appended to Detail."""
         def fn(wb: Workbook) -> bool:
             ws = wb["Action Items"]
             hdr = _header_index(ws)
@@ -616,7 +616,8 @@ class Tracker:
             _put(ws, r, hdr["Done"], "Y")
             _put(ws, r, hdr["DoneDate"], _today())
             if note:
-                _put(ws, r, hdr["Detail"], note)
+                old = ws.cell(row=r, column=hdr["Detail"]).value
+                _put(ws, r, hdr["Detail"], f"{old}\n{note}" if old else note)  # keep the original detail
             return True
 
         return self._mutate("mark_action_done", {"id": id, **({"note": note} if note else {})}, fn)

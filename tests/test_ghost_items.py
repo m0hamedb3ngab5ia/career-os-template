@@ -84,3 +84,26 @@ def test_dry_run_changes_nothing(env):
     tr.add_action_item("possible ghost", type="ghost_job", job_id=low.job_id, company="Nimbus")
     res = close_stale_ghost_items(s, today=TODAY, dry_run=True)
     assert res["closed"] == 1 and len(_open(tr)) == 1
+
+
+def test_skipped_or_applied_jobs_raise_nothing(env):
+    s, tr = env
+    store = Store(s)
+    store.set_status(_job(s, 1).job_id, "skipped", "location below min_fit_nonpreferred_location")
+    store.set_status(_job(s, 2).job_id, "applied")
+    p = _job(s, 3)
+    raw = store.job_dir(p.job_id) / "score.json"
+    import json
+    raw.write_text(json.dumps({**json.loads(raw.read_text()), "decision": "skip", "skip_reason": "location"}))
+    raise_ghost_items(s, today=TODAY)
+    assert _open(tr) == []
+
+
+def test_company_item_follows_new_flagged_jobs(env):
+    s, tr = env
+    _job(s, 1)
+    raise_ghost_items(s, today=TODAY)
+    _job(s, 2)
+    raise_ghost_items(s, today=TODAY)
+    (item,) = _open(tr)
+    assert "2 jobs" in item["What to do"]

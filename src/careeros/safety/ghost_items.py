@@ -14,6 +14,7 @@ from careeros.store import Store
 from careeros.tracker import Tracker, add_action
 
 TYPE = "ghost_job"
+_OPEN_STATUSES = {"found", "scored", "queued", "prepared", "needs_review"}
 
 
 def _review_reasons(s: Settings, store: Store, p: Posting, today: date | None, hist: dict[str, Any]) -> list[str]:
@@ -23,6 +24,9 @@ def _review_reasons(s: Settings, store: Store, p: Posting, today: date | None, h
 
 def _worthy(s: Settings, store: Store, job_id: str) -> Posting | None:
     p = store.load_posting(job_id)
+    raw = store._read(job_id, "score.json") or {}
+    if raw.get("decision", "prepare") != "prepare" or (store.get_status(job_id) or "found") not in _OPEN_STATUSES:
+        return None  # skipped by the skill (e.g. a non-preferred-location threshold) or already past applying
     try:
         sc = store.load_score(job_id)
     except ValueError:
@@ -47,16 +51,19 @@ def _flagged(s: Settings, today: date | None) -> dict[str, list[tuple[Posting, l
 def raise_ghost_items(s: Settings, today: date | None = None) -> list[str]:
     """Add one open item per company that has flagged prepare-worthy jobs and no open ghost item yet."""
     tr = Tracker(settings=s)
-    open_cos = {normalize_company(str(i.get("Company") or "")) for i in tr.list_action_items(open_only=True)
-                if i.get("Type") == TYPE and not i.get("JobID")}
+    open_items = {normalize_company(str(i.get("Company") or "")): i for i in tr.list_action_items(open_only=True)
+                  if i.get("Type") == TYPE and not i.get("JobID")}
     lines = []
     for key, jobs in _flagged(s, today).items():
-        if key in open_cos:
-            continue
         company = jobs[0][0].company
-        detail = "\n".join(f"{p.title} ({p.job_id}): {'; '.join(w)}" for p, w in jobs)
+        detail = "\n".join(f"{p.title} ({p.job_id}): {'; '.join(w)}" for p, w in jobs)[:2000]
+        old = open_items.get(key)
+        if old and str(old.get("Detail") or "") == detail:
+            continue
+        if old:  # the job list changed: replace the company's item so it lists every flagged job
+            tr.mark_action_done(str(old["ID"]), note="Replaced by an updated item for this company.")
         lines.append(add_action(s, f"Posting may be stale: {len(jobs)} jobs at {company}", TYPE, company=company,
-                                link=jobs[0][0].url or jobs[0][0].apply_url, detail=detail[:2000]))
+                                link=jobs[0][0].url or jobs[0][0].apply_url, detail=detail))
     return lines
 
 
