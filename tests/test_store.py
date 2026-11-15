@@ -138,3 +138,12 @@ def test_underscore_dirs_are_fixtures_not_jobs(settings):
     (ex / "posting.json").write_text((st.job_dir("j1") / "posting.json").read_text())
     assert list(st.iter_job_ids()) == ["j1"]
     assert [j["job_id"] for j in st.list_jobs()] == ["j1"]
+
+
+def test_list_jobs_survives_a_malformed_score(settings):
+    # a hand-made score.json without `fit` crashed `careeros jobs list` (and everything built on it)
+    st = Store(settings)
+    st.save_posting(_post("j1"))
+    (st.jobs_dir / "j1" / "score.json").write_text(json.dumps({"job_id": "j1", "tier": "B"}))
+    (j,) = st.list_jobs()
+    assert j["job_id"] == "j1" and j["fit"] is None
