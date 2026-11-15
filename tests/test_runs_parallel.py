@@ -132,3 +132,19 @@ def test_parallel_config_default_is_one(settings):
     assert cfg_of(settings).parallel == {"score": 1}
     assert cfg_of(settings, parallel={"score": 3}).parallel == {"score": 3}
 
+
+
+def test_explicit_jobs_stay_sequential_so_a_locked_job_leaves_the_rest_untouched(settings, store):
+    import os
+
+    from careeros.runs import locks
+    from careeros.runs.runner import JobBusy, execute_run
+
+    first, second = jobs(store, 2)  # `first` is fresher: ranked first
+    locks.acquire(RunStore(settings).job_lock_path(first), owner="someone-else", pid=os.getpid(), ttl_seconds=600)
+    cfg = cfg_of(settings, preflight_doctor=False, parallel={"score": 3})
+    inv = Concurrent(settings)
+    with pytest.raises(JobBusy):
+        execute_run(settings, "score", budget_for(cfg, "score"), cfg=cfg, invoke=inv, now=lambda: NOW,
+                    job_ids=[first, second])
+    assert inv.calls == [] and store.get_status(second) == "found"

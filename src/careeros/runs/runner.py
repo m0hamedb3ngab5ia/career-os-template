@@ -459,7 +459,8 @@ class _Loop:
     def go(self, ranked: list[dict[str, Any]], extra_stop: Callable[[], tuple[str, str] | None] | None = None,
            ) -> tuple[str, str]:
         self.t_start = self.clock()
-        workers = self.cfg.parallel.get(self.kind, 1)
+        # `--job` runs stay sequential: a refused or locked job must raise before any later job is touched
+        workers = 1 if self.explicit else self.cfg.parallel.get(self.kind, 1)
         if workers > 1:
             return self._go_parallel(ranked, extra_stop, workers)
         streak = 0
