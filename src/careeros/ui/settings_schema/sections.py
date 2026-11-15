@@ -425,6 +425,10 @@ SECTIONS: tuple[Section, ...] = (
             _switch(P, "runs.stop_on_timeout", "Stop the run on a timeout", True,
                     "A hung call usually means a login or prompt wait."),
             _num(P, "runs.max_consecutive_failures", "Stop after failures in a row", 3, lo=1),
+            _num(P, "runs.parallel.score", "Jobs scored at once", 1, lo=1,
+                 help="1 (Recommended) scores one job at a time. 3 suits a Max plan: score runs finish about "
+                      "3x faster, but each job is its own Claude session, so usage limits arrive sooner. "
+                      "Prepare and apply always run one job at a time."),
             Field(P, "runs.on_usage_limit", "select", "When Claude hits your usage limit",
                   default=runs_cfg.RunsConfig.on_usage_limit, options=runs_cfg.ON_USAGE_LIMIT,
                   help="The run stops and says so. Stop: the next scheduled run tries again. "

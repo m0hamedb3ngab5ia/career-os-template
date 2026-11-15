@@ -349,10 +349,20 @@ class _Loop:
         self.force_tailor = False
         self.c = run["counters"]
         self.durations: list[float] = []
+        self._mu = threading.Lock()  # runs.parallel: guards attempt numbers, status/tracker writes, the run record
+        self._last_n = 0
+
+    def _next_attempt(self) -> tuple[int, Path]:
+        """The next attempt number and its stream path, unique across concurrent workers (taken after the job
+        lock, so a locked job never burns a number)."""
+        with self._mu:
+            n, path = self.rs.next_attempt(self.run["id"])
+            n = max(n, self._last_n + 1)
+            self._last_n = n
+            return n, path.with_name(f"{n:03d}.stream.jsonl")
 
     def attempt(self, item: dict[str, Any]) -> dict[str, Any]:
         jid = item["job_id"]
-        n, stream_path = self.rs.next_attempt(self.run["id"])
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
         posting = self.store._read(jid, "posting.json") or {}
         if self.kind in ("score", "prepare"):  # REQ-108: the posting text is data, never instructions
@@ -366,6 +376,7 @@ class _Loop:
         budget_bound = left_s < job_s
         lock = locks.acquire(self.rs.job_lock_path(jid), owner=f"run:{self.run['id']}", pid=os.getpid(),
                              ttl_seconds=job_s + 300, note=f"{self.kind} {jid}")
+        n, stream_path = self._next_attempt()
         env = {**os.environ, "CAREEROS_RUN_ID": self.run["id"], "CAREEROS_LOCK_TOKEN": lock.token,
                "CAREEROS_ROOT": str(self.s.root)}
         submit: dict[str, Any] | None = None
@@ -395,7 +406,8 @@ class _Loop:
             outcome, detail = "time_budget", f"stopped at the run's {self.budget.max_minutes:g}-minute budget"
         result = parse_result_line(res.result_text) if res.saw_result else None
         if outcome == "ok" and self.kind == "score" and result:
-            _record_score_verdict(self.s, self.store, jid, result, self.run["id"])
+            with self._mu:  # one writer at a time for status.json + the tracker
+                _record_score_verdict(self.s, self.store, jid, result, self.run["id"])
         if outcome == "ok" and self.kind in ("prepare", "apply") and result:  # the skill sets the status itself
             st = self.store.get_status(jid)
             if st != result.get("status"):
@@ -422,11 +434,13 @@ class _Loop:
         if submit:
             att["auto_submit"] = submit
         self.rs.save_attempt(self.run["id"], att)
-        self.run["attempts"].append(n)
+        with self._mu:
+            self.run["attempts"] = sorted([*self.run["attempts"], n])
         self.rs.log(self.run["id"], f"attempt {n} {self.kind} {jid} -> {outcome}" + (f": {detail}" if detail else ""))
         self.echo(f"    -> {outcome}" + (f": {detail}" if detail else ""))
         if self.after_attempt:
-            self.after_attempt(att)
+            with self._mu:
+                self.after_attempt(att)
         return att
 
     def stop_before_next(self) -> tuple[str, str] | None:
@@ -445,51 +459,123 @@ class _Loop:
     def go(self, ranked: list[dict[str, Any]], extra_stop: Callable[[], tuple[str, str] | None] | None = None,
            ) -> tuple[str, str]:
         self.t_start = self.clock()
+        workers = self.cfg.parallel.get(self.kind, 1)
+        if workers > 1:
+            return self._go_parallel(ranked, extra_stop, workers)
         streak = 0
         for item in ranked:
             if self.c["attempted"] >= self.budget.max_jobs:
-                left = len(ranked) - self.c["attempted"] - self.c["locked"] - self.c["gated"]
-                return "budget_reached", f"{self.budget.max_jobs} job(s) done; {left} left for later"
+                return self._budget_reached(ranked)
             stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
             if stop:
                 return stop
-            held_back = self.pre_attempt(item) if self.pre_attempt else None
-            if not held_back and self.kind != "score" and not self.explicit \
-                    and not self.store.is_selected(item["job_id"]):
-                held_back = "not selected"  # REQ-104: unticked while the run was working on an earlier job
-            if held_back and self.explicit:  # `--job`: a refused job is the answer, not something to skip
-                raise JobNotRunnable(self.kind, {item["job_id"]: held_back})
-            if held_back:
-                self.c["gated"] += 1
-                self.rs.log(self.run["id"], f"skip {item['job_id']}: {held_back}")
-                self.echo(f"    {item['job_id']} passed over: {held_back}")
+            if self._held_back(item):
                 continue
             try:
                 att = self.attempt(item)
             except locks.LockBusy as e:
-                if self.explicit:
-                    raise JobBusy(item["job_id"], e.holder) from None
-                self.c["locked"] += 1
-                self.rs.log(self.run["id"], f"skip {item['job_id']}: locked by {e.holder.get('owner')}")
-                self.echo(f"    {item['job_id']} locked by {e.holder.get('owner')}; passed over")
+                self._locked(item, e)
                 continue
-            self.c["attempted"] += 1
-            outcome = att["outcome"]
-            if outcome == "ok":
-                self.c["ok"] += 1
-                streak = 0
-            else:
-                self.c["failed"] += 1
-                streak += 1
-            if outcome in HARD_STOPS or outcome == "time_budget":
-                return outcome, att["detail"]
-            if outcome == "timeout" and self.cfg.stop_on_timeout:
-                return "timeout", att["detail"]
-            if outcome != "ok" and streak >= self.cfg.max_consecutive_failures:
-                return "consecutive_failures", f"{streak} failures in a row (last: {outcome}: {att['detail']})"
+            streak, stop = self._tally(att, streak)
+            if stop:
+                return stop
             locks.refresh(self.rs.runner_lock_path, self.lock_token, self.lock_ttl, now=self.now())
+        return self._completed()
+
+    def _completed(self) -> tuple[str, str]:
         return "completed", (f"{self.c['attempted']} job(s) tried ({self.c['ok']} ok, {self.c['failed']} failed), "
                              "nothing left in the queue")
+
+    def _budget_reached(self, ranked: list[dict[str, Any]]) -> tuple[str, str]:
+        left = len(ranked) - self.c["attempted"] - self.c["locked"] - self.c["gated"]
+        return "budget_reached", f"{self.budget.max_jobs} job(s) done; {left} left for later"
+
+    def _held_back(self, item: dict[str, Any]) -> bool:
+        """True when the job is passed over before launch (pre_attempt gate, unticked); `--job` raises instead."""
+        held_back = self.pre_attempt(item) if self.pre_attempt else None
+        if not held_back and self.kind != "score" and not self.explicit \
+                and not self.store.is_selected(item["job_id"]):
+            held_back = "not selected"  # REQ-104: unticked while the run was working on an earlier job
+        if held_back and self.explicit:  # `--job`: a refused job is the answer, not something to skip
+            raise JobNotRunnable(self.kind, {item["job_id"]: held_back})
+        if held_back:
+            self.c["gated"] += 1
+            self.rs.log(self.run["id"], f"skip {item['job_id']}: {held_back}")
+            self.echo(f"    {item['job_id']} passed over: {held_back}")
+        return bool(held_back)
+
+    def _locked(self, item: dict[str, Any], e: locks.LockBusy) -> None:
+        if self.explicit:
+            raise JobBusy(item["job_id"], e.holder) from None
+        self.c["locked"] += 1
+        self.rs.log(self.run["id"], f"skip {item['job_id']}: locked by {e.holder.get('owner')}")
+        self.echo(f"    {item['job_id']} locked by {e.holder.get('owner')}; passed over")
+
+    def _tally(self, att: dict[str, Any], streak: int) -> tuple[int, tuple[str, str] | None]:
+        """Count one finished attempt; (new failure streak, the stop it triggers or None)."""
+        self.c["attempted"] += 1
+        outcome = att["outcome"]
+        if outcome == "ok":
+            self.c["ok"] += 1
+            streak = 0
+        else:
+            self.c["failed"] += 1
+            streak += 1
+        if outcome in HARD_STOPS or outcome == "time_budget":
+            return streak, (outcome, att["detail"])
+        if outcome == "timeout" and self.cfg.stop_on_timeout:
+            return streak, ("timeout", att["detail"])
+        if outcome != "ok" and streak >= self.cfg.max_consecutive_failures:
+            return streak, ("consecutive_failures", f"{streak} failures in a row (last: {outcome}: {att['detail']})")
+        return streak, None
+
+    def _go_parallel(self, ranked: list[dict[str, Any]], extra_stop: Callable[[], tuple[str, str] | None] | None,
+                     workers: int) -> tuple[str, str]:
+        """`runs.parallel.<kind>: N` (score only): up to N attempts at once. Launch decisions (budget, pause/cancel,
+        time budget, extra_stop, gates) stay in this thread, before each launch, counting jobs in flight toward
+        max_jobs. A stop ends launching; jobs in flight finish and are recorded. Results are tallied here as they
+        finish (ties in launch order), so counters and the stop rules see one attempt at a time."""
+        from concurrent.futures import FIRST_COMPLETED, Future, ThreadPoolExecutor, wait
+
+        running: dict[Future, tuple[int, dict[str, Any]]] = {}
+        streak, result_stop, launch_stop = 0, None, None
+
+        def settle(done: Iterable[Future]) -> None:
+            nonlocal streak, result_stop
+            for f in sorted(done, key=lambda f: running[f][0]):
+                _, item = running.pop(f)
+                try:
+                    att = f.result()
+                except locks.LockBusy as e:
+                    self._locked(item, e)
+                    continue
+                streak, stop = self._tally(att, streak)
+                result_stop = result_stop or stop
+                locks.refresh(self.rs.runner_lock_path, self.lock_token, self.lock_ttl, now=self.now())
+
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix=f"careeros-{self.kind}") as pool:
+            for i, item in enumerate(ranked):
+                settle([f for f in running if f.done()])
+                while len(running) >= workers and not result_stop:
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)
+                if result_stop:
+                    break
+                if self.c["attempted"] + len(running) >= self.budget.max_jobs:
+                    launch_stop = "budget"
+                    break
+                launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
+                if launch_stop:
+                    break
+                if self._held_back(item):
+                    continue
+                running[pool.submit(self.attempt, item)] = (i, item)
+            while running:
+                settle(wait(running, return_when=FIRST_COMPLETED).done)
+        if result_stop:
+            return result_stop
+        if launch_stop == "budget":
+            return self._budget_reached(ranked)
+        return launch_stop or self._completed()
 
 
 def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig | None = None,
