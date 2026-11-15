@@ -194,6 +194,25 @@ def test_prefilter_max_post_age_days(example_settings):
     assert pf.check(_p("Software Engineer"))[0]  # no date: kept
 
 
+def test_prefilter_new_grad_max_post_age_days(example_settings):
+    sc = example_settings.targets.setdefault("scout", {})
+    sc["max_post_age_days"], sc["new_grad_max_post_age_days"] = 14, 60
+
+    def grad(title, days):
+        p = _dated(days)
+        p.title = title
+        return p
+
+    pf = Prefilter(example_settings)
+    for t in ("Software Engineer, New Grad", "Graduate Software Engineer (2027 Start)", "Entry-Level Software Engineer",
+              "Software Engineer - University Graduate", "Early Career Software Engineer", "New College Grad SWE"):
+        assert pf.check(grad(t, 45))[0], t  # new-grad titles get the longer window
+        assert pf.check(grad(t, 70))[1:2] == ("age",), t
+    assert pf.check(grad("Software Engineer", 45))[1:2] == ("age",)  # everything else keeps 14 days
+    sc.pop("new_grad_max_post_age_days")
+    assert Prefilter(example_settings).check(grad("Software Engineer, New Grad", 45))[1:2] == ("age",)  # unset = same
+
+
 def test_prefilter_work_modes(example_settings):
     example_settings.targets["location"]["work_modes"] = ["remote", "hybrid"]
     pf = Prefilter(example_settings)
