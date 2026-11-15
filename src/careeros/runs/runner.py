@@ -570,11 +570,18 @@ class _Loop:
                     settle(wait(running, return_when=FIRST_COMPLETED).done)
                 if result_stop:
                     break
+                while running and self.c["attempted"] + len(running) >= self.budget.max_jobs and not result_stop:
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)  # a prefiltered job frees its slot
+                if result_stop:
+                    break
                 if self.c["attempted"] + len(running) >= self.budget.max_jobs:
                     launch_stop = "budget"
                     break
                 launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
-                if launch_stop:
+                while launch_stop and launch_stop[0] == "daily_cap" and running and not result_stop:
+                    settle(wait(running, return_when=FIRST_COMPLETED).done)  # prefiltered jobs give their slot back
+                    launch_stop = self.stop_before_next() or (extra_stop() if extra_stop else None)
+                if launch_stop or result_stop:
                     break
                 if self._held_back(item):
                     continue

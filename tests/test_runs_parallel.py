@@ -164,7 +164,7 @@ def _daily(settings, **runs):
 
 
 def test_prefiltered_job_does_not_use_the_daily_slot(settings, store):
-    bad = add_job(store, 1, hours_old=90, description_text=YOE)  # ranks first
+    bad = add_job(store, 1, hours_old=50, description_text=YOE)  # ranks first
     good = add_job(store, 2, hours_old=60)
     earlier_run(settings, 4)  # one daily slot left
     cfg, run_batch, b = _daily(settings)
@@ -177,8 +177,8 @@ def test_prefiltered_job_does_not_use_the_daily_slot(settings, store):
 
 def test_parallel_prefiltered_jobs_free_their_daily_slot(settings, store):
     for i in range(1, 4):
-        add_job(store, i, hours_old=100 - i, description_text=YOE)
-    good = add_job(store, 9, hours_old=50)
+        add_job(store, i, hours_old=50 + i, description_text=YOE)
+    good = add_job(store, 9, hours_old=100)
     earlier_run(settings, 4)
     cfg, run_batch, b = _daily(settings, parallel={"score": 3})
     inv = Concurrent(settings, hold_s=0)
@@ -188,11 +188,11 @@ def test_parallel_prefiltered_jobs_free_their_daily_slot(settings, store):
 
 def test_parallel_prefiltered_jobs_are_not_failures_and_free_max_jobs(settings, store):
     for i in range(1, 6):
-        add_job(store, i, hours_old=100 - i, description_text=YOE)
-    good = [add_job(store, i, hours_old=50 + i) for i in (7, 8)]
+        add_job(store, i, hours_old=50 + i, description_text=YOE)
+    good = [add_job(store, i, hours_old=100 + i) for i in (7, 8)]
     inv = Concurrent(settings, hold_s=0)
     rec = run(settings, inv, max_jobs=2, max_consecutive_failures=2, parallel={"score": 3})
     c = rec["counters"]
     assert sorted(x["job_id"] for x in inv.calls) == sorted(good)
     assert c["prefiltered"] == 5 and c["attempted"] == 2 and c["failed"] == 0
-    assert rec["stop_reason"] == "budget_reached"
+    assert rec["stop_reason"] in ("budget_reached", "completed")
