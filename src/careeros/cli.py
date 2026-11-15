@@ -79,7 +79,7 @@ def cmd_doctor(args: argparse.Namespace) -> int:
 
 def _not_ready(e: Exception) -> int:
     """REQ-103: an apply path refused while a readiness must-have is open (exit 7)."""
-    print(f"{e}; nothing filled. Fix them: careeros doctor (or the Profile page)", file=sys.stderr)
+    print(f"{e}; nothing ran. Fix them: careeros doctor (or the Profile page)", file=sys.stderr)
     return 7
 
 
@@ -1002,6 +1002,18 @@ def cmd_resume_keep_master(args: argparse.Namespace) -> int:
         return 1
     print("master.yaml kept; marked synced with the master résumé")
     return 0
+def cmd_resume_look_check(args: argparse.Namespace) -> int:
+    """REQ-143: exit 7 until the master résumé look is approved (prepare-job Step 0)."""
+    from careeros.readiness import PREPARE_GATE, NotReady, require_ready
+
+    try:
+        require_ready(_settings(args).root, only=PREPARE_GATE)
+    except NotReady as e:
+        return _not_ready(e)
+    print("master résumé look approved")
+    return 0
+
+
 def cmd_resume_approve_look(args: argparse.Namespace) -> int:
     """Approve how the master résumé looks (closes readiness `resume_look_approved`); says where its PDF is."""
     from careeros import master_sync
@@ -2166,6 +2178,8 @@ def build_parser() -> argparse.ArgumentParser:
     rsp.set_defaults(fn=cmd_resume_keep_master)
     rsp = rss.add_parser("approve-look", help="approve how the master résumé looks (gate for prepare/apply)")
     rsp.set_defaults(fn=cmd_resume_approve_look)
+    rsp = rss.add_parser("look-check", help="exit 7 until the master résumé look is approved (prepare-job Step 0)")
+    rsp.set_defaults(fn=cmd_resume_look_check)
     rsp = rss.add_parser("import-save", help="guard an uploaded résumé's structured resume.json -> v2 (DEC-019; "
                          "used by the extract-master skill)")
     rsp.add_argument("rid")

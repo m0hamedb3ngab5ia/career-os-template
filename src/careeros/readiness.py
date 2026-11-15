@@ -112,7 +112,11 @@ def status(root: Path) -> dict[str, Any]:
     return {"ready": all(i["done"] for i in its if i["must"]), "items": its}
 
 
-def require_ready(root: Path) -> None:
-    """Raise NotReady listing the open must-haves (every apply path calls this first)."""
-    if open_ := [i for i in items(root) if i["must"] and not i["done"]]:
+PREPARE_GATE = ("resume_look_approved",)  # REQ-143: prepare spends tokens, so it waits for the look
+
+
+def require_ready(root: Path, only: tuple[str, ...] | None = None) -> None:
+    """Raise NotReady listing the open must-haves (every apply path calls this first; prepare passes
+    `only=PREPARE_GATE`)."""
+    if open_ := [i for i in items(root) if i["must"] and not i["done"] and (only is None or i["id"] in only)]:
         raise NotReady(open_)

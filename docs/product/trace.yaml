@@ -851,6 +851,8 @@ requirements:
     provenance: confirmed
     tests:
     - test_look_gate_needs_approval_and_resets_on_new_version
+    - test_prepare_gate_checks_only_the_look
+    - test_prepare_exits_7_until_the_look_is_approved
   REQ-144:
     status: implemented
     provenance: confirmed

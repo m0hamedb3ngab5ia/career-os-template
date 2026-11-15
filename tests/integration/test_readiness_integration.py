@@ -29,10 +29,25 @@ def test_run_apply_and_apply_plan_exit_7_while_master_resume_missing(root, home,
         assert "not ready: master résumé" in r.stderr.lower()  # E2E-006-01
     assert not (tmp_path / "argv.jsonl").exists()  # nothing ran
     assert not (root / "data" / "jobs" / ids[0] / "fill_plan.json").exists()
-    r = cli(root, env, "run", "score", "--job", ids[0])  # score/prepare are never blocked
+    r = cli(root, env, "run", "score", "--job", ids[0])  # score is never blocked
     assert r.returncode == 0, r.stderr
     r = cli(root, env, "doctor")
     assert "readiness" in r.stdout and "Master résumé set: apply blocked" in r.stdout
+
+
+def test_prepare_exits_7_until_the_look_is_approved(root, home, fake_bin, tmp_path):
+    """REQ-143: `run prepare` and the prepare-job skill's check refuse before any token is spent."""
+    ids = add_jobs(root, 1)
+    (root / "profile" / "master.look.json").unlink(missing_ok=True)
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_ARGV=str(tmp_path / "argv.jsonl"))
+    for args in (("run", "prepare", "--job", ids[0]), ("resume", "look-check")):
+        r = cli(root, env, *args)
+        assert r.returncode == 7, (args, r.stderr)
+        assert "look approved" in r.stderr, r.stderr
+    assert not (tmp_path / "argv.jsonl").exists()
+    assert cli(root, env, "resume", "approve-look").returncode == 0
+    r = cli(root, env, "resume", "look-check")
+    assert r.returncode == 0, r.stderr
 
 
 @pytest.fixture
@@ -76,3 +91,18 @@ def test_ui_run_apply_refused_before_spawn(root, monkeypatch):
     with pytest.raises(NotReady):
         rc.start("apply", job_id=jid)
     assert spawned == []
+
+
+def test_ui_run_prepare_refused_until_look_approved(root, monkeypatch):
+    """REQ-143: a UI prepare run (POST /api/runs/start) goes through RunControl.start: NotReady -> 409, no spawn."""
+    from careeros.readiness import NotReady
+    from careeros.ui.services.runs import RunControl
+
+    monkeypatch.setattr("careeros.readiness.shutil.which", lambda n: f"/fake/{n}")
+    add_jobs(root, 1)
+    (root / "profile" / "master.look.json").unlink(missing_ok=True)
+    spawned = []
+    rc = RunControl(Settings.load(root), popen=lambda *a, **k: spawned.append(a))
+    with pytest.raises(NotReady) as e:
+        rc.start("prepare")
+    assert [i["id"] for i in e.value.items] == ["resume_look_approved"] and spawned == []
