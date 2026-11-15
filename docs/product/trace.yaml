@@ -846,6 +846,21 @@ requirements:
     provenance: confirmed
     tests:
     - test_score_job_does_not_saturate_on_generic_postings_and_lists_gaps
+  REQ-143:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_look_gate_needs_approval_and_resets_on_new_version
+  REQ-144:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_apply_run_passes_auto_submit_0_with_the_default_config
+  REQ-145:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_view_documents_tab_replaces_setup_once_ready
 use_cases:
   UC-001:
     status: approved
