@@ -8,7 +8,8 @@ Behaviour per job: FAKE_CLAUDE_MODE (env) or data/jobs/<id>/.fake_mode (file, wi
   ok (default) | skip | usage_limit | rate_event | auth | deny | garbage | error_result | hang | exit1
 FAKE_CLAUDE_ARGV=<path> appends the argv (JSON) to that file, so tests can check the command line.
 FAKE_CLAUDE_ENV=<path> appends the CAREEROS_* environment (JSON) to that file, so tests can check what the runner
-handed down. `/apply-job` honours CAREEROS_AUTO_SUBMIT=0 like the real skill: it stages the form (outcome staged,
+handed down. FAKE_CLAUDE_SPANS=<path> holds each call FAKE_CLAUDE_HOLD_S seconds (default 0.5) and appends
+{job_id, start, end} (wall-clock) to that file, so tests can see calls overlap. `/apply-job` honours CAREEROS_AUTO_SUBMIT=0 like the real skill: it stages the form (outcome staged,
 status needs_review, no submit click) instead of submitting.
 """
 from __future__ import annotations
@@ -48,6 +49,12 @@ def main() -> int:
           # Like the real CLI: claude-in-chrome loads only with --chrome.
           "mcp_servers": [{"name": "claude-in-chrome", "status": "connected"}] if "--chrome" in argv else [],
           "model": "fake"})
+    spans = os.environ.get("FAKE_CLAUDE_SPANS")
+    if spans:
+        start = time.time()
+        time.sleep(float(os.environ.get("FAKE_CLAUDE_HOLD_S", "0.5")))
+        with open(spans, "a", encoding="utf-8") as f:
+            f.write(json.dumps({"job_id": job_id, "start": start, "end": time.time()}) + "\n")
     if mode == "hang":
         time.sleep(600)
         return 0

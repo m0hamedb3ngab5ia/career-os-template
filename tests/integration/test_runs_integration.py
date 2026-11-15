@@ -322,3 +322,22 @@ def test_run_job_refused_by_the_company_gate_exits_2(root, home, fake_bin, tmp_p
     assert "closed" in body["reasons"][ids[0]] and "error" in body
     argv = [json.loads(l) for l in (tmp_path / "argv.jsonl").read_text().splitlines()]
     assert len(argv) == 1  # only the score call; prepare-job was never spawned
+
+
+def test_parallel_score_runs_fake_claude_calls_at_the_same_time(root, home, fake_bin, tmp_path):
+    """runs.parallel.score: 3 -> three real `claude` subprocesses overlap; each job scored and recorded once."""
+    ids = add_jobs(root, 6)
+    set_runs(root, parallel={"score": 3})
+    spans_log = tmp_path / "spans.jsonl"
+    env = env_for(root, home, fake_bin, FAKE_CLAUDE_SPANS=str(spans_log), FAKE_CLAUDE_HOLD_S="1")
+    r = cli(root, env, "run", "score")
+    assert r.returncode == 0, r.stdout + r.stderr
+    spans = [json.loads(line) for line in spans_log.read_text().splitlines()]
+    assert sorted(s["job_id"] for s in spans) == sorted(ids)
+    peak = max(sum(1 for o in spans if o["start"] <= s["start"] < o["end"]) for s in spans)
+    assert peak == 3  # never more than N at once, and N reached
+    assert all(status_of(root, j) == "scored" for j in ids)
+    runs = json.loads(cli(root, env, "run", "list", "--json").stdout)
+    show = json.loads(cli(root, env, "run", "show", runs[0]["id"], "--json").stdout)
+    assert sorted(a["job_id"] for a in show["attempts"]) == sorted(ids)
+    assert [a["n"] for a in show["attempts"]] == [1, 2, 3, 4, 5, 6] and runs[0]["stop_reason"] == "completed"

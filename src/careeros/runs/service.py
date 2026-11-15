@@ -196,11 +196,10 @@ def run_batch(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfig 
         left = max(0, scfg["per_day"] - scored_today(past, now()))
         budget = replace(budget, max_jobs=min(budget.max_jobs, scfg["per_scan"]))
         done_now = [0]
-        after_job = after
 
-        def after(att: dict[str, Any]) -> None:  # noqa: F811 - counts this run's attempts toward per_day
-            done_now[0] += 1
-            after_job(att)
+        def pre_attempt(item: dict[str, Any]) -> str | None:  # noqa: F811 - counts launches toward per_day, so
+            done_now[0] += 1  # jobs still in flight count too (runs.parallel.score); a locked job counts as well
+            return None
 
         def extra_stop() -> tuple[str, str] | None:
             if done_now[0] >= left:

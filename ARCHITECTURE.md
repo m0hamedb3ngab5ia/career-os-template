@@ -149,7 +149,7 @@ Python decides what to work on and when to stop; the LLM only does one skill on 
 |---|---|
 | `config.py` | `pipeline.yaml: runs` + `llm`, validated (a malformed budget is a ConfigError: runs never guess) |
 | `ranking.py` | pure ranking with a `why` per job: freshness (full weight under `fresh_hours`, linear to 0 at `stale_days`) + dream bonus + deadline bonus + fit × `fit_weight` (prepare only) + retry bonus. Prepare runs keep the company gate's fit-first order inside each company |
-| `runner.py` | the loop: rank → write `queue-<kind>.json` (dry run stops here) → global runner lock → preflight (pause, `careeros doctor`) → per job: job lock, headless call, classify, record, release |
+| `runner.py` | the loop: rank → write `queue-<kind>.json` (dry run stops here) → global runner lock → preflight (pause, `careeros doctor`) → per job: job lock, headless call, classify, record; `runs.parallel.score: N` runs up to N score jobs in a thread pool (launch decisions and tallies stay on the loop thread, status/tracker writes and the run record under one lock; prepare/apply stay sequential), release |
 | `headless.py` | builds the command, streams events, validates the `RESULT:` line (job id, `decision` for score, `status` for prepare), classifies the outcome |
 | `service.py` | `run_batch`, what the CLI and the scheduler call: retry-once + Action Item, company gate before each prepare, daily-cap stop |
 | `policy.py` | daily apply cap in code, `runs.auto_submit` rules, retry and prepare config |
