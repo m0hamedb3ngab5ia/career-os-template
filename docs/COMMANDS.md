@@ -27,4 +27,4 @@ Moved out of `CLAUDE.md` to keep agent context small; `CLAUDE.md` points here.
 - `.venv/bin/python -m careeros.qa data/jobs/<id>` — deterministic QA
 - `.venv/bin/python templates/resume/render.py data/jobs/<id>/resume.json` — tex+pdf+txt
 - `.venv/bin/python -m pytest -q`
-
+- `.venv/bin/careeros safety ghost-items [--close-stale] [--dry-run]` — one `ghost_job` Action Item per dream company, listing its scored jobs that pass hard filters, meet `thresholds.min_fit_to_prepare` and still trip a ghost review flag (`safety check` no longer adds items). `--close-stale` first marks done, with a note and never deleting, open per-job `ghost_job` items the current rule would not raise; `--dry-run` (with it) only counts. Idempotent.
