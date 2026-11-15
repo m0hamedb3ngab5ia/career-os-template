@@ -180,24 +180,39 @@ def _search(s) -> str:
     age = (t.get("scout") or {}).get("max_post_age_days")
     modes = loc.get("work_modes") or ["remote", "hybrid", "onsite"]
     fit = (t.get("thresholds") or {}).get("min_fit_to_prepare")
+    nfit = (t.get("thresholds") or {}).get("min_fit_nonpreferred_location")
     salary = cand.get("min_base_usd")
     years = sen.get("max_years_required")
+    from careeros.scout import scout_config
+    sc = scout_config(s)
+    off = [k for k, on in sc["filters"].items() if not on]
+    nice = lambda xs: _list([str(x).replace("_", " ") for x in xs or []])  # noqa: E731
     rows = [
         ["Posted within", f"Last {age} days" if age else "Any age", "Only jobs posted in the last 14 days"],
         ["Work mode", ", ".join(m.replace("onsite", "on-site") for m in modes), "Only remote and hybrid jobs"],
         ["Minimum salary", f"${salary:,}" if isinstance(salary, int) else "Not set", "My minimum salary is $120,000"],
         ["Visa sponsorship", "Needed" if cand.get("needs_sponsorship") else "Not needed", "I need visa sponsorship"],
         ["Preferred cities", _list(loc.get("preferred")), "I want jobs in Austin TX and Chicago IL"],
+        ["Preferred countries", _list(loc.get("preferred_regions")), "I prefer jobs in the US and Canada"],
+        ["Allowed countries", _list(loc.get("allowed_countries")), "Only jobs in the US"],
         ["Blocked countries", _list(loc.get("blocked_countries")), "Skip jobs in Germany"],
         ["Remote jobs", "OK" if loc.get("remote_ok") else "Not OK", "I don't want remote jobs"],
         ["Senior titles skipped", _list(sen.get("exclude_title_keywords")), "Also skip titles containing \"contract\""],
         ["Most years of experience asked", f"{years} years" if years else "No limit", "Allow jobs asking up to 5 years"],
-        ["Main job types", _list([c.replace("_", " ") for c in cat.get("primary") or []]), "Focus on data engineering jobs"],
-        ["Industries I like", _list([i.replace("_", " ") for i in ind.get("boost") or []]), "I like healthtech companies"],
-        ["Industries to avoid", _list([i.replace("_", " ") for i in ind.get("blocked") or []]), "Never show me defense jobs"],
+        ["Main job types", nice(cat.get("primary")), "Focus on data engineering jobs"],
+        ["Also OK job types", nice(cat.get("secondary")), "Also consider SRE jobs"],
+        ["Job types skipped", nice(cat.get("excluded")), "Never show me sales engineer jobs"],
+        ["Industries I like", nice(ind.get("boost")), "I like healthtech companies"],
+        ["Industries to avoid", nice(ind.get("blocked")), "Never show me defense jobs"],
+        ["Industries never applied to", nice(bl.get("industries")), "Never apply to gambling companies"],
         ["Blocked companies", _list(bl.get("companies")), "Never show me jobs at Initech"],
+        ["Company names skipped", _list(bl.get("name_patterns")), "Skip any company with \"casino\" in its name"],
         ["Dream companies", _list(co.get("dream_list")), "Add Initech to my dream companies"],
         ["Lowest fit to prepare", f"{fit} of 100" if fit else "Not set", "Only prepare jobs that fit 80 or more"],
+        ["Lowest fit outside preferred places", f"{nfit} of 100" if nfit else "Not set",
+         "Outside my preferred places, only prepare fits of 90 or more"],
+        ["Job boards searched", nice(sc["sources"]), "Stop searching Lever boards"],
+        ["Search filters turned off", nice(off) if off else "None (all on)", "Keep senior roles in the search"],
     ]
     table = _table(["Filter", "Now", "Say in chat to change it"], [[a, b, f"\u201c{c}\u201d"] for a, b, c in rows])
     try:
