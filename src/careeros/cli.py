@@ -445,7 +445,8 @@ def cmd_safety_ghost_items(args: argparse.Namespace) -> int:
     s = _settings(args)
     if args.close_stale:
         r = close_stale_ghost_items(s, dry_run=args.dry_run)
-        print(f"ghost items: {'would close' if args.dry_run else 'closed'} {r['closed']}, kept {r['kept']}")
+        print(f"ghost items: {'would close' if args.dry_run else 'closed'} {r['closed']} old per-job items "
+              f"({r['covered']} still flagged, now listed on their company's item)")
     if not args.dry_run:
         for line in raise_ghost_items(s):
             print(line)

@@ -71,11 +71,13 @@ def test_close_stale_marks_done_with_a_note_and_never_deletes(env):
         tr.add_action_item("possible ghost", type="ghost_job", job_id=p.job_id, company=p.company)
     other = tr.add_action_item("call recruiter", type="other", job_id=gone.job_id)
     res = close_stale_ghost_items(s, today=TODAY)
-    assert res["closed"] == 2 and res["kept"] == 1
+    assert res == {"closed": 3, "covered": 1}  # per-job items are the old format: all close
     remaining = {i["ID"] for i in tr.list_action_items()}
     assert other in remaining
-    done = [i for i in tr.list_action_items(open_only=False) if i["Type"] == "ghost_job" and i["Done"] == "Y"]
-    assert len(done) == 2 and all("no longer raised" in str(i["Detail"]) for i in done)
+    done = {i["JobID"]: str(i["Detail"]) for i in tr.list_action_items(open_only=False)
+            if i["Type"] == "ghost_job" and i["Done"] == "Y"}
+    assert "no longer raised" in done[gone.job_id] and "no longer raised" in done[low.job_id]
+    assert "company item" in done[keep.job_id]  # still flagged: the per-company item lists it
 
 
 def test_dry_run_changes_nothing(env):
@@ -83,7 +85,7 @@ def test_dry_run_changes_nothing(env):
     low = _job(s, 3, fit=10)
     tr.add_action_item("possible ghost", type="ghost_job", job_id=low.job_id, company="Nimbus")
     res = close_stale_ghost_items(s, today=TODAY, dry_run=True)
-    assert res["closed"] == 1 and len(_open(tr)) == 1
+    assert res == {"closed": 1, "covered": 0} and len(_open(tr)) == 1
 
 
 def test_skipped_or_applied_jobs_raise_nothing(env):
