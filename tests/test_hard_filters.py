@@ -125,6 +125,42 @@ def test_pay_exempts_location(settings, kw, cap, exempt):
     assert pay_exempts_location(settings, _posting(**kw)) is exempt
 
 
+@pytest.mark.parametrize("desc,exempt", [
+    ("Base Salary: $200,000", True),
+    ("Pay range: $150k per year", True),
+    ("The range is $124,000\u2014$162,000 USD", False),
+    ("The range is $124,000 \u2013 $162,000", False),
+    ("The range is $124,000 to $162,000", False),
+    ("Range $124,000-$162,000.\nRange (NYC) $180,000-$210,000", False),  # lowest minimum wins
+    ("Range $160,000-$190,000 CAD", False),
+    ("Salary \u00a3160,000", False),
+    ("Equity: $500,000 in RSUs.\nBase salary: $120,000", False),
+    ("Equity grant of $500,000. Base salary $120,000", False),
+    ("Sign-on bonus $200,000", False),
+    ("Contract at $200,000 per hour", False),
+    ("Base $170,000 USD, or $200,000 CAD in Toronto", False),  # mixed currency: unsure
+    ("Up to $200,000", False),  # a maximum only
+    ("Raised $200 million in funding", False),
+    ("Base $40,000", False),  # under the 50k floor
+    ("Compensation: $200,000 - $250,000", True),
+    ("Salary Range\n\n$175,000—$225,000 USD", True),  # pay label on its own line above the amount
+    ("Annual Salary:\n\n$320,000—$405,000 USD", True),
+    ("Our team runs a big program.\n\n$200,000 budget per quarter", False),  # line above is not a pay label
+    ("You will manage a $200,000 annual budget", False),  # no pay wording: not a salary
+    ("Salary up to USD $200,000", False),  # a maximum, with a token between "up to" and the amount
+    ("Salary: we raised $400,000,000 in our Series C", False),  # over $1M: not a salary
+])
+def test_pay_exempts_location_reads_description_when_no_structured_pay(settings, desc, exempt):
+    settings.targets.setdefault("thresholds", {})["any_location_min_base_usd"] = 150000
+    assert pay_exempts_location(settings, _posting(description_text=desc)) is exempt
+
+
+def test_structured_salary_beats_description(settings):
+    settings.targets.setdefault("thresholds", {})["any_location_min_base_usd"] = 150000
+    p = _posting(salary_min=100000, description_text="Base Salary: $200,000")
+    assert pay_exempts_location(settings, p) is False
+
+
 def test_cli_reports_pay_exempts_location(tmp_path, capsys):
     root, d = _job(tmp_path, salary_min=150000)
     t = root / "config" / "targets.yaml"
