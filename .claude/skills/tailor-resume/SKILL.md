@@ -40,6 +40,10 @@ description: Build a one-page tailored resume for a scored job dir from profile/
   `resume_writing_rules.md` but never the Hard rules in CLAUDE.md (no fabrication, frozen numbers, confidential terms).
 - `.claude/skills/_shared/resume_writing_rules.md`: how a strong bullet reads, which bullet and variant to
   prefer, and its OVERRIDE (never estimate a number; a bullet without one gets a metric question).
+- `.claude/skills/_shared/resume_references.md`: patterns from public senior/backend résumés and how to quantify
+  without inventing numbers (shape guidance only; if `profile/resume_examples/` has files, read its README.md and
+  compare the draft with the approved example(s) for tone, density and quantification; never copy facts from them
+  that are not in `master.yaml`).
 - `templates/resume/resume_schema.md` (the JSON shape `render.py` expects) and `templates/resume/<resume_template>.tex`.
   If `resume_schema.md` is absent, use the shape in section 4 below (it is the same shape) and say so in the RESULT.
 
