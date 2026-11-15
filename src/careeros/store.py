@@ -331,7 +331,10 @@ class Store:
             p = self.load_posting(jid)
             if not p:
                 continue
-            sc = self.load_score(jid)
+            try:
+                sc = self.load_score(jid)
+            except ValueError:  # pydantic ValidationError: one malformed score.json must not break the list
+                sc = None
             out.append(
                 {
                     "job_id": jid,
