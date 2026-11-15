@@ -24,6 +24,12 @@ pytestmark = pytest.mark.unit
     ("1+ years of internship experience.", None),
     ("We were founded 10 years ago and serve 5 million users.", None),
     ("New grads welcome; no prior experience required.", None),
+    ("Preferred qualifications\n5+ years of hands-on R&D or industry experience", None),
+    ("NICE TO HAVES:\n - 10+ years of experience", None),
+    ("Building on more than 30 years of investing experience, Acme seeks engineers.", None),
+    ("We have over 20 years of experience in business.", None),
+    ("Minimum requirements:\n5+ years experience\nPreferred:\n8+ years", 5),
+    ("Preferred qualifications\n8+ years of experience\nWhat you need\n4+ years of experience", 4),
 ])
 def test_min_years_required(text, years):
     assert min_years_required(text) == years

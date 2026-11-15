@@ -25,17 +25,30 @@ from careeros.config import Settings
 # "6+ years", "at least 5 years", "5-7 years", "4 years'" followed by "experience" in the same clause
 _YEARS = re.compile(r"(?<![\d.])(\d{1,2})\s*(?:\+|plus)?\s*(?:(?:-|–|to)\s*\d{1,2}\s*\+?)?\s*years?\b'?"
                     r"(?P<tail>[^.;\n]{0,60})", re.I)
-_COMPANY = re.compile(r"\b(we|we've|our|us|has|founded|for)\b", re.I)  # company history, not a requirement
+_COMPANY = re.compile(r"\b(we|we've|our|us|has|founded|for|more than|over|building on)\b", re.I)  # company history, not a requirement
+_HISTORY = re.compile(r"\bof (investing|history)\b|\bin business\b", re.I)  # "30 years of investing experience"
+_OPT_HEAD = re.compile(r"\b(preferred|nice[- ]to[- ]haves?|bonus|plus)\b", re.I)
+_REQ_HEAD = re.compile(r"\b(required|requirements?|minimum|must|basic|qualifications|what you need|you have|you bring)\b",
+                       re.I)
 _OPTIONAL = re.compile(r"\b(prefer\w*|nice to have|bonus|ideally|a plus)\b", re.I)
 
 
 def min_years_required(text: str) -> int | None:
     """Largest required minimum years of experience stated in `text`, or None. Clauses that say preferred / nice to
     have / bonus, internship-only experience and years without "experience" never count."""
-    found = []
+    found, optional = [], False
     for line in re.split(r"(?<=[.;])\s+|\n", text or ""):
+        head = line.strip()
+        if head and not _YEARS.search(head) and (len(head) <= 50 or head.endswith(":")):  # section header
+            if _OPT_HEAD.search(head):
+                optional = True
+            elif _REQ_HEAD.search(head):
+                optional = False
+            continue
         for m in _YEARS.finditer(line):
             tail = m.group("tail").lower().split(",")[0]  # this clause only: "5+ required, 7 preferred"
+            if optional or _HISTORY.search(m.group("tail")):
+                continue
             if _OPTIONAL.search(tail) or _OPTIONAL.search(line[max(0, m.start() - 25):m.start()]):
                 continue
             if _COMPANY.search(line[max(0, m.start() - 30):m.start()]):  # "Acme has 20 years", "for 10 years we"
