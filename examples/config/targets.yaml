@@ -39,6 +39,7 @@ location:
 seniority:                  # reusable default: fine to keep. Title-level prefilter in scout (cheap, before LLM scoring)
   exclude_title_keywords: [senior, sr., staff, principal, lead, manager, director, head of, vp, vice president, distinguished, architect, fellow, intern, internship, co-op, phd, postdoc, chief]
   # "lead" matches "Tech Lead"; "Team Lead" etc. Titles like "Software Engineer II" pass; scorer handles YOE.
+  max_years_required: 3       # score-job hard filter (code): a posting requiring more years of experience is skipped
 
 categories:                 # reusable default: fine to keep (see categories.yaml for keyword definitions)
   primary: [swe_backend, swe_fullstack, data_engineering, swe_platform]
