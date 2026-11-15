@@ -520,3 +520,9 @@ def test_resume_txt_shows_company_once_for_grouped_roles(tmp_path: Path) -> None
     txt = resume.render_txt(_grouped_resume(tmp_path)).read_text()
     assert txt.count("Acme") == 1
     assert "Associate Engineer" in txt and "Software Engineer" in txt
+
+
+@pytest.mark.parametrize("mod", [resume, cover], ids=["resume", "cover"])
+def test_latex_escape_tilde_operator_renders_as_tilde(mod):
+    # "∼30" (U+223C, common in pasted résumé text) has no glyph in the résumé font and rendered blank
+    assert mod.latex_escape("∼30") == r"\textasciitilde{}30"

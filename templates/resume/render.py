@@ -60,6 +60,7 @@ _ESCAPES = [
     ("{", r"\{"),
     ("}", r"\}"),
     ("~", r"\textasciitilde{}"),
+    ("∼", r"\textasciitilde{}"),  # U+223C tilde operator: no glyph in the font, rendered blank
     ("^", r"\textasciicircum{}"),
 ]
 _TYPO = [

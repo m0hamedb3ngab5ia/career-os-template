@@ -41,7 +41,7 @@ _FM_RE = re.compile(r"\A---\s*\n(.*?)\n---\s*\n", re.S)
 
 _ESC = {
     "\\": r"\textbackslash{}", "&": r"\&", "%": r"\%", "$": r"\$", "#": r"\#",
-    "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "^": r"\textasciicircum{}",
+    "_": r"\_", "{": r"\{", "}": r"\}", "~": r"\textasciitilde{}", "∼": r"\textasciitilde{}", "^": r"\textasciicircum{}",
 }
 _TYPO = [("–", "--"), ("—", "---"), ("‘", "`"), ("’", "'"), ("“", "``"), ("”", "''")]
 

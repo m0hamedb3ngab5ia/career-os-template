@@ -255,7 +255,7 @@ def test_every_editable_field_has_a_reader():
     words = {}
     for d in dirs:
         for root, sub, names in os.walk(repo / d):
-            sub[:] = [s for s in sub if s != "__pycache__" and not s.endswith(".egg-info")]
+            sub[:] = [s for s in sub if s not in ("__pycache__", "worktrees") and not s.endswith(".egg-info")]  # .claude/worktrees: other checkouts
             for n in names:
                 path = Path(root, n)
                 rel = path.relative_to(repo).as_posix()
