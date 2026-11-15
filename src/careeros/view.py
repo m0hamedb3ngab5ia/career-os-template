@@ -181,6 +181,7 @@ def _search(s) -> str:
     modes = loc.get("work_modes") or ["remote", "hybrid", "onsite"]
     fit = (t.get("thresholds") or {}).get("min_fit_to_prepare")
     nfit = (t.get("thresholds") or {}).get("min_fit_nonpreferred_location")
+    anyloc = (t.get("thresholds") or {}).get("any_location_min_base_usd")
     salary = cand.get("min_base_usd")
     years = sen.get("max_years_required")
     from careeros.scout import scout_config
@@ -211,6 +212,8 @@ def _search(s) -> str:
         ["Lowest fit to prepare", f"{fit} of 100" if fit else "Not set", "Only prepare jobs that fit 80 or more"],
         ["Lowest fit outside preferred places", f"{nfit} of 100" if nfit else "Not set",
          "Outside my preferred places, only prepare fits of 90 or more"],
+        ["Any location if base pay at least", f"${anyloc:,}" if isinstance(anyloc, int) else "Off",
+         "Allow any location when base pay is $150K or more"],
         ["Job boards searched", nice(sc["sources"]), "Stop searching Lever boards"],
         ["Search filters turned off", nice(off) if off else "None (all on)", "Keep senior roles in the search"],
     ]

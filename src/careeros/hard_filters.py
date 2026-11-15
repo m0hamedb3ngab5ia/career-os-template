@@ -11,6 +11,8 @@ already applied, safety, prestige).
 | `location_blocked` | targets.yaml location.blocked_countries (scout filter `location`) |
 | `yoe_gt_<n>`       | a required (not preferred) minimum years of experience > seniority.max_years_required (default 3) |
 | `salary_below_min` | posted salary_max (USD or no currency) < candidate.min_base_usd |
+
+Not a fail: `pay_exempts_location` (see `pay_exempts_location`), reported by `job filters`.
 """
 from __future__ import annotations
 
@@ -68,6 +70,15 @@ def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
     if usd and isinstance(p.salary_max, (int, float)) and floor and p.salary_max < floor:
         fails.append("salary_below_min")
     return fails
+
+
+def pay_exempts_location(settings: Settings, posting: dict[str, Any]) -> bool:
+    """True when the posted minimum base (USD) is at least thresholds.any_location_min_base_usd: score-job then
+    skips the non-preferred-location fit rule. Unlisted minimum, other currency or key unset = False."""
+    cap = (settings.targets.get("thresholds") or {}).get("any_location_min_base_usd")
+    lo = posting.get("salary_min")
+    usd = str(posting.get("salary_currency") or "USD").upper() == "USD"
+    return bool(cap and usd and isinstance(lo, (int, float)) and lo >= cap)
 
 
 def reasons(settings: Settings, posting: dict[str, Any], fails: list[str]) -> list[str]:

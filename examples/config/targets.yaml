@@ -56,6 +56,7 @@ industries:
 thresholds:
   min_fit_to_prepare: 70     # below → status skipped, reason logged
   min_fit_nonpreferred_location: 85
+  any_location_min_base_usd: null   # null (Recommended; off): a job whose posted MINIMUM base (USD) is at least this is allowed in any location, skipping the non-preferred-location fit rule (blocked countries still apply). Unlisted pay never qualifies. e.g. 150000
   boost_industry_bonus: 5    # added to fit for boost industries (doesn't bypass min)
   tier_a_min_fit: 60         # dream firms: prepare even at lower fit, but flag gap
   min_match: 70              # 70 (Recommended): résumé match score (0-100) a résumé needs to be reused for a job
