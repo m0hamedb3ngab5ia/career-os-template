@@ -1387,3 +1387,13 @@ def test_repeated_employer_requires_adjacent(tmp_path: Path, order: list, ok: bo
     job = _resume_with(make_job(tmp_path), experience=[_exp(c, 2, i) for i, c in enumerate(order)])
     c = by_name(run(job), "repeated_employer")
     assert c["ok"] is ok, c["detail"]
+
+
+def test_best_line_matches_a_short_variant_on_its_own():
+    """A short declared variant must match its résumé line even though the master text is much longer."""
+    from careeros.qa import _best_line
+    master = ("Led the migration of the billing ledger to an event-driven pipeline across four teams, cutting nightly "
+              "batch time from ~6 hours to 40 minutes and retiring two legacy schedulers")
+    short = "Cut nightly batch time from ~6 hours to 40 minutes"
+    lines = ["- Cut nightly batch time from ~6 hours to 40 minutes", "- Mentored 6 interns over 2 summers"]
+    assert _best_line([master, short], lines) == lines[0]

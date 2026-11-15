@@ -195,19 +195,21 @@ def number_tokens(text: str) -> set[str]:
     return out
 
 
-def _best_line(bullet: str, lines: list[str], min_ratio: float = 0.5) -> str | None:
-    """The résumé line that renders `bullet` (markdown, `**` and `~` stripped), or None below `min_ratio` word overlap."""
+def _best_line(sources: list[str], lines: list[str], min_ratio: float = 0.5) -> str | None:
+    """The résumé line that renders one of a bullet's `sources` (master text or a declared variant, each compared on
+    its own; markdown, `**` and `~` stripped), or None below `min_ratio` word overlap."""
     def words(t: str) -> list[str]:
         return re.findall(r"[a-z0-9]+", re.sub(r"[*~]", "", t).lower())
-    bw = words(bullet)
     best, best_r = None, 0.0
-    for ln in lines:
-        lw = words(ln)
-        if not lw or not bw:
-            continue
-        r = difflib.SequenceMatcher(None, bw, lw, autojunk=False).ratio()
-        if r > best_r:
-            best, best_r = ln, r
+    for src in sources:
+        bw = words(src)
+        for ln in lines:
+            lw = words(ln)
+            if not lw or not bw:
+                continue
+            r = difflib.SequenceMatcher(None, bw, lw, autojunk=False).ratio()
+            if r > best_r:
+                best, best_r = ln, r
     return best if best_r >= min_ratio else None
 
 
@@ -860,7 +862,7 @@ class Checker:
                         continue
                     scope = text
                     if not prose:   # résumé: only the line(s) rendering this bullet; no match -> whole text (strict)
-                        line = _best_line(self.profile.bullet_text(bid), lines)
+                        line = _best_line(self.profile.bullet_sources(bid), lines)
                         scope = line if line is not None else text
                     for m in re.finditer(r"(?<![\d.,$])" + re.escape(num) + r"(?![\d])", scope):
                         if not re.search(hedge, scope[max(0, m.start() - 20):m.start()], re.I):
