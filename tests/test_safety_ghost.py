@@ -39,9 +39,12 @@ def test_30_days_only_lowers_confidence(example_settings):
     assert _codes(flags, "info") == {"GHOST_OLD_POST"} and verdict(flags) == "pass"
 
 
-def test_45_days_with_recent_update_or_hiring_is_review(example_settings):
+def test_45_days_updated_recently_is_info_only(example_settings):
     p = _p(posted_at="2026-06-01", last_updated="2026-09-10")
-    assert verdict(check_ghost(p, None, {}, example_settings, today=TODAY)) == "review"
+    assert verdict(check_ghost(p, None, {}, example_settings, today=TODAY)) == "pass"
+
+
+def test_45_days_with_hiring_is_review(example_settings):
     company_hist = {"nimbus|backend engineer|new york ny": {"first_published": "2026-09-15"}}
     p2 = _p(posted_at="2026-06-01", last_updated="2026-06-01")
     flags = check_ghost(p2, None, {}, example_settings, today=TODAY, company_history=company_hist)
@@ -151,3 +154,43 @@ def test_load_signals_merges_config_over_data(example_settings, tmp_path):
     f.write_text(json.dumps({"nimbus": {"kind": "layoffs", "date": "2026-06-01", "source_url": "a"}}))
     example_settings.companies["hiring_signals"] = [{"company": "Nimbus", "kind": "none", "date": "2026-09-01"}]
     assert load_signals(example_settings, f)["nimbus"]["kind"] == "none"
+
+
+RICH = ("Build the ledger service in Go and Postgres. You join a team of six reporting to the platform director; "
+        "first six months: migrate the batch jobs to streaming and own on-call. Salary range $140,000 - $170,000. " * 3)
+OLD = dict(posted_at="2026-06-01", last_updated="2026-06-01")
+HIRING = {"nimbus|backend engineer|new york ny": {"first_published": "2026-09-15"}}
+
+
+def test_old_posting_at_busy_company_with_a_real_description_is_info(example_settings):
+    p = _p(description_text=RICH, **OLD)
+    flags = check_ghost(p, None, {}, example_settings, today=TODAY, company_history=HIRING)
+    assert _codes(flags, "info") == {"GHOST_OLD_POST"} and verdict(flags) == "pass"
+    assert "company still posting roles" in flags[0].detail
+
+
+def test_old_posting_with_thin_description_and_no_pay_is_review(example_settings):
+    p = _p(description_text="We are hiring an engineer.", **OLD)
+    flags = check_ghost(p, None, {}, example_settings, today=TODAY, company_history=HIRING)
+    assert _codes(flags, "review") == {"GHOST_OLD_POST"}
+    assert "thin description" in flags[0].detail and "no pay range" in flags[0].detail
+
+
+def test_one_weak_signal_is_not_enough(example_settings):
+    thin_but_paid = _p(description_text="Pay $120,000 - $150,000. Apply.", **OLD)
+    assert verdict(check_ghost(thin_but_paid, None, {}, example_settings, today=TODAY, company_history=HIRING)) == "pass"
+    no_pay = _p(description_text=RICH.replace("$", "USD "), **OLD)
+    assert verdict(check_ghost(no_pay, None, {}, example_settings, today=TODAY, company_history=HIRING)) == "pass"
+
+
+def test_passed_closing_date_alone_is_review(example_settings):
+    p = _p(description_text=RICH, closes_at="2026-08-01", **OLD)
+    flags = check_ghost(p, None, {}, example_settings, today=TODAY, company_history=HIRING)
+    assert _codes(flags, "review") == {"GHOST_OLD_POST"} and "closing date passed" in flags[0].detail
+
+
+def test_thin_description_threshold_is_configurable(example_settings):
+    assert ghost_settings(example_settings)["thin_description_chars"] == 600
+    example_settings.targets.setdefault("safety", {}).setdefault("ghost", {})["thin_description_chars"] = 5
+    p = _p(description_text="We are hiring an engineer.", **OLD)
+    assert verdict(check_ghost(p, None, {}, example_settings, today=TODAY, company_history=HIRING)) == "pass"

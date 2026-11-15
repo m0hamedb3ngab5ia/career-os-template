@@ -1,6 +1,8 @@
 """Ghost-job detection: signs a posting may not be a real, open hiring need. Levels (see scam.verdict):
 
-- GHOST_OLD_POST: `old_post_days`+ = info (lower confidence). `very_old_post_days`+ = review.
+- GHOST_OLD_POST: `old_post_days`+ = info (lower confidence). `very_old_post_days`+ = review only when the
+  posting also looks weak (two of: thin description, no pay range; or a closing date already passed) and it
+  was not updated recently. Age alone, "company still posting roles", evergreen and senior titles are info.
 - GHOST_STALE_NO_ACTIVITY (skip): very old AND not updated within `recent_update_days` AND no sign the
   company is still hiring (no other role published recently) AND not an evergreen / senior role.
 - GHOST_REPOSTED (review): the same role under `repost_flag_count`+ different requisition ids within
@@ -32,6 +34,7 @@ DEFAULTS: dict[str, int] = {
     "repost_flag_count": 3,
     "freeze_window_days": 180,
     "layoff_window_days": 180,
+    "thin_description_chars": 600,
 }
 
 _REQ_RE = re.compile(r"\b(r|req|jr|job)?[-# ]?\d{3,}\b|\(\s*\d{4}\s*\)|\b20\d\d\b", re.I)
@@ -40,6 +43,23 @@ EVERGREEN_RE = re.compile(
     r"\b(evergreen|rolling basis|talent (community|pool|network)|general application|always hiring|"
     r"future opportunit|pipeline (role|req))", re.I)
 SENIOR_RE = re.compile(r"\b(senior|sr\.?|staff|principal|lead|director|manager|head of|architect|vp)\b", re.I)
+
+
+_PAY_RE = re.compile(r"[$£€]\s?\d|\b\d[\d,.]*\s?k\b|\b(salary|compensation|pay)\s+(range|band)\b", re.I)
+
+
+def _weak_signals(p: Posting, today: date, thin_chars: int) -> list[str]:
+    """Deterministic quality signals (cf. career-ops legitimacy check): description quality, pay transparency,
+    a closing date that has already passed."""
+    out: list[str] = []
+    if len((p.description_text or "").strip()) < thin_chars:
+        out.append("thin description")
+    if p.salary_min is None and p.salary_max is None and not _PAY_RE.search(p.description_text or ""):
+        out.append("no pay range")
+    closes = _d(p.closes_at)
+    if closes and closes < today:
+        out.append("closing date passed")
+    return out
 
 
 def ghost_settings(settings: Settings) -> dict[str, int]:
@@ -155,7 +175,10 @@ def check_ghost(p: Posting, hist: dict[str, Any] | None, signals: dict[str, dict
             why = [w for w, on in (("updated recently", recently_updated), ("company still posting roles", hiring),
                                    ("evergreen role", evergreen), ("senior role (stays open longer)", senior)) if on]
             if why:
-                flags.append(Flag("GHOST_OLD_POST", "review", f"posted {age} days ago; but {', '.join(why)}", ev))
+                weak = _weak_signals(p, today, g["thin_description_chars"])
+                raise_it = not recently_updated and (len(weak) >= 2 or "closing date passed" in weak)
+                detail = f"posted {age} days ago" + (f"; {', '.join(weak)}" if raise_it else "") + f"; but {', '.join(why)}"
+                flags.append(Flag("GHOST_OLD_POST", "review" if raise_it else "info", detail, ev))
             else:
                 flags.append(Flag("GHOST_STALE_NO_ACTIVITY", "skip",
                                   f"posted {age} days ago, not updated in {g['recent_update_days']} days, "
