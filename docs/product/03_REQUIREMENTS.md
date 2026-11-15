@@ -169,6 +169,7 @@ observed · Evidence: src/careeros/ui/routers/jobs.py · Tests: tests/test_ui_jo
 ### REQ-073 Action Items page
 > UI retired 2026-11-14 (DEC-024): replaced by ask Claude what needs you; `careeros action list`, `action done <id>`. Intent unchanged.
 Bulk done/reopen, answer, due, block/unblock company, mark-safe + undo.
+> Routes removed 2026-11-14 (#216): bulk done/reopen, block/unblock company, mark-safe. Done in chat: Claude edits `config/companies.yaml: blocklist.companies` and runs `careeros job status <id> skipped`; see docs/PROCESS.md.
 observed · Evidence: routers/actions.py:65-147 · Tests: tests/test_ui_actions_service.py
 ### REQ-074 Pipeline + batch builder
 Deprecated 2026-10-13 (DEC-022): Pipeline page folded into Jobs › Applied › Board (REQ-129). `/pipeline` redirects to `/jobs?tab=applied&view=board`. Batch progress `/pipeline/batch/:id` stays (REQ-117).

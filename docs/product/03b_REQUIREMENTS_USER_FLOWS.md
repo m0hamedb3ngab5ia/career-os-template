@@ -230,3 +230,14 @@ Given a job with status interview · When the skill runs · Then `interview_prep
 `score.json` carries `gaps[]`: posting requirements with no matching master.yaml evidence, one line each, so tailoring and `/interview-prep` can address them. Empty list when none.
 Given a posting asking for a tool absent from master.yaml · When `/score-job` runs · Then `gaps[]` names that tool.
 
+## Process (DEC-024, docs/PROCESS.md)
+### REQ-143 Master résumé look approved before apply
+After onboarding the candidate sees the rendered master résumé and says it looks right; `careeros resume approve-look` records `profile/master.look.json` for that résumé version. Readiness must-item `resume_look_approved` blocks apply until then; a new master version needs a new approval. Prepare is not gated.
+Given an approved look and a new master version · When readiness runs · Then `resume_look_approved` is undone and apply is blocked.
+### REQ-144 Auto-submit is opt-in
+Default config never submits: tiers B/C `auto_submit: false`, `runs.auto_submit` off; Claude fills the form and the candidate submits. Opting in is a config change the candidate asks for in chat (per tier, plus `safety.auto_submit_ats` and `safety.pause_auto_submit`). Tier A never auto-submits.
+Given the example config · When an apply run starts · Then it runs with auto-submit 0.
+### REQ-145 `careeros view` status pages
+`careeros view` writes static HTML pages for the chat sidebar, one tab each: Setup (only while a must-item is undone, then replaced by Documents), Documents (résumés, cover letters, writing samples, saved answers; name, kind, used for, status, date), Jobs (needs you + stage counts + last runs), Applications (company, role, applied date, status). Plain words, a dot + word per status, no prefixes. Read-only.
+Given all must-items done · When `careeros view` runs · Then a Documents tab exists and no Setup tab.
+
