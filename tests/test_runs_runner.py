@@ -52,7 +52,7 @@ class FakeInvoke:
         self.clock, self.step_s = clock, step_s
 
     def __call__(self, cmd, cwd, env, timeout_s, stream_path):
-        job_id = Path(cmd[-1].splitlines()[0].split(" ", 1)[1]).name
+        job_id = Path(cmd[-1].splitlines()[0].split()[1]).name
         self.calls.append({"cmd": cmd, "cwd": cwd, "env": dict(env), "timeout_s": timeout_s, "job_id": job_id,
                            "lock": locks.read(RunStore(self.s).job_lock_path(job_id))})
         if self.clock:

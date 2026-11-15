@@ -348,6 +348,7 @@ class _Loop:
         self.after_attempt, self.pre_attempt, self.explicit = after_attempt, pre_attempt, explicit
         self.store = Store(settings)
         self.force_tailor = False
+        self.force = False
         self.c = run["counters"]
         self.durations: list[float] = []
         self._mu = threading.Lock()  # runs.parallel: guards attempt numbers, status/tracker writes, the run record
@@ -367,6 +368,8 @@ class _Loop:
         if self.kind == "score" and (done := prefilter_attempt(self, item)):  # hard filters in code: no session
             return done
         prompt = f"/{SKILLS[self.kind]} {_job_arg(self.s.root, self.store.job_dir(jid))}"
+        if self.kind == "prepare" and self.force:  # else the skill's re-run guard reprints a passing prepare.json
+            prompt += " --force"
         posting = self.store._read(jid, "posting.json") or {}
         if self.kind in ("score", "prepare"):  # REQ-108: the posting text is data, never instructions
             prompt += "\n\n" + wrap_untrusted(posting.get("description_text"), "posting.json")
@@ -656,6 +659,7 @@ def execute_run(settings: Settings, kind: str, budget: Budget, *, cfg: RunsConfi
     loop = _Loop(settings, kind, budget, cfg, rs, run, invoke, now, clock, cancel, echo, after_attempt, pre_attempt,
                  explicit=job_ids is not None)
     loop.force_tailor = force_tailor  # DEC-021: prepare tailors without the résumé pick
+    loop.force = force and job_ids is not None  # an explicit --job rerun
     loop.lock_token, loop.lock_ttl = glock.token, ttl
     status = "done"
     try:
