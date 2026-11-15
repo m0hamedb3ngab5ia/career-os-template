@@ -95,4 +95,4 @@ You say it; Claude edits files or runs existing commands (no special commands ex
 All state is files: `data/` (jobs, runs), `profile/`, `config/` and the tracker. Nothing lives only in a chat.
 Open any Claude chat in the repo and say "where are we?"; Claude runs `/today` and tells you what needs you and
 what is in flight.
-For unattended runs and scheduling see GETTING_STARTED.md step 12 and `docs/COMMANDS.md`.
+For unattended runs and scheduling see GETTING_STARTED.md, "Unattended runs" and `docs/COMMANDS.md`.

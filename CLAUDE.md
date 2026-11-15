@@ -24,7 +24,7 @@ Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMM
 - `.venv/bin/python -m pytest -q`
 
 ## Skills (`.claude/skills/`)
-`prepare-job` (score-job → tailor-resume → write-cover-letter → qa-review) · `review-resume` · `edit-resume` · `apply-job` (Chrome) · `extract-master` (master résumé → `careeros resume propose-master` → pending master.yaml diff; approve/reject `POST /api/profile/master/proposal/approve|reject`) · `answer-question` · `inbox-sync` · `find-contacts` · `draft-outreach` · `learn-voice` · `advice` (verdict on outside advice → `.agent/ADVICE.md`) · `today` (dashboard in chat, read-only) · `interview-prep` (`JOB/interview_prep.md` from master.yaml ids)
+`onboard` (new user: "set me up" → clone-to-first-application checklist, resumes from `careeros doctor`) · `job-alerts` (LinkedIn alert emails in Gmail → `careeros company find-board` → verified `boards:`) · `prepare-job` (score-job → tailor-resume → write-cover-letter → qa-review) · `review-resume` · `edit-resume` · `apply-job` (Chrome) · `extract-master` (master résumé → `careeros resume propose-master` → pending master.yaml diff; approve/reject `POST /api/profile/master/proposal/approve|reject`) · `answer-question` · `inbox-sync` · `find-contacts` · `draft-outreach` · `learn-voice` · `advice` (verdict on outside advice → `.agent/ADVICE.md`) · `today` (dashboard in chat, read-only) · `interview-prep` (`JOB/interview_prep.md` from master.yaml ids)
 UI is a dashboard only (Today + Jobs); chat equivalents: `docs/CHAT.md`.
 New chat about the job search: run `/today` first; process: docs/PROCESS.md.
 
