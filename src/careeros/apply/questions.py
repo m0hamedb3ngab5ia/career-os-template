@@ -152,6 +152,12 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path,
     ones (`years_experience`). EEO questions never match. Salary matches return (key, None) because
     the answer is null in the YAML; the caller must open an Action Item.
     """
+    entry = _match_entry(question_text, standard_answers_yaml, company)
+    return (entry["key"], entry.get("answer")) if entry else None
+
+
+def _match_entry(question_text: str, standard_answers_yaml: str | Path,
+                 company: str | None = None) -> dict[str, Any] | None:
     t = _norm(question_text)
     if not t or _EEO_RE.search(t) or _is_sensitive(t):
         return None
@@ -168,8 +174,15 @@ def match_standard_answer(question_text: str, standard_answers_yaml: str | Path,
                 continue
             if guard_spans and not any(m.start() < e and s < m.end() for s, e in guard_spans):
                 continue
-            return entry["key"], entry.get("answer")
+            return entry
     return None
+
+
+def answer_prefer(question_text: str, standard_answers_yaml: str | Path, company: str | None = None) -> list[str]:
+    """Optional `prefer: [keyword, ...]` of the entry that answers `question_text`: option keywords a select tries
+    in order. Taken from that same entry, never from another one sharing its key."""
+    entry = _match_entry(question_text, standard_answers_yaml, company)
+    return [str(x) for x in (entry or {}).get("prefer") or []]
 
 
 _STREET_RE = re.compile(r"\b(street|address line ?1|address 1|mailing address|home address)\b", re.I)

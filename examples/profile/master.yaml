@@ -42,6 +42,7 @@ education:
   - id: state_u                                   # INSERT: short unique id for this school, e.g. ut_austin
     school: Springfield State University          # INSERT: official school name
     degree: Bachelor of Science, Computer Science   # INSERT: degree as printed, e.g. Bachelor of Arts, Mathematics
+    # discipline: [Software Engineering, Computer Science]   # optional: Greenhouse picks the first of these its list offers; a plain string works too; default is the text after the comma in degree
     gpa: "3.6"                                    # INSERT: GPA as a quoted string, e.g. "3.4", or null to omit
     location: Springfield, NY                     # INSERT: City, ST
     start: 2022-08                                # INSERT: start month, YYYY-MM, e.g. 2023-06

@@ -76,7 +76,7 @@ def test_plan_identity_files_and_hidden():
 
 def test_plan_selects_are_exact_option_labels_or_review():
     for x in _plan()["fields"]:
-        if x["type"] in ("select", "multiselect") and x["value"] is not None:
+        if x["type"] in ("select", "multiselect") and x["value"] is not None and "options" in x:  # extras have none
             assert x["value"] in x["options"], x
         if x["type"] == "checkbox_group" and x["value"] is not None:
             assert set(x["value"]) <= set(x["options"]), x
@@ -106,7 +106,7 @@ def test_plan_greenhouse_extras_only_where_profile_has_data():
                                        "needs_review": False}
     assert f["school--0"]["value"] == "Springfield State University"
     assert f["start-year--0"]["value"] == "2022"
-    assert "country" not in f  # example identity has no country
+    assert f["country"]["value"] == "United States"  # example phone is 10 US digits
     prof = {**PROFILE, "identity": {**PROFILE["identity"], "country": "United States"}}
     f2 = _by_id(build_plan(normalize(DATA), profile=prof, answers_path=ANSWERS, company="x", files={})["fields"])
     assert f2["country"]["value"] == "United States"
@@ -134,10 +134,12 @@ def test_pick_option_ambiguous_prefix_is_none():
     assert pick_option(["Yes", "Yes, but later"], "Yes") == "Yes"  # exact still wins
 
 
-def test_plan_combined_degree_needs_review():
+def test_plan_degree_derivation_and_unparseable_review():
     f = _by_id(_plan()["fields"])  # example profile: "Bachelor of Science, Computer Science", no discipline
-    assert f["degree--0"]["needs_review"] and f["discipline--0"]["needs_review"]
-    assert f["discipline--0"]["value"] is None
+    assert f["degree--0"]["value"] == "Bachelor's Degree" and f["discipline--0"]["value"] == "Computer Science"
+    edu0 = {**PROFILE["education"][0], "degree": "BS Computer Science"}  # no level word, no comma: never guess
+    f0 = _by_id(build_plan([], profile={**PROFILE, "education": [edu0]}, answers_path=ANSWERS, files={})["fields"])
+    assert f0["degree--0"]["needs_review"] and f0["discipline--0"]["needs_review"]
     edu = {**PROFILE["education"][0], "degree": "BS", "discipline": "Computer Science"}
     f2 = _by_id(build_plan([], profile={**PROFILE, "education": [edu]}, answers_path=ANSWERS, files={})["fields"])
     assert f2["degree--0"]["value"] == "BS" and not f2["degree--0"]["needs_review"]
@@ -210,3 +212,102 @@ def test_carry_over_keeps_draft_review_only_for_same_text():
     assert carry_over(old, plan("A"))["fields"][0]["needs_review"] is False
     assert carry_over(old, plan("B"))["fields"][0]["reviewed"] is False  # draft rewritten: review again
     assert carry_over(plan("A"), plan("A"))["fields"][0]["reviewed"] is False
+
+
+def _extras_for(**edu_kw):
+    edu = {**PROFILE["education"][0], **edu_kw}
+    return _by_id(build_plan([], profile={**PROFILE, "education": [edu]}, answers_path=ANSWERS, files={})["fields"])
+
+
+@pytest.mark.parametrize("degree,label", [
+    ("Bachelor of Engineering, Software Engineering", "Bachelor's Degree"),
+    ("Master of Science, Physics", "Master's Degree"),
+    ("Associate of Arts", "Associate's Degree"),
+    ("PhD, Physics", "Doctor of Philosophy (Ph.D.)"),
+    ("Doctor of Philosophy, Physics", "Doctor of Philosophy (Ph.D.)"),
+])
+def test_extras_degree_level_maps_to_dropdown_label(degree, label):
+    assert _extras_for(degree=degree)["degree--0"]["value"] == label
+
+
+def test_extras_discipline_from_degree_comma_and_list_fallback():
+    f = _extras_for(degree="Bachelor of Engineering, Software Engineering")
+    assert f["discipline--0"]["value"] == "Software Engineering" and not f["discipline--0"]["needs_review"]
+    f = _extras_for(discipline=["Software Engineering", "Computer Science"])
+    assert f["discipline--0"]["value"] == ["Software Engineering", "Computer Science"]
+    assert _extras_for(discipline="Math")["discipline--0"]["value"] == "Math"
+
+
+def test_extras_month_and_end_year():
+    f = _extras_for(start="2022-08", end="2026-05")
+    assert (f["start-month--0"]["value"], f["end-month--0"]["value"]) == ("August", "May")
+    assert f["start-year--0"]["value"] == "2022" and f["end-year--0"]["value"] == "2026"
+    assert f["start-month--0"]["type"] == "select"
+    g = _extras_for(start="2022", end=None)
+    assert "start-month--0" not in g and "end-month--0" not in g and "end-year--0" not in g
+
+
+@pytest.mark.parametrize("phone,value,review", [
+    ("+1 415 555 0100", "United States", False), ("555-010-0199", "United States", False),
+    ("+44 7700 900123", None, True), ("12345", None, True)])
+def test_extras_phone_country(phone, value, review):
+    prof = {**PROFILE, "identity": {**PROFILE["identity"], "phone": phone}}
+    f = _by_id(build_plan([], profile=prof, answers_path=ANSWERS, files={})["fields"])
+    assert f["country"]["value"] == value and f["country"]["needs_review"] is review
+
+
+OFFERS = ["Job board", "Acme's Career Site", "Employee referral", "LinkedIn"]
+
+
+def test_pick_option_word_subset_unique():
+    assert pick_option(["Job board", "Acme's Career Site"], "Career Site") == "Acme's Career Site"
+    assert pick_option(["I have not previously been employed at Acme", "I am a former Acme employee"],
+                       "not previously employed") == "I have not previously been employed at Acme"
+    assert pick_option(["Career Site A", "Career Site B"], "Career Site") is None  # ambiguous: review
+
+
+def test_pick_option_never_crosses_words():
+    assert pick_option(["Female", "Prefer not to say"], "Male") is None
+    assert pick_option(["Not declared", "Female"], "No") is None
+
+
+def test_pick_option_prefer_keywords_in_order():
+    no = ["I have previously been employed at Acme", "I have not previously been employed at Acme"]
+    assert pick_option(no, "No", prefer=["have not", "never", "no"]) == no[1]
+    assert pick_option(OFFERS, "Company careers page", prefer=["careers page", "career site", "website"]) == OFFERS[1]
+    assert pick_option(OFFERS, "Company careers page", prefer=["nothing"]) is None
+    assert pick_option(["No", "Yes"], "Yes", prefer=["no"]) == "Yes"  # exact answer still wins over prefer
+
+
+def test_plan_standard_answer_prefer_from_yaml(tmp_path):
+    ans = tmp_path / "sa.yaml"
+    ans.write_text("answers:\n  - key: referral\n    match: ['how did you hear']\n    answer: Company careers page\n"
+                   "    prefer: ['career site', 'website']\n")
+    fields = [{"field_id": "q1", "label": "How did you hear about us?", "type": "select", "required": True,
+               "options": OFFERS}]
+    row = build_plan(fields, profile=PROFILE, answers_path=ans, files={})["fields"][0]
+    assert row["value"] == "Acme's Career Site"
+
+
+def test_pick_option_subset_never_adds_a_negation():
+    assert pick_option(["I do not require sponsorship", "Other"], "I require sponsorship") is None
+    assert pick_option(["I don't need a visa", "Other"], "need a visa") is None
+    assert pick_option(["I never worked here", "Other"], "worked here") is None
+    assert pick_option(["I will require sponsorship", "I do not require sponsorship"],
+                       "I require sponsorship") == "I will require sponsorship"
+
+
+@pytest.mark.parametrize("degree", ["Doctor of Medicine", "Doctor of Education, Leadership", "Doctorate in Law"])
+def test_extras_other_doctorates_are_not_phd(degree):
+    assert _extras_for(degree=degree)["degree--0"]["value"] == degree  # typed as is, never claimed as a Ph.D.
+
+
+def test_plan_prefer_comes_from_the_entry_that_matched(tmp_path):
+    ans = tmp_path / "sa.yaml"
+    ans.write_text("answers:\n  - key: referral\n    match: ['how did you hear']\n    answer: Company careers page\n"
+                   "company_answers:\n  Acme:\n    - key: referral\n      match: ['where did you find']\n"
+                   "      answer: LinkedIn\n      prefer: ['job board']\n")
+    fields = [{"field_id": "q1", "label": "How did you hear about us?", "type": "select", "required": True,
+               "options": OFFERS}]
+    row = build_plan(fields, profile=PROFILE, answers_path=ans, company="Acme", files={})["fields"][0]
+    assert row["value"] is None  # general entry answered; the company entry's prefer must not leak in

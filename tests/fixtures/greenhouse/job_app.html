@@ -1,8 +1,11 @@
 <!doctype html>
 <!-- Minimal stand-in for a job-boards.greenhouse.io application form: text, file, checkbox group,
-     react-select-like comboboxes (role=option menu, Escape closes) and a field that appears only after
+     react-select-like comboboxes (role=option menu with aria-controls, Escape closes) and a field that appears only after
      another answer (race only after hispanic_ethnicity = No) and a file input that becomes a filename chip, as on the real form. -->
 <html><head><meta charset="utf-8"><title>Apply</title></head><body>
+<!-- like the phone-country list job-boards keeps in the DOM: an unscoped option query clicks these -->
+<div role="listbox" id="decoy"><div role="option">United States +1</div><div role="option">Bachelor's Degree</div>
+  <div role="option">Computer Science</div><div role="option">August</div></div>
 <form id="application-form">
   <label for="first_name">First Name</label><input id="first_name" type="text">
   <label for="email">Email</label><input id="email" type="text">
@@ -24,6 +27,12 @@
   <div class="select" data-options="High School|Associate's Degree|Bachelor's Degree|Master's Degree|Master of Business Administration (M.B.A.)|Juris Doctor (J.D.)|Doctor of Philosophy (Ph.D.)">
     <label for="degree--0">Degree</label>
     <div class="select__control"><div class="select__single-value"></div><input id="degree--0" role="combobox"></div></div>
+  <div class="select" data-options="Canada +1|United States +1|United Kingdom +44"><label for="country">Country</label>
+    <div class="select__control"><div class="select__single-value"></div><input id="country" role="combobox"></div></div>
+  <div class="select" data-options="Computer Science|Mathematics"><label for="discipline--0">Discipline</label>
+    <div class="select__control"><div class="select__single-value"></div><input id="discipline--0" role="combobox"></div></div>
+  <div class="select" data-options="July|August|September"><label for="start-month--0">Start month</label>
+    <div class="select__control"><div class="select__single-value"></div><input id="start-month--0" role="combobox"></div></div>
   <button type="submit" id="submit" onclick="document.title='SUBMITTED';return false">Submit application</button>
 </form>
 <script>
@@ -35,6 +44,7 @@ document.querySelectorAll('.select').forEach(w => {
   const open = () => {
     close();
     menu = document.createElement('div'); menu.setAttribute('role', 'listbox');
+    menu.id = inp.id + '-listbox'; inp.setAttribute('aria-controls', menu.id);  // set on open, like react-select
     opts.filter(o => o.toLowerCase().includes(inp.value.toLowerCase())).forEach(o => {
       const d = document.createElement('div'); d.setAttribute('role', 'option'); d.textContent = o;
       d.onmousedown = e => { e.preventDefault(); val.textContent = o; inp.value = ''; close();

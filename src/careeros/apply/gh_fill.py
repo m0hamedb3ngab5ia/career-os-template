@@ -83,8 +83,10 @@ def matches(t: str, value: Any, shown: str, field_id: str = "") -> bool:
 def _pick(root: Any, inp: Any, value: str, exact: bool) -> None:
     inp.click()
     inp.fill(value)
-    opt = (root.get_by_role("option", name=value, exact=True) if exact
-           else root.get_by_role("option").filter(has_text=value))
+    lb = inp.get_attribute("aria-controls")  # read the list this input opens: the phone-country list is also in the DOM
+    scope = root.locator(f'[id="{lb}"]') if lb else root
+    opt = (scope.get_by_role("option", name=value, exact=True) if exact
+           else scope.get_by_role("option").filter(has_text=value))
     try:
         opt.first.click()
     except Exception:
@@ -110,9 +112,20 @@ def _fill_one(root: Any, f: dict[str, Any]) -> bool:
         return all(box.get_by_label(opt, exact=True).is_checked() for opt in v)
     if t in ("select", "multiselect", "select_async"):
         try:
-            for one in v if isinstance(v, list) else [v]:
+            picked = False
+            if fid.startswith("discipline") and isinstance(v, list):  # ordered fallback: first one offered wins
+                for cand in v:
+                    try:
+                        _pick(root, loc, str(cand), exact=False)
+                        v, picked = cand, True
+                        break
+                    except LookupError:
+                        continue
+                else:
+                    raise LookupError(f"none of {v!r} offered")
+            for one in [] if picked else v if isinstance(v, list) else [v]:
                 try:
-                    _pick(root, loc, str(one), exact=t != "select_async")
+                    _pick(root, loc, str(one), exact=t != "select_async" and fid != "country")  # "United States +1"
                 except LookupError:  # "Bachelor of Engineering, X" has no option: pick the fixed label by keyword
                     if not (fid.startswith("degree") and (key := degree_key(str(one)))):
                         raise
