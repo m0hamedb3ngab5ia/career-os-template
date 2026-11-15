@@ -159,6 +159,12 @@ def _never(settings, preferred=("New York NY", "Boston MA"), regions=("Northeast
     ("London, UK", False),                      # not a US state: unparseable, skill decides
     ("", False),
     ("Austin, TX; Somewhere", False),           # one part unparseable
+    ("Jersey City, NJ", False),                 # Northeast by state, never by the word
+    ("New York, New York", False),              # full state name
+    ("Northeast", False), ("East Coast", False), ("Multiple locations", False), ("US", False),
+    ("Boston", False), ("Manhattan", False), ("Hoboken", False),   # city without a state
+    ("Austin, TX (Hybrid)", False), ("Hybrid", False),
+    ("Dallas, TX; Austin, TX", True),           # every location outside
 ])
 def test_location_nonpreferred(settings: Settings, location, skipped):
     _never(settings)
@@ -202,3 +208,29 @@ def test_cli_location_skip_writes_score(tmp_path):
     assert main(["--root", str(root), "job", "filters", "job000000001"]) == 3
     sc = json.loads((d / "score.json").read_text())
     assert sc["skip_reason"] == "location_nonpreferred" and "Location" in sc["fit_reasons"][0]
+
+
+def test_unparseable_pay_does_not_skip_or_exempt(settings: Settings):
+    _never(settings)
+    settings.targets["thresholds"]["any_location_min_base_usd"] = 150000
+    p = _posting(location="Boston", salary_min=None)
+    assert not pay_exempts_location(settings, p) and hard_filters(settings, p) == []
+
+
+def test_skip_note_names_prefilter_and_states(tmp_path):
+    from careeros.hard_filters import reasons
+    s = Settings.load(make_temp_root(tmp_path / "r"))
+    _never(s)
+    why = reasons(s, _posting(location="Austin, TX; Denver, CO"), ["location_nonpreferred"])[0]
+    assert why.startswith("prefilter: location_nonpreferred (TX, CO)")
+
+
+def test_prefilter_never_skips_what_claude_prepared(tmp_path):
+    from careeros.hard_filters import compare_with_scores
+    root, d = _job(tmp_path, location="Austin, TX")
+    s = Settings.load(root)
+    _never(s)
+    (d / "score.json").write_text(json.dumps({"decision": "skip"}))
+    assert compare_with_scores(s) == []
+    (d / "score.json").write_text(json.dumps({"decision": "prepare"}))
+    assert compare_with_scores(s) == ["job000000001"]   # a prefilter bug, surfaced

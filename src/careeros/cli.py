@@ -1410,6 +1410,9 @@ def _run_kind(args: argparse.Namespace, kind: str) -> int:
         _print_queue(rec["selected"], len(rec["selected"]))
         if rec["excluded"]:
             print(f"excluded: " + ", ".join(f"{e['job_id']} ({e['reason']})" for e in rec["excluded"][:10]))
+        if rec.get("prefiltered"):
+            print(f"prefiltered (hard filters, no session): " + ", ".join(
+                f"{e['job_id']} ({', '.join(e['why'])})" for e in rec["prefiltered"][:10]))
     else:
         c = rec["counters"]
         print(f"run {rec['id']}: {rec['stop_reason']} — attempted {c['attempted']}, ok {c['ok']}, "

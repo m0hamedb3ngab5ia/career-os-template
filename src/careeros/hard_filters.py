@@ -83,6 +83,13 @@ def _state_of(segment: str) -> str | None:
     return None
 
 
+def posting_states(posting: dict[str, Any]) -> list[str]:
+    """US states of every listed location, [] when any part cannot be parsed (a bare city, "Northeast", "US")."""
+    text = str(posting.get("location") or "")
+    states = [_state_of(x) for x in re.split(r"[;|\n]| or ", text) if x.strip()]
+    return [x for x in states if x] if states and all(states) else []
+
+
 def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
     """True only when the non-preferred-location rule is decisive (min fit above 100 = never wanted) and the
     posting is clearly outside the candidate's places. Anything unclear returns False: the skill decides."""
@@ -90,8 +97,9 @@ def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
     if (t.get("min_fit_nonpreferred_location") or 0) <= 100 or pay_exempts_location(settings, posting):
         return False
     text = str(posting.get("location") or "")
-    if loc.get("remote_ok", True) and (posting.get("remote") is True or re.search(r"\bremote\b", text, re.I)):
-        return False
+    if re.search(r"\bhybrid\b", text, re.I) or (loc.get("remote_ok", True) and (
+            posting.get("remote") is True or re.search(r"\bremote\b", text, re.I))):
+        return False  # hybrid / remote: the skill decides
     ok: set[str] = set()
     for city in loc.get("preferred") or []:  # "Boston MA": the whole state counts, "Cambridge, MA" is close enough
         st = str(city).split()[-1].upper() if str(city).split() else ""
@@ -102,9 +110,8 @@ def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:
         if key in ("us", "usa", "united states") or key not in REGION_STATES:
             return False
         ok.update(REGION_STATES[key])
-    segments = [x for x in re.split(r"[;|\n]| or ", text) if x.strip()]
-    states = [_state_of(x) for x in segments]
-    return bool(states) and all(states) and not ok.intersection(states)
+    states = posting_states(posting)
+    return bool(states) and not ok.intersection(states)
 
 
 def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
@@ -148,8 +155,9 @@ def reasons(settings: Settings, posting: dict[str, Any], fails: list[str]) -> li
     text = {"company_blocked": "Company: on the blocklist.",
             "title_senior": "Seniority: the title names a level above the target (seniority.exclude_title_keywords).",
             "location_blocked": "Location: in a blocked country.",
-            "location_nonpreferred": "Location: outside the preferred places and non-preferred locations are never "
-                                     "wanted (thresholds.min_fit_nonpreferred_location above 100).",
+            "location_nonpreferred": f"prefilter: location_nonpreferred ({', '.join(posting_states(posting))}): "
+                                     "outside the preferred places and non-preferred locations are never wanted "
+                                     "(thresholds.min_fit_nonpreferred_location above 100).",
             "salary_below_min": f"Salary: posted maximum {posting.get('salary_max')} is below the minimum base."}
     return [text.get(f) or f"Experience: requires {yrs}+ years, above the {max_years(settings)}-year limit; "
             "a dealbreaker, so fit is not scored." for f in fails]
@@ -173,3 +181,16 @@ def write_skip(settings: Settings, job_id: str, posting: dict[str, Any], fails: 
                                         "scored_at": now_iso()})
     store.append_log(job_id, f"category={cat} fit=0 tier=None decision=skip {fails[0]}", component="score-job")
     return res
+
+
+def compare_with_scores(settings: Settings, store: Any = None) -> list[str]:
+    """Job ids Claude scored `prepare` that the hard filters would skip: each one is a prefilter bug."""
+    from careeros.store import Store
+
+    store = store or Store(settings)
+    bad = []
+    for d in sorted(p for p in store.jobs_dir.iterdir() if p.is_dir()):
+        sc, post = store._read(d.name, "score.json"), store._read(d.name, "posting.json")
+        if sc and post and sc.get("decision") == "prepare" and hard_filters(settings, post):
+            bad.append(d.name)
+    return bad

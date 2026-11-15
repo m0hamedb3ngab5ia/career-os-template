@@ -341,7 +341,8 @@ def test_parallel_score_runs_fake_claude_calls_at_the_same_time(root, home, fake
     show = json.loads(cli(root, env, "run", "show", runs[0]["id"], "--json").stdout)
     assert sorted(a["job_id"] for a in show["attempts"]) == sorted(ids)
     assert [a["n"] for a in show["attempts"]] == [1, 2, 3, 4, 5, 6] and runs[0]["stop_reason"] == "completed"
-=======
+
+
 def test_prefiltered_job_never_spawns_claude(root, home, fake_bin, tmp_path):
     ids = add_jobs(root, 2)
     p = root / "data" / "jobs" / ids[0] / "posting.json"
@@ -357,4 +358,3 @@ def test_prefiltered_job_never_spawns_claude(root, home, fake_bin, tmp_path):
     assert status_of(root, ids[0]) == "skipped"
     assert json.loads((root / "data" / "jobs" / ids[0] / "score.json").read_text())["skip_reason"] == "yoe_gt_3"
     assert json.loads(r.stdout)["counters"]["prefiltered"] == 1
->>>>>>> c0c9a4a (WIP: location_nonpreferred + write_skip + failing prefilter tests)
