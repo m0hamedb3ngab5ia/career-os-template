@@ -142,6 +142,13 @@ def test_pay_exempts_location(settings, kw, cap, exempt):
     ("Up to $200,000", False),  # a maximum only
     ("Raised $200 million in funding", False),
     ("Base $40,000", False),  # under the 50k floor
+    ("Compensation: $200,000 - $250,000", True),
+    ("Salary Range\n\n$175,000—$225,000 USD", True),  # pay label on its own line above the amount
+    ("Annual Salary:\n\n$320,000—$405,000 USD", True),
+    ("Our team runs a big program.\n\n$200,000 budget per quarter", False),  # line above is not a pay label
+    ("You will manage a $200,000 annual budget", False),  # no pay wording: not a salary
+    ("Salary up to USD $200,000", False),  # a maximum, with a token between "up to" and the amount
+    ("Salary: we raised $400,000,000 in our Series C", False),  # over $1M: not a salary
 ])
 def test_pay_exempts_location_reads_description_when_no_structured_pay(settings, desc, exempt):
     settings.targets.setdefault("thresholds", {})["any_location_min_base_usd"] = 150000

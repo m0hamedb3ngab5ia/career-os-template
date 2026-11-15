@@ -172,28 +172,34 @@ def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
 
 
 # "$124,000", "$124,000\u2014$162,000", "$124,000 to 162,000", "$150k"
-_MONEY = re.compile(r"(?P<pre>up to\s*|\u00a3|\u20ac)?\$\s*(?P<n>\d[\d,]*(?:\.\d+)?)\s*(?P<k>[kK]\b)?"
+_MONEY = re.compile(r"\$\s*(?P<n>\d[\d,]*(?:\.\d+)?)\s*(?P<k>[kK]\b)?"
                     r"(?:\s*(?:-|\u2013|\u2014|to)\s*\$?\s*\d[\d,]*(?:\.\d+)?\s*[kK]?\b)?", re.I)
 _NOT_BASE = re.compile(r"equity|bonus|sign-?on|signing|rsu|stock|commission|\bOTE\b", re.I)
+_PAY = re.compile(r"salary|base|\bpay\b|compensation|wage|\brange\b", re.I)  # the sentence must be about pay
+_MAX = re.compile(r"\bup to\b", re.I)
 _NOT_USD = re.compile(r"\b(CAD|GBP|EUR|AUD|CHF|INR)\b|[\u00a3\u20ac]|per hour|/\s*hr|hourly|an hour", re.I)
 
 
 def posted_min_base_usd(text: str) -> float | None:
     """Lowest posted minimum base (USD) found in a posting's description, or None when unsure.
 
-    Conservative because it relaxes a skip: only `$` amounts >= 50,000 (so "$200 million" and hourly rates drop out);
-    a range counts by its first number; "up to $X" is a maximum, not a minimum; amounts whose sentence names equity,
-    bonus, sign-on or RSUs are ignored; any other currency or an hourly rate near a >= 50k amount means unsure
-    (None). Several ranges (location bands): the lowest minimum."""
+    Conservative because it relaxes a skip: only `$` amounts from 50,000 to 1,000,000 (so "$200 million", funding
+    totals and hourly rates drop out) in a sentence that names pay (salary, base, pay, compensation, wage, range);
+    a range counts by its first number; "up to" before the amount means a maximum, not a minimum; amounts whose
+    sentence names equity, bonus, sign-on or RSUs are ignored; any other currency or an hourly rate near a counted
+    amount means unsure (None). Several ranges (location bands): the lowest minimum."""
     mins = []
     for m in _MONEY.finditer(text):
         n = float(m["n"].replace(",", "")) * (1000 if m["k"] else 1)
-        if n < 50_000 or (m["pre"] or "").strip().lower() == "up to":
+        if not 50_000 <= n <= 1_000_000:
             continue
         a = max(text.rfind("\n", 0, m.start()), text.rfind(". ", 0, m.start()))
         b = [i for i in (text.find("\n", m.end()), text.find(". ", m.end())) if i >= 0]
-        ctx = text[max(a, m.start() - 80, 0):min(b + [m.end() + 40])]
-        if _NOT_BASE.search(ctx):
+        start = max(a, m.start() - 80, 0)
+        ctx = text[start:min(b + [m.end() + 40])]
+        above = next((ln.strip() for ln in reversed(text[:max(a, 0)].splitlines()) if ln.strip()), "")
+        label = len(above) <= 40 and _PAY.search(above)  # "Salary Range" heading on the line above the amount
+        if not (_PAY.search(ctx) or label) or _MAX.search(text, start, m.start()) or _NOT_BASE.search(ctx):
             continue
         if _NOT_USD.search(ctx):
             return None
