@@ -117,8 +117,8 @@ threshold is optional config in `config/qa.yaml` (`consistency:`, `outreach:`, `
 ## Autonomy tiers (`config/targets.yaml`)
 
 - **A** — dream firms. Full prep, **never auto-submit**. Outreach prioritized.
-- **B** — strong fit. Auto-submit on supported ATS after QA pass. Review only failures.
-- **C** — volume. Auto-submit, no cover letter unless required.
+- **B** — strong fit. Prepared and QA-checked; auto-submit on supported ATS only if you opt in (`auto_submit: true`, off by default). Review only failures.
+- **C** — volume. Same opt-in; no cover letter unless required.
 
 Per-job override possible via tracker `Override` column.
 

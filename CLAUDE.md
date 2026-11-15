@@ -26,6 +26,7 @@ Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMM
 ## Skills (`.claude/skills/`)
 `prepare-job` (score-job → tailor-resume → write-cover-letter → qa-review) · `review-resume` · `edit-resume` · `apply-job` (Chrome) · `extract-master` (master résumé → `careeros resume propose-master` → pending master.yaml diff; approve/reject `POST /api/profile/master/proposal/approve|reject`) · `answer-question` · `inbox-sync` · `find-contacts` · `draft-outreach` · `learn-voice` · `advice` (verdict on outside advice → `.agent/ADVICE.md`) · `today` (dashboard in chat, read-only) · `interview-prep` (`JOB/interview_prep.md` from master.yaml ids)
 UI is a dashboard only (Today + Jobs); chat equivalents: `docs/CHAT.md`.
+New chat about the job search: run `/today` first; process: docs/PROCESS.md.
 
 ## Gotchas
 - `.venv` in iCloud-synced folder gets macOS hidden flag + "* 2.py" duplicates; keep checkout outside iCloud. `import careeros` breaks → `chflags -R nohidden .venv` or `PYTHONPATH=src`.

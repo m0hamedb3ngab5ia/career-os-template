@@ -11,6 +11,8 @@ All AI work runs through your Claude Code subscription. There is no API key.
 **→ [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**: clone, install, fill in your profile, and run
 `careeros doctor` until it has no FAIL. About 20 minutes to your first tailored application.
 
+Then the whole path (onboarding, applying, status, follow-ups) is in **[docs/PROCESS.md](docs/PROCESS.md)**.
+
 ```sh
 git clone https://github.com/m0hamedb3ngab5ia/career-os-template.git career-os && cd career-os
 python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
@@ -56,7 +58,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 
 `/prepare-job` runs score, tailor, cover letter and QA for one job. `prepare-job` and `apply-job` both run
 `careeros doctor --quiet` first and stop while the example data is still in place. Unattended setup (Claude
-login, allowed tools, scheduler): [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#11-unattended-runs-optional-macos).
+login, allowed tools, scheduler): [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#12-unattended-runs-optional-macos).
 
 ## What you configure vs what's reusable
 
@@ -207,7 +209,7 @@ skipped; only `company_cap` / `cooldown` stay queued for the next session. `care
 
 `profile/`, `config/`, `CLAUDE.local.md`, `data/` and `.reviews/` are gitignored. Keep them in your own
 **private** repo and link them in with `careeros init --link ~/career-private` (steps in
-[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#9-keep-your-data-private-recommended)). `--link` refuses to
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#10-keep-your-data-private-recommended)). `--link` refuses to
 replace a real (non-symlink) `profile/` or `config/`; move those into the private repo first.
 `CLAUDE.local.md` is where personal context for Claude goes; Claude Code loads it automatically.
 
@@ -239,7 +241,7 @@ src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, quest
 .claude/skills Claude Code skills (table above)
 data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx,
                runs/ (<run_id>/run.json + run.log + attempts/, queue, schedule and scheduler logs)   [gitignored]
-docs/          GETTING_STARTED.md, CHAT.md, CODE_REVIEW_PROMPT.md, UI.md
+docs/          PROCESS.md, GETTING_STARTED.md, CHAT.md, CODE_REVIEW_PROMPT.md, UI.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```
 
