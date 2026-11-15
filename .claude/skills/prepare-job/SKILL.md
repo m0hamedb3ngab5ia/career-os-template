@@ -49,6 +49,8 @@ below: `JOB/score.json` from phase 1 is the score; use it instead of scoring aga
   (the gate may have run before other jobs at the company were scored). Go to Step 1b and let the gate
   decide; on exit 0 rewrite `JOB/score.json` with `decision: "prepare"`, `skip_reason: null`.
 - If `decision == "skip"` for any other reason: final status `skipped`, reason = `skip_reason` (or first hard filter). Go to Finish.
+- If `decision == "prepare"`: run `.venv/bin/careeros safety ghost-items` (one `ghost_job` item per company, only
+  for jobs worth preparing; prints nothing when there is nothing to raise). Do not add a per-job ghost item.
 - If `profile_gap` is set: `action_items.append("profile_gap: " + profile_gap)` (priority M, once per gap).
 
 `tier` = score.tier. `tier_cfg` = `targets.tiers[tier]` (tier null -> treat as C).

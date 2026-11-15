@@ -432,13 +432,22 @@ def cmd_safety_check(args: argparse.Namespace) -> int:
         store.append_log(p.job_id, f"safety skip: {codes}", component="safety")
         print(f"{p.job_id}: SKIP ({codes})")
         return GHOST_SKIP_EXIT
-    ghosts = [f for f in flags if f.code.startswith("GHOST_") and f.level == "review"]
-    if ghosts and s.is_dream(p.company):
-        print(_add_action(s, f"possible ghost job at dream company: {'; '.join(f.detail for f in ghosts)}"[:300],
-                          "ghost_job", job_id=p.job_id, link=p.url or p.apply_url, priority="M",
-                          needs="anytime", dedupe=True))
     store.append_log(p.job_id, f"safety {v}" + (f": {', '.join(concerns)}" if concerns else ""), component="safety")
     print(f"{p.job_id}: {v.upper()}" + (f" ({', '.join(dict.fromkeys(concerns))}; auto-submit off)" if v == "review" else ""))
+    return 0
+
+
+def cmd_safety_ghost_items(args: argparse.Namespace) -> int:
+    """One `ghost_job` Action Item per dream company for scored jobs worth preparing; --close-stale closes old ones."""
+    from careeros.safety.ghost_items import close_stale_ghost_items, raise_ghost_items
+
+    s = _settings(args)
+    if args.close_stale:
+        r = close_stale_ghost_items(s, dry_run=args.dry_run)
+        print(f"ghost items: {'would close' if args.dry_run else 'closed'} {r['closed']}, kept {r['kept']}")
+    if not args.dry_run:
+        for line in raise_ghost_items(s):
+            print(line)
     return 0
 
 
@@ -2215,6 +2224,11 @@ def build_parser() -> argparse.ArgumentParser:
     sck = sfs.add_parser("check", help="posting checks -> safety.json verdict pass|review|skip|block")
     sck.add_argument("job_id")
     sck.set_defaults(fn=cmd_safety_check)
+    sgi = sfs.add_parser("ghost-items", help="one ghost_job Action Item per dream company, only for jobs worth preparing")
+    sgi.add_argument("--close-stale", action="store_true",
+                     help="first mark done (with a note) open per-job ghost_job items the current rule would not raise")
+    sgi.add_argument("--dry-run", action="store_true", help="with --close-stale: only count; raise nothing")
+    sgi.set_defaults(fn=cmd_safety_ghost_items)
     sfd = sfs.add_parser("fields", help="check visible form labels (JSON list) for identity/bank/payment/credential fields")
     sfd.add_argument("job_id")
     sfd.add_argument("--labels-json", required=True, help="path to a JSON list of labels, or - for stdin")
