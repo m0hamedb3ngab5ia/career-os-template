@@ -172,13 +172,6 @@ def test_tracker_sync_and_open(client, opened, data):
     assert r.status_code == 200 and opened == [["open", str(Tracker(settings=data["settings"]).path.resolve())]]
 
 
-def test_open_refused_off_macos(client, data, monkeypatch):
-    monkeypatch.setattr(desktop, "_platform", lambda: "linux")
-    monkeypatch.setattr(desktop, "_run", lambda argv: pytest.fail("must not run"))
-    r = client.post(f"/api/jobs/{data['jobs']['review']}/open-folder", headers=H)
-    assert r.status_code == 409 and "macOS" in r.json()["detail"]
-
-
 # --- Job detail --------------------------------------------------------------------------------------------------
 
 def test_job_detail_extras_and_files(client, data, tmp_path):
@@ -242,14 +235,8 @@ def test_rerun_qa(client, data):
     assert r.status_code == 200 and "pass" in r.json() and "summary" in r.json()
 
 
-def test_safety_verify_flag_clear(client, data):
+def test_safety_flag_clear(client, data):
     s, jid = data["settings"], data["jobs"]["review"]
-    r = client.post(f"/api/jobs/{jid}/safety/verify", json={"risk": "low", "signals": ["one"]}, headers=H)
-    assert r.status_code == 400 and "two" in r.json()["detail"]
-    r = client.post(f"/api/jobs/{jid}/safety/verify", json={"risk": "medium", "signals": ["careers page"],
-                                                            "evidence": ["https://umbrella.example.com/careers"]},
-                    headers=H)
-    assert r.json()["risk"] == "medium"
     r = client.post(f"/api/jobs/{jid}/safety/flag", json={"reason": "manual", "confidence": "medium"}, headers=H)
     assert r.json()["state"] == "active"
     assert client.get(f"/api/jobs/{jid}").json()["registry"]["flagged"]["confidence"] == "medium"
@@ -257,9 +244,3 @@ def test_safety_verify_flag_clear(client, data):
     assert not registry.is_flagged(registry.load(registry.default_path(s)), "Umbrella Labs")
     assert client.post(f"/api/jobs/{data['jobs']['found']}/safety/clear", headers=H).status_code == 404
     assert client.post(f"/api/jobs/{jid}/safety/flag", json={"evidence": ["ftp://x"]}, headers=H).status_code == 400
-
-
-def test_open_folder(client, data, opened):
-    jid = data["jobs"]["review"]
-    assert client.post(f"/api/jobs/{jid}/open-folder", headers=H).json() == {"opened": True}
-    assert opened == [["open", str(Store(data["settings"]).job_dir(jid).resolve())]]

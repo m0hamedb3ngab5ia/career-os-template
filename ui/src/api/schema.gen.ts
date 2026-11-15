@@ -11,14 +11,6 @@ export interface paths {
     /** Add Action */
     post: operations["add_action_api_actions_post"];
   };
-  "/api/actions/bulk-done": {
-    /** Bulk Done */
-    post: operations["bulk_done_api_actions_bulk_done_post"];
-  };
-  "/api/actions/bulk-reopen": {
-    /** Bulk Reopen */
-    post: operations["bulk_reopen_api_actions_bulk_reopen_post"];
-  };
   "/api/actions/{aid}/answer": {
     /**
      * Answer
@@ -26,10 +18,6 @@ export interface paths {
      * mark it done. Returns the done outcome plus `learned` {key, scope, company, question, answer, match}.
      */
     post: operations["answer_api_actions__aid__answer_post"];
-  };
-  "/api/actions/{aid}/block-company": {
-    /** Block Company */
-    post: operations["block_company_api_actions__aid__block_company_post"];
   };
   "/api/actions/{aid}/done": {
     /** Done */
@@ -39,21 +27,9 @@ export interface paths {
     /** Set Due */
     post: operations["set_due_api_actions__aid__due_post"];
   };
-  "/api/actions/{aid}/mark-safe": {
-    /** Mark Safe */
-    post: operations["mark_safe_api_actions__aid__mark_safe_post"];
-  };
-  "/api/actions/{aid}/mark-safe/undo": {
-    /** Undo Mark Safe */
-    post: operations["undo_mark_safe_api_actions__aid__mark_safe_undo_post"];
-  };
   "/api/actions/{aid}/reopen": {
     /** Reopen */
     post: operations["reopen_api_actions__aid__reopen_post"];
-  };
-  "/api/actions/{aid}/unblock-company": {
-    /** Unblock Company */
-    post: operations["unblock_company_api_actions__aid__unblock_company_post"];
   };
   "/api/events": {
     /** Events */
@@ -150,20 +126,6 @@ export interface paths {
     /** Job File */
     get: operations["job_file_api_jobs__job_id__files__name__get"];
   };
-  "/api/jobs/{job_id}/fill-plan": {
-    /** Fill Plan */
-    get: operations["fill_plan_api_jobs__job_id__fill_plan_get"];
-    /** Make Fill Plan */
-    post: operations["make_fill_plan_api_jobs__job_id__fill_plan_post"];
-  };
-  "/api/jobs/{job_id}/fill-plan/fields/{field_id}": {
-    /** Edit Fill Field */
-    post: operations["edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post"];
-  };
-  "/api/jobs/{job_id}/fill-plan/fields/{field_id}/approve": {
-    /** Approve Fill Field */
-    post: operations["approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post"];
-  };
   "/api/jobs/{job_id}/injection/clear": {
     /**
      * Clear Injection
@@ -177,10 +139,6 @@ export interface paths {
      * @description Every résumé's match score for this job, best first, with missing skills (REQ-111/115, DEC-003).
      */
     get: operations["job_matches_api_jobs__job_id__matches_get"];
-  };
-  "/api/jobs/{job_id}/open-folder": {
-    /** Open Folder */
-    post: operations["open_folder_api_jobs__job_id__open_folder_post"];
   };
   "/api/jobs/{job_id}/override": {
     /** Set Override */
@@ -211,10 +169,6 @@ export interface paths {
   "/api/jobs/{job_id}/safety/flag": {
     /** Safety Flag */
     post: operations["safety_flag_api_jobs__job_id__safety_flag_post"];
-  };
-  "/api/jobs/{job_id}/safety/verify": {
-    /** Safety Verify */
-    post: operations["safety_verify_api_jobs__job_id__safety_verify_post"];
   };
   "/api/jobs/{job_id}/status": {
     /** Set Status */
@@ -836,21 +790,6 @@ export interface components {
       /** Size */
       size: number;
     };
-    /** FillFieldBody */
-    FillFieldBody: {
-      /**
-       * Save
-       * @default true
-       */
-      save?: boolean;
-      /**
-       * Skip
-       * @default false
-       */
-      skip?: boolean;
-      /** Value */
-      value?: string | null;
-    };
     /** FlagBody */
     FlagBody: {
       /**
@@ -886,11 +825,6 @@ export interface components {
       next_cursor: string | null;
       /** Runs */
       runs: components["schemas"]["RunRecord"][];
-    };
-    /** Ids */
-    Ids: {
-      /** Ids */
-      ids: string[];
     };
     /** IndexState */
     IndexState: {
@@ -1739,25 +1673,6 @@ export interface components {
        */
       tour_done?: boolean;
     };
-    /** Unblock */
-    Unblock: {
-      /** Company */
-      company: string;
-      /**
-       * Remove
-       * @default true
-       */
-      remove?: boolean;
-    };
-    /** UndoSafe */
-    UndoSafe: {
-      /** Previous Status */
-      previous_status?: string | null;
-      /** Registry Before */
-      registry_before?: {
-        [key: string]: unknown;
-      } | null;
-    };
     /** ValidationError */
     ValidationError: {
       /** Context */
@@ -1770,29 +1685,6 @@ export interface components {
       msg: string;
       /** Error Type */
       type: string;
-    };
-    /** VerifyBody */
-    VerifyBody: {
-      /**
-       * Domain
-       * @default
-       */
-      domain?: string;
-      /**
-       * Evidence
-       * @default []
-       */
-      evidence?: string[];
-      /**
-       * Risk
-       * @enum {string}
-       */
-      risk: "low" | "medium" | "high";
-      /**
-       * Signals
-       * @default []
-       */
-      signals?: string[];
     };
   };
   responses: never;
@@ -1857,54 +1749,6 @@ export interface operations {
       };
     };
   };
-  /** Bulk Done */
-  bulk_done_api_actions_bulk_done_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Ids"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Bulk Reopen */
-  bulk_reopen_api_actions_bulk_reopen_post: {
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Ids"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /**
    * Answer
    * @description Learn the answer to a question/salary item (profile/standard_answers.yaml + the job's answers.json), then
@@ -1919,30 +1763,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["Answer"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Block Company */
-  block_company_api_actions__aid__block_company_post: {
-    parameters: {
-      path: {
-        aid: string;
       };
     };
     responses: {
@@ -2015,93 +1835,11 @@ export interface operations {
       };
     };
   };
-  /** Mark Safe */
-  mark_safe_api_actions__aid__mark_safe_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Undo Mark Safe */
-  undo_mark_safe_api_actions__aid__mark_safe_undo_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["UndoSafe"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /** Reopen */
   reopen_api_actions__aid__reopen_post: {
     parameters: {
       path: {
         aid: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Unblock Company */
-  unblock_company_api_actions__aid__unblock_company_post: {
-    parameters: {
-      path: {
-        aid: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["Unblock"];
       };
     };
     responses: {
@@ -2598,109 +2336,6 @@ export interface operations {
       };
     };
   };
-  /** Fill Plan */
-  fill_plan_api_jobs__job_id__fill_plan_get: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Make Fill Plan */
-  make_fill_plan_api_jobs__job_id__fill_plan_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Edit Fill Field */
-  edit_fill_field_api_jobs__job_id__fill_plan_fields__field_id__post: {
-    parameters: {
-      path: {
-        job_id: string;
-        field_id: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["FillFieldBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Approve Fill Field */
-  approve_fill_field_api_jobs__job_id__fill_plan_fields__field_id__approve_post: {
-    parameters: {
-      path: {
-        job_id: string;
-        field_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
   /**
    * Clear Injection
    * @description REQ-109 "I checked it": the user read a flagged posting; prepare/apply are allowed again.
@@ -2746,30 +2381,6 @@ export interface operations {
       200: {
         content: {
           "application/json": components["schemas"]["Matches"];
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Open Folder */
-  open_folder_api_jobs__job_id__open_folder_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
         };
       };
       /** @description Validation Error */
@@ -2929,35 +2540,6 @@ export interface operations {
     requestBody: {
       content: {
         "application/json": components["schemas"]["FlagBody"];
-      };
-    };
-    responses: {
-      /** @description Successful Response */
-      200: {
-        content: {
-          "application/json": {
-            [key: string]: unknown;
-          };
-        };
-      };
-      /** @description Validation Error */
-      422: {
-        content: {
-          "application/json": components["schemas"]["HTTPValidationError"];
-        };
-      };
-    };
-  };
-  /** Safety Verify */
-  safety_verify_api_jobs__job_id__safety_verify_post: {
-    parameters: {
-      path: {
-        job_id: string;
-      };
-    };
-    requestBody: {
-      content: {
-        "application/json": components["schemas"]["VerifyBody"];
       };
     };
     responses: {

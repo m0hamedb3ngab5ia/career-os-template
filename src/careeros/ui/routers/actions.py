@@ -34,23 +34,9 @@ class Answer(BaseModel):
     company: str | None = None
 
 
-class Ids(BaseModel):
-    ids: list[str] = Field(min_length=1, max_length=500)
-
-
 class Due(BaseModel):
     due: str | None = None
     due_reason: str | None = None
-
-
-class Unblock(BaseModel):
-    company: str
-    remove: bool = True  # False when the Block found it already blocked (added: False)
-
-
-class UndoSafe(BaseModel):
-    previous_status: str | None = None
-    registry_before: dict[str, Any] | None = None
 
 
 def _run(fn, *args: Any) -> Any:  # noqa: ANN001
@@ -75,20 +61,6 @@ def list_actions(tab: str = "open", group: str = "due", sort: str = "soonest", t
 @router.post("/actions")
 def add_action(body: NewItem, c=Depends(ctx)) -> dict[str, Any]:
     out = _run(svc.add_item, c.settings, body.model_dump())
-    after_write(c, tracker=True)
-    return out
-
-
-@router.post("/actions/bulk-done")
-def bulk_done(body: Ids, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.mark_done, c.settings, body.ids)
-    after_write(c, tracker=True)
-    return out
-
-
-@router.post("/actions/bulk-reopen")
-def bulk_reopen(body: Ids, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.reopen, c.settings, body.ids)
     after_write(c, tracker=True)
     return out
 
@@ -120,32 +92,4 @@ def reopen(aid: str, c=Depends(ctx)) -> dict[str, Any]:
 def set_due(aid: str, body: Due, c=Depends(ctx)) -> dict[str, Any]:
     out = _run(svc.set_due, c.settings, aid, body.due, body.due_reason)
     after_write(c, tracker=True)
-    return out
-
-
-@router.post("/actions/{aid}/block-company")
-def block_company(aid: str, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.block_company, c.settings, c.index, aid)
-    after_write(c, tracker=True, config=True)
-    return out
-
-
-@router.post("/actions/{aid}/unblock-company")
-def unblock_company(aid: str, body: Unblock, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.unblock_company, c.settings, c.index, aid, body.company, body.remove)
-    after_write(c, tracker=True, config=True)
-    return out
-
-
-@router.post("/actions/{aid}/mark-safe")
-def mark_safe(aid: str, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.mark_safe, c.settings, c.index, aid)
-    after_write(c, jobs=[out["job_id"]], tracker=True)
-    return out
-
-
-@router.post("/actions/{aid}/mark-safe/undo")
-def undo_mark_safe(aid: str, body: UndoSafe, c=Depends(ctx)) -> dict[str, Any]:
-    out = _run(svc.undo_mark_safe, c.settings, c.index, aid, body.previous_status, body.registry_before)
-    after_write(c, jobs=[out["job_id"]], tracker=True)
     return out
