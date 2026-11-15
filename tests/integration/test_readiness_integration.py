@@ -91,3 +91,18 @@ def test_ui_run_apply_refused_before_spawn(root, monkeypatch):
     with pytest.raises(NotReady):
         rc.start("apply", job_id=jid)
     assert spawned == []
+
+
+def test_ui_run_prepare_refused_until_look_approved(root, monkeypatch):
+    """REQ-143: a UI prepare run (POST /api/runs/start) goes through RunControl.start: NotReady -> 409, no spawn."""
+    from careeros.readiness import NotReady
+    from careeros.ui.services.runs import RunControl
+
+    monkeypatch.setattr("careeros.readiness.shutil.which", lambda n: f"/fake/{n}")
+    add_jobs(root, 1)
+    (root / "profile" / "master.look.json").unlink(missing_ok=True)
+    spawned = []
+    rc = RunControl(Settings.load(root), popen=lambda *a, **k: spawned.append(a))
+    with pytest.raises(NotReady) as e:
+        rc.start("prepare")
+    assert [i["id"] for i in e.value.items] == ["resume_look_approved"] and spawned == []
