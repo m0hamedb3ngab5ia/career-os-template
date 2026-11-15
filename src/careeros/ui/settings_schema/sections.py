@@ -327,8 +327,8 @@ SECTIONS: tuple[Section, ...] = (
         ), advanced=True),
         _tier("A", "dream firms — full prep, the candidate submits", False, "always", "always",
               ["resume", "cover_letter", "answers", "form"]),
-        _tier("B", "strong fit — auto-submit after QA", True, "always", "if_contact_found", []),
-        _tier("C", "volume", True, "if_required", "never", []),
+        _tier("B", "strong fit — prepared and QA-checked; you submit unless you opt in", False, "always", "if_contact_found", []),
+        _tier("C", "volume", False, "if_required", "never", []),
         Group("tier_rules", "Tier rules", (
             Field(T, "tier_rules", "rule_list", "Rules", check=_tier_rules,
                   default=[{"if": "company_in dream_list", "tier": "A"}, {"if": "fit >= 85", "tier": "B"},

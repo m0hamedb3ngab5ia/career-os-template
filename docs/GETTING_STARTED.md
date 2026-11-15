@@ -1,7 +1,8 @@
 # Getting started
 
-From a fresh clone to your first tailored application in about 20 minutes. Every command is meant to be
-copy-pasted from the repo root. Nothing is submitted anywhere until step 11, and only when you run it.
+Setup only: from a fresh clone to a passing `careeros doctor`. The day-to-day process (onboarding approvals,
+scout, prepare, apply, status, follow-ups) is in [PROCESS.md](PROCESS.md). Every command is meant to be
+copy-pasted from the repo root. Nothing is submitted anywhere unless you opt in to auto-submit (see PROCESS.md).
 
 ## Prerequisites
 
@@ -103,44 +104,24 @@ To change what scout keeps:
 | never skip old postings | `scout.filters.ghost: false`, or tune `safety.ghost` thresholds |
 | treat a safety check differently | `safety.levels: {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}` |
 
-## 7. Open the app
+## 7. Optional dashboard
 
 ```sh
 .venv/bin/pip install -e ".[ui]"
-.venv/bin/playwright install chromium  # the browser "Fill application" stages forms in
+.venv/bin/playwright install chromium  # the browser `careeros apply fill` stages forms in
 .venv/bin/careeros ui  # --port 8765 (default) --reindex --no-open
 ```
 
-Opens a browser at `http://127.0.0.1:8765` (loopback only; add `--host` and it refuses to start). `data/careeros.db`
-is a disposable index built from the files above; delete it or pass `--reindex` any time and it rebuilds. One
-read-only dashboard with two screens (DEC-024); everything else is done in Claude chat or the CLI, see [docs/CHAT.md](CHAT.md):
+Opens a read-only dashboard (Today and Jobs) at `http://127.0.0.1:8765` (loopback only; add `--host` and it
+refuses to start). `data/careeros.db` is a disposable index built from your files; delete it or pass `--reindex`
+and it rebuilds. Everything else is done in Claude chat or the CLI, see [CHAT.md](CHAT.md).
 
-| Screen | Shows |
-|---|---|
-| Today | what needs you, top picks (read-only) |
-| Jobs | the jobs table and board, with job ticking |
+## 8. Prepare and apply
 
-Retired pages (Job detail, Action Items, Runs, Contacts, Inbox, Settings, Profile, résumé workspace) are covered in CHAT.md.
+Next, follow [PROCESS.md](PROCESS.md): approve the résumé look, then `/prepare-job data/jobs/<id>` for one job.
+Prepare checks `careeros doctor` first and ends with a `RESULT` of `queued`, `needs_review` or `skipped`.
 
-[docs/UI.md](UI.md) is the earlier full-UI design; Today and Jobs only still apply.
-
-## 8. Prepare one job
-
-Pick an id from the list, start Claude Code in the repo, and run the skill:
-
-```sh
-claude
-```
-
-```
-/prepare-job data/jobs/<id>
-```
-
-It checks `careeros doctor` first, then scores the posting, tailors a one-page résumé from your bullets,
-writes a cover letter when the tier calls for one, and runs QA (one regeneration if needed). The last
-line is a `RESULT` with `queued`, `needs_review` or `skipped`.
-
-## 9. Review the output
+## 9. What a prepared job folder holds
 
 ```sh
 ls data/jobs/<id>/
@@ -183,16 +164,10 @@ cd ~/career-private && git init && git add . && git commit -m "my career-os data
 `--link` makes `profile`, `config` (and `CLAUDE.local.md` if that folder has one) symlinks into
 `~/career-private`. `CLAUDE.local.md` is where personal notes for Claude go; it is never committed.
 
-## 11. Apply (when you're ready)
+## 11. ATS logins and what the system learns
 
-Open Chrome with the Claude in Chrome extension signed in, then in Claude Code:
-
-```
-/apply-job data/jobs/<id>
-```
-
-It checks `careeros doctor`, the QA result, daily and per-company caps, and a scam gate before touching
-the form. See the FAQ for what submits on its own.
+Applying itself is described in [PROCESS.md](PROCESS.md) (stage 2). Chrome with the Claude in Chrome extension signed in is
+needed only for the `/apply-job` path.
 
 If an ATS needs a login, store it once (outside the repo, mode 0600, never committed):
 
@@ -303,7 +278,7 @@ and let `careeros doctor` tell you if a required key is missing.
 
 ## Keeping a private copy in sync
 
-Step 9 keeps only your data private. Some people instead keep a whole **private copy** of this repo: the same
+Step 10 keeps only your data private. Some people instead keep a whole **private copy** of this repo: the same
 code plus a committed `personal/` folder (profile, config, `CLAUDE.local.md`, linked with
 `careeros init --link personal`). The rule for such a copy: code, docs and skill changes land in the public
 template first, then get merged into the private copy; only personal values are committed privately.
@@ -363,14 +338,14 @@ toward your subscription's usage limits.
 to send, and builds LinkedIn search URLs. The LinkedIn discovery source is off by default and never uses
 Easy Apply.
 
-**What gets submitted automatically?** Only when you run `/apply-job`, and only Tier B and C jobs
-(fit 70+, not on your dream list) on Greenhouse, Lever or Ashby, after QA passed. Tier A (dream list)
-is never submitted for you. Workday, iCIMS, Taleo and other systems stop at the filled review page with
+**What gets submitted automatically?** Nothing by default: `tiers.B.auto_submit` and `tiers.C.auto_submit`
+in `config/targets.yaml` ship as `false`. If you opt in (`true`), only Tier B and C jobs (not on your dream list)
+on Greenhouse, Lever or Ashby are submitted, after QA passed. Tier A (dream list) is never submitted for you. Workday, iCIMS, Taleo and other systems stop at the filled review page with
 an Action Item. Salary, legal or unknown questions are never guessed; they become Action Items.
 
 **How do I stop it?** Press Esc (or Ctrl-C) in Claude Code to interrupt a running skill. To make
-everything stop before submit, set `auto_submit: false` under both `tiers.B` and `tiers.C` in
-`config/targets.yaml`. For one job, set its `Override` column in the tracker to `A`. Nothing runs in the
+everything stop before submit, keep `auto_submit: false` under `tiers.B` and `tiers.C` (the default), or set
+`safety.pause_auto_submit: true`, in `config/targets.yaml`. For one job, set its `Override` column in the tracker to `A`. Nothing runs in the
 background unless you install the scheduler (`careeros schedule install`); `careeros run pause` stops scheduled
 and running batches, `careeros schedule uninstall` removes it. Batches never submit anything.
 

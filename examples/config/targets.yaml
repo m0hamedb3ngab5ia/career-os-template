@@ -67,14 +67,14 @@ tiers:
     outreach: always
     review_required: [resume, cover_letter, answers, form]
   B:
-    description: strong fit — auto-submit after QA
-    auto_submit: true
+    description: strong fit — prepared and QA-checked; you submit unless you opt in
+    auto_submit: false       # opt in: true (Tier A never auto-submits)
     cover_letter: always
     outreach: if_contact_found
     review_required: []      # only QA failures surface
   C:
     description: volume
-    auto_submit: true
+    auto_submit: false       # opt in: true (Tier A never auto-submits)
     cover_letter: if_required
     outreach: never
     review_required: []

@@ -1,6 +1,8 @@
 # Chat instead of clicking
 
-The web UI (`careeros ui`) is a read-only dashboard: **Today** and **Jobs** (table, board, ticking). Everything else is done in Claude Code chat, with the skills in `.claude/skills/` and the `careeros` CLI (`docs/COMMANDS.md`). Decision: DEC-024.
+You never need to remember commands: say what you want and Claude runs them. The commands below are for reference.
+
+The web UI (`careeros ui`) is a read-only dashboard: **Today** and **Jobs** (table, board, ticking). Everything else is done in Claude Code chat, with the skills in `.claude/skills/` and the `careeros` CLI (`docs/COMMANDS.md`). Decision: DEC-024. The whole path from onboarding to follow-ups is in [PROCESS.md](PROCESS.md).
 
 | You used to click | Say, or run now |
 |---|---|
@@ -29,5 +31,10 @@ New chat skills (DEC-024):
 - `/today`: the dashboard in chat, read-only.
 - `/interview-prep <id>`: writes `interview_prep.md` in the job folder from `profile/master.yaml` bullet ids.
 - `/score-job` now also writes `gaps[]` (stated requirements the profile does not evidence, plus logistics (start date, relocation, on-site)).
+
+Changing your mind (Claude edits files or runs existing commands; you only say it):
+- "Don't apply to `<company>`": Claude adds it to `config/companies.yaml: blocklist.companies` (keeping comments) and sets that company's open jobs (found, scored, queued, needs_review) to skipped with `careeros job status <id> skipped --note blocklist`. Scout and score-job keep enforcing the blocklist. "Unblock `<company>`" reverses it.
+- "This posting is fine" / "mark safe": `careeros safety clear`, then `careeros job status <id> queued`.
+- "Close these action items": `careeros action done <id>` for each id.
 
 Hard rules still apply in chat: no fabricated résumé facts, no guessed legal or salary answers, nothing submitted for Tier A.
