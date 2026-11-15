@@ -35,7 +35,7 @@ def test_items_have_the_contract_shape(tmp_path):
 
 
 def test_fresh_install_is_not_ready(tmp_path):
-    assert set(open_musts(fresh(tmp_path))) == {"master_resume", "setup_clean", "legal_answers", "salary_answer"}
+    assert set(open_musts(fresh(tmp_path))) == {"master_resume", "resume_look_approved", "setup_clean", "legal_answers", "salary_answer"}
 
 
 def test_leftover_example_values_stay_open(tmp_path):
@@ -95,4 +95,24 @@ def test_require_ready_raises_listing_open_ids(tmp_path, monkeypatch):
     shutil.rmtree(root / "profile" / "resumes")
     with pytest.raises(readiness.NotReady) as e:
         readiness.require_ready(root)
-    assert str(e.value) == "not ready: Master résumé set" and e.value.items[0]["id"] == "master_resume"
+    assert str(e.value).startswith("not ready: Master résumé set") and e.value.items[0]["id"] == "master_resume"
+
+
+def test_look_gate_needs_approval_and_resets_on_new_version(tmp_path):
+    from careeros import master_sync
+
+    root = personalize(fresh(tmp_path))
+    assert "resume_look_approved" not in open_musts(root)
+    (root / "profile" / "master.look.json").unlink()
+    assert "resume_look_approved" in open_musts(root)
+    master_sync.approve_look(root)
+    assert open_musts(root) == []
+    (root / "profile" / "master.look.json").write_text('{"rid": "master-0000", "version": 99}')
+    assert "resume_look_approved" in open_musts(root)
+
+
+def test_approve_look_without_master_raises(tmp_path):
+    from careeros import master_sync
+
+    with pytest.raises(LookupError):
+        master_sync.approve_look(fresh(tmp_path))

@@ -5,7 +5,7 @@
 
 Must-haves: a master résumé (profile/resumes/<rid>/meta.json type master), doctor clean (no example data, YAML
 and schema ok), work-auth + sponsorship answers and the salary dropdown floor, `claude` installed, master.yaml
-synced (no pending or rejected master.yaml proposal, REQ-099). Nice: a writing sample, ATS credentials, EEO answers.
+synced (no pending or rejected master.yaml proposal, REQ-099), master résumé look approved. Nice: a writing sample, ATS credentials, EEO answers.
 Gates apply only; score/prepare never call it.
 """
 from __future__ import annotations
@@ -93,6 +93,8 @@ def items(root: Path, which: Callable[[str], str | None] | None = None,
          and not _unchanged(root, examples, "config/targets.yaml", "salary_dropdown_floor_usd:"),
          "/settings"),
         ("claude", "Claude Code (`claude`) installed", True, "claude" not in fails, "/profile#readiness"),
+        ("resume_look_approved", "Master résumé look approved (`careeros resume approve-look`)", True,
+         master_sync.look_approved(root), "/profile#resumes"),
         ("master_synced", "master.yaml synced with the master résumé", True,
          master_sync.state(root)["state"] == "synced", "/profile#master"),
         ("writing_sample", "At least one writing sample", False,

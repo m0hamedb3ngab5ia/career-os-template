@@ -56,7 +56,7 @@ def test_api_readiness_and_409_on_apply(root, client, monkeypatch):
     shutil.rmtree(root / "profile" / "resumes")
     body = client.get("/api/readiness").json()
     assert body["ready"] is False
-    assert [i["id"] for i in body["items"] if i["must"] and not i["done"]] == ["master_resume"]
+    assert [i["id"] for i in body["items"] if i["must"] and not i["done"]] == ["master_resume", "resume_look_approved"]
     r = client.post(f"/api/jobs/{jid}/application/open", json={}, headers={"x-careeros": "1"})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "not_ready"
     assert r.json()["detail"]["items"][0]["id"] == "master_resume"
