@@ -24,7 +24,8 @@ The web UI (`careeros ui`) is a read-only dashboard: **Today** and **Jobs** (tab
 | Inbox | `/inbox-sync` |
 | Contacts, Drafts sheet | `/find-contacts <id>`, `/draft-outreach <id>` (draft only, never sent); `careeros outreach check` |
 | Writing samples (Profile) | put files in `profile/voice/samples/`, run `/learn-voice` |
-| Component kit, onboarding Tour | none; read `docs/GETTING_STARTED.md` |
+| Component kit, onboarding Tour | say "set me up" (`/onboard`), or read `docs/GETTING_STARTED.md` |
+| Add companies / job sources | "add <company>": `careeros company find-board "<name>"`; "job alerts": `/job-alerts` (LinkedIn alert emails → boards) |
 | Today (needs-you, top picks) | still in the UI; in chat: `/today` (read-only) |
 
 New chat skills (DEC-024):

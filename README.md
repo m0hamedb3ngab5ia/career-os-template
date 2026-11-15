@@ -6,19 +6,16 @@ word against that profile, applies through Chrome where it's safe, and tracks ev
 The repo ships code plus a fictional candidate ("Alex Example"); your own data never enters it.
 All AI work runs through your Claude Code subscription. There is no API key.
 
-## Get started
+## Start here
 
-**→ [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**: clone, install, fill in your profile, and run
-`careeros doctor` until it has no FAIL. About 20 minutes to your first tailored application.
+1. `git clone https://github.com/m0hamedb3ngab5ia/career-os-template.git career-os` (outside iCloud/Dropbox).
+2. Open the `career-os` folder in Claude Code. (Or skip step 1: paste this repo's link into any Claude Code chat and say "clone this and set me up".)
+3. Say **"set me up"** (or run `/onboard`). Claude checks your tools, installs, and fills your profile from your résumé with you.
+4. You choose job sources (company boards, Handshake, LinkedIn job-alert emails); Claude turns on the ones you pick.
+5. You end with a passing `careeros doctor`, scored jobs, one tailored résumé + cover letter, and a filled form you submit yourself.
 
-Then the whole path (onboarding, applying, status, follow-ups) is in **[docs/PROCESS.md](docs/PROCESS.md)**.
-
-```sh
-git clone https://github.com/m0hamedb3ngab5ia/career-os-template.git career-os && cd career-os
-python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
-.venv/bin/careeros init      # copies the example candidate into profile/ and config/ (gitignored)
-.venv/bin/careeros doctor    # FAILs until you replace the example data with your own
-```
+Step by step, by hand: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**. Day-to-day process (applying, status,
+follow-ups): **[docs/PROCESS.md](docs/PROCESS.md)**.
 
 ## How it works
 
@@ -58,7 +55,7 @@ python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 
 `/prepare-job` runs score, tailor, cover letter and QA for one job. `prepare-job` and `apply-job` both run
 `careeros doctor --quiet` first and stop while the example data is still in place. Unattended setup (Claude
-login, allowed tools, scheduler): [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#12-unattended-runs-optional-macos).
+login, allowed tools, scheduler): [docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#unattended-runs-optional-macos).
 
 ## What you configure vs what's reusable
 
@@ -209,7 +206,7 @@ skipped; only `company_cap` / `cooldown` stay queued for the next session. `care
 
 `profile/`, `config/`, `CLAUDE.local.md`, `data/` and `.reviews/` are gitignored. Keep them in your own
 **private** repo and link them in with `careeros init --link ~/career-private` (steps in
-[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#10-keep-your-data-private-recommended)). `--link` refuses to
+[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md#keep-your-data-private-recommended)). `--link` refuses to
 replace a real (non-symlink) `profile/` or `config/`; move those into the private repo first.
 `CLAUDE.local.md` is where personal context for Claude goes; Claude Code loads it automatically.
 

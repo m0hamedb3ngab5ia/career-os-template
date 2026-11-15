@@ -1,154 +1,157 @@
 # Getting started
 
-Setup only: from a fresh clone to a passing `careeros doctor`. The day-to-day process (onboarding approvals,
-scout, prepare, apply, status, follow-ups) is in [PROCESS.md](PROCESS.md). Every command is meant to be
-copy-pasted from the repo root. Nothing is submitted anywhere unless you opt in to auto-submit (see PROCESS.md).
+From a fresh clone to your first application. The easy way: open the repo in Claude Code and say
+**"set me up"**. Claude follows the [`onboard`](../.claude/skills/onboard/SKILL.md) skill, runs every command for
+you, and picks up where you left off if you stop. This page is the same checklist, for reading or doing by hand.
+Every command runs from the repo root. Nothing is ever submitted for you unless you turn on auto-submit later.
 
-## Prerequisites
+## 1. Check what you need
 
-| Need | Why | Install |
+| Need | Why | How to check / install |
 |---|---|---|
-| macOS or Linux | the CLI and skills assume a POSIX shell | |
-| Python 3.12+ | the `careeros` package | `python3 --version`; on macOS `brew install python@3.12` |
-| Claude Code subscription + CLI | every skill (scoring, tailoring, QA, applying) runs through it; no API key | install from https://docs.claude.com/en/docs/claude-code, then run `claude` once to log in |
-| Claude in Chrome extension | only for applying (`/apply-job` drives your browser) | Chrome Web Store: "Claude in Chrome", then sign in |
-| Homebrew + tectonic | turns résumés and cover letters into PDFs | `brew install tectonic` (or any `pdflatex`) |
-| gh + codex (optional) | only for `/review` of code changes | `brew install gh`, `npm install -g @openai/codex` |
+| macOS or Linux | the tool assumes a normal shell | |
+| Python 3.11+ | runs the `careeros` tool | `python3 --version`; macOS: `brew install python@3.12` |
+| Claude Code | does all the AI work (scoring, writing, QA) on your subscription; no API key | https://docs.claude.com/en/docs/claude-code, then run `claude` once to sign in |
+| tectonic (or `pdflatex`) | turns résumés into PDFs | `brew install tectonic` |
+| Chrome | only for applying and the Handshake source | |
 
-## 1. Clone (outside iCloud / Dropbox)
+## 2. Clone and install
 
-Synced folders hide files inside `.venv` and create "file 2.py" duplicates. Use a plain folder:
-
-```sh
-mkdir -p ~/dev && cd ~/dev
-git clone https://github.com/m0hamedb3ngab5ia/career-os-template.git career-os
-cd career-os
-```
-
-## 2. Python environment
+Use a plain folder, not iCloud Drive or Dropbox (synced folders break the Python environment).
 
 ```sh
-python3 -m venv .venv
-.venv/bin/pip install -e ".[test]"
-.venv/bin/python -m pytest -q -m unit        # optional: should be all green, uses only the fake example data
+git clone https://github.com/m0hamedb3ngab5ia/career-os-template.git career-os && cd career-os
+python3 -m venv .venv && .venv/bin/pip install -e ".[test]"
 ```
 
-## 3. Create your profile/ and config/
+Works when `.venv/bin/careeros --help` prints a list of commands.
+
+## 3. Create your private files
 
 ```sh
 .venv/bin/careeros init
-```
-
-This copies the fictional candidate "Alex Example" from `examples/` into `profile/` and `config/`
-(both gitignored). It never overwrites existing files. Run the checklist once to see what's left:
-
-```sh
 .venv/bin/careeros doctor
 ```
 
-Expect a list of FAIL lines: the profile still holds the example identity, experience ids and answers.
-The skills refuse to prepare or submit anything until those are gone.
+`init` copies a made-up candidate, "Alex Example", into `profile/` and `config/`. Both folders are gitignored: your
+data never goes into git. `doctor` is the checklist. Right now it shows about 11 FAIL lines. That is expected: each
+one says "this is still Alex's data". Steps 4 to 7 clear them all.
 
-## 4. Fill in these first (minimum viable set)
-
-Every personal line in these files carries an `# INSERT: <what goes here, format, example>` comment.
-Replace the value; delete the comment once the line holds your real value. Lines labeled
-`reusable default: fine to keep` can stay as they are.
-
-| # | File | What to fill in | Time |
-|---|---|---|---|
-| 1 | `profile/master.yaml` → `identity` | name, email, phone, location, LinkedIn, GitHub | 2 min |
-| 2 | `profile/master.yaml` → `experience`, `projects`, `education` | 2-3 real entries, each with a new `id` (e.g. `northwind`) and 2-4 bullets (`northwind.1`, ...). One fact per bullet, real numbers only. Delete the example entries | 8 min |
-| 3 | `profile/master.yaml` → `skills`, `narratives` | tools you can defend; 1-2 true sentences about what drives you | 2 min |
-| 4 | `profile/standard_answers.yaml` | every `answer` with an INSERT comment (work authorization, sponsorship, school, links, phone, address) and the `eeo:` block ("Decline" is fine) | 3 min |
-| 5 | `config/targets.yaml` → `candidate`, `location`, `industries` | level, graduation, salary floors, work authorization, preferred cities | 2 min |
-| 6 | `config/companies.yaml` → `dream_list`, `blocklist` | companies you want to review yourself (Tier A); your current employer in `blocklist.companies` | 1 min |
-| 7 | `config/categories.yaml` → `bullet_priority` | replace `acme, initech_intern, widgetizer` with your own entry ids, most relevant first | 1 min |
-| 8 | `profile/confidential_terms.yaml` | your employer's internal codenames (or `terms: []`, `patterns: []`) | 1 min |
-
-Optional: `profile/resume_feedback.md` holds your own résumé-writing rules; the résumé skills read it and add to it when you correct a résumé.
-
-Later, when you have time: put 2-5 letters or emails you wrote in `profile/voice/samples/` and run
-`/learn-voice` in Claude Code, so cover letters sound like you.
-
-## 5. Run the doctor until there is no FAIL
-
-```sh
-.venv/bin/careeros doctor
-```
-
-- **FAIL** blocks everything (example data left, broken YAML, a `bullet_priority` id that doesn't exist,
-  `claude` not installed). Fix and rerun. Exit code 0 means ready.
-- **WARN** is advice: an `# INSERT` line still identical to the example (if the example value is also your
-  true answer, e.g. `"Yes"`, delete its `# INSERT` comment), no LaTeX engine, no voice samples, no gh/codex.
-
-## 6. First scout
-
-```sh
-.venv/bin/careeros scout --sync
-.venv/bin/careeros jobs list --status found
-```
-
-Scout pulls every board in `config/companies.yaml`, applies the prefilters enabled in
-`config/targets.yaml: scout.filters` (by default: title keywords, seniority, blocked countries, blocklist,
-flagged companies and ghost jobs), stores each posting in `data/jobs/<id>/` and creates the tracker
-`data/JobTracker.xlsx`. Nothing is sent anywhere.
-
-To change what scout keeps:
-
-| Want | Set in `config/targets.yaml` |
+| FAIL says | Fixed in |
 |---|---|
-| only some job-board sources | `scout.sources: [greenhouse]` |
-| keep senior roles | `scout.filters.seniority: false` (or edit `seniority.exclude_title_keywords`) |
-| keep every title, no category filter | `scout.filters.title: false` |
-| never skip old postings | `scout.filters.ghost: false`, or tune `safety.ghost` thresholds |
-| treat a safety check differently | `safety.levels: {SCAM_FREE_EMAIL_RECRUITER: block, GHOST_OLD_POST: off}` |
+| `profile/master.yaml: identity.* is still the example value` | step 4 |
+| `experience / projects / education / leadership id '...' is from the example` | step 4 |
+| `profile/standard_answers.yaml: identical to the example file` | step 6 |
+| `bullet_priority` id does not exist (appears after step 4) | step 7 |
 
-## 7. Optional dashboard
+## 4. Your profile, from your résumé
+
+`profile/master.yaml` holds every fact your résumés and letters may use. Nothing else is ever invented.
 
 ```sh
-.venv/bin/pip install -e ".[ui]"
-.venv/bin/playwright install chromium  # the browser `careeros apply fill` stages forms in
-.venv/bin/careeros ui  # --port 8765 (default) --reindex --no-open
+.venv/bin/careeros resume add ~/path/to/your-resume.pdf --type master
 ```
 
-Opens a read-only dashboard (Today and Jobs) at `http://127.0.0.1:8765` (loopback only; add `--host` and it
-refuses to start). `data/careeros.db` is a disposable index built from your files; delete it or pass `--reindex`
-and it rebuilds. Everything else is done in Claude chat or the CLI, see [CHAT.md](CHAT.md).
-
-## 8. Prepare and apply
-
-Next, follow [PROCESS.md](PROCESS.md): approve the résumé look, then `/prepare-job data/jobs/<id>` for one job.
-Prepare checks `careeros doctor` first and ends with a `RESULT` of `queued`, `needs_review` or `skipped`.
-
-## 9. What a prepared job folder holds
+Then in Claude Code run `/extract-master` ([skill](../.claude/skills/extract-master/SKILL.md)). It proposes a full
+`master.yaml` from your résumé and shows the diff. Check it, add any missing numbers, then approve it:
 
 ```sh
-ls data/jobs/<id>/
+.venv/bin/python -c "import careeros.master_sync as m; print(m.approve('.'))"
+```
+
+(`m.reject('.')` throws the proposal away.) By hand instead: edit `profile/master.yaml` directly. Replace
+the `identity` block, and replace Alex's entries (`acme`, `initech_intern`, `widgetizer`, `state_u`, `acm`) with
+your own, each with a new `id` and 2-4 true bullets.
+
+## 5. Confidential terms
+
+If your employer has internal project names or codes, list them in `profile/confidential_terms.yaml: terms`. QA
+blocks any document that contains one. No such terms: `terms: []` and `patterns: []`.
+
+## 6. Standard answers
+
+`profile/standard_answers.yaml` holds the answers application forms reuse word for word: work authorization,
+sponsorship, school, links, phone, start date, and the `eeo:` block ("Decline to self-identify" is always fine).
+Replace each line marked `# INSERT`, then delete the comment. Claude asks you these one group at a time during
+onboarding and never guesses a legal answer.
+
+## 7. Targets and companies
+
+| File | Set |
+|---|---|
+| `config/targets.yaml` | `candidate` (level, graduation, salary floors, work authorization), `location`, roles in `scout.filters` |
+| `config/companies.yaml` | `dream_list` (you review these yourself; never auto-submitted), `blocklist.companies` (your current employer) |
+| `config/categories.yaml` | each `bullet_priority` list: your own experience ids, most relevant first |
+| `config/pipeline.yaml` | fine as is; `paths.tracker_xlsx` moves the tracker spreadsheet |
+
+Run `.venv/bin/careeros doctor` again until it exits with no FAIL. WARN lines are advice. An `# INSERT` WARN on a
+line where Alex's value is also your true answer (say `"Yes"`) goes away when you delete the comment.
+
+## 8. Approve how your résumé looks
+
+```sh
+.venv/bin/careeros resume approve-look
+```
+
+It prints where your master résumé PDF is. Open it; run the command once you are happy with it. Preparing jobs
+waits for this (`careeros resume look-check` exits 0 when done).
+
+## 9. Choose your job sources
+
+Turn on any mix. Company boards are the usual start.
+
+| Source | What it finds | What it needs | How to turn on |
+|---|---|---|---|
+| Company boards (Greenhouse, Ashby, Lever) | every open job at the companies you list | company names | edit `boards:` in `config/companies.yaml`; add by name with `careeros company find-board "Name"` |
+| Handshake | your school's Handshake job search, read-only | a Handshake account; `pip install -e ".[fast-apply]"`, `playwright install chromium`; you sign in once in the apply browser | say "turn on Handshake" (the [onboard](../.claude/skills/onboard/SKILL.md) skill, step 9b), then uncomment the `Handshake` line under `boards:` |
+| LinkedIn job-alert emails | companies hiring for your LinkedIn alerts, added as company boards | LinkedIn alerts by email, a Gmail label, the Claude desktop browser pane or a Gmail connector | say "job alerts" ([job-alerts](../.claude/skills/job-alerts/SKILL.md) skill) |
+
+`careeros company find-board` prints ready-to-paste `boards:` lines. Check a common company name's board really is
+that company before adding it. LinkedIn itself is never automated: the job-alerts route only reads emails LinkedIn
+already sent you, and you sign in to Gmail yourself.
+
+## 10. First jobs
+
+```sh
+.venv/bin/careeros scout --sync                 # pull the boards; nothing is sent anywhere
+.venv/bin/careeros run score --preset small     # Claude scores up to 10 jobs
+.venv/bin/careeros jobs list --status scored
+.venv/bin/careeros run prepare --job <id>       # résumé, cover letter and QA for one job; never applies
 .venv/bin/careeros job show <id>
 ```
 
-| File | What to check |
-|---|---|
-| `score.json` | category, fit 0-100, tier, why it would be skipped |
-| `resume.pdf` / `resume.txt` | every bullet is yours, word for word or lightly rephrased; numbers unchanged |
-| `cover_letter.md` | 120-250 words, two concrete facts about the company, sounds like you |
-| `qa.json` | `pass`, and `fail_reasons` if not |
-| `log.md`, `prepare.json` | what each step did |
+Scout found nothing? `data/scout_last.json` shows which filter removed what; loosen that filter in
+`config/targets.yaml: scout.filters`. A job ends as `needs_review` when something needs your answer:
+`careeros action list`, then `careeros action done <id> --answer "..."`.
 
-To get the letter as `.txt` / `.pdf` (needed by `/apply-job`):
+A prepared job folder `data/jobs/<id>/` holds `score.json` (fit and why), `resume.pdf`, `cover_letter.md` and
+`qa.json` (pass or the reasons). Read the résumé and letter before applying.
 
-```sh
-.venv/bin/python templates/cover_letter/render.py data/jobs/<id>/cover_letter.md
-```
+## 11. Apply
 
-Open items (questions it couldn't answer, reviews) are in the tracker's Action Items tab:
+Greenhouse and Ashby, fast fill (needs the `[fast-apply]` extra and `playwright install chromium`):
 
 ```sh
-.venv/bin/careeros action list
+.venv/bin/careeros apply plan <id>    # every answer it will type, in data/jobs/<id>/fill_plan.json
+.venv/bin/careeros apply fill <id>    # fills the form in a separate browser window; never submits
 ```
 
-## 10. Keep your data private (recommended)
+Check the form, fill anything it reports as empty, click submit yourself, then
+`.venv/bin/careeros job status <id> applied`. Other sites: `/apply-job` ([skill](../.claude/skills/apply-job/SKILL.md))
+fills through the Claude in Chrome extension and stops before submit.
+
+## Daily use
+
+- Start each Claude Code chat with `/today`: what needs you, the best new jobs, the last run.
+- Then: `scout --sync`, `run score`, `run prepare --job <id>`, review, apply (steps 10-11).
+- `/inbox-sync` moves recruiter replies into the tracker. `/job-alerts` weekly refreshes companies from LinkedIn alerts.
+- You can say all of this in plain words; [CHAT.md](CHAT.md) lists the commands behind each request.
+- Optional: put 2-5 letters you wrote in `profile/voice/samples/` and run `/learn-voice` so letters sound like you.
+- Optional dashboard: `pip install -e ".[ui]"`, then `careeros ui` opens Today and Jobs at http://127.0.0.1:8765.
+- Optional, macOS: `careeros schedule install` runs scout, score and prepare overnight (see "Unattended runs").
+- The full process (follow-ups, statuses, outreach) is in [PROCESS.md](PROCESS.md).
+
+## Keep your data private (recommended)
 
 `profile/`, `config/`, `CLAUDE.local.md` and `data/` are gitignored, so they never go into this repo. To
 back them up and use them from several machines, keep them in your own **private** repo and link them in:
@@ -164,7 +167,7 @@ cd ~/career-private && git init && git add . && git commit -m "my career-os data
 `--link` makes `profile`, `config` (and `CLAUDE.local.md` if that folder has one) symlinks into
 `~/career-private`. `CLAUDE.local.md` is where personal notes for Claude go; it is never committed.
 
-## 11. ATS logins and what the system learns
+## ATS logins and what the system learns
 
 Applying itself is described in [PROCESS.md](PROCESS.md) (stage 2). Chrome with the Claude in Chrome extension signed in is
 needed only for the `/apply-job` path.
@@ -189,7 +192,7 @@ becomes an Action Item with the question in its text; answer it once with
 written to `profile/apply_lessons.yaml` (`careeros learn lesson`, `careeros learn list`) and read before the
 next session there.
 
-## 12. Unattended runs (optional, macOS)
+## Unattended runs (optional, macOS)
 
 Once single jobs look right, the system can score and prepare in batches on a schedule. Python ranks the jobs and
 enforces the budgets; each job is one headless Claude Code call (`claude -p`, your subscription). Runs never apply:
