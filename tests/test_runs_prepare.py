@@ -48,7 +48,7 @@ class Fake:
         self.s, self.modes, self.default, self.calls = settings, modes or {}, default, []
 
     def __call__(self, cmd, cwd, env, timeout_s, stream_path):
-        jid = Path(cmd[-1].splitlines()[0].split(" ", 1)[1]).name
+        jid = Path(cmd[-1].splitlines()[0].split()[1]).name
         self.calls.append(jid)
         mode = self.modes.get(jid, self.default)
         Path(stream_path).write_text("{}")
@@ -349,3 +349,21 @@ def test_dec_021_run_batch_passes_force_tailor_to_the_resume_pick(settings, stor
     run_batch(settings, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg, invoke=Fake(settings),
               now=lambda: NOW, job_ids=[jid], force=True, force_tailor=flag)
     assert seen == [flag]
+
+
+@pytest.mark.parametrize("force", [True, False])
+def test_run_prepare_passes_force_to_the_skill(settings, store, force):
+    # regression: `run prepare --force --job X` let the job through but called the skill without --force, so its
+    # re-run guard (prepare.json qa_pass: true) printed the old RESULT and nothing was rebuilt
+    jid = add_job(store, 1)
+    settings.pipeline = {**settings.pipeline, "runs": {**(settings.pipeline.get("runs") or {}),
+                                                       "preflight_doctor": False}}
+    cfg = load_runs_config(settings)
+    seen = []
+    fake = Fake(settings)
+    def spy(cmd, *a, **kw):
+        seen.append(cmd[-1].splitlines()[0])
+        return fake(cmd, *a, **kw)
+    run_batch(settings, "prepare", budget_for(cfg, "prepare", max_jobs=1), cfg=cfg, invoke=spy,
+              now=lambda: NOW, job_ids=[jid], force=force)
+    assert len(seen) == 1 and seen[0].endswith(" --force") is force
