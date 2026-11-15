@@ -1937,7 +1937,7 @@ def build_parser() -> argparse.ArgumentParser:
     it.add_argument("--link", metavar="DIR", help="symlink profile/, config/ (and CLAUDE.local.md) from DIR instead of copying")
     it.set_defaults(fn=cmd_init)
 
-    vw = sub.add_parser("view", help="write data/views/status.html: checklist, pipeline, applied history (no AI)")
+    vw = sub.add_parser("view", help="write data/views/ tab pages: setup or documents, jobs, applications (no AI)")
     vw.add_argument("--open", action="store_true", help="open it with the OS")
     vw.set_defaults(fn=cmd_view)
     dr = sub.add_parser("doctor", help="check setup: files, example data left, tools (exit 1 on any FAIL)")
