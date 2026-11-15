@@ -101,3 +101,13 @@ def test_cli_pass_writes_nothing(tmp_path):
 def test_company_history_is_not_a_years_requirement(text):
     # a false skip drops a real job silently; when unsure, leave it to the skill
     assert min_years_required(text) is None
+
+
+def test_required_years_survive_a_preferred_clause_on_the_same_line():
+    assert min_years_required("5+ years of experience required, 7 years of experience preferred.") == 5
+
+
+def test_non_usd_salary_is_not_compared_with_the_usd_floor(settings):
+    settings.targets.setdefault("candidate", {})["min_base_usd"] = 90000
+    assert "salary_below_min" not in hard_filters(settings, _posting(salary_max=60000, salary_currency="GBP"))
+    assert "salary_below_min" in hard_filters(settings, _posting(salary_max=60000, salary_currency="USD"))

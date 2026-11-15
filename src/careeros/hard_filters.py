@@ -10,7 +10,7 @@ already applied, safety, prestige).
 | `title_senior`     | targets.yaml seniority.exclude_title_keywords in the title (scout filter `seniority`) |
 | `location_blocked` | targets.yaml location.blocked_countries (scout filter `location`) |
 | `yoe_gt_<n>`       | a required (not preferred) minimum years of experience > seniority.max_years_required (default 3) |
-| `salary_below_min` | posted salary_max < candidate.min_base_usd |
+| `salary_below_min` | posted salary_max (USD or no currency) < candidate.min_base_usd |
 """
 from __future__ import annotations
 
@@ -31,10 +31,10 @@ def min_years_required(text: str) -> int | None:
     have / bonus, internship-only experience and years without "experience" never count."""
     found = []
     for line in re.split(r"(?<=[.;])\s+|\n", text or ""):
-        if _OPTIONAL.search(line):
-            continue
         for m in _YEARS.finditer(line):
-            tail = m.group("tail").lower()
+            tail = m.group("tail").lower().split(",")[0]  # this clause only: "5+ required, 7 preferred"
+            if _OPTIONAL.search(tail) or _OPTIONAL.search(line[max(0, m.start() - 25):m.start()]):
+                continue
             if _COMPANY.search(line[max(0, m.start() - 30):m.start()]):  # "Acme has 20 years", "for 10 years we"
                 continue
             if re.search(r"\bexperience\b", tail) and "intern" not in tail:
@@ -64,7 +64,8 @@ def hard_filters(settings: Settings, posting: dict[str, Any]) -> list[str]:
     if yrs is not None and yrs > cap:
         fails.append(f"yoe_gt_{cap}")
     floor = (settings.targets.get("candidate") or {}).get("min_base_usd")
-    if isinstance(p.salary_max, (int, float)) and floor and p.salary_max < floor:
+    usd = str(p.salary_currency or "USD").upper() == "USD"  # explicit other currency: not comparable, leave to the skill
+    if usd and isinstance(p.salary_max, (int, float)) and floor and p.salary_max < floor:
         fails.append("salary_below_min")
     return fails
 
