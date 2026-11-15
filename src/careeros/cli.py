@@ -44,6 +44,17 @@ def cmd_init(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_view(args: argparse.Namespace) -> int:
+    from careeros import view
+
+    path = view.write(_settings(args).root)
+    print(path)
+    if args.open:
+        import subprocess
+        subprocess.run(["open" if sys.platform == "darwin" else "xdg-open", str(path)], check=False)
+    return 0
+
+
 def cmd_doctor(args: argparse.Namespace) -> int:
     """Setup checklist (see careeros.doctor). Exit 1 on any FAIL. Needs no setup itself."""
     from careeros.doctor import PASS, WARN, Check, exit_code, format_report, run_doctor
@@ -953,6 +964,23 @@ def cmd_resume_keep_master(args: argparse.Namespace) -> int:
         return 1
     print("master.yaml kept; marked synced with the master résumé")
     return 0
+def cmd_resume_approve_look(args: argparse.Namespace) -> int:
+    """Approve how the master résumé looks (closes readiness `resume_look_approved`); says where its PDF is."""
+    from careeros import master_sync
+
+    root = _settings(args).root
+    try:
+        rec = master_sync.approve_look(root)
+    except LookupError as e:
+        print(f"error: {e}", file=sys.stderr)
+        return 1
+    print(f"master résumé look approved ({rec['rid']} v{rec['version']})")
+    d = root / "profile" / "resumes" / rec["rid"]
+    pdf = next(iter(sorted(d.glob("cache/*.pdf")) + sorted(d.glob(f"v{rec['version']}/original.pdf"))), None)
+    print(f"rendered PDF: {pdf}" if pdf else "no rendered PDF yet (open the résumé in the UI to render one)")
+    return 0
+
+
 def cmd_resume_import_save(args: argparse.Namespace) -> int:
     """extract-master hands an uploaded résumé's resume.json here (DEC-019): guarded, then v2; refused -> failed."""
     from careeros import resume_import
@@ -1909,6 +1937,9 @@ def build_parser() -> argparse.ArgumentParser:
     it.add_argument("--link", metavar="DIR", help="symlink profile/, config/ (and CLAUDE.local.md) from DIR instead of copying")
     it.set_defaults(fn=cmd_init)
 
+    vw = sub.add_parser("view", help="write data/views/status.html: checklist, pipeline, applied history (no AI)")
+    vw.add_argument("--open", action="store_true", help="open it with the OS")
+    vw.set_defaults(fn=cmd_view)
     dr = sub.add_parser("doctor", help="check setup: files, example data left, tools (exit 1 on any FAIL)")
     dr.add_argument("--quiet", action="store_true", help="print only FAIL lines (nothing when all good)")
     dr.set_defaults(fn=cmd_doctor)
@@ -2092,6 +2123,8 @@ def build_parser() -> argparse.ArgumentParser:
     rsp = rss.add_parser("keep-master", help="keep profile/master.yaml as is: drop any proposal, mark it synced "
                          "with the master résumé")
     rsp.set_defaults(fn=cmd_resume_keep_master)
+    rsp = rss.add_parser("approve-look", help="approve how the master résumé looks (gate for prepare/apply)")
+    rsp.set_defaults(fn=cmd_resume_approve_look)
     rsp = rss.add_parser("import-save", help="guard an uploaded résumé's structured resume.json -> v2 (DEC-019; "
                          "used by the extract-master skill)")
     rsp.add_argument("rid")

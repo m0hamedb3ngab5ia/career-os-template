@@ -208,7 +208,18 @@ def add_master_resume(root: Path) -> Path:
     """A master résumé in profile/resumes (DEC-008 layout): readiness must-have `master_resume` (REQ-102)."""
     d = root / "profile" / "resumes" / "master-0000"
     d.mkdir(parents=True, exist_ok=True)
-    (d / "meta.json").write_text(json.dumps({"name": "Master", "type": "master", "versions": []}), encoding="utf-8")
+    (d / "meta.json").write_text(json.dumps(
+        {"name": "Master", "type": "master", "rid": "master-0000", "versions": [{"n": 1, "at": "2026-01-01T00:00:00Z"}]}),
+        encoding="utf-8")
+    (root / "profile" / "master.synced.json").write_text('{"rid": "master-0000", "version": 1}', encoding="utf-8")
+    return root
+
+
+def approve_look(root: Path) -> Path:
+    """Approve the master résumé look (readiness must-have `resume_look_approved`)."""
+    from careeros import master_sync
+
+    master_sync.approve_look(root)
     return root
 
 
@@ -230,6 +241,7 @@ def personalize(root: Path) -> Path:
 
     _yaml_rw(root / "profile" / "master.yaml", _ids)
     add_master_resume(root)
+    approve_look(root)
 
     def _cats(d):
         for c in d.values():

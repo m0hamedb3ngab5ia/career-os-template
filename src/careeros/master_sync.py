@@ -24,6 +24,7 @@ from careeros.runs.atomic import write_text
 
 MASTER, PROPOSED, REJECTED = "profile/master.yaml", "profile/master.proposed.yaml", "profile/master.rejected.yaml"
 SYNCED = "profile/master.synced.json"
+LOOK = "profile/master.look.json"
 NUM = re.compile(r"\d(?:[\d,.]*\d)?%?")
 
 
@@ -169,3 +170,25 @@ def reject(root: Path) -> dict[str, Any]:
             raise LookupError("no pending master.yaml proposal")
         (root / PROPOSED).replace(root / REJECTED)
     return state(root)
+
+
+def look_approved(root: Path) -> bool:
+    """The user approved how the current master résumé (rid + version) looks; a new master or version resets it."""
+    m = _master(Path(root))
+    try:
+        d = json.loads(_read(Path(root) / LOOK) or "null")
+    except ValueError:
+        return False
+    return bool(m and isinstance(d, dict) and {"rid": d.get("rid"), "version": d.get("version")} == _source(m))
+
+
+def approve_look(root: Path) -> dict[str, Any]:
+    """Write profile/master.look.json {rid, version, approved_at} for the current master résumé."""
+    from datetime import datetime, timezone
+
+    m = _master(Path(root))
+    if m is None:
+        raise LookupError("no master résumé set: mark one master first")
+    rec = _source(m) | {"approved_at": datetime.now(timezone.utc).isoformat(timespec="seconds")}
+    write_text(Path(root) / LOOK, json.dumps(rec))
+    return rec
