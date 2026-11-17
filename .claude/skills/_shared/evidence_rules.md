@@ -19,10 +19,14 @@ Rules:
 2. `skills.*` / `stack` justify *familiarity only*. They never justify a metric, an outcome, seniority
    ("expert in"), or a duration ("3 years of Go").
 3. Synonyms are allowed for the familiarity check only: Postgres/PostgreSQL, JS/JavaScript,
-   K8s/Kubernetes, Athena/AWS Athena. Do not stretch: "SQL" is not "PostgreSQL"; "AWS Athena" is not "AWS Lambda".
+   K8s/Kubernetes, Athena/AWS Athena, plus `pipeline.yaml: match.synonyms`. One-way implications in
+   `match.implies` only raise score-job matching/fit; they never license writing the implied term in a résumé,
+   cover letter or answer (that needs the term or a synonym in profile text) (e.g. Kafka or event-driven evidences "distributed systems"; monitoring, Kibana or
+   Geneos evidences "observability"; RHEL evidences "Linux"), never the reverse. Do not stretch: "SQL" is not "PostgreSQL"; "AWS Athena" is not "AWS Lambda".
 4. Posting terminology may be mirrored only when evidence exists under these rules; record the pair
    (`term -> evidence id`) in the artifact's `keyword_mirror` / `skill_evidence` map.
 5. Evidence id formats: `skills.programming | skills.frameworks | skills.tools | skills.concepts`,
+   `skill_groups.<label>` (e.g. `skill_groups.Cloud & DevOps`: the master résumé's grouped skills count too),
    `<entry id>.stack`, `<bullet id>` (e.g. `acme.3`), `<narrative id>` (e.g. `n.data`).
 6. Stronger verbs than the bullet ("led" when the bullet says "supported") are unsupported even
    when the id is cited.

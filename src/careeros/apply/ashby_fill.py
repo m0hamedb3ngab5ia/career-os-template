@@ -48,6 +48,7 @@ def fill_one(root: Any, f: dict[str, Any]) -> bool:
         btn.click()
         return btn.get_attribute("aria-pressed") == "true"
     if t == "checkbox_group":
+        v = [v] if isinstance(v, str) else v  # one picked option may arrive as a plain string
         for opt in v:
             w.get_by_label(opt, exact=True).check()
         return all(w.get_by_label(opt, exact=True).is_checked() for opt in v)

@@ -18,6 +18,8 @@
     "scam_suspected",
     "ghost_job",
     "injection_suspected",
+    "referral",
+    "follow_up",
     "other"
   ],
   "clean_stops": [

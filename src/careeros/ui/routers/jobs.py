@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
-from datetime import datetime
+from datetime import date, datetime, timedelta
 from typing import Any, Iterator, Literal
 
 from fastapi import APIRouter, Body, Depends, HTTPException, Query, Request
@@ -37,13 +37,19 @@ def _column_filters(*, company: list[str], location_in: list[str], ats: list[str
                     fit_min: float | None, fit_max: float | None, qa_score_min: float | None,
                     qa_score_max: float | None, found_from: str | None, found_to: str | None,
                     applied_from: str | None, applied_to: str | None, closes_from: str | None,
-                    closes_to: str | None) -> dict[str, Any]:
+                    closes_to: str | None, posted_within: int | None = None) -> dict[str, Any]:
     """The Excel-style column filters as the service's `values` / `ranges` (status, tier, safety, category keep
     their own params). `location_in` is exact values; `location` stays the substring search."""
     return {"values": {"company": company, "location": location_in, "ats": ats, "qa_passed": qa_passed},
             "ranges": {"fit": (fit_min, fit_max), "qa_score": (qa_score_min, qa_score_max),
                        "found_at": (found_from, found_to), "applied_at": (applied_from, applied_to),
-                       "closes_at": (closes_from, closes_to)}}
+                       "closes_at": (closes_from, closes_to),
+                       "posted_at": (_days_ago(posted_within), None)}}
+
+
+def _days_ago(n: int | None) -> str | None:
+    """Posted-within filter: the oldest posted date still wanted (None = any)."""
+    return (date.today() - timedelta(days=n)).isoformat() if n else None
 
 
 _ISO_DATE_PATTERN = r"^\d{4}-\d{2}-\d{2}$"
@@ -58,11 +64,12 @@ def column_filters(company: list[str] = Query(default=[]), location_in: list[str
                    applied_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
                    applied_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
                    closes_from: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
-                   closes_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN)) -> dict[str, Any]:
+                   closes_to: str | None = Query(default=None, pattern=_ISO_DATE_PATTERN),
+                   posted_within: int | None = Query(default=None, ge=1, le=3650)) -> dict[str, Any]:
     return _column_filters(company=company, location_in=location_in, ats=ats, qa_passed=qa_passed, fit_min=fit_min,
                            fit_max=fit_max, qa_score_min=qa_score_min, qa_score_max=qa_score_max,
                            found_from=found_from, found_to=found_to, applied_from=applied_from,
-                           applied_to=applied_to, closes_from=closes_from, closes_to=closes_to)
+                           applied_to=applied_to, closes_from=closes_from, closes_to=closes_to, posted_within=posted_within)
 
 
 @router.get("/jobs")
@@ -122,6 +129,7 @@ class Export(BaseModel):
     applied_to: str | None = None
     closes_from: str | None = None
     closes_to: str | None = None
+    posted_within: int | None = None
     sort: str = svc.DEFAULT_SORT
     columns: list[str] | None = None
 
@@ -131,7 +139,7 @@ def export(body: Export, c=Depends(ctx)) -> Response:
     b = body.model_dump()
     cols = _column_filters(**{k: b[k] for k in ("company", "location_in", "ats", "qa_passed", "fit_min", "fit_max",
                                                 "qa_score_min", "qa_score_max", "found_from", "found_to",
-                                                "applied_from", "applied_to", "closes_from", "closes_to")})
+                                                "applied_from", "applied_to", "closes_from", "closes_to", "posted_within")})
     raw = svc.export_xlsx(c.index, job_ids=body.job_ids, columns=body.columns, sort=body.sort, closed=_closed(c),
                           **({} if body.job_ids is not None else
                              {"tab": body.tab, "q": body.q, "location": body.location, "status": body.status,

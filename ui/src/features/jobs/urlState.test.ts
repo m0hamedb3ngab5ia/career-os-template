@@ -5,7 +5,7 @@ describe("Jobs URL state", () => {
   it("reads defaults from an empty query string", () => {
     expect(readView(new URLSearchParams())).toEqual({
       tab: "recommended",
-      view: "", stage: "",
+      view: "", stage: "", posted: 0,
       q: "",
       location: "",
       sort: DEFAULT_SORT,
@@ -50,6 +50,7 @@ describe("Jobs URL state", () => {
       view: "table", stage: "",
       q: "data",
       location: "remote",
+      posted: 0,
       sort: "company",
       hidden: ["ats", "qa"],
       selected: ["a1", "b2"],
@@ -101,5 +102,13 @@ describe("stage param", () => {
     expect(readView(new URLSearchParams("tab=applied&stage=bogus")).stage).toBe("");
     const p = writeView(new URLSearchParams("tab=applied&stage=offer"), { tab: "saved" });
     expect(p.has("stage")).toBe(false);
+  });
+
+  it("reads and writes posted within; ignores other values; absent = any", () => {
+    expect(readView(new URLSearchParams("posted=14")).posted).toBe(14);
+    expect(readView(new URLSearchParams("posted=5")).posted).toBe(0);
+    expect(readView(new URLSearchParams("tab=inprogress")).tab).toBe("inprogress");
+    expect(writeView(new URLSearchParams(), { posted: 7 }).get("posted")).toBe("7");
+    expect(writeView(new URLSearchParams("posted=7"), { posted: 0 }).has("posted")).toBe(false);
   });
 });

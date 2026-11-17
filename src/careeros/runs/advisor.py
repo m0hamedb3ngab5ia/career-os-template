@@ -292,13 +292,39 @@ def load_runs_history(settings: Any) -> list[dict[str, Any]]:
     return out
 
 
+def skips_advice(settings: Any) -> dict[str, Any]:
+    """Advice-only notes on skipped jobs: which skills and filters would unlock the most. Never carries a change."""
+    from careeros.runs.skip_insights import load_scores, skip_insights
+
+    from careeros.skill_evidence import credit
+
+    m = settings.pipeline.get("match") or {}
+    min_fit = float((settings.targets.get("thresholds") or {}).get("min_fit_to_prepare", 70))
+    ins = skip_insights(load_scores(settings.paths["jobs_dir"]), min_fit,
+                        lambda sk: credit(sk, settings.profile, m.get("synonyms") or {}, m.get("implies") or {}))
+    recs = []
+    sk = ins["skills"]["learnable"][:3]
+    if sk:
+        names = ", ".join(f"{x['skill']} ({x['near_miss']} near misses)" for x in sk)
+        recs.append(_rec("skips-skills", "skips", "info", "Skills missing from near-miss skips",
+                         f"{names}. Only add one to master.yaml if it is true; this lists, it does not claim."))
+    for f in ins["flex"]:
+        if f["rescored"]:
+            recs.append(_rec(f"skips-{f['filter']}", "skips", "info",
+                             f"Loosening {f['filter']} would let {f['rescored']} more jobs be scored",
+                             f"{f['blocked']} jobs are blocked by {f['filter']}; {f['rescored']} fail nothing else."))
+    return {"insights": ins, "recommendations": recs}
+
+
 def advise(settings: Any, now: datetime) -> dict[str, Any]:
     from careeros.runs.storage import load_snapshots
     from careeros.runs.store import RunStore
 
     s = storage_advice(load_snapshots(RunStore(settings)), settings.pipeline, now)
     r = run_advice(load_runs_history(settings), settings.pipeline, now)
-    return {"storage": s, "runs": r, "recommendations": s["recommendations"] + r["recommendations"]}
+    k = skips_advice(settings)
+    return {"storage": s, "runs": r, "skips": k["insights"],
+            "recommendations": s["recommendations"] + r["recommendations"] + k["recommendations"]}
 
 
 def validate_root(root: Any) -> None:

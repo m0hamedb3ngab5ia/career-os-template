@@ -33,6 +33,7 @@ export function job(over: Partial<JobListItem> & { job_id: string }): JobListIte
     selected: 1,
     injection: null,
     prescore: null,
+    posted_at: null,
     title: "Software Engineer",
     location: "Springfield",
     ats: "greenhouse",
@@ -64,8 +65,9 @@ export const JOBS: JobListItem[] = [
 export const TABS_REPLY = {
   tabs: [
     { key: "recommended", label: "Recommended", count: 59 },
-    { key: "notscored", label: "Not scored", count: 12 },
-    { key: "saved", label: "Saved", count: 3 },
+    { key: "inprogress", label: "In progress", count: 2 },
     { key: "applied", label: "Applied", count: 41 },
+    { key: "saved", label: "Saved", count: 3 },
+    { key: "notscored", label: "Not scored", count: 12 },
   ],
 };

@@ -4,6 +4,7 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+  max-width: 760px;
 }
 .card {
   background: var(--card);
@@ -454,4 +455,147 @@
   font-size: var(--fs-h2);
   font-weight: 600;
   text-align: center;
+}
+
+/* ---- Today redesign (prototype): grouped inset lists, Settings-style ---- */
+.lead {
+  margin: 0 0 var(--space-2);
+  font-size: 22px;
+  line-height: 1.3;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--label);
+  text-wrap: balance;
+}
+.sections {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+}
+.section {
+  min-width: 0;
+}
+.sectionHead {
+  padding: 0 4px 8px;
+}
+.sectionTitle {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 600;
+  color: var(--label);
+}
+.sectionCount {
+  font-weight: 400;
+  color: var(--sec);
+  font-variant-numeric: tabular-nums;
+}
+.sectionCaption {
+  margin: 2px 0 0;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.inset {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  background: var(--card);
+  border-radius: 12px;
+  overflow: hidden;
+}
+.cell {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: 11px 16px;
+  position: relative;
+}
+.inset > li + li::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 16px;
+  right: 0;
+  border-top: 0.5px solid var(--sep);
+}
+.inset > li { position: relative; }
+.cellMain {
+  flex: 1;
+  min-width: 0;
+}
+.cellTitle {
+  font-weight: 600;
+  color: var(--label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cellSub {
+  font-weight: 400;
+  color: var(--sec);
+}
+.cellWhy {
+  margin-top: 2px;
+  font-size: var(--fs-caption);
+  line-height: 1.4;
+  color: var(--sec);
+}
+.cellSide {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  flex-shrink: 0;
+}
+.cellLink {
+  font-weight: 500;
+  white-space: nowrap;
+}
+.more {
+  width: 100%;
+  padding: 11px 16px;
+  border: 0;
+  background: none;
+  font: inherit;
+  text-align: left;
+  color: var(--link);
+  cursor: pointer;
+}
+.more:hover { background: var(--hover); }
+.allClear {
+  margin: 0;
+  color: var(--sec);
+}
+.quiet {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2) var(--space-4);
+  padding: 0 4px;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+@media (max-width: 560px) {
+  .cell { flex-wrap: wrap; }
+  .cellTitle { white-space: normal; }
+}
+.answerForm {
+  display: flex;
+  gap: var(--space-2);
+  align-items: center;
+  width: 100%;
+}
+.answerInput {
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  padding: 0 10px;
+  border: 0.5px solid var(--sep);
+  border-radius: 8px;
+  background: var(--fill);
+  color: var(--label);
+  font: inherit;
+}
+.answerInput:focus {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
 }

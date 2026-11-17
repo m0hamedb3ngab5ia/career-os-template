@@ -125,7 +125,8 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 - `matched_skills[]`: subset of required_skills with evidence in the profile per
   `.claude/skills/_shared/evidence_rules.md` (familiarity: `skills.*`, any `stack`, or a
   non-placeholder bullet text; allowed synonyms listed there). Record the evidence id in
-  `skill_evidence` map `{skill: "skills.programming" | "<bullet id>" | "<entry id>.stack"}`.
+  `skill_evidence` map `{skill: "skills.programming" | "skill_groups.<label>" | "<bullet id>" | "<entry id>.stack"}`.
+  Check `skill_groups[].items` and the `match.implies` terms too: a skill listed only there is still matched.
 - `missing_skills[]` = required minus matched. NEVER move a skill to matched without an evidence id.
 - Generic practices (code review, debugging, testing, system design, collaboration, communication,
   problem solving, ownership) never go in `required_skills`: every engineer matches them, so they
@@ -184,6 +185,10 @@ elif tier == "A" and fit >= thresholds.tier_a_min_fit:  decision=prepare  (flag 
 elif fit >= thresholds.min_fit_to_prepare: decision=prepare
 else: decision=skip, skip_reason=below_min_fit
 ```
+
+**Evidence post-pass** (decision `skip` with `below_min_fit` / `location_nonpreferred_low_fit` only): after writing
+`score.json`, run `.venv/bin/careeros jobs recredit <job_id> --min-fit 0 --write`. It credits missing skills the
+profile evidences (by id) and recomputes fit and decision in code; if it flips to `prepare`, run the company gate.
 
 **Company gate** (only when the decision above is `prepare`). Caps per company, the rejection cooldown
 and posting close dates are code (`src/careeros/company_policy.py`), not judgment:

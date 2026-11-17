@@ -180,3 +180,17 @@ def test_action_list_prints_the_detail(settings, monkeypatch, capsys):
     assert cli.cmd_action_list(argparse.Namespace(all=False)) == 0
     out = capsys.readouterr().out.splitlines()
     assert out[0].endswith("Retry it by hand — see `careeros run show r1`") and out[1].endswith("Plain item")
+
+
+def test_sync_survives_a_hand_made_score_json_and_links_the_resume(cli, settings):
+    import json
+
+    from careeros.models import Posting
+    from careeros.store import Store
+
+    store = Store(settings)
+    store.save_posting(Posting(job_id="h1", company="Acme", title="SWE", ats="greenhouse"))
+    (store.job_dir("h1") / "score.json").write_text(json.dumps({"job_id": "h1", "tier": "B"}))  # no fit
+    (store.job_dir("h1") / "resume.pdf").write_bytes(b"%PDF")
+    assert cli(["tracker", "sync"]) == 0
+    assert Tracker(settings=settings).get_job("h1")["ResumeVersion"] == "resume"

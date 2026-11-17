@@ -90,7 +90,12 @@ Never move a status backwards (interview -> screening) and never change a status
 Push notification (if tool exists): title `<company>: <class>`, body `<role> — <subject> (<date>)`.
 
 Apply changes:
-- Run `.venv/bin/careeros job status <job_id> <status> --note "<note>"`.
+- Run `.venv/bin/careeros job status <job_id> <status> --note "<note>"`. Every call appends to the job's
+  status history (the yield model reads it), so apply each real change in date order and never rewrite or skip
+  one: an interview or rejection update is a new entry, not an edit.
+- Recruiter or hiring-manager outreach that led to a job on the tracker (they contacted the candidate first):
+  also pass `--channel sourced` (`--referral-contact <id>` only for a referral). Never set a channel from
+  guesswork; unset stays `cold`.
 - If it fails, append to `data/sync_updates.json` (list): `{"job_id","company","status","note","source_thread","date","applied": false}`.
 - Action items: `careeros action add "<what>" --type review --job <job_id> --link "<link>" --priority H --needs <laptop|phone|anytime>`
   (interview/assessment prep needs `laptop`; a scheduling reply is `phone`).
@@ -104,6 +109,15 @@ One extra search: `(recruiter OR sourcing OR "reaching out" OR "your background"
 minus threads already matched to a job. For each real inbound outreach (a person, not a job-alert
 newsletter): `careeros action add "Recruiter outreach: <name> at <company> re <role/subject> — <link>" --type review --priority M --company "<company>"`.
 Optionally print a suggested `data/jobs/` seed if the role is on a supported ATS (do not create the dir).
+
+## 5b. Job-alert emails (LinkedIn, Indeed)
+
+Search `from:(jobalerts-noreply@linkedin.com OR jobs-noreply@linkedin.com OR alert@indeed.com OR noreply@indeed.com) newer_than:<n>d`
+(same `inbox_seen.json` rule). From each alert read the listed jobs as `{"title", "company", "url"}` (the link
+in the email; copy the three fields as written, skip a job missing any). Write the list to a scratch file and run
+`careeros job add --from-alert <file>`: it stores new ones as `found` and reports `exists` for repeats. Never open
+or fetch the LinkedIn/Indeed link and never click anything in the email; the posting text is added later by the user
+or in the apply browser. Imported alert jobs have no text, so they cannot be scored yet: add one Action Item per added job (`careeros action add "Paste the posting text for <title> at <company>, then run: careeros job describe <job_id> --text-file -" --type review --job <job_id> --needs laptop`). When the user pastes the text, run `careeros job describe <job_id> --text-file -` with it on stdin; that clears the needs-description mark. Count `alerts_added` in RESULT.
 
 ## 6. RESULT
 

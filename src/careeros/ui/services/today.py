@@ -24,10 +24,33 @@ class PrepareQueue(TypedDict):
     error: str | None
 
 
+class OutreachItem(TypedDict):
+    """One job with people to contact (contacts.json) and/or drafted messages (outreach.json). Nothing is sent."""
+    job_id: str
+    company: str
+    title: str
+    contact_name: str | None
+    contact_role: str | None
+    email: str | None
+    email_confidence: str | None
+    draft_ready: bool
+    followup_due: str | None
+
+
 class Today(TypedDict):
     actions: list[ActionItem]
     prepare_queue: PrepareQueue
     top_picks: list[JobListItem]
+    outreach: list[OutreachItem]
+
+
+# Tasks that only matter before applying; once the job is applied or skipped they are stale (never closed by hand).
+PRE_APPLY = ("review", "question", "salary", "qa_fail")
+PAST_APPLY = ("applied", "screening", "interview", "offer", "rejected", "withdrawn", "ghosted", "skipped")
+# Shared by Today's list and the sidebar count so they always agree.
+OPEN_FROM = ("FROM action_items a LEFT JOIN jobs j ON j.job_id = a.job_id WHERE a.done = 0 AND NOT ("
+             f"a.type IN ({','.join('?' * len(PRE_APPLY))}) AND COALESCE(j.status, '') IN ({','.join('?' * len(PAST_APPLY))}))")
+OPEN_PARAMS = (*PRE_APPLY, *PAST_APPLY)
 
 
 def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[ActionItem]:
@@ -35,7 +58,7 @@ def open_actions(ix: Any, now: datetime, tz: tzinfo, soon_hours: int) -> list[Ac
     highest priority first."""
     from careeros.ui.services.actions import _item
 
-    rows = ix.query("SELECT * FROM action_items WHERE done = 0")
+    rows = ix.query(f"SELECT a.* {OPEN_FROM}", OPEN_PARAMS)
     items = [_item(r, now, tz, soon_hours) for r in rows if r.get("id")]
     return sorted(items, key=lambda i: (PRIORITY.get(i["priority"], 3), i["created"] or "", i["id"]))
 
@@ -104,10 +127,55 @@ def started_ids(settings: Any, rc: Any) -> set[str]:
     return ids
 
 
+NO_OUTREACH = ("skipped", "rejected", "withdrawn", "ghosted")
+ROLE_ORDER = {"recruiter": 0, "hiring_manager": 1, "team_lead": 2}
+
+
+def _json(path: Any) -> dict[str, Any]:
+    import json
+
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def outreach(settings: Any, ix: Any, *, closed: list[str]) -> list[OutreachItem]:
+    """Jobs with contacts.json and/or outreach.json (find-contacts, draft-outreach), open jobs only. The main
+    contact is the first recruiter, else hiring manager, else team lead, else the first listed."""
+    from careeros.ui.services.jobs import job_dir_for
+
+    skip = {*closed, *NO_OUTREACH}
+    out: list[OutreachItem] = []
+    for r in ix.query("SELECT job_id, company, title, status FROM jobs ORDER BY found_at DESC, job_id"):
+        if r["status"] in skip:
+            continue
+        d = job_dir_for(settings, r["job_id"])
+        if d is None or not (d / "contacts.json").is_file() and not (d / "outreach.json").is_file():
+            continue
+        contacts = [c for c in _json(d / "contacts.json").get("contacts") or [] if isinstance(c, dict) and c.get("name")]
+        ou = _json(d / "outreach.json")
+        drafts = [x for x in ou.get("drafts") or [] if isinstance(x, dict)]
+        if not contacts and not drafts:
+            continue
+        main = min(contacts, key=lambda c: ROLE_ORDER.get(c.get("role"), 3), default=None)
+        cands = (main or {}).get("email_candidates") or []
+        due = ou.get("followup_due") or next((x["followup_due"] for x in drafts if x.get("followup_due")), None)
+        out.append({
+            "job_id": r["job_id"], "company": r["company"] or "", "title": r["title"] or "",
+            "contact_name": (main or {}).get("name"), "contact_role": (main or {}).get("role"),
+            "email": (main or {}).get("email") or (cands[0] if cands else None),
+            "email_confidence": (main or {}).get("email_confidence"),
+            "draft_ready": any(x.get("email") or x.get("linkedin_note") or x.get("linkedin_message") for x in drafts),
+            "followup_due": due if isinstance(due, str) else None})
+    return out
+
+
 def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
           soon_hours: int = 48, closed: list[str] | None = None, keep: Collection[str] = ()) -> Today:
     from careeros.ui.services.jobs import with_reasons
 
     picks = with_reasons(settings, top_picks(ix, now, closed=closed or [], keep=keep))
     return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now),
-            "top_picks": picks}
+            "top_picks": picks, "outreach": outreach(settings, ix, closed=closed or [])}

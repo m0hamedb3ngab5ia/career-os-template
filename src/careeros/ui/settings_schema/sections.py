@@ -164,6 +164,8 @@ OUTREACH_FIELDS = (
     _num(P, "outreach.mutuals_threshold", "Minimum mutual connections", outreach.OutreachPolicy.mutuals_threshold,
          lo=outreach.MUTUALS_THRESHOLD_RANGE[0], hi=outreach.MUTUALS_THRESHOLD_RANGE[1], unit="or more",
          help="Counts people with at least this many mutual connections."),
+    _num(P, "outreach.min_fit", "Outreach fit bar", outreach.OutreachPolicy.min_fit, lo=0, hi=100, unit="fit or more",
+         help="Strong-fit (tier B) jobs at this fit or more get cold-outreach drafts; dream companies always do."),
 )
 # Rules the code enforces with no key to change them (shown as locked rows).
 DREAM_FLAG_ONLY = Policy("Dream companies", "Flag only",
@@ -358,8 +360,8 @@ SECTIONS: tuple[Section, ...] = (
                         "Old post"),)),
     Section("scout", "Scout", (
         Group("sources", "Sources", (
-            _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby", "handshake"],
-                  options=("greenhouse", "lever", "ashby", "handshake"), strict=True),
+            _tags(T, "scout.sources", "Job boards to fetch", ["greenhouse", "lever", "ashby", "handshake", "simplify"],
+                  options=("greenhouse", "lever", "ashby", "handshake", "simplify"), strict=True),
             _num(T, "scout.max_post_age_days", "Skip postings older than", None, unit="days", lo=1, nullable=True,
                  help="Empty keeps any age. Uses the posting's own dates."),
             _num(T, "scout.new_grad_max_post_age_days", "Skip new-grad postings older than", None, unit="days",
@@ -453,6 +455,8 @@ SECTIONS: tuple[Section, ...] = (
                  control="slider", step=0.1, unit="points per fit point"),
             _num(P, "runs.ranking.retry_bonus", "Retry bonus", R["retry_bonus"], hi=100, control="slider",
                  unit="points"),
+            _num(P, "runs.ranking.referral_weight", "Referral weight (prepare)", R["referral_weight"], hi=100,
+                 control="slider", unit="points per 1x referral lift"),
         ), help="Which jobs go first. No Claude involved.", advanced=True),
         Group("scoring", "Scoring budget", (
             _num(P, "scoring.per_scan", "Jobs per score run", SC["per_scan"], lo=1, unit="jobs"),
@@ -537,6 +541,8 @@ SECTIONS: tuple[Section, ...] = (
                  unit="days"),
             _num(P, "retention.run_logs_days", "Run logs", RET["run_logs_days"], unit="days"),
             _num(P, "retention.run_summaries_days", "Run summaries", RET["run_summaries_days"], unit="days"),
+            _num(P, "retention.tracker_closed_after_days", "Closed skipped jobs in the tracker",
+                 RET["tracker_closed_after_days"], unit="days"),
         )),
         Group("advisor", "Advisor", (
             _num(P, "advisor.advise_after_days", "Storage advice after", AD["advise_after_days"], lo=1, unit="days"),
@@ -590,6 +596,9 @@ SECTIONS: tuple[Section, ...] = (
 
 # Example config keys with no form control, and why. The coverage test fails on any key that is in neither.
 NOT_IN_UI: dict[tuple[str, str], str] = {
+    (P, "follow_ups.after_days"): "Chat-set nudge delay (days before a follow-up Action Item); default 7 is fine.",
+    ("companies", "referral_strength"): "Per-company map; set in chat or the YAML (yield model referral lift).",
+    ("targets", "goal"): "Yield-model goal; set in chat or the YAML until the onboarding command exists.",
     (P, "paths.jobs_dir"): "Data location; changing it moves where every job is read and written.",
     (P, "paths.seen_file"): "Data location; changing it moves where every job is read and written.",
     (P, "paths.profile"): "Profile files are edited outside the UI (free text, not settings).",
@@ -606,6 +615,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "llm.headless_cmd"): "The exact claude command line; a wrong flag breaks every run.",
     (P, "resume_build.fallback"): "Only one fallback exists (markdown_to_pdf); nothing to choose.",
     (P, "match.synonyms"): "Skill synonym table for the résumé match score; edit pipeline.yaml.",
+    (P, "match.implies"): "One-way skill implications for scoring evidence; edit pipeline.yaml.",
     (Q, "resume.max_pages"): "Shown as a locked row: a one-page résumé is a hard rule.",
     (Q, "resume.hard"): "Hard truth and ATS rules the QA gate always enforces; not switches.",
     (Q, "cover_letter.hard.truth_trace"): "Hard truth rule the QA gate always enforces; not a switch.",

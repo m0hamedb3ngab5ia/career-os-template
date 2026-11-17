@@ -36,10 +36,18 @@ afterEach(() => {
 });
 
 describe("Jobs screen", () => {
+  it("job titles are buttons that open the inspector", async () => {
+    const { router } = setup();
+    const user = userEvent.setup();
+    const table = await screen.findByRole("table");
+    await user.click(within(table).getByRole("button", { name: "Data Engineer" }));
+    expect(router.state.location.search).toContain("job=gx02");
+  });
+
   it("shows the header, tabs with counts and the first page of the live table", async () => {
     const { api } = setup();
     expect(await screen.findByRole("heading", { level: 1, name: "Jobs" }, { timeout: 5000 })).toBeInTheDocument();
-    expect(screen.getByText(/same columns as the Jobs tab in JobTracker.xlsx/)).toBeInTheDocument();
+    expect(screen.getByText("Every job career-os is tracking.")).toBeInTheDocument();
     const table = await screen.findByRole("table", { name: "Tracked jobs, sorted by fit, highest first" });
     expect(within(table).getByRole("rowheader", { name: "Northwind Labs" })).toBeInTheDocument();
     expect(within(table).getByRole("link", { name: "Northwind Labs" })).toHaveAttribute("href", "https://example.com/jobs/1");
@@ -47,7 +55,7 @@ describe("Jobs screen", () => {
     expect(screen.getByRole("tab", { name: "Applied (41)" })).toBeInTheDocument();
     const req = api.callsTo("GET /api/jobs")[0]!;
     expect(Object.fromEntries(req.search)).toEqual({ tab: "recommended", sort: "-fit", limit: "2" });
-    expect(await screen.findByText(/3 recommended jobs · live from/)).toBeInTheDocument();
+    expect(await screen.findByText("3 recommended jobs")).toBeInTheDocument();
   });
 
   it("renders every mockup column with chips, dates and spoken dashes for empty cells", async () => {
@@ -55,7 +63,7 @@ describe("Jobs screen", () => {
     const table = await screen.findByRole("table");
     const headers = within(table).getAllByRole("columnheader").map((h) => h.textContent?.replace(/,.*$/, ""));
     expect(headers).toEqual(["Select all shown jobs", "Company", "Pipeline", "Role", "Location", "Tier", "Fit", "Status", "Category", "Safety",
-      "QA", "QA passed", "ATS", "Found", "Applied", "Closes", "Next action"]);
+      "QA", "QA passed", "ATS", "Posted", "Found", "Applied", "Closes", "Next action"]);
     const nw = within(table).getByRole("rowheader", { name: "Northwind Labs" }).closest("tr")!;
     expect(within(nw).getByRole("cell", { name: "Software Engineer" })).toBeInTheDocument();
     expect(within(nw).getByRole("cell", { name: "Springfield" })).toBeInTheDocument();
@@ -83,7 +91,7 @@ describe("Jobs screen", () => {
   it("fills a 10-row page by fetching the next cursor page; no pager while it all fits", async () => {
     const { api } = setup();
     expect(await screen.findByRole("rowheader", { name: "Initech" })).toBeInTheDocument();
-    expect(screen.getByText(/3 recommended jobs · live from/)).toBeInTheDocument();
+    expect(screen.getByText("3 recommended jobs")).toBeInTheDocument();
     expect(api.callsTo("GET /api/jobs")[1]!.search.get("cursor")).toBe("2");
     expect(screen.queryByRole("navigation", { name: "Jobs pages" })).not.toBeInTheDocument();
   });
@@ -95,7 +103,8 @@ describe("Jobs screen", () => {
     expect(screen.getByRole("tab", { name: "Saved (3)" })).toHaveAttribute("tabindex", "-1");
     active.focus();
     await user.keyboard("{ArrowRight}");
-    expect(screen.getByRole("tab", { name: "Not scored (12)" })).toHaveFocus();
+    expect(screen.getByRole("tab", { name: "In progress (2)" })).toHaveFocus();
+    await user.keyboard("{ArrowRight}");
     await user.keyboard("{ArrowRight}");
     const review = screen.getByRole("tab", { name: "Saved (3)" });
     expect(review).toHaveFocus();
@@ -225,7 +234,7 @@ describe("Jobs screen", () => {
     expect(req.body).toEqual({
       job_ids: ["nw01"],
       columns: ["job_id", "company", "selected", "title", "location", "tier", "fit", "status", "category", "safety", "qa_score", "qa_passed",
-        "found_at", "applied_at", "closes_at", "next_action"],
+        "posted_at", "found_at", "applied_at", "closes_at", "next_action"],
     });
     expect(click).toHaveBeenCalled();
     expect(revokeObjectURL).toHaveBeenCalledWith("blob:x");

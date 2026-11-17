@@ -5,6 +5,8 @@ score = freshness_weight * freshness            (1.0 under fresh_hours, then lin
       + deadline_bonus     if the posting closes within deadline_days (and has not closed)
       + fit_weight * fit   prepare runs only (score runs have no fit yet)
       + retry_bonus        a job whose last attempt failed (retried once, then an Action Item)
+      + referral_weight * (lift - 1)   prepare only: a 1st-degree connection works there; lift = expected
+                           offer odds if you ask for a referral vs applying cold (yield_model.referral_lift)
 
 Ties break by job id, so the same inputs always give the same order. Every item carries `why`, a short
 human reason ("posted 20h ago (+60); dream company (+25)") that `careeros run status` and the UI show.
@@ -28,6 +30,7 @@ class Candidate:
     dream: bool = False
     fit: int | None = None
     retry: bool = False
+    referral_lift: float | None = None
 
 
 def _age(hours: float) -> str:
@@ -66,6 +69,10 @@ def score_candidate(c: Candidate, w: dict[str, float], now: datetime, stage: str
         pts = round(c.fit * w["fit_weight"], 2)
         total += pts
         why.append(f"fit {c.fit} ({_fmt(pts)})")
+    if stage == "prepare" and c.referral_lift and w.get("referral_weight"):
+        pts = round(w["referral_weight"] * (c.referral_lift - 1), 2)
+        total += pts
+        why.append(f"connection at {c.company}: referral possible, ~{c.referral_lift:.1f}x odds if you ask ({_fmt(pts)})")
     if c.retry and w.get("retry_bonus"):
         total += w["retry_bonus"]
         why.append(f"retry after a failed attempt ({_fmt(w['retry_bonus'])})")

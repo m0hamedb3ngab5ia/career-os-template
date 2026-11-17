@@ -334,3 +334,24 @@
 .detail > header {
   padding-inline: var(--space-4);
 }
+
+.posted {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-secondary, inherit);
+  font-size: 13px;
+}
+
+.openJob {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.openJob:hover {
+  text-decoration: underline;
+}

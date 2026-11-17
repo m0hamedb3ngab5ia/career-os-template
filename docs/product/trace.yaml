@@ -863,6 +863,74 @@ requirements:
     provenance: confirmed
     tests:
     - test_view_documents_tab_replaces_setup_once_ready
+  REQ-146:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_profile_lists_documents_and_answers
+    - test_settings_grouped_and_no_secrets
+  REQ-147:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - JobInspector.test.tsx
+  REQ-148:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_open_actions_hide_pre_apply_tasks_of_jobs_already_applied
+    - test_open_items_without_a_known_job_stay_on_today
+    - test_outreach_one_entry_per_job_with_contact_and_draft
+    - NeedsYou.test.tsx
+  REQ-149:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_progress_words_in_progress_rows
+  REQ-150:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_posted_date_and_posted_within_filter
+  REQ-151:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_master_pdf_is_served_inline
+    - test_no_master_is_404
+    - ProfileSettings.test.tsx
+  REQ-152:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_reasons_counted_and_prepared_ignored
+    - test_skills_only_from_near_miss_below_min_fit_and_split_scorer_misses
+    - test_flex_counts_blocked_and_only_fail_via_real_write_skip
+    - test_advise_is_advice_only_and_excludes_evidenced_skills
+    - test_cli_prints_scorer_misses
+  REQ-153:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_add_ats_job_stores_posting_and_dedups
+    - test_manual_page_becomes_ats_manual
+    - test_handshake_needs_browser
+    - test_alert_items_import_without_fetching
+    - test_parse_embed_eu_and_custom_domain_links
+    - test_describe_makes_alert_job_score_eligible
+    - test_describe_unknown_job_and_empty_text
+    - test_add_from_alert_describe_and_dedup
+  REQ-154:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_applied_job_with_no_reply_gets_one_deduped_item
+    - test_item_closes_when_job_moves_on
+    - test_sent_outreach_without_answer_gets_item_and_closes_on_reply
+    - test_outreach_sent_writes_sent_at_and_triggers_nudge
+    - test_done_sticks_across_ticks
+    - test_locked_ticks_are_idempotent
+    - sections.test.ts
 use_cases:
   UC-001:
     status: approved

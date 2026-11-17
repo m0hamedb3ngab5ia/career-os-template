@@ -144,9 +144,9 @@ def test_catch_up_run_and_dismiss(client, data, popen):
 
 def test_tabs_and_tab_filter(client):
     tabs = {t["key"]: t["count"] for t in client.get("/api/jobs/tabs").json()["tabs"]}
-    assert tabs == {"recommended": 0, "notscored": 0, "saved": 4, "applied": 3}
+    assert tabs == {"recommended": 0, "inprogress": 2, "notscored": 0, "saved": 2, "applied": 3}
     page = client.get("/api/jobs", params={"tab": "review"}).json()
-    assert [j["company"] for j in page["items"]] == ["Umbrella Labs"]
+    assert {j["company"] for j in page["items"]} == {"Umbrella Labs", "Initech"}
     assert page["items"][0]["next_action"] == "Review and submit"
     assert client.get("/api/jobs", params={"tab": "nope"}).status_code == 400
 

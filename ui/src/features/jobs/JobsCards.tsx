@@ -1,7 +1,9 @@
 import { StatusChip } from "../../kit/chips";
 import { formatCount, formatDate } from "../../lib/format";
 import styles from "./JobsCards.module.css";
-import { PostingLink } from "./cells";
+import { useRowOpen } from "../inspector/JobInspector";
+import { OpenJob, PostingLink } from "./cells";
+import { datesLine } from "./dates";
 import { reasonsLine } from "./reasons";
 import type { JobListItem, TabKey } from "./types";
 
@@ -22,7 +24,8 @@ export function CardBody({ job, tab }: { job: JobListItem; tab: TabKey }) {
         <PostingLink job={job} className={styles.title}>
           {job.company || job.job_id} <span className={styles.role}>{job.title}</span>
         </PostingLink>
-        <span className={styles.meta}>{place}</span>
+        <span className={styles.meta}><OpenJob id={job.job_id}>{place}</OpenJob></span>
+        {datesLine(job) ? <span className={styles.meta}>{datesLine(job)}</span> : null}
         <span className={pending ? styles.pending : styles.reasons}>{reasonsLine(job.reasons)}</span>
       </span>
       <span className={styles.badge}>
@@ -30,6 +33,8 @@ export function CardBody({ job, tab }: { job: JobListItem; tab: TabKey }) {
           <span className={styles.needs}>
             <span className={styles.dot} aria-hidden="true" /> Needs you
           </span>
+        ) : tab === "inprogress" && job.progress ? (
+          <span className={styles.saved}>{job.progress}</span>
         ) : tab === "saved" ? (
           <span className={styles.saved}>
             <span className={styles.dot} aria-hidden="true" /> Saved
@@ -52,10 +57,11 @@ interface ListProps {
 }
 
 export function JobsList({ rows, tab, selected, onToggle, current }: ListProps) {
+  const rowOpen = useRowOpen();
   return (
     <ul className={styles.list} aria-label="Jobs">
       {rows.map((j) => (
-        <li key={j.job_id} className={styles.card} data-needs-you={needsYou(j) || undefined} aria-current={j.job_id === current ? "true" : undefined}>
+        <li key={j.job_id} className={styles.card} onClick={rowOpen(j.job_id)} data-needs-you={needsYou(j) || undefined} aria-current={j.job_id === current ? "true" : undefined}>
           <input
             type="checkbox"
             checked={selected.has(j.job_id)}

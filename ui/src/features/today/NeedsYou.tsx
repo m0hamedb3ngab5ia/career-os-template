@@ -1,10 +1,12 @@
 import { useEffect, useRef, useState } from "react";
-import { Button, ButtonLink } from "../../kit/Button";
+import { Button } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { useToast } from "../../kit/Toast";
 import { formatCount } from "../../lib/format";
-import { sortTasks, taskRow } from "./actions";
-import { errorText, useMarkDone, useMeta, useReopen, useToday } from "./api";
+import { Link } from "react-router";
+import { sortTasks } from "./actions";
+import { buildSections, type Row, type Section } from "./sections";
+import { errorText, useAnswer, useMarkDone, useMeta, useReopen, useToday } from "./api";
 import type { ActionItem } from "./types";
 import styles from "./Today.module.css";
 
@@ -17,18 +19,20 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
   const reopen = useReopen();
   const undoSeconds = meta.data?.ui?.undo_seconds;
   const headingRef = useRef<HTMLHeadingElement>(null);
-  const listRef = useRef<HTMLUListElement>(null);
+  const listRef = useRef<HTMLElement>(null);
   /** After Mark done: the row that left and the row whose control takes focus (null = the heading). */
   const [refocus, setRefocus] = useState<{ done: string; next: string | null } | null>(null);
 
   function onDone(item: ActionItem) {
-    const i = shown.findIndex((a) => a.id === item.id);
-    const next = shown[i + 1] ?? shown[i - 1];
-    setRefocus({ done: String(item.id), next: next ? String(next.id) : null });
+    // Next row as seen on screen (sections reorder the priority list), else the previous one.
+    const ids = [...(listRef.current?.querySelectorAll<HTMLElement>("[data-action-id]") ?? [])].map((e) => e.dataset.actionId ?? "");
+    const i = ids.indexOf(String(item.id));
+    const next = i < 0 ? undefined : ids[i + 1] ?? ids[i - 1];
+    setRefocus({ done: String(item.id), next: next ?? null });
     markDone.mutate(item, {
       onSuccess: (res) =>
         toast.show({
-          message: `Marked ${item.company} done.${res?.queued.length ? " The tracker is open in Excel, so the change is queued." : ""}`,
+          message: `Marked ${item.company || "task"} done.${res?.queued.length ? " The tracker is open in Excel, so the change is queued." : ""}`,
           seconds: undoSeconds,
           onUndo: () =>
             reopen.mutate(item, {
@@ -52,58 +56,138 @@ export function NeedsYou({ jobIds }: { jobIds?: readonly string[] } = {}) {
     (target ?? headingRef.current)?.focus();
   });
 
+  const sections = buildSections(shown, (today.data?.outreach ?? []).filter((o) => !jobIds || jobIds.includes(o.job_id)));
+  const total = sections.reduce((t, x) => t + x.rows.length, 0);
+
+  if (today.isPending) return <div className={styles.skeletonBlock} aria-label="Loading tasks" role="img" />;
+  if (today.isError)
+    return (
+      <EmptyState
+        title="Couldn’t load what needs you"
+        headingLevel={2}
+        action={
+          <Button size="small" onClick={() => void today.refetch()}>
+            Try again
+          </Button>
+        }
+      >
+        {errorText(today.error)}
+      </EmptyState>
+    );
   return (
-    <section className={styles.list} aria-labelledby="needs-you-title" aria-busy={today.isPending || undefined}>
-      <div className={styles.listHead}>
-        <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className={styles.h2}>
-          Needs your attention {today.data ? <span className={`${styles.count} tabular`}>{formatCount(shown.length)}</span> : null}
-        </h2>
-      </div>
-      {today.isPending ? (
-        <div className={styles.skeletonBlock} aria-label="Loading tasks" role="img" />
-      ) : today.isError ? (
-        <EmptyState
-          title="Couldn’t load tasks"
-          headingLevel={3}
-          action={
-            <Button size="small" onClick={() => void today.refetch()}>
-              Retry
-            </Button>
-          }
-        >
-          {errorText(today.error)}
-        </EmptyState>
-      ) : shown.length === 0 ? (
-        <EmptyState title="Nothing needs you" headingLevel={3}>
-          New tasks appear here when a run needs a decision from you.
-        </EmptyState>
+    <section ref={listRef} className={styles.sections} aria-labelledby="needs-you-title">
+      <h2 id="needs-you-title" ref={headingRef} tabIndex={-1} className="sr-only">
+        Needs you, {formatCount(total)}
+      </h2>
+      {total === 0 ? (
+        <p className={styles.allClear}>Nothing needs you. New tasks show up here when a run needs a decision.</p>
       ) : (
-        <ul ref={listRef} className={styles.rows}>
-          {shown.map((item) => (
-            <TaskRowItem key={item.id} item={item} onDone={onDone} />
-          ))}
-        </ul>
+        sections.map((sec) => <SectionList key={sec.key} section={sec} onDone={onDone} />)
       )}
     </section>
   );
 }
 
-function TaskRowItem({ item, onDone }: { item: ActionItem; onDone: (item: ActionItem) => void }) {
-  const r = taskRow(item);
+const PREVIEW = 3;
+
+function SectionList({ section, onDone }: { section: Section; onDone: (item: ActionItem) => void }) {
+  const [open, setOpen] = useState(false);
+  const rows = open ? section.rows : section.rows.slice(0, PREVIEW);
+  const id = `sec-${section.key}`;
   return (
-    <li className={styles.row} data-action-id={String(item.id)}>
-      <div className={styles.rowMain}>
-        <div className={`${styles.rowTitle} ${styles.strong}`}>{r.title}</div>
-        {r.why ? <div className={styles.rowWhat}>{r.why}</div> : null}
+    <section className={styles.section} aria-labelledby={id}>
+      <header className={styles.sectionHead}>
+        <h3 id={id} className={styles.sectionTitle}>
+          {section.title} <span className={styles.sectionCount}>{formatCount(section.rows.length)}</span>
+        </h3>
+        {section.caption ? <p className={styles.sectionCaption}>{section.caption}</p> : null}
+      </header>
+      <ul className={styles.inset}>
+        {rows.map((r) => (
+          <RowItem key={r.id} row={r} onDone={onDone} />
+        ))}
+        {section.rows.length > PREVIEW ? (
+          <li>
+            <button type="button" className={styles.more} aria-expanded={open} onClick={() => setOpen(!open)}>
+              {open ? "Show less" : `Show ${formatCount(section.rows.length - PREVIEW)} more`}
+            </button>
+          </li>
+        ) : null}
+      </ul>
+    </section>
+  );
+}
+
+function RowItem({ row: r, onDone }: { row: Row; onDone: (item: ActionItem) => void }) {
+  return (
+    <li className={styles.cell} data-action-id={r.id}>
+      <div className={styles.cellMain}>
+        <div className={styles.cellTitle}>
+          {r.title}
+          {r.sub ? <span className={styles.cellSub}> · {r.sub}</span> : null}
+        </div>
+        {r.why ? <div className={styles.cellWhy}>{r.why}</div> : null}
       </div>
-      <div className={styles.rowSide}>
+      <div className={styles.cellSide}>
         {r.detected ? null : (
-          <button type="button" className={styles.textButton} data-mark-done aria-label={`Mark done: ${item.company || r.title}`} onClick={() => onDone(item)}>
-            Mark done
+          <button type="button" className={styles.textButton} data-mark-done aria-label={`Dismiss: ${r.title}`} onClick={() => r.items.forEach(onDone)}>
+            Dismiss
           </button>
         )}
-        {r.href ? <ButtonLink to={r.href}>{r.cta}</ButtonLink> : null}
+        {r.answerable && r.items[0] ? <AnswerControl item={r.items[0]} title={r.title} /> : null}
+        {r.href && r.cta && r.external ? (
+          <a href={r.href} target="_blank" rel="noopener noreferrer" className={styles.cellLink}>
+            {r.cta}
+          </a>
+        ) : r.href && r.cta ? (
+          <Link to={r.href} className={styles.cellLink}>
+            {r.cta}
+          </Link>
+        ) : null}
       </div>
     </li>
+  );
+}
+
+/** Inline Answer: a button reveals a field and Save; Esc cancels. The item closes once the answer is saved. */
+function AnswerControl({ item, title }: { item: ActionItem; title: string }) {
+  const [open, setOpen] = useState(false);
+  const [text, setText] = useState("");
+  const answer = useAnswer();
+  const toast = useToast();
+  const btn = useRef<HTMLButtonElement>(null);
+  const cancel = () => {
+    setOpen(false);
+    setText("");
+    queueMicrotask(() => btn.current?.focus());
+  };
+  if (!open)
+    return (
+      <button ref={btn} type="button" className={styles.cellLink} aria-label={`Answer: ${title}`} onClick={() => setOpen(true)}>
+        Answer
+      </button>
+    );
+  const save = () =>
+    answer.mutate(
+      { item, answer: text.trim() },
+      {
+        onSuccess: () => toast.show({ message: `Saved your answer for ${title}.` }),
+        onError: (e) => toast.show({ message: `Couldn’t save the answer: ${errorText(e)}` }),
+      },
+    );
+  return (
+    <form
+      className={styles.answerForm}
+      onSubmit={(e) => {
+        e.preventDefault();
+        if (text.trim()) save();
+      }}
+      onKeyDown={(e) => e.key === "Escape" && (e.stopPropagation(), cancel())}
+    >
+      <input autoFocus type="text" className={styles.answerInput} placeholder="Your answer" value={text} onChange={(e) => setText(e.target.value)} aria-label={`Your answer for ${title}`} />
+      <Button size="small" variant="primary" type="submit" disabled={!text.trim()} pending={answer.isPending} pendingLabel="Saving…">
+        Save
+      </Button>
+    </form>
   );
 }

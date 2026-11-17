@@ -47,7 +47,7 @@ def preflight() -> None:
 
 
 _CONSENT = re.compile(r"privacy|terms and conditions|terms of (use|service)|code of conduct|arbitration|acknowledg"
-                      r"|consent|^i (agree|understand|confirm|acknowledge)", re.I)
+                      r"|consent|certif|^i (agree|understand|confirm|acknowledge|hereby)", re.I)
 
 
 def consent_fields(plan: dict[str, Any]) -> list[dict[str, Any]]:
@@ -69,7 +69,31 @@ def plan_problems(plan: dict[str, Any]) -> list[str]:
             + [f"needs input (required): {f['label']}" for f in empty
                if f.get("source") == "unanswered" and f.get("required") and not f.get("skipped")]
             + [f"unreviewed AI draft: {f['label']}" for f in plan["fields"]
-               if f.get("source") == "ai_draft" and not f.get("reviewed") and not f.get("skipped")])
+               if f.get("source") == "ai_draft" and not f.get("reviewed") and not f.get("skipped")]
+            + repeated_answers(plan))
+
+
+def _words(text: str) -> list[str]:
+    return re.findall(r"[a-z0-9]+", text.lower())
+
+
+def repeated_answers(plan: dict[str, Any]) -> list[str]:
+    """Free-text answers in one form that repeat each other: same first 3 words, or >= 25% of the shorter answer's
+    word 5-grams shared. Plain string checks, no model call; the later answer has to be rewritten."""
+    essays = [(f["label"], _words(f["value"])) for f in plan["fields"]
+              if isinstance(f.get("value"), str) and len(f["value"].split()) >= 12 and not f.get("skipped")
+              and not f.get("options") and "select" not in str(f.get("type"))]  # picked options may overlap
+    grams = [{tuple(w[i:i + 5]) for i in range(len(w) - 4)} for _, w in essays]
+    out = []
+    for j, (label, w) in enumerate(essays):
+        for i in range(j):
+            if w[:3] == essays[i][1][:3]:
+                out.append(f"repeats {essays[i][0]} (same opening): {label}")
+                break
+            if len(grams[i] & grams[j]) >= 0.25 * min(len(grams[i]), len(grams[j])):
+                out.append(f"repeats {essays[i][0]} (shared phrasing): {label}")
+                break
+    return out
 
 
 def job_url(plan: dict[str, Any]) -> str:
@@ -216,6 +240,21 @@ def fill(plan: dict[str, Any], page: Any, job_dir: str | Path, url: str | None =
     return summary
 
 
+def _tab_key(url: str) -> str:
+    base, _, query = url.split("#")[0].partition("?")  # keep the query: Greenhouse embeds name the job there
+    base = base.rstrip("/")
+    return (base[: -len("/application")] if base.endswith("/application") else base) + (f"?{query}" if query else "")
+
+
+def job_tab(ctx: Any, url: str) -> tuple[Any, bool]:
+    """One tab per job: reuse the tab already open on this posting (closing any duplicates), else open one.
+    Returns (page, fresh)."""
+    same = [pg for pg in ctx.pages if _tab_key(pg.url) == _tab_key(url)]
+    for extra in same[1:]:
+        extra.close()
+    return (same[0], False) if same else (ctx.new_page(), True)
+
+
 def run(plan: dict[str, Any], job_dir: str | Path, *, cdp: str | None, profile_dir: str | Path,
         url: str | None = None) -> dict[str, Any]:
     """Real use: fill in a new visible tab of the apply browser (your Chrome over `cdp`, or a detached dedicated
@@ -227,11 +266,12 @@ def run(plan: dict[str, Any], job_dir: str | Path, *, cdp: str | None, profile_d
             browser.ensure(cdp, profile_dir, p.chromium.executable_path)
         b = p.chromium.connect_over_cdp(cdp)
         ctx = b.contexts[0] if b.contexts else b.new_context()
-        page = ctx.new_page()
+        page, fresh = job_tab(ctx, url or job_url(plan))
         try:
             summary = fill(plan, page, job_dir, url)
         except Exception:
-            page.close()  # our own fresh tab, no record saved yet: don't leave an orphan behind
+            if fresh:
+                page.close()  # our own fresh tab, no record saved yet: don't leave an orphan behind
             raise
         tab_id = ctx.new_cdp_session(page).send("Target.getTargetInfo")["targetInfo"]["targetId"]
         browser.save_record(job_dir, tab_id=tab_id, url=page.url, cdp=cdp)

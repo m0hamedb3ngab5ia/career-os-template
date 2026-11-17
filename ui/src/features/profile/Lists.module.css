@@ -1,0 +1,59 @@
+.stack {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  max-width: 720px;
+  padding: 0 24px 40px;
+}
+.heading {
+  margin: 0 0 6px 12px;
+  font-size: var(--fs-group);
+  font-weight: 600;
+  color: var(--sec);
+}
+.note {
+  margin: 6px 12px 0;
+  font-size: var(--fs-caption);
+  color: var(--sec);
+}
+.list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  background: var(--card);
+  border: 1px solid var(--sep);
+  border-radius: var(--r-card);
+}
+.row {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 10px 12px;
+  font-size: var(--fs-body);
+}
+.row + .row {
+  border-top: 1px solid var(--sep);
+}
+.name {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.value {
+  min-width: 0;
+  text-align: right;
+  color: var(--sec);
+  overflow-wrap: anywhere;
+}
+.empty {
+  padding: 10px 12px;
+  color: var(--sec);
+  font-size: var(--fs-body);
+}
+.preview {
+  display: block;
+  width: 100%;
+  height: 80vh;
+  border: 1px solid var(--sep);
+  border-radius: var(--r-card);
+  background: var(--card);
+}

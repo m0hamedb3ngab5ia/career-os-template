@@ -38,7 +38,8 @@ def test_plan_problems_required_consent_left_for_the_user():
     p = _plan()
     for i, label in enumerate(["Privacy Statement", "Terms and Conditions", "Interview Code of Conduct",
                                "Please confirm receipt of the above linked Global Data Privacy Notice and US "
-                               "Arbitration Agreement.", "Privacy Policy Acknowledgement"]):
+                               "Arbitration Agreement.", "Privacy Policy Acknowledgement",
+                               "I hereby certify that I have not knowingly withheld any information"]):
         p["fields"].append({"field_id": f"c{i}", "label": label, "type": "select", "value": None,
                             "source": "unanswered", "required": True})
     p["fields"].append({"field_id": "q1", "label": "Favourite language?", "type": "text", "value": None,
@@ -236,3 +237,54 @@ def test_fill_one_checkbox_group_rendered_as_react_select_is_picked(monkeypatch)
     root.locator.return_value.count.return_value = 1
     assert gh_fill._fill_one(root, {"field_id": "q[]", "type": "checkbox_group", "value": ["Other"]})
     assert picked == ["Other"]
+
+
+PRIOR = ("At Northwind Bank I'm a backend engineer on the real-time ledger service (Java/Spring Boot, "
+            "Kafka, Oracle), the system of record for every account balance.")
+WHY = ("At Northwind Bank I build backend systems that keep financial records correct in real time, and Acme Pay's payments "
+       "rails need that same correctness at much higher speed.")
+
+
+def _essays(*answers):
+    p = _plan()
+    p["fields"] += [{"field_id": f"q{i}", "label": f"Q{i}", "type": "textarea", "value": a, "source": "user"}
+                    for i, a in enumerate(answers)]
+    return p
+
+
+def test_plan_problems_flags_essays_that_repeat_each_other():
+    assert gh_fill.plan_problems(_essays(PRIOR, WHY)) == ["repeats Q0 (same opening): Q1"]
+
+
+def test_plan_problems_flags_copied_sentences():
+    other = "I care about this company. " + PRIOR
+    assert gh_fill.plan_problems(_essays(PRIOR, other)) == ["repeats Q0 (shared phrasing): Q1"]
+
+
+def test_plan_problems_distinct_essays_and_short_answers_pass():
+    acme = ("Acme Pay is building payments on stablecoin rails, and every transfer becomes data that finance and risk "
+            "have to trust.")
+    p = _essays(PRIOR, acme, "Yes", "Yes")
+    p["fields"] += [{"field_id": f"s{i}", "label": f"S{i}", "type": "select", "value": PRIOR, "source": "standard:x"}
+                    for i in range(2)]  # chosen options may repeat; only free text is checked
+    assert gh_fill.plan_problems(p) == []
+
+
+def test_fill_reuses_the_jobs_open_tab_and_closes_duplicates():
+    from types import SimpleNamespace
+
+    def pg(url):
+        return SimpleNamespace(url=url, close=MagicMock())
+
+    a, b, other = (pg("https://jobs.ashbyhq.com/acme/123/application"), pg("https://jobs.ashbyhq.com/acme/123/"),
+                   pg("https://jobs.ashbyhq.com/acme/999/application"))
+    ctx = SimpleNamespace(pages=[a, other, b], new_page=MagicMock())
+    page, fresh = gh_fill.job_tab(ctx, "https://jobs.ashbyhq.com/acme/123/application")
+    assert page is a and not fresh and b.close.called and not other.close.called and not ctx.new_page.called
+    page, fresh = gh_fill.job_tab(SimpleNamespace(pages=[other], new_page=MagicMock(return_value=b)),
+                                  "https://jobs.ashbyhq.com/acme/123")
+    assert page is b and fresh
+    gh = "https://job-boards.greenhouse.io/embed/job_app?for=acme&token="
+    one, two = pg(gh + "1"), pg(gh + "2")
+    page, fresh = gh_fill.job_tab(SimpleNamespace(pages=[one, two], new_page=MagicMock()), gh + "2")
+    assert page is two and not fresh and not one.close.called  # another Greenhouse job is a different tab

@@ -21,7 +21,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 |---|-----------|----------|------|--------|
 | 0 | Setup | `careeros init` (`src/careeros/bootstrap.py`), `examples/` | once | copy or `--link` |
 | 1 | Master profile | `profile/master.yaml`, `profile/standard_answers.yaml`, `profile/confidential_terms.yaml`, `profile/voice/` | — | candidate-owned |
-| 2 | Scout | `src/careeros/scout/` | daily | Greenhouse/Lever/Ashby APIs |
+| 2 | Scout | `src/careeros/scout/` | daily | Greenhouse/Lever/Ashby APIs; Handshake; SimplifyJobs new-grad list (`simplify`) |
 | 3 | Scorer / categorizer | `.claude/skills/score-job/` | per job | Claude skill |
 | 4 | Tailor (résumé) | `.claude/skills/tailor-resume/` + `templates/resume/` | per job ≥ threshold | LaTeX |
 | 5 | Writer (cover letter + app questions) | `.claude/skills/write-cover-letter/`, `.claude/skills/answer-question/` | per job | voice from `profile/voice/` |

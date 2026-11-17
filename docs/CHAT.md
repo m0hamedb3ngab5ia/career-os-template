@@ -23,6 +23,8 @@ The web UI (`careeros ui`) is a read-only dashboard: **Today** and **Jobs** (tab
 | Action Items page | "what needs me?"; `careeros action list`, `action add`, `action done <id>` |
 | Inbox | `/inbox-sync` |
 | Contacts, Drafts sheet | `/find-contacts <id>`, `/draft-outreach <id>` (draft only, never sent); `careeros outreach check` |
+| Cold outreach for my best applications | "draft outreach for my top 3" → `careeros outreach targets --top 3`, then `/find-contacts <id>` and `/draft-outreach <id>` per job; emails: `careeros outreach emails <id>` |
+| Referrals (who do I know at these companies?) | drop LinkedIn's `Connections.csv` in, "import my network" → `careeros network import <csv>`; `careeros network match`; `/today` lists them; `/draft-outreach <id>` drafts the ask |
 | Writing samples (Profile) | put files in `profile/voice/samples/`, run `/learn-voice` |
 | Component kit, onboarding Tour | say "set me up" (`/onboard`), or read `docs/GETTING_STARTED.md` |
 | Add companies / job sources | "add <company>": `careeros company find-board "<name>"`; "job alerts": `/job-alerts` (LinkedIn alert emails → boards) |

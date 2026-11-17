@@ -74,6 +74,7 @@ ACTION_TEXT = {  # open Action Item type -> the next step
     "ghost_job": "The posting may be stale", "review": "Review and submit the application",
     "injection_suspected": "Check the posting for hidden instructions",
     "send_linkedin": "Send a LinkedIn message", "send_email": "Send an email",
+    "referral": "Ask your connection for a referral",
 }
 
 

@@ -16,14 +16,17 @@ Run each command once from the repo root. If one fails, print "n/a: <first error
 4. For the in-flight counts run `.venv/bin/careeros jobs list --status found --status scored --status queued --status prepared --status applied --status screening --status interview --json`
    and count by `status`. For the top queued jobs run `.venv/bin/careeros jobs list --status queued --json` and sort by `fit`.
 5. `.venv/bin/careeros run list --limit 1`: the last run's kind, outcome and time.
+6. `.venv/bin/careeros network match --json`: open jobs (scored..needs_review) where the candidate has a 1st-degree
+   LinkedIn connection. Exit 1 = no network imported: skip the group.
 
 Print at most 25 lines, in this order:
 - **Needs you**: open Action Items (count, top 5 as one line each) and needs_review jobs (company, title, id).
 - **In flight**: one line of `status: n` pairs, only non-zero.
 - **Queued, best fit first**: top 5, one line each: `fit  company  title  id`.
+- **Referrals**: count, then top 3 by fit: `fit  company  title  id  <first connection name> (<position>)`.
 - **Last run**: kind, outcome, when.
 - A last line naming the one next step (for example `/prepare-job <id>`), or "nothing waiting".
 
 Cut lines to fit 25. Never list more than 5 rows per group.
 
-`RESULT: {"skill":"today","action_items":4,"needs_review":2,"in_flight":{"queued":5},"top_queued":["<job_id>"],"last_run":"prepare ok"}`
+`RESULT: {"skill":"today","action_items":4,"needs_review":2,"in_flight":{"queued":5},"top_queued":["<job_id>"],"referrals":3,"last_run":"prepare ok"}`

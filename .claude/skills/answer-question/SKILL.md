@@ -54,6 +54,10 @@ For `sensitive`, `salary_freeform`, and `unknown`: `answer: null`, `needs_review
 Read `profile/master.yaml` (bullets, narratives), `profile/voice/style_guide.md` (+ samples),
 `JOB/posting.json`, `JOB/score.json`, and `JOB/cover_letter.md` if present (reuse its facts and ids
 so the application is consistent; do not paste the letter).
+Also read the other free-text answers already in `JOB/answers.json` / `JOB/fill_plan.json`. Answer only what this
+question asks (a "why us" answer is about the company and role, not your background again), and never reuse
+another answer's opening words or sentences: `careeros apply fill` refuses a form whose answers repeat each other.
+Never copy an answer from another job's form without rewriting it for this question.
 
 Rules:
 - Only claims traceable to bullet ids / narrative ids; record them in `bullet_ids` / `narrative_ids`.

@@ -9,6 +9,8 @@ export interface FilterParams {
   tab: TabKey;
   q: string;
   location: string;
+  /** Posted within N days; 0/undefined = any. */
+  posted?: number;
   filters: Filters;
   /** Count filter values over these rows instead of asking the server (the Start pipeline review table). */
   rows?: JobListItem[];
@@ -39,10 +41,11 @@ export function filterPairs(filters: Filters): [string, string][] {
   return out;
 }
 
-function baseParams({ tab, q, location, filters }: FilterParams): URLSearchParams {
+function baseParams({ tab, q, location, filters, posted }: FilterParams): URLSearchParams {
   const p = new URLSearchParams({ tab });
   if (q) p.set("q", q);
   if (location) p.set("location", location);
+  if (posted) p.set("posted_within", String(posted));
   for (const [k, v] of filterPairs(filters)) p.append(k, v);
   return p;
 }

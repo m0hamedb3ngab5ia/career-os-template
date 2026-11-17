@@ -14,7 +14,7 @@ def test_init_creates_tabs_and_validation(tmp_path: Path):
     tr = Tracker(path=tmp_path / "JobTracker.xlsx")
     tr.init()
     wb = load_workbook(tr.path)
-    assert wb.sheetnames == ["Jobs", "Action Items", "Contacts", "Log", "Config"]
+    assert wb.sheetnames == ["Jobs", "Skipped", "Action Items", "Contacts", "Log", "Config"]
     ws = wb["Jobs"]
     assert ws["A1"].value == "JobID" and ws["A1"].font.bold
     assert ws.freeze_panes == "A2"
@@ -493,3 +493,35 @@ def test_legacy_formula_url_cells_are_neutralised_on_open(tmp_path: Path):
     c1, c2 = ws.cell(row=2, column=hdr["URL"]), ws.cell(row=3, column=hdr["URL"])
     assert c1.data_type == "s" and c1.value == evil and c1.hyperlink is None
     assert c2.hyperlink.target == "https://ok.example/1"
+
+
+def test_resume_column_links_the_jobs_resume_pdf(tmp_path: Path):
+    p = tmp_path / "JobTracker.xlsx"
+    jobs = tmp_path / "jobs"
+    (jobs / "r1").mkdir(parents=True)
+    (jobs / "r1" / "resume.pdf").write_bytes(b"%PDF")
+    (jobs / "r2").mkdir()
+    tr = Tracker(path=p)
+    tr.jobs_dir = jobs
+    tr.upsert_job({"job_id": "r1"})
+    tr.upsert_job({"job_id": "r2"})
+    ws = load_workbook(p)["Jobs"]
+    hdr = {c.value: c.column for c in ws[1]}
+    cells = {ws.cell(row=r, column=hdr["JobID"]).value: ws.cell(row=r, column=hdr["ResumeVersion"]) for r in range(2, ws.max_row + 1)}
+    assert cells["r1"].value == "resume" and cells["r1"].hyperlink.target == str(jobs / "r1" / "resume.pdf")
+    assert cells["r2"].value is None and cells["r2"].hyperlink is None
+
+
+def test_resume_link_never_overwrites_an_explicit_resume_version(tmp_path: Path):
+    p = tmp_path / "JobTracker.xlsx"
+    jobs = tmp_path / "jobs"
+    (jobs / "r1").mkdir(parents=True)
+    (jobs / "r1" / "resume.pdf").write_bytes(b"%PDF")
+    tr = Tracker(path=p)
+    tr.jobs_dir = jobs
+    tr.upsert_job({"job_id": "r1", "resume_version": "swe_backend-v3"})
+    tr.upsert_job({"job_id": "r1", "status": "applied"})  # e.g. a later sync: no explicit version
+    ws = load_workbook(p)["Jobs"]
+    hdr = {c.value: c.column for c in ws[1]}
+    cell = ws.cell(row=2, column=hdr["ResumeVersion"])
+    assert cell.value == "swe_backend-v3" and cell.hyperlink is None

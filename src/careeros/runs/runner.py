@@ -274,6 +274,9 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
             if explicit:
                 excluded.append({"job_id": jid, "reason": "posting.json unreadable"})
             continue
+        if kind == "score" and (p.raw or {}).get("needs_description"):  # aggregator listing, no text to score
+            excluded.append({"job_id": jid, "reason": "needs description"})
+            continue
         ok, why, _ = pre.check(p)
         if not ok:
             excluded.append({"job_id": jid, "reason": f"filtered: {why}"})
@@ -291,6 +294,13 @@ def rank_records(settings: Settings, kind: str, cfg: RunsConfig, now: datetime, 
             closes_at=posting_closes_at(p), dream=settings.is_dream(p.company),
             fit=int(fit) if isinstance(fit, (int, float)) and not isinstance(fit, bool) else None,
             retry=jid in retry_ids))
+    if kind == "prepare" and cfg.ranking.get("referral_weight"):
+        from careeros.yield_model import referral_lifts
+
+        lifts = referral_lifts(settings, [(c.job_id, c.company, c.fit if c.fit is not None else 70,
+                                           bool(c.posted_at and (now - c.posted_at).days > 60)) for c in cands])
+        for c in cands:
+            c.referral_lift = lifts.get(c.job_id)
     ranked = rank(cands, cfg.ranking, now, stage=kind)
     if kind == "prepare":
         ranked = fit_first_within_company(ranked)

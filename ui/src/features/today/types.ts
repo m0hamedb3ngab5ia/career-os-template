@@ -15,6 +15,8 @@ export type Tiles = Schemas["Tiles"];
 export type PipelineColumn = Schemas["PipelineColumnCount"];
 export type RunRow = Schemas["RunRow"];
 export type Meta = ApiMeta;
+/** One job with a recruiter or contact found and/or a drafted message (services/today.py OutreachItem). */
+export type OutreachItem = Schemas["OutreachItem"];
 export type TodayData = Schemas["Today"];
 
 /** runs/pause.json as the run store writes it. */

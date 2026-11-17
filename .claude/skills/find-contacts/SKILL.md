@@ -66,7 +66,18 @@ or past employers (`experience[].company`) in a public bio, set `possible_referr
   "gaps": ["no names in posting", "team page has no engineering leads"]
 }
 ```
-`email` stays null unless `email_confidence` is `verified`. The caller (tracker) copies contacts into
+Then run `.venv/bin/careeros outreach emails <job_id>` (one call). Order: Apollo.io first when the candidate stored a key
+(`careeros creds set apollo --password-stdin`): people search (0 credits) + email for up to `--enrich 2` people
+(1 credit each), recruiters first; a 403 means the plan has no API (free API needs a work-email account): then tell the
+candidate to open `search_urls.apollo_recruiter` / `apollo_hiring_manager` and paste names/emails back; add each as a
+contact (`source: "apollo.io (manual)"`) and run `outreach emails` again. Never open or scrape Apollo's web app.
+Then Hunter.io, then pattern guesses. Credits used go to `JOB/log.md`. It also resolves the domain (`companies.yaml:
+company_domains`, else the posting URL unless it is an ATS, else the `domain` you wrote here when high|medium, else `<name>.com` low), orders `email_candidates` by the
+company's real pattern from Hunter.io when the candidate stored a key (`careeros creds set hunter --password-stdin`),
+fills exact Hunter hits (`email_confidence: medium`, `email_source: hunter.io`), adds recruiters Hunter knows, and
+writes `email_pattern` + `verify_tip` (Gmail-compose photo check: a manual tip for the candidate, never automated).
+Never probe, verify or send to an address yourself.
+`email` stays null unless `email_confidence` is `verified` or Hunter returned that exact person. The caller (tracker) copies contacts into
 the Contacts tab; `draft-outreach` reads this file next.
 
 Append to `JOB/log.md`: `- YYYY-MM-DD HH:MM:SS [find-contacts] <n> contacts (<roles>), web=<b>, domain=<d> (<conf>)`

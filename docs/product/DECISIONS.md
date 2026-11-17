@@ -187,3 +187,10 @@ Decision: (1) The UI keeps Today (needs-you, top picks, read-only) and Jobs (tab
 Why: a long chat buries what is in flight, so a dashboard earns its place; editing, review and set-up are conversation, and a UI for them duplicated what the skills already do.
 Rejected: keep every page and add chat on top (two surfaces to maintain); drop the UI entirely (no stable view of the job list).
 Consequences: removed from the UI (frontend only): Settings, Job detail (`/jobs/:jobId`), Automation / runs, Profile, standard answers, résumé workspace + review, Action Items, Inbox, Contacts, Drafts sheet, component kit, onboarding Tour, batch progress, and the "start pipeline" / "check a job" surfaces on Jobs. Routers for these stay until the follow-up pass (stream `chat-first`); streams `private-ui-redesign` and `ttv-user-test` (planned UI work) are superseded and need a decision. DEC-009..DEC-023 UI parts apply to Today and Jobs only. Amends REQ-071/072 (Today, Jobs stay).
+
+### DEC-025 Dashboard shows reference views and takes quick decisions (amends DEC-024)
+Reasoned by: human (2026-11-16): "These are things I want to access. Regardless of where the chat is, I want to see what documents I have available, what my master resume looks like… what configurations or filters I have set up." Write rule chosen by human from agent options: "Allow quick decisions".
+Decision: (1) The UI adds read-only Profile (résumés, documents, answers, master résumé preview) and Settings (search config) pages. (2) The dashboard may take one-click decisions: Approve (queues only, never submits; QA must pass; Tier A stays manual), Dismiss, and a short answer to an open question. (3) All editing (résumé, profile, config) stays in chat, per DEC-024. (4) Nav: ≤6 top-level items; collapsible sub-items don't count.
+Why: reference data and pending decisions must be findable without hunting through a long chat; a one-click decision is faster than typing it and is safe because approve only queues.
+Rejected: strictly read-only dashboard (every decision becomes a chat round trip); editing in the UI (duplicates the skills, DEC-024).
+

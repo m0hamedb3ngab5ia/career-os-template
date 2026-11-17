@@ -9,11 +9,11 @@ from typing import Any
 import yaml
 
 CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
-ATS_WITH_SLUG = ("greenhouse", "lever", "ashby", "handshake")  # adapters that fetch by board slug (custom uses url)
+ATS_WITH_SLUG = ("greenhouse", "lever", "ashby", "handshake", "simplify")  # adapters that fetch by board slug (custom uses url)
 # Nested keys the code reads as mappings; a list or scalar there is a config typo -> ConfigError.
 MAPPING_KEYS = {
     "pipeline": ("paths", "outreach", "credentials", "match"),
-    "targets": ("candidate", "location", "seniority", "categories", "volume", "safety", "thresholds"),
+    "targets": ("candidate", "location", "seniority", "categories", "volume", "safety", "thresholds", "goal"),
     "companies": ("blocklist", "prestige_scoring", "prestige_tiers", "company_caps"),
 }
 # targets.yaml `volume` keys read by careeros.company_policy: key -> (default, minimum).
@@ -250,7 +250,17 @@ def _check_shapes(cfg: dict[str, dict[str, Any]]) -> None:
     _check_volume(cfg.get("targets", {}).get("volume"))
     _check_match(cfg.get("pipeline", {}).get("match"), cfg.get("targets", {}).get("thresholds"))
     _check_safety(cfg.get("targets", {}).get("safety"))
+    _check_goal(cfg.get("targets", {}).get("goal"))
     _check_company_caps(cfg.get("companies", {}).get("company_caps"))
+    from types import SimpleNamespace
+
+    from careeros.yield_model import priors
+
+    priors(SimpleNamespace(pipeline=cfg.get("pipeline") or {}))  # pipeline.yaml: yield_priors shape
+    rs = cfg.get("companies", {}).get("referral_strength")
+    if rs is not None and not (isinstance(rs, dict) and all(isinstance(k, str) and k.strip() and v in ("weak", "normal", "strong")
+                                                             for k, v in rs.items())):
+        raise ConfigError(f"config/companies.yaml: referral_strength must map company -> weak|normal|strong, got {rs!r}")
     boards = cfg.get("companies", {}).get("boards")
     if boards is not None:
         if not isinstance(boards, list):
@@ -277,6 +287,13 @@ def _check_match(match: Any, thresholds: Any) -> None:
         for k, v in syn.items():
             if v is not None and not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
                 raise ConfigError(f"config/pipeline.yaml: match.synonyms.{k} must be a list of strings, got {v!r}")
+    imp = (match or {}).get("implies")
+    if imp is not None:
+        if not isinstance(imp, dict):
+            raise ConfigError(f"config/pipeline.yaml: match.implies must be a mapping, got {type(imp).__name__}")
+        for k, v in imp.items():
+            if v is not None and not (isinstance(v, list) and all(isinstance(x, str) for x in v)):
+                raise ConfigError(f"config/pipeline.yaml: match.implies.{k} must be a list of strings, got {v!r}")
     for key in ("min_match", "min_tweak_gain"):
         mm = (thresholds or {}).get(key)
         if mm is not None and not (_whole(mm, 0) and mm <= 100):
@@ -292,6 +309,25 @@ def _check_volume(volume: Any) -> None:
         if key in volume and not _whole(volume[key], minimum):
             raise ConfigError(f"config/targets.yaml: volume.{key} must be a whole number >= {minimum}, "
                               f"got {volume[key]!r}")
+
+
+def _check_goal(goal: Any) -> None:
+    """targets.yaml `goal: {pay_bar, minutes_per_week, locations, flex_for_prestige}` (yield model). pay_bar may be
+    null (not chosen yet)."""
+    if goal is None:
+        return
+    if not isinstance(goal, dict):
+        raise ConfigError(f"config/targets.yaml: goal must be a mapping, got {type(goal).__name__}")
+    g = "config/targets.yaml: goal."
+    if goal.get("pay_bar") is not None and not _whole(goal["pay_bar"], 0):
+        raise ConfigError(f"{g}pay_bar must be a whole number >= 0 (USD base) or null, got {goal['pay_bar']!r}")
+    if "minutes_per_week" in goal and not _whole(goal["minutes_per_week"], 1):
+        raise ConfigError(f"{g}minutes_per_week must be a whole number >= 1, got {goal['minutes_per_week']!r}")
+    loc = goal.get("locations")
+    if "locations" in goal and not (isinstance(loc, list) and all(isinstance(x, str) and x.strip() for x in loc)):
+        raise ConfigError(f"{g}locations must be a list of place names, got {loc!r}")
+    if "flex_for_prestige" in goal and not isinstance(goal["flex_for_prestige"], bool):
+        raise ConfigError(f"{g}flex_for_prestige must be true or false, got {goal['flex_for_prestige']!r}")
 
 
 def _check_safety(safety: Any) -> None:

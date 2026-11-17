@@ -173,7 +173,7 @@ def test_scout_defaults_keep_every_filter_on(example_settings):
     from careeros.scout import scout_config
 
     cfg = scout_config(example_settings)
-    assert cfg["sources"] == ["greenhouse", "lever", "ashby", "handshake"]
+    assert cfg["sources"] == ["greenhouse", "lever", "ashby", "handshake", "simplify"]
     assert all(cfg["filters"].values()) and set(cfg["filters"]) == {
         "blocklist", "flagged", "title", "seniority", "location", "ghost"}
 

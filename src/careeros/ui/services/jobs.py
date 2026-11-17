@@ -25,11 +25,11 @@ KEY_DOCUMENTS = ("resume.pdf", "cover_letter.pdf", "cover_letter.md", "resume.tx
 # GET /api/jobs/facets counts a column's values under every other active filter.
 VALUE_COLUMNS = ("company", "location", "status", "tier", "category", "safety", "ats", "qa_passed")
 NUMBER_COLUMNS = ("fit", "qa_score")
-DATE_COLUMNS = ("found_at", "applied_at", "closes_at")
+DATE_COLUMNS = ("found_at", "applied_at", "closes_at", "posted_at")
 _ISO_DATE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
 LIST_FIELDS = ("job_id", "company", "title", "location", "ats", "url", "category", "fit", "tier", "status", "safety",
                "qa_passed", "qa_score", "found_at", "applied_at", "updated_at", "closes_at", "selected", "injection",
-               "prescore")
+               "prescore", "posted_at")
 
 
 # Response shapes (OpenAPI -> ui/src/api/schema.gen.ts). Index columns are nullable (qa_passed is the index's 0/1
@@ -56,6 +56,8 @@ class JobRow(TypedDict):
     selected: int | None     # REQ-104: 1 = ticked for prepare/apply (a missing flag counts as ticked)
     injection: str | None    # REQ-109: uncleared injection reasons; None = not flagged or "I checked it"
     prescore: int | None     # REQ-133: keyword pre-score 0-100 ("Quick match"), not the fit score
+    posted_at: str | None    # YYYY-MM-DD the employer posted it (ATS first-published / posted date); None = unknown
+    progress: NotRequired[str | None]     # In progress rows only: where preparation stands, in plain words
 
 
 class Reasons(TypedDict):
@@ -156,23 +158,35 @@ def _like(q: str) -> str:
 
 
 # Jobs screen tabs (DEC-022, docs/product/09_ARCHITECTURE.md "Delta 2026-10-13" Buckets): key -> label.
-TABS = (("recommended", "Recommended"), ("notscored", "Not scored"), ("saved", "Saved"), ("applied", "Applied"))
+TABS = (("recommended", "Recommended"), ("inprogress", "In progress"), ("notscored", "Not scored"), ("saved", "Saved"), ("applied", "Applied"))
 APPLIED_STATUSES = ("applied", "screening", "interview", "offer")
+IN_PROGRESS = ("queued", "prepared", "needs_review")   # picked and being prepared, not applied yet
 AFTER_APPLY = (*APPLIED_STATUSES, "rejected", "withdrawn", "ghosted")   # Applied tab, incl. its Closed stage (Q-028)
-# Old tab keys (saved URLs) -> (new tab, extra clause): never a 400. needs_review jobs are prepared, so ticked.
+# Old tab keys (saved URLs) -> (new tab, extra clause): never a 400.
 OLD_TABS: dict[str, tuple[str, str | None, list[Any]]] = {
     "active": ("recommended", None, []), "all": ("recommended", None, []),
-    "tier_a": ("recommended", "tier = ?", ["A"]), "review": ("saved", "status = ?", ["needs_review"])}
+    "tier_a": ("recommended", "tier = ?", ["A"]), "review": ("inprogress", None, [])}
 _NEXT_ACTION = ("(SELECT a.what FROM action_items a WHERE a.job_id = jobs.job_id AND a.done = 0 ORDER BY "
                 "CASE a.priority WHEN 'H' THEN 0 WHEN 'M' THEN 1 WHEN 'L' THEN 2 ELSE 3 END, a.created LIMIT 1)")
 # Export columns: key -> header. JobID always comes first.
 EXPORT_COLUMNS = {"company": "Company", "title": "Role", "location": "Location", "tier": "Tier", "fit": "Fit",
-                  "status": "Status", "safety": "Safety", "qa_score": "QA", "ats": "ATS", "found_at": "Found",
+                  "status": "Status", "safety": "Safety", "qa_score": "QA", "ats": "ATS", "found_at": "Found", "posted_at": "Posted",
                   "applied_at": "Applied", "next_action": "Next action", "category": "Category", "url": "URL",
                   "closes_at": "Closes", "selected": "Pipeline"}
 DEFAULT_EXPORT = ("company", "title", "location", "tier", "fit", "status", "safety", "qa_score", "ats", "found_at",
                   "applied_at", "next_action", "url")
 MAX_EXPORT = 5000
+
+
+def progress_word(status: str | None, qa_passed: int | None) -> str | None:
+    """Where an in-progress job stands, in plain words."""
+    if status == "queued":
+        return "Ready to send"
+    if status == "needs_review":
+        return "Quality check failed" if qa_passed == 0 else "Waiting for you"
+    if status == "prepared":
+        return "Drafted, quality check next"
+    return None
 
 
 def _in(col: str, vals: Any) -> tuple[str, list[Any]]:
@@ -187,14 +201,16 @@ def _tab_clause(tab: str | None, closed: list[str] | None) -> tuple[str | None, 
         tab, extra, extra_params = OLD_TABS[tab]
     applied, a_params = _in("status", AFTER_APPLY)
     if tab == "recommended":
-        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY}))
+        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY, *IN_PROGRESS}))
         clause, params = f"fit IS NOT NULL AND selected = 0 AND (status IS NULL OR NOT {out})", ex
     elif tab == "notscored":   # REQ-136: unscored, unticked, not skipped / applied / closed
-        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY}))
+        out, ex = _in("status", sorted({"skipped", *(closed or []), *AFTER_APPLY, *IN_PROGRESS}))
         clause, params = f"fit IS NULL AND selected = 0 AND (status IS NULL OR NOT {out})", ex
     elif tab == "saved":
-        out, ex = _in("status", ("skipped", *AFTER_APPLY))
+        out, ex = _in("status", ("skipped", *AFTER_APPLY, *IN_PROGRESS))
         clause, params = f"selected = 1 AND (status IS NULL OR NOT {out})", ex
+    elif tab == "inprogress":   # whatever the tick: a job being prepared is never a pick again
+        clause, params = _in("status", IN_PROGRESS)
     elif tab == "applied":
         clause, params = applied, a_params
     else:
@@ -277,6 +293,8 @@ def list_jobs(ix: Any, *, status: list[str] | None = None, tier: list[str] | Non
     total = ix.query(f"SELECT COUNT(*) AS n FROM jobs{clause}", params)[0]["n"]
     rows = ix.query(f"SELECT {', '.join(LIST_FIELDS)}, {_NEXT_ACTION} AS next_action FROM jobs{clause} "
                     f"ORDER BY {_order(sort)} LIMIT ? OFFSET ?", [*params, limit, offset])
+    for r in rows:
+        r["progress"] = progress_word(r["status"], r["qa_passed"]) if r["status"] in IN_PROGRESS else None
     nxt = offset + len(rows)
     return {"items": rows, "total": total, "next_cursor": str(nxt) if nxt < total else None}
 

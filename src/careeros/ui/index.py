@@ -26,8 +26,8 @@ from careeros import untrusted
 from careeros.config import ConfigError
 from careeros.store import _is_finder_copy
 
-SCHEMA_VERSION = 7   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail;
-#                      6: jobs.selected, jobs.injection; 7: jobs.prescore (REQ-133)
+SCHEMA_VERSION = 8   # 2: action_items.due, due_reason; 3: candidates; 4: candidates.error; 5: action_items.detail;
+#                      6: jobs.selected, jobs.injection; 7: jobs.prescore (REQ-133); 8: jobs.posted_at
 
 _SCHEMA = """
 CREATE TABLE meta (key TEXT PRIMARY KEY, value TEXT);
@@ -35,7 +35,7 @@ CREATE TABLE jobs (
     job_id TEXT PRIMARY KEY, company TEXT, title TEXT, location TEXT, ats TEXT, url TEXT, apply_url TEXT,
     category TEXT, fit INTEGER, tier TEXT, status TEXT, safety TEXT, qa_passed INTEGER, qa_score REAL,
     found_at TEXT, applied_at TEXT, updated_at TEXT, closes_at TEXT, pruned INTEGER, sig TEXT,
-    selected INTEGER, injection TEXT, prescore INTEGER);
+    selected INTEGER, injection TEXT, prescore INTEGER, posted_at TEXT);
 CREATE INDEX jobs_status ON jobs(status);
 CREATE TABLE candidates (
     job_id TEXT PRIMARY KEY, status TEXT, score TEXT, has_score INTEGER, prepared_ok INTEGER, posting TEXT,
@@ -385,13 +385,14 @@ class Index:
         injection = ("; ".join(map(str, reasons)) or "suspected") if untrusted.blocked(flags) else None
         self._delete_job(jid)
         self.con.execute(
-            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
+            "INSERT INTO jobs VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)",
             (jid, posting.get("company"), posting.get("title"), posting.get("location"), posting.get("ats"),
              posting.get("url"), posting.get("apply_url"), score.get("category"),
              fit if isinstance(fit, int) and not isinstance(fit, bool) else None, score.get("tier"),
              status.get("status") or "found", safety.get("verdict"), qa_passed, qa_score, found_at, applied_at,
              status.get("updated_at"), posting.get("closes_at"), int(bool(posting.get("pruned"))), sig,
-             int(bool(flags.get("selected", True))), injection, self._prescore(posting)))
+             int(bool(flags.get("selected", True))), injection, self._prescore(posting),
+             (posting.get("first_published") or posting.get("posted_at") or "")[:10] or None))
         self.con.execute("INSERT INTO candidates VALUES (?,?,?,?,?,?,?)",
                          (jid, status.get("status") or "found", json.dumps(candidate_score(score)),
                           int(bool(score) or (d / "score.json").exists()),

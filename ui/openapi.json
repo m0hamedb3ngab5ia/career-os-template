@@ -441,6 +441,24 @@
         "title": "Answer",
         "type": "object"
       },
+      "AnswerRow": {
+        "properties": {
+          "answer": {
+            "title": "Answer",
+            "type": "string"
+          },
+          "key": {
+            "title": "Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "key",
+          "answer"
+        ],
+        "title": "AnswerRow",
+        "type": "object"
+      },
       "AppliedWeekTile": {
         "properties": {
           "daily_cap": {
@@ -1247,6 +1265,24 @@
         "title": "CurrentRun",
         "type": "object"
       },
+      "DocumentRow": {
+        "properties": {
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "size": {
+            "title": "Size",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "size"
+        ],
+        "title": "DocumentRow",
+        "type": "object"
+      },
       "Due": {
         "properties": {
           "due": {
@@ -1436,6 +1472,17 @@
             },
             "title": "Location In",
             "type": "array"
+          },
+          "posted_within": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posted Within"
           },
           "q": {
             "anyOf": [
@@ -2081,6 +2128,17 @@
             ],
             "title": "Next Action"
           },
+          "posted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posted At"
+          },
           "prescore": {
             "anyOf": [
               {
@@ -2091,6 +2149,17 @@
               }
             ],
             "title": "Prescore"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
           },
           "qa_passed": {
             "anyOf": [
@@ -2223,6 +2292,7 @@
           "selected",
           "injection",
           "prescore",
+          "posted_at",
           "next_action"
         ],
         "title": "JobListItem",
@@ -2333,6 +2403,17 @@
             ],
             "title": "Location"
           },
+          "posted_at": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Posted At"
+          },
           "prescore": {
             "anyOf": [
               {
@@ -2343,6 +2424,17 @@
               }
             ],
             "title": "Prescore"
+          },
+          "progress": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Progress"
           },
           "qa_passed": {
             "anyOf": [
@@ -2464,7 +2556,8 @@
           "closes_at",
           "selected",
           "injection",
-          "prescore"
+          "prescore",
+          "posted_at"
         ],
         "title": "JobRow",
         "type": "object"
@@ -2896,6 +2989,95 @@
         "title": "NoteBody",
         "type": "object"
       },
+      "OutreachItem": {
+        "description": "One job with people to contact (contacts.json) and/or drafted messages (outreach.json). Nothing is sent.",
+        "properties": {
+          "company": {
+            "title": "Company",
+            "type": "string"
+          },
+          "contact_name": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Name"
+          },
+          "contact_role": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Contact Role"
+          },
+          "draft_ready": {
+            "title": "Draft Ready",
+            "type": "boolean"
+          },
+          "email": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email"
+          },
+          "email_confidence": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Email Confidence"
+          },
+          "followup_due": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Followup Due"
+          },
+          "job_id": {
+            "title": "Job Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "job_id",
+          "company",
+          "title",
+          "contact_name",
+          "contact_role",
+          "email",
+          "email_confidence",
+          "draft_ready",
+          "followup_due"
+        ],
+        "title": "OutreachItem",
+        "type": "object"
+      },
       "OverrideBody": {
         "properties": {
           "value": {
@@ -3243,6 +3425,38 @@
         "title": "Presets",
         "type": "object"
       },
+      "Profile": {
+        "properties": {
+          "answers": {
+            "items": {
+              "$ref": "#/components/schemas/AnswerRow"
+            },
+            "title": "Answers",
+            "type": "array"
+          },
+          "documents": {
+            "items": {
+              "$ref": "#/components/schemas/DocumentRow"
+            },
+            "title": "Documents",
+            "type": "array"
+          },
+          "resumes": {
+            "items": {
+              "$ref": "#/components/schemas/ResumeRow"
+            },
+            "title": "Resumes",
+            "type": "array"
+          }
+        },
+        "required": [
+          "resumes",
+          "documents",
+          "answers"
+        ],
+        "title": "Profile",
+        "type": "object"
+      },
       "QuietHours": {
         "properties": {
           "end": {
@@ -3461,6 +3675,39 @@
           "breakdown"
         ],
         "title": "ResponseRateTile",
+        "type": "object"
+      },
+      "ResumeRow": {
+        "properties": {
+          "at": {
+            "title": "At",
+            "type": "string"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "rid": {
+            "title": "Rid",
+            "type": "string"
+          },
+          "type": {
+            "title": "Type",
+            "type": "string"
+          },
+          "version": {
+            "title": "Version",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "rid",
+          "name",
+          "type",
+          "version",
+          "at"
+        ],
+        "title": "ResumeRow",
         "type": "object"
       },
       "RunBudget": {
@@ -4472,6 +4719,92 @@
         "title": "SelectBody",
         "type": "object"
       },
+      "SettingGroup": {
+        "properties": {
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/SettingRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "rows"
+        ],
+        "title": "SettingGroup",
+        "type": "object"
+      },
+      "SettingRow": {
+        "properties": {
+          "help": {
+            "default": "",
+            "title": "Help",
+            "type": "string"
+          },
+          "label": {
+            "title": "Label",
+            "type": "string"
+          },
+          "value": {
+            "title": "Value",
+            "type": "string"
+          }
+        },
+        "required": [
+          "label",
+          "value"
+        ],
+        "title": "SettingRow",
+        "type": "object"
+      },
+      "SettingSection": {
+        "properties": {
+          "groups": {
+            "items": {
+              "$ref": "#/components/schemas/SettingGroup"
+            },
+            "title": "Groups",
+            "type": "array"
+          },
+          "id": {
+            "title": "Id",
+            "type": "string"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "title",
+          "groups"
+        ],
+        "title": "SettingSection",
+        "type": "object"
+      },
+      "SettingsView": {
+        "properties": {
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/SettingSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "sections"
+        ],
+        "title": "SettingsView",
+        "type": "object"
+      },
       "StartBody": {
         "properties": {
           "dry_run": {
@@ -4709,6 +5042,13 @@
             "title": "Actions",
             "type": "array"
           },
+          "outreach": {
+            "items": {
+              "$ref": "#/components/schemas/OutreachItem"
+            },
+            "title": "Outreach",
+            "type": "array"
+          },
           "prepare_queue": {
             "$ref": "#/components/schemas/PrepareQueue"
           },
@@ -4723,7 +5063,8 @@
         "required": [
           "actions",
           "prepare_queue",
-          "top_picks"
+          "top_picks",
+          "outreach"
         ],
         "title": "Today",
         "type": "object"
@@ -5560,6 +5901,24 @@
               ],
               "title": "Closes To"
             }
+          },
+          {
+            "in": "query",
+            "name": "posted_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3650,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Posted Within"
+            }
           }
         ],
         "responses": {
@@ -6056,6 +6415,24 @@
               ],
               "title": "Closes To"
             }
+          },
+          {
+            "in": "query",
+            "name": "posted_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3650,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Posted Within"
+            }
           }
         ],
         "responses": {
@@ -6476,6 +6853,24 @@
                 }
               ],
               "title": "Closes To"
+            }
+          },
+          {
+            "in": "query",
+            "name": "posted_within",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "maximum": 3650,
+                  "minimum": 1,
+                  "type": "integer"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "title": "Posted Within"
             }
           }
         ],
@@ -7506,6 +7901,45 @@
         ]
       }
     },
+    "/api/profile": {
+      "get": {
+        "operationId": "get_profile_api_profile_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Profile"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Profile",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
+    "/api/profile/master.pdf": {
+      "get": {
+        "description": "The master résumé's latest version, inline, for the Profile preview (REQ-151). 404 none; 409 not a PDF.",
+        "operationId": "master_pdf_api_profile_master_pdf_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/pdf": {}
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Master Pdf",
+        "tags": [
+          "profile"
+        ]
+      }
+    },
     "/api/profile/master/proposal": {
       "get": {
         "operationId": "get_master_proposal_api_profile_master_proposal_get",
@@ -8195,6 +8629,27 @@
         "summary": "Schedule Action",
         "tags": [
           "runs"
+        ]
+      }
+    },
+    "/api/settings": {
+      "get": {
+        "operationId": "get_settings_api_settings_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SettingsView"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Get Settings",
+        "tags": [
+          "profile"
         ]
       }
     },
