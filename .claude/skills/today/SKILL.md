@@ -27,6 +27,8 @@ Print at most 25 lines, in this order:
 - **Last run**: kind, outcome, when.
 - A last line naming the one next step (for example `/prepare-job <id>`), or "nothing waiting".
 
+- Footer (only when nothing is waiting): "what else can I do? -> docs/CATALOGUE.md".
+
 Cut lines to fit 25. Never list more than 5 rows per group.
 
 `RESULT: {"skill":"today","action_items":4,"needs_review":2,"in_flight":{"queued":5},"top_queued":["<job_id>"],"referrals":3,"last_run":"prepare ok"}`

@@ -16,6 +16,7 @@ All AI work runs through your Claude Code subscription. There is no API key.
 
 Step by step, by hand: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**. Day-to-day process (applying, status,
 follow-ups): **[docs/PROCESS.md](docs/PROCESS.md)**.
+Everything it can do, by task: **[docs/CATALOGUE.md](docs/CATALOGUE.md)**.
 
 ## How it works
 

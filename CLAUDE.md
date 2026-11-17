@@ -19,7 +19,7 @@ Personal context (who candidate is, where private files live): gitignored `CLAUD
 - `.venv/bin/careeros doctor [--quiet]`: setup checklist, exit 1 on FAIL (example data left, broken YAML, unknown bullet_priority ids, no `claude`). `prepare-job` / `apply-job` run it first. New user: `docs/GETTING_STARTED.md`.
 
 ## Commands
-Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMMANDS.md`. Read before running or changing any `careeros` command or `/api` route. Most used:
+Feature catalogue (everything the app can do, by task): `docs/CATALOGUE.md`; keep it current when adding a skill or command (`tests/test_catalogue.py`). Full CLI + API reference (subcommands, flags, exit codes, endpoints): `docs/COMMANDS.md`. Read before running or changing any `careeros` command or `/api` route. Most used:
 - `.venv/bin/careeros doctor`, `ui [--no-open]`, `scout --sync`, `jobs list`, `run list|show <id>`
 - `.venv/bin/python -m pytest -q`
 
