@@ -452,19 +452,38 @@ def check_bold(master: dict) -> list[Check]:
     return out or [Check(PASS, "bold_markup", "**bold** markup in bullets and summaries is valid")]
 
 
-def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None) -> list[Check]:
+def configured_binary(pipeline: dict[str, Any]) -> tuple[str, str]:
+    """(llm.cli, the binary a run actually executes): headless_cmd[0] when set, else the cli name."""
+    llm = pipeline.get("llm") if isinstance(pipeline, dict) else None
+    llm = llm if isinstance(llm, dict) else {}
+    cli = str(llm.get("cli") or "claude")
+    cmd = llm.get("headless_cmd")
+    return cli, str(cmd[0]) if isinstance(cmd, list) and cmd and isinstance(cmd[0], str) else cli
+
+
+def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None,
+                cli: str = "claude", binary: str | None = None) -> list[Check]:
+    binary = binary or cli
+
+    def found(name: str) -> bool:  # an explicit path is checked directly, a bare name via PATH
+        return os.access(name, os.X_OK) and os.path.isfile(name) if os.sep in name else bool(which(name))
+
     out = []
     latex = [t for t in ("tectonic", "pdflatex") if which(t)]
     out.append(Check(PASS, "latex", f"{latex[0]} found") if latex else Check(
         WARN, "latex", "neither tectonic nor pdflatex on PATH: résumés stay .tex, no PDF (brew install tectonic)"))
     inside = (os.environ if env is None else env).get("CLAUDECODE") == "1"  # set by Claude Code in its shells
-    if which("claude"):
+    if cli != "claude":  # pipeline.yaml llm.cli (REQ-158): that binary runs every skill instead
+        out.append(Check(PASS, cli, f"{cli} CLI found (llm.cli)") if found(binary) else Check(
+            FAIL, cli, f"{binary} not found or not executable but pipeline.yaml llm.cli is {cli}: "
+                       "install it and log in once"))
+    elif which("claude") if os.sep not in binary else found(binary):
         out.append(Check(PASS, "claude", "claude CLI found"))
     elif inside:
         out.append(Check(PASS, "claude", "running inside Claude Code (no `claude` on PATH; headless `claude -p` needs it)"))
     else:
         out.append(Check(FAIL, "claude", "claude (Claude Code CLI) not on PATH: every skill needs it. Install Claude Code, then `claude` once to log in"))
-    for tool in ("gh", "codex"):
+    for tool in [t for t in ("gh", "codex") if t != cli]:
         out.append(Check(PASS, tool, f"{tool} found") if which(tool) else Check(
             WARN, tool, f"{tool} not on PATH: only needed for /review (code review of PRs)"))
     return out
@@ -486,7 +505,7 @@ def check_runs(pipeline: dict[str, Any]) -> list[Check]:
     else:
         cmd = cfg.headless_cmd
         fmt = cmd[cmd.index("--output-format") + 1] if "--output-format" in cmd[:-1] else "text"
-        if fmt != "stream-json" or "--verbose" not in cmd:
+        if cfg.cli == "claude" and (fmt != "stream-json" or "--verbose" not in cmd):
             out.append(Check(WARN, "runs", "llm.headless_cmd should use --output-format stream-json --verbose: "
                                            "`careeros run` reads the live event stream and its final result event"))
         else:
@@ -667,7 +686,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks += check_metric_questions(master)
         checks += check_estimates(master)
         checks += check_bold(master)
-    checks += check_tools(which, env)
+    checks += check_tools(which, env, *configured_binary(cfg["pipeline"]))
     checks.append(check_voice(root))
     return checks
 

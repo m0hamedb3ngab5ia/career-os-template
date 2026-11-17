@@ -62,10 +62,12 @@ schedule:                                  # reusable default: fine to keep. `ca
 
 llm:                                       # reusable default: fine to keep
   runner: claude_code                      # claude_code (subscription, `claude -p`) | api (NOT enabled; requires explicit opt-in)
-  # How `careeros run` calls a skill (the prompt `/score-job data/jobs/<id>` is appended). (Recommended) as is:
-  # -p prints and exits; stream-json + --verbose streams events live and ends with one `result` event;
+  cli: claude                              # claude (Recommended, tested) | codex | gemini (best effort): the agent
+                                           # CLI `careeros run` calls; see docs/GETTING_STARTED.md "Using Codex or Gemini CLI"
+  # headless_cmd overrides the cli's default command (the prompt `/score-job data/jobs/<id>` is appended). Claude's
+  # default: -p prints and exits; stream-json + --verbose streams events live and ends with one `result` event;
   # dontAsk denies any tool not in allowed_tools instead of waiting for a prompt nobody will answer.
-  headless_cmd: ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "dontAsk"]
+  # headless_cmd: ["claude", "-p", "--output-format", "stream-json", "--verbose", "--permission-mode", "dontAsk"]
   allowed_tools:                           # passed as --allowedTools. (Recommended) this list: what score-job and
     - Read                                 # prepare-job use. A tool a skill needs but is not here ends the run
     - Write                                # with stop reason permission_denied (never a hang).

@@ -7,6 +7,7 @@ read it first; it says which `ARCHITECTURE.md` sections to read.
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -e ".[test]" && .venv/bin/careeros init`.
 - Tests: `.venv/bin/python -m pytest -q` (they use `examples/` only; no `profile/` or `config/` needed).
 - Never commit `profile/`, `config/`, `CLAUDE.local.md`, `data/`, `.reviews/`, or anything with credentials.
+- Headless runs: `pipeline.yaml: llm.cli: codex` makes `careeros run` call `codex exec`; skills live in `.claude/skills/<name>/SKILL.md` (read and follow one by path). See `docs/GETTING_STARTED.md` "Using Codex or Gemini CLI".
 - Learning: `.agent/LESSONS.md` (evidence) and `.agent/DECISIONS.md` (design decisions); promoted rules live in CLAUDE.md.
 
 ## Work docs

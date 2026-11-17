@@ -228,7 +228,8 @@ SECTIONS: tuple[Section, ...] = (
                   default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
         ), advanced=True),
         Group("claude", "Claude", (
-            Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),
+            Policy("Runs use", "Your agent CLI subscription (llm.cli: Claude Code, Codex or Gemini)",
+                   "No API key; the chosen CLI runs each skill headless."),
             Field(P, "llm.model_hint", "text", "Model", default=None, nullable=True,
                   help="Empty = Claude Code's default (Recommended). For example: sonnet."),
         ), advanced=True),
@@ -496,7 +497,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("tools", "Allowed tools", (
             _tags(P, "llm.allowed_tools", "Tools a run may use", runs_cfg.DEFAULT_ALLOWED_TOOLS,
-                  help='A tool missing here ends a run with "Tool not allowed", never a hang.'),
+                  help='Claude Code only (Codex and Gemini ignore it). A tool missing here ends a run with "Tool not allowed", never a hang.'),
         )),
         Group("schedule", "Schedule", (
             Field(P, "schedule.jobs.scout", "schedule", "Scout", default=JOBS["scout"],
@@ -614,7 +615,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "ui.index_path"): "Index location; rebuildable, change it only when data/ is on a slow or synced disk.",
     (P, "schedule.launchd_label"): "LaunchAgent id; change it only after uninstalling the schedule.",
     (P, "llm.runner"): "Shown as a locked row: runs use the Claude Code subscription; the API is not enabled.",
-    (P, "llm.headless_cmd"): "The exact claude command line; a wrong flag breaks every run.",
+    (P, "llm.cli"): "Which agent CLI runs skills (claude, codex, gemini); set in pipeline.yaml, checked by doctor.",
     (P, "resume_build.fallback"): "Only one fallback exists (markdown_to_pdf); nothing to choose.",
     (P, "match.synonyms"): "Skill synonym table for the résumé match score; edit pipeline.yaml.",
     (P, "match.implies"): "One-way skill implications for scoring evidence; edit pipeline.yaml.",

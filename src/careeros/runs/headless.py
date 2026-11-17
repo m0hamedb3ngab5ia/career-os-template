@@ -86,8 +86,17 @@ SHELL_RULE = ("Headless run, --permission-mode dontAsk: a tool call outside the 
               "the tool result. Allowed tools: ")
 
 
+def skill_prompt(prompt: str) -> str:
+    """`/name args` -> plain instructions, for CLIs that cannot expand Claude Code slash commands (REQ-158)."""
+    m = re.match(r"/([\w-]+)\s*(.*)", prompt, re.S)
+    return f"Read .claude/skills/{m.group(1)}/SKILL.md and follow it for: {m.group(2)}" if m else prompt
+
+
 def build_command(cfg: RunsConfig, prompt: str, session_id: str | None = None, kind: str | None = None,
                   extra_tools: list[str] | tuple = ()) -> list[str]:
+    if cfg.cli != "claude":  # no --allowedTools, session id or settings sources: their sandbox is the limit
+        cmd = list(cfg.headless_cmd) + (["-m", cfg.model] if cfg.model else [])
+        return cmd + (["-p"] if cfg.cli == "gemini" else []) + [skill_prompt(prompt)]
     cmd, it = [], iter(cfg.headless_cmd)
     # the per-kind list is the only allowlist: drop any configured one (and its value). KIND_ONLY kinds also load
     # project settings only: local allow-rules would widen their list (project is kept: it carries the skills)
@@ -146,12 +155,28 @@ def feed(r: HeadlessResult, line: str) -> None:
             r.rate_limit_rejected = True
     elif kind == "result":
         r.saw_result = True
-        r.result_text = str(ev.get("result") or "")
-        r.is_error = bool(ev.get("is_error"))
+        if "result" in ev or "status" not in ev:  # gemini's result carries a status, its text came in messages
+            r.result_text = str(ev.get("result") or "")
+        r.is_error = bool(ev.get("is_error")) or ev.get("status") not in (None, "success")
         r.subtype = ev.get("subtype")
         r.num_turns = ev.get("num_turns")
         r.cost_usd = ev.get("total_cost_usd")
         r.permission_denials = [d for d in ev.get("permission_denials") or [] if isinstance(d, dict)]
+
+    # Codex CLI (exec --json) and Gemini CLI (--output-format stream-json) events, REQ-158
+    elif kind in ("thread.started", "init"):
+        r.saw_init = True
+        r.session_id = ev.get("thread_id") or r.session_id
+    elif kind == "item.completed" and (ev.get("item") or {}).get("type") == "agent_message":
+        r.result_text = str(ev["item"].get("text") or "")
+    elif kind == "turn.completed":
+        r.saw_result = True
+    elif kind == "turn.failed":
+        r.saw_result = r.is_error = True
+        err = ev.get("error")
+        r.result_text = str(err.get("message") if isinstance(err, dict) else err or "")
+    elif kind == "message" and ev.get("role") == "assistant":
+        r.result_text = (r.result_text if ev.get("delta") else "") + str(ev.get("content") or "")
 
 
 def parse_stream(lines: Iterable[str]) -> HeadlessResult:
@@ -292,7 +317,7 @@ def invoke(cmd: list[str], cwd: str, env: dict[str, str], timeout_s: float, stre
     # `creds set` during this run is not masked until the next run
     redact = redactor_for_root(Path(cwd))
     try:
-        proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
+        proc = subprocess.Popen(cmd, cwd=cwd, env=env, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True,
                                 start_new_session=True, bufsize=1)
     except (FileNotFoundError, PermissionError) as e:
         r.exit_code, r.stderr_tail = 127, f"{cmd[0]}: {e}"
