@@ -30,7 +30,8 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   LinkedIn export, `careeros network import`) is a contact with `role: "referral"`, `linkedin_degree: 1`,
   `confidence: high`, added to the drafts even when `contacts.json` is missing (then skip find-contacts' contacts).
   For them draft only `linkedin_message` (50-100 words): what the role is (title + posting URL), one proof, and the ask
-  "would you be open to referring me, or pointing me to the right person?". Connected, so always `manual_tailor: true`.
+  "would you be open to referring me, or pointing me to the right person?" plus the referral-form line (rule below).
+  Connected, so always `manual_tailor: true`.
 - `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
   wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.
 
@@ -45,6 +46,12 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   email; any `**` in outreach.json hard-fails QA (`no_markdown_bold`).
 - Never claim a referral, a mutual contact, or that you were told to reach out. Never mention having
   guessed the email.
+- Referral ask (employee contact, not a recruiter): ask them to submit the referral through the company's applicant
+  system, not just forward the resume. When `posting.json: ats` is `greenhouse`, name the Greenhouse referral form
+  (referrals entered there land in the recruiters' priority review queue; research/greenhouse.md s5). Other ATS:
+  ask them to use their company's internal referral process, with no claim about priority. One short clause inside
+  the single ask; keep the email body at most 80 words. Recruiters never get this line. Never claim a referral that
+  was not agreed.
 - Use the contact's first name only if `confidence` is `high`; else open with "Hi," (no name).
 - Addressing by role: recruiter -> ask about process/timeline and offer the resume; hiring manager
   -> one proof + one question about the team's system; team lead -> a specific technical question or

@@ -649,7 +649,13 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
             old = json.loads((jd / "fill_plan.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             old = None
-        path = store._write(args.job_id, "fill_plan.json", carry_over(old, plan))  # keep this job's edits/skips
+        merged = carry_over(old, plan)  # keep this job's edits/skips
+        from careeros.apply.knockout import knockout_risk
+        risk = knockout_risk(merged["fields"])  # warning only: answers are never changed
+        merged.pop("knockout_risk", None)
+        if risk:
+            merged["knockout_risk"] = risk
+        path = store._write(args.job_id, "fill_plan.json", merged)
     if blocked:
         what = "; ".join(blocked)[:300]
         print(f"  BLOCK  sensitive_field {what}")
@@ -658,6 +664,9 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         _set_status_both(s, args.job_id, "needs_review", f"safety block (form): sensitive_field: {what}"[:200])
         return SAFETY_HARD_EXIT
     fields = plan["fields"]
+    if merged.get("knockout_risk"):
+        print("  WARN knockout_risk: " + ", ".join(merged["knockout_risk"])
+              + " (a negative answer here can auto-reject; check before submitting)")
     review = [f for f in fields if f["needs_review"]]
     paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")
               or (f["source"] == "unanswered" and f.get("required"))]  # REQ-106: required unknowns ask too

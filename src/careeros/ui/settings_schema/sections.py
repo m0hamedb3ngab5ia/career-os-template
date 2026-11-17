@@ -638,6 +638,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (Q, "cover_letter.hard.no_banned_phrases"): "Hard rule the QA gate always enforces; not a switch.",
     (Q, "answers.hard"): "Hard truth rules the QA gate always enforces; not switches.",
     (Q, "resume.soft.date_format"): "Must match the LaTeX template's date format; edit both together.",
+    (Q, "resume.parse"): "ATS parse limits (PDF size, abbreviated-title list); edit qa.yaml if you need to.",
     (Q, "resume.soft.scale_words"): "Tuning list for the metric heuristic; edit qa.yaml if you need to.",
     (Q, "critic.model_rubric"): "The critic's rubric names are read by the qa-review skill; not a preference.",
     (Q, "style_rules"): "Mixed rule list read by the writing skills; edit qa.yaml if you need to.",

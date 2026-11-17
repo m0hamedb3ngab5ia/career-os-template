@@ -36,6 +36,9 @@ resume:
       - involved in
       - tasked with
     scale_words: [users, requests, records, teams, services, daily, million, thousand, dozen]   # count as a metric when a bullet has no digit
+  parse:                         # ATS parse safety (Greenhouse cannot parse files over 2.5 MB; abbreviated titles degrade)
+    max_pdf_mb: 2.5              # (Recommended) hard fail above this size
+    abbreviations: [sr, jr, snr, swe, sde, eng, engr, mgr, dev, assoc, dir, asst]   # (Recommended) soft warn when a title uses one
 
 cover_letter:
   max_words: 250

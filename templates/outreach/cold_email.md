@@ -8,7 +8,9 @@ Target 80 to 130 words. Subject under 60 characters.
 - Subject names the role or the thing you have in common. No "Quick question", no "Opportunity".
 - First sentence: why them, specifically. A sourced fact about their team or something they wrote.
 - Proof: 2 sentences, bullet ids, numbers intact.
-- Ask: one. Call, referral, or "who should I talk to".
+- Ask: one. Call, referral, or "who should I talk to". For a referral from an employee (not a recruiter), ask them to
+  submit it in the company's applicant system (the Greenhouse referral form when `posting.ats` is greenhouse, where referrals land in the recruiters'
+  priority review queue; other ATS: their internal referral process, no priority claim). Keep the whole body at most 80 words.
 - Close: "Would like to talk." or similar. Sign with the first name from `profile/master.yaml: identity.name`,
   phone and LinkedIn from `identity` under it.
 - Email address confidence must be `verified` or `pattern_match_high` before any auto-send.
