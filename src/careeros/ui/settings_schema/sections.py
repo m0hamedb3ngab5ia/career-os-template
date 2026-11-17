@@ -614,7 +614,6 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "ui.index_path"): "Index location; rebuildable, change it only when data/ is on a slow or synced disk.",
     (P, "schedule.launchd_label"): "LaunchAgent id; change it only after uninstalling the schedule.",
     (P, "llm.runner"): "Shown as a locked row: runs use the Claude Code subscription; the API is not enabled.",
-    (P, "llm.headless_cmd"): "The exact agent command line; a wrong flag breaks every run.",
     (P, "llm.cli"): "Which agent CLI runs skills (claude, codex, gemini); set in pipeline.yaml, checked by doctor.",
     (P, "resume_build.fallback"): "Only one fallback exists (markdown_to_pdf); nothing to choose.",
     (P, "match.synonyms"): "Skill synonym table for the résumé match score; edit pipeline.yaml.",

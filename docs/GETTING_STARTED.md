@@ -367,7 +367,7 @@ fake candidate. The skills refuse to apply with that data (`careeros doctor` fai
 ## Using Codex or Gemini CLI
 
 Claude Code is the default and the only CLI tested end to end. Codex CLI and Gemini CLI are best effort:
-`careeros run` builds their commands and reads their event streams, but no real run is covered by tests.
+`careeros run score|prepare` builds their commands and reads their event streams, but no real run is covered by tests.
 
 1. Install the CLI and log in once (`codex`, or `gemini`), in this folder.
 2. Set `llm.cli: codex` (or `gemini`) in `config/pipeline.yaml`; leave `llm.headless_cmd` unset (each CLI has a
