@@ -55,6 +55,9 @@ def score_candidate(c: Candidate, w: dict[str, float], now: datetime, stage: str
         pts = round(w["freshness_weight"] * f, 2)
         total += pts
         why.append(f"posted {_age(hours)} ago ({_fmt(pts)})")
+        if w.get("fresh_boost") and hours <= float(w.get("fresh_boost_hours", 72)):  # REQ-161
+            total += w["fresh_boost"]
+            why.append(f"fresh boost: applying early gets seen first ({_fmt(w['fresh_boost'])})")
     else:
         why.append("posting date unknown (+0)")
     if c.dream and w["dream_bonus"]:

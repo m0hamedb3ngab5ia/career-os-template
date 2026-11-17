@@ -148,7 +148,10 @@ def _follow_ups(settings: Settings, out: dict[str, Any], echo: Callable[[str], N
 
         from careeros.follow_ups import raise_reach_outs
 
-        added = raise_follow_ups(settings) + raise_reach_outs(settings)
+        from careeros.high_odds import raise_reach_first, scan_fresh
+
+        added = raise_follow_ups(settings) + raise_reach_outs(settings) + raise_reach_first(settings)
+        out["fresh"] = len(scan_fresh(settings))
         out["follow_ups"] = len(added)
         if added:
             echo(f"tick: {len(added)} follow-up(s)")

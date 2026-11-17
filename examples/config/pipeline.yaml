@@ -106,6 +106,8 @@ runs:                                      # reusable default: fine to keep. `ca
     deadline_bonus: 15                     # the posting closes within deadline_days
     deadline_days: 7
     fit_weight: 0.5                        # prepare runs only: points per fit point
+    fresh_boost: 20                        # 20 (Recommended): extra points for a posting younger than fresh_boost_hours; 0 = off
+    fresh_boost_hours: 72                  # 72 (Recommended)
     retry_bonus: 30                        # a job whose last attempt failed goes near the front of the next run
     referral_weight: 15                    # 15 (Recommended): prepare only; a 1st-degree connection at the company
                                            # (careeros network import) adds 15 x (referral odds lift - 1), ~+15
@@ -196,6 +198,8 @@ outreach:                                  # reusable default: fine to keep
   mutuals_threshold: 1                     # 1 (Recommended): this many mutual connections or more counts (1 to 50)
   min_fit: 80                              # 80 (Recommended): `careeros outreach targets` picks tier `outreach: always`
                                            # jobs at any fit, `if_contact_found` jobs at this fit or more (0 to 100)
+  auto: true                               # true (Recommended): prepare-job also finds contacts and drafts outreach for jobs at min_fit or more
+  max_overdue: 3                           # 3 (Recommended): more overdue reach-outs than this puts "Reach out before applying to more" first
 
 scoring:                                   # reusable default: fine to keep. Auto-scoring (scheduled / batch
                                            # `careeros run score`) takes the queue by quick match, fresh first;

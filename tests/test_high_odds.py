@@ -1,0 +1,165 @@
+"""REQ-161 fresh first, REQ-162 outreach QA gate + your line, REQ-163 volume yields to outreach."""
+from __future__ import annotations
+
+from datetime import date, datetime, timedelta, timezone
+
+import pytest
+
+from careeros import high_odds as h
+from careeros.models import Posting, Score
+from careeros.runs.ranking import Candidate, score_candidate
+from careeros.store import Store
+from careeros.tracker import Tracker, add_action
+
+pytestmark = pytest.mark.unit
+NOW = datetime(2026, 11, 16, 12, tzinfo=timezone.utc)
+W = {"freshness_weight": 60, "fresh_hours": 48, "stale_days": 30, "dream_bonus": 0, "deadline_bonus": 0,
+     "deadline_days": 7, "fit_weight": 0, "retry_bonus": 0, "fresh_boost": 20, "fresh_boost_hours": 72}
+
+
+def _job(s, n, fit, hours):
+    p = Posting(company="Initech", title=f"Eng {n}", ats="greenhouse", ats_job_id=str(n), description_text="x",
+                url=f"https://e.com/{n}", posted_at=(NOW - timedelta(hours=hours)).isoformat())
+    Store(s).save_posting(p)
+    Store(s).save_score(Score(job_id=p.job_id, category="swe", fit=fit))
+    return p
+
+
+def test_fresh_boost_only_within_window():
+    def pts(hrs):
+        return score_candidate(Candidate("a", "C", "T", "queued", NOW - timedelta(hours=hrs), None, False, 80), W, NOW, "prepare")
+    assert pts(60)[0] - pts(80)[0] > 20 - 1 and any("fresh boost" in x for x in pts(60)[1])
+    assert not any("fresh boost" in x for x in pts(80)[1])
+
+
+def test_scan_fresh_emails_once_for_fresh_fitting_job(settings):
+    Tracker(settings=settings).init()
+    old = _job(settings, 0, 90, 5)
+    assert h.scan_fresh(settings, NOW, send=lambda *x, **k: "sent") == []  # first run: baseline, no flood
+    a, _b, _c = _job(settings, 1, 90, 10), _job(settings, 2, 90, 100), _job(settings, 3, 40, 10)
+    calls = []
+    got = h.scan_fresh(settings, NOW, send=lambda *x, **k: calls.append(x[1]) or "sent")
+    assert got == [a.job_id] and calls == [f"job:{a.job_id}"] and old.job_id not in got
+
+
+def test_age_ignores_fetched_at():
+    p = Posting(company="C", title="T", ats="greenhouse", ats_job_id="1", description_text="x", url="https://e.com/1",
+                fetched_at=NOW.isoformat())
+    assert h.age_hours(p, NOW) is None
+
+
+def test_fresh_watched_job_emails_once(settings, monkeypatch):
+    from careeros import notify
+    from careeros.watch import scan_watch
+
+    Tracker(settings=settings).init()
+    settings.companies["dream_list"] = ["Initech"]
+    monkeypatch.setattr(notify, "config", lambda s: {"enabled": True, "urgent": True, "email": "me@x.com"})
+    mails = []
+    monkeypatch.setattr(notify, "smtp_send", lambda *a, **k: mails.append(a[1]))
+    monkeypatch.setattr(notify, "keychain_password", lambda e: "pw")
+    scan_watch(settings)
+    h.scan_fresh(settings, NOW)  # baselines
+    p = _job(settings, 5, 95, 2)
+    h.scan_fresh(settings, NOW)
+    scan_watch(settings)
+    assert len(mails) == 1
+    assert notify.send_urgent(settings, f"job:{p.job_id}", "x", "y") == "already_sent"
+
+
+GOOD = {"contact": "Sam", "to": "s@x.com", "email": {"subject": "Hi", "body": "I built a stock reconciler. Would you point me to the right person?"},
+        "facts_used": [{"fact": "ships daily", "source": "posting"}], "bullet_ids": ["b1"]}
+
+
+def test_gate_flags_slop_and_requires_your_line():
+    bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * 90}, "facts_used": []}
+    probs = h.draft_problems(bad, ["I hope this finds you well"])
+    assert any("too long" in p for p in probs) and any("banned" in p for p in probs) and any("fact" in p for p in probs)
+    d = dict(GOOD)
+    data = {"drafts": [d]}
+    assert h.gate_outreach(data, []) == [] and d["qa_pass"] is True and d["ready"] is False and d["your_line"] == ""
+    assert h.compose_url(d) is None
+    d["your_line"] = "I also ran a similar migration."
+    d["ready"] = h.draft_ready(d)
+    assert d["ready"] and h.compose_url(d).startswith("https://mail.google.com/mail/?view=cm") and "to=s%40x.com" in h.compose_url(d)
+
+
+def test_compose_falls_back_to_email_to_and_fact_source():
+    d = {**GOOD, "ready": True, "your_line": "hi"}
+    del d["to"]
+    d["email"] = {**d["email"], "to": "e@x.com"}
+    assert "to=e%40x.com" in h.compose_url(d)
+    legacy = {**GOOD, "facts_used": [], "fact_source": "posting"}
+    assert h.draft_problems(legacy, []) == []
+
+
+def _reach(s, jid, due):
+    return add_action(s, f"Reach out {jid}", "follow_up", job_id=jid, detail="reach_out", priority="H", due=due.isoformat(), id=jid)
+
+
+def test_reach_first_item_raised_and_closed(settings):
+    Tracker(settings=settings).init()
+    today = date(2026, 11, 16)
+    for i in range(4):
+        _reach(settings, f"r{i}", today - timedelta(days=3))
+    assert len(h.raise_reach_first(settings, today)) == 1 and h.raise_reach_first(settings, today) == []
+    open_ = [i for i in Tracker(settings=settings).list_action_items(open_only=True) if "reach_first" in str(i.get("Detail"))]
+    assert len(open_) == 1
+    for i in range(3):
+        Tracker(settings=settings).mark_action_done(f"r{i}")
+    h.raise_reach_first(settings, today)
+    assert not [i for i in Tracker(settings=settings).list_action_items(open_only=True) if "reach_first" in str(i.get("Detail"))]
+
+
+def test_digest_leads_with_reach_first_and_has_why(settings):
+    from careeros import notify
+
+    Tracker(settings=settings).init()
+    today = date(2026, 11, 16)
+    for i in range(4):
+        _reach(settings, f"r{i}", today - timedelta(days=3))
+    h.raise_reach_first(settings, today)
+    body = notify.build_digest(settings, today)
+    assert body.startswith("Reach out before applying to more") and "40%" in body
+
+
+def test_cli_outreach_qa_records_line_and_prints_link(settings, monkeypatch, capsys):
+    import argparse
+    import json
+
+    from careeros import cli
+
+    p = _job(settings, 9, 90, 5)
+    path = Store(settings).job_dir(p.job_id) / "outreach.json"
+    path.write_text(json.dumps({"drafts": [dict(GOOD)]}))
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    ns = argparse.Namespace(job_id=p.job_id, contact=None, line=None)
+    assert cli.cmd_outreach_qa(ns) == 0 and "needs your line" in capsys.readouterr().out
+    ns.line = "I ran a similar migration."
+    assert cli.cmd_outreach_qa(ns) == 0 and "send: https://mail.google.com" in capsys.readouterr().out
+    assert json.loads(path.read_text())["drafts"][0]["ready"] is True
+
+
+def test_reach_first_stays_open_across_ticks_and_reraises(settings):
+    from careeros.follow_ups import raise_follow_ups
+
+    tr = Tracker(settings=settings)
+    tr.init()
+    today = date(2026, 11, 16)
+    for i in range(4):
+        _reach(settings, f"r{i}", today - timedelta(days=3))
+    h.raise_reach_first(settings, today)
+    raise_follow_ups(settings, today)
+    raise_follow_ups(settings, today)
+    h.raise_reach_first(settings, today)
+
+    def rf():
+        return [i for i in tr.list_action_items(open_only=True) if "reach_first" in str(i.get("Detail"))]
+    assert len(rf()) == 1
+    for i in range(3):
+        tr.mark_action_done(f"r{i}")
+    h.raise_reach_first(settings, today)
+    assert not rf()
+    for i in range(3):
+        tr.reopen_action(f"r{i}")
+    assert len(h.raise_reach_first(settings, today)) == 1 and len(rf()) == 1

@@ -66,7 +66,7 @@ def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
             want[(jid, OUTREACH)] = (f"Your message got no answer in {(today - sent).days} days. Send a nudge.", sent)
     have: set[tuple[str, str]] = set()  # open AND done keys: Done sticks
     for it in tr.list_action_items(open_only=False):
-        if it.get("Type") != TYPE or str(it.get("Detail") or "").split("\n")[0] == REACH:
+        if it.get("Type") != TYPE or str(it.get("Detail") or "").split("\n")[0] in (REACH, "reach_first"):
             continue
         key = (str(it.get("JobID") or ""), str(it.get("Detail") or "").split("\n")[0])
         if key in want:

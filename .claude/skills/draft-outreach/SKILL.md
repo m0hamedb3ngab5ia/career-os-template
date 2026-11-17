@@ -60,7 +60,7 @@ For each entry in `contacts.json.contacts` produce:
    number, the ask (15-min chat or "would you be the right person to ask about <role>?").
 3. `email`: when the job is already applied, this is the after-applying outreach (`post_apply_outreach.md`, ~100 words,
    one hook, one or two proofs, not a mini cover letter). Otherwise: `subject` (<= 60 chars, e.g. "New grad backend
-   applicant: <role> at <company>"), `body` (90-150 words): greeting per rule above, hook fact, proof (bullet ids), ask, sign-off
+   applicant: <role> at <company>"), `body` (at most 80 words, DEC-027): greeting per rule above, hook fact, proof (bullet ids), ask, sign-off
    `identity.name` + phone + LinkedIn URL from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
 4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.

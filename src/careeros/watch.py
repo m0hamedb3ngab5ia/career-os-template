@@ -61,7 +61,7 @@ def scan_watch(s: Settings, *, send: Callable[..., str] | None = None) -> list[s
                        TYPE, job_id=jid, detail=WATCH, priority="H", link=p.url or "",
                        due_reason="Postings at target companies fill fast", id=hashlib.sha1(f"{jid}|{WATCH}".encode()).hexdigest()[:8])
             (send or notify.send_urgent)(
-                s, f"watch:{jid}", f"{p.title} at {p.company} (fit {sc.fit})",
+                s, f"job:{jid}", f"{p.title} at {p.company} (fit {sc.fit})",
                 f"{p.title} at {p.company}\nFit: {sc.fit}\n{p.url or ''}\n\nApply as soon as possible.")
     notify._save(s, watch_seen=seen, watch_pending=pending)
     return new

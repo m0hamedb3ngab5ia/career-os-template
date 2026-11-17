@@ -52,7 +52,7 @@ def test_watch_urgent_once_per_job_and_only_high_fit_unfiltered(env):
     _scored(env, 4, "Hooli", 99)                           # not watched
     assert scan_watch(env, send=send) == [hi.job_id, lo.job_id]
     assert scan_watch(env, send=send) == []
-    assert [k for k, *_ in sent] == [f"watch:{hi.job_id}"]
+    assert [k for k, *_ in sent] == [f"job:{hi.job_id}"]
     assert "apply as soon as possible" in sent[0][2].lower() and "https://example.com/1" in sent[0][2]
     items = [i for i in Tracker(settings=env).list_action_items() if i["Detail"] == "watch"]
     assert len(items) == 1 and items[0]["Priority"] == "H" and items[0]["JobID"] == hi.job_id

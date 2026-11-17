@@ -105,8 +105,13 @@ def build_digest(s: Settings, today: date | None = None) -> str | None:
     def prio(it: dict[str, Any]) -> bool:
         return str(it.get("Priority") or "").upper() == "H" and it.get("Type") != FOLLOW
 
-    sections = [("Reach out (overdue)", [line(i, True) for i in items if _kind(i) == REACH]),
-                ("Follow up", [line(i, True) for i in items if i.get("Type") == FOLLOW and _kind(i) != REACH]),
+    from careeros.high_odds import REACH_FIRST, WHY
+
+    first = [i for i in items if _kind(i) == REACH_FIRST]
+    sections = [("Reach out before applying to more", [f"- {i.get('What to do')}\n  {WHY[REACH_FIRST]}" for i in first]),
+                ("Reach out (overdue)", [line(i, True) for i in items if _kind(i) == REACH]
+                 + ([f"  {WHY['reach_out']}"] if any(_kind(i) == REACH for i in items) else [])),
+                ("Follow up", [line(i, True) for i in items if i.get("Type") == FOLLOW and _kind(i) not in (REACH, REACH_FIRST)]),
                 ("Needs you", [f"- {i.get('What to do')}" for i in items if prio(i)])]
     sections += _extra_sections(s, today, store)
     out = [f"{h}\n" + "\n".join(rows) for h, rows in sections if rows]
@@ -198,8 +203,9 @@ def send_urgent(s: Settings, key: str, subject: str, body: str, *, sender: Calla
         return "disabled"
     if not c["email"]:
         return "no_email"
-    if key in (_state(s).get("urgent") or []):
-        return "already_sent"
+    sent_keys = _state(s).get("urgent") or []
+    if key in sent_keys or (key.startswith("job:") and {f"watch:{key[4:]}", f"fresh:{key[4:]}"} & set(sent_keys)):
+        return "already_sent"  # job:<id> is the shared key; old watch:/fresh: keys still count
     try:
         (sender or smtp_send)(c, f"Urgent: {subject}", body, (keychain or keychain_password)(c["email"]))
         _save(s, urgent=[*(_state(s).get("urgent") or []), key])

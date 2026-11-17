@@ -31,6 +31,15 @@ broken YAML, unknown bullet ids, tools. Readiness must-items block applying unti
 
 Done when `careeros doctor` shows no FAIL.
 
+**How career-os gets you interviews** (explain this once during onboarding; sources in
+`docs/work/yield-model/research/`). AI-tailored volume is now baseline: applications per recruiter went from 146 to 746
+between 2022 and 2025 (Greenhouse), and a cold application becomes an interview about 3% of the time while a
+referred one does about 40% (Ashby). So by default career-os (1) ranks fresh postings first and emails you about
+fitting ones under 48 hours old, (2) drafts a short, sourced outreach note for every queued job with fit 80 or
+more, with one empty line left for you to write, and (3) asks you to reach out before applying to more once more
+than 3 reach-outs are overdue. It never sends anything for you and never touches LinkedIn. Turn any of it off in
+`config/pipeline.yaml` (`outreach.auto`, `runs.ranking.fresh_boost`).
+
 ## 2. Applying (repeat)
 
 **You say:** "find jobs", "score and prepare the best ones", "fill the form for job X", "submit it". **Claude does:**

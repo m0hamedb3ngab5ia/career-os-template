@@ -164,8 +164,14 @@ Referral: unless `status` is `skipped`, run `.venv/bin/careeros network match --
 deduped `referral` Action Item ("referral: ask <name> (<position>) at <company> for <title>") when the candidate
 has a 1st-degree connection at the company. Exit 1 = no network imported yet: ignore it. Never changes `status`.
 
-Outreach: if `tier_cfg.outreach == "always"`, note `"outreach": "run /find-contacts then /draft-outreach"` in
-the final RESULT (do not run them here; they run after apply).
+Outreach (REQ-162, DEC-027): unless `config/pipeline.yaml: outreach.auto` is false, when `status` is `queued` and
+`score.fit >= outreach.min_fit` (default 80), also run `.claude/skills/find-contacts/SKILL.md` then
+`.claude/skills/draft-outreach/SKILL.md` for the job. Drafts follow the "Easy, not slop" rules: at most 80 words,
+`fact_source` (one sourced fact from the posting or company), `bullet_ids`, one `ask`, an empty `your_line` for the
+candidate. Then run `.venv/bin/careeros outreach qa <job_id>`; fix and re-run once if it reports problems. A draft
+is "ready" only after the candidate adds their own line (`careeros outreach qa <job_id> --line "..." --contact NAME`);
+the command prints a prefilled Gmail compose link they open and send themselves. Never send, never open LinkedIn.
+Otherwise (auto off, low fit) note `"outreach": "run /find-contacts then /draft-outreach"` in the final RESULT.
 
 ## Step 6: render the cover letter for pasting
 

@@ -1,0 +1,183 @@
+"""High-odds channels as the default path (REQ-161..163, DEC-027). Fresh postings first, outreach after applying,
+and volume that yields to outreach. Nothing here sends mail to anyone but the candidate (DEC-026) and nothing
+opens LinkedIn; outreach drafts are drafts until the candidate fills "your line" and presses send themselves."""
+from __future__ import annotations
+
+import hashlib
+import re
+from datetime import date, datetime, timezone
+from typing import Any, Callable
+from urllib.parse import quote
+
+from careeros.config import Settings
+from careeros.store import Store
+from careeros.tracker import Tracker
+
+FRESH_URGENT_HOURS = 48
+DONE_STATUSES = {"applied", "screening", "interview", "offer", "rejected", "skipped", "withdrawn"}
+REACH_FIRST = "reach_first"
+MAX_WORDS = 80
+
+# One plain line per item kind. Numbers are copied from docs/work/yield-model/research (funnel.md, competition.md).
+WHY = {
+    "fresh": "Fresh: a posting that is only a day or two old is one of the few edges left, because most applicants arrive later.",
+    "reach_out": "Why: a referred application turns into an interview about 40% of the time, a cold one about 3% (Ashby).",
+    REACH_FIRST: "Why: applications per recruiter went from 146 to 746 between 2022 and 2025 (Greenhouse), so more volume buys less each year.",
+}
+
+
+def _cfg(s: Settings, key: str) -> dict[str, Any]:
+    v = s.pipeline.get(key)
+    return v if isinstance(v, dict) else {}
+
+
+def max_overdue(s: Settings) -> int:
+    try:
+        return max(0, int(_cfg(s, "outreach").get("max_overdue", 3)))
+    except (TypeError, ValueError):
+        return 3
+
+
+def outreach_auto(s: Settings) -> bool:
+    return _cfg(s, "outreach").get("auto", True) is not False
+
+
+def _dt(v: Any) -> datetime | None:
+    try:
+        d = datetime.fromisoformat(str(v).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return d if d.tzinfo else d.replace(tzinfo=timezone.utc)
+
+
+def age_hours(p: Any, now: datetime) -> float | None:
+    v = p.first_published or p.posted_at
+    d = _dt(v) if v else None
+    return max(0.0, (now - d).total_seconds() / 3600) if d else None
+
+
+def scan_fresh(s: Settings, now: datetime | None = None, *, send: Callable[..., str] | None = None) -> list[str]:
+    """REQ-161: urgent email (once per job) for a fitting posting at most 48h old that is not yet applied to."""
+    from careeros import notify
+    from careeros.watch import min_fit
+
+    now = now or datetime.now(timezone.utc)
+    store, tr = Store(s), Tracker(settings=s)
+    status = {str(j["JobID"]): str(j.get("Status") or "") for j in tr.list_jobs()}
+    st = notify._state(s)
+    if "fresh_seen" not in st:  # first run: baseline existing jobs so rollout doesn't flood urgent emails
+        notify._save(s, fresh_seen=list(store.iter_job_ids()))
+        return []
+    seen = list(st.get("fresh_seen") or [])
+    sent = []
+    for jid in store.iter_job_ids():
+        if jid in seen:
+            continue
+        sc, p = store.load_score(jid), store.load_posting(jid)
+        if not sc or not p:
+            continue
+        seen.append(jid)
+        if sc.hard_filter_fails or sc.fit < min_fit(s) or status.get(jid, "") in DONE_STATUSES:
+            continue
+        h = age_hours(p, now)
+        if h is None or h > FRESH_URGENT_HOURS:
+            continue
+        res = (send or notify.send_urgent)(
+            s, f"job:{jid}", f"Fresh: {p.title} at {p.company} (fit {sc.fit})",
+            f"{p.title} at {p.company}\nFit: {sc.fit}\nPosted about {h:.0f}h ago.\n{p.url or ''}\n\n{WHY['fresh']}")
+        if res == "sent":
+            sent.append(jid)
+    notify._save(s, fresh_seen=seen)
+    return sent
+
+
+def overdue_reach_outs(s: Settings, today: date | None = None) -> int:
+    today = today or date.today()
+    n = 0
+    for it in Tracker(settings=s).list_action_items(open_only=True):
+        if str(it.get("Detail") or "").split("\n")[0] != "reach_out":
+            continue
+        d = str(it.get("Due") or "")[:10]
+        if d and d < today.isoformat():
+            n += 1
+    return n
+
+
+def raise_reach_first(s: Settings, today: date | None = None) -> list[str]:
+    """REQ-163: one soft Action Item "Reach out before applying to more" while overdue reach-outs exceed
+    `outreach.max_overdue`; closed when they drop back. Never blocks anything."""
+    from careeros.tracker import add_action
+
+    today = today or date.today()
+    n, tr = overdue_reach_outs(s, today), Tracker(settings=s)
+    iid = hashlib.sha1(REACH_FIRST.encode()).hexdigest()[:8]
+    mine = [i for i in tr.list_action_items(open_only=False) if str(i.get("ID")) == iid]
+    is_open = any(str(i.get("Done") or "N").upper() != "Y" for i in mine)
+    if n <= max_overdue(s):
+        if is_open:
+            tr.mark_action_done(iid, note="Closed: reach-outs are back under the limit.")
+        return []
+    if is_open:
+        return []
+    if mine:  # closed earlier, over the limit again: reopen the same item
+        tr.reopen_action(iid)
+        return [f"Reopened: reach out before applying to more ({n} overdue)."]
+    return [add_action(s, f"Reach out before applying to more: {n} reach-outs are overdue.", "follow_up",
+                       detail=REACH_FIRST, priority="H", due=today.isoformat(), due_reason=WHY[REACH_FIRST], id=iid)]
+
+
+# ---- outreach QA gate + "your line" + one-click compose -------------------------------------------------------
+def _words(t: str) -> int:
+    return len(re.findall(r"\S+", t))
+
+
+def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
+    """Deterministic gate for one outreach draft. [] = passes."""
+    em = d.get("email") if isinstance(d.get("email"), dict) else {}
+    body = str(em.get("body") or d.get("linkedin_message") or "")
+    out = []
+    if not body.strip():
+        out.append("no message text")
+    if _words(body) > MAX_WORDS:
+        out.append(f"too long: {_words(body)} words, limit {MAX_WORDS}")
+    low = body.lower()
+    out += [f"banned phrase: {b}" for b in banned if b and b.lower() in low]
+    facts = [f for f in d.get("facts_used") or [] if isinstance(f, dict) and str(f.get("fact") or "").strip()]
+    if not facts and not str(d.get("fact_source") or "").strip():
+        out.append("no sourced fact (facts_used) from the posting or company")
+    if not (d.get("bullet_ids") or d.get("narrative_ids")):
+        out.append("no profile bullet id")
+    if "**" in body:
+        out.append("markdown bold in message")
+    return out
+
+
+def draft_ready(d: dict[str, Any]) -> bool:
+    """Ready = passes the gate AND the candidate wrote their own line."""
+    return d.get("qa_pass") is True and bool(str(d.get("your_line") or "").strip())
+
+
+def gate_outreach(data: dict[str, Any], banned: list[str]) -> list[str]:
+    """Stamps `qa_pass`, `qa_problems`, `ready` on every draft (and ensures an empty `your_line`). Returns problems."""
+    allp = []
+    for d in data.get("drafts") or []:
+        if not isinstance(d, dict):
+            continue
+        d.setdefault("your_line", "")
+        probs = draft_problems(d, banned)
+        d.update(qa_pass=not probs, qa_problems=probs)
+        d["ready"] = draft_ready(d)
+        allp += [f"{d.get('contact') or '?'}: {x}" for x in probs]
+    return allp
+
+
+def compose_url(d: dict[str, Any]) -> str | None:
+    """Gmail compose link prefilled with the draft's own to/subject/body plus the candidate's line. Only for a
+    ready email draft; the candidate reads it and presses send."""
+    em = d.get("email") if isinstance(d.get("email"), dict) else None
+    to = d.get("to") or (em or {}).get("to")
+    if not em or not d.get("ready") or not to:
+        return None
+    body = f"{str(d['your_line']).strip()}\n\n{em.get('body') or ''}"
+    return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))
+            + "&body=" + quote(body))

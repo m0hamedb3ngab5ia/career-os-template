@@ -1574,6 +1574,37 @@ def cmd_outreach_sent(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_outreach_qa(args: argparse.Namespace) -> int:
+    """REQ-162: gate every draft (length, banned phrases, sourced fact, bullet id, ask); stamp qa_pass/ready.
+    `--line TEXT --contact NAME` records the candidate's own sentence. Prints a compose link per ready email."""
+    import json
+
+    from careeros import high_odds as ho
+
+    s = _settings(args)
+    path = Store(s).job_dir(args.job_id) / "outreach.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        print(f"outreach qa: no readable drafts in {path}", file=sys.stderr)
+        return 1
+    if args.line:
+        hit = [d for d in data.get("drafts") or [] if isinstance(d, dict)
+               and (not args.contact or str(d.get("contact") or "").lower() == args.contact.lower())]
+        for d in hit:
+            d["your_line"] = args.line.strip()
+    probs = ho.gate_outreach(data, [str(b) for b in (s.qa.get("banned_phrases") or [])])
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    for d in data.get("drafts") or []:
+        if isinstance(d, dict):
+            url = ho.compose_url(d)
+            print(f"{d.get('contact')}: {'ready' if d.get('ready') else 'not ready'}"
+                  + ("" if d.get("your_line") else " (needs your line)") + (f"\n  send: {url}" if url else ""))
+    for p in probs:
+        print(f"  problem: {p}")
+    return 1 if probs else 0
+
+
 def cmd_notify(args: argparse.Namespace) -> int:
     """Email digest to yourself (REQ-155). The app password lives only in the macOS Keychain."""
     from careeros import notify
@@ -2702,6 +2733,11 @@ def build_parser() -> argparse.ArgumentParser:
     osn.add_argument("--contact", help="contact name; default every draft")
     osn.add_argument("--date", help="YYYY-MM-DD, default today")
     osn.set_defaults(fn=cmd_outreach_sent)
+    oqa = outs.add_parser("qa", help="gate outreach drafts and record your own line (--line); prints the one-click compose link")
+    oqa.add_argument("job_id")
+    oqa.add_argument("--contact")
+    oqa.add_argument("--line", help="one genuine sentence of your own; a draft is not ready without it")
+    oqa.set_defaults(fn=cmd_outreach_qa)
     otg = outs.add_parser("targets", help="high-yield jobs for outreach (tier rule + outreach.min_fit), no outreach.json yet")
     otg.add_argument("--status", nargs="+", choices=STATUSES, help="default: applied queued")
     otg.add_argument("--min-fit", type=int)

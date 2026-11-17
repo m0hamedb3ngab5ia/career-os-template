@@ -976,6 +976,24 @@ requirements:
     tests:
     - test_watch_urgent_once_per_job_and_only_high_fit_unfiltered
     - test_digest_lists_new_at_targets_once
+  REQ-161:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_fresh_boost_only_within_window
+    - test_scan_fresh_emails_once_for_fresh_fitting_job
+  REQ-162:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_gate_flags_slop_and_requires_your_line
+    - test_cli_outreach_qa_records_line_and_prints_link
+  REQ-163:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_reach_first_item_raised_and_closed
+    - test_digest_leads_with_reach_first_and_has_why
   REQ-160:
     status: implemented
     provenance: confirmed

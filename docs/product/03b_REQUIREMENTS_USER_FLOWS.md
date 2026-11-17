@@ -301,3 +301,15 @@ Given a dream-list company posts a job scored 90 · When a tick runs · Then one
 ### REQ-160 Hiring seasons
 `targets.yaml: volume.season_multiplier` also accepts named windows `{name, start "MM-DD", end "MM-DD", level low|normal|high|peak, multiplier?, advice}` (defaults by level 0.5/1/1.5/2). The window sets the daily cap; Today shows its name, one-line advice and the adjusted weekly target (cap x 7). The digest warns once, up to 7 days before a high or peak window starts. The old month form keeps working.
 Given a peak window starts in 5 days · When the digest is built · Then a "Coming up" line names it once.
+
+### REQ-161 Fresh first
+Prepare ranking adds `runs.ranking.fresh_boost` (default 20) to postings younger than `fresh_boost_hours` (default 72), with the reason "fresh boost" in the queue's why-line. A tick sends one urgent email (REQ-159's `send_urgent`, once per job) for a scored, not hard-filtered job at most 48h old with fit at least `notify.urgent_min_fit` that you have not applied to; the email carries the posting link and a one-line reason.
+Given a 10h-old job scored 90 and a 100h-old one · When a tick runs · Then one urgent email exists, and the 72h boost applies only to the first.
+
+### REQ-162 Outreach by default, with a QA gate
+`prepare-job` also runs find-contacts and draft-outreach for each queued job with fit at least `outreach.min_fit` unless `outreach.auto: false`. Each draft is at most 80 words, names one sourced fact (`fact_source`), a profile bullet id and one clear ask, and has an empty `your_line` that you fill with one sentence of your own. `careeros outreach qa <job> [--line TEXT --contact NAME]` gates every draft (length, banned phrases, fact, bullet id, ask), marks it `ready` only when it passes and your line is filled, and prints a prefilled Gmail compose link; you press send. Nothing is sent and LinkedIn is never opened.
+Given a draft with no `your_line` · When the gate runs · Then it is not ready and no compose link prints; after `--line "..."` it is ready and the link prints.
+
+### REQ-163 Volume yields to outreach, and why lines
+When open reach-out items older than a day exceed `outreach.max_overdue` (default 3), a tick raises one high-priority Today item "Reach out before applying to more" (soft: nothing is blocked) and the digest leads with it; it closes when the count drops back. Digest rows for reach-outs and this item carry one plain "Why" line quoting the sourced numbers (about 40% interview rate referred vs about 3% cold, Ashby; 146 to 746 applications per recruiter, Greenhouse). README and `docs/PROCESS.md` explain the approach once.
+Given 4 overdue reach-outs · When a tick runs and the digest is built · Then the digest starts with "Reach out before applying to more" and a Why line.
