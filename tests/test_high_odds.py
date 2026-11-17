@@ -219,3 +219,12 @@ def test_mail_app_link_for_iphone():
     assert h.compose_url({**d, "ready": False}, mail=True) is None
     kit = h.send_kit("j1", "SWE", {"drafts": [{**d, "contact": "Sam", "linkedin_note": "x"}]}, {})
     assert "[Mail](mailto:" in kit and "[Gmail](https://mail.google.com" in kit and "attach" in kit.lower()
+
+
+def test_word_limit_skips_the_signature():
+    """The candidate's template signs off with name, phone and LinkedIn; only the message counts toward 80 words."""
+    msg = " ".join(["word"] * 78)
+    d = {**GOOD, "email": {"subject": "S", "body": f"Hi Sam,\n\n{msg}\n\nThank you,\nAlex Example\n555-0100\nhttps://linkedin.com/in/x"}}
+    assert h.draft_problems(d, []) == []
+    d["email"]["body"] = f"Hi Sam,\n\n{msg} two more words\n\nThank you,\nAlex Example"
+    assert any("too long" in p for p in h.draft_problems(d, []))

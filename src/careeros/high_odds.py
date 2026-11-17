@@ -131,6 +131,15 @@ def _words(t: str) -> int:
     return len(re.findall(r"\S+", t))
 
 
+SIGN_OFF = re.compile(r"\n\n(thank you|thanks|best|regards|cheers|sincerely)\b[^\n]*\n", re.I)
+
+
+def message_text(body: str) -> str:
+    """The body without the sign-off block (name, phone, LinkedIn), which the word limit does not count."""
+    m = list(SIGN_OFF.finditer(body + "\n"))
+    return body[:m[-1].start()] if m else body
+
+
 def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     """Deterministic gate for one outreach draft. [] = passes."""
     em = d.get("email") if isinstance(d.get("email"), dict) else {}
@@ -138,8 +147,9 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     out = []
     if not body.strip():
         out.append("no message text")
-    if _words(body) > MAX_WORDS:
-        out.append(f"too long: {_words(body)} words, limit {MAX_WORDS}")
+    n = _words(message_text(body))
+    if n > MAX_WORDS:
+        out.append(f"too long: {n} words, limit {MAX_WORDS}")
     low = body.lower()
     out += [f"banned phrase: {b}" for b in banned if b and b.lower() in low]
     facts = [f for f in d.get("facts_used") or [] if isinstance(f, dict) and str(f.get("fact") or "").strip()]
