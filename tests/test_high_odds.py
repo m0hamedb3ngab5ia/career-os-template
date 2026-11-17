@@ -189,3 +189,20 @@ def test_send_kit_referral_uses_the_message_and_flags_manual_tailor():
     kit = h.send_kit("j2", "SWE", out, {})
     assert "Message, paste:" in kit and "Hey Pat, would you refer me?" in kit and "Connect" not in kit
     assert "Tailor by hand before sending (connected)" in kit
+
+
+def test_compose_puts_your_line_after_the_greeting_once():
+    """The candidate's line goes after "Hi Adam," (not above it), and is not repeated when the body already has it."""
+    from urllib.parse import unquote
+    d = {**GOOD, "ready": True, "your_line": "Fellow Duck here.",
+         "email": {"subject": "S", "body": "Hi Adam,\n\nAsk."}}
+    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Adam,\n\nFellow Duck here.\n\nAsk."
+    d["email"]["body"] = "Hi Adam,\n\nFellow Duck here. Ask."
+    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Adam,\n\nFellow Duck here. Ask."
+
+
+def test_shared_network_draft_needs_no_bullet_id():
+    """A note to a fellow alum leads with the overlap and attaches the résumé, so it may skip the experience proof."""
+    d = {k: v for k, v in GOOD.items() if k != "bullet_ids"}
+    assert "no profile bullet id" in h.draft_problems(d, [])
+    assert h.draft_problems({**d, "shared_network": "Stevens alum"}, []) == []

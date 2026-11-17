@@ -145,7 +145,7 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     facts = [f for f in d.get("facts_used") or [] if isinstance(f, dict) and str(f.get("fact") or "").strip()]
     if not facts and not str(d.get("fact_source") or "").strip():
         out.append("no sourced fact (facts_used) from the posting or company")
-    if not (d.get("bullet_ids") or d.get("narrative_ids")):
+    if not (d.get("bullet_ids") or d.get("narrative_ids") or str(d.get("shared_network") or "").strip()):
         out.append("no profile bullet id")
     if "**" in body:
         out.append("markdown bold in message")
@@ -178,7 +178,10 @@ def compose_url(d: dict[str, Any]) -> str | None:
     to = d.get("to") or (em or {}).get("to")
     if not em or not d.get("ready") or not to:
         return None
-    body = f"{str(d['your_line']).strip()}\n\n{em.get('body') or ''}"
+    line, body = str(d["your_line"]).strip(), str(em.get("body") or "")
+    if line not in body:  # after the greeting ("Hi Adam,"), never above it
+        head, sep, rest = body.partition("\n\n")
+        body = f"{head}\n\n{line}\n\n{rest}" if sep and head.rstrip().endswith(",") else f"{line}\n\n{body}"
     return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))
             + "&body=" + quote(body))
 
