@@ -312,13 +312,53 @@ def check_placeholders(root: Path, examples: Path) -> list[Check]:
                   if MARKER_RE.search(ln) and not ln.lstrip().startswith("#")}  # comment-only lines carry no value
         text = mine.read_text(encoding="utf-8").splitlines()
         same = [n for n, ln in enumerate(text, 1) if ln.strip() in marked]
-        if same:
-            where = ", ".join(f"{n} {_line_key(text, n - 1)}" for n in same)
+        hard = [n for n in same if _is_onboarding_line(rel, text[n - 1], _line_key(text, n - 1))]
+        soft = [n for n in same if n not in hard]
+        if hard:
+            where = ", ".join(f"{n} {_line_key(text, n - 1)}" for n in hard)
+            out.append(Check(FAIL, "unchanged_placeholder",
+                             f"{rel}: your answer is still missing (onboarding asks it) at line(s) (line key): {where}"))
+        if soft:
+            where = ", ".join(f"{n} {_line_key(text, n - 1)}" for n in soft)
             out.append(Check(WARN, "unchanged_placeholder",
-                             f"{rel}: {len(same)} `# INSERT` line(s) still identical to the example (line key): {where}"))
+                             f"{rel}: {len(soft)} `# INSERT` line(s) still identical to the example (line key): {where}"))
     if not out:
         out.append(Check(PASS, "unchanged_placeholder", "no example placeholder line left unchanged"))
     return out
+
+
+# Preference lines the onboard interview must answer (FAIL, not WARN, when still the example's): the
+# `candidate:` block and `location.preferred` in targets.yaml, the placeholder entry in companies.yaml dream_list.
+ONBOARDING_KEYS = {"level", "graduation", "current_base_usd", "min_base_usd", "salary_dropdown_floor_usd",
+                   "work_authorization", "needs_sponsorship", "preferred"}
+PLACEHOLDER_COMPANY = "Example Company"
+
+
+def _is_onboarding_line(rel: str, line: str, key: str) -> bool:
+    if rel == "config/targets.yaml":
+        return key in ONBOARDING_KEYS
+    if rel == "config/companies.yaml":
+        return line.strip().lstrip("- ").startswith(PLACEHOLDER_COMPANY)
+    return False
+
+
+def check_work_authorization(targets: dict, answers: dict) -> list[Check]:
+    """targets.candidate work authorization/sponsorship vs the same two standard answers (FAIL on disagreement)."""
+    cand = targets.get("candidate") if isinstance(targets.get("candidate"), dict) else {}
+    by_key = {a.get("key"): str(a.get("answer", "")).strip().lower()
+              for a in answers.get("answers") or [] if isinstance(a, dict)}
+    out: list[Check] = []
+    if "needs_sponsorship" in cand and by_key.get("sponsorship") in ("yes", "no"):
+        want = "yes" if cand["needs_sponsorship"] else "no"
+        if by_key["sponsorship"] != want:
+            out.append(Check(FAIL, "work_authorization",
+                             f"config/targets.yaml candidate.needs_sponsorship is {str(cand['needs_sponsorship']).lower()} but "
+                             f"profile/standard_answers.yaml sponsorship answers {by_key['sponsorship'].title()}; make them agree"))
+    if cand.get("work_authorization") in ("us_citizen", "permanent_resident") and by_key.get("work_authorization") == "no":
+        out.append(Check(FAIL, "work_authorization",
+                         f"config/targets.yaml candidate.work_authorization is {cand['work_authorization']} but "
+                         "profile/standard_answers.yaml work_authorization answers No; make them agree"))
+    return out or [Check(PASS, "work_authorization", "targets and standard answers agree on work authorization")]
 
 
 def _line_key(lines: list[str], i: int) -> str:
@@ -609,6 +649,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks += check_placeholders(root, examples)
     else:
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
+    checks += check_work_authorization(cfg["targets"], answers)
     checks += check_bullet_priority(cfg["categories"], master)
     checks += check_runs(cfg["pipeline"])
     goal = cfg["targets"].get("goal")

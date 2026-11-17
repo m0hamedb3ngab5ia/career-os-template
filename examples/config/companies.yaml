@@ -21,17 +21,15 @@
 # Add a company = one line. Unknown slug? scout reports it as a 404 "bad slug".
 # ==================================================================================================
 
-dream_list:            # INSERT: company names, one per line, e.g. - Figma. Tier A: full prep, you submit, outreach prioritized
-  - Stripe
-  - Databricks
-  - Anthropic
+dream_list:            # INSERT: replace Example Company with your dream companies, one per line, e.g. - Figma. Tier A: full prep, you submit, outreach prioritized
+  - Example Company      # INSERT: your dream company (replace this line)
 
 already_applied: []    # INSERT: past applications, e.g. [{company: Acme, role: Software Engineer, date: 2026-07}]; skipped unless 90 days passed
 
 blocklist:             # never apply
   companies: [Globex Bank]                    # INSERT: your current employer (+ any company to never apply to), e.g. [Initrode]
-  industries: [gambling]                      # INSERT: industries to never apply to, or []
-  name_patterns: [draftkings, fanduel]        # INSERT: lowercase substrings of company names to skip, or []
+  industries: []                              # INSERT: industries to never apply to, or []
+  name_patterns: []                           # INSERT: lowercase substrings of company names to skip, or []
 
 # Company-owned domains for the scam gate (careeros safety check). Needed only when the careers site's
 # domain is not just the company name (acme.com for "Acme" is recognized on its own). Board entries may
@@ -104,7 +102,7 @@ boards:                # reusable default: fine to keep. Scout sources. ats: gre
 # Aggregator / discovery sources. Priority order. All feed postings into the same pipeline; apply ALWAYS on company ATS.
 # public = no login, parse directly.  chrome = read through the candidate's logged-in Chrome (Claude in Chrome); fragile, discovery only.
 searches:
-  keywords: [software engineer new grad, software engineer early career, backend engineer, data engineer, platform engineer]   # INSERT: search phrases for your target roles, e.g. [data analyst, analytics engineer]
+  keywords: [software engineer]   # INSERT: search phrases for your target roles, e.g. [data analyst, analytics engineer]
   sources:             # reusable default: fine to keep
     - {name: simplify_newgrad_github, kind: public, enabled: true,
        url: https://github.com/SimplifyJobs/New-Grad-Positions, notes: "README table → company, role, location, apply link (ATS). Daily."}

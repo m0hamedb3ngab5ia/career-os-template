@@ -145,7 +145,9 @@ def test_unchanged_insert_lines_warn_with_file_and_line(tmp_path: Path):
     shutil.copy(EXAMPLE_REPO / "config" / "targets.yaml", root / "config" / "targets.yaml")
     warns = [d for d in details(doctor(root), WARN) if d.startswith("unchanged_placeholder")]
     assert warns and all("config/targets.yaml:" in w for w in warns), warns
-    assert any("min_base_usd" in w for w in warns)
+    assert any("industries" in w or "boost" in w for w in warns)
+    fails = [d for d in details(doctor(root), FAIL) if d.startswith("unchanged_placeholder")]
+    assert any("config/targets.yaml" in f and "min_base_usd" in f for f in fails), fails
 
 
 def test_edited_or_reviewed_insert_line_does_not_warn(tmp_path: Path):
@@ -237,12 +239,14 @@ def test_format_report_full_and_quiet():
 
 
 def test_placeholder_warnings_are_one_line_per_file_with_line_and_key(tmp_path: Path):
-    warns = [d for d in details(doctor(fresh(tmp_path)), WARN) if d.startswith("unchanged_placeholder")]
+    checks = doctor(fresh(tmp_path))
+    warns = [d for d in details(checks, WARN) if d.startswith("unchanged_placeholder")]
     files = [w.split(": ")[1] for w in warns]
     assert len(files) == len(set(files))  # grouped per file, not one line per placeholder
     sa = next(w for w in warns if "profile/standard_answers.yaml" in w)
     assert "phone.answer" in sa and "gender.answer" in sa  # repeated keys qualified by their entry
-    assert any("config/targets.yaml" in w and "min_base_usd" in w for w in warns)
+    fails = [d for d in details(checks, FAIL) if d.startswith("unchanged_placeholder")]
+    assert any("config/targets.yaml" in f and "min_base_usd" in f for f in fails)
 
 
 
@@ -641,3 +645,39 @@ def test_schema_accepts_a_handshake_board():
     prof = {n: load(EXAMPLE_REPO / "profile" / f"{n}.yaml") for n in ("master", "standard_answers", "confidential_terms")}
     cfg["companies"]["boards"] = [{"company": "Handshake", "ats": "handshake", "slug": "handshake"}]
     assert schema_problems(cfg, prof) == []
+
+
+# --- guided onboarding (REQ-157): preference lines FAIL until answered; work authorization cross-check -------
+
+def test_fresh_example_fails_on_unanswered_preferences(tmp_path: Path) -> None:
+    fails = " ".join(details(doctor(fresh(tmp_path)), FAIL))
+    for key in ("level", "work_authorization", "preferred", "Example Company"):
+        assert key in fails or key == "Example Company" and "Example" in fails or key in fails
+    assert "config/targets.yaml: your answer is still missing" in fails
+    assert "config/companies.yaml: your answer is still missing" in fails
+
+
+def test_unchanged_non_onboarding_placeholder_stays_warn(tmp_path: Path) -> None:
+    root = fresh(tmp_path)
+    t = root / "config" / "targets.yaml"
+    txt = t.read_text().replace("# INSERT: cities", "# cities").replace("level: new_grad            # INSERT", "level: new_grad  # ok")
+    for k in ("graduation", "current_base_usd", "min_base_usd", "salary_dropdown_floor_usd", "work_authorization", "needs_sponsorship"):
+        txt = "\n".join(ln.split("# INSERT")[0].rstrip() if ln.lstrip().startswith(k + ":") else ln for ln in txt.splitlines())
+    t.write_text(txt)
+    c = root / "config" / "companies.yaml"
+    c.write_text(c.read_text().replace("- Example Company", "- Figma"))
+    fails = " ".join(details(doctor(root), FAIL))
+    assert "config/targets.yaml: your answer" not in fails and "config/companies.yaml: your answer" not in fails
+
+
+def test_work_authorization_mismatch_fails(tmp_path: Path) -> None:
+    root = filled(tmp_path)
+    t = root / "config" / "targets.yaml"
+    d = yaml.safe_load(t.read_text())
+    d["candidate"].update(needs_sponsorship=True, work_authorization="visa")
+    t.write_text(yaml.safe_dump(d))
+    out = details(doctor(root), FAIL)
+    assert any(x.startswith("work_authorization:") and "needs_sponsorship" in x for x in out)
+    d["candidate"].update(needs_sponsorship=False, work_authorization="us_citizen")
+    t.write_text(yaml.safe_dump(d))
+    assert not any(x.startswith("work_authorization:") for x in details(doctor(root), FAIL))

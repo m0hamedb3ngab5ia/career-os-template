@@ -50,7 +50,7 @@ categories:                 # reusable default: fine to keep (see categories.yam
 
 industries:
   boost: [ai_ml, fintech, developer_tools, infra_cloud]   # INSERT: industries to rank higher, e.g. [healthtech, climate]
-  blocked: [gambling]                                     # INSERT: industries never applied to, or []
+  blocked: []                                             # INSERT: industries never applied to, or []
 
 # reusable default: fine to keep. Fit-score cutoffs used by score-job.
 thresholds:
