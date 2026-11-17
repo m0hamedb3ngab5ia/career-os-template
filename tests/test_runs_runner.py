@@ -269,8 +269,9 @@ def test_selection_excludes_scored_pruned_filtered_and_underscore_dirs(settings,
 
 
 def test_dream_company_ranks_first_even_when_older(settings, store):
+    settings.companies["dream_list"] = ["Acme Robotics"]
     plain = add_job(store, 1, hours_old=100)
-    dream = add_job(store, 2, hours_old=100, company="Stripe")
+    dream = add_job(store, 2, hours_old=100, company="Acme Robotics")
     sel, _ = select_candidates(settings, "score", load_runs_config(settings), NOW)
     assert [c["job_id"] for c in sel] == [dream, plain]
     assert "dream company" in sel[0]["why"]
