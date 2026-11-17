@@ -149,6 +149,10 @@ Check the form, fill anything it reports as empty, click submit yourself, then
 `.venv/bin/careeros job status <id> applied`. Other sites: `/apply-job` ([skill](../.claude/skills/apply-job/SKILL.md))
 fills through the Claude in Chrome extension and stops before submit.
 
+Codex or Gemini: use `apply plan` + `apply fill` above (plain code, works with any agent). `/apply-job` needs
+Claude in Chrome, so on other sites fill the form yourself. A general browser tool was tried (agent-browser,
+2026-11) and not adopted: it cannot block a click on Submit.
+
 ## Daily use
 
 - Start each Claude Code chat with `/today`: what needs you, the best new jobs, the last run.
