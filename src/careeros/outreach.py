@@ -29,6 +29,7 @@ class OutreachPolicy:
     manual_if_connected: bool = True
     manual_if_mutuals: bool = True
     mutuals_threshold: int = 1        # this many mutual connections or more = someone you know
+    min_fit: int = 80                 # `outreach targets`: tier `if_contact_found` jobs need this fit
 
     @classmethod
     def from_settings(cls, s: Settings) -> "OutreachPolicy":
@@ -42,8 +43,11 @@ class OutreachPolicy:
         lo, hi = MUTUALS_THRESHOLD_RANGE
         if isinstance(n, bool) or not isinstance(n, int) or not lo <= n <= hi:
             raise ConfigError(f"{where}.mutuals_threshold must be a whole number from {lo} to {hi}, got {n!r}")
+        f = cfg.get("min_fit", 80)
+        if isinstance(f, bool) or not isinstance(f, int) or not 0 <= f <= 100:
+            raise ConfigError(f"{where}.min_fit must be a whole number from 0 to 100, got {f!r}")
         return cls(manual_if_connected=cfg.get("manual_if_connected", True),
-                   manual_if_mutuals=cfg.get("manual_if_mutuals", True), mutuals_threshold=n)
+                   manual_if_mutuals=cfg.get("manual_if_mutuals", True), mutuals_threshold=n, min_fit=f)
 
 
 def _fields(contact: Mapping[str, Any] | Contact) -> tuple[int | None, int | None]:

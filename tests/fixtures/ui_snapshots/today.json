@@ -64,6 +64,30 @@
       "what": "Send the LinkedIn note"
     }
   ],
+  "outreach": [
+    {
+      "company": "Hooli",
+      "contact_name": "Dana Cruz",
+      "contact_role": "recruiter",
+      "draft_ready": true,
+      "email": "dana.cruz@example.com",
+      "email_confidence": "verified",
+      "followup_due": null,
+      "job_id": "<job:applied>",
+      "title": "New Grad Engineer"
+    },
+    {
+      "company": "Stark Industries",
+      "contact_name": "Pat Rivers",
+      "contact_role": "Engineering Manager",
+      "draft_ready": true,
+      "email": "pat@example.com",
+      "email_confidence": null,
+      "followup_due": null,
+      "job_id": "<job:interview>",
+      "title": "Software Engineer"
+    }
+  ],
   "prepare_queue": {
     "error": null,
     "total": 0

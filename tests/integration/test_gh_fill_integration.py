@@ -107,3 +107,16 @@ def test_fill_education_extras_scoped_to_their_listbox(server: str, tmp_path: Pa
     fields = [{"field_id": i, "label": i, "type": t, "value": v, "source": "profile"} for i, t, v in f]
     summary, _ = _run(server, tmp_path, "job_app.html", fields)
     assert summary["failed"] == [] and summary["filled"] == 4, summary  # decoy options above the form never picked
+
+
+def test_fill_refuses_answers_that_repeat_each_other(temp_root: Path, tmp_path: Path):
+    jd = temp_root / "data" / "jobs" / "j-1"
+    jd.mkdir(parents=True)
+    a = "At Acme I build backend systems that keep financial records correct in real time for traders."
+    b = "At Acme I have spent two years making sure the ledger stays right when trades are cancelled late."
+    fields = [{"field_id": f"q{i}", "label": f"Q{i}", "type": "textarea", "value": v, "source": "user"}
+              for i, v in enumerate((a, b))]
+    (jd / "fill_plan.json").write_text(json.dumps({"job_id": "j-1", "board": "b", "ats_job_id": "1", "fields": fields}))
+    r = _cli(temp_root, tmp_path, "j-1")
+    assert r.returncode == 2 and "repeats Q0 (same opening): Q1" in r.stderr
+    assert not (jd / "fill_summary.json").exists()

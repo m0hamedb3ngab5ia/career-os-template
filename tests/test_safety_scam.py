@@ -127,6 +127,10 @@ def test_suspicious_process_is_review(example_settings, text, code):
     "Beware of fraud: we will never ask you to deposit or cash a check.",
     "We do not ask candidates to buy gift cards or pay an application fee.",
     "Recruiters will never request that you purchase equipment and get reimbursed by a vendor.",
+    # list form: the "never" sits in the lead clause, the scam phrase opens a later list item
+    "We\u2019ll also never ask you to pay a fee, send money, deposit or cash a check, or purchase equipment.",
+    "We will never request payment, such as a training fee, gift cards, or to deposit a check.",
+    "Beware of fraudulent recruiters. We will not ask you to pay, buy gift cards, or cash a check.",
 ])
 def test_legit_mentions_do_not_trip(example_settings, text):
     assert check_posting(_p(description_text=text), example_settings) == []
@@ -139,6 +143,12 @@ def test_legit_mentions_do_not_trip(example_settings, text):
     "No fraud here, buy gift cards for the team.",
     "If you are not local, cash the check we mail you.",
     "Don't hesitate to buy gift cards for onboarding.",
+    "We never ask for a resume twice, but first deposit the check we send you.",
+    "This is not a scam, deposit the check.",
+    # an unrelated "never ask/need" earlier in the sentence must not excuse a later scam ask
+    "We never ask for references, deposit the check we send you.",
+    "We never ask for a resume twice, but after we hire you, deposit the check we send you.",
+    "You do not need a degree, deposit the check we mail you to buy supplies.",
 ])
 def test_negation_outside_clause_still_trips(example_settings, text):
     assert verdict(check_posting(_p(description_text=text), example_settings)) == "block"

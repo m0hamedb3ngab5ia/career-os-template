@@ -141,6 +141,19 @@ def _run_one(action: Action, trigger: str) -> tuple[str, str]:
         return "error", f"{type(e).__name__}: {e}"[:300]
 
 
+def _follow_ups(settings: Settings, out: dict[str, Any], echo: Callable[[str], None]) -> None:
+    """Cheap and local (no Claude): raise/close follow-up nudges. A failure never stops the tick."""
+    try:
+        from careeros.follow_ups import raise_follow_ups
+
+        added = raise_follow_ups(settings)
+        out["follow_ups"] = len(added)
+        if added:
+            echo(f"tick: {len(added)} follow-up(s)")
+    except Exception as e:  # noqa: BLE001
+        out["follow_ups_error"] = f"{type(e).__name__}: {e}"[:300]
+
+
 def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[], datetime] | None = None,
          actions: dict[str, Action] | None = None, dry_run: bool = False,
          echo: Callable[[str], None] = lambda s: None) -> dict[str, Any]:
@@ -186,6 +199,7 @@ def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[],
                 else:
                     entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status=status,
                                  last_detail=detail)
+        _follow_ups(settings, out, echo)
         state["last_tick"] = clock().isoformat()
         _write(rs.dir / "schedule.json", state)
     finally:

@@ -51,6 +51,16 @@ interface DoneResult {
 const actionPath = (item: ActionItem, verb: "done" | "reopen") =>
   `/api/actions/${encodeURIComponent(String(item.id))}/${verb}`;
 
+/** POST /api/actions/{id}/answer: learns the answer, then closes the item. */
+export function useAnswer() {
+  const refresh = useRefreshToday();
+  return useMutation({
+    mutationFn: ({ item, answer }: { item: ActionItem; answer: string }) =>
+      apiSend<unknown>("POST", `/api/actions/${encodeURIComponent(String(item.id))}/answer`, { answer }),
+    onSettled: refresh,
+  });
+}
+
 /** Mark done: the row leaves the list at once; on failure it comes back. */
 export function useMarkDone() {
   const qc = useQueryClient();

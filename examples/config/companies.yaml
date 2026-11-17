@@ -44,6 +44,11 @@ company_domains: {}    # e.g. {"Two Sigma": twosigma.com, "Example Corp": [examp
 # company_caps:
 #   Example Corp: {max: 3, window_days: 30, aliases: [Example Labs]}
 
+# How much a referral helps at a company (yield model): weak | normal | strong, default normal. Prepare runs
+# rank a job up when your imported LinkedIn network has a connection there; weak scales that boost by 0.3,
+# strong by 1.5. Set from what you hear (e.g. a referral program recruiters say barely matters -> weak).
+referral_strength: {}  # e.g. {Example Corp: weak}
+
 # Hiring freezes / layoffs you know about (ghost-job check). score-job also records web findings in
 # data/company_signals.json; entries here win. kind: freeze (skip) | layoffs (flag) | none (clears).
 hiring_signals: []     # e.g. [{company: Example Corp, kind: layoffs, date: 2026-08-01, source: "https://..."}]
@@ -51,6 +56,9 @@ hiring_signals: []     # e.g. [{company: Example Corp, kind: layoffs, date: 2026
 boards:                # reusable default: fine to keep. Scout sources. ats: greenhouse | lever | ashby | handshake | custom (no adapter yet; skipped)
   # Handshake (optional): sign in once in the apply browser (`careeros apply fill` opens it at 127.0.0.1:9223), then uncomment.
   # - {company: Handshake, ats: handshake, slug: handshake, pages: 3, queries: [software engineer, new grad software engineer]}
+  # SimplifyJobs new-grad list (Recommended): one public JSON file, many employers. Greenhouse/Ashby/Lever links reuse
+  # those apply adapters; other ATSs are stored as ats "other" (apply by hand). Needs `simplify` in targets.yaml scout.sources.
+  - {company: SimplifyJobs, ats: simplify, slug: simplify, window_days: 14}
   # --- AI ---
   - {company: Anthropic,        ats: greenhouse, slug: anthropic}
   - {company: OpenAI,           ats: ashby,      slug: openai}

@@ -1,6 +1,7 @@
 # Status
 
 ## Now
+- Lane: Change — dashboard views + quick decisions (DEC-025 amends DEC-024): REQ-146..150 implemented (#184), not verified; REQ-151 master résumé preview implemented. Stream: today-redesign
 - Lane: Major change — chat-first (DEC-024): UI = Today + Jobs dashboard only; 56 REQ/UC/FLOW/IA entries annotated `ui: retired-chat-first` (Q-032); REQ-139..142 (skills advice, today, interview-prep, score-job gaps) and REQ-143..145 (look gate, auto-submit opt-in, `careeros view`) implemented, not verified. Stream: chat-first
 - Lane: Feature — scoring budget (Q-031, DEC-023: USR-038, REQ-133..137, UC-017, FLOW-006, mockup `mockups/not-scored.html`, TASK-038..041). Stage: gate approved 2026-10-14; Build: TASK-038 + TASK-040 in parallel, then 039, then 041 after TASK-037. Stream: ttv-user-test
 - Lane: Feature — §2 Jobs on Today (DEC-022: REQ-127..132, UC-015/016, FLOW-005, mockup `mockups/jobs-today.html`). Stream: ttv-user-test

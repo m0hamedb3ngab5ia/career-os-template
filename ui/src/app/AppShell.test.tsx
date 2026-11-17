@@ -65,13 +65,51 @@ describe("AppShell", () => {
     expect(links).toEqual([
       "Today",
       "Jobs",
+      "Recommended",
+      "In progress",
+      "Applied",
+      "Saved",
+      "Not scored",
+      "Profile",
+      "Settings",
     ]);
-    for (const g of ["Job search"]) expect(within(nav).getByText(g)).toBeInTheDocument();
+  });
+
+  it("Jobs sub-items link to the tabs and mark the one in the URL", async () => {
+    renderAt("/jobs?tab=applied");
+    const nav = await screen.findByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "In progress" })).toHaveAttribute("href", "/jobs?tab=inprogress");
+    expect(within(nav).getByRole("link", { name: "Applied" })).toHaveAttribute("aria-current", "page");
+    expect(within(nav).getByRole("link", { name: "Recommended" })).not.toHaveAttribute("aria-current");
+  });
+
+  it("the Jobs group collapses and remembers it", async () => {
+    localStorage.clear();
+    const user = userEvent.setup();
+    const { unmount } = renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    await user.click(within(nav).getByRole("button", { name: "Jobs sections" }));
+    expect(within(nav).queryByRole("link", { name: "Applied" })).toBeNull();
+    expect(localStorage.getItem("careeros.sidebar.jobs")).toBe("closed");
+    unmount();
+    renderAt("/");
+    expect(within(screen.getByRole("navigation", { name: "Sections" })).queryByRole("link", { name: "Saved" })).toBeNull();
+    localStorage.clear();
+  });
+
+  it("Profile and Settings open their pages; Cmd/Ctrl+, opens Settings", async () => {
+    const { router } = renderAt("/");
+    const nav = screen.getByRole("navigation", { name: "Sections" });
+    expect(within(nav).getByRole("link", { name: "Profile" })).toHaveAttribute("href", "/profile");
+    expect(within(nav).getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
+    const mac = /Mac|iPhone|iPad|iPod/.test(navigator.platform);
+    fireEvent.keyDown(document, { key: ",", metaKey: mac, ctrlKey: !mac });
+    await waitFor(() => expect(router.state.location.pathname).toBe("/settings"));
   });
 
   it("marks the current section and shows its page heading", async () => {
     renderAt("/jobs");
-    expect(await screen.findByRole("link", { name: "Jobs" })).toHaveAttribute("aria-current", "page");
+    expect(await screen.findByRole("link", { name: "Recommended" })).toHaveAttribute("aria-current", "page");
     // the screen is a lazy route: allow for its chunk to load
     expect(await screen.findByRole("heading", { level: 1, name: "Jobs" }, { timeout: 4000 })).toBeInTheDocument();
   });

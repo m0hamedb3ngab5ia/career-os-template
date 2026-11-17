@@ -80,7 +80,7 @@ class Store:
         from careeros import untrusted
 
         extra = (self.settings.pipeline.get("injection") or {}).get("extra_patterns") or []
-        reasons = untrusted.scan(posting.description_text, posting.description_html, extra)
+        reasons = untrusted.scan(f"{posting.title}\n{posting.company}\n{posting.description_text}", posting.description_html, extra)
         with self._flags_lock(posting.job_id):
             flags = self.load_flags(posting.job_id)
             if not reasons and not flags.get("injection_suspected"):
@@ -169,11 +169,21 @@ class Store:
 
     # --- status ------------------------------------------------------------
 
-    def set_status(self, job_id: str, status: str, note: str | None = None) -> None:
+    def set_status(self, job_id: str, status: str, note: str | None = None, *, channel: str | None = None,
+                   referral_contact_id: str | None = None) -> None:
+        from careeros.models import CHANNELS
+
+        if channel is not None and channel not in CHANNELS:
+            raise ValueError(f"unknown channel {channel!r}; one of {', '.join(CHANNELS)}")
         cur = self._read(job_id, STATUS) or {"history": []}
         cur["status"] = status
         cur["updated_at"] = now_iso()
-        cur.setdefault("history", []).append({"status": status, "at": cur["updated_at"], "note": note})
+        entry = {"status": status, "at": cur["updated_at"], "note": note}
+        if channel is not None:  # channel and contact live on the job (latest wins) and on the history entry
+            cur["channel"] = entry["channel"] = channel
+            if referral_contact_id is not None:
+                cur["referral_contact_id"] = entry["referral_contact_id"] = referral_contact_id
+        cur.setdefault("history", []).append(entry)
         self._write(job_id, STATUS, cur)
         self.append_log(job_id, f"status -> {status}" + (f": {note}" if note else ""), component="store")
         if status == "applied":
@@ -202,6 +212,10 @@ class Store:
     def get_status(self, job_id: str) -> str | None:
         d = self._read(job_id, STATUS)
         return d.get("status") if d else None
+
+    def get_channel(self, job_id: str) -> tuple[str, str | None]:
+        d = self._read(job_id, STATUS) or {}
+        return d.get("channel") or "cold", d.get("referral_contact_id")
 
     # --- log ---------------------------------------------------------------
 
@@ -345,6 +359,7 @@ class Store:
                     "url": p.url,
                     "fetched_at": p.fetched_at,
                     "status": st,
+                    "channel": self.get_channel(jid)[0],
                     "category": sc.category if sc else None,
                     "fit": sc.fit if sc else None,
                     "tier": sc.tier if sc else None,

@@ -160,6 +160,10 @@ L, needs `phone`, no `--job`: it is about the profile, not this job) unless an o
 with `metric_question: <bullet_id>:`. They never change `status`.
 Any RESULT that contained `ACTION_ITEM` is appended verbatim.
 
+Referral: unless `status` is `skipped`, run `.venv/bin/careeros network match --job <job_id> --actions`. It adds one
+deduped `referral` Action Item ("referral: ask <name> (<position>) at <company> for <title>") when the candidate
+has a 1st-degree connection at the company. Exit 1 = no network imported yet: ignore it. Never changes `status`.
+
 Outreach: if `tier_cfg.outreach == "always"`, note `"outreach": "run /find-contacts then /draft-outreach"` in
 the final RESULT (do not run them here; they run after apply).
 

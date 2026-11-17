@@ -42,7 +42,7 @@ PASS, WARN, FAIL = "pass", "warn", "fail"
 
 CONFIG_FILES = ("targets", "categories", "companies", "qa", "pipeline")
 PROFILE_FILES = ("master", "standard_answers", "confidential_terms")
-KNOWN_ATS = {"greenhouse", "lever", "ashby", "handshake", "custom"}
+KNOWN_ATS = {"greenhouse", "lever", "ashby", "handshake", "simplify", "custom"}
 # The key set skills and the applier rely on (profile/standard_answers.yaml). Extra keys are fine.
 STANDARD_KEYS = (
     "work_authorization", "sponsorship", "citizenship", "over_18", "relocate", "remote_hybrid", "start_date",
@@ -611,6 +611,12 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks.append(Check(WARN, "example_data", "no examples/ found to compare against; example data not checked"))
     checks += check_bullet_priority(cfg["categories"], master)
     checks += check_runs(cfg["pipeline"])
+    goal = cfg["targets"].get("goal")
+    if not isinstance(goal, dict):
+        checks.append(Check(WARN, "goal", "config/targets.yaml has no goal: block (pay_bar, minutes_per_week, "
+                                          "locations, flex_for_prestige); copy it from examples/config/targets.yaml"))
+    elif missing := [k for k in ("minutes_per_week", "locations") if not goal.get(k)]:
+        checks.append(Check(WARN, "goal", f"config/targets.yaml goal: is missing {', '.join(missing)}"))
     checks += check_ui_index(root)
     checks += check_apply_lessons(root)
     cp = (cfg["pipeline"].get("paths") or {}).get("credentials") if isinstance(cfg["pipeline"].get("paths"), dict) else None

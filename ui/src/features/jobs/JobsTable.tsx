@@ -1,6 +1,7 @@
 import { useWindowVirtualizer } from "@tanstack/react-virtual";
 import { ArrowDown, ArrowUp } from "lucide-react";
 import { memo, useLayoutEffect, useRef, useState } from "react";
+import { useRowOpen } from "../inspector/JobInspector";
 import type { FilterParams } from "./api";
 import type { Column } from "./cells";
 import { HeaderFilterMenu } from "./HeaderFilterMenu";
@@ -87,8 +88,9 @@ const Row = memo(function Row({
   onToggle: (id: string) => void;
 }) {
   const name = job.company || job.job_id;
+  const rowOpen = useRowOpen();
   return (
-    <tr className={styles.row} aria-rowindex={index + 2} data-selected={checked || undefined}>
+    <tr className={styles.row} onClick={rowOpen(job.job_id)} aria-rowindex={index + 2} data-selected={checked || undefined}>
       <td className={styles.td}>
         <label className={styles.check}>
           <input type="checkbox" checked={checked} onChange={() => onToggle(job.job_id)} />

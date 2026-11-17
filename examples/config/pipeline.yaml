@@ -30,6 +30,10 @@ credentials:                               # reusable default: fine to keep
   backend: file                            # file (Recommended): passwords in paths.credentials (0600) | keychain:
                                            # macOS login keychain (`security`), the file keeps only username/notes
 
+follow_ups:                                # reusable default: fine to keep
+  after_days: 7                            # 7: days without a reply before `careeros tick` raises a
+                                           # "follow up" Action Item (applied jobs, sent outreach). Nothing is sent
+
 schedule:                                  # reusable default: fine to keep. `careeros schedule install` adds a macOS
                                            # LaunchAgent that runs `careeros tick` every tick_minutes; the tick runs
                                            # whatever is due below. Follow-ups are not scheduled here.
@@ -99,6 +103,11 @@ runs:                                      # reusable default: fine to keep. `ca
     deadline_days: 7
     fit_weight: 0.5                        # prepare runs only: points per fit point
     retry_bonus: 30                        # a job whose last attempt failed goes near the front of the next run
+    referral_weight: 15                    # 15 (Recommended): prepare only; a 1st-degree connection at the company
+                                           # (careeros network import) adds 15 x (referral odds lift - 1), ~+15
+# Yield-model priors (docs/YIELD_MODEL.md; defaults in src/careeros/yield_model.py). Override any one:
+# yield_priors: {r: {cold: 0.03, referral: 0.2}, o: {cold: 0.06, referral: 0.1}, q_ask: {warm: 0.4, weak: 0.1},
+#                s_co: {weak: 0.3, normal: 1, strong: 1.5}, m_stale: 0.7}
   required_mcp_servers: []                 # MCP servers a run needs logged in (e.g. [gmail] for inbox work);
                                            # one reported needs-auth stops the run with auth_required
   job_lock_minutes: 120                     # 120 (Recommended): a `careeros job lock` taken by a skill expires after this
@@ -125,6 +134,9 @@ retention:                                 # reusable default: fine to keep. `ca
   unprepared_posting_days: 90              # found/scored/skipped postings: description trimmed to a short stub
   run_logs_days: 30                        # 30 (Recommended): data/runs/<id>/run.log + raw stream output go after this
   run_summaries_days: 365                  # 365 (Recommended): the whole run (run.json, attempts) goes after this
+  tracker_closed_after_days: 7             # 7 (Recommended): `tracker sync` drops a Skipped-tab row once its posting
+                                           # closed (closes_at passed, or the company's later scouts stopped seeing it
+                                           # for this many days). Open postings stay however old; 0 = only closes_at
                                            # 0 turns a rule off. Never touched: active jobs, submitted/ copies,
                                            # seen.json, posting_history.json, the scam registries.
 
@@ -168,6 +180,8 @@ outreach:                                  # reusable default: fine to keep
   manual_if_connected: true                # already connected on LinkedIn (1st degree): never automate; you tailor it
   manual_if_mutuals: true                  # mutual connections (see below): same. Record with `careeros outreach mark`
   mutuals_threshold: 1                     # 1 (Recommended): this many mutual connections or more counts (1 to 50)
+  min_fit: 80                              # 80 (Recommended): `careeros outreach targets` picks tier `outreach: always`
+                                           # jobs at any fit, `if_contact_found` jobs at this fit or more (0 to 100)
 
 scoring:                                   # reusable default: fine to keep. Auto-scoring (scheduled / batch
                                            # `careeros run score`) takes the queue by quick match, fresh first;
@@ -184,6 +198,11 @@ match:                                     # reusable default: fine to keep. `ca
     javascript: [js]
     typescript: [ts]
     postgresql: [postgres]
+  implies:                                 # (Recommended) one-way: profile text naming a right-hand term evidences
+                                           # the left-hand skill (never the reverse). `careeros jobs recredit`, score-job
+    distributed systems: [kafka, event-driven, microservices, service-oriented architecture]
+    observability: [monitoring, kibana, grafana, splunk, geneos, prometheus, datadog]
+    linux: [rhel, red hat enterprise linux, ubuntu, centos]
 
 resume_build:
   engine: tectonic                         # tectonic | pdflatex

@@ -186,6 +186,17 @@ export interface paths {
     /** Meta */
     get: operations["meta_api_meta_get"];
   };
+  "/api/profile": {
+    /** Get Profile */
+    get: operations["get_profile_api_profile_get"];
+  };
+  "/api/profile/master.pdf": {
+    /**
+     * Master Pdf
+     * @description The master résumé's latest version, inline, for the Profile preview (REQ-151). 404 none; 409 not a PDF.
+     */
+    get: operations["master_pdf_api_profile_master_pdf_get"];
+  };
   "/api/profile/master/proposal": {
     /** Get Master Proposal */
     get: operations["get_master_proposal_api_profile_master_proposal_get"];
@@ -261,6 +272,10 @@ export interface paths {
   "/api/schedule/{action}": {
     /** Schedule Action */
     post: operations["schedule_action_api_schedule__action__post"];
+  };
+  "/api/settings": {
+    /** Get Settings */
+    get: operations["get_settings_api_settings_get"];
   };
   "/api/status": {
     /** Status */
@@ -424,6 +439,13 @@ export interface components {
        * @default general
        */
       scope?: string;
+    };
+    /** AnswerRow */
+    AnswerRow: {
+      /** Answer */
+      answer: string;
+      /** Key */
+      key: string;
     };
     /** AppliedWeekTile */
     AppliedWeekTile: {
@@ -672,6 +694,13 @@ export interface components {
       /** Warnings */
       warnings?: string[];
     };
+    /** DocumentRow */
+    DocumentRow: {
+      /** Name */
+      name: string;
+      /** Size */
+      size: number;
+    };
     /** Due */
     Due: {
       /** Due */
@@ -723,6 +752,8 @@ export interface components {
        * @default []
        */
       location_in?: string[];
+      /** Posted Within */
+      posted_within?: number | null;
       /** Q */
       q?: string | null;
       /**
@@ -924,8 +955,12 @@ export interface components {
       location: string | null;
       /** Next Action */
       next_action: string | null;
+      /** Posted At */
+      posted_at: string | null;
       /** Prescore */
       prescore: number | null;
+      /** Progress */
+      progress?: string | null;
       /** Qa Passed */
       qa_passed: number | null;
       /** Qa Score */
@@ -968,8 +1003,12 @@ export interface components {
       job_id: string;
       /** Location */
       location: string | null;
+      /** Posted At */
+      posted_at: string | null;
       /** Prescore */
       prescore: number | null;
+      /** Progress */
+      progress?: string | null;
       /** Qa Passed */
       qa_passed: number | null;
       /** Qa Score */
@@ -1148,6 +1187,30 @@ export interface components {
       /** Note */
       note?: string | null;
     };
+    /**
+     * OutreachItem
+     * @description One job with people to contact (contacts.json) and/or drafted messages (outreach.json). Nothing is sent.
+     */
+    OutreachItem: {
+      /** Company */
+      company: string;
+      /** Contact Name */
+      contact_name: string | null;
+      /** Contact Role */
+      contact_role: string | null;
+      /** Draft Ready */
+      draft_ready: boolean;
+      /** Email */
+      email: string | null;
+      /** Email Confidence */
+      email_confidence: string | null;
+      /** Followup Due */
+      followup_due: string | null;
+      /** Job Id */
+      job_id: string;
+      /** Title */
+      title: string;
+    };
     /** OverrideBody */
     OverrideBody: {
       /** Value */
@@ -1253,6 +1316,15 @@ export interface components {
         };
       };
     };
+    /** Profile */
+    Profile: {
+      /** Answers */
+      answers: components["schemas"]["AnswerRow"][];
+      /** Documents */
+      documents: components["schemas"]["DocumentRow"][];
+      /** Resumes */
+      resumes: components["schemas"]["ResumeRow"][];
+    };
     /** QuietHours */
     QuietHours: {
       /** End */
@@ -1323,6 +1395,19 @@ export interface components {
       responded: number;
       /** Rows */
       rows: components["schemas"]["TileRow"][];
+    };
+    /** ResumeRow */
+    ResumeRow: {
+      /** At */
+      at: string;
+      /** Name */
+      name: string;
+      /** Rid */
+      rid: string;
+      /** Type */
+      type: string;
+      /** Version */
+      version: number;
     };
     /** RunBudget */
     RunBudget: {
@@ -1579,6 +1664,39 @@ export interface components {
       /** Selected */
       selected: boolean;
     };
+    /** SettingGroup */
+    SettingGroup: {
+      /** Rows */
+      rows: components["schemas"]["SettingRow"][];
+      /** Title */
+      title: string;
+    };
+    /** SettingRow */
+    SettingRow: {
+      /**
+       * Help
+       * @default
+       */
+      help?: string;
+      /** Label */
+      label: string;
+      /** Value */
+      value: string;
+    };
+    /** SettingSection */
+    SettingSection: {
+      /** Groups */
+      groups: components["schemas"]["SettingGroup"][];
+      /** Id */
+      id: string;
+      /** Title */
+      title: string;
+    };
+    /** SettingsView */
+    SettingsView: {
+      /** Sections */
+      sections: components["schemas"]["SettingSection"][];
+    };
     /** StartBody */
     StartBody: {
       /**
@@ -1646,6 +1764,8 @@ export interface components {
     Today: {
       /** Actions */
       actions: components["schemas"]["ActionItem"][];
+      /** Outreach */
+      outreach: components["schemas"]["OutreachItem"][];
       prepare_queue: components["schemas"]["PrepareQueue"];
       /** Top Picks */
       top_picks: components["schemas"]["JobListItem"][];
@@ -1911,6 +2031,7 @@ export interface operations {
         applied_to?: string | null;
         closes_from?: string | null;
         closes_to?: string | null;
+        posted_within?: number | null;
       };
     };
     responses: {
@@ -2014,6 +2135,7 @@ export interface operations {
         applied_to?: string | null;
         closes_from?: string | null;
         closes_to?: string | null;
+        posted_within?: number | null;
       };
     };
     responses: {
@@ -2107,6 +2229,7 @@ export interface operations {
         applied_to?: string | null;
         closes_from?: string | null;
         closes_to?: string | null;
+        posted_within?: number | null;
       };
     };
     responses: {
@@ -2657,6 +2780,31 @@ export interface operations {
       };
     };
   };
+  /** Get Profile */
+  get_profile_api_profile_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Profile"];
+        };
+      };
+    };
+  };
+  /**
+   * Master Pdf
+   * @description The master résumé's latest version, inline, for the Profile preview (REQ-151). 404 none; 409 not a PDF.
+   */
+  master_pdf_api_profile_master_pdf_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/pdf": unknown;
+        };
+      };
+    };
+  };
   /** Get Master Proposal */
   get_master_proposal_api_profile_master_proposal_get: {
     responses: {
@@ -2987,6 +3135,17 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /** Get Settings */
+  get_settings_api_settings_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["SettingsView"];
         };
       };
     };

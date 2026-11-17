@@ -1,13 +1,14 @@
 import type { LucideIcon } from "lucide-react";
-import { Search, Sun, Table2, Zap } from "lucide-react";
+import { ChevronRight, Search, Settings, Sun, Table2, UserRound, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
-import { NavLink, Outlet, useLocation, useNavigate } from "react-router";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
 import { useMeta } from "../api/meta";
 import { useStatus } from "../api/queries";
 import type { StatusSummary } from "../api/types";
 import { formatCount, formatRelative } from "../lib/format";
 import { useNow } from "../lib/useNow";
+import { JobInspector } from "../features/inspector/JobInspector";
 import styles from "./AppShell.module.css";
 
 interface NavItem {
@@ -18,16 +19,79 @@ interface NavItem {
   end?: boolean;
 }
 
-// Sidebar groups and counts from design doc 2.1; max 6 items (REQ-119/IA). Chat-first: runs, inbox, contacts, settings live in chat skills and the CLI.
-const NAV: { group: string; items: NavItem[] }[] = [
-  {
-    group: "Job search",
-    items: [
-      { to: "/", label: "Today", icon: Sun, end: true, count: (s) => s.counts?.action_items_open },
-      { to: "/jobs", label: "Jobs", icon: Table2 },
-    ],
-  },
+const NAV_TOP: NavItem[] = [{ to: "/", label: "Today", icon: Sun, end: true, count: (s) => s.counts?.action_items_open }];
+
+// Jobs tabs as sub-items (same ids as the Jobs page ?tab=). No tab in the URL means the page's first tab.
+const JOB_TABS = [
+  { tab: "recommended", label: "Recommended" },
+  { tab: "inprogress", label: "In progress" },
+  { tab: "applied", label: "Applied" },
+  { tab: "saved", label: "Saved" },
+  { tab: "notscored", label: "Not scored" },
 ];
+const JOBS_OPEN_KEY = "careeros.sidebar.jobs";
+
+function readOpen(): boolean {
+  try {
+    return localStorage.getItem(JOBS_OPEN_KEY) !== "closed";
+  } catch {
+    return true;
+  }
+}
+
+function JobsGroup() {
+  const { pathname, search } = useLocation();
+  const [open, setOpen] = useState(readOpen);
+  const onJobs = pathname === "/jobs";
+  const tab = new URLSearchParams(search).get("tab") ?? "";
+  const current = onJobs ? (JOB_TABS.some((t) => t.tab === tab) ? tab : "recommended") : null;
+  function toggle() {
+    const next = !open;
+    setOpen(next);
+    try {
+      localStorage.setItem(JOBS_OPEN_KEY, next ? "open" : "closed");
+    } catch {
+      /* storage blocked: the group just opens again next visit */
+    }
+  }
+  return (
+    <li>
+      <div className={styles.parent}>
+        <Link to="/jobs" className={styles.item} aria-current={!current && pathname.startsWith("/jobs/") ? "page" : undefined}>
+          <span className={styles.icon}>
+            <Table2 size={16} strokeWidth={1.7} aria-hidden="true" />
+          </span>
+          <span className={styles.itemLabel}>Jobs</span>
+        </Link>
+        <button
+          type="button"
+          className={styles.chevron}
+          aria-expanded={open}
+          aria-controls="jobs-subnav"
+          aria-label="Jobs sections"
+          onClick={toggle}
+        >
+          <ChevronRight size={14} strokeWidth={2} aria-hidden="true" data-open={open} />
+        </button>
+      </div>
+      {open ? (
+        <ul id="jobs-subnav" className={styles.sub}>
+          {JOB_TABS.map(({ tab, label }) => (
+            <li key={tab}>
+              <Link
+                to={`/jobs?tab=${tab}`}
+                className={styles.item}
+                aria-current={current === tab ? "page" : undefined}
+              >
+                <span className={styles.itemLabel}>{label}</span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+    </li>
+  );
+}
 
 const LIVE_TEXT: Record<Connection, string> = {
   connecting: "Connecting…",
@@ -112,6 +176,22 @@ function SidebarSearch() {
   );
 }
 
+/** Cmd+, (Mac) / Ctrl+, opens Settings from anywhere but an open modal. */
+function useSettingsShortcut() {
+  const navigate = useNavigate();
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.defaultPrevented || e.altKey || e.shiftKey || e.key !== ",") return;
+      if (isMac() ? !e.metaKey || e.ctrlKey : !e.ctrlKey || e.metaKey) return;
+      if (document.querySelector('[aria-modal="true"]')) return;
+      e.preventDefault();
+      navigate("/settings");
+    }
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [navigate]);
+}
+
 /**
  * On a route change (a new path, not just a new query string such as ?sel=, so a sheet's focus return is left
  * alone) move focus to the main region and announce the new page's title. Skipped on the first load. Focus that
@@ -152,6 +232,7 @@ export function AppShell() {
   const { data: status } = useStatus();
   const main = useRef<HTMLElement>(null);
   const routeMessage = useRouteFocus(main);
+  useSettingsShortcut();
   // Settings > ui.theme: light/dark force a palette on <html>; system (or unknown) drops it so tokens.css follows the OS.
   const theme = useMeta().data?.ui.theme;
   useEffect(() => {
@@ -174,27 +255,39 @@ export function AppShell() {
           <span translate="no">career-os</span>
         </div>
         <SidebarSearch />
-        {NAV.map(({ group, items }) => (
-          <div key={group}>
-            <h2 className={styles.group}>{group}</h2>
-            <ul className={styles.list}>
-              {items.map(({ to, label, icon: Icon, count, end }) => {
-                const n = status && count ? (count(status) ?? 0) : undefined;
-                return (
-                  <li key={to}>
-                    <NavLink to={to} end={end} className={styles.item}>
-                      <span className={styles.icon}>
-                        <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
-                      </span>
-                      <span className={styles.itemLabel}>{label}</span>
-                      {n !== undefined ? <span className={styles.count}>{formatCount(n)}</span> : null}
-                    </NavLink>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        ))}
+        <ul className={styles.list}>
+          {NAV_TOP.map(({ to, label, icon: Icon, count, end }) => {
+            const n = status && count ? (count(status) ?? 0) : undefined;
+            return (
+              <li key={to}>
+                <NavLink to={to} end={end} className={styles.item}>
+                  <span className={styles.icon}>
+                    <Icon size={16} strokeWidth={1.7} aria-hidden="true" />
+                  </span>
+                  <span className={styles.itemLabel}>{label}</span>
+                  {n !== undefined ? <span className={styles.count}>{formatCount(n)}</span> : null}
+                </NavLink>
+              </li>
+            );
+          })}
+          <JobsGroup />
+          <li>
+            <NavLink to="/profile" className={styles.item}>
+              <span className={styles.icon}>
+                <UserRound size={16} strokeWidth={1.7} aria-hidden="true" />
+              </span>
+              <span className={styles.itemLabel}>Profile</span>
+            </NavLink>
+          </li>
+        </ul>
+        <div className={styles.bottom}>
+          <NavLink to="/settings" className={styles.item} aria-keyshortcuts={isMac() ? "Meta+," : "Control+,"}>
+            <span className={styles.icon}>
+              <Settings size={16} strokeWidth={1.7} aria-hidden="true" />
+            </span>
+            <span className={styles.itemLabel}>Settings</span>
+          </NavLink>
+        </div>
         <Freshness status={status} connection={connection} />
       </nav>
       <div role="status" aria-live="polite" className="sr-only" data-testid="route-announcer">
@@ -203,6 +296,7 @@ export function AppShell() {
       <main ref={main} id="main" tabIndex={-1} className={styles.main}>
         <Outlet />
       </main>
+      <JobInspector />
     </div>
   );
 }

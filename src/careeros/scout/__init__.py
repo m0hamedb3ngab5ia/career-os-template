@@ -19,6 +19,7 @@ from careeros.scout.base import Adapter, BoardNotFound, FetchError
 from careeros.scout.greenhouse import GreenhouseAdapter
 from careeros.scout.handshake import HandshakeAdapter
 from careeros.scout.lever import LeverAdapter
+from careeros.scout.simplify import SimplifyAdapter, drop_known, enrich as enrich_simplify
 from careeros.store import Store
 
 ADAPTERS: dict[str, type[Adapter]] = {
@@ -26,6 +27,7 @@ ADAPTERS: dict[str, type[Adapter]] = {
     "lever": LeverAdapter,
     "ashby": AshbyAdapter,
     "handshake": HandshakeAdapter,  # aggregator: one board, many employers; needs the signed-in apply browser
+    "simplify": SimplifyAdapter,  # aggregator: SimplifyJobs new-grad listings.json, public, no browser
 }
 
 # Built-in location words per ISO country code, used when that code is in `location.blocked_countries`.
@@ -102,7 +104,7 @@ def scout_config(settings: Settings) -> dict[str, Any]:
     """`targets.yaml: scout` with defaults: every adapter source on, every filter on.
 
     scout:
-      sources: [greenhouse, lever, ashby, handshake]   # ATS families to fetch; boards on others are skipped
+      sources: [greenhouse, lever, ashby, handshake, simplify]   # ATS families to fetch; boards on others are skipped
       filters:                              # set one to false to keep those postings
         blocklist: true    # companies.yaml blocklist
         flagged: true      # high-confidence entries in data/flagged_registry.yaml
@@ -245,7 +247,8 @@ def run_scout(
         except Exception as e:  # noqa: BLE001 - one bad job must not abort the scout run
             log(f"[scout] prescore backfill skipped {jid}: {e}")
 
-    for board in s.boards:
+    # Simplify last: its listings are dropped when a native board already has the job (full record first).
+    for board in sorted(s.boards, key=lambda b: str(b.get("ats", "")).lower() == "simplify"):
         company = str(board.get("company", "?"))
         ats = str(board.get("ats", "")).lower()
         slug = str(board.get("slug") or board.get("url") or "")
@@ -289,6 +292,8 @@ def run_scout(
             log(f"[scout] {company} ({ats}/{slug}): error {res.error}")
             continue
 
+        if ats == "simplify":  # drop what the Greenhouse/Ashby/Lever boards already found
+            postings = enrich_simplify(drop_known(postings, st.load_history()), log=log)
         res.fetched = len(postings)
         history = st.update_history(postings)
         full_history = st.load_history()

@@ -26,13 +26,16 @@ Status = Literal[
     "screening", "interview", "offer", "rejected", "withdrawn", "ghosted",
 ]
 
+# How an application reached the employer (yield model).
+CHANNELS: tuple[str, ...] = ("cold", "referral", "sourced", "hm_dm")
+
 ACTION_TYPES: tuple[str, ...] = (
     "captcha", "review", "question", "salary", "bot_detection", "qa_fail",
-    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "other",
+    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "referral", "follow_up", "other",
 )
 ActionType = Literal[
     "captcha", "review", "question", "salary", "bot_detection", "qa_fail",
-    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "other",
+    "send_linkedin", "send_email", "profile_gap", "laptop_required", "scam_suspected", "ghost_job", "injection_suspected", "referral", "follow_up", "other",
 ]
 
 # What the user needs on hand to complete an action item (tracker `Needs` column).

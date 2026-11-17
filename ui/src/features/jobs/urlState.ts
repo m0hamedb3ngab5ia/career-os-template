@@ -3,16 +3,18 @@ import { useSearchParams } from "react-router";
 import type { StageKey, TabKey, ViewKey } from "./types";
 
 // Jobs view state lives in the query string (docs/UI.md "URL state"):
-//   ?tab=recommended|notscored|saved|applied  &stage=applied|screening|interview|offer|closed (Applied tab)  &view=list|table|board  &q=<search>  &loc=<location contains>  &sort=[-]fit|company|…
+//   ?tab=recommended|inprogress|notscored|saved|applied  &stage=applied|screening|interview|offer|closed (Applied tab)  &view=list|table|board  &q=<search>  &loc=<location contains>  &posted=7|14|30 (posted within N days; absent = any)  &sort=[-]fit|company|…
 //   &cols=<hidden column keys>  &sel=<selected job ids>
 //   &f.<field>=v1,v2 (column value filter; literal commas in a value are backslash-escaped so they survive the
 //   split; URLSearchParams itself percent-encodes the rest, so values aren't double-encoded)  &f.<field>=min..max (number
 //   or ISO date range, either side may be empty). Fields: see FILTERS.
 // Defaults are left out so /jobs stays clean.
 
-export const TABS: TabKey[] = ["recommended", "notscored", "saved", "applied"];
+export const TABS: TabKey[] = ["recommended", "inprogress", "applied", "saved", "notscored"];
 export const DEFAULT_TAB: TabKey = "recommended";
 export const VIEWS: ViewKey[] = ["list", "table", "board"];
+/** "Posted within" choices, in days (0 = any). */
+export const POSTED_WITHIN = [7, 14, 30] as const;
 export const DEFAULT_VIEW: ViewKey = "list";
 /** Applied-tab sub-tabs (REQ-128, Q-028): statuses 1:1; Closed = rejected + withdrawn; ghosted shows only under All. */
 export const STAGES: { key: StageKey; label: string; statuses: string[] }[] = [
@@ -42,6 +44,7 @@ export const HIDEABLE = [
   "qa",
   "qa_passed",
   "ats",
+  "posted",
   "found",
   "applied",
   "closes_at",
@@ -77,6 +80,8 @@ export interface JobsView {
   view: ViewKey | "";
   q: string;
   location: string;
+  /** Posted within N days; 0 = any. */
+  posted: number;
   sort: string;
   hidden: string[];
   selected: string[];
@@ -139,6 +144,7 @@ export function readView(p: URLSearchParams): JobsView {
     view: (VIEWS as string[]).includes(p.get("view") ?? "") ? (p.get("view") as ViewKey) : "",
     q: p.get("q") ?? "",
     location: p.get("loc") ?? "",
+    posted: (POSTED_WITHIN as readonly number[]).includes(Number(p.get("posted"))) ? Number(p.get("posted")) : 0,
     sort: validSort(p.get("sort")),
     hidden: list(p.get("cols")).filter((c) => (HIDEABLE as readonly string[]).includes(c)),
     selected: list(p.get("sel")),
@@ -167,6 +173,7 @@ export function writeView(p: URLSearchParams, patch: Partial<JobsView>): URLSear
   if (patch.tab !== undefined && patch.tab !== "applied" && patch.stage === undefined) next.delete("stage");
   if (patch.q !== undefined) set("q", patch.q.trim());
   if (patch.location !== undefined) set("loc", patch.location.trim());
+  if (patch.posted !== undefined) set("posted", patch.posted ? String(patch.posted) : "")
   if (patch.sort !== undefined) set("sort", patch.sort, DEFAULT_SORT);
   if (patch.hidden !== undefined) set("cols", patch.hidden.join(","));
   if (patch.selected !== undefined) set("sel", patch.selected.join(","));

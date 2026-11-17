@@ -132,10 +132,32 @@ _NEGATION_RE = re.compile(r"\b(never|not|beware|fraud\w*|scam\w*)\b|n['’]t\b",
 _URGE_RE = re.compile(r"\b(worry|hesitate)\b", re.I)
 
 
+# "never ask you to" / "will not request" heading a list whose own first item is a scam-type action.
+_NEVER_ASK_RE = re.compile(
+    r"\b(never|not|n['’]t)\s+(ever\s+)?(ask|request|require)\w*\s+((you|candidates|applicants)\s+)?((to|for|that you)\s+)?",
+    re.I)
+_SCAM_ITEM_RE = re.compile(
+    r"\b(pay\w*|fees?|money|deposit|cash|checks?|cheques?|buy|purchase|gift ?cards?|crypto\w*|bitcoin|install|"
+    r"anydesk|teamviewer|remote (access|desktop))\b", re.I)
+
+
 def _negated(text: str, start: int) -> bool:
-    """True when the clause before a match negates or warns about it ("we will never ask you to …")."""
-    clause = re.split(r"[.!?\n,;:]", text[max(0, start - 120):start])[-1]
-    return bool(_NEGATION_RE.search(clause)) and not _URGE_RE.search(clause)
+    """True when the clause before a match negates or warns about it ("we will never ask you to ...").
+    A match that opens a comma list item ("never ask you to pay a fee, send money, deposit a check") also
+    counts when the sentence's lead is "never ask/request/require" and that list's first item is itself a
+    scam-type action (pay, fee, money, check, gift card, crypto, remote software)."""
+    segs = re.split(r"[.!?\n;:]", text[max(0, start - 300):start])[-1].split(",")
+    clause = segs[-1]
+    if bool(_NEGATION_RE.search(clause)) and not _URGE_RE.search(clause):
+        return True
+    if clause.strip() and not re.search(r"\b(or|and|such as|like|including)(\s+(an?|to))?\s*$", clause, re.I):
+        return False
+    lead = ",".join(segs[:-1])
+    m = _NEVER_ASK_RE.search(lead)
+    if not m or _URGE_RE.search(lead):
+        return False
+    first_item = lead[m.end():].split(",")[0]
+    return bool(_SCAM_ITEM_RE.search(first_item))
 
 
 # Form fields. Remote access, payment and credentials for other accounts block at any stage; identity and

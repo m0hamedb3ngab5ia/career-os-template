@@ -6,6 +6,7 @@ import re
 import uuid
 import warnings
 from contextlib import contextmanager
+from copy import copy
 from datetime import datetime, timedelta
 from pathlib import Path
 from typing import Any, Callable, Iterator
@@ -43,6 +44,8 @@ JOB_COLUMNS: list[tuple[str, str, int]] = [
     ("DateFound", "date_found", 12),
     ("DateApplied", "date_applied", 12),
     ("Status", "status", 14),
+    ("Reason", "reason", 44),
+    ("Notes", "notes", 40),
     ("ATS", "ats", 11),
     ("ResumeVersion", "resume_version", 14),
     ("CoverLetter", "cover_letter", 11),
@@ -51,9 +54,52 @@ JOB_COLUMNS: list[tuple[str, str, int]] = [
     ("LastEmailDate", "last_email_date", 13),
     ("NextAction", "next_action", 28),
     ("NextActionDate", "next_action_date", 14),
-    ("Notes", "notes", 40),
     ("Folder", "folder", 12),
 ]
+# Skipped sheet: jobs with status skipped live here, not on Jobs. Posting = open | closed (closed rows are pruned at sync).
+SKIPPED_COLUMNS: list[tuple[str, str, int]] = [
+    ("JobID", "job_id", 14), ("Company", "company", 22), ("Role", "role", 40), ("Fit", "fit", 6),
+    ("DateFound", "date_found", 12), ("Posting", "posting", 9), ("Reason", "reason", 44), ("Notes", "notes", 40),
+    ("URL", "url", 40),
+]
+REASON_STATUSES = ("skipped", "rejected", "withdrawn")
+# Skip-note code (first words of the Notes text, see score-job / hard_filters / company gate) -> plain English.
+_REASONS = {
+    "company_cap": "Company application limit reached (90 days)",
+    "cooldown": "Recent rejection at this company (cooldown)",
+    "stale": "Posting too old", "posted": "Posting too old",
+    "below_min_fit": "Fit score too low",
+    "location_nonpreferred_low_fit": "Location not preferred and fit too low",
+    "location_nonpreferred": "Location not preferred", "location_blocked": "Location not allowed",
+    "sponsorship_required": "Needs visa sponsorship", "clearance_required": "Needs a security clearance",
+    "safety": "Flagged by the safety check", "ghost": "Looks like a ghost posting",
+    "closed": "Posting closed", "already_applied": "Already applied",
+    "not_similar": "Failed the company similarity check",
+    "company_blocked": "Company is blocked", "title_senior": "Title too senior",
+    "salary_below_min": "Pay below your minimum", "no_category_match": "No matching job category",
+    "retention": "Posting aged out (retention)",
+}
+
+
+def reason_for(note: Any) -> str:
+    """Plain-English reason from a Notes text: the first known code in its first words, else its first clause."""
+    line = str(note or "").strip().split("\n")[0]
+    for tok in re.findall(r"[a-z]+(?:_[a-z0-9]+)*", line.lower())[:6]:
+        if m := re.fullmatch(r"yoe_gt_(\d+)", tok):
+            return f"Asks for more than {m[1]} years' experience"
+        if tok in _REASONS:
+            return _REASONS[tok]
+    return re.split(r"[:;(]", line)[0].strip()[:80]
+
+
+def posting_state(closes_at: str | None, last_seen: str | None, company_latest: str | None, days: int,
+                  today: str | None = None) -> str:
+    """"closed" if closes_at is past, or later scouts of the company no longer saw it (`days` older than the
+    company's newest sighting; 0 = off). No history = "open": never drop on doubt."""
+    if closes_at and str(closes_at)[:10] < (today or _today())[:10]:
+        return "closed"
+    a, b = _parse_date(last_seen or ""), _parse_date(company_latest or "")
+    return "closed" if days and a and b and (b - a).days > days else "open"
 ACTION_COLUMNS = [
     ("ID", 10), ("Created", 18), ("JobID", 14), ("Company", 22), ("Role", 36), ("Type", 14),
     ("What to do", 50), ("Link", 40), ("Priority", 9), ("Needs", 9), ("Done", 7), ("DoneDate", 12),
@@ -183,6 +229,141 @@ def _put(ws: Worksheet, row: int, column: int, value: Any) -> Any:
     return cell
 
 
+def _jobs_validations(ws: Worksheet) -> None:
+    col = _header_index(ws)
+    for h, vals in (("Status", STATUSES), ("Tier", ["A", "B", "C"]), ("Remote", ["Y", "N"]),
+                    ("CoverLetter", ["Y", "N"]), ("Override", ["", "A", "B", "C", "skip", "manual"])):
+        if h in col:
+            _add_list_validation(ws, col[h], list(vals))
+
+
+def _rebuild_sheet(ws: Worksheet) -> None:
+    """Rewrite Jobs / Skipped in canonical column order, by header name: every value, hyperlink and style is kept,
+    unknown (user-added) columns go last, fully empty rows are dropped. Fixes old layouts and gaps left by moves."""
+    cols = JOB_COLUMNS if ws.title == "Jobs" else SKIPPED_COLUMNS
+    old = _header_index(ws)
+    snap = []
+    for r in range(2, ws.max_row + 1):
+        row = {h: ws.cell(row=r, column=c) for h, c in old.items()}
+        if any(c.value not in (None, "") for c in row.values()):
+            snap.append({h: (c.value, c.hyperlink.target if c.hyperlink else None, copy(c._style))
+                         for h, c in row.items()})
+    names = [h for h, _, _ in cols]
+    layout = [(h, w) for h, _, w in cols] + [(h, 14) for h in old if h not in names]
+    ws.delete_rows(1, ws.max_row)
+    ws.data_validations.dataValidation = []
+    _style_header(ws, layout)
+    for r, d in enumerate(snap, start=2):
+        for i, (h, _) in enumerate(layout, start=1):
+            if h in d:
+                v, link, style = d[h]
+                cell = _put(ws, r, i, v)
+                if link:
+                    cell.hyperlink = link
+                cell._style = style
+    if ws.title == "Jobs":
+        _jobs_validations(ws)
+
+
+def _blank(ws: Worksheet, r: int) -> None:
+    for cell in ws[r]:
+        cell.value = None
+        cell.hyperlink = None
+
+
+def _row_dict(ws: Worksheet, hdr: dict[str, int], r: int, cols: list[tuple[str, str, int]],
+              into: list[tuple[str, str, int]]) -> dict[str, Any]:
+    """Row r of ws as {key: value}, only the keys the destination sheet (`into`) has."""
+    keys = {k for _, k, _ in into}
+    return {k: v for h, k, _ in cols if k in keys and h in hdr
+            and (v := ws.cell(row=r, column=hdr[h]).value) not in (None, "")}
+
+
+def _snapshot(ws: Worksheet, hdr: dict[str, int], r: int) -> dict[str, tuple[Any, Any, Any]]:
+    """Every non-empty cell of row r by header: (value, hyperlink target, style)."""
+    out = {}
+    for h, c in hdr.items():
+        cell = ws.cell(row=r, column=c)
+        if cell.value not in (None, ""):
+            out[h] = (cell.value, cell.hyperlink.target if cell.hyperlink else None, copy(cell._style))
+    return out
+
+
+def _carry(ws: Worksheet, hdr: dict[str, int], r: int, snap: dict[str, tuple[Any, Any, Any]]) -> None:
+    """Restore a moved row's cells the destination row still lacks; headers the destination sheet has not get
+    appended as new columns, so no value (Override, user-added columns) is lost in a move."""
+    for h, (v, link, style) in snap.items():
+        if h not in hdr:
+            hdr[h] = max(hdr.values(), default=0) + 1
+            head = ws.cell(row=1, column=hdr[h], value=h)
+            head.font = Font(bold=True)
+            head.fill = HEADER_FILL
+            head.alignment = Alignment(vertical="center")
+            ws.column_dimensions[get_column_letter(hdr[h])].width = 14
+        cell = ws.cell(row=r, column=hdr[h])
+        if cell.value in (None, ""):
+            cell = _put(ws, r, hdr[h], v)
+            if link:
+                cell.hyperlink = link
+            cell._style = style
+
+
+class _Book:
+    """The Jobs + Skipped sheets of one workbook: a job lives on exactly one of them, by status."""
+
+    def __init__(self, wb: Workbook):
+        self.j, self.s = wb["Jobs"], wb["Skipped"]
+        self.jh, self.sh = _header_index(self.j), _header_index(self.s)
+        self.ji, self.si = Tracker._job_index(self.j, self.jh), Tracker._job_index(self.s, self.sh)
+        self.dirty: set[str] = set()
+
+    def current(self, jid: str) -> dict[str, Any] | None:
+        for ws, hdr, idx in ((self.j, self.jh, self.ji), (self.s, self.sh, self.si)):
+            if jid in idx:
+                row = {h: ws.cell(row=idx[jid], column=c).value for h, c in hdr.items()}
+                return row if ws is self.j else {**row, "Status": "skipped"}
+        return None
+
+    def apply(self, data: dict[str, Any]) -> str:
+        jid, status = data["job_id"], data.get("status")
+        in_j, in_s = jid in self.ji, jid in self.si
+        existed = in_j or in_s
+        if status == "skipped" or (status is None and in_s):
+            if in_j:
+                data = {**_row_dict(self.j, self.jh, self.ji[jid], JOB_COLUMNS, SKIPPED_COLUMNS), **data}
+                snap = _snapshot(self.j, self.jh, self.ji[jid])
+                _blank(self.j, self.ji.pop(jid))
+                self.dirty.add("j")
+            else:
+                snap = {}
+            res = Tracker._write_row(self.s, self.sh, self._cols(SKIPPED_COLUMNS, self.sh), self.si, data,
+                                     {"DateFound": _today(), "Posting": "open"})
+            _carry(self.s, self.sh, self.si[jid], snap)
+        else:
+            if in_s:
+                data = {**_row_dict(self.s, self.sh, self.si[jid], SKIPPED_COLUMNS, JOB_COLUMNS), **data}
+                snap = _snapshot(self.s, self.sh, self.si[jid])
+                _blank(self.s, self.si.pop(jid))
+                self.dirty.add("s")
+            else:
+                snap = {}
+            res = Tracker._write_row(self.j, self.jh, JOB_COLUMNS, self.ji, data,
+                                     {"Status": "found", "DateFound": _today()})
+            _carry(self.j, self.jh, self.ji[jid], snap)
+        return "updated" if existed else res
+
+    @staticmethod
+    def _cols(cols: list[tuple[str, str, int]], hdr: dict[str, int]) -> list[tuple[str, str, int]]:
+        """Known columns plus any Jobs-only column the sheet already carries (e.g. Override on Skipped)."""
+        have = {h for h, _, _ in cols}
+        return cols + [c for c in JOB_COLUMNS if c[0] not in have and c[0] in hdr]
+
+    def finish(self) -> None:
+        for name, ws in (("j", self.j), ("s", self.s)):
+            if name in self.dirty:
+                _rebuild_sheet(ws)
+
+
 def _today() -> str:
     return datetime.now().strftime("%Y-%m-%d")
 
@@ -231,12 +412,8 @@ class Tracker:
         ws = wb.active
         ws.title = "Jobs"
         _style_header(ws, [(n, w) for n, _, w in JOB_COLUMNS])
-        col = {n: i for i, (n, _, _) in enumerate(JOB_COLUMNS, start=1)}
-        _add_list_validation(ws, col["Status"], list(STATUSES))
-        _add_list_validation(ws, col["Tier"], ["A", "B", "C"])
-        _add_list_validation(ws, col["Remote"], ["Y", "N"])
-        _add_list_validation(ws, col["CoverLetter"], ["Y", "N"])
-        _add_list_validation(ws, col["Override"], ["", "A", "B", "C", "skip", "manual"])
+        _jobs_validations(ws)
+        _style_header(wb.create_sheet("Skipped"), [(n, w) for n, _, w in SKIPPED_COLUMNS])
 
         wa = wb.create_sheet("Action Items")
         _style_header(wa, ACTION_COLUMNS)
@@ -293,7 +470,27 @@ class Tracker:
         """Add columns introduced after a workbook was created (non-destructive: appended after existing headers),
         and neutralise Jobs URL cells written before they were text-safe."""
         if "Jobs" in wb.sheetnames:
-            _sanitize_urls(wb["Jobs"])
+            ws = wb["Jobs"]
+            if "Skipped" not in wb.sheetnames:
+                _style_header(wb.create_sheet("Skipped", 1), [(n, w) for n, _, w in SKIPPED_COLUMNS])
+            heads = [c.value for c in ws[1] if c.value is not None]
+            if heads[: len(JOB_COLUMNS)] != [h for h, _, _ in JOB_COLUMNS]:
+                _rebuild_sheet(ws)  # old layout (no Reason, Notes elsewhere): new order, every cell kept
+            _sanitize_urls(ws)
+            _sanitize_urls(wb["Skipped"])
+            hdr = _header_index(ws)
+            legacy_skipped = False  # skipped rows move to Skipped; rejected/withdrawn rows get a Reason
+            for r in range(2, ws.max_row + 1):
+                st = ws.cell(row=r, column=hdr["Status"]).value
+                legacy_skipped = legacy_skipped or st == "skipped"
+                if st in ("rejected", "withdrawn") and not ws.cell(row=r, column=hdr["Reason"]).value:
+                    _put(ws, r, hdr["Reason"], reason_for(ws.cell(row=r, column=hdr["Notes"]).value) or None)
+            if legacy_skipped:
+                b = _Book(wb)
+                for jid, r in list(b.ji.items()):
+                    if ws.cell(row=r, column=hdr["Status"]).value == "skipped":
+                        b.apply({"job_id": jid, "status": "skipped"})
+                b.finish()
         if "Action Items" not in wb.sheetnames:
             return
         ws = wb["Action Items"]
@@ -417,10 +614,16 @@ class Tracker:
             raise ValueError("job_id required")
         if "folder" not in data and self.jobs_dir is not None:
             data["folder"] = str(self.jobs_dir / data["job_id"])
+        if "resume_version" not in data and self.jobs_dir is not None:
+            pdf = self.jobs_dir / data["job_id"] / "resume.pdf"
+            if pdf.is_file():
+                data["resume_version"] = str(pdf)
+                data["_inferred_resume"] = True
         return data
 
     @staticmethod
-    def _write_job(ws: Worksheet, hdr: dict[str, int], index: dict[str, int], data: dict[str, Any]) -> str:
+    def _write_row(ws: Worksheet, hdr: dict[str, int], columns: list[tuple[str, str, int]], index: dict[str, int],
+                   data: dict[str, Any], defaults: dict[str, str]) -> str:
         jid = data["job_id"]
         r = index.get(jid)
         created = r is None
@@ -429,14 +632,18 @@ class Tracker:
             while ws.cell(row=r, column=hdr["JobID"]).value not in (None, ""):
                 r += 1
             index[jid] = r
-            _put(ws, r, hdr["Status"], "found")
-            _put(ws, r, hdr["DateFound"], _today())
-        for header, key, _ in JOB_COLUMNS:
-            if key not in data:
+            for header, val in defaults.items():
+                _put(ws, r, hdr[header], val)
+        for header, key, _ in columns:
+            if key not in data or header not in hdr:
                 continue
             val = data[key]
-            if key == "folder":  # our own job dir path
-                cell = _put(ws, r, hdr[header], "open")
+            if (key == "resume_version" and data.get("_inferred_resume")
+                    and ws.cell(row=r, column=hdr[header]).value not in (None, "", "resume")):
+                continue  # never replace an explicit résumé version with the inferred PDF link
+            if key == "folder" or (key == "resume_version" and Path(str(val)).name == "resume.pdf"):
+                # our own job dir / résumé pdf path: a short label linking to it
+                cell = _put(ws, r, hdr[header], "open" if key == "folder" else "resume")
                 cell.hyperlink = str(val)
                 cell.font = Font(color="0563C1", underline="single")
             elif key == "url":  # board data: always text; clickable only for http(s)
@@ -446,6 +653,10 @@ class Tracker:
                     cell.font = Font(color="0563C1", underline="single")
             else:
                 _put(ws, r, hdr[header], val)
+        if "Reason" in hdr:
+            st = ws.cell(row=r, column=hdr["Status"]).value if "Status" in hdr else "skipped"
+            reason = reason_for(ws.cell(row=r, column=hdr["Notes"]).value) if st in REASON_STATUSES else ""
+            _put(ws, r, hdr["Reason"], reason or None)
         return "created" if created else "updated"
 
     @staticmethod
@@ -461,9 +672,10 @@ class Tracker:
         data = self._row_data(row)
 
         def fn(wb: Workbook) -> str:
-            ws = wb["Jobs"]
-            hdr = _header_index(ws)
-            return self._write_job(ws, hdr, self._job_index(ws, hdr), data)
+            b = _Book(wb)
+            res = b.apply(data)
+            b.finish()
+            return res
 
         return self._mutate("upsert_job", {"row": data}, fn) or "queued"
 
@@ -471,12 +683,11 @@ class Tracker:
         datas = [self._row_data(r) for r in rows]
 
         def fn(wb: Workbook) -> dict[str, int]:
-            ws = wb["Jobs"]
-            hdr = _header_index(ws)
-            index = self._job_index(ws, hdr)
+            b = _Book(wb)
             counts = {"created": 0, "updated": 0}
             for d in datas:
-                counts[self._write_job(ws, hdr, index, d)] += 1
+                counts[b.apply(d)] += 1
+            b.finish()
             return counts
 
         return self._mutate("upsert_jobs", {"rows": datas}, fn) or {"created": 0, "updated": 0, "queued": len(datas)}
@@ -486,31 +697,36 @@ class Tracker:
             raise ValueError(f"invalid status '{status}'; expected one of {STATUSES}")
 
         def fn(wb: Workbook) -> None:
-            ws = wb["Jobs"]
-            hdr = _header_index(ws)
-            r = _find_row(ws, hdr["JobID"], job_id)
-            if r is None:
-                r = ws.max_row + 1
-                _put(ws, r, hdr["JobID"], job_id)
-                _put(ws, r, hdr["DateFound"], _today())
-            _put(ws, r, hdr["Status"], status)
-            if status == "applied" and not ws.cell(row=r, column=hdr["DateApplied"]).value:
-                _put(ws, r, hdr["DateApplied"], _today())
+            b = _Book(wb)
+            cur = b.current(job_id) or {}
+            data: dict[str, Any] = {"job_id": job_id, "status": status}
+            if status == "applied" and not cur.get("DateApplied"):
+                data["date_applied"] = _today()
             if note:
-                prev = ws.cell(row=r, column=hdr["Notes"]).value
-                _put(ws, r, hdr["Notes"], f"{prev}\n{note}" if prev else note)
+                data["notes"] = f"{cur['Notes']}\n{note}" if cur.get("Notes") else note
+            b.apply(data)
+            b.finish()
             self._append_log_ws(wb, job_id, "tracker", f"status -> {status}" + (f": {note}" if note else ""))
 
         self._mutate("set_status", {"job_id": job_id, "status": status, "note": note}, fn)
 
     def get_job(self, job_id: str) -> dict[str, Any] | None:
-        wb = self._load()
-        ws = wb["Jobs"]
-        hdr = _header_index(ws)
-        r = _find_row(ws, hdr["JobID"], job_id)
-        if r is None:
-            return None
-        return {h: ws.cell(row=r, column=c).value for h, c in hdr.items()}
+        """The job's row from Jobs or Skipped (header -> value), or None."""
+        return _Book(self._load()).current(job_id)
+
+    def prune_closed_skipped(self) -> int:
+        """Drop Skipped rows whose Posting is `closed`; open ones stay however old. Returns how many went."""
+        def fn(wb: Workbook) -> int:
+            ws = wb["Skipped"]
+            col = _header_index(ws)["Posting"]
+            rows = [c.row for (c,) in ws.iter_rows(min_row=2, min_col=col, max_col=col) if c.value == "closed"]
+            for r in rows:
+                _blank(ws, r)
+            if rows:
+                _rebuild_sheet(ws)
+            return len(rows)
+
+        return self._mutate("prune_closed_skipped", {}, fn) or 0
 
     def list_jobs(self) -> list[dict[str, Any]]:
         wb = self._load()
@@ -733,7 +949,7 @@ def set_status_both(settings: Settings, job_id: str, status: str, note: str) -> 
 
 def add_action(settings: Settings, what: str, type: str, job_id: str = "", company: str = "", role: str = "",
                link: str = "", priority: str = "M", needs: str = "anytime", dedupe: bool = False,
-               due: str | None = None, due_reason: str | None = None, detail: str | None = None) -> str:
+               due: str | None = None, due_reason: str | None = None, detail: str | None = None, id: str | None = None) -> str:
     """Add an Action Item (company/role filled from the job's posting). `dedupe`: no-op when an open item with the
     same job + type exists. Returns the line `careeros action add` prints."""
     from careeros.store import Store
@@ -749,7 +965,7 @@ def add_action(settings: Settings, what: str, type: str, job_id: str = "", compa
                 return f"action item {it.get('ID')} already open ({type}, job {job_id or '-'}); not added"
     aid = tr.add_action_item(what=what, type=type, job_id=job_id, company=company,
                              role=role, link=link, priority=priority, needs=needs, due=due, due_reason=due_reason,
-                             detail=detail)
+                             detail=detail, id=id)
     return f"action item {aid} added ({type}/{priority}/{needs})"
 
 
@@ -762,17 +978,42 @@ def sync_all(settings: Settings) -> dict[str, Any]:
     store = Store(settings)
     tr = Tracker(settings=settings)
     tr.init()
-    rows = []
+    from careeros.retention import retention_config
+
+    days = retention_config(settings)["tracker_closed_after_days"]
+    hist = store.load_history()
+    items = []
     for jid in store.iter_job_ids():
         p = store.load_posting(jid)
         if not p:
             continue
-        row = TrackerRow.from_posting(p, store.load_score(jid), folder=str(store.job_dir(jid)))
+        try:
+            score = store.load_score(jid)
+        except ValueError:  # a hand-made score.json must not block the whole sync
+            score = None
+        row = TrackerRow.from_posting(p, score, folder=str(store.job_dir(jid)))
         st = store.get_status(jid)
         if st:
             row.status = st  # type: ignore[assignment]
-        rows.append(row)
+        items.append((p, row))
+    latest: dict[str, str] = {}  # company -> newest last_seen: how far behind a job's own sighting is
+    company_of = {p.job_id: normalize_company(p.company) for p, _ in items}
+    for e in hist.values():
+        co = next((company_of[j] for j in e.get("job_ids", []) if j in company_of), None)
+        if co and str(e.get("last_seen") or "") > latest.get(co, ""):
+            latest[co] = str(e["last_seen"])
+    rows: list[Any] = []
+    for p, row in items:
+        if row.status != "skipped":
+            rows.append(row)
+            continue
+        h = store.history_for(p) or {}
+        d = row.model_dump(exclude_none=True)
+        d["posting"] = posting_state(getattr(p, "closes_at", None), h.get("last_seen"),
+                                     latest.get(normalize_company(p.company)), days)
+        rows.append(d)
     counts = tr.upsert_jobs(rows)
+    tr.prune_closed_skipped()
     jobs = store.list_jobs()
     tr.set_config("last_sync", datetime.now().strftime("%Y-%m-%d %H:%M"))
     tr.set_config("jobs_count", len(jobs))

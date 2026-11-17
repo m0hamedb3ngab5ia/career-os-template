@@ -17,16 +17,16 @@ import { JobsList, NotScoredList } from "./JobsCards";
 import { JobsTable } from "./JobsTable";
 import { FilterChips } from "./HeaderFilterMenu";
 import styles from "./JobsPage.module.css";
-import { DEFAULT_SORT, STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
+import { DEFAULT_SORT, POSTED_WITHIN, STAGES, TABS, VIEWS, effectiveView, toggleSort, useJobsView, type SortKey, type ColumnFilter, type FilterField } from "./urlState";
 import type { StageKey, TabKey, ViewKey } from "./types";
 
 const DEFAULT_PAGE_SIZE = 100;
 const SEARCH_DEBOUNCE_MS = 250;
 
 // Fallback labels until GET /api/jobs/tabs answers (the server's labels win).
-const TAB_LABELS: Record<TabKey, string> = { recommended: "Recommended", notscored: "Not scored", saved: "Saved", applied: "Applied" };
+const TAB_LABELS: Record<TabKey, string> = { recommended: "Recommended", inprogress: "In progress", notscored: "Not scored", saved: "Saved", applied: "Applied" };
 // Footer noun: "Showing 12 of 59 recommended jobs".
-const TAB_NOUNS: Record<TabKey, string> = { recommended: "recommended jobs", notscored: "unscored jobs", saved: "saved jobs", applied: "applied jobs" };
+const TAB_NOUNS: Record<TabKey, [string, string]> = { recommended: ["recommended job", "recommended jobs"], inprogress: ["job in progress", "jobs in progress"], notscored: ["unscored job", "unscored jobs"], saved: ["saved job", "saved jobs"], applied: ["applied job", "applied jobs"] };
 const VIEW_LABELS: Record<ViewKey, string> = { list: "List", table: "Table", board: "Board" };
 
 function errorText(e: unknown): string {
@@ -81,7 +81,7 @@ function FilterField({ value: q, onCommit, name, label, placeholder, icon }: Fil
 export function JobsPage() {
   const toast = useToast();
   const [view, update] = useJobsView();
-  const { tab, q, location, sort, stage } = view;
+  const { tab, q, location, sort, stage, posted } = view;
   const columnFilters = view.filters;
   const meta = useMeta();
   const uiState = useUiState();
@@ -99,14 +99,14 @@ export function JobsPage() {
     () => (stageStatuses && mode !== "board" ? { ...filters, status: { kind: "values" as const, values: stageStatuses } } : filters),
     [filters, stageStatuses, mode],
   );
-  const filterParams = useMemo(() => ({ tab, q, location, filters: requestFilters }), [tab, q, location, requestFilters]);
-  const stageFacets = useJobFacets("status", { tab, q, location, filters: { ...filters, status: undefined } }, tab === "applied");
+  const filterParams = useMemo(() => ({ tab, q, location, posted, filters: requestFilters }), [tab, q, location, posted, requestFilters]);
+  const stageFacets = useJobFacets("status", { tab, q, location, posted, filters: { ...filters, status: undefined } }, tab === "applied");
   const stageCount = (statuses: string[]) =>
     stageFacets.data ? (stageFacets.data.values ?? []).filter((v) => statuses.includes(String(v.value))).reduce((n, v) => n + v.count, 0) : null;
   // Unscored jobs have no fit: best quick match first (REQ-136).
   const listSort = tab === "notscored" && sort === DEFAULT_SORT ? "-prescore" : sort;
   const list = useJobsList({ ...filterParams, sort: listSort, limit: pageSize }, !meta.isPending);
-  const tabs = useJobsTabs({ tab, q, location, filters });
+  const tabs = useJobsTabs({ tab, q, location, posted, filters });
   const exporter = useExportJobs();
   const pick = useSelectJobs();
   const bulkPick = (on: boolean) =>
@@ -177,7 +177,7 @@ export function JobsPage() {
     const body =
       nSel > 0
         ? { job_ids: [...selected], columns: cols }
-        : { tab, q: q || undefined, location: location || undefined, sort, columns: cols, ...exportFilters(requestFilters) };
+        : { tab, q: q || undefined, location: location || undefined, ...(posted ? { posted_within: posted } : {}), sort, columns: cols, ...exportFilters(requestFilters) };
     exporter.mutate(body, {
       onSuccess: (name) => toast.show({ message: `Downloaded ${name}` }),
       onError: (e) => toast.show({ message: errorText(e) }),
@@ -201,11 +201,11 @@ export function JobsPage() {
   } else if (list.isPending) {
     body = <p className={styles.loading}>Loading jobs…</p>;
   } else if (rows.length === 0) {
-    body = q || location ? (
+    body = q || location || posted ? (
       <EmptyState
-        title={q ? `No jobs match “${q}”` : `No jobs in “${location}”`}
+        title={q ? `No jobs match “${q}”` : location ? `No jobs in “${location}”` : `No jobs posted in the last ${posted} days`}
         action={
-          <Button size="small" onClick={() => update({ q: "", location: "" }, true)}>
+          <Button size="small" onClick={() => update({ q: "", location: "", posted: 0 }, true)}>
             Clear search
           </Button>
         }
@@ -240,6 +240,8 @@ export function JobsPage() {
           ? "Scout adds postings here. Run scout from the command line (careeros scout --sync)."
           : tab === "notscored"
           ? "New postings from scout wait here until they are scored."
+          : tab === "inprogress"
+          ? "Jobs you picked appear here while their résumé and letter are being prepared, until you apply."
           : "Nothing in this tab right now. Other tabs may have jobs."}
       </EmptyState>
     );
@@ -276,7 +278,7 @@ export function JobsPage() {
   return (
     <Page
       title="Jobs"
-      subtitle="Every tracked posting · same columns as the Jobs tab in JobTracker.xlsx"
+      subtitle="Every job career-os is tracking."
     >
       <div className={styles.stack}>
         <div className={styles.toolbar}>
@@ -303,6 +305,21 @@ export function JobsPage() {
             placeholder="Location…"
             icon={<MapPin size={14} strokeWidth={1.7} aria-hidden="true" />}
           />
+          <label className={styles.posted}>
+            <span>Posted within</span>
+            <select
+              aria-label="Posted within"
+              value={posted}
+              onChange={(e) => update({ posted: Number(e.target.value) }, true)}
+            >
+              <option value={0}>Any time</option>
+              {POSTED_WITHIN.map((d) => (
+                <option key={d} value={d}>
+                  {d} days
+                </option>
+              ))}
+            </select>
+          </label>
           <span className={styles.grow} />
           <div role="status" aria-live="polite" className={styles.bulk}>
             {nSel > 0 ? (
@@ -385,7 +402,7 @@ export function JobsPage() {
           {rows.length > 0 ? (
             <div className={styles.footer}>
               <span className="tabular">
-                {formatCount(total)} {TAB_NOUNS[tab]} · live from data/careeros.db
+                {formatCount(total)} {TAB_NOUNS[tab][total === 1 ? 0 : 1]}
               </span>
               <Pager paged={paged} label="Jobs" />
             </div>

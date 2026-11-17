@@ -10,7 +10,7 @@ from pathlib import Path
 
 from careeros.bootstrap import EDIT_HINTS, InitError, copy_examples, link_private
 from careeros.config import ConfigError, Settings, SetupError, find_repo_root, get_settings
-from careeros.models import ACTION_NEEDS, ACTION_TYPES, STATUSES, TrackerRow
+from careeros.models import ACTION_NEEDS, ACTION_TYPES, CHANNELS, STATUSES, TrackerRow
 from careeros.outreach import OutreachPolicy, check_contacts, manual_action_text, mark_contact
 from careeros.scout import run_scout
 from careeros.store import Store
@@ -198,6 +198,24 @@ def cmd_tracker_upsert(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_jobs_recredit(args: argparse.Namespace) -> int:
+    """Credit missing skills the profile evidences (match.synonyms / match.implies) on low-fit skips; dry run
+    unless --write."""
+    from careeros.skill_evidence import recredit
+
+    rows = recredit(_settings(args), min_fit=args.min_fit, write=args.write, job_ids=args.job_ids or None)
+    flips = [r for r in rows if r["old_decision"] != r["decision"]]
+    if args.json:
+        print(json.dumps({"jobs": rows, "flipped": len(flips), "written": args.write}, indent=2))
+        return 0
+    for r in rows:
+        why = ", ".join(f"{k} <- {v}" for k, v in r["credited"].items()) or "current thresholds"
+        print(f"{r['job_id']}: fit {r['old_fit']} -> {r['fit']}, {r['old_decision']} -> {r['decision']}; {why}")
+    print(f"{sum(bool(r['credited']) for r in rows)} gain evidenced skills; {len(flips)} flip to prepare"
+          + ("" if args.write else " (dry run; --write to save)"))
+    return 0
+
+
 def cmd_jobs_list(args: argparse.Namespace) -> int:
     s = _settings(args)
     store = Store(s)
@@ -223,6 +241,42 @@ def cmd_jobs_list(args: argparse.Namespace) -> int:
         print(f"{j['job_id']:<12} {j['status']:<13} {fit:>3} {j['company'][:20]:<20} {j['title'][:45]:<45} "
               f"{j['location'][:30]}{urgent}")
     print(f"\n{len(jobs)} jobs")
+    return 0
+
+
+def cmd_job_add(args: argparse.Namespace) -> int:
+    import json as _json
+
+    from careeros import job_import as ji
+
+    s = _settings(args)
+    try:
+        if args.from_alert:
+            raw = sys.stdin.read() if args.from_alert == "-" else Path(args.from_alert).read_text(encoding="utf-8")
+            rows = ji.add_alerts(s, _json.loads(raw))
+        elif args.url:
+            rows = [ji.add_url(s, args.url)]
+        else:
+            print("give a URL or --from-alert <file|->", file=sys.stderr)
+            return 2
+    except (ji.ImportError_, ValueError) as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    for r in rows:
+        print(f"{r['status']:<8} {r.get('job_id', '-'):<12} {r.get('company', '')} - {r.get('title', r.get('reason', ''))}")
+    return 0
+
+
+def cmd_job_describe(args: argparse.Namespace) -> int:
+    from careeros import job_import as ji
+
+    text = sys.stdin.read() if args.text_file == "-" else Path(args.text_file).read_text(encoding="utf-8")
+    try:
+        r = ji.describe(_settings(args), args.job_id, text)
+    except ji.ImportError_ as e:
+        print(str(e), file=sys.stderr)
+        return 1
+    print(f"{r['status']:<8} {r['job_id']:<12} {r['company']} - {r['title']}")
     return 0
 
 
@@ -809,11 +863,30 @@ def cmd_job_status(args: argparse.Namespace) -> int:
         return 1
     if (locked := _job_lock_guard(s, args.job_id, args)) is not None:
         return locked
-    store.set_status(args.job_id, args.status, args.note)
+    if args.referral_contact and not args.channel:
+        print("--referral-contact needs --channel", file=sys.stderr)
+        return 2
+    store.set_status(args.job_id, args.status, args.note, channel=args.channel,
+                     referral_contact_id=args.referral_contact)
     tr = Tracker(settings=s)
     tr.set_status(args.job_id, args.status, args.note)
     pend = tr.pending_count()
     print(f"{args.job_id}: status -> {args.status}" + (f" (tracker op queued, file locked)" if pend else ""))
+    return 0
+
+
+def cmd_yield_report(args: argparse.Namespace) -> int:
+    from careeros.yield_data import yield_rows
+
+    rows = yield_rows(Store(_settings(args)))
+    if args.json:
+        print(json.dumps(rows, indent=2))
+        return 0
+    print(f"{'channel':<9} {'n':>4} {'interviews':>10} {'rate':>6}  95% (Wilson)  censored")
+    for r in rows:
+        rate = "-" if r["rate"] is None else f"{r['rate']:.0%}"
+        lo, hi = r["ci95"]
+        print(f"{r['channel']:<9} {r['n']:>4} {r['interviews']:>10} {rate:>6}  {lo:.1%}-{hi:.1%}  {r['censored']:>8}")
     return 0
 
 
@@ -1325,6 +1398,139 @@ def cmd_outreach_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_outreach_targets(args: argparse.Namespace) -> int:
+    """High-yield jobs for /find-contacts -> /draft-outreach (no outreach.json yet), best fit first."""
+    from careeros.email_guess import outreach_targets
+
+    s = _settings(args)
+    store = Store(s)
+    min_fit = args.min_fit if args.min_fit is not None else OutreachPolicy.from_settings(s).min_fit
+    jobs = store.list_jobs()
+    done = {j["job_id"] for j in jobs if (store.job_dir(j["job_id"]) / "outreach.json").exists()}
+    out = outreach_targets(jobs, s.targets.get("tiers") or {}, min_fit, args.status or ["applied", "queued"],
+                           done)[: args.top]
+    if args.json:
+        print(json.dumps(out, indent=2))
+        return 0
+    for j in out:
+        print(f"{j['job_id']:<12} {j['status']:<10} {j['fit'] or '':>3} {j['tier'] or '-':<2} "
+              f"{j['company'][:20]:<20} {j['title'][:45]}")
+    print(f"\n{len(out)} outreach targets (min fit {min_fit}); next: /find-contacts then /draft-outreach per job")
+    return 0
+
+
+def cmd_outreach_emails(args: argparse.Namespace) -> int:
+    """Fill contacts.json: Apollo.io (who + email, `creds set apollo`) -> Hunter.io (pattern, `creds set hunter`) ->
+    pattern guesses. Keys are optional; credits used go to the job log. Never sends."""
+    import urllib.error
+
+    from careeros.credentials import get_credential
+    from careeros.email_guess import (apollo_contacts, apollo_search_url, apply_to_contacts, company_domain,
+                                      hunter_domain_search)
+    from careeros.runs.atomic import write_json
+
+    def key_for(site: str) -> str | None:
+        try:
+            return get_credential(s, site).get("password")
+        except (KeyError, RuntimeError, ValueError):
+            return None
+
+    s = _settings(args)
+    store = Store(s)
+    p = store.load_posting(args.job_id)
+    if not p:
+        print(f"outreach emails: no posting for job {args.job_id}", file=sys.stderr)
+        return 1
+    f = store.job_dir(args.job_id) / "contacts.json"
+    data = json.loads(f.read_text(encoding="utf-8")) if f.exists() else {
+        "job_id": args.job_id, "company": p.company, "contacts": []}
+    domain, conf = (args.domain, "high") if args.domain else company_domain(s, p.company, p.url)
+    if conf == "low" and data.get("domain") and data.get("domain_confidence") in ("high", "medium"):
+        domain, conf = data["domain"], data["domain_confidence"]  # researched beats the `<name>.com` guess
+    used = []
+    apollo = None
+    akey = None if args.no_apollo else key_for("apollo")
+    if akey and conf != "high":
+        print(f"apollo.io: skipped, domain {domain} is a guess (credits would go to the wrong company); "
+              "rerun with --domain <company email domain>")
+        akey = None
+    if akey:
+        try:
+            apollo = apollo_contacts(akey, domain, enrich=args.enrich)
+            print(f"apollo.io: {len(apollo)} people with email (search 0 credits, enrich <= {args.enrich} credits)")
+            used.append(f"apollo search 0cr + enrich {len(apollo)}/{args.enrich}cr")
+        except urllib.error.HTTPError as e:
+            print(f"apollo.io: refused ({e.code}); free API needs a work-email account. Open search_urls.apollo_* "
+                  "in contacts.json and paste names/emails back in chat")
+            used.append(f"apollo search refused {e.code}")
+        except (OSError, ValueError) as e:
+            print(f"apollo.io: no answer ({type(e).__name__}); open search_urls.apollo_* by hand")
+            used.append("apollo search failed")
+    data.setdefault("search_urls", {}).update({"apollo_recruiter": apollo_search_url(p.company, "recruiter"),
+                                               "apollo_hiring_manager": apollo_search_url(p.company, "engineering manager")})
+    key = None if args.no_hunter else key_for("hunter")
+    hunter = None
+    if key:
+        used.append("hunter domain search 1")
+        hunter = hunter_domain_search(key, **({"domain": domain} if conf in ("high", "medium") else {"company": p.company}))
+        print("hunter.io: " + (f"pattern {hunter.get('pattern')}, {len(hunter.get('emails') or [])} addresses"
+                               if hunter else "no answer (quota, key or network); pattern guesses only"))
+    else:
+        print("no hunter key (optional: careeros creds set hunter --password-stdin); pattern guesses only")
+    out = apply_to_contacts(data, domain, conf, hunter, apollo=apollo)
+    write_json(f, out)
+    store.append_log(args.job_id, "outreach emails: " + ("; ".join(used) or "no provider keys, 0 credits"),
+                     component="outreach")
+    print(f"{len(out['contacts'])} contacts, domain {out['domain']} ({out['domain_confidence']}) -> {f}")
+    return 0
+
+
+NETWORK_OPEN = ["scored", "queued", "prepared", "needs_review"]
+
+
+def cmd_network_import(args: argparse.Namespace) -> int:
+    from careeros.network import import_csv, network_path
+
+    s = _settings(args)
+    try:
+        n = import_csv(s, Path(args.csv).expanduser())
+    except (OSError, ValueError) as e:
+        print(f"network import: {e}", file=sys.stderr)
+        return 1
+    print(f"imported {n} connections (with a company) -> {network_path(s)}")
+    return 0
+
+
+def cmd_network_match(args: argparse.Namespace) -> int:
+    """Jobs where the candidate has a 1st-degree connection at the company (referral asks)."""
+    from careeros.company_policy import Policy
+    from careeros.network import load_network, match_jobs, referral_action_text
+
+    s = _settings(args)
+    conns = load_network(s)
+    if not conns:
+        print("no network yet: export LinkedIn Connections.csv, then `careeros network import <csv>`", file=sys.stderr)
+        return 1
+    wanted = set(args.status or NETWORK_OPEN)
+    jobs = [j for j in Store(s).list_jobs() if (j["job_id"] == args.job if args.job else j["status"] in wanted)]
+    matches = match_jobs(jobs, conns, Policy.from_settings(s).company_key)
+    if args.actions:
+        for m in matches:
+            print(_add_action(s, referral_action_text(m), "referral", job_id=m["job_id"],
+                              link=m["connections"][0]["url"], dedupe=True),
+                  file=sys.stderr if args.json else sys.stdout)  # --json keeps stdout one JSON document
+    if args.json:
+        print(json.dumps(matches, indent=2))
+    elif not args.actions:
+        for m in matches:
+            who = "; ".join(f"{c['name']} ({c['position']})" for c in m["connections"][:3])
+            more = f" +{len(m['connections']) - 3}" if len(m["connections"]) > 3 else ""
+            print(f"{m['job_id']:<12} {m['status']:<12} {m['fit'] or '':>3} {m['company'][:20]:<20} "
+                  f"{m['title'][:40]:<40} {who}{more}")
+        print(f"\n{len(matches)} jobs with a connection")
+    return 0
+
+
 def cmd_outreach_mark(args: argparse.Namespace) -> int:
     if args.degree is None and args.mutuals is None:
         print("outreach mark: give --degree and/or --mutuals", file=sys.stderr)
@@ -1341,6 +1547,30 @@ def cmd_outreach_mark(args: argparse.Namespace) -> int:
         print(f"outreach mark: {e}", file=sys.stderr)
         return 2
     print(f"{c.get('name')}: degree={c.get('linkedin_degree')} mutuals={c.get('mutuals')}")
+    return 0
+
+
+def cmd_outreach_sent(args: argparse.Namespace) -> int:
+    """Record a send the candidate did by hand: canonical `sent_at` on the drafts (career-os never sends)."""
+    import json
+    from datetime import date
+
+    path = Store(_settings(args)).job_dir(args.job_id) / "outreach.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        drafts = [d for d in data["drafts"] if isinstance(d, dict)]
+    except (OSError, ValueError, KeyError, TypeError):
+        print(f"outreach sent: no readable drafts in {path}", file=sys.stderr)
+        return 1
+    hit = [d for d in drafts if not args.contact or str(d.get("contact") or "").lower() == args.contact.lower()]
+    if not hit:
+        print(f"outreach sent: no draft for contact {args.contact!r}", file=sys.stderr)
+        return 1
+    when = args.date or date.today().isoformat()
+    for d in hit:
+        d.update(sent=True, sent_by="candidate", sent_at=when)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    print(f"marked {len(hit)} draft(s) sent on {when}")
     return 0
 
 
@@ -1910,6 +2140,12 @@ def cmd_advise(args: argparse.Namespace) -> int:
     for kind, m in rn["metrics"].items():
         print(f"{kind}: {m['runs']} runs, {m['attempts']} jobs, avg {m['avg_job_s']:.0f}s/job, "
               f"failures {m['failure_rate']:.0%}, budget used {m['budget_used']:.0%}")
+    sk = out["skips"]
+    if sk["skipped"]:
+        print(f"skipped {sk['skipped']}: " + ", ".join(f"{x['reason']} {x['count']}" for x in sk["reasons"][:5]))
+    if sk["skills"]["scorer_misses"]:
+        print("scorer misses (master.yaml already shows these): "
+              + ", ".join(f"{x['skill']} {x['count']}" for x in sk["skills"]["scorer_misses"]))
     if not out["recommendations"]:
         print("no recommendations")
     for r in out["recommendations"]:
@@ -2094,6 +2330,13 @@ def build_parser() -> argparse.ArgumentParser:
     jl.add_argument("--order", choices=["urgent"],
                     help="urgent: jobs that must go now (deadline / cluster) first, then by close date, then fit")
     jl.set_defaults(fn=cmd_jobs_list)
+    jr = js.add_parser("recredit", help="move missing skills the profile evidences (match.synonyms/implies) to "
+                       "matched on low-fit skips; recompute fit + decision under current thresholds (dry run unless --write)")
+    jr.add_argument("job_ids", nargs="*", help="limit to these jobs (default: every low-fit skip)")
+    jr.add_argument("--min-fit", type=int, default=0, help="only skips with fit >= this (default 0: every low-fit skip)")
+    jr.add_argument("--write", action="store_true", help="rewrite score.json; flipped jobs go back to scored")
+    jr.add_argument("--json", action="store_true")
+    jr.set_defaults(fn=cmd_jobs_recredit)
 
     co = sub.add_parser("company", help="per-company caps, rejection cooldown, close dates (exit 3 = blocked)")
     cos = co.add_subparsers(dest="company_cmd", required=True)
@@ -2123,6 +2366,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     job = sub.add_parser("job")
     jbs = job.add_subparsers(dest="job_cmd", required=True)
+    jad = jbs.add_parser("add", help="store one posting from a URL (Greenhouse/Lever/Ashby, else a plain page) "
+                                     "or --from-alert JSON [{title, company, url}] from LinkedIn/Indeed alert emails")
+    jad.add_argument("url", nargs="?")
+    jad.add_argument("--from-alert", metavar="FILE|-")
+    jad.set_defaults(fn=cmd_job_add)
+    jds = jbs.add_parser("describe", help="attach pasted posting text to a job added from an alert; makes it scoreable")
+    jds.add_argument("job_id")
+    jds.add_argument("--text-file", required=True, metavar="PATH|-")
+    jds.set_defaults(fn=cmd_job_describe)
     jsh = jbs.add_parser("show")
     jsh.add_argument("job_id")
     jsh.add_argument("--full", action="store_true")
@@ -2131,8 +2383,15 @@ def build_parser() -> argparse.ArgumentParser:
     jst.add_argument("job_id")
     jst.add_argument("status", choices=STATUSES)
     jst.add_argument("--note")
+    jst.add_argument("--channel", choices=CHANNELS, help="how the application reached the employer (default cold)")
+    jst.add_argument("--referral-contact", help="contact id of the referrer, with --channel")
     _lock_args(jst)
     jst.set_defaults(fn=cmd_job_status)
+    yl = sub.add_parser("yield", help="application yield data")
+    yls = yl.add_subparsers(dest="ycmd", required=True)
+    yr = yls.add_parser("report", help="per-channel applications, interviews, rate with Wilson 95% interval")
+    yr.add_argument("--json", action="store_true")
+    yr.set_defaults(fn=cmd_yield_report)
     jfz = jbs.add_parser("freeze", help="keep an as-submitted copy of the documents under submitted/<stamp>/")
     jfz.add_argument("job_id")
     jfz.add_argument("--reason", choices=("submitted", "assisted_stop", "manual"),
@@ -2400,6 +2659,36 @@ def build_parser() -> argparse.ArgumentParser:
     omk.add_argument("--degree", type=int)
     omk.add_argument("--mutuals", type=int)
     omk.set_defaults(fn=cmd_outreach_mark)
+    osn = outs.add_parser("sent", help="record an outreach message you sent by hand (sets sent_at; starts the follow-up clock)")
+    osn.add_argument("job_id")
+    osn.add_argument("--contact", help="contact name; default every draft")
+    osn.add_argument("--date", help="YYYY-MM-DD, default today")
+    osn.set_defaults(fn=cmd_outreach_sent)
+    otg = outs.add_parser("targets", help="high-yield jobs for outreach (tier rule + outreach.min_fit), no outreach.json yet")
+    otg.add_argument("--status", nargs="+", choices=STATUSES, help="default: applied queued")
+    otg.add_argument("--min-fit", type=int)
+    otg.add_argument("--top", type=int, default=3)
+    otg.add_argument("--json", action="store_true")
+    otg.set_defaults(fn=cmd_outreach_targets)
+    oem = outs.add_parser("emails", help="fill contacts.json email guesses (domain + pattern; Hunter.io if keyed). Never sends")
+    oem.add_argument("job_id")
+    oem.add_argument("--domain", help="company email domain, when you know it")
+    oem.add_argument("--no-hunter", action="store_true", help="skip Hunter.io even with a key (saves free credits)")
+    oem.add_argument("--no-apollo", action="store_true", help="skip Apollo.io even with a key")
+    oem.add_argument("--enrich", type=int, default=2, help="Apollo people to enrich for an email (1 credit each; default 2)")
+    oem.set_defaults(fn=cmd_outreach_emails)
+
+    nw = sub.add_parser("network", help="your LinkedIn connections (your own export) -> referral matches")
+    nws = nw.add_subparsers(dest="network_cmd", required=True)
+    nwi = nws.add_parser("import", help="load LinkedIn's Connections.csv into data/network.json (replaces it)")
+    nwi.add_argument("csv")
+    nwi.set_defaults(fn=cmd_network_import)
+    nwm = nws.add_parser("match", help="jobs at companies where you have a 1st-degree connection")
+    nwm.add_argument("--status", nargs="+", choices=STATUSES, help=f"default: {' '.join(NETWORK_OPEN)}")
+    nwm.add_argument("--job", help="one job id (any status)")
+    nwm.add_argument("--actions", action="store_true", help="add one `referral` Action Item per job (deduped)")
+    nwm.add_argument("--json", action="store_true")
+    nwm.set_defaults(fn=cmd_network_match)
 
     rn = sub.add_parser("run", help="unattended batches: rank jobs, call one skill per job headless, within a budget")
     rns = rn.add_subparsers(dest="run_cmd", required=True)

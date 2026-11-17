@@ -38,40 +38,46 @@ def idx(data):
     ix.close()
 
 
+def _unqueue(data, idx):
+    """Back to plain scored picks (fit 91 and 88), so Recommended has the high-fit rows these tests need."""
+    for k in ("review", "queued"):
+        Store(data["settings"]).set_status(data["jobs"][k], "scored")
+    idx.rebuild()
+
+
 def _companies(ix, tab, **kw):
     return [r["company"] for r in jobs_svc.list_jobs(ix, tab=tab, closed=CLOSED, sort="-fit", **kw)["items"]]
 
 
 def test_buckets(idx, data):
     # recommended: scored, unticked, not skipped / applied / closed; fit first
-    assert _companies(idx, "recommended") == ["Umbrella Labs", "Initech", "Globex"]
-    Store(data["settings"]).set_selected([data["jobs"]["queued"]], True)
+    # queued and needs_review jobs are in progress even when unticked: never offered again as a pick
+    assert _companies(idx, "recommended") == ["Globex"]
+    assert _companies(idx, "inprogress") == ["Umbrella Labs", "Initech"]
+    Store(data["settings"]).set_selected([data["jobs"]["queued"], data["jobs"]["scored"]], True)
     idx.rebuild()
-    assert _companies(idx, "saved") == ["Initech"]
+    assert _companies(idx, "saved") == ["Globex"]   # the in-progress job is not also Saved
     # applied: applied or later, incl. closed after applying (Q-028), whatever the tick
     assert _companies(idx, "applied") == ["Stark Industries", "Hooli", "Wayne Enterprises"]
 
 
 def test_counts_equal_rows(idx):
     counts = {t["key"]: t["count"] for t in jobs_svc.tabs(idx, CLOSED)}
-    assert list(counts) == ["recommended", "notscored", "saved", "applied"]
+    assert list(counts) == ["recommended", "inprogress", "notscored", "saved", "applied"]
     for key, n in counts.items():
         assert jobs_svc.list_jobs(idx, tab=key, closed=CLOSED, limit=jobs_svc.MAX_LIMIT)["total"] == n
         assert len(jobs_svc.list_jobs(idx, tab=key, closed=CLOSED, limit=jobs_svc.MAX_LIMIT)["items"]) == n
 
 
-@pytest.mark.parametrize("old,want", [("active", ["Umbrella Labs", "Initech", "Globex"]),
-                                      ("all", ["Umbrella Labs", "Initech", "Globex"]),
-                                      ("tier_a", ["Umbrella Labs"])])
+@pytest.mark.parametrize("old,want", [("active", ["Globex"]), ("all", ["Globex"]), ("tier_a", [])])
 def test_old_tab_keys_map_not_400(idx, old, want):
     assert _companies(idx, old) == want
 
 
 def test_old_review_tab_maps_to_saved(idx, data):
-    # needs_review jobs were prepared, so ticked: nearest new tab is Saved
     Store(data["settings"]).set_selected([data["jobs"]["review"], data["jobs"]["queued"]], True)
     idx.rebuild()
-    assert _companies(idx, "review") == ["Umbrella Labs"]
+    assert _companies(idx, "review") == ["Umbrella Labs", "Initech"]   # needs_review is In progress now, not Saved
 
 
 def test_unknown_tab_still_refused(idx):
@@ -80,6 +86,7 @@ def test_unknown_tab_still_refused(idx):
 
 
 def test_top_picks_subset_of_recommended_same_order(idx, data):
+    _unqueue(data, idx)
     picks = [p["job_id"] for p in today_svc.top_picks(idx, NOW, closed=CLOSED)]
     rec = [r["job_id"] for r in jobs_svc.list_jobs(idx, tab="recommended", closed=CLOSED, sort="-fit")["items"]]
     assert picks and set(picks) <= set(rec)
@@ -89,6 +96,7 @@ def test_top_picks_subset_of_recommended_same_order(idx, data):
 
 
 def test_reasons_only_for_returned_rows_and_texts_loaded_once(idx, data, monkeypatch):
+    _unqueue(data, idx)
     calls: list[str] = []
     loads: list[int] = []
     real = jobs_svc._resume_texts
@@ -137,6 +145,7 @@ def test_malformed_score_drops_that_rows_reasons_not_500(idx, data):
 
 
 def test_started_pick_stays_until_prepared(idx, data):
+    _unqueue(data, idx)
     # Codex #193 P1: Prepare ticks the job (selected=1), which drops it from Recommended; Today keeps it while its run
     # is in flight or failed, and lets it go once prepared.
     first = today_svc.top_picks(idx, NOW, closed=CLOSED)[0]["job_id"]
@@ -169,4 +178,34 @@ def test_notscored_tab_is_unscored_unticked_unskipped_by_quick_match(idx, data):
     """REQ-136: unscored, not ticked, not skipped; sorts by quick match."""
     rows = jobs_svc.list_jobs(idx, tab="notscored", closed=CLOSED, sort="-prescore", limit=jobs_svc.MAX_LIMIT)["items"]
     assert rows and all(r["fit"] is None and r["selected"] == 0 and r["status"] != "skipped" for r in rows)
-    assert [t["key"] for t in jobs_svc.tabs(idx, CLOSED)] == ["recommended", "notscored", "saved", "applied"]
+    assert [t["key"] for t in jobs_svc.tabs(idx, CLOSED)] == ["recommended", "inprogress", "notscored", "saved", "applied"]
+
+
+def test_progress_words_in_progress_rows(idx, data):
+    rows = {r["company"]: r["progress"] for r in jobs_svc.list_jobs(idx, tab="inprogress", closed=CLOSED)["items"]}
+    assert rows["Initech"] == "Ready to send"
+    assert rows["Umbrella Labs"] in ("Waiting for you", "Quality check failed")
+    assert jobs_svc.list_jobs(idx, tab="recommended", closed=CLOSED)["items"][0]["progress"] is None
+
+
+def test_posted_date_and_posted_within_filter(data):
+    from careeros.store import Store
+
+    st = Store(data["settings"])
+    for key, days in (("scored", 3), ("found", 20), ("applied", 100)):
+        jid = data["jobs"][key]
+        post = st.load_posting(jid).model_dump() if hasattr(st, "load_posting") else None
+        post["posted_at"] = (NOW - __import__("datetime").timedelta(days=days)).strftime("%Y-%m-%d")
+        st._write(jid, "posting.json", post)
+    ix = Index(data["settings"])
+    ix.rebuild()
+    try:
+        rows = jobs_svc.list_jobs(ix, closed=CLOSED, limit=50)["items"]
+        assert {r["company"]: r["posted_at"] for r in rows}["Globex"] == "2026-04-28"
+        def within(n):
+            r = (( NOW - __import__("datetime").timedelta(days=n)).strftime("%Y-%m-%d"), None)
+            return sorted(x["company"] for x in jobs_svc.list_jobs(ix, closed=CLOSED, ranges={"posted_at": r})["items"])
+        assert within(7) == ["Globex"]
+        assert within(30) == ["Acme Robotics", "Globex"]
+    finally:
+        ix.close()

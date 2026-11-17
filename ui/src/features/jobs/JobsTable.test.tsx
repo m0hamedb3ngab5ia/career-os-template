@@ -3,7 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { ToastProvider } from "../../kit/Toast";
-import { MemoryRouter } from "react-router";
+import { MemoryRouter, useLocation } from "react-router";
 import { describe, expect, it, vi } from "vitest";
 import { axeViolations } from "../../test/axe";
 import { COLUMNS } from "./cells";
@@ -94,5 +94,26 @@ describe("JobsTable", () => {
   it("has no axe violations", async () => {
     const { container } = renderTable({ rows: MANY.slice(0, 5), total: 5 });
     expect(await axeViolations(container)).toEqual([]);
+  });
+});
+
+describe("row click", () => {
+  it("opens the job inspector via ?job=, but not from the checkbox", async () => {
+    const Where = () => <output data-testid="where">{useLocation().search}</output>;
+    render(
+      <MemoryRouter initialEntries={["/jobs?tab=recommended"]}>
+        <Where />
+        <JobsTable rows={[job({ job_id: "jx", company: "Acme" })]} columns={COLUMNS} sort="-fit" onSort={vi.fn()} selected={new Set()}
+          onToggle={vi.fn()} onToggleAll={vi.fn()} total={1} captionId="cap" filters={{}} onFilter={vi.fn()}
+          filterParams={{ tab: "recommended", q: "", location: "", filters: {} }} onSortTo={vi.fn()} />
+      </MemoryRouter>,
+      { wrapper },
+    );
+    await userEvent.click(screen.getByRole("checkbox", { name: "Select Acme" }));
+    expect(screen.getByTestId("where")).toHaveTextContent("?tab=recommended");
+    expect(screen.getByTestId("where")).not.toHaveTextContent("job=");
+    const cells = screen.getAllByRole("cell");
+    await userEvent.click(cells[cells.length - 1]!);
+    expect(screen.getByTestId("where").textContent).toBe("?tab=recommended&job=jx");
   });
 });

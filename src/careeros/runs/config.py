@@ -31,7 +31,8 @@ DEFAULT_RANKING: dict[str, float] = {
     "deadline_bonus": 15,     # posting closes within deadline_days
     "deadline_days": 7,
     "fit_weight": 0.5,        # prepare runs only: points per fit point (fit 80 -> +40)
-    "retry_bonus": 30,        # a job that failed once goes near the front of the next run
+    "retry_bonus": 30,
+    "referral_weight": 15,    # prepare runs only: points per extra 1x of referral odds (weak tie ~+15)        # a job that failed once goes near the front of the next run
 }
 DEFAULT_TIMEOUTS: dict[str, float] = {"score": 10, "prepare": 45, "apply": 30, "inbox_sync": 20}
 TIMEOUT_KINDS = ("score", "prepare", "apply", "inbox_sync")

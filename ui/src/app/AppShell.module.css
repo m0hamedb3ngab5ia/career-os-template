@@ -114,7 +114,6 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  margin-top: auto;
   padding: 12px 10px 0;
   font-size: var(--fs-caption);
   color: var(--sec);
@@ -143,4 +142,56 @@
 }
 .main:focus {
   outline: none;
+}
+
+.parent {
+  position: relative;
+}
+.parent .item {
+  padding-right: 30px;
+}
+.chevron {
+  position: absolute;
+  top: 0;
+  right: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: var(--nav-h);
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--sec);
+  cursor: pointer;
+}
+.chevron svg {
+  transition: transform 120ms;
+}
+.chevron svg[data-open="true"] {
+  transform: rotate(90deg);
+}
+.sub {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.sub .item {
+  padding-left: 35px;
+}
+.bottom {
+  margin-top: auto;
+  padding-top: 12px;
+}
+
+/* Narrow window: icon rail instead of a half-width sidebar. */
+@media (max-width: 760px) {
+  .sidebar { width: 60px; padding: 14px 8px; }
+  .brand { font-size: 0; gap: 0; justify-content: center; padding: 0 0 12px; }
+  .search, .group, .count, .itemLabel, .footer, .chevron, .sub { display: none; }
+  .parent .item { padding: 0; }
+  .item { justify-content: center; padding: 0; }
+}
+@media (max-width: 480px) {
+  .sidebar { display: none; }
 }

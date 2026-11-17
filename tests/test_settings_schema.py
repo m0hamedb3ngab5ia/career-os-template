@@ -216,7 +216,7 @@ def test_section_checks_catch_cross_field_mistakes():
 
 def test_reset_group_gives_recommended_values_for_editable_fields_only():
     ch = reset_group("runs", "ranking")
-    assert ch["pipeline:runs.ranking.freshness_weight"] == 60 and len(ch) == 8
+    assert ch["pipeline:runs.ranking.freshness_weight"] == 60 and len(ch) == 9
     assert "pipeline:runs.auto_submit.enabled" not in reset_group("runs", "auto_submit")
     assert reset_group("targets", "candidate") == {}
     with pytest.raises(KeyError):

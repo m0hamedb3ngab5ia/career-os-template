@@ -51,7 +51,8 @@ def test_config_defaults_when_missing(settings):
     settings.pipeline.pop("retention", None)
     cfg = retention.retention_config(settings)
     assert cfg == {"screenshots_after_closed_days": 30, "keep_confirmation_screenshot": True,
-                   "unprepared_posting_days": 90, "run_logs_days": 30, "run_summaries_days": 365}
+                   "unprepared_posting_days": 90, "run_logs_days": 30, "run_summaries_days": 365,
+                   "tracker_closed_after_days": 7}
 
 
 def test_config_reads_overrides(settings):

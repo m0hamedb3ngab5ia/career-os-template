@@ -1,5 +1,4 @@
 import { parseTime } from "../../lib/dates";
-import { taskText } from "../../kit/labels";
 import type { ActionItem } from "./types";
 
 // Grouping, order and link handling for the "Needs you" list. Pure, so the screen and the tests share them.
@@ -39,53 +38,3 @@ export function groupByJob(items: readonly ActionItem[]): JobGroup[] {
 
 /** Open tasks in priority order (blocked → priority → due). */
 export const sortTasks = (items: readonly ActionItem[]): ActionItem[] => items.toSorted(byOrder);
-
-// Kinds whose completion the system notices (the workflow finishing closes them): no Mark done.
-const DETECTED = new Set(["question", "salary", "qa_fail", "review", "profile_gap", "captcha", "bot_detection"]);
-
-export interface TaskRow {
-  title: string;
-  why: string;
-  cta: string;
-  /** null when the target page was removed (chat-first): the row shows text only. */
-  href: string | null;
-  detected: boolean;
-}
-
-/** Strip file paths and CLI commands: the row speaks plain language only. */
-/** Skimmable task text: one plain headline, the rest as short bullets. Drops the company/role, local paths and "question:" labels. */
-function brief(item: { type?: string | null; what: string; company?: string | null; role?: string | null }): { head: string; more: string[] } {
-  let t = taskText(item.type, item.what);
-  if (item.company) t = t.replaceAll(item.role ? `${item.company} ${item.role}` : item.company, "");
-  t = t.replace(/(Screenshot:\s*)?\S*data\/jobs\/\S*\.?/g, "").replace(/\(\s*\)/g, "").replace(/question:\s*/gi, "").replace(/\s+([.,;:])/g, "$1").replace(/\s{2,}/g, " ").trim();
-  const [head = "", ...rest] = t.split(/(?<=\.)\s+/);
-  const more = rest.join(" ").split(/;\s*|(?<=\.)\s+/).map((x) => x.replace(/\.$/, "").trim()).filter((x) => x && !x.endsWith(":"));
-  return { head: head.replace(/\.$/, ""), more };
-}
-
-const plain = (t: string) =>
-  t.replace(/`?careeros [^`.;]*`?/gi, "").replace(/\S*\.(ya?ml|json)\b/g, "").replace(/\s+([.,;:])/g, "$1").replace(/\s{2,}/g, " ").trim();
-
-/** One "Needs your attention" row: a one-sentence title (company inside), optional why/blocker line, one short CTA. */
-export function taskRow(a: ActionItem): TaskRow {
-  const job = a.job_id ? `/jobs/${encodeURIComponent(a.job_id)}` : null;
-  const profile = a.type === "profile_gap";
-  const detected = DETECTED.has(a.type);
-  const row = (title: string, why: string, cta: string, href: string | null) => ({ title, why, cta, href, detected });
-  const co = a.company ? `${a.company} ` : "";
-  if (/chrome/i.test(a.what)) return row("Connect CareerOS to Chrome", "Required to continue browser-based applications.", "Connect", null);
-  if (a.type === "review") return row(`Review ${co}application`, "Approval required before submission.", "Review", job);
-  if (a.type === "qa_fail") return row(`Review ${co}résumé and cover letter`, "", "Review", job);
-  if (a.type === "question" || a.type === "salary")
-    return row(`Answer ${co}application questions`, "The application can’t continue without your answers.", "Answer", job);
-  if (a.type === "captcha" || a.type === "bot_detection")
-    return row("Solve a verification check", "The job site asked to confirm you’re a person.", "Open", job);
-  const b = brief(a);
-  const bullet = /\badd real (\w+?)(?:_\w+)? bullets/i.exec(b.head);
-  if (bullet || (profile && /placeholder/i.test(a.what))) {
-    const emp = bullet?.[1] ?? (a.company && !a.job_id ? a.company : "");
-    return row(`Add ${emp ? `${emp.replace(/^./, (c) => c.toUpperCase())} ` : ""}experience to your profile`, "", "", null);
-  }
-  if (profile) return row(plain(b.head) || "Fill a gap in your profile", "", "", null);
-  return row(plain(b.head) || "Finish a task", plain(b.more[0] ?? a.detail ?? ""), "Open", job);
-}

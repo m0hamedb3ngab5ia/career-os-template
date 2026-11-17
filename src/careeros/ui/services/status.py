@@ -12,6 +12,7 @@ from typing_extensions import TypedDict
 
 from careeros.config import ConfigError
 from careeros.ui.config import load_ui_config
+from careeros.ui.services.today import OPEN_FROM, OPEN_PARAMS
 
 POST_APPLY = ("applied", "screening", "interview", "offer")      # the Inbox & follow-ups list
 RESPONDED = ("screening", "interview", "offer", "rejected")
@@ -250,7 +251,7 @@ def status(settings: Any, ix: Any, now: datetime) -> Status:
         "tiles": tiles(ix, settings, now),
         "pipeline": pipeline(ix, settings),
         "counts": {"jobs": one("SELECT COUNT(*) AS n FROM jobs"),
-                   "action_items_open": one("SELECT COUNT(*) AS n FROM action_items WHERE done = 0"),
+                   "action_items_open": one(f"SELECT COUNT(*) AS n {OPEN_FROM}", OPEN_PARAMS),
                    "inbox": one(f"SELECT COUNT(*) AS n FROM jobs WHERE status IN ({','.join('?' * len(POST_APPLY))})",
                                 POST_APPLY),
                    "contacts": one("SELECT COUNT(*) AS n FROM contacts")},

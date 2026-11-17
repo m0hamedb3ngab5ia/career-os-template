@@ -37,6 +37,7 @@ DEFAULTS: dict[str, Any] = {
     "unprepared_posting_days": 90,
     "run_logs_days": 30,
     "run_summaries_days": 365,
+    "tracker_closed_after_days": 7,
 }
 CLOSED = ("rejected", "withdrawn", "ghosted")
 UNPREPARED = ("found", "scored", "skipped")
@@ -65,7 +66,8 @@ def retention_config(settings: Settings) -> dict[str, Any]:
     if not isinstance(raw, dict):
         raise ConfigError("pipeline.yaml: retention must be a mapping (see examples/config/pipeline.yaml)")
     cfg = dict(DEFAULTS)
-    for key in ("screenshots_after_closed_days", "unprepared_posting_days", "run_logs_days", "run_summaries_days"):
+    for key in ("screenshots_after_closed_days", "unprepared_posting_days", "run_logs_days", "run_summaries_days",
+                "tracker_closed_after_days"):
         if key not in raw:
             continue
         val = raw[key]

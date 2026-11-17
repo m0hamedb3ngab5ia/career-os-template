@@ -87,9 +87,10 @@ def test_response_rate_breakdown(data, idx):
 
 def test_tabs_count_each_view(data, idx):
     tabs = {t["key"]: t for t in jobs_svc.tabs(idx, closed(data))}
-    assert list(tabs) == ["recommended", "notscored", "saved", "applied"]
+    assert list(tabs) == ["recommended", "inprogress", "notscored", "saved", "applied"]
     assert tabs["recommended"]["count"] == 0        # fixture jobs carry no `selected` flag: all count as ticked
-    assert tabs["saved"]["count"] == 4              # ticked, not skipped, not applied-or-later
+    assert tabs["saved"]["count"] == 2              # ticked, not in progress, not skipped, not applied-or-later
+    assert tabs["inprogress"]["count"] == 2         # queued + needs_review
     assert tabs["applied"]["count"] == 3            # applied + interview + rejected (Closed stage)
     assert {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), q="hooli")}["applied"] == 1
     by_loc = {t["key"]: t["count"] for t in jobs_svc.tabs(idx, closed(data), location="REMOTE")}
@@ -100,7 +101,7 @@ def test_list_by_tab_and_next_action(data, idx):
     page = jobs_svc.list_jobs(idx, tab="applied", closed=closed(data))
     assert {j["company"] for j in page["items"]} == {"Hooli", "Stark Industries", "Wayne Enterprises"}
     assert jobs_svc.list_jobs(idx, tab="active", closed=closed(data))["total"] == 0     # old key -> recommended
-    assert jobs_svc.list_jobs(idx, tab="review", closed=closed(data))["total"] == 1     # old key -> saved + needs_review
+    assert jobs_svc.list_jobs(idx, tab="review", closed=closed(data))["total"] == 2     # old key -> inprogress
     rows = {j["company"]: j for j in jobs_svc.list_jobs(idx)["items"]}
     assert rows["Umbrella Labs"]["next_action"] == "Review and submit"
     assert rows["Hooli"]["next_action"] is None          # its only item is done
@@ -446,3 +447,89 @@ def test_job_detail_splits_key_documents_from_other_files(data, idx):
     assert "resume.json" in others and "resume.tex" in others and "cover_letter.md" not in others
     assert not {"posting.json", "score.json", "log.md"} & set(others)
     assert not set(others) & {f["name"] for f in d["documents"]}
+
+
+# --- Today: Reach out ---------------------------------------------------------------------------------------------
+
+def _reach(data, idx, *keys):
+    ids = {data["jobs"][k] for k in keys}
+    return [o for o in today_svc.today(data["settings"], idx, NOW, closed=closed(data))["outreach"] if o["job_id"] in ids]
+
+
+def _write_outreach(data, key, contacts=None, drafts=None, **extra):
+    from careeros.ui.services.jobs import job_dir_for
+    d = job_dir_for(data["settings"], data["jobs"][key])
+    if contacts is not None:
+        (d / "contacts.json").write_text(json.dumps({"contacts": contacts}))
+    if drafts is not None:
+        (d / "outreach.json").write_text(json.dumps({"drafts": drafts, **extra}))
+
+
+def test_outreach_one_entry_per_job_with_contact_and_draft(data, idx):
+    _write_outreach(
+        data, "queued",
+        contacts=[{"name": "Jane Doe", "title": "Technical Recruiter", "role": "recruiter",
+                   "email_candidates": ["jane.doe@initech.example"], "email": None, "email_confidence": "low"}],
+        drafts=[{"contact": "Jane Doe", "role": "recruiter", "sent": False,
+                 "email": {"subject": "Hi", "body": "Body"}}], followup_due="2026-10-01")
+    out = _reach(data, idx, "queued")
+    assert out == [{
+        "job_id": data["jobs"]["queued"], "company": "Initech", "title": "Platform Engineer",
+        "contact_name": "Jane Doe", "contact_role": "recruiter", "email": "jane.doe@initech.example",
+        "email_confidence": "low", "draft_ready": True, "followup_due": "2026-10-01"}]
+
+
+def test_outreach_contacts_only_means_no_draft_and_prefers_recruiter(data, idx):
+    _write_outreach(data, "applied", contacts=[
+        {"name": "Sam Lead", "role": "team_lead", "email_candidates": []},
+        {"name": "Rae Hire", "role": "hiring_manager", "email": "rae@hooli.example", "email_confidence": "verified"}])
+    [o] = _reach(data, idx, "applied")
+    assert (o["contact_name"], o["contact_role"], o["email"], o["draft_ready"]) == ("Rae Hire", "hiring_manager", "rae@hooli.example", False)
+    assert o["email_confidence"] == "verified" and o["followup_due"] is None
+
+
+def test_outreach_skips_closed_and_skipped_jobs(data, idx):
+    for key in ("rejected", "skipped"):
+        _write_outreach(data, key, contacts=[{"name": "A B", "role": "recruiter"}])
+    assert _reach(data, idx, "rejected", "skipped") == []
+
+
+def test_outreach_survives_broken_json(data, idx):
+    from careeros.ui.services.jobs import job_dir_for
+    (job_dir_for(data["settings"], data["jobs"]["queued"]) / "contacts.json").write_text("{nope")
+    assert _reach(data, idx, "queued") == []
+
+
+def test_open_actions_hide_pre_apply_tasks_of_jobs_already_applied(data, idx):
+    """A review/question/qa task left open after the job was applied is stale: Today must not offer it."""
+    items = today_svc.open_actions(idx, NOW, timezone.utc, 48)
+    job = next(i for i in items if i["job_id"])
+    idx.con.execute("UPDATE action_items SET type = 'review' WHERE id = ?", (job["id"],))
+    idx.con.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ?", (job["job_id"],))
+    shown = {i["id"] for i in today_svc.open_actions(idx, NOW, timezone.utc, 48)}
+    assert job["id"] not in shown
+    idx.con.execute("UPDATE jobs SET status = 'queued' WHERE job_id = ?", (job["job_id"],))
+    assert job["id"] in {i["id"] for i in today_svc.open_actions(idx, NOW, timezone.utc, 48)}
+
+
+def test_sidebar_count_matches_todays_open_actions(data, idx):
+    """The Today badge counts what Today lists: stale pre-apply tasks of applied jobs are out of both."""
+    from careeros.ui.services.status import status
+
+    job = next(i for i in today_svc.open_actions(idx, NOW, timezone.utc, 48) if i["job_id"])
+    idx.con.execute("UPDATE action_items SET type = 'review' WHERE id = ?", (job["id"],))
+    idx.con.execute("UPDATE jobs SET status = 'applied' WHERE job_id = ?", (job["job_id"],))
+    shown = today_svc.open_actions(idx, NOW, timezone.utc, 48)
+    assert status(data["settings"], idx, NOW)["counts"]["action_items_open"] == len(shown)
+
+
+def test_open_items_without_a_known_job_stay_on_today(data, idx):
+    """A question with no job (or an unknown job id) is still open: a NULL job status must not hide it."""
+    for aid, jid in (("a-nojob", ""), ("a-ghost", "no-such-job")):
+        idx.con.execute(
+            "INSERT INTO action_items (id, created, job_id, company, role, type, what, priority, done) "
+            "VALUES (?, '2026-09-24', ?, 'Acme', 'Engineer', 'question', 'Visa status?', 'high', 0)", (aid, jid))
+    ids = {i["id"] for i in today_svc.open_actions(idx, NOW, timezone.utc, 48)}
+    assert {"a-nojob", "a-ghost"} <= ids
+    n = idx.query(f"SELECT COUNT(*) AS n {today_svc.OPEN_FROM}", today_svc.OPEN_PARAMS)[0]["n"]
+    assert n == len(ids)

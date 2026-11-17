@@ -6,12 +6,17 @@
       "label": "Recommended"
     },
     {
+      "count": 2,
+      "key": "inprogress",
+      "label": "In progress"
+    },
+    {
       "count": 0,
       "key": "notscored",
       "label": "Not scored"
     },
     {
-      "count": 4,
+      "count": 2,
       "key": "saved",
       "label": "Saved"
     },

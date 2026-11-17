@@ -23,3 +23,15 @@ def test_plan_problems_same_gate_for_ashby():
     plan = {"ats": "ashby", "fields": [{"field_id": "x", "label": "Salary expectations", "value": None,
                                         "source": "pause:salary", "type": "text"}]}
     assert gh_fill.plan_problems(plan) == ["unanswered (pause:salary): Salary expectations"]
+
+
+def test_checkbox_group_with_one_string_value_checks_that_option():
+    from unittest.mock import MagicMock
+
+    from careeros.apply import ashby_fill
+
+    root = MagicMock()
+    w = root.locator.return_value
+    assert ashby_fill.fill_one(root, {"field_id": "f", "type": "checkbox_group", "value": "Austin, Texas"})
+    labels = {c.args[0] for c in w.get_by_label.call_args_list}
+    assert labels == {"Austin, Texas"}  # never one letter at a time

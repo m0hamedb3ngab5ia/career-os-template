@@ -4,7 +4,9 @@ import { SafetyChip, StatusChip, TierBadge } from "../../kit/chips";
 import { humanize } from "../../kit/labels";
 import { useToast } from "../../kit/Toast";
 import { formatDate, formatDecimal } from "../../lib/format";
+import { useInspector } from "../inspector/JobInspector";
 import { useSelectJobs } from "./api";
+import { daysAgo } from "./dates";
 import styles from "./JobsPage.module.css";
 import type { JobListItem } from "./types";
 import type { FilterField, SortKey } from "./urlState";
@@ -67,7 +69,7 @@ export const COLUMNS: Column[] = [
     label: "Role",
     exportField: "title",
     title: (j) => j.title ?? undefined,
-    cell: (j) => j.title || <Empty sr="No role" />,
+    cell: (j) => (j.title ? <OpenJob id={j.job_id}>{j.title}</OpenJob> : <Empty sr="No role" />),
   },
   {
     key: "location",
@@ -142,6 +144,17 @@ export const COLUMNS: Column[] = [
     exportField: "ats",
     className: styles.sec,
     cell: (j) => (j.ats ? humanize(j.ats) : <Empty sr="Unknown ATS" />),
+  },
+  {
+    key: "posted",
+    label: "Posted",
+    width: 104,
+    exportField: "posted_at",
+    className: styles.num,
+    cell: (j) => {
+      const t = daysAgo(j.posted_at);
+      return t ? t.charAt(0).toUpperCase() + t.slice(1) : <Empty sr="Posted date unknown" />;
+    },
   },
   {
     key: "found",
@@ -221,5 +234,15 @@ export function PostingLink({ job, className, children }: { job: { url?: string 
     <span className={className} translate="no">
       {children}
     </span>
+  );
+}
+
+/** Keyboard-reachable way to open the job inspector (?job=<id>); the row click does the same for the mouse. */
+export function OpenJob({ id, children }: { id: string; children: ReactNode }) {
+  const { open } = useInspector();
+  return (
+    <button type="button" className={styles.openJob} onClick={() => open(id)}>
+      {children}
+    </button>
   );
 }

@@ -1,0 +1,83 @@
+"""Follow-up nudges (yield model step 4). One open `follow_up` Action Item per applied job with no reply after
+`follow_ups.after_days` (pipeline.yaml, default 7), and one per job whose sent outreach has had no answer for as
+long. Deduped by job + kind (a marker in Detail). Closed when the job's status moves past `applied` or the contact
+replied. Runs in `careeros tick`; suggest-only, nothing is sent."""
+from __future__ import annotations
+
+import hashlib
+import json
+from datetime import date, datetime
+from typing import Any
+
+from careeros.config import Settings
+from careeros.store import Store
+from careeros.tracker import Tracker
+
+TYPE = "follow_up"
+APPLIED, OUTREACH = "follow_up:applied", "follow_up:outreach"
+
+
+def after_days(s: Settings) -> int:
+    try:
+        return max(1, int((s.pipeline.get("follow_ups") or {}).get("after_days", 7)))
+    except (TypeError, ValueError):
+        return 7
+
+
+def _day(v: Any) -> date | None:
+    try:
+        return datetime.fromisoformat(str(v)[:10]).date() if v else None
+    except ValueError:
+        return None
+
+
+def _json(path) -> dict[str, Any]:
+    try:
+        d = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return d if isinstance(d, dict) else {}
+
+
+def _outreach_wait(store: Store, job_id: str) -> date | None:
+    """Date of the oldest sent, unanswered message for this job, else None."""
+    d = store.job_dir(job_id)
+    drafts = [x for x in _json(d / "outreach.json").get("drafts") or [] if isinstance(x, dict) and x.get("sent") is True]
+    contacts = [c for c in _json(d / "contacts.json").get("contacts") or [] if isinstance(c, dict)]
+    if not drafts or any(x.get("replied") for x in drafts) or any(c.get("replied") for c in contacts):
+        return None
+    days = [_day(x.get("sent_at") or x.get("sent_date")) for x in drafts]
+    return min((x for x in days if x), default=None)
+
+
+def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
+    today, n = today or date.today(), after_days(s)
+    tr, store = Tracker(settings=s), Store(s)
+    jobs = {str(j["JobID"]): j for j in tr.list_jobs()}
+    want: dict[tuple[str, str], tuple[str, date]] = {}
+    for jid, j in jobs.items():
+        if j.get("Status") != "applied":
+            continue
+        since = _day(j.get("DateApplied"))
+        if since and (today - since).days >= n:
+            want[(jid, APPLIED)] = (f"No reply in {(today - since).days} days. Send a short follow-up.", since)
+        sent = _outreach_wait(store, jid)
+        if sent and (today - sent).days >= n:
+            want[(jid, OUTREACH)] = (f"Your message got no answer in {(today - sent).days} days. Send a nudge.", sent)
+    have: set[tuple[str, str]] = set()  # open AND done keys: Done sticks
+    for it in tr.list_action_items(open_only=False):
+        if it.get("Type") != TYPE:
+            continue
+        key = (str(it.get("JobID") or ""), str(it.get("Detail") or "").split("\n")[0])
+        if key in want:
+            have.add(key)
+        elif str(it.get("Done") or "N").upper() != "Y":
+            tr.mark_action_done(str(it["ID"]), note="Closed: the job moved on or the contact replied.")
+    from careeros.tracker import add_action
+
+    lines = []
+    for key, (what, _since) in want.items():
+        if key not in have:
+            lines.append(add_action(s, what, TYPE, job_id=key[0], detail=key[1],
+                                   id=hashlib.sha1("|".join(key).encode()).hexdigest()[:8]))
+    return lines

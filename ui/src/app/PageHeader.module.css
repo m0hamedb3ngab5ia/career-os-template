@@ -27,3 +27,7 @@
 .body {
   padding: 0 32px 32px;
 }
+@media (max-width: 760px) {
+  .header { padding: 20px 16px 12px; }
+  .body { padding: 0 16px 24px; }
+}

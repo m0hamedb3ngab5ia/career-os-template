@@ -570,3 +570,22 @@ def test_prepare_job_carries_gaps():
     assert '"gaps": [...]' in rec and "non-empty `gaps[]`" in rec
     assert '"gaps":["' in text.split("## Finish: RESULT", 1)[1]
     assert "no new Action Item" in text
+
+
+def test_find_contacts_runs_outreach_emails():
+    assert "careeros outreach emails <job_id>" in _skill("find-contacts")
+
+
+@pytest.mark.parametrize("skill", ["today", "prepare-job"])
+def test_skills_surface_referral_matches(skill):
+    assert "careeros network match" in _skill(skill)
+
+
+def test_draft_outreach_drafts_referral_asks():
+    text = _skill("draft-outreach")
+    assert "careeros network match --job" in text and '"referral"' in text
+
+
+def test_draft_outreach_contacts_json_optional_for_referrals():
+    text = _skill("draft-outreach")
+    assert "skip `careeros outreach check`" in text and "Requires `JOB/contacts.json`" not in text

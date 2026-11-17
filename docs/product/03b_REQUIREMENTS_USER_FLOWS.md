@@ -149,7 +149,7 @@ Given 4 ticked (plain, Tier A, LinkedIn Easy Apply, LinkedIn-found with Greenhou
 Batch keeps `stop_at` (default for all) plus optional `stops: {job_id: stage}`; driver stops each job at its own stage. CLI `batch create … --stop-at S [--job-stop J=S ...]`; `POST /api/batches` accepts `stops`. Same caps as REQ-117 enforced server-side (a requested Submit on Tier A or fill/submit on LinkedIn Easy Apply is lowered with reason, never trusted from the client). Old batch files without `stops` behave as today. Amends REQ-045: the LinkedIn exclusion applies only to LinkedIn Easy Apply, keyed on the apply URL host, not the source board.
 Given batch stop_at fill, stops {B: prepare, C: submit} · When run · Then A filled, B prepared only, C submitted only if auto-submit verdict allows.
 ### REQ-119 Page guidance line
-Every page header: h1 + one short line saying what the page is for and the next thing to do, + its primary action (08_DESIGN_SYSTEM.md Page header). Empty states say what to do, with a button. Disabled buttons show why (UnavailableButton). Nav ≤6 items, plain names.
+Every page header: h1 + one short line saying what the page is for and the next thing to do, + its primary action (08_DESIGN_SYSTEM.md Page header). Empty states say what to do, with a button. Disabled buttons show why (UnavailableButton). Nav ≤6 top-level items, plain names; sub-items inside a collapsible group (Jobs tabs) don't count (DEC-025).
 Given any route · When rendered · Then header has h1 + non-empty guidance line; no disabled button lacks a reason.
 ### REQ-120 Spreadsheet-style job tables
 Every list of jobs (Jobs list, pipeline review sheet, batch progress) uses the current Jobs table: column header sort + filter menus, filter chips, pager rows 10/25/50/100, chosen size remembered (`ui.page_size`).
@@ -241,3 +241,39 @@ Given the example config · When an apply run starts · Then it runs with auto-s
 `careeros view` writes static HTML pages for the chat sidebar, one tab each: Setup (only while a must-item is undone, then replaced by Documents), Documents (résumés, cover letters, writing samples, saved answers; name, kind, used for, status, date), Jobs (needs you + stage counts + last runs), Applications (company, role, applied date, status). Plain words, a dot + word per status, no prefixes. Read-only.
 Given all must-items done · When `careeros view` runs · Then a Documents tab exists and no Setup tab.
 
+### REQ-146 Profile and Settings pages (read-only)
+Sidebar has Profile (résumés, documents, standard answers) and Settings (search config grouped by section, plain labels). Both read-only; edits happen in chat. Settings never shows credential, password, secret, token or api_key fields. DEC-025.
+Given a config with a token field · When Settings renders · Then the token is absent and every other section shows.
+
+### REQ-147 Job panel with quick decisions
+Clicking a job opens a side panel (`?job=<id>`): steps done, documents, outreach drafts. Approve sets status queued and never submits; shown only when QA passed. Tier A always says the user submits it. Dismiss closes the job. DEC-025.
+Given a drafted job whose qa.json has pass=false · When the panel opens · Then no Approve button.
+
+### REQ-148 Today: grouped tasks, reach out, inline answers
+Needs-you groups tasks by kind (send, reach out, answer, eligibility, résumé, safety, stale, failed), 3 per group + "Show N more", one row per job. Reach out lists jobs with a contact or outreach draft (drafts only, never sent). Answer rows show the question and an inline answer box that posts to `/api/actions/{id}/answer`. Pre-apply tasks of jobs already applied or past are hidden; tasks with no known job stay. DEC-025.
+Given a question task for an applied job and one with no job · When Today loads · Then only the job-less one shows.
+
+### REQ-149 Jobs In progress tab
+Jobs tabs: Recommended, In progress, Applied, Saved, Not scored. In progress = queued, prepared, needs review, each with a progress word. Recommended, Saved and Not scored exclude in-progress and applied jobs.
+Given a queued job · When Recommended renders · Then it is absent and In progress lists it.
+
+### REQ-150 Posted date and filter
+Each job row says when it was posted and when career-os found it. Filter `posted` = 7, 14 or 30 days.
+Given jobs posted 3 and 20 days ago · When posted=7 · Then only the first shows.
+
+### REQ-151 Master résumé preview
+Profile shows the master résumé itself (rendered, read-only), not just its name and version. DEC-025.
+Given a master résumé exists · When Profile renders · Then its content is visible without leaving the page.
+
+
+### REQ-152 Skip insights
+`careeros advise` explains skipped jobs: top skip reasons with counts; skills missing from near-miss `below_min_fit` skips (skills master.yaml already evidences, via synonyms/implications, are printed as scorer misses, not gaps); and per filter (location, years, salary) how many jobs it blocks and how many would be rescored if loosened (jobs failing no other filter). Advice only; never writes config or claims a skill.
+Given skipped jobs exist · When the user runs `careeros advise [--json]` · Then reasons, learnable skills, scorer misses and filter counts are shown, with no change to any file.
+
+### REQ-153 Add a job by link or from an alert email
+`careeros job add <url>` stores one posting: Greenhouse, Lever and Ashby links use the board's own data, any other page is stored as a manual posting with its text. Handshake links are refused with a message that they need the signed-in browser. `careeros job add --from-alert <file|->` stores jobs read from LinkedIn/Indeed alert emails (title, company, link) without opening those sites; such a job has no text and cannot be scored until the user pastes it with `careeros job describe <id> --text-file <path|->`. Link detection is scout's (board, embed, EU and `gh_jid` custom-domain links). A job already stored (by scout or an earlier add) is reported as existing, not stored twice.
+Given the same link added twice · When both run · Then the second says it exists and one job folder remains.
+
+### REQ-154 Follow-up nudges
+`careeros tick` raises one `follow_up` Action Item per applied job with no reply after `follow_ups.after_days` (pipeline.yaml, default 7) and per sent outreach message with no answer for as long. One per job and kind; closed when the job moves past applied or the contact replies. Today shows them under "Follow up"; Done dismisses. Suggest-only: nothing is sent. A message counts as sent only after `careeros outreach sent <job_id> [--contact X]` (you send by hand, it records `sent_at`). Done sticks: a dismissed nudge is not raised again. Item ids are derived from job + kind, so replays while Excel holds the tracker never duplicate.
+Given a job applied 11 days ago with no status change · When a tick runs · Then one follow_up item exists, and a second tick adds none.

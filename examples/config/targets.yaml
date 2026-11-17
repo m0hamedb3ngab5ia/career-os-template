@@ -139,7 +139,7 @@ safety:
 
 # Scout: which job-board sources to fetch and which prefilters to apply. Defaults: all on.
 scout:
-  sources: [greenhouse, lever, ashby, handshake]  # ATS adapters to fetch; boards on others are skipped
+  sources: [greenhouse, lever, ashby, handshake, simplify]  # (Recommended: simplify on) ATS adapters to fetch; boards on others are skipped
   max_post_age_days: null              # null (Recommended = off). A number, e.g. 14: scout drops postings first
                                        # published longer ago than that (no date = kept)
   new_grad_max_post_age_days: null     # null (Recommended = same as max_post_age_days). E.g. 60: new-grad titles
@@ -152,3 +152,10 @@ scout:
     seniority: true                    # seniority.exclude_title_keywords (false = keep senior roles)
     location: true                     # location.blocked_countries
     ghost: true                        # ghost-job skip
+
+# Goal: what the yield model optimises for (docs/YIELD_MODEL.md §7).
+goal:
+  pay_bar: null              # minimum base salary in USD (Recommended: your real floor; null = not chosen yet)
+  minutes_per_week: 120      # candidate minutes per week for the search (Recommended)
+  locations: [Remote]        # where you would work (Recommended: your real list, e.g. [Chicago, Remote])
+  flex_for_prestige: true    # accept below-bar pay or location at top-prestige companies (Recommended)
