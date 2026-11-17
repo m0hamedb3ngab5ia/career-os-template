@@ -58,6 +58,9 @@ Also read the other free-text answers already in `JOB/answers.json` / `JOB/fill_
 question asks (a "why us" answer is about the company and role, not your background again), and never reuse
 another answer's opening words or sentences: `careeros apply fill` refuses a form whose answers repeat each other.
 Never copy an answer from another job's form without rewriting it for this question.
+Shape every essay as an argument, not a list: what draws you to this work, why (one real reason), the experience
+that proves you can do it, then one line tying that experience to what this role needs. Never jump from interest
+straight to a résumé line.
 
 Rules:
 - Only claims traceable to bullet ids / narrative ids; record them in `bullet_ids` / `narrative_ids`.
