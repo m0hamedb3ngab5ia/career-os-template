@@ -171,10 +171,9 @@ def gate_outreach(data: dict[str, Any], banned: list[str]) -> list[str]:
     return allp
 
 
-def compose_url(d: dict[str, Any], app: bool = False) -> str | None:
+def compose_url(d: dict[str, Any]) -> str | None:
     """Gmail compose link prefilled with the draft's own to/subject/body plus the candidate's line. Only for a
-    ready email draft; the candidate reads it and presses send. `app=True`: the Gmail phone app's own scheme
-    (opens its compose screen; does nothing where the app isn't installed, so the web link is always shown too)."""
+    ready email draft; the candidate reads it and presses send."""
     em = d.get("email") if isinstance(d.get("email"), dict) else None
     to = d.get("to") or (em or {}).get("to")
     if not em or not d.get("ready") or not to:
@@ -183,8 +182,6 @@ def compose_url(d: dict[str, Any], app: bool = False) -> str | None:
     if line not in body:  # after the greeting ("Hi Sam,"), never above it
         head, sep, rest = body.partition("\n\n")
         body = f"{head}\n\n{line}\n\n{rest}" if sep and head.rstrip().endswith(",") else f"{line}\n\n{body}"
-    if app:
-        return f"googlegmail:///co?to={quote(str(to))}&subject={quote(str(em.get('subject') or ''))}&body={quote(body)}"
     return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))
             + "&body=" + quote(body))
 
@@ -213,8 +210,7 @@ def send_kit(job_id: str, title: str, out: dict[str, Any], contacts: dict[str, A
             lines += [f"1. [Find on LinkedIn]({li}), {how}, paste:" if li else "1. LinkedIn, paste:",
                       "```", str(text).strip(), "```"]
         url = compose_url(d)
-        lines.append(f"2. Open the email prefilled (read, then Send): [Gmail app]({compose_url(d, app=True)}) on a phone, "
-                     f"[Gmail web]({url}) otherwise" if url else
+        lines.append(f"2. [Open the email in Gmail]({url}) (prefilled; read, then Send)" if url else
                      f"2. Email: needs your line first: `careeros outreach qa {job_id} --contact \"{who}\" --line \"...\"`")
         lines.append(f"3. Sent? `careeros outreach sent {job_id} --contact \"{who}\"`")
         blocks.append("\n".join(lines))
