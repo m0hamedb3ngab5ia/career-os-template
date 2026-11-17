@@ -1641,7 +1641,7 @@ def cmd_outreach_qa(args: argparse.Namespace) -> int:
         if isinstance(d, dict):
             url = ho.compose_url(d)
             print(f"{d.get('contact')}: {'ready' if d.get('ready') else 'not ready'}"
-                  + ("" if d.get("your_line") else " (needs your line)") + (f"\n  send: {url}" if url else ""))
+                  + ("" if d.get("your_line") else " (needs your line)") + (f"\n  send: {url}\n  iphone: {ho.compose_url(d, mail=True)}" if url else ""))
     for p in probs:
         print(f"  problem: {p}")
     return 1 if probs else 0
