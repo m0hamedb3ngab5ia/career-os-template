@@ -452,17 +452,32 @@ def check_bold(master: dict) -> list[Check]:
     return out or [Check(PASS, "bold_markup", "**bold** markup in bullets and summaries is valid")]
 
 
+def configured_binary(pipeline: dict[str, Any]) -> tuple[str, str]:
+    """(llm.cli, the binary a run actually executes): headless_cmd[0] when set, else the cli name."""
+    llm = pipeline.get("llm") if isinstance(pipeline, dict) else None
+    llm = llm if isinstance(llm, dict) else {}
+    cli = str(llm.get("cli") or "claude")
+    cmd = llm.get("headless_cmd")
+    return cli, str(cmd[0]) if isinstance(cmd, list) and cmd and isinstance(cmd[0], str) else cli
+
+
 def check_tools(which: Callable[[str], str | None], env: dict[str, str] | None = None,
-                cli: str = "claude") -> list[Check]:
+                cli: str = "claude", binary: str | None = None) -> list[Check]:
+    binary = binary or cli
+
+    def found(name: str) -> bool:  # an explicit path is checked directly, a bare name via PATH
+        return os.access(name, os.X_OK) and os.path.isfile(name) if os.sep in name else bool(which(name))
+
     out = []
     latex = [t for t in ("tectonic", "pdflatex") if which(t)]
     out.append(Check(PASS, "latex", f"{latex[0]} found") if latex else Check(
         WARN, "latex", "neither tectonic nor pdflatex on PATH: résumés stay .tex, no PDF (brew install tectonic)"))
     inside = (os.environ if env is None else env).get("CLAUDECODE") == "1"  # set by Claude Code in its shells
     if cli != "claude":  # pipeline.yaml llm.cli (REQ-158): that binary runs every skill instead
-        out.append(Check(PASS, cli, f"{cli} CLI found (llm.cli)") if which(cli) else Check(
-            FAIL, cli, f"{cli} not on PATH but pipeline.yaml llm.cli is {cli}: install it and log in once"))
-    elif which("claude"):
+        out.append(Check(PASS, cli, f"{cli} CLI found (llm.cli)") if found(binary) else Check(
+            FAIL, cli, f"{binary} not found or not executable but pipeline.yaml llm.cli is {cli}: "
+                       "install it and log in once"))
+    elif which("claude") if os.sep not in binary else found(binary):
         out.append(Check(PASS, "claude", "claude CLI found"))
     elif inside:
         out.append(Check(PASS, "claude", "running inside Claude Code (no `claude` on PATH; headless `claude -p` needs it)"))
@@ -671,8 +686,7 @@ def run_doctor(root: Path, which: Callable[[str], str | None] = shutil.which,
         checks += check_metric_questions(master)
         checks += check_estimates(master)
         checks += check_bold(master)
-    llm = cfg["pipeline"].get("llm")
-    checks += check_tools(which, env, str((llm if isinstance(llm, dict) else {}).get("cli") or "claude"))
+    checks += check_tools(which, env, *configured_binary(cfg["pipeline"]))
     checks.append(check_voice(root))
     return checks
 

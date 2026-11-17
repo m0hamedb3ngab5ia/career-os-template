@@ -228,7 +228,8 @@ SECTIONS: tuple[Section, ...] = (
                   default=ui_cfg.UiConfig.watch_debounce_ms, min=50, max=10000, integer=True, unit="ms"),
         ), advanced=True),
         Group("claude", "Claude", (
-            Policy("Runs use", "Your Claude Code subscription", "No API key; `claude -p` runs each skill."),
+            Policy("Runs use", "Your agent CLI subscription (llm.cli: Claude Code, Codex or Gemini)",
+                   "No API key; the chosen CLI runs each skill headless."),
             Field(P, "llm.model_hint", "text", "Model", default=None, nullable=True,
                   help="Empty = Claude Code's default (Recommended). For example: sonnet."),
         ), advanced=True),
@@ -496,7 +497,7 @@ SECTIONS: tuple[Section, ...] = (
         )),
         Group("tools", "Allowed tools", (
             _tags(P, "llm.allowed_tools", "Tools a run may use", runs_cfg.DEFAULT_ALLOWED_TOOLS,
-                  help='A tool missing here ends a run with "Tool not allowed", never a hang.'),
+                  help='Claude Code only (Codex and Gemini ignore it). A tool missing here ends a run with "Tool not allowed", never a hang.'),
         )),
         Group("schedule", "Schedule", (
             Field(P, "schedule.jobs.scout", "schedule", "Scout", default=JOBS["scout"],

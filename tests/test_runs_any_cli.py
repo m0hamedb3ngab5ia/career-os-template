@@ -95,3 +95,62 @@ def test_doctor_checks_the_configured_cli_binary(cli):
     assert missing[cli] == FAIL and "claude" not in missing
     found = {c.name: c.level for c in check_tools(lambda t: f"/bin/{t}", env={}, cli=cli)}
     assert found[cli] == PASS
+
+
+def test_doctor_checks_the_configured_headless_binary_path(tmp_path):
+    exe = tmp_path / "codex"
+    exe.write_text("#!/bin/sh\n")
+    exe.chmod(0o755)
+    ok = {c.name: c.level for c in check_tools(lambda t: None, env={}, cli="codex", binary=str(exe))}
+    assert ok["codex"] == PASS
+    exe.chmod(0o644)
+    bad = {c.name: c.level for c in check_tools(lambda t: None, env={}, cli="codex", binary=str(exe))}
+    assert bad["codex"] == FAIL
+    bare = {c.name: c.level for c in check_tools(lambda t: "/bin/codex", env={}, cli="codex", binary="codex")}
+    assert bare["codex"] == PASS
+
+
+def test_doctor_uses_headless_cmd_binary_from_pipeline(tmp_path):
+    from careeros.doctor import configured_binary
+
+    assert configured_binary({"llm": {"cli": "codex", "headless_cmd": ["/opt/bin/codex", "exec", "--json"]}}) == (
+        "codex", "/opt/bin/codex")
+    assert configured_binary({"llm": {"cli": "gemini"}}) == ("gemini", "gemini")
+    assert configured_binary({}) == ("claude", "claude")
+
+
+FAKE = """#!/usr/bin/env python3
+import json, os, sys
+with open(os.environ["FAKE_OUT"], "w") as f:
+    json.dump({"argv": sys.argv[1:], "stdin_eof": sys.stdin.read() == ""}, f)
+for e in json.loads(os.environ["FAKE_EVENTS"]):
+    print(json.dumps(e), flush=True)
+"""
+
+EVENTS = {
+    "codex": [{"type": "thread.started", "thread_id": "t-1"},
+              {"type": "item.completed", "item": {"type": "agent_message", "text": 'ok\nRESULT: {"status": "ok"}'}},
+              {"type": "turn.completed", "usage": {}}],
+    "gemini": [{"type": "init", "session_id": "g-1"},
+               {"type": "message", "role": "assistant", "content": 'ok\nRESULT: {"status": "ok"}', "delta": True},
+               {"type": "result", "status": "success", "stats": {}}],
+}
+
+
+@pytest.mark.parametrize("cli", ["codex", "gemini"])
+def test_invoke_runs_a_fake_cli_from_path_end_to_end(cli, tmp_path, monkeypatch):
+    from careeros.runs.headless import invoke
+
+    bindir = tmp_path / "bin"
+    bindir.mkdir()
+    exe = bindir / cli
+    exe.write_text(FAKE)
+    exe.chmod(0o755)
+    out = tmp_path / "argv.json"
+    env = {"PATH": f"{bindir}:/usr/bin:/bin", "FAKE_OUT": str(out), "FAKE_EVENTS": json.dumps(EVENTS[cli])}
+    cmd = build_command(cfg_for(cli=cli), "/score-job data/jobs/abc", session_id="s1", kind="score")
+    r = invoke(cmd, str(tmp_path), env, 30, tmp_path / "stream.jsonl")
+    got = json.loads(out.read_text())
+    assert got["argv"] == cmd[1:] and got["stdin_eof"] is True
+    assert r.exit_code == 0 and r.saw_result and not r.is_error
+    assert parse_result_line(r.result_text) == {"status": "ok"}
