@@ -9,7 +9,7 @@ Personal context (who candidate is, where private files live): gitignored `CLAUD
 - Never guess legal/EEO/salary answers: `profile/standard_answers.yaml` or Action Item.
 - Never automate LinkedIn actions. Draft only.
 - Never click submit twice. Never submit Tier A. Never bypass `qa-review`.
-- No Anthropic API key in repo. LLM work = Claude Code skills (`claude -p` headless ok).
+- No Anthropic API key in repo. LLM work = agent CLI running the skills (`claude -p` default; Codex/Gemini via `pipeline.yaml: llm.cli`).
 - Uncertain → `careeros action add` (Action Items tab), not guess.
 - Never commit personal data. Gitignored: `profile/`, `config/`, `CLAUDE.local.md`, `data/`, `.reviews/`. Committed examples use fictional candidate in `examples/`. Terms in `profile/confidential_terms.yaml` never appear in any artifact or committed file.
 

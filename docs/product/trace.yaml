@@ -939,6 +939,16 @@ requirements:
     - test_unchanged_non_onboarding_placeholder_stays_warn
     - test_work_authorization_mismatch_fails
     - test_unchanged_insert_lines_warn_with_file_and_line
+  REQ-158:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_cli_defaults_to_claude_and_each_cli_has_its_own_command
+    - test_codex_command_is_non_interactive_sandboxed_and_reads_the_skill_file
+    - test_gemini_command_streams_and_passes_the_prompt_with_p
+    - test_codex_stream_yields_the_last_agent_message_as_the_result
+    - test_gemini_stream_joins_assistant_deltas_and_reads_status
+    - test_doctor_checks_the_configured_cli_binary
 use_cases:
   UC-001:
     status: approved

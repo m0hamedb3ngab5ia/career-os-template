@@ -9,7 +9,7 @@ example candidate (`examples/`) are committed; the real candidate's `profile/` a
 2. **Configurable, not hardcoded.** Categories, tiers, keywords, salary floors, blocked countries, templates, autonomy levels live in `config/*.yaml`. Personal facts live in `profile/`.
 3. **Uncertain → Action Items, never guess.** Anything the system can't do confidently lands in the `Action Items` tab of the tracker for the candidate.
 4. **Self-review.** Every generated artifact goes through `qa` before use. QA results are logged per job.
-5. **Subscription first, API never (unless confirmed).** All LLM work runs through Claude Code (`claude -p` headless + skills in `.claude/skills/`). No Anthropic API key in this repo.
+5. **Subscription first, API never (unless confirmed).** All LLM work runs through an agent CLI on its subscription: Claude Code by default (`claude -p` headless + skills in `.claude/skills/`), or Codex/Gemini CLI via `pipeline.yaml: llm.cli` (REQ-158, best effort). No Anthropic API key in this repo.
 6. **One application per company per role family.** Dedup by company + normalized title; cooldown window per company.
 7. **Personal data stays private.** `profile/`, `config/`, `CLAUDE.local.md`, `data/` are gitignored. `careeros init`
    creates them from `examples/` or symlinks them from the candidate's own private repo (`--link`).
@@ -140,6 +140,12 @@ Skills in `.claude/skills/` are invoked two ways, both on the Claude Code subscr
   `result` event. `--output-format json` only prints at the end, so a hung call shows nothing. `dontAsk` denies any
   tool not in `--allowedTools` instead of waiting for a prompt nobody will answer. `--session-id` is recorded per
   attempt so a failed call can be reopened in Claude Code.
+
+  `llm.cli: codex | gemini` (REQ-158) swaps the binary: `codex exec --json --sandbox workspace-write "<prompt>"` or
+  `gemini --output-format stream-json --approval-mode auto_edit -p "<prompt>"`, where `<prompt>` is "Read
+  .claude/skills/<name>/SKILL.md and follow it for: <args>" (no slash commands there). Their JSONL events map onto
+  the same result (`runs/headless.py: feed`). Neither takes a per-tool allowlist: the sandbox / approval mode is the
+  only limit, so `--allowedTools`, `--session-id` and the `--chrome` apply path stay Claude-only.
 
 ## Runs and scheduling (`src/careeros/runs/`)
 

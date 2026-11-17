@@ -363,3 +363,23 @@ and running batches, `careeros schedule uninstall` removes it. Batches never sub
 
 **Can I try it without my own data?** Yes: `.venv/bin/python -m pytest -q` runs the whole pipeline on the
 fake candidate. The skills refuse to apply with that data (`careeros doctor` fails on it).
+
+## Using Codex or Gemini CLI
+
+Claude Code is the default and the only CLI tested end to end. Codex CLI and Gemini CLI are best effort:
+`careeros run` builds their commands and reads their event streams, but no real run is covered by tests.
+
+1. Install the CLI and log in once (`codex`, or `gemini`), in this folder.
+2. Set `llm.cli: codex` (or `gemini`) in `config/pipeline.yaml`; leave `llm.headless_cmd` unset (each CLI has a
+   default; a `headless_cmd` for another binary is a config error).
+3. `careeros doctor` now checks that binary instead of `claude`.
+
+What changes: those CLIs have no `/skill` slash commands, so each run asks them to read
+`.claude/skills/<name>/SKILL.md` and follow it. Project rules reach them through `AGENTS.md` (Codex) and
+`GEMINI.md` (Gemini), which point at `CLAUDE.md`. Safety is coarser than Claude's per-tool allowlist:
+
+- Codex: `codex exec --json --sandbox workspace-write`: writes stay inside the repo, no network (so prepare cannot
+  look up company facts; cover letters may come back needs_review).
+- Gemini: `--approval-mode auto_edit`: file edits are approved, shell commands are refused unless you allow
+  `.venv/bin/careeros` and `.venv/bin/python` in a Gemini policy rule. `yolo` works but approves everything.
+- `apply-job` needs the Claude in Chrome extension: Claude only.
