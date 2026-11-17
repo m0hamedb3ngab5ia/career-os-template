@@ -206,3 +206,15 @@ def test_shared_network_draft_needs_no_bullet_id():
     d = {k: v for k, v in GOOD.items() if k != "bullet_ids"}
     assert "no profile bullet id" in h.draft_problems(d, [])
     assert h.draft_problems({**d, "shared_network": "State University alum"}, []) == []
+
+
+def test_gmail_app_link_for_phones():
+    """Phones get a googlegmail:// link that opens the Gmail app's compose screen with the same to/subject/body."""
+    from urllib.parse import unquote
+    d = {**GOOD, "ready": True, "your_line": "Mine.", "email": {"subject": "S 1", "body": "Hi Sam,\n\nAsk."}}
+    app = h.compose_url(d, app=True)
+    assert app.startswith("googlegmail:///co?to=s%40x.com&subject=S%201&body=")
+    assert unquote(app.split("&body=")[1]) == unquote(h.compose_url(d).split("&body=")[1])
+    assert h.compose_url({**d, "ready": False}, app=True) is None
+    kit = h.send_kit("j1", "SWE", {"drafts": [{**d, "contact": "Sam", "linkedin_note": "x"}]}, {})
+    assert "googlegmail:///co?" in kit and "https://mail.google.com" in kit
