@@ -600,6 +600,15 @@ SECTIONS: tuple[Section, ...] = (
 # Example config keys with no form control, and why. The coverage test fails on any key that is in neither.
 NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "follow_ups.after_days"): "Chat-set nudge delay (days before a follow-up Action Item); default 7 is fine.",
+    (P, "follow_ups.reach_out_window_days"): "Chat-set window (days) for the reach-out nag; default 14 is fine.",
+    (P, "notify.enabled"): "Set up with `careeros notify setup` (needs a Keychain password); not a UI toggle.",
+    (P, "notify.digest"): "Chat-set (daily, weekly or off); default daily is fine.",
+    (P, "notify.weekly_day"): "Chat-set weekday for the weekly digest.",
+    (P, "notify.urgent"): "Chat-set: whether rare urgent emails are sent at all.",
+    (P, "notify.email"): "Personal address, set in `careeros notify setup` / the YAML.",
+    (P, "notify.send_at"): "Chat-set digest time; default 08:00 is fine.",
+    (P, "notify.smtp_host"): "Mail server; Gmail default is fine.",
+    (P, "notify.smtp_port"): "Mail server; STARTTLS default is fine.",
     ("companies", "referral_strength"): "Per-company map; set in chat or the YAML (yield model referral lift).",
     ("targets", "goal"): "Yield-model goal; set in chat or the YAML until the onboarding command exists.",
     (P, "paths.jobs_dir"): "Data location; changing it moves where every job is read and written.",

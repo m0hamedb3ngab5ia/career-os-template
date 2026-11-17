@@ -1574,6 +1574,35 @@ def cmd_outreach_sent(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_notify(args: argparse.Namespace) -> int:
+    """Email digest to yourself (REQ-155). The app password lives only in the macOS Keychain."""
+    from careeros import notify
+
+    s = _settings(args)
+    try:
+        if args.notify_cmd == "setup":
+            email = (args.email or input("Your email address (the digest goes to you only): ")).strip()
+            print("Paste a Gmail app password when `security` asks (it is stored in the Keychain, nowhere else).")
+            notify.store_password(email)
+            print(f"saved. Now set pipeline.yaml notify: {{enabled: true, email: {email}}}, then `careeros notify test`.")
+            return 0
+        c = notify.config(s)
+        if args.notify_cmd == "digest":
+            body = notify.build_digest(s)
+            print(body if body else "nothing to send: every section is empty")
+            return 0
+        if not c["email"]:
+            print("notify: set notify.email in config/pipeline.yaml first", file=sys.stderr)
+            return 1
+        notify.smtp_send(c, "career-os test", "If you can read this, the daily digest will reach you.",
+                         notify.keychain_password(c["email"]))
+        print(f"test email sent to {c['email']}")
+        return 0
+    except (notify.NotifyError, OSError) as e:
+        print(f"notify: {e}", file=sys.stderr)
+        return 1
+
+
 def cmd_stats(args: argparse.Namespace) -> int:
     s = _settings(args)
     store = Store(s)
@@ -2647,6 +2676,15 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--yes", action="store_true", help="actually delete / trim")
     pr.add_argument("--json", action="store_true", help="machine-readable plan (and result with --yes)")
     pr.set_defaults(fn=cmd_prune)
+
+    nt = sub.add_parser("notify", help="daily email digest to yourself (SMTP app password in the macOS Keychain)")
+    nts = nt.add_subparsers(dest="notify_cmd", required=True)
+    nsu = nts.add_parser("setup", help="store your app password in the Keychain (asked by `security`, never by us)")
+    nsu.add_argument("--email")
+    nts.add_parser("test", help="send a one-line test email to yourself")
+    ndg = nts.add_parser("digest", help="print today's digest body (--dry-run); sending is done by `careeros tick`")
+    ndg.add_argument("--dry-run", action="store_true")
+    nt.set_defaults(fn=cmd_notify)
 
     out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
     outs = out.add_subparsers(dest="outreach_cmd", required=True)

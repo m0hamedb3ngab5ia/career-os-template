@@ -66,7 +66,7 @@ def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
             want[(jid, OUTREACH)] = (f"Your message got no answer in {(today - sent).days} days. Send a nudge.", sent)
     have: set[tuple[str, str]] = set()  # open AND done keys: Done sticks
     for it in tr.list_action_items(open_only=False):
-        if it.get("Type") != TYPE:
+        if it.get("Type") != TYPE or str(it.get("Detail") or "").split("\n")[0] == REACH:
             continue
         key = (str(it.get("JobID") or ""), str(it.get("Detail") or "").split("\n")[0])
         if key in want:
@@ -80,4 +80,50 @@ def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
         if key not in have:
             lines.append(add_action(s, what, TYPE, job_id=key[0], detail=key[1],
                                    id=hashlib.sha1("|".join(key).encode()).hexdigest()[:8]))
+    return lines
+
+
+REACH = "reach_out"  # Detail marker; Action Item Type stays `follow_up` (no UI/schema change)
+
+
+def reach_out_window(s: Settings) -> int:
+    try:
+        return max(1, int((s.pipeline.get("follow_ups") or {}).get("reach_out_window_days", 14)))
+    except (TypeError, ValueError):
+        return 14
+
+
+def raise_reach_outs(s: Settings, today: date | None = None) -> list[str]:
+    """REQ-156: one high-priority `reach_out` item per job applied in the last `reach_out_window_days`, due the day
+    it is raised. Closed once a draft is marked sent (`careeros outreach sent`) or the job leaves `applied`; a done
+    or dismissed item is never re-raised."""
+    from careeros.tracker import add_action
+
+    today, win = today or date.today(), reach_out_window(s)
+    tr, store = Tracker(settings=s), Store(s)
+    jobs = {str(j["JobID"]): j for j in tr.list_jobs()}
+
+    def sent(jid: str) -> bool:
+        return any(isinstance(x, dict) and x.get("sent") is True
+                   for x in _json(store.job_dir(jid) / "outreach.json").get("drafts") or [])
+
+    have: set[str] = set()
+    for it in tr.list_action_items(open_only=False):
+        if it.get("Type") != TYPE or str(it.get("Detail") or "").split("\n")[0] != REACH:
+            continue
+        jid = str(it.get("JobID") or "")
+        have.add(jid)
+        if str(it.get("Done") or "N").upper() != "Y" and ((jobs.get(jid) or {}).get("Status") != "applied" or sent(jid)):
+            tr.mark_action_done(str(it["ID"]), note="Closed: outreach sent or the job moved on.")
+    lines = []
+    for jid, j in jobs.items():
+        since = _day(j.get("DateApplied"))
+        if j.get("Status") != "applied" or jid in have or not since or (today - since).days > win or sent(jid):
+            continue
+        p = store.load_posting(jid)
+        what = (f"Reach out to the recruiter or hiring manager for {p.title} at {p.company}" if p
+                else "Reach out to the recruiter or hiring manager for this job")
+        lines.append(add_action(s, what, TYPE, job_id=jid, detail=REACH, priority="H", due=today.isoformat(),
+                                due_reason="Early outreach doubles the odds of a reply",
+                                id=hashlib.sha1(f"{jid}|{REACH}".encode()).hexdigest()[:8]))
     return lines

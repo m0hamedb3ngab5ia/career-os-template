@@ -294,6 +294,7 @@ the macOS login keychain (`security -i`, password hex-encoded on stdin, never ar
 shows it. `runs/headless.invoke` passes every stream-json line and stderr through `credentials.redactor`, so stored
 passwords (file and keychain, raw and JSON-escaped) never reach a run log or result. `careeros doctor` WARNs when the file sits inside a git repo
 (louder when not gitignored) or its mode is not 0600; `.gitignore` ignores `credentials.yaml`.
+The notify digest's SMTP app password (`careeros-smtp`) lives only in the Keychain, entered through `security`'s own prompt, and is read at send time (`notify.py`).
 
 ## Directories
 

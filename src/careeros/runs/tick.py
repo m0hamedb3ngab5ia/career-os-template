@@ -146,12 +146,27 @@ def _follow_ups(settings: Settings, out: dict[str, Any], echo: Callable[[str], N
     try:
         from careeros.follow_ups import raise_follow_ups
 
-        added = raise_follow_ups(settings)
+        from careeros.follow_ups import raise_reach_outs
+
+        added = raise_follow_ups(settings) + raise_reach_outs(settings)
         out["follow_ups"] = len(added)
         if added:
             echo(f"tick: {len(added)} follow-up(s)")
     except Exception as e:  # noqa: BLE001
         out["follow_ups_error"] = f"{type(e).__name__}: {e}"[:300]
+
+
+def _notify(settings: Settings, out: dict[str, Any], echo: Callable[[str], None], now: datetime) -> None:
+    """Daily email digest to self (REQ-155). A failure is logged in the tick result and retried next tick."""
+    try:
+        from careeros.notify import maybe_send_digest
+
+        res = maybe_send_digest(settings, now.astimezone().replace(tzinfo=None))
+        out["notify"] = res
+        if res == "sent":
+            echo("tick: digest emailed")
+    except Exception as e:  # noqa: BLE001
+        out["notify"] = f"error: {type(e).__name__}: {e}"[:300]
 
 
 def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[], datetime] | None = None,
@@ -200,6 +215,7 @@ def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[],
                     entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status=status,
                                  last_detail=detail)
         _follow_ups(settings, out, echo)
+        _notify(settings, out, echo, now)
         state["last_tick"] = clock().isoformat()
         _write(rs.dir / "schedule.json", state)
     finally:

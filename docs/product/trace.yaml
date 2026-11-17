@@ -931,6 +931,27 @@ requirements:
     - test_done_sticks_across_ticks
     - test_locked_ticks_are_idempotent
     - sections.test.ts
+  REQ-155:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_digest_sections_and_days
+    - test_digest_none_when_everything_empty
+    - test_send_once_per_day_after_send_at
+    - test_failure_is_returned_and_retried_next_tick
+    - test_weekly_digest_only_on_its_day_and_off_never
+    - test_urgent_sends_immediately_once_per_key_and_can_be_off
+    - test_urgent_failure_is_retried_and_digest_state_survives
+    - test_keychain_uses_security_binary_and_never_leaks
+    - test_store_password_lets_security_prompt_so_we_never_see_it
+    - test_cli_digest_dry_run_prints_body_and_test_sends
+    - test_tick_sends_digest_and_survives_failure
+  REQ-156:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_reach_out_item_for_recent_applied_job_only
+    - test_reach_out_closes_when_outreach_sent_or_done_sticks
   REQ-157:
     status: implemented
     provenance: confirmed
