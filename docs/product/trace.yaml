@@ -931,6 +931,14 @@ requirements:
     - test_done_sticks_across_ticks
     - test_locked_ticks_are_idempotent
     - sections.test.ts
+  REQ-157:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_fresh_example_fails_on_unanswered_preferences
+    - test_unchanged_non_onboarding_placeholder_stays_warn
+    - test_work_authorization_mismatch_fails
+    - test_unchanged_insert_lines_warn_with_file_and_line
 use_cases:
   UC-001:
     status: approved

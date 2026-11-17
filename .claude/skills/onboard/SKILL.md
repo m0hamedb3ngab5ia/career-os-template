@@ -92,19 +92,30 @@ its `# INSERT` comment.
 
 Check: doctor no longer shows `standard_answers.yaml: identical to the example file`.
 
-## 7. Targets and pipeline (`config/`)
+## 7. Preferences interview (`config/`, `profile/standard_answers.yaml`)
 
-Ask, then edit, keeping comments:
+Nothing here is a default to keep: the example values are a stranger's. Ask the groups below **one at a time, in
+this order**, wait for the answer, write the named keys (edit in place, keep every comment), then move on. Offer
+the example value only as "(Recommended)" where the file says so.
 
-- `config/targets.yaml`: `candidate` (level, graduation, salary floors, work authorization), `location`
-  (preferred cities, work modes), roles they want (the `scout.filters` title keywords), industries to boost or block.
-- `config/companies.yaml`: `dream_list` (companies they want to review by hand: Tier A, never auto-submitted) and
-  `blocklist.companies` (their current employer at least).
-- `config/categories.yaml`: every `bullet_priority` list uses their own experience ids, most relevant first.
-- `config/pipeline.yaml`: usually fine as is. Mention `paths.tracker_xlsx` if they want the tracker elsewhere.
+| Group | Ask | Writes |
+|---|---|---|
+| a. Role and level | What roles? New grad, early career, or more? How many years of experience do they have? Titles to avoid? | `targets.yaml`: `candidate.level`, `candidate.graduation`, `seniority.max_years_required`, `seniority.exclude_title_keywords`; `categories.primary/secondary/excluded` (they are job families defined in `categories.yaml`: keep the ones that match, drop the rest); `companies.yaml: searches.keywords`. If not new grad / early career: delete the `SimplifyJobs` line under `boards:`, set `scout.sources` without `simplify`, and set `searches.sources[simplify_newgrad_github].enabled: false`. Then each used category's `bullet_priority` in `categories.yaml`: ids from their own `master.yaml`, most relevant first |
+| b. Where | Cities ("City ST"), countries, remote and work modes? Willing to relocate? | `location.preferred`, `preferred_regions`, `allowed_countries`, `blocked_countries`, `remote_ok`, `work_modes`; `goal.locations`; standard answer `relocate` |
+| c. Work authorization | Citizen, permanent resident or visa holder? Need sponsorship now or later? Over 18? | `candidate.work_authorization`, `candidate.needs_sponsorship`, **and** `standard_answers.yaml` keys `work_authorization`, `sponsorship`, `over_18`, derived from that one answer so they cannot disagree (doctor FAILs if they do) |
+| d. Pay | Floor for base pay? Current base (optional)? | `candidate.min_base_usd`, `salary_dropdown_floor_usd`, `current_base_usd`, `goal.pay_bar` |
+| e. Companies | Dream companies (reviewed by hand, Tier A)? Never-apply list (current employer at least)? Industries to boost or block? Keep company prestige ranking (`prestige_tiers`, a community list that nudges fit and adds top names to the dream list) or turn it off? | `companies.yaml`: `dream_list` (replace the `Example Company` line), `blocklist.companies/industries/name_patterns`, `already_applied`; `targets.yaml: industries.boost/blocked`. Prestige off: `prestige_scoring.auto_dream: []`, every `bonus` value `0`, `prestige_tiers.avoid: []` |
+| f. Pace and schedule | Applications per day? Timezone and hours when background Claude runs may start? Heavier months (campus seasons)? | `volume.max_applications_per_day`, `volume.season_multiplier` (months and factors, `{}` = none), `pipeline.yaml: schedule` `timezone`, `quiet_hours`; `careeros schedule install` is macOS only: on Linux say so and skip it |
+| g. Cover letter | Short or long? Words and phrases you never use? Any letters you wrote (voice samples)? | `qa.yaml: cover_letter.min_words/max_words`, `banned_phrases`; if they have samples: put them in `profile/voice/samples/`, run `/learn-voice` |
+| h. Mail and Handshake | Which mail provider (Gmail, Outlook, other, none)? Student or recent graduate with Handshake? | Mail: only Gmail is wired (`/inbox-sync`, `/job-alerts`, step 9c); for any other say `/inbox-sync` is unavailable and skip 9c. Handshake: offer step 9b only to students and new grads |
 
-Run `.venv/bin/careeros doctor` until it exits 0. WARN lines are advice, not blockers: an `# INSERT` line whose
-example value is also their true answer just needs its comment deleted.
+Then walk the remaining `standard_answers.yaml` `# INSERT` answers (step 6) that this interview did not cover, one
+by one: never let an example "Yes" stand because the user deleted a comment.
+
+Run `.venv/bin/careeros doctor` until it exits 0. It FAILs on a `candidate:` value, `location.preferred` or the
+`Example Company` dream-list line still equal to the example, and on work authorization that disagrees with the
+standard answers. Other WARN lines are advice; an `# INSERT` line whose example value is also their true answer
+just needs its comment deleted.
 
 ## 8. Approve the résumé look
 
@@ -155,8 +166,7 @@ running?`: step 2 again (it closes when the Mac restarts).
 .venv/bin/careeros jobs list --status scored
 ```
 
-Scout keeps 0 jobs: the filters in `config/targets.yaml: scout.filters` are too tight for these boards; open
-`data/scout_last.json` to see which filter removed what, and loosen that one. Pick one well-scored job with the
+Scout keeps 0 jobs: open `data/scout_last.json` to see which filter removed what (`config/targets.yaml: scout.filters` toggles each; the title words are the `title_keywords` in `config/categories.yaml`), and loosen that one. Pick one well-scored job with the
 user, then:
 
 ```sh
