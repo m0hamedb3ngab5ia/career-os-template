@@ -123,7 +123,7 @@ def test_recredit_dry_run_does_not_write(settings):
 
 def test_cli_jobs_recredit_dry_run(tmp_path, capsys):
     from careeros.cli import main
-    from tests.conftest import make_temp_root
+    from conftest import make_temp_root
 
     root = make_temp_root(tmp_path / "repo")
     d = root / "data" / "jobs" / "job000000001"
@@ -198,7 +198,7 @@ def test_recredit_lists_a_threshold_flip_with_no_credit(settings):
 
 def test_cli_recredit_default_reaches_a_cutoff_below_55(tmp_path, capsys):
     from careeros.cli import main
-    from tests.conftest import make_temp_root
+    from conftest import make_temp_root
 
     root = make_temp_root(tmp_path / "repo")
     t = root / "config" / "targets.yaml"
