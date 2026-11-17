@@ -205,4 +205,4 @@ def test_shared_network_draft_needs_no_bullet_id():
     """A note to a fellow alum leads with the overlap and attaches the résumé, so it may skip the experience proof."""
     d = {k: v for k, v in GOOD.items() if k != "bullet_ids"}
     assert "no profile bullet id" in h.draft_problems(d, [])
-    assert h.draft_problems({**d, "shared_network": "Stevens alum"}, []) == []
+    assert h.draft_problems({**d, "shared_network": "State University alum"}, []) == []

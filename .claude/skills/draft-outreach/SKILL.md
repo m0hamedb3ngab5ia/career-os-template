@@ -38,7 +38,7 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
 ## 2. Rules
 
 - Shared network (same school, employer, program or high school as the candidate, from `profile/master.yaml` and the
-  contact's profile): set `shared_network` (e.g. "Stevens alum") and write a short, warm note instead of a pitch.
+  contact's profile): set `shared_network` (e.g. "State University alum") and write a short, warm note instead of a pitch.
   Open with the overlap ("fellow <school> alum"), one line of interest in the role, the ask, "résumé attached". Body
   at most ~60 words, no experience proof (no bullet needed; the gate accepts `shared_network` instead), no team
   sizes or résumé lines. Busy people skim; the overlap is the reason they reply.
