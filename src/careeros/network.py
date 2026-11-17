@@ -27,7 +27,18 @@ def network_path(s: Settings) -> Path:
 
 def parse_connections_csv(path: Path) -> list[dict[str, str]]:
     """Rows with a company. LinkedIn prefixes the header with a few notes lines; skip to `First Name,...`."""
-    text = path.read_text(encoding="utf-8-sig")
+    if path.suffix.lower() == ".zip":  # LinkedIn's export as downloaded: read the member, never extract
+        import zipfile
+        try:
+            with zipfile.ZipFile(path) as z:
+                name = next((n for n in z.namelist() if n.rsplit("/", 1)[-1] == "Connections.csv"), None)
+                if name is None:
+                    raise ValueError(f"{path.name}: no Connections.csv inside")
+                text = z.read(name).decode("utf-8-sig")
+        except zipfile.BadZipFile as e:
+            raise ValueError(f"{path.name}: not a readable zip ({e})") from e
+    else:
+        text = path.read_text(encoding="utf-8-sig")
     lines = text.splitlines()
     start = next((i for i, ln in enumerate(lines) if ln.startswith("First Name,")), None)
     if start is None:
@@ -40,6 +51,12 @@ def parse_connections_csv(path: Path) -> list[dict[str, str]]:
         name = f"{(r.get('First Name') or '').strip()} {(r.get('Last Name') or '').strip()}".strip()
         out.append({"name": name, **row})
     return out
+
+
+def find_export(folder: Path) -> Path | None:
+    """Newest LinkedIn export the candidate downloaded: `Connections*.csv` or `*LinkedInDataExport*.zip`."""
+    found = [*folder.glob("Connections*.csv"), *folder.glob("*LinkedInDataExport*.zip")]
+    return max(found, key=lambda f: f.stat().st_mtime) if found else None
 
 
 def import_csv(s: Settings, path: Path) -> int:

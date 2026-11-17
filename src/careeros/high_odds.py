@@ -181,3 +181,34 @@ def compose_url(d: dict[str, Any]) -> str | None:
     body = f"{str(d['your_line']).strip()}\n\n{em.get('body') or ''}"
     return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))
             + "&body=" + quote(body))
+
+
+def send_kit(job_id: str, title: str, out: dict[str, Any], contacts: dict[str, Any]) -> str:
+    """Markdown the candidate sends from in a few clicks: per unsent draft, a LinkedIn link (their profile, a
+    people search for the named person, or the role's search URL; career-os never opens LinkedIn itself), the note
+    in a copy block, the prefilled Gmail link when the draft is ready, and the command that records the send."""
+    company = str(out.get("company") or contacts.get("company") or "")
+    urls = contacts.get("search_urls") or {}
+    blocks = []
+    for d in out.get("drafts") or []:
+        if not isinstance(d, dict) or d.get("sent"):
+            continue
+        who = str(d.get("contact") or "")
+        named = who and "unnamed" not in who.lower()
+        li = d.get("linkedin") or (
+            "https://www.linkedin.com/search/results/people/?keywords=" + quote(f"{who} {company}") if named
+            else urls.get(str(d.get("role") or "recruiter")) or urls.get("recruiter"))
+        lines = [f"### {company}, {title}: {who}"]
+        if d.get("manual_tailor"):
+            lines.append(f"Tailor by hand before sending ({d.get('manual_reason') or 'you know this person'}).")
+        connected = d.get("linkedin_degree") == 1 or d.get("role") == "referral" or not d.get("linkedin_note")
+        text, how = ((d.get("linkedin_message"), "Message") if connected else (d.get("linkedin_note"), "Connect, Add a note"))
+        if text:
+            lines += [f"1. [Find on LinkedIn]({li}), {how}, paste:" if li else "1. LinkedIn, paste:",
+                      "```", str(text).strip(), "```"]
+        url = compose_url(d)
+        lines.append(f"2. [Open the email in Gmail]({url}) (prefilled; read, then Send)" if url else
+                     f"2. Email: needs your line first: `careeros outreach qa {job_id} --contact \"{who}\" --line \"...\"`")
+        lines.append(f"3. Sent? `careeros outreach sent {job_id} --contact \"{who}\"`")
+        blocks.append("\n".join(lines))
+    return "\n\n".join(blocks)

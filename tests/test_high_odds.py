@@ -163,3 +163,29 @@ def test_reach_first_stays_open_across_ticks_and_reraises(settings):
     for i in range(3):
         tr.reopen_action(f"r{i}")
     assert len(h.raise_reach_first(settings, today)) == 1 and len(rf()) == 1
+
+
+def test_send_kit_links_and_copy_blocks():
+    """One block per unsent draft: LinkedIn people-search link (never automated), the note to paste, the Gmail
+    link once the draft is ready, and the one command that records the send."""
+    out = {"company": "Garage", "drafts": [
+        {"contact": "Alaz Sengul", "role": "hiring_manager", "linkedin": None, "linkedin_note": "Hi, I applied.",
+         "email": {"subject": "S", "body": "B"}, "to": "a@x.com", "ready": True, "your_line": "Mine."},
+        {"contact": "Recruiter (unnamed)", "linkedin_note": "Hi there.", "email": {"subject": "S", "body": "B"}},
+        {"contact": "Old", "linkedin_note": "x", "sent": True}]}
+    contacts = {"search_urls": {"recruiter": "https://www.linkedin.com/search/results/people/?keywords=Garage%20recruiter"}}
+    kit = h.send_kit("j1", "Software Engineer", out, contacts)
+    assert "keywords=Alaz%20Sengul%20Garage" in kit and "```\nHi, I applied.\n```" in kit
+    assert "https://mail.google.com/mail/?view=cm" in kit and "to=a%40x.com" in kit
+    assert 'careeros outreach sent j1 --contact "Alaz Sengul"' in kit
+    assert "keywords=Garage%20recruiter" in kit and "needs your line" in kit
+    assert "Old" not in kit
+
+
+def test_send_kit_referral_uses_the_message_and_flags_manual_tailor():
+    out = {"company": "Acme", "drafts": [{"contact": "Pat Kim", "role": "referral", "linkedin_degree": 1,
+                                          "linkedin_message": "Hey Pat, would you refer me?", "manual_tailor": True,
+                                          "manual_reason": "connected"}]}
+    kit = h.send_kit("j2", "SWE", out, {})
+    assert "Message, paste:" in kit and "Hey Pat, would you refer me?" in kit and "Connect" not in kit
+    assert "Tailor by hand before sending (connected)" in kit

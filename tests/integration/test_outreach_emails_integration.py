@@ -64,3 +64,32 @@ def test_emails_keeps_researched_domain_over_a_name_guess(temp_root, tmp_path):
     out = json.loads((d / "contacts.json").read_text())
     assert out["domain"] == "shophammock.com" and out["domain_confidence"] == "medium"
     assert out["contacts"][0]["email_candidates"][0] == "sam.lee@shophammock.com"
+
+
+def test_outreach_kit_prints_every_unsent_draft(temp_root, tmp_path):
+    store = Store(Settings.load(temp_root))
+    p = Posting(company="Hammock", title="Software Engineer", ats="ashby", ats_job_id="3",
+                location="New York, NY", description_text="x", url="https://jobs.ashbyhq.com/hammock/3")
+    store.save_posting(p)
+    (store.job_dir(p.job_id) / "outreach.json").write_text(json.dumps({"company": "Hammock", "drafts": [
+        {"contact": "Sam Lee", "linkedin_note": "Hi Sam."}]}))
+    home = tmp_path / "home"
+    home.mkdir()
+    r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(temp_root), "outreach", "kit"],
+                       capture_output=True, text=True, env=subprocess_env(temp_root, home), timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert "### Hammock, Software Engineer: Sam Lee" in r.stdout and "keywords=Sam%20Lee%20Hammock" in r.stdout
+
+
+def test_network_import_finds_the_export_in_downloads(temp_root, tmp_path):
+    import zipfile
+    home = tmp_path / "home"
+    (home / "Downloads").mkdir(parents=True)
+    with zipfile.ZipFile(home / "Downloads" / "Basic_LinkedInDataExport_11-16-2026.zip", "w") as f:
+        f.writestr("Connections.csv", "First Name,Last Name,URL,Email Address,Company,Position,Connected On\n"
+                                      "Sam,Lee,u,,Hammock,CTO,1\n")
+    r = subprocess.run([PY, "-m", "careeros.cli", "--root", str(temp_root), "network", "import"],
+                       capture_output=True, text=True, env=subprocess_env(temp_root, home), timeout=120)
+    assert r.returncode == 0, r.stderr
+    assert "imported 1 connections" in r.stdout
+    assert json.loads((temp_root / "data" / "network.json").read_text())["connections"][0]["name"] == "Sam Lee"

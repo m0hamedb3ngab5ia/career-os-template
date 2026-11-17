@@ -1489,11 +1489,15 @@ NETWORK_OPEN = ["scored", "queued", "prepared", "needs_review"]
 
 
 def cmd_network_import(args: argparse.Namespace) -> int:
-    from careeros.network import import_csv, network_path
+    from careeros.network import find_export, import_csv, network_path
 
     s = _settings(args)
+    src = Path(args.csv).expanduser() if args.csv else find_export(Path.home() / "Downloads")
+    if src is None:
+        print("network import: no Connections.csv or LinkedIn export .zip in ~/Downloads", file=sys.stderr)
+        return 1
     try:
-        n = import_csv(s, Path(args.csv).expanduser())
+        n = import_csv(s, src)
     except (OSError, ValueError) as e:
         print(f"network import: {e}", file=sys.stderr)
         return 1
@@ -1571,6 +1575,35 @@ def cmd_outreach_sent(args: argparse.Namespace) -> int:
         d.update(sent=True, sent_by="candidate", sent_at=when)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"marked {len(hit)} draft(s) sent on {when}")
+    return 0
+
+
+def cmd_outreach_kit(args: argparse.Namespace) -> int:
+    """Send kit (markdown) for the given jobs, or every job with an unsent draft: links + copy blocks."""
+    import json
+
+    from careeros import high_odds as ho
+
+    store = Store(_settings(args))
+    ids = args.job_ids or sorted(p.parent.name for p in store.jobs_dir.glob("*/outreach.json"))
+    kits = []
+    for jid in ids:
+        d = store.job_dir(jid)
+        try:
+            out = json.loads((d / "outreach.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            if args.job_ids:
+                print(f"outreach kit: no readable drafts for {jid}", file=sys.stderr)
+            continue
+        try:
+            contacts = json.loads((d / "contacts.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            contacts = {}
+        p = store.load_posting(jid)
+        kit = ho.send_kit(jid, p.title if p else "", out, contacts)
+        if kit:
+            kits.append(kit)
+    print("\n\n".join(kits) if kits else "outreach kit: nothing unsent")
     return 0
 
 
@@ -2733,6 +2766,9 @@ def build_parser() -> argparse.ArgumentParser:
     osn.add_argument("--contact", help="contact name; default every draft")
     osn.add_argument("--date", help="YYYY-MM-DD, default today")
     osn.set_defaults(fn=cmd_outreach_sent)
+    okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
+    okt.add_argument("job_ids", nargs="*")
+    okt.set_defaults(fn=cmd_outreach_kit)
     oqa = outs.add_parser("qa", help="gate outreach drafts and record your own line (--line); prints the one-click compose link")
     oqa.add_argument("job_id")
     oqa.add_argument("--contact")
@@ -2755,7 +2791,7 @@ def build_parser() -> argparse.ArgumentParser:
     nw = sub.add_parser("network", help="your LinkedIn connections (your own export) -> referral matches")
     nws = nw.add_subparsers(dest="network_cmd", required=True)
     nwi = nws.add_parser("import", help="load LinkedIn's Connections.csv into data/network.json (replaces it)")
-    nwi.add_argument("csv")
+    nwi.add_argument("csv", nargs="?", help="Connections.csv or LinkedIn's export .zip; default the newest in ~/Downloads")
     nwi.set_defaults(fn=cmd_network_import)
     nwm = nws.add_parser("match", help="jobs at companies where you have a 1st-degree connection")
     nwm.add_argument("--status", nargs="+", choices=STATUSES, help=f"default: {' '.join(NETWORK_OPEN)}")
