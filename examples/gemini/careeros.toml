@@ -1,0 +1,17 @@
+# Gemini CLI policy so headless `careeros run` may execute the project's CLI (llm.cli: gemini).
+# Copy to ~/.gemini/policies/careeros.toml. The workspace tier (.gemini/policies in the repo) is documented as
+# currently disabled, so it must live in the user tier.
+# Format: https://github.com/google-gemini/gemini-cli/blob/main/docs/reference/policy-engine.md
+# BEST-EFFORT, UNTESTED: no real Gemini run has been done with this file.
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ".venv/bin/careeros"
+decision = "allow"
+priority = 100
+
+[[rule]]
+toolName = "run_shell_command"
+commandPrefix = ".venv/bin/python"
+decision = "allow"
+priority = 100

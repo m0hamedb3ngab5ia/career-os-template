@@ -367,7 +367,9 @@ fake candidate. The skills refuse to apply with that data (`careeros doctor` fai
 ## Using Codex or Gemini CLI
 
 Claude Code is the default and the only CLI tested end to end. Codex CLI and Gemini CLI are best effort:
-`careeros run score|prepare` builds their commands and reads their event streams, but no real run is covered by tests.
+`careeros run score|prepare` builds their commands and reads their event streams. Codex had one real smoke run (see
+the PR); **Gemini is best-effort and untested**: it was never run, and the field names in its stream-json events
+(`role`, `content`, `delta`, `status`) are unverified because its docs do not spell them out.
 
 1. Install the CLI and log in once (`codex`, or `gemini`), in this folder.
 2. Set `llm.cli: codex` (or `gemini`) in `config/pipeline.yaml`; leave `llm.headless_cmd` unset (each CLI has a
@@ -381,5 +383,7 @@ What changes: those CLIs have no `/skill` slash commands, so each run asks them 
 - Codex: `codex exec --json --sandbox workspace-write`: writes stay inside the repo, no network (so prepare cannot
   look up company facts; cover letters may come back needs_review).
 - Gemini: `--approval-mode auto_edit`: file edits are approved, shell commands are refused unless you allow
-  `.venv/bin/careeros` and `.venv/bin/python` in a Gemini policy rule. `yolo` works but approves everything.
+  `.venv/bin/careeros` and `.venv/bin/python` in a Gemini policy rule: copy `examples/gemini/careeros.toml` to
+  `~/.gemini/policies/` (the repo-level `.gemini/policies` tier is documented as disabled; untested). `yolo` works
+  but approves everything.
 - `apply-job` needs the Claude in Chrome extension: Claude only.

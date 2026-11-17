@@ -6,3 +6,4 @@ Guidance for Gemini CLI. `CLAUDE.md` is canonical for project rules: read it fir
 - Skills are Markdown files in `.claude/skills/<name>/SKILL.md`; to run one, read it and follow it for the job dir.
 - Headless runs: `pipeline.yaml: llm.cli: gemini`; see `docs/GETTING_STARTED.md` "Using Codex or Gemini CLI".
 - Never commit `profile/`, `config/`, `CLAUDE.local.md`, `data/`, `.reviews/`, or anything with credentials.
+- Gemini support is best-effort and untested. Shell permission for headless runs: copy `examples/gemini/careeros.toml` to `~/.gemini/policies/`.
