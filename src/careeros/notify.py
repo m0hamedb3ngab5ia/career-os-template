@@ -108,8 +108,34 @@ def build_digest(s: Settings, today: date | None = None) -> str | None:
     sections = [("Reach out (overdue)", [line(i, True) for i in items if _kind(i) == REACH]),
                 ("Follow up", [line(i, True) for i in items if i.get("Type") == FOLLOW and _kind(i) != REACH]),
                 ("Needs you", [f"- {i.get('What to do')}" for i in items if prio(i)])]
+    sections += _extra_sections(s, today, store)
     out = [f"{h}\n" + "\n".join(rows) for h, rows in sections if rows]
     return "\n\n".join(out) if out else None
+
+
+def _extra_sections(s: Settings, today: date, store: Store) -> list[tuple[str, list[str]]]:
+    """REQ-159 watch jobs not yet digested, REQ-160 heads-up before a high/peak season (once per window and year)."""
+    rows = []
+    for jid in _state(s).get("watch_pending") or []:
+        p = store.load_posting(jid)
+        sc = store.load_score(jid)
+        if p:
+            rows.append(f"- {p.title} @ {p.company}" + (f" (fit {sc.fit})" if sc else "") + (f" - {p.url}" if p.url else ""))
+    out = [("New at your target companies", rows)]
+    up = _heads_up(s, today)
+    if up:
+        out.append(("Coming up", [f"- {up['name']} starts {up['starts']} ({up['level']}). {up['advice']}"]))
+    return out
+
+
+def _heads_up(s: Settings, today: date) -> dict[str, Any] | None:
+    from careeros.runs.policy import upcoming_window
+
+    try:
+        up = upcoming_window(s.targets or {}, today)
+    except Exception:  # noqa: BLE001 - a bad season config must not stop the digest
+        return None
+    return up if up and f"{up['name']}:{up['starts'][:4]}" not in (_state(s).get("season_pinged") or []) else None
 
 
 def _state_path(s: Settings):
@@ -155,7 +181,9 @@ def maybe_send_digest(s: Settings, now: datetime, *, sender: Callable[..., None]
         if body is None:
             return "empty"
         (sender or smtp_send)(c, "career-os: what needs you today", body, (keychain or keychain_password)(c["email"]))
-        _save(s, last_sent=today.isoformat())
+        up = _heads_up(s, today)
+        _save(s, last_sent=today.isoformat(), watch_pending=[],
+              season_pinged=[*(_state(s).get("season_pinged") or []), *([f"{up['name']}:{up['starts'][:4]}"] if up else [])])
     except Exception as e:  # noqa: BLE001 - never crash the tick; the message never contains the password
         return f"error: {type(e).__name__}: {e}"[:200]
     return "sent"

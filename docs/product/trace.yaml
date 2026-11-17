@@ -970,6 +970,19 @@ requirements:
     - test_codex_stream_yields_the_last_agent_message_as_the_result
     - test_gemini_stream_joins_assistant_deltas_and_reads_status
     - test_doctor_checks_the_configured_cli_binary
+  REQ-159:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_watch_urgent_once_per_job_and_only_high_fit_unfiltered
+    - test_digest_lists_new_at_targets_once
+  REQ-160:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_named_windows_set_cap_and_describe_season
+    - test_old_month_form_still_works_and_bad_window_rejected
+    - test_digest_heads_up_once_before_high_window
 use_cases:
   UC-001:
     status: approved

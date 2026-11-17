@@ -39,8 +39,13 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        {picks.length ? <TopPicks picks={picks} /> : null}
+        {today.data?.season ? (
+          <p className={styles.season}>
+            <strong>{today.data.season.name.replace(/-/g, " ")}.</strong> {today.data.season.advice} Aim for about {formatCount(today.data.season.weekly_target)} applications this week.
+          </p>
+        ) : null}
         <NeedsYou />
+        {picks.length ? <TopPicks picks={picks} /> : null}
         {s ? <Quiet runs={s.recent_runs ?? []} columns={s.pipeline?.columns ?? []} now={now} /> : null}
       </div>
     </Page>

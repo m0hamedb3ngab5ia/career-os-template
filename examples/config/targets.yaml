@@ -100,11 +100,15 @@ volume:
   same_company_cooldown_days: 30      # after a rejection; a posting that closes before it ends goes now
   deadline_cluster_days: 7            # 2+ selected similar roles at one company closing within this many
                                       # days of each other: apply to all of them now, together (cooldown or not)
-  season_multiplier:                  # month → multiplier on max/day
-    "9": 2.0
-    "10": 1.5
-    "1": 2.0
-    "2": 1.5
+  season_multiplier:                  # named hiring-season windows (medium confidence, all-jobs data); the cap is
+                                      # max/day x multiplier (defaults by level: low 0.5, normal 1, high 1.5, peak 2).
+                                      # Old form still works: a month → multiplier mapping ("9": 2.0).
+    - {name: fall-newgrad-wave, start: "08-01", end: "10-31", level: peak, advice: "peak: apply within 48h, push referrals"}
+    - {name: late-fall-tail, start: "11-01", end: "11-30", level: normal, advice: "big tech mostly filled; target startups, follow up"}
+    - {name: holiday-lull, start: "12-01", end: "12-31", level: low, advice: "few postings; network and line up referrals"}
+    - {name: q1-budget-reset, start: "01-01", end: "03-31", level: high, advice: "new budgets; fewer applicants than fall"}
+    - {name: spring-peak, start: "04-01", end: "05-31", level: high, advice: "postings peak; apply broadly to startups"}
+    - {name: summer-shoulder, start: "06-01", end: "07-31", level: normal, advice: "steady; get ready for August listings"}
 
 # reusable default: fine to keep. Only change if you understand the applier (src/careeros/apply/adapters.md).
 safety:

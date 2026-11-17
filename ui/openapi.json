@@ -4696,6 +4696,45 @@
         "title": "ScoreBody",
         "type": "object"
       },
+      "Season": {
+        "description": "REQ-160: the named season window today falls in (targets.yaml volume.season_multiplier list form).",
+        "properties": {
+          "advice": {
+            "title": "Advice",
+            "type": "string"
+          },
+          "daily_cap": {
+            "title": "Daily Cap",
+            "type": "integer"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "multiplier": {
+            "title": "Multiplier",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weekly_target": {
+            "title": "Weekly Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "advice",
+          "multiplier",
+          "daily_cap",
+          "weekly_target"
+        ],
+        "title": "Season",
+        "type": "object"
+      },
       "SelectBody": {
         "properties": {
           "ids": {
@@ -5052,6 +5091,16 @@
           "prepare_queue": {
             "$ref": "#/components/schemas/PrepareQueue"
           },
+          "season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Season"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "top_picks": {
             "items": {
               "$ref": "#/components/schemas/JobListItem"
@@ -5064,7 +5113,8 @@
           "actions",
           "prepare_queue",
           "top_picks",
-          "outreach"
+          "outreach",
+          "season"
         ],
         "title": "Today",
         "type": "object"

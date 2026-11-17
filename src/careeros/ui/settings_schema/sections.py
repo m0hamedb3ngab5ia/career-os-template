@@ -354,9 +354,6 @@ SECTIONS: tuple[Section, ...] = (
             _num(T, "volume.max_per_company_per_90_days", "Applications per company in 90 days", 2, lo=1),
             _num(T, "volume.same_company_cooldown_days", "Cooldown after a rejection", 30, unit="days"),
             _num(T, "volume.deadline_cluster_days", "Apply together when deadlines are within", 7, unit="days"),
-            Field(T, "volume.season_multiplier", "key_value", "Busy-month multiplier", check=_season,
-                  default={"9": 2.0, "10": 1.5, "1": 2.0, "2": 1.5},
-                  help="Month (1–12) → multiplier on applications per day."),
         ), advanced=True),
     ), checks=(_greater("targets:safety.ghost.old_post_days", "targets:safety.ghost.very_old_post_days",
                         "Old post"),)),
@@ -601,6 +598,8 @@ SECTIONS: tuple[Section, ...] = (
 NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "follow_ups.after_days"): "Chat-set nudge delay (days before a follow-up Action Item); default 7 is fine.",
     (P, "follow_ups.reach_out_window_days"): "Chat-set window (days) for the reach-out nag; default 14 is fine.",
+    (T, "volume.season_multiplier"): "Named hiring-season windows (list); chat-edited.",
+    (P, "notify.urgent_min_fit"): "Chat-set; default 85 is fine.",
     (P, "notify.enabled"): "Set up with `careeros notify setup` (needs a Keychain password); not a UI toggle.",
     (P, "notify.digest"): "Chat-set (daily, weekly or off); default daily is fine.",
     (P, "notify.weekly_day"): "Chat-set weekday for the weekly digest.",

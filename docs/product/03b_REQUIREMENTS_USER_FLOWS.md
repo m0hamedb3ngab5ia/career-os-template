@@ -293,3 +293,11 @@ Given a fresh `careeros init` copy · When the user runs `careeros doctor` · Th
 ### REQ-158 Any agent CLI
 `pipeline.yaml: llm.cli: claude | codex | gemini` (default claude) picks the CLI `careeros run` calls per job. Each has one default command, non-interactive with its narrowest working permission mode (Claude dontAsk + allowlist; Codex workspace-write sandbox; Gemini auto_edit). Non-Claude CLIs get "Read .claude/skills/<name>/SKILL.md and follow it for: <args>" instead of a slash command, and their JSONL events yield the same RESULT line and outcome. `careeros doctor` checks the configured binary. `AGENTS.md` and `GEMINI.md` point at `CLAUDE.md`. Claude is tested end to end; Codex and Gemini are best effort.
 Given `llm.cli: codex` · When `careeros run score` calls a job · Then the command is `codex exec --json --sandbox workspace-write "Read .claude/skills/score-job/SKILL.md ..."` and the last agent message's RESULT line is the result.
+
+### REQ-159 Target watch and urgent
+Watched companies are `companies.yaml: dream_list` plus any `boards[]` entry with `watch: true`. After scoring, each new job at a watched company that is not hard-filtered appears once in the digest under "New at your target companies". If its fit is at least `notify.urgent_min_fit` (default 85) it also becomes a high-priority Today item in a top "Urgent" section (open reach-out items sit there too; Dismiss works) and one urgent email: title, company, fit, link, "apply as soon as possible".
+Given a dream-list company posts a job scored 90 · When a tick runs · Then one urgent email and one Urgent row exist, and a second tick adds nothing.
+
+### REQ-160 Hiring seasons
+`targets.yaml: volume.season_multiplier` also accepts named windows `{name, start "MM-DD", end "MM-DD", level low|normal|high|peak, multiplier?, advice}` (defaults by level 0.5/1/1.5/2). The window sets the daily cap; Today shows its name, one-line advice and the adjusted weekly target (cap x 7). The digest warns once, up to 7 days before a high or peak window starts. The old month form keeps working.
+Given a peak window starts in 5 days · When the digest is built · Then a "Coming up" line names it once.

@@ -1657,6 +1657,24 @@ export interface components {
       /** Job Ids */
       job_ids: string[];
     };
+    /**
+     * Season
+     * @description REQ-160: the named season window today falls in (targets.yaml volume.season_multiplier list form).
+     */
+    Season: {
+      /** Advice */
+      advice: string;
+      /** Daily Cap */
+      daily_cap: number;
+      /** Level */
+      level: string;
+      /** Multiplier */
+      multiplier: number;
+      /** Name */
+      name: string;
+      /** Weekly Target */
+      weekly_target: number;
+    };
     /** SelectBody */
     SelectBody: {
       /** Ids */
@@ -1767,6 +1785,7 @@ export interface components {
       /** Outreach */
       outreach: components["schemas"]["OutreachItem"][];
       prepare_queue: components["schemas"]["PrepareQueue"];
+      season: components["schemas"]["Season"] | null;
       /** Top Picks */
       top_picks: components["schemas"]["JobListItem"][];
     };

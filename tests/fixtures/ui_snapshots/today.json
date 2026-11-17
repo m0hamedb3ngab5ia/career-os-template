@@ -92,5 +92,13 @@
     "error": null,
     "total": 0
   },
+  "season": {
+    "advice": "peak: apply within 48h, push referrals",
+    "daily_cap": 30,
+    "level": "peak",
+    "multiplier": 2.0,
+    "name": "fall-newgrad-wave",
+    "weekly_target": 210
+  },
   "top_picks": []
 }

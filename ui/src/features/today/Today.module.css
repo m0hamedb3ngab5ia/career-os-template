@@ -599,3 +599,10 @@
   outline: 2px solid var(--focus);
   outline-offset: 1px;
 }
+
+.season {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.4;
+  color: var(--sec);
+}

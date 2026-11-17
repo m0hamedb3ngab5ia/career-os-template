@@ -156,6 +156,19 @@ def _follow_ups(settings: Settings, out: dict[str, Any], echo: Callable[[str], N
         out["follow_ups_error"] = f"{type(e).__name__}: {e}"[:300]
 
 
+def _watch(settings: Settings, out: dict[str, Any], echo: Callable[[str], None]) -> None:
+    """REQ-159: surface newly scored jobs at watched companies (Today item + urgent email). Never stops the tick."""
+    try:
+        from careeros.watch import scan_watch
+
+        new = scan_watch(settings)
+        out["watch"] = len(new)
+        if new:
+            echo(f"tick: {len(new)} new job(s) at target companies")
+    except Exception as e:  # noqa: BLE001
+        out["watch_error"] = f"{type(e).__name__}: {e}"[:300]
+
+
 def _notify(settings: Settings, out: dict[str, Any], echo: Callable[[str], None], now: datetime) -> None:
     """Daily email digest to self (REQ-155). A failure is logged in the tick result and retried next tick."""
     try:
@@ -215,6 +228,7 @@ def tick(settings: Settings, *, now: datetime | None = None, clock: Callable[[],
                     entry.update(last_run=now.isoformat(), since=now.isoformat(), last_status=status,
                                  last_detail=detail)
         _follow_ups(settings, out, echo)
+        _watch(settings, out, echo)
         _notify(settings, out, echo, now)
         state["last_tick"] = clock().isoformat()
         _write(rs.dir / "schedule.json", state)

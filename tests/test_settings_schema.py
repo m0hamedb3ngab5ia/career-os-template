@@ -177,8 +177,6 @@ def _f(key: str) -> Field:
     ("safety.levels", {"NOT_A_CODE": "off"}, False),
     ("tier_rules", [{"if": "fit >= 80", "tier": "B"}], True),
     ("tier_rules", [{"if": "fit >= 80", "tier": "D"}], False),
-    ("volume.season_multiplier", {"9": 2.0, "1": 1.5}, True),
-    ("volume.season_multiplier", {"13": 2.0}, False),
     ("candidate.graduation", "2026-05", True),
     ("candidate.graduation", "May 2026", False),
     ("candidate.current_base_usd", None, True),

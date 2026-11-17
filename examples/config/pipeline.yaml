@@ -183,6 +183,7 @@ notify:
   enabled: false                          # false: set up with `careeros notify setup`, then true
   digest: daily                            # daily: daily | weekly | off (urgent emails are separate)
   weekly_day: mon                          # mon: day the weekly digest goes out (at send_at)
+  urgent_min_fit: 85                       # 85 (Recommended): a new job at a watched company (dream_list or boards[].watch: true) at/above this fit is urgent
   urgent: true                             # true: immediate "Urgent:" email for rare big things (e.g. a high match at a target company)
   email: null                              # your address (also the Gmail login)
   send_at: "08:00"                         # "08:00": local time; first `careeros tick` at/after it sends once a day
