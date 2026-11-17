@@ -192,13 +192,13 @@ def test_send_kit_referral_uses_the_message_and_flags_manual_tailor():
 
 
 def test_compose_puts_your_line_after_the_greeting_once():
-    """The candidate's line goes after "Hi Adam," (not above it), and is not repeated when the body already has it."""
+    """The candidate's line goes after "Hi Sam," (not above it), and is not repeated when the body already has it."""
     from urllib.parse import unquote
-    d = {**GOOD, "ready": True, "your_line": "Fellow Duck here.",
-         "email": {"subject": "S", "body": "Hi Adam,\n\nAsk."}}
-    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Adam,\n\nFellow Duck here.\n\nAsk."
-    d["email"]["body"] = "Hi Adam,\n\nFellow Duck here. Ask."
-    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Adam,\n\nFellow Duck here. Ask."
+    d = {**GOOD, "ready": True, "your_line": "Fellow alum here.",
+         "email": {"subject": "S", "body": "Hi Sam,\n\nAsk."}}
+    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Sam,\n\nFellow alum here.\n\nAsk."
+    d["email"]["body"] = "Hi Sam,\n\nFellow alum here. Ask."
+    assert unquote(h.compose_url(d).split("&body=")[1]) == "Hi Sam,\n\nFellow alum here. Ask."
 
 
 def test_shared_network_draft_needs_no_bullet_id():

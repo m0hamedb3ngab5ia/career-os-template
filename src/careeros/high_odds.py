@@ -179,7 +179,7 @@ def compose_url(d: dict[str, Any]) -> str | None:
     if not em or not d.get("ready") or not to:
         return None
     line, body = str(d["your_line"]).strip(), str(em.get("body") or "")
-    if line not in body:  # after the greeting ("Hi Adam,"), never above it
+    if line not in body:  # after the greeting ("Hi Sam,"), never above it
         head, sep, rest = body.partition("\n\n")
         body = f"{head}\n\n{line}\n\n{rest}" if sep and head.rstrip().endswith(",") else f"{line}\n\n{body}"
     return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))
