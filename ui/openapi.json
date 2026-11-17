@@ -679,6 +679,87 @@
         "title": "CancelBody",
         "type": "object"
       },
+      "Catalogue": {
+        "properties": {
+          "intro": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Intro",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogueSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "intro",
+          "sections"
+        ],
+        "title": "Catalogue",
+        "type": "object"
+      },
+      "CatalogueRow": {
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "how": {
+            "title": "How",
+            "type": "string"
+          },
+          "req": {
+            "title": "Req",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature",
+          "what",
+          "how",
+          "req"
+        ],
+        "title": "CatalogueRow",
+        "type": "object"
+      },
+      "CatalogueSection": {
+        "properties": {
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogueRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "rows"
+        ],
+        "title": "CatalogueSection",
+        "type": "object"
+      },
       "CatchUp": {
         "properties": {
           "created_at": {
@@ -5541,6 +5622,28 @@
         "summary": "Reopen",
         "tags": [
           "actions"
+        ]
+      }
+    },
+    "/api/catalogue": {
+      "get": {
+        "description": "REQ-165: docs/CATALOGUE.md parsed into sections and rows.",
+        "operationId": "catalogue_api_catalogue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Catalogue",
+        "tags": [
+          "catalogue"
         ]
       }
     },

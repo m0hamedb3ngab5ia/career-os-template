@@ -71,6 +71,7 @@ describe("AppShell", () => {
       "Saved",
       "Not scored",
       "Profile",
+      "What can I do?",
       "Settings",
     ]);
   });

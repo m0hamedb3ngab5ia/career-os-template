@@ -31,6 +31,13 @@ export interface paths {
     /** Reopen */
     post: operations["reopen_api_actions__aid__reopen_post"];
   };
+  "/api/catalogue": {
+    /**
+     * Catalogue
+     * @description REQ-165: docs/CATALOGUE.md parsed into sections and rows.
+     */
+    get: operations["catalogue_api_catalogue_get"];
+  };
   "/api/events": {
     /** Events */
     get: operations["events_api_events_get"];
@@ -511,6 +518,36 @@ export interface components {
     CancelBody: {
       /** Run Id */
       run_id?: string | null;
+    };
+    /** Catalogue */
+    Catalogue: {
+      /** Intro */
+      intro: string[];
+      /** Sections */
+      sections: components["schemas"]["CatalogueSection"][];
+    };
+    /** CatalogueRow */
+    CatalogueRow: {
+      /** Feature */
+      feature: string;
+      /** How */
+      how: string;
+      /** Req */
+      req: string;
+      /** What */
+      what: string;
+    };
+    /** CatalogueSection */
+    CatalogueSection: {
+      /**
+       * Notes
+       * @default []
+       */
+      notes?: string[];
+      /** Rows */
+      rows: components["schemas"]["CatalogueRow"][];
+      /** Title */
+      title: string;
     };
     /** CatchUp */
     CatchUp: {
@@ -1994,6 +2031,20 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Catalogue
+   * @description REQ-165: docs/CATALOGUE.md parsed into sections and rows.
+   */
+  catalogue_api_catalogue_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Catalogue"];
         };
       };
     };

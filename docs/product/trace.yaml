@@ -994,6 +994,13 @@ requirements:
     tests:
     - test_reach_first_item_raised_and_closed
     - test_digest_leads_with_reach_first_and_has_why
+  REQ-165:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_parse_sections_rows_and_intro
+    - test_endpoint_and_missing_file
+    - test_real_catalogue_parses
   REQ-160:
     status: implemented
     provenance: confirmed

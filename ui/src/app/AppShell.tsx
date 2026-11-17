@@ -1,5 +1,5 @@
 import type { LucideIcon } from "lucide-react";
-import { ChevronRight, Search, Settings, Sun, Table2, UserRound, Zap } from "lucide-react";
+import { ChevronRight, CircleHelp, Search, Settings, Sun, Table2, UserRound, Zap } from "lucide-react";
 import { useEffect, useRef, useState, type FormEvent, type RefObject } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router";
 import { useLiveEvents, type Connection } from "../api/events";
@@ -281,6 +281,12 @@ export function AppShell() {
           </li>
         </ul>
         <div className={styles.bottom}>
+          <NavLink to="/catalogue" className={styles.item}>
+            <span className={styles.icon}>
+              <CircleHelp size={16} strokeWidth={1.7} aria-hidden="true" />
+            </span>
+            <span className={styles.itemLabel}>What can I do?</span>
+          </NavLink>
           <NavLink to="/settings" className={styles.item} aria-keyshortcuts={isMac() ? "Meta+," : "Control+,"}>
             <span className={styles.icon}>
               <Settings size={16} strokeWidth={1.7} aria-hidden="true" />

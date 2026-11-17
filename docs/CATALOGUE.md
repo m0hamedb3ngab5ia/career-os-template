@@ -29,6 +29,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 | Writing samples | Learns your writing style from samples you add. | Put files in `profile/voice/samples/`, then `/learn-voice` | REQ-101 |
 | Saved answers | Stores standard answers (work authorization, EEO, address, links) once. | `careeros learn answer "<question>" "<answer>"`, `careeros learn list` | REQ-107 |
 | Credentials | Stores job-site logins outside git for the apply skill. | `careeros creds set <site>` | |
+| Catalogue view | This list in the app: search box, commands with a copy button. | "What can I do?" button on Today, or open `/catalogue` in `careeros ui` | REQ-165 |
 | Setup view | Static HTML tabs: Setup, Documents, Jobs, Search, Applications. | `careeros view --open` | |
 | Template sync | Compares and pulls this copy against the public template. | `careeros sync status`, `careeros sync pull` | |
 

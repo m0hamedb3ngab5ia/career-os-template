@@ -14,6 +14,7 @@ export const routes: RouteObject[] = [
       { path: "pipeline", loader: () => redirect("/jobs?tab=applied&view=board") },
       { path: "jobs", lazy: () => import("../features/jobs/JobsPage").then((m) => ({ Component: m.JobsPage })) },
       { path: "profile", lazy: () => import("../features/profile/ProfilePage").then((m) => ({ Component: m.ProfilePage })) },
+      { path: "catalogue", lazy: () => import("../features/catalogue/CataloguePage").then((m) => ({ Component: m.CataloguePage })) },
       { path: "settings", lazy: () => import("../features/profile/SettingsPage").then((m) => ({ Component: m.SettingsPage })) },
       { path: "*", element: <NotFoundPage /> },
     ],
