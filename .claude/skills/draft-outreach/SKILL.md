@@ -45,8 +45,12 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
 - Every claim traces to a bullet id or narrative id; numbers and tools exactly as in the bullet.
   Placeholder bullets never. Record `bullet_ids` / `narrative_ids` per draft.
 - One company/team fact per message, from `contacts.json`/posting/cover letter facts (source recorded).
-- Voice: first person, short sentences, plain ask, no flattery, no banned phrases, no em-dash > 1 per
-  message, no rhetorical questions, no "I hope this finds you well".
+- Voice: warm, humble, brief and easy to read, like a person, not a status report. Follow the candidate's
+  template in `profile/voice/followups/post_apply_outreach.md` when present (greeting line, why I'd fit in 2-3 plain
+  reasons, résumé attached, one ask). A friendly opener such as "I hope this message finds you well" is fine when the
+  template uses it (user 2026-11-17: the clipped "I applied. <résumé line>. Could you...?" emails read as robotic).
+  Vary the ask: a brief chat, a referral (employees only, not every email), or how to position myself in the process.
+  No flattery, no banned phrases, no em-dash > 1 per message, no rhetorical questions, no stacked numbers.
 - Plain text: bullet text may carry `**bold**` markers (résumé PDF only). Never copy them into a note, message or
   email; any `**` in outreach.json hard-fails QA (`no_markdown_bold`).
 - Never claim a referral, a mutual contact, or that you were told to reach out. Never mention having
