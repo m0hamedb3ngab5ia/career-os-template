@@ -8,6 +8,7 @@ from __future__ import annotations
 import re
 from copy import deepcopy
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from careeros.config import ConfigError
@@ -40,6 +41,15 @@ TIMEOUT_KINDS = ("score", "prepare", "apply", "inbox_sync")
 # with one `result` event; dontAsk denies any tool not in --allowedTools instead of prompting (nobody is there).
 DEFAULT_HEADLESS_CMD: list[str] = ["claude", "-p", "--output-format", "stream-json", "--verbose",
                                    "--permission-mode", "dontAsk"]
+# REQ-158: the agent CLI `careeros run` drives (`llm.cli`). Claude Code is the tested path; the others are built from
+# their docs (2026-11): `codex exec` is non-interactive, --json streams JSONL, workspace-write lets skills write
+# files in the repo (no network, no per-tool allowlist). Gemini has no per-tool allowlist on the CLI (--allowed-tools
+# is deprecated for its policy engine): auto_edit approves file edits only, so shell commands need a policy rule.
+CLI_CMDS: dict[str, list[str]] = {
+    "claude": DEFAULT_HEADLESS_CMD,
+    "codex": ["codex", "exec", "--json", "--sandbox", "workspace-write"],
+    "gemini": ["gemini", "--output-format", "stream-json", "--approval-mode", "auto_edit"],
+}
 DEFAULT_ALLOWED_TOOLS: list[str] = [
     "Read", "Write", "Edit", "Glob", "Grep",
     "Bash(.venv/bin/careeros *)", "Bash(.venv/bin/python *)", "Bash(date *)",
@@ -111,6 +121,7 @@ class RunsConfig:
     headless_cmd: list[str] = field(default_factory=lambda: list(DEFAULT_HEADLESS_CMD))
     allowed_tools: list[str] = field(default_factory=lambda: list(DEFAULT_ALLOWED_TOOLS))
     model: str | None = None
+    cli: str = "claude"
     scoring: dict[str, int] = field(default_factory=dict)  # pipeline.yaml: scoring (runs/scoring.py, REQ-134/135)
     parallel: dict[str, int] = field(default_factory=lambda: {"score": 1, "prepare": 1})  # runs.parallel: jobs at once per kind
     raw: dict[str, Any] = field(default_factory=dict)
@@ -233,8 +244,15 @@ def load_runs_config(settings: Any) -> RunsConfig:
     llm = pipeline.get("llm") or {}
     if not isinstance(llm, dict):
         raise _err("llm must be a mapping")
+    cfg.cli = str(llm.get("cli") or "claude")
+    if cfg.cli not in CLI_CMDS:
+        raise _err(f"llm.cli must be one of {', '.join(CLI_CMDS)}, got {cfg.cli!r}")
+    cfg.headless_cmd = list(CLI_CMDS[cfg.cli])
     if "headless_cmd" in llm:
         cfg.headless_cmd = _str_list(llm["headless_cmd"], "llm.headless_cmd")
+        if cfg.headless_cmd and Path(cfg.headless_cmd[0]).name != cfg.cli:
+            raise _err(f"llm.headless_cmd runs {cfg.headless_cmd[0]!r} but llm.cli is {cfg.cli!r}: "
+                       "delete llm.headless_cmd (each cli has a default) or make them match")
     if "allowed_tools" in llm:
         cfg.allowed_tools = _str_list(llm["allowed_tools"], "llm.allowed_tools")
     model = llm.get("model_hint")
