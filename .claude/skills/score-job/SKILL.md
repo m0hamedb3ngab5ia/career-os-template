@@ -142,8 +142,8 @@ If no category scores > 0: category `unknown`, confidence 0, decision `skip`, sk
 - `seniority_guess`: `new_grad | early_career | mid | senior | staff+` from title words (New Grad,
   Early Career, I/II, Senior, Staff, Principal, Lead) and stated YOE.
 - `salary_est`: `{min, max, source}` where source = `posting` if numbers present, else your estimate
-  from title+location+industry with source `estimate` (be conservative; new-grad NYC backend
-  110k-160k). Never present an estimate as posted.
+  from title+location+industry with source `estimate` (be conservative; anchor on the candidate's
+  `min_base_usd`, `candidate.level` and the first `location.preferred` city, never a fixed range). Never present an estimate as posted.
 - `prestige_tier`: the key in `prestige_tiers` whose list contains the company (case-insensitive,
   normalize "Inc", "Securities" variants only if the list uses them), else `null`.
 

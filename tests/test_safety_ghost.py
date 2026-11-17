@@ -130,6 +130,7 @@ def test_layoffs_only_lower_confidence(example_settings):
 
 
 def test_dream_company_skip_becomes_review(example_settings):
+    example_settings.companies["dream_list"] = ["Stripe"]
     p = _p(company="Stripe", posted_at="2026-05-01", last_updated="2026-05-01")
     flags = check_ghost(p, None, {}, example_settings, today=TODAY, company_history={})
     assert verdict(flags) == "review" and "GHOST_STALE_NO_ACTIVITY" in _codes(flags)

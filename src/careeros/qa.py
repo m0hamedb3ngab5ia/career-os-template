@@ -86,7 +86,7 @@ TOOL_ALLOWLIST = {
     "technologies", "technology", "databases", "cloud", "devops", "messaging", "scheduling", "testing", "ci",
     "gpa", "b.e", "b.e.", "b.s", "b.s.", "bs", "be", "bachelor", "bachelors", "bachelor's",
     "master", "masters", "degree", "university", "institute", "college", "school",
-    "us", "usa", "u.s", "u.s.", "nj", "ny", "ct", "ma", "pa", "remote", "hybrid",
+    "us", "usa", "u.s", "u.s.", "remote", "hybrid",
     "linkedin", "github", "email", "phone", "portfolio", "website",
     "inc", "llc", "co", "ltd", "corp", "group",
     "engineer", "engineering", "software", "developer", "intern", "internship", "co-op", "assistant",

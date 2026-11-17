@@ -75,17 +75,26 @@ sponsorship, school, links, phone, start date, and the `eeo:` block ("Decline to
 Replace each line marked `# INSERT`, then delete the comment. Claude asks you these one group at a time during
 onboarding and never guesses a legal answer.
 
-## 7. Targets and companies
+## 7. Your preferences
 
-| File | Set |
+Nothing in `config/` is yours until you answer. The [onboard](../.claude/skills/onboard/SKILL.md) skill asks one
+group at a time and writes the answers, keeping the file comments: (a) role and level, (b) where you will work,
+(c) work authorization (written to `targets.yaml` and, derived from the same answer, to `standard_answers.yaml`),
+(d) pay floor, (e) dream companies, never-apply list, industries, and whether to keep the company prestige ranking,
+(f) applications per day, timezone, quiet hours, busy seasons, (g) cover-letter length, phrases you never use, voice
+samples, (h) mail provider (only Gmail is wired) and Handshake (students and new graduates only).
+
+| File | Holds |
 |---|---|
-| `config/targets.yaml` | `candidate` (level, graduation, salary floors, work authorization), `location`, roles in `scout.filters` |
-| `config/companies.yaml` | `dream_list` (you review these yourself; never auto-submitted), `blocklist.companies` (your current employer) |
-| `config/categories.yaml` | each `bullet_priority` list: your own experience ids, most relevant first |
-| `config/pipeline.yaml` | fine as is; `paths.tracker_xlsx` moves the tracker spreadsheet |
+| `config/targets.yaml` | `candidate` (level, graduation, salary floors, work authorization), `location`, `seniority`, `industries`, `volume` |
+| `config/companies.yaml` | `dream_list` (you review these yourself; never auto-submitted), `blocklist`, `searches.keywords`, `boards` |
+| `config/categories.yaml` | the job families (title words, skills) and each `bullet_priority` list: your own experience ids, most relevant first |
+| `config/qa.yaml`, `config/pipeline.yaml` | cover-letter length and banned phrases; timezone, quiet hours, tracker path |
 
-Run `.venv/bin/careeros doctor` again until it exits with no FAIL. WARN lines are advice. An `# INSERT` WARN on a
-line where Alex's value is also your true answer (say `"Yes"`) goes away when you delete the comment.
+Run `.venv/bin/careeros doctor` again until it exits with no FAIL. It FAILs while a `candidate:` value,
+`location.preferred` or the `Example Company` dream-list line is still the example's, and when your work
+authorization in `targets.yaml` disagrees with `standard_answers.yaml`. Other WARN lines are advice. An `# INSERT`
+WARN on a line where the example value is also your true answer goes away when you delete the comment.
 
 ## 8. Approve how your résumé looks
 
@@ -120,8 +129,8 @@ already sent you, and you sign in to Gmail yourself.
 .venv/bin/careeros job show <id>
 ```
 
-Scout found nothing? `data/scout_last.json` shows which filter removed what; loosen that filter in
-`config/targets.yaml: scout.filters`. A job ends as `needs_review` when something needs your answer:
+Scout found nothing? `data/scout_last.json` shows which filter removed what; loosen that filter (`config/targets.yaml: scout.filters`
+toggles each; title words are `title_keywords` in `config/categories.yaml`). A job ends as `needs_review` when something needs your answer:
 `careeros action list`, then `careeros action done <id> --answer "..."`.
 
 A prepared job folder `data/jobs/<id>/` holds `score.json` (fit and why), `resume.pdf`, `cover_letter.md` and

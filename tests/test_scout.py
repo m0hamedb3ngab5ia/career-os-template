@@ -26,6 +26,7 @@ def test_prefilter_title_match(example_settings):
 
 def test_prefilter_location_and_blocklist(example_settings):
     example_settings.targets["location"]["blocked_countries"] = ["DE"]
+    example_settings.companies["blocklist"] = {"companies": ["Globex Bank"], "name_patterns": ["draftkings"]}
     pf = Prefilter(example_settings)
     assert pf.check(_p("Software Engineer", location="Berlin, Germany"))[1] == "location"
     assert pf.check(_p("Software Engineer", location="Remote", raw={"country": "DE"}))[1] == "location"
@@ -37,6 +38,8 @@ def test_prefilter_location_and_blocklist(example_settings):
 
 def test_settings_helpers(example_settings):
     s = example_settings
+    s.companies["dream_list"] = ["Stripe", "Databricks", "Anthropic"]
+    s.companies["blocklist"] = {"companies": ["Globex Bank"]}
     dream = s.merged_dream_list()
     assert dream[:3] == ["Stripe", "Databricks", "Anthropic"]  # explicit dream_list first, then auto tiers
     assert "Citadel" in dream and "Two Sigma" in dream and "Akuna Capital" in dream
