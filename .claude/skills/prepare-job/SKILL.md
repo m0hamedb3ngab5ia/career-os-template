@@ -166,7 +166,7 @@ has a 1st-degree connection at the company. Exit 1 = no network imported yet: ig
 
 Outreach (REQ-162, DEC-027): unless `config/pipeline.yaml: outreach.auto` is false, when `status` is `queued` and
 `score.fit >= outreach.min_fit` (default 80), also run `.claude/skills/find-contacts/SKILL.md` then
-`.claude/skills/draft-outreach/SKILL.md` for the job. Drafts follow the "Easy, not slop" rules (candidate template, warm and humble): at most 100 words before the sign-off,
+`.claude/skills/draft-outreach/SKILL.md` for the job. Drafts follow the "Easy, not slop" rules (candidate template, warm and humble): at most 120 words before the sign-off,
 `fact_source` (one sourced fact from the posting or company), `bullet_ids`, one `ask`, an empty `your_line` for the
 candidate. Then run `.venv/bin/careeros outreach qa <job_id>`; fix and re-run once if it reports problems. A draft
 is "ready" only after the candidate adds their own line (`careeros outreach qa <job_id> --line "..." --contact NAME`);

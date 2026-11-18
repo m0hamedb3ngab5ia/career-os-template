@@ -72,7 +72,7 @@ GOOD = {"contact": "Sam", "to": "s@x.com", "email": {"subject": "Hi", "body": "I
 
 
 def test_gate_flags_slop_and_requires_your_line():
-    bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * 110}, "facts_used": []}
+    bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * 130}, "facts_used": []}
     probs = h.draft_problems(bad, ["I hope this finds you well"])
     assert any("too long" in p for p in probs) and any("banned" in p for p in probs) and any("fact" in p for p in probs)
     d = dict(GOOD)
@@ -223,7 +223,7 @@ def test_mail_app_link_for_iphone():
 
 def test_word_limit_skips_the_signature():
     """The candidate's template signs off with name and LinkedIn; only the message counts toward the limit."""
-    msg = " ".join(["word"] * 98)
+    msg = " ".join(["word"] * 118)
     d = {**GOOD, "email": {"subject": "S", "body": f"Hi Sam,\n\n{msg}\n\nThank you,\nAlex Example\n555-0100\nhttps://linkedin.com/in/x"}}
     assert h.draft_problems(d, []) == []
     d["email"]["body"] = f"Hi Sam,\n\n{msg} two more words\n\nThank you,\nAlex Example"

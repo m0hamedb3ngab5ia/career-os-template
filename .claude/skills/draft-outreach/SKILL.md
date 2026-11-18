@@ -50,7 +50,9 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   reasons, résumé attached, one ask). Open with the person, in plain words a stranger understands: "I came across your
   profile and saw that you lead <team> at <company>." Never name a source they would not recognise ("your Built In
   interview"). Then one honest line on why that connects to me ("Payments at that scale are the kind of work I want
-  to do"); for a recruiter, "so I thought you'd be the right person to reach out to". No praise. Then "I see <company> has
+  to do"). Use their CURRENT role only: verify it (company team page, recent news or post, dated within ~6 months;
+  record `role_verified` with url + date). If they have moved on, drop them unless they share a school or employer with
+  the candidate; then say it plainly ("I saw you were at <company> and that we both went to <school>"). For a recruiter, "so I thought you'd be the right person to reach out to". No praise. Then "I see <company> has
   <role> open, and I think I'd be a great fit because ...". Fit reasons are impact, not stack: what the work means
   (ships to production at an investment bank, high-stakes and fast-paced, builds with AI agents), never "Java and
   Kafka at <employer>" or résumé numbers (user 2026-11-18). A friendly opener such as "I hope this message finds you well" is fine when the
@@ -64,8 +66,9 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
 - Referral ask (employee contact, not a recruiter): ask them to submit the referral through the company's applicant
   system, not just forward the resume. When `posting.json: ats` is `greenhouse`, name the Greenhouse referral form
   (referrals entered there land in the recruiters' priority review queue; research/greenhouse.md s5). Other ATS:
-  ask them to use their company's internal referral process, with no claim about priority. One short clause inside
-  the single ask; keep the message at most 100 words (sign-off not counted). Recruiters never get this line. Never claim a referral that
+  ask them to use their company's internal referral process, with no claim about priority. Lead with a brief chat,
+  since a stranger needs a reason to refer: "<Company> uses Greenhouse, where referrals reach recruiters first. Would you
+  be open to a brief chat about a referral, or to referring me directly? Totally understand if not." (user 2026-11-18); keep the message at most 120 words (sign-off not counted). Recruiters never get this line. Never claim a referral that
   was not agreed.
 - Use the contact's first name only if `confidence` is `high`; else open with "Hi," (no name).
 - Addressing by role: recruiter -> ask about process/timeline and offer the resume; hiring manager
@@ -82,7 +85,7 @@ For each entry in `contacts.json.contacts` produce:
    number, the ask (15-min chat or "would you be the right person to ask about <role>?").
 3. `email`: when the job is already applied, this is the after-applying outreach (`post_apply_outreach.md`, ~100 words,
    one hook, one or two proofs, not a mini cover letter). Otherwise: `subject` (<= 60 chars, e.g. "New grad backend
-   applicant: <role> at <company>"), `body` (at most 100 words before the sign-off, DEC-027), in the template shape: greeting, "reaching out regarding <role>", 2-3 plain fit reasons (bullet ids), résumé attached, one varied ask, sign-off "Thank you," + name + LinkedIn
+   applicant: <role> at <company>"), `body` (at most 120 words before the sign-off, DEC-027), in the template shape: greeting, "reaching out regarding <role>", 2-3 plain fit reasons (bullet ids), résumé attached, one varied ask, sign-off "Thank you," + name + LinkedIn
    `identity.name` + LinkedIn URL (never the phone number) from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
 4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.

@@ -1,7 +1,7 @@
 # After applying: outreach to a recruiter, hiring manager or engineer
 
 Send same day to 3 days after applying. Brief, straightforward, easy to read, humble: it should sound like a person,
-not a status report ("I applied. <résumé line>. Could you...?" reads as robotic). At most 100 words before the sign-off.
+not a status report ("I applied. <résumé line>. Could you...?" reads as robotic). At most 120 words before the sign-off.
 LinkedIn variant: the same idea cut roughly in half (connection note <= 300 characters).
 A candidate's own wording in `profile/voice/followups/post_apply_outreach.md` replaces this skeleton.
 
@@ -20,7 +20,8 @@ I saw the [ROLE] role at [COMPANY], and I think I'd be a great fit because [IMPA
 
 [ONE ASK, vary it; a referral only from employees, and not in every email:]
 I'd be glad to connect briefly if you're open to it.
-  / Would you be open to referring me through [Greenhouse's referral form / your referral process]? Totally understand if not.
+  / (Greenhouse) [COMPANY] uses Greenhouse, where referrals reach recruiters first. Would you be open to a brief chat
+    about a referral, or to referring me directly? Totally understand if not.
   / Is there anything I could do to better position myself in the process?
 
 Thank you,
