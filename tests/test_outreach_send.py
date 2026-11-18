@@ -1,4 +1,4 @@
-"""Send panel: per draft, read it, open in iPhone Mail, open a Gmail draft with the résumé attached, or send on request."""
+"""Send panel: per draft, read it, open in the Mail app (iPhone or Mac), open a Gmail draft with the résumé attached, or send on request."""
 from __future__ import annotations
 
 import email

@@ -202,4 +202,4 @@ Decision: Daily/weekly digest and urgent emails go only to the candidate's own a
 ### DEC-027 High-odds channels are the default path
 Reasoned by: human (2026-11-16).
 Decision: AI-tailored volume is now baseline (docs/work/yield-model/research/competition.md). Outreach after applying, referrals and applying to fresh postings fast move the odds and are rarer, so they are the product's default and are explained to the user, not optional extras.
-Amended (human, 2026-11-18): the candidate asked for three ways to send each approved email: iPhone Mail link, a Gmail draft with the résumé attached (career-os writes to the candidate's own Drafts), and send-now on an explicit yes per email, with a bounce warning. Nothing is scheduled or sent without that yes (`careeros outreach panel`, `outreach send`).
+Amended (human, 2026-11-18): the candidate asked for three ways to send each approved email: Mail-app link (iPhone or Mac), a Gmail draft with the résumé attached (career-os writes to the candidate's own Drafts), and send-now on an explicit yes per email, with a bounce warning. Nothing is scheduled or sent without that yes (`careeros outreach panel`, `outreach send`).

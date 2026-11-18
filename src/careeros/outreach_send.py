@@ -1,5 +1,5 @@
-"""Send panel for outreach drafts (user 2026-11-18). Per draft, four options in chat: read it, open it in the iPhone
-Mail app (mailto, no attachment), open a Gmail draft with the résumé attached (IMAP append to the candidate's own
+"""Send panel for outreach drafts (user 2026-11-18). Per draft, four options in chat: read it, open it in the Mail app (iPhone or Mac)
+(mailto, no attachment), open a Gmail draft with the résumé attached (IMAP append to the candidate's own
 Drafts; the candidate presses Send), or send it now on the candidate's explicit request (SMTP, with a bounce warning).
 The app password is the one `careeros notify setup` stored in the Keychain; nothing here runs on a schedule."""
 from __future__ import annotations
@@ -70,7 +70,7 @@ def send_now(frm: str, password: str, d: dict[str, Any], resume: Path | None, na
 
 def panel(rows: list[dict[str, Any]]) -> str:
     """Markdown: one table row per draft with Read / Mail / Gmail / Auto-send, then each draft in full."""
-    out = ["| # | To | Company, role | Address | Read | iPhone | Laptop | Auto-send |", "|---|---|---|---|---|---|---|---|"]
+    out = ["| # | To | Company, role | Address | Read | Mail app | Gmail | Auto-send |", "|---|---|---|---|---|---|---|---|"]
     full = []
     for r in rows:
         d, n = r["draft"], r["n"]
@@ -86,6 +86,6 @@ def panel(rows: list[dict[str, Any]]) -> str:
         em = d.get("email") or {}
         full.append(f'<a id="d{n}"></a>\n### {n}. {d.get("contact")}, {r["company"]}\n\n**Subject:** {em.get("subject")}\n\n'
                     f'{em.get("body")}\n')
-    legend = ("**iPhone:** opens Mail with the email typed in; attach your résumé yourself. **Laptop:** a Gmail draft "
+    legend = ("**Mail app** (iPhone or Mac): opens Mail with the email typed in; attach your résumé yourself. **Gmail:** a draft "
               "with your résumé attached; read it and press Send. **Auto-send:** reply `send <#>`. " + WARNING)
     return "\n".join(out) + "\n\n" + legend + "\n\n## Drafts\n\n" + "\n".join(full)

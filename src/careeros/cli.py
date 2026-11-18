@@ -1639,7 +1639,7 @@ def _job_resume(job_dir: Path) -> Path | None:
 
 
 def cmd_outreach_panel(args: argparse.Namespace) -> int:
-    """Send panel (markdown): every unsent email draft with Read / iPhone Mail / Gmail draft / auto-send.
+    """Send panel (markdown): every unsent email draft with Read / Mail app (iPhone or Mac) / Gmail draft / auto-send.
     `--gmail` first puts each unheld draft in Gmail Drafts with the résumé attached (once per draft)."""
     import json
 
@@ -2865,7 +2865,7 @@ def build_parser() -> argparse.ArgumentParser:
     okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
     okt.add_argument("job_ids", nargs="*")
     okt.set_defaults(fn=cmd_outreach_kit)
-    opn = outs.add_parser("panel", help="send panel: every unsent email with Read / iPhone Mail / Gmail draft / auto-send")
+    opn = outs.add_parser("panel", help="send panel: every unsent email with Read / Mail app (iPhone or Mac) / Gmail draft / auto-send")
     opn.add_argument("job_ids", nargs="*")
     opn.add_argument("--gmail", action="store_true", help="first put each draft in Gmail Drafts with the résumé attached")
     opn.set_defaults(fn=cmd_outreach_panel)
