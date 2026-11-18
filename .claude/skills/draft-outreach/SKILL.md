@@ -37,6 +37,21 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
 
 ## 2. Rules
 
+- Why would THIS person help? Answer it before writing, in `why_refer` (the gate fails without it), and put it in
+  the message in at most one sentence (research: `docs/research/stranger-referrals.md`):
+  - Shared background (school, employer, program, city, uncommon path; verified from `profile/master.yaml` and
+    the contact's profile, never guessed) → that is the reason; lead with it (`shared_network`, rule below).
+  - None → lower their risk instead: one checkable proof in plain words (an outcome, at most one number, no tool
+    names), and offer a 10-minute chat so they can judge fit before referring.
+  - Never mention a referral bonus (it makes the ask look transactional). Never state traits ("go-getter",
+    "charismatic", "passionate"); show one through a fact. The gate fails both.
+  - Exactly one ask. For an engineer, manager or founder the chat offer is the ask ("Would you be open to a
+    10-minute chat?"), never a chat line in the reasons plus a second ask. Recruiters and role inboxes get a
+    process or positioning ask, no chat-to-judge-fit line.
+  - Describe a proof at its true status ("delivered a fix for", "designed to protect"); never imply production use
+    the bullet doesn't state.
+  - Write each message for one named person; no sentence repeated verbatim across a batch, least of all two
+    emails to one company. Prefer one strong contact per company over several near-identical emails.
 - Shared network (same school, employer, program or high school as the candidate, from `profile/master.yaml` and the
   contact's profile): set `shared_network` (e.g. "State University alum") and write a short, warm note instead of a pitch.
   Open with the overlap ("fellow <school> alum"), one line of interest in the role, the ask, "résumé attached". Body
@@ -118,6 +133,7 @@ For each contact `outreach check` marks `manual: true`:
      "linkedin_message": "...", "email": {"subject": "...", "body": "..."},
      "followup_7d": "...", "followup_14d": null,
      "bullet_ids": ["acme.1"], "narrative_ids": ["n.data"], "facts_used": [{"fact": "...", "source": "posting"}],
+     "why_refer": "fellow State University alum" ,
      "manual_tailor": false, "manual_reason": null, "send_after": null, "linkedin_send_after": null,
      "auto_send": false, "sent": false, "sent_by": null}
   ],

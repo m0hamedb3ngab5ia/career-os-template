@@ -68,7 +68,23 @@ def test_fresh_watched_job_emails_once(settings, monkeypatch):
 
 
 GOOD = {"contact": "Sam", "to": "s@x.com", "email": {"subject": "Hi", "body": "I built a stock reconciler. Would you point me to the right person?"},
-        "facts_used": [{"fact": "ships daily", "source": "posting"}], "bullet_ids": ["b1"]}
+        "facts_used": [{"fact": "ships daily", "source": "posting"}], "bullet_ids": ["b1"],
+        "why_refer": "low risk: one checkable proof plus a 10-minute chat first"}
+
+
+def test_gate_requires_why_refer_and_rejects_bonus_and_trait_claims():
+    """Research 2026-11-18 (stranger-referrals.md): every draft answers why THIS person would help; never mention
+    the referral bonus (cuts credibility); show traits through a fact, never claim them."""
+    assert h.draft_problems(GOOD, []) == []
+    no_why = {k: v for k, v in GOOD.items() if k != "why_refer"}
+    assert any("why_refer" in p for p in h.draft_problems(no_why, []))
+    bonus = {**GOOD, "email": {**GOOD["email"], "body": "You'd also get the referral bonus. Would you refer me?"}}
+    assert any("bonus" in p for p in h.draft_problems(bonus, []))
+    trait = {**GOOD, "email": {**GOOD["email"], "body": "I'm a charismatic go-getter. Would you refer me?"}}
+    assert any("trait claim" in p for p in h.draft_problems(trait, []))
+    for field in ("linkedin_note", "linkedin_message"):  # every sendable text, not just the email
+        assert any("bonus" in p for p in h.draft_problems({**GOOD, field: "Happy to share the referral bonus."}, []))
+        assert any("trait claim" in p for p in h.draft_problems({**GOOD, field: "I'm a witty go-getter."}, []))
 
 
 def test_gate_flags_slop_and_your_line_is_optional():
