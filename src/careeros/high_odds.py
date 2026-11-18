@@ -16,7 +16,7 @@ from careeros.tracker import Tracker
 FRESH_URGENT_HOURS = 48
 DONE_STATUSES = {"applied", "screening", "interview", "offer", "rejected", "skipped", "withdrawn"}
 REACH_FIRST = "reach_first"
-MAX_WORDS = 80
+MAX_WORDS = 100  # message only, sign-off excluded; the person line needs room (user 2026-11-18)
 
 # One plain line per item kind. Numbers are copied from docs/work/yield-model/research (funnel.md, competition.md).
 WHY = {

@@ -1,7 +1,7 @@
 # After applying: outreach to a recruiter, hiring manager or engineer
 
 Send same day to 3 days after applying. Brief, straightforward, easy to read, humble: it should sound like a person,
-not a status report ("I applied. <résumé line>. Could you...?" reads as robotic). At most 80 words before the sign-off.
+not a status report ("I applied. <résumé line>. Could you...?" reads as robotic). At most 100 words before the sign-off.
 LinkedIn variant: the same idea cut roughly in half (connection note <= 300 characters).
 A candidate's own wording in `profile/voice/followups/post_apply_outreach.md` replaces this skeleton.
 
@@ -12,8 +12,10 @@ Subject: [ROLE] at [COMPANY]
 
 Hi [NAME],
 
-I hope this message finds you well. I came across your [BACKGROUND OR WORK, one sourced line, no praise] and wanted
-to reach out. I see [COMPANY] has the [ROLE] role open, and I think I'd be a great fit because [IMPACT REASON 1] and
+I hope this message finds you well. I came across your profile and saw that you [WHAT THEY DO, plain words].
+[WHY THAT CONNECTS TO ME, one honest line; recruiter: "so I thought you'd be the right person to reach out to."]
+
+I saw the [ROLE] role at [COMPANY], and I think I'd be a great fit because [IMPACT REASON 1] and
 [IMPACT REASON 2]. My résumé is attached.
 
 [ONE ASK, vary it; a referral only from employees, and not in every email:]
@@ -39,8 +41,10 @@ Subject: Backend Engineer at Acme
 
 Hi Dan,
 
-I hope this message finds you well. I came across your talk on Acme's payments platform and wanted to reach out. I see
-Acme has the Backend Engineer role open, and I think I'd be a great fit because I ship production software at a
+I hope this message finds you well. I came across your profile and saw that you lead Acme's payments platform.
+Payments are the kind of work I want to do.
+
+I saw the Backend Engineer role at Acme, and I think I'd be a great fit because I ship production software at a
 logistics company where outages cost real money, and I move fast without breaking things. My résumé is attached.
 
 I'd be glad to connect briefly if you're open to it.

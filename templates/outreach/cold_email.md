@@ -1,7 +1,7 @@
 # Cold email (engineer or hiring manager)
 
 Sent via Gmail only after the candidate confirms the template (see TODO.md). Until then: draft in Contacts tab.
-At most 80 words before the sign-off. Subject under 60 characters.
+At most 100 words before the sign-off. Subject under 60 characters.
 
 ## Guidance
 
@@ -10,7 +10,7 @@ At most 80 words before the sign-off. Subject under 60 characters.
 - Why I'd fit: 2-3 short plain reasons (bullet ids, numbers intact, never stacked in one sentence).
 - Ask: one. Call, referral, or "who should I talk to". For a referral from an employee (not a recruiter), ask them to
   submit it in the company's applicant system (the Greenhouse referral form when `posting.ats` is greenhouse, where referrals land in the recruiters'
-  priority review queue; other ATS: their internal referral process, no priority claim). Keep the message at most 80 words (the sign-off is not counted).
+  priority review queue; other ATS: their internal referral process, no priority claim). Keep the message at most 100 words (the sign-off is not counted).
 - Close: "Thank you," then the full name from `profile/master.yaml: identity.name`,
   LinkedIn from `identity` under it. Never the phone number.
 - Email address confidence must be `verified` or `pattern_match_high` before any auto-send.
