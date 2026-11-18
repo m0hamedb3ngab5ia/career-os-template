@@ -228,3 +228,20 @@ def test_word_limit_skips_the_signature():
     assert h.draft_problems(d, []) == []
     d["email"]["body"] = f"Hi Sam,\n\n{msg} two more words\n\nThank you,\nAlex Example"
     assert any("too long" in p for p in h.draft_problems(d, []))
+
+
+def test_a_long_closing_paragraph_starting_with_thanks_still_counts():
+    """Only a short sign-off line is skipped; a long last paragraph that opens with "Thank you" is message."""
+    msg = " ".join(["word"] * 100)
+    long_close = "Thank you " + " ".join(["more"] * 40)
+    d = {**GOOD, "email": {"subject": "S", "body": f"Hi Sam,\n\n{msg}\n\n{long_close}\n\nBest,\nAlex Example"}}
+    assert any("too long" in p for p in h.draft_problems(d, []))
+
+
+def test_fresh_urgent_failure_is_retried_next_tick(settings):
+    """A failed urgent send must not mark the job seen; the next tick sends it."""
+    Tracker(settings=settings).init()
+    h.scan_fresh(settings, NOW, send=lambda *x, **k: "sent")  # baseline
+    a = _job(settings, 1, 90, 10)
+    assert h.scan_fresh(settings, NOW, send=lambda *x, **k: "error: SMTPException: down") == []
+    assert h.scan_fresh(settings, NOW, send=lambda *x, **k: "sent") == [a.job_id]

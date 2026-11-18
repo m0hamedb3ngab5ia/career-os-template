@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any, Callable
 from urllib.parse import quote
 
+from careeros.high_odds import final_body
+
 WARNING = ("Auto-send sends right away from your Gmail. Addresses are guesses at each company's email format; a "
            "bounce hurts how Gmail treats your mail, so send only the ones you approve, one at a time.")
 
@@ -21,30 +23,48 @@ class SendError(RuntimeError):
     pass
 
 
+def check(d: dict[str, Any]) -> None:
+    """Every route (Mail link, Gmail draft, send) refuses a held draft or one that has not passed the outreach gate."""
+    if d.get("hold"):
+        raise SendError(f"{d.get('contact')}: held ({d.get('hold_reason') or 'unverified'}); fix the draft first")
+    if d.get("qa_pass") is not True:
+        raise SendError(f"{d.get('contact')}: has not passed outreach QA ({'; '.join(d.get('qa_problems') or []) or 'run `careeros outreach qa`'})")
+
+
 def build_message(frm: str, d: dict[str, Any], resume: Path | None, name: str) -> EmailMessage:
+    """The email with the résumé attached. Refuses without the PDF: every draft says the résumé is attached."""
+    check(d)
+    if not resume or not resume.exists():
+        raise SendError(f"{d.get('contact')}: no résumé PDF for this job (resume.pdf or submitted/*/resume.pdf)")
     em = d.get("email") or {}
     m = EmailMessage()
     m["From"], m["To"], m["Subject"] = frm, str(d["to"]), str(em.get("subject") or "")
-    m.set_content(str(em.get("body") or ""))
-    if resume and resume.exists():
-        m.add_attachment(resume.read_bytes(), maintype="application", subtype="pdf",
-                         filename=f"{name.replace(' ', '_')}_Resume.pdf")
+    m.set_content(final_body(d))
+    m.add_attachment(resume.read_bytes(), maintype="application", subtype="pdf",
+                     filename=f"{name.replace(' ', '_')}_Resume.pdf")
     return m
 
 
-def mail_link(d: dict[str, Any]) -> str:
+def mail_link(d: dict[str, Any]) -> str | None:
+    """mailto: link (Mail app on iPhone or Mac); None for a held or not-QA-passed draft."""
+    try:
+        check(d)
+    except SendError:
+        return None
     em = d.get("email") or {}
-    return f"mailto:{quote(str(d['to']))}?subject={quote(str(em.get('subject') or ''))}&body={quote(str(em.get('body') or ''))}"
+    return f"mailto:{quote(str(d['to']))}?subject={quote(str(em.get('subject') or ''))}&body={quote(final_body(d))}"
 
 
 def gmail_draft(frm: str, password: str, d: dict[str, Any], resume: Path | None, name: str, *,
                 imap: Callable[[str], Any] = imaplib.IMAP4_SSL) -> str:
     """Puts the email, résumé attached, in the candidate's Gmail Drafts; returns a link that finds it."""
+    msg = build_message(frm, d, resume, name)
     box = imap("imap.gmail.com")
     box.login(frm, password)
     try:
-        box.append('"[Gmail]/Drafts"', "\\Draft", imaplib.Time2Internaldate(time.time()),
-                   build_message(frm, d, resume, name).as_bytes())
+        typ, data = box.append('"[Gmail]/Drafts"', "\\Draft", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
+        if typ != "OK":  # a rejected APPEND returns NO without raising
+            raise SendError(f"Gmail refused the draft: {data!r}")
     finally:
         box.logout()
     return "https://mail.google.com/mail/u/0/#search/" + quote(f"in:drafts to:{d['to']}")
@@ -62,6 +82,7 @@ def send_now(frm: str, password: str, d: dict[str, Any], resume: Path | None, na
     """Sends one draft the candidate approved in chat. Refuses without `yes` or when already sent."""
     if d.get("sent"):
         raise SendError(f"{d.get('contact')}: already sent")
+    check(d)
     if not yes:
         raise SendError(f"{WARNING} Re-run with --yes to send.")
     smtp(frm, password, build_message(frm, d, resume, name))
@@ -82,7 +103,9 @@ def panel(rows: list[dict[str, Any]]) -> str:
             out.append(f"| {n} | {who} | {job} | {addr} | [Read](#d{n}) | held: {d.get('hold_reason') or 'unverified'} | | |")
         else:
             gm = f"[Gmail]({r['gmail']})" if r.get("gmail") else "reply `gmail " + str(n) + "`"
-            out.append(f"| {n} | {who} | {job} | {addr} | [Read](#d{n}) | [Mail]({mail_link(d)}) | {gm} | `send {n}` |")
+            ml = mail_link(d)
+            mail = f"[Mail]({ml})" if ml else "fails QA"
+            out.append(f"| {n} | {who} | {job} | {addr} | [Read](#d{n}) | {mail} | {gm} | `send {n}` |")
         em = d.get("email") or {}
         full.append(f'<a id="d{n}"></a>\n### {n}. {d.get("contact")}, {r["company"]}\n\n**Subject:** {em.get("subject")}\n\n'
                     f'{em.get("body")}\n')

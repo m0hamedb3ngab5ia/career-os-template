@@ -8,7 +8,7 @@ import pytest
 from careeros import outreach_send as o
 
 pytestmark = pytest.mark.unit
-D = {"contact": "Sam Lee", "role": "hiring_manager", "to": "sam@x.com", "to_confidence": "medium",
+D = {"contact": "Sam Lee", "role": "hiring_manager", "to": "sam@x.com", "to_confidence": "medium", "qa_pass": True,
      "email": {"subject": "Hi Sam", "body": "Hi Sam,\n\nAsk.\n\nThank you,\nAlex"}}
 
 
@@ -29,7 +29,7 @@ def test_gmail_draft_appends_to_drafts_and_returns_a_link(tmp_path):
     class Imap:
         def __init__(self, host): calls.append(("host", host))
         def login(self, u, p): calls.append(("login", u))
-        def append(self, box, flags, when, raw): calls.append(("append", box, raw))
+        def append(self, box, flags, when, raw): calls.append(("append", box, raw)); return ("OK", [b""])
         def logout(self): calls.append(("logout",))
 
     url = o.gmail_draft("me@x.com", "pw", D, pdf, "Alex Example", imap=Imap)
@@ -78,3 +78,96 @@ def test_cli_send_refuses_without_yes(settings, monkeypatch, capsys):
     monkeypatch.setattr(cli, "_settings", lambda a: settings)
     assert cli.cmd_outreach_send(argparse.Namespace(job_id="j9", contact="Sam Lee", yes=False)) == 1
     assert "bounce" in capsys.readouterr().err and not json.loads((jd / "outreach.json").read_text())["drafts"][0].get("sent")
+
+
+def _job(settings, drafts):
+    import json
+
+    from careeros.store import Store
+    jd = Store(settings).job_dir("j9")
+    jd.mkdir(parents=True, exist_ok=True)
+    (jd / "outreach.json").write_text(json.dumps({"drafts": drafts}))
+    (jd / "resume.pdf").write_bytes(b"%PDF")
+    return jd
+
+
+def test_cli_send_refuses_a_held_draft(settings, monkeypatch, capsys):
+    import argparse
+
+    from careeros import cli
+    jd = _job(settings, [{**D, "hold": True, "hold_reason": "address unverified"}])
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    monkeypatch.setattr(cli, "_outreach_ctx", lambda s: ("me@x.com", "pw", "Alex"))
+    monkeypatch.setattr(o, "_smtp", lambda *a: pytest.fail("held draft was sent"))
+    assert cli.cmd_outreach_send(argparse.Namespace(job_id="j9", contact="Sam Lee", yes=True)) == 1
+    assert "held" in capsys.readouterr().err and jd.exists()
+
+
+def test_cli_panel_saves_each_gmail_draft_and_stops_cleanly_on_failure(settings, monkeypatch, capsys):
+    """A failure on the second draft must not lose the first one's link (a rerun would duplicate it in Gmail)."""
+    import argparse
+    import json
+
+    from careeros import cli
+    jd = _job(settings, [dict(D), {**D, "contact": "Kim Park", "to": "kim@x.com"}])
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    monkeypatch.setattr(cli, "_outreach_ctx", lambda s: ("me@x.com", "pw", "Alex"))
+    calls = []
+
+    def fake(frm, pw, d, resume, name):
+        calls.append(d["to"])
+        if len(calls) == 2:
+            raise OSError("imap down")
+        return "https://mail.google.com/mail/u/0/#search/a"
+    monkeypatch.setattr(o, "gmail_draft", fake)
+    assert cli.cmd_outreach_panel(argparse.Namespace(job_ids=["j9"], gmail=True)) == 1
+    assert "imap down" in capsys.readouterr().err
+    saved = json.loads((jd / "outreach.json").read_text())["drafts"]
+    assert saved[0]["gmail_draft_url"].startswith("https://") and "gmail_draft_url" not in saved[1]
+
+
+def test_cli_missing_app_password_is_a_clean_error(settings, monkeypatch, capsys):
+    import argparse
+
+    from careeros import cli, notify
+    _job(settings, [dict(D)])
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    monkeypatch.setattr(notify, "config", lambda s: {"email": "me@x.com"})
+    monkeypatch.setattr(notify, "keychain_password", lambda e: (_ for _ in ()).throw(notify.NotifyError("no app password")))
+    assert cli.cmd_outreach_send(argparse.Namespace(job_id="j9", contact="Sam Lee", yes=True)) == 1
+    assert "no app password" in capsys.readouterr().err
+
+
+def test_no_resume_pdf_refuses_instead_of_sending_without_it():
+    """The body says the résumé is attached; never send or draft it without one."""
+    with pytest.raises(o.SendError, match="résumé"):
+        o.send_now("me@x.com", "pw", dict(D), None, "Alex", yes=True, smtp=lambda *a: pytest.fail("sent"))
+    with pytest.raises(o.SendError, match="résumé"):
+        o.gmail_draft("me@x.com", "pw", dict(D), None, "Alex", imap=lambda h: pytest.fail("appended"))
+
+
+def test_gmail_draft_raises_when_gmail_rejects_the_append():
+    class Imap:
+        def __init__(self, host): pass
+        def login(self, u, p): pass
+        def append(self, *a): return ("NO", [b"over quota"])
+        def logout(self): pass
+    import pathlib
+    import tempfile
+    pdf = pathlib.Path(tempfile.mkdtemp()) / "resume.pdf"
+    pdf.write_bytes(b"%PDF")
+    with pytest.raises(o.SendError, match="over quota"):
+        o.gmail_draft("me@x.com", "pw", dict(D), pdf, "Alex", imap=Imap)
+
+
+def test_every_route_refuses_a_draft_that_failed_qa_and_uses_the_candidates_line(tmp_path):
+    pdf = tmp_path / "resume.pdf"
+    pdf.write_bytes(b"%PDF")
+    bad = {**D, "qa_pass": False, "qa_problems": ["too long"]}
+    with pytest.raises(o.SendError, match="QA"):
+        o.build_message("me@x.com", bad, pdf, "Alex")
+    assert o.mail_link(bad) is None
+    lined = {**D, "qa_pass": True, "your_line": "We met at the fintech meetup."}
+    body = o.build_message("me@x.com", lined, pdf, "Alex").get_body(("plain",)).get_content()
+    assert body.startswith("Hi Sam,\n\nWe met at the fintech meetup.\n\nAsk.")
+    assert "We%20met" in o.mail_link(lined)

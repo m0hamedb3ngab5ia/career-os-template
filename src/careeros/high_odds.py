@@ -85,7 +85,9 @@ def scan_fresh(s: Settings, now: datetime | None = None, *, send: Callable[..., 
         res = (send or notify.send_urgent)(
             s, f"job:{jid}", f"Fresh: {p.title} at {p.company} (fit {sc.fit})",
             f"{p.title} at {p.company}\nFit: {sc.fit}\nPosted about {h:.0f}h ago.\n{p.url or ''}\n\n{WHY['fresh']}")
-        if res == "sent":
+        if str(res).startswith("error"):
+            seen.remove(jid)  # send_urgent keeps the key unsent; retry next tick
+        elif res == "sent":
             sent.append(jid)
     notify._save(s, fresh_seen=seen)
     return sent
@@ -131,7 +133,8 @@ def _words(t: str) -> int:
     return len(re.findall(r"\S+", t))
 
 
-SIGN_OFF = re.compile(r"\n\n(thank you|thanks|best|regards|cheers|sincerely)\b[^\n]*\n", re.I)
+# a short sign-off line only ("Thank you,", "Best regards,"); a long paragraph that opens with "Thanks" is message
+SIGN_OFF = re.compile(r"\n\n(thank you|thanks|best|regards|cheers|sincerely)\b[^\n]{0,30}(?=\n)", re.I)
 
 
 def message_text(body: str) -> str:
@@ -181,6 +184,16 @@ def gate_outreach(data: dict[str, Any], banned: list[str]) -> list[str]:
     return allp
 
 
+def final_body(d: dict[str, Any]) -> str:
+    """The email body as sent: the candidate's own line (if any) after the greeting ("Hi Sam,"), never above it."""
+    em = d.get("email") if isinstance(d.get("email"), dict) else {}
+    line, body = str(d.get("your_line") or "").strip(), str(em.get("body") or "")
+    if line and line not in body:
+        head, sep, rest = body.partition("\n\n")
+        body = f"{head}\n\n{line}\n\n{rest}" if sep and head.rstrip().endswith(",") else f"{line}\n\n{body}"
+    return body
+
+
 def compose_url(d: dict[str, Any], mail: bool = False) -> str | None:
     """Gmail compose link prefilled with the draft's own to/subject/body plus the candidate's line. Only for a
     ready email draft; the candidate reads it and presses send. `mail=True`: a mailto: link for the phone's mail
@@ -189,10 +202,7 @@ def compose_url(d: dict[str, Any], mail: bool = False) -> str | None:
     to = d.get("to") or (em or {}).get("to")
     if not em or not d.get("ready") or not to:
         return None
-    line, body = str(d["your_line"]).strip(), str(em.get("body") or "")
-    if line not in body:  # after the greeting ("Hi Sam,"), never above it
-        head, sep, rest = body.partition("\n\n")
-        body = f"{head}\n\n{line}\n\n{rest}" if sep and head.rstrip().endswith(",") else f"{line}\n\n{body}"
+    body = final_body(d)
     if mail:
         return f"mailto:{quote(str(to))}?subject={quote(str(em.get('subject') or ''))}&body={quote(body)}"
     return ("https://mail.google.com/mail/?view=cm&fs=1&to=" + quote(str(to)) + "&su=" + quote(str(em.get("subject") or ""))

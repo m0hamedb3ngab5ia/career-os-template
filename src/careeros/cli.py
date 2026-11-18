@@ -1641,14 +1641,20 @@ def _job_resume(job_dir: Path) -> Path | None:
 def cmd_outreach_panel(args: argparse.Namespace) -> int:
     """Send panel (markdown): every unsent email draft with Read / Mail app (iPhone or Mac) / Gmail draft / auto-send.
     `--gmail` first puts each unheld draft in Gmail Drafts with the résumé attached (once per draft)."""
+    import imaplib
     import json
 
+    from careeros import notify
     from careeros import outreach_send as osend
 
     s = _settings(args)
     store = Store(s)
     ids = args.job_ids or sorted(p.parent.name for p in store.jobs_dir.glob("*/outreach.json"))
-    ctx = _outreach_ctx(s) if args.gmail else None
+    try:
+        ctx = _outreach_ctx(s) if args.gmail else None
+    except notify.NotifyError as e:  # no app password in the Keychain
+        print(f"outreach panel: {e}", file=sys.stderr)
+        return 1
     rows, index = [], {}
     for jid in ids:
         path = store.job_dir(jid) / "outreach.json"
@@ -1656,19 +1662,22 @@ def cmd_outreach_panel(args: argparse.Namespace) -> int:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             continue
-        p, dirty = store.load_posting(jid), False
+        p = store.load_posting(jid)
         for d in data.get("drafts") or []:
             if not isinstance(d, dict) or d.get("sent") or not d.get("to") or not isinstance(d.get("email"), dict):
                 continue
             if ctx and not d.get("hold") and not d.get("gmail_draft_url"):
-                d["gmail_draft_url"] = osend.gmail_draft(ctx[0], ctx[1], d, _job_resume(store.job_dir(jid)), ctx[2])
-                dirty = True
+                try:
+                    d["gmail_draft_url"] = osend.gmail_draft(ctx[0], ctx[1], d, _job_resume(store.job_dir(jid)), ctx[2])
+                except (osend.SendError, imaplib.IMAP4.error, OSError) as e:
+                    print(f"outreach panel: Gmail draft for {d.get('contact')} failed: {e}", file=sys.stderr)
+                    return 1
+                # saved per draft, so a later failure never loses a link (a rerun would duplicate the Gmail draft)
+                path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
             n = len(rows) + 1
             rows.append({"n": n, "job_id": jid, "company": p.company if p else "", "title": p.title if p else "",
                          "url": p.url if p else "", "draft": d, "gmail": d.get("gmail_draft_url")})
             index[str(n)] = {"job_id": jid, "contact": d.get("contact")}
-        if dirty:
-            path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     (store.jobs_dir.parent / "outreach_panel.json").write_text(json.dumps(index, indent=2), encoding="utf-8")
     print(osend.panel(rows) if rows else "outreach panel: nothing unsent")
     return 0
@@ -1677,7 +1686,9 @@ def cmd_outreach_panel(args: argparse.Namespace) -> int:
 def cmd_outreach_send(args: argparse.Namespace) -> int:
     """Send one approved draft now from the candidate's Gmail (résumé attached). Needs --yes; prints the warning."""
     import json
+    import smtplib
 
+    from careeros import notify
     from careeros import outreach_send as osend
 
     s = _settings(args)
@@ -1689,13 +1700,17 @@ def cmd_outreach_send(args: argparse.Namespace) -> int:
     if len(hit) != 1:
         print(f"outreach send: no single draft for contact {args.contact!r}", file=sys.stderr)
         return 1
+    if hit[0].get("hold"):
+        print(f"outreach send: {args.contact} is held ({hit[0].get('hold_reason') or 'unverified'}); fix the draft first",
+              file=sys.stderr)
+        return 1
     if not args.yes:
         print(osend.WARNING + " Re-run with --yes to send.", file=sys.stderr)
         return 1
-    frm, pw, name = _outreach_ctx(s)
     try:
+        frm, pw, name = _outreach_ctx(s)
         osend.send_now(frm, pw, hit[0], _job_resume(store.job_dir(args.job_id)), name, yes=True)
-    except osend.SendError as e:
+    except (osend.SendError, notify.NotifyError, smtplib.SMTPException, OSError) as e:  # one line; nothing recorded
         print(f"outreach send: {e}", file=sys.stderr)
         return 1
     path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
