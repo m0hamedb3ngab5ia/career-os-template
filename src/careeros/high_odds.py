@@ -166,8 +166,8 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
 
 
 def draft_ready(d: dict[str, Any]) -> bool:
-    """Ready = passes the gate AND the candidate wrote their own line."""
-    return d.get("qa_pass") is True and bool(str(d.get("your_line") or "").strip())
+    """Ready = passes the gate. `your_line` is optional: the candidate's approval in chat is enough (user 2026-11-18)."""
+    return d.get("qa_pass") is True
 
 
 def gate_outreach(data: dict[str, Any], banned: list[str]) -> list[str]:
@@ -235,7 +235,7 @@ def send_kit(job_id: str, title: str, out: dict[str, Any], contacts: dict[str, A
         url = compose_url(d)
         lines.append(f"2. Open the email prefilled: [Mail]({compose_url(d, mail=True)}) on iPhone, [Gmail]({url}) on a "
                      "computer. Attach your résumé, read, then Send" if url else
-                     f"2. Email: needs your line first: `careeros outreach qa {job_id} --contact \"{who}\" --line \"...\"`")
+                     f"2. Email: not ready, run the QA gate: `careeros outreach qa {job_id} --contact \"{who}\"`")
         lines.append(f"3. Sent? `careeros outreach sent {job_id} --contact \"{who}\"`")
         blocks.append("\n".join(lines))
     return "\n\n".join(blocks)

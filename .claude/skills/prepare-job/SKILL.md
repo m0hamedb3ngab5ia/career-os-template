@@ -169,7 +169,7 @@ Outreach (REQ-162, DEC-027): unless `config/pipeline.yaml: outreach.auto` is fal
 `.claude/skills/draft-outreach/SKILL.md` for the job. Drafts follow the "Easy, not slop" rules (candidate template, warm and humble): at most 120 words before the sign-off,
 `fact_source` (one sourced fact from the posting or company), `bullet_ids`, one `ask`, an empty `your_line` for the
 candidate. Then run `.venv/bin/careeros outreach qa <job_id>`; fix and re-run once if it reports problems. A draft
-is "ready" only after the candidate adds their own line (`careeros outreach qa <job_id> --line "..." --contact NAME`);
+is "ready" once it passes the gate; the candidate may add their own line (`careeros outreach qa <job_id> --line "..." --contact NAME`);
 the command prints a prefilled Gmail compose link they open and send themselves. Never send, never open LinkedIn.
 Otherwise (auto off, low fit) note `"outreach": "run /find-contacts then /draft-outreach"` in the final RESULT.
 

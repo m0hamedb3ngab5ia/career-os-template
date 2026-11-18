@@ -1743,7 +1743,7 @@ def cmd_outreach_qa(args: argparse.Namespace) -> int:
         if isinstance(d, dict):
             url = ho.compose_url(d)
             print(f"{d.get('contact')}: {'ready' if d.get('ready') else 'not ready'}"
-                  + ("" if d.get("your_line") else " (needs your line)") + (f"\n  send: {url}\n  iphone: {ho.compose_url(d, mail=True)}" if url else ""))
+                  + "" + (f"\n  send: {url}\n  iphone: {ho.compose_url(d, mail=True)}" if url else ""))
     for p in probs:
         print(f"  problem: {p}")
     return 1 if probs else 0
@@ -2889,7 +2889,7 @@ def build_parser() -> argparse.ArgumentParser:
     osd.add_argument("--contact", required=True)
     osd.add_argument("--yes", action="store_true", help="you approved this send; guessed addresses can bounce")
     osd.set_defaults(fn=cmd_outreach_send)
-    oqa = outs.add_parser("qa", help="gate outreach drafts and record your own line (--line); prints the one-click compose link")
+    oqa = outs.add_parser("qa", help="gate outreach drafts, optionally add your own line (--line); prints the one-click compose link")
     oqa.add_argument("job_id")
     oqa.add_argument("--contact")
     oqa.add_argument("--line", help="one genuine sentence of your own; a draft is not ready without it")

@@ -71,17 +71,16 @@ GOOD = {"contact": "Sam", "to": "s@x.com", "email": {"subject": "Hi", "body": "I
         "facts_used": [{"fact": "ships daily", "source": "posting"}], "bullet_ids": ["b1"]}
 
 
-def test_gate_flags_slop_and_requires_your_line():
+def test_gate_flags_slop_and_your_line_is_optional():
     bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * 130}, "facts_used": []}
     probs = h.draft_problems(bad, ["I hope this finds you well"])
     assert any("too long" in p for p in probs) and any("banned" in p for p in probs) and any("fact" in p for p in probs)
     d = dict(GOOD)
     data = {"drafts": [d]}
-    assert h.gate_outreach(data, []) == [] and d["qa_pass"] is True and d["ready"] is False and d["your_line"] == ""
-    assert h.compose_url(d) is None
+    assert h.gate_outreach(data, []) == [] and d["qa_pass"] is True and d["ready"] is True and d["your_line"] == ""
+    assert h.compose_url(d).startswith("https://mail.google.com/mail/?view=cm")
     d["your_line"] = "I also ran a similar migration."
-    d["ready"] = h.draft_ready(d)
-    assert d["ready"] and h.compose_url(d).startswith("https://mail.google.com/mail/?view=cm") and "to=s%40x.com" in h.compose_url(d)
+    assert h.draft_ready(d) and "similar%20migration" in h.compose_url(d) and h.compose_url(d).startswith("https://mail.google.com/mail/?view=cm") and "to=s%40x.com" in h.compose_url(d)
 
 
 def test_compose_falls_back_to_email_to_and_fact_source():
@@ -134,7 +133,8 @@ def test_cli_outreach_qa_records_line_and_prints_link(settings, monkeypatch, cap
     path.write_text(json.dumps({"drafts": [dict(GOOD)]}))
     monkeypatch.setattr(cli, "_settings", lambda a: settings)
     ns = argparse.Namespace(job_id=p.job_id, contact=None, line=None)
-    assert cli.cmd_outreach_qa(ns) == 0 and "needs your line" in capsys.readouterr().out
+    out = capsys.readouterr().out if cli.cmd_outreach_qa(ns) == 0 else ""
+    assert "needs your line" not in out and "send: https://mail.google.com" in out
     ns.line = "I ran a similar migration."
     assert cli.cmd_outreach_qa(ns) == 0 and "send: https://mail.google.com" in capsys.readouterr().out
     assert json.loads(path.read_text())["drafts"][0]["ready"] is True
@@ -178,7 +178,7 @@ def test_send_kit_links_and_copy_blocks():
     assert "keywords=Alaz%20Sengul%20Garage" in kit and "```\nHi, I applied.\n```" in kit
     assert "https://mail.google.com/mail/?view=cm" in kit and "to=a%40x.com" in kit
     assert 'careeros outreach sent j1 --contact "Alaz Sengul"' in kit
-    assert "keywords=Garage%20recruiter" in kit and "needs your line" in kit
+    assert "keywords=Garage%20recruiter" in kit and "not ready, run the QA gate" in kit
     assert "Old" not in kit
 
 
