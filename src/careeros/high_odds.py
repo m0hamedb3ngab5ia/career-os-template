@@ -171,9 +171,10 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     if not str(d.get("why_refer") or "").strip():
         out.append("no why_refer: say in one clause why THIS person would help (shared background, or a checkable "
                    "proof plus a short chat)")
-    if "bonus" in low:
+    sendable = " ".join(str(x or "") for x in (em.get("body"), d.get("linkedin_note"), d.get("linkedin_message"))).lower()
+    if "bonus" in sendable:
         out.append("mentions a referral bonus")
-    out += [f"trait claim: {t} (show it with a fact)" for t in TRAIT_CLAIMS if t in low]
+    out += [f"trait claim: {t} (show it with a fact)" for t in TRAIT_CLAIMS if t in sendable]
     return out
 
 

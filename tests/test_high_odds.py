@@ -82,6 +82,9 @@ def test_gate_requires_why_refer_and_rejects_bonus_and_trait_claims():
     assert any("bonus" in p for p in h.draft_problems(bonus, []))
     trait = {**GOOD, "email": {**GOOD["email"], "body": "I'm a charismatic go-getter. Would you refer me?"}}
     assert any("trait claim" in p for p in h.draft_problems(trait, []))
+    for field in ("linkedin_note", "linkedin_message"):  # every sendable text, not just the email
+        assert any("bonus" in p for p in h.draft_problems({**GOOD, field: "Happy to share the referral bonus."}, []))
+        assert any("trait claim" in p for p in h.draft_problems({**GOOD, field: "I'm a witty go-getter."}, []))
 
 
 def test_gate_flags_slop_and_your_line_is_optional():
