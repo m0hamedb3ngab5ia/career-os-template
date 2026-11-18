@@ -96,6 +96,8 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 | Contact emails | Fills `contacts.json` with email guesses (optional Apollo and Hunter keys). | `careeros outreach emails <id>` | |
 | Draft outreach | Drafts connection note, message, email, follow-ups; never sends. | `/draft-outreach <id>` | |
 | Outreach QA | Gates drafts (length, sourced fact, ask); gives a Gmail compose link. | `careeros outreach qa <id>` | REQ-162 |
+| Send panel | Table of every unsent email: Read, iPhone Mail, Gmail draft with résumé attached, auto-send. | `careeros outreach panel --gmail`; "show my outreach" | REQ-162 |
+| Send now | Sends one approved email from your Gmail with the résumé; warns that guessed addresses bounce. | `careeros outreach send <id> --contact X --yes`; "send 3" | REQ-162 |
 | Record a send | Marks what you sent by hand and starts the follow-up clock. | `careeros outreach sent <id>` | REQ-154 |
 | Network match | Imports your LinkedIn export and shows jobs where you know someone. | `careeros network import <csv>`, `careeros network match` | |
 

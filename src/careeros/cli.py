@@ -1616,6 +1616,93 @@ def cmd_outreach_kit(args: argparse.Namespace) -> int:
     return 0
 
 
+def _outreach_ctx(s: Any) -> tuple[str, str, str]:
+    """(from address, Keychain app password, candidate name) for Gmail drafts and sends."""
+    import yaml
+
+    from careeros import notify
+
+    frm = notify.config(s)["email"]
+    if not frm:
+        raise SystemExit("set config/pipeline.yaml: notify.email and run `careeros notify setup` first")
+    try:
+        ident = (yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}).get("identity") or {}
+    except OSError:
+        ident = {}
+    return frm, notify.keychain_password(frm), str(ident.get("name") or "Resume")
+
+
+def _job_resume(job_dir: Path) -> Path | None:
+    """The résumé that went with the application: the newest frozen submission, else the job's resume.pdf."""
+    sub = sorted(job_dir.glob("submitted/*/resume.pdf"))
+    return sub[-1] if sub else (job_dir / "resume.pdf" if (job_dir / "resume.pdf").exists() else None)
+
+
+def cmd_outreach_panel(args: argparse.Namespace) -> int:
+    """Send panel (markdown): every unsent email draft with Read / iPhone Mail / Gmail draft / auto-send.
+    `--gmail` first puts each unheld draft in Gmail Drafts with the résumé attached (once per draft)."""
+    import json
+
+    from careeros import outreach_send as osend
+
+    s = _settings(args)
+    store = Store(s)
+    ids = args.job_ids or sorted(p.parent.name for p in store.jobs_dir.glob("*/outreach.json"))
+    ctx = _outreach_ctx(s) if args.gmail else None
+    rows, index = [], {}
+    for jid in ids:
+        path = store.job_dir(jid) / "outreach.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        p, dirty = store.load_posting(jid), False
+        for d in data.get("drafts") or []:
+            if not isinstance(d, dict) or d.get("sent") or not d.get("to") or not isinstance(d.get("email"), dict):
+                continue
+            if ctx and not d.get("hold") and not d.get("gmail_draft_url"):
+                d["gmail_draft_url"] = osend.gmail_draft(ctx[0], ctx[1], d, _job_resume(store.job_dir(jid)), ctx[2])
+                dirty = True
+            n = len(rows) + 1
+            rows.append({"n": n, "job_id": jid, "company": p.company if p else "", "title": p.title if p else "",
+                         "url": p.url if p else "", "draft": d, "gmail": d.get("gmail_draft_url")})
+            index[str(n)] = {"job_id": jid, "contact": d.get("contact")}
+        if dirty:
+            path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    (store.jobs_dir.parent / "outreach_panel.json").write_text(json.dumps(index, indent=2), encoding="utf-8")
+    print(osend.panel(rows) if rows else "outreach panel: nothing unsent")
+    return 0
+
+
+def cmd_outreach_send(args: argparse.Namespace) -> int:
+    """Send one approved draft now from the candidate's Gmail (résumé attached). Needs --yes; prints the warning."""
+    import json
+
+    from careeros import outreach_send as osend
+
+    s = _settings(args)
+    store = Store(s)
+    path = store.job_dir(args.job_id) / "outreach.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    hit = [d for d in data.get("drafts") or [] if isinstance(d, dict)
+           and str(d.get("contact") or "").lower() == args.contact.lower()]
+    if len(hit) != 1:
+        print(f"outreach send: no single draft for contact {args.contact!r}", file=sys.stderr)
+        return 1
+    if not args.yes:
+        print(osend.WARNING + " Re-run with --yes to send.", file=sys.stderr)
+        return 1
+    frm, pw, name = _outreach_ctx(s)
+    try:
+        osend.send_now(frm, pw, hit[0], _job_resume(store.job_dir(args.job_id)), name, yes=True)
+    except osend.SendError as e:
+        print(f"outreach send: {e}", file=sys.stderr)
+        return 1
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"sent to {hit[0]['to']} ({args.contact})")
+    return 0
+
+
 def cmd_outreach_qa(args: argparse.Namespace) -> int:
     """REQ-162: gate every draft (length, banned phrases, sourced fact, bullet id, ask); stamp qa_pass/ready.
     `--line TEXT --contact NAME` records the candidate's own sentence. Prints a compose link per ready email."""
@@ -2778,6 +2865,15 @@ def build_parser() -> argparse.ArgumentParser:
     okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
     okt.add_argument("job_ids", nargs="*")
     okt.set_defaults(fn=cmd_outreach_kit)
+    opn = outs.add_parser("panel", help="send panel: every unsent email with Read / iPhone Mail / Gmail draft / auto-send")
+    opn.add_argument("job_ids", nargs="*")
+    opn.add_argument("--gmail", action="store_true", help="first put each draft in Gmail Drafts with the résumé attached")
+    opn.set_defaults(fn=cmd_outreach_panel)
+    osd = outs.add_parser("send", help="send one approved draft now from your Gmail, résumé attached (needs --yes)")
+    osd.add_argument("job_id")
+    osd.add_argument("--contact", required=True)
+    osd.add_argument("--yes", action="store_true", help="you approved this send; guessed addresses can bounce")
+    osd.set_defaults(fn=cmd_outreach_send)
     oqa = outs.add_parser("qa", help="gate outreach drafts and record your own line (--line); prints the one-click compose link")
     oqa.add_argument("job_id")
     oqa.add_argument("--contact")

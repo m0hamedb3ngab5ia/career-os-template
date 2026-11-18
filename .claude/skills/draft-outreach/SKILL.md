@@ -9,7 +9,7 @@ description: Draft (never send) per-contact outreach for a job dir from contacts
 
 `$ARGUMENTS` = job dir (`JOB`). Needs `JOB/contacts.json` (run `.claude/skills/find-contacts/SKILL.md` first)
 unless the job has referral contacts (step 1, `careeros network match --job`): then a missing `contacts.json` means
-referral drafts only; skip reading it and skip `careeros outreach check` (it exits 1 without the file). This skill writes drafts only. It never sends, never creates Gmail drafts, never opens LinkedIn.
+referral drafts only; skip reading it and skip `careeros outreach check` (it exits 1 without the file). This skill writes drafts only. It never sends, never opens LinkedIn. To show drafts for sending, run `careeros outreach panel --gmail` and print its table (the standard send UI in chat: Read / iPhone Mail / Gmail draft with résumé / auto-send on the user's explicit yes per email).
 
 ## 1. Read
 
