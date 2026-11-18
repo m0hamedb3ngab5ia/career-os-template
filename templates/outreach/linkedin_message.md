@@ -4,6 +4,9 @@ Draft only; the candidate sends. Target 60 to 110 words. One ask.
 
 ## Guidance
 
+- Referral ask to an employee (not a recruiter): ask them to submit the referral in the company's applicant system
+  (the Greenhouse referral form when `posting.ats` is greenhouse, where it lands in the recruiters' priority
+  review queue; other ATS: their internal referral process, no priority claim).
 - Open with the thread you already share: the note they accepted, or the role you applied to.
 - Two sentences of proof, from bullet ids. Pick the bullets closest to their team's work.
 - One specific ask: a 15-minute call, a referral, or "is the team still hiring for this".

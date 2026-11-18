@@ -24,7 +24,7 @@ def test_fresh_posting_beats_old_one():
 
 
 def test_everything_under_48h_gets_full_freshness_weight():
-    w = DEFAULT_RANKING
+    w = {**DEFAULT_RANKING, "fresh_boost": 0}
     a, b = rank([cand("a", hours_old=1), cand("b", hours_old=47)], w, NOW, stage="score")
     assert a["score"] == b["score"] == w["freshness_weight"]
 

@@ -273,6 +273,8 @@ Desktop 1440×900 (sidebar layout) plus a phone companion at 390×844. Light and
 
 Plus a **components sheet**: the 13 status chips, safety badges, tier chips, the 13 stop-reason chips, action-type glyphs, light/dark tokens.
 
+12. **What can I do?** (`/catalogue`, REQ-165): `docs/CATALOGUE.md` in the app. Reached from the "What can I do?" button in Today's header and the sidebar. Search box (every word must match, across all columns), section headings in file order, one row per feature (name, what, how-to with commands in code style and a Copy button). Empty state when nothing matches.
+
 ## Running pipeline steps from the UI
 
 Every run is a subprocess the server owns, one row in the `runs` table, and a stream of events on SSE.

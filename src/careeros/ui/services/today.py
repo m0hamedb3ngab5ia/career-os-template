@@ -37,11 +37,22 @@ class OutreachItem(TypedDict):
     followup_due: str | None
 
 
+class Season(TypedDict):
+    """REQ-160: the named season window today falls in (targets.yaml volume.season_multiplier list form)."""
+    name: str
+    level: str
+    advice: str
+    multiplier: float
+    daily_cap: int
+    weekly_target: int
+
+
 class Today(TypedDict):
     actions: list[ActionItem]
     prepare_queue: PrepareQueue
     top_picks: list[JobListItem]
     outreach: list[OutreachItem]
+    season: Season | None
 
 
 # Tasks that only matter before applying; once the job is applied or skipped they are stale (never closed by hand).
@@ -178,4 +189,13 @@ def today(settings: Any, ix: Any, now: datetime, *, tz: tzinfo = timezone.utc,
 
     picks = with_reasons(settings, top_picks(ix, now, closed=closed or [], keep=keep))
     return {"actions": open_actions(ix, now, tz, soon_hours), "prepare_queue": prepare_queue(settings, ix, now),
-            "top_picks": picks, "outreach": outreach(settings, ix, closed=closed or [])}
+            "top_picks": picks, "outreach": outreach(settings, ix, closed=closed or []), "season": _season(settings, now)}
+
+
+def _season(settings: Any, now: datetime) -> Season | None:
+    from careeros.runs.policy import season_on
+
+    try:
+        return season_on(settings.targets or {}, now.date())  # type: ignore[return-value]
+    except ConfigError:
+        return None

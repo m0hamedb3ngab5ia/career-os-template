@@ -1545,6 +1545,7 @@ class Checker:
     # ---- run -------------------------------------------------------------
     def run(self) -> dict[str, Any]:
         # careeros.qa_ext imports names from this module: import at call time, not at module load
+        from careeros.qa_ext.ats_parse import check_ats_parse
         from careeros.qa_ext.company import check_wrong_company
         from careeros.qa_ext.consistency import check_cross_doc
         from careeros.qa_ext.outreach_policy import check_outreach_policy
@@ -1572,6 +1573,7 @@ class Checker:
         self.check_contact()
         self.check_pdf()
         check_pdf_fidelity(self)
+        check_ats_parse(self)
         self.check_keyword_coverage()
         self.check_bullet_shape()
         self.check_bold_markup()

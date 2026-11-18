@@ -3,7 +3,7 @@ import type { ActionItem, OutreachItem } from "./types";
 // Today's "needs you" list, grouped by what the person does next, in plain words.
 // Pure: the screen and tests share it. Raw action text is machine-written; nothing here shows it as-is.
 
-export type SectionKey = "eligibility" | "send" | "reach" | "followup" | "answers" | "resume" | "safety" | "stale" | "failed" | "other";
+export type SectionKey = "urgent" | "eligibility" | "send" | "reach" | "followup" | "answers" | "resume" | "safety" | "stale" | "failed" | "other";
 
 export interface Row {
   id: string;
@@ -31,6 +31,7 @@ export interface Section {
 }
 
 const ORDER: { key: SectionKey; title: string; caption: string }[] = [
+  { key: "urgent", title: "Urgent", caption: "Time matters on these." },
   { key: "send", title: "Ready to send", caption: "Prepared and waiting for your approval." },
   { key: "reach", title: "Reach out", caption: "Drafts are written. You send them yourself." },
   { key: "followup", title: "Follow up", caption: "No answer yet. A short nudge often gets one." },
@@ -55,8 +56,12 @@ const date = (s: string | undefined = "") => {
 
 const isEligibility = (t: string) => /graduat|eligib/i.test(t);
 
+/** Urgent: a high-priority reach-out nag, or a high match at a target company (marked in the item's detail). */
+const isUrgent = (a: ActionItem) => a.priority === "H" && /^(reach_out|watch)\b/.test(a.detail ?? "");
+
 function sectionOf(a: ActionItem): SectionKey {
   const t = a.what ?? "";
+  if (isUrgent(a)) return "urgent";
   if (/chrome/i.test(t)) return "other";
   if (a.type === "review" || a.type === "question" || a.type === "salary") {
     if (isEligibility(t)) return "eligibility";
@@ -121,6 +126,14 @@ export function toRow(a: ActionItem, key: SectionKey): Row {
   const sub = a.company ? a.role ?? "" : "";
   const base: Row = { id: String(a.id), items: [a], title, sub, href: job, why: "", cta: "", detected: false };
   switch (key) {
+    case "urgent": {
+      const watch = (a.detail ?? "").startsWith("watch");
+      return {
+        ...base, sub: a.role ?? "", detected: false,
+        why: watch ? "A strong match at a company you’re watching. Apply as soon as possible." : "You applied recently. Message the recruiter or hiring manager now.",
+        cta: watch && posting ? "Read posting" : "Open", ...(watch && posting ? ext(posting) : {}),
+      };
+    }
     case "eligibility":
       return { ...base, why: eligibilityWhy(t), cta: "Review", detected: true };
     case "followup":
@@ -219,6 +232,7 @@ export function summary(sections: readonly Section[]): string {
   const lead: Record<SectionKey, string> = {
     send: `${count(first.rows.length, "application is", "applications are")} ready to send.`,
     reach: `${count(first.rows.length, "contact is", "contacts are")} ready to reach out to.`,
+    urgent: `${count(first.rows.length, "thing is", "things are")} urgent.`,
     followup: `${count(first.rows.length, "application has", "applications have")} had no reply yet.`,
     answers: `${count(first.rows.length, "form needs", "forms need")} your answers.`,
     eligibility: `Start by confirming you’re eligible for ${count(first.rows.length, "job", "jobs")}.`,

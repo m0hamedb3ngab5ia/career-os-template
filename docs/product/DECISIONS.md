@@ -194,3 +194,12 @@ Decision: (1) The UI adds read-only Profile (résumés, documents, answers, mast
 Why: reference data and pending decisions must be findable without hunting through a long chat; a one-click decision is faster than typing it and is safe because approve only queues.
 Rejected: strictly read-only dashboard (every decision becomes a chat round trip); editing in the UI (duplicates the skills, DEC-024).
 
+
+### DEC-026 Email to the candidate's own address is allowed
+Reasoned by: human (2026-11-16).
+Decision: Daily/weekly digest and urgent emails go only to the candidate's own address; career-os still never mails anyone else. The app password lives in the Keychain.
+
+### DEC-027 High-odds channels are the default path
+Reasoned by: human (2026-11-16).
+Decision: AI-tailored volume is now baseline (docs/work/yield-model/research/competition.md). Outreach after applying, referrals and applying to fresh postings fast move the odds and are rarer, so they are the product's default and are explained to the user, not optional extras.
+Amended (human, 2026-11-18): the candidate asked for three ways to send each approved email: Mail-app link (iPhone or Mac), a Gmail draft with the résumé attached (career-os writes to the candidate's own Drafts), and send-now on an explicit yes per email, with a bounce warning. Nothing is scheduled or sent without that yes (`careeros outreach panel`, `outreach send`).

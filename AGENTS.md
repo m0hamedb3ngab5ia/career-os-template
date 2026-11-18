@@ -3,6 +3,7 @@
 Guidance for Codex and other non-Claude agents. `CLAUDE.md` is canonical for project rules;
 read it first; it says which `ARCHITECTURE.md` sections to read.
 
+- Feature catalogue (what the app can do): `docs/CATALOGUE.md`; `tests/test_catalogue.py` keeps it complete.
 - Reviews: `$review <PR>` (`.agents/skills/review/SKILL.md`) follows `docs/CODE_REVIEW_PROMPT.md`.
 - Setup: `python3 -m venv .venv && .venv/bin/pip install -e ".[test]" && .venv/bin/careeros init`.
 - Tests: `.venv/bin/python -m pytest -q` (they use `examples/` only; no `profile/` or `config/` needed).

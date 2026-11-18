@@ -58,6 +58,16 @@ Also read the other free-text answers already in `JOB/answers.json` / `JOB/fill_
 question asks (a "why us" answer is about the company and role, not your background again), and never reuse
 another answer's opening words or sentences: `careeros apply fill` refuses a form whose answers repeat each other.
 Never copy an answer from another job's form without rewriting it for this question.
+Every essay answers the meta questions behind the form question, as an argument, not a list:
+1. What draws me to this work (the company's actual work, from the posting)?
+2. Why (one real reason, never a slogan)?
+3. What have I done that proves I can do it (bullet/narrative ids)?
+4. Why does that make me a strong fit for what this role needs?
+Never jump from interest straight to a résumé line. Write it the way a new grad talks: plain words, short sentences, one idea each; no
+abstract claims a skimming reader has to decode (user 2026-11-17). After drafting, check the answer against 1–4 and the literal
+question; fix any gap. Then a reviewer subagent (fresh context, Sonnet) gets only the question, the posting summary
+and the answer, names which of 1–4 it fails and any slop; fix and re-check until it passes. Keep `needs_review: true`:
+the candidate still approves.
 
 Rules:
 - Only claims traceable to bullet ids / narrative ids; record them in `bullet_ids` / `narrative_ids`.

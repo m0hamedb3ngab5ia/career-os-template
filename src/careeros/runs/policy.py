@@ -41,6 +41,9 @@ def _volume(targets: dict[str, Any]) -> tuple[int, dict[int, float]]:
         raise ConfigError(f"config/targets.yaml: volume.max_applications_per_day must be a whole number >= 1, "
                           f"got {base!r}")
     raw = vol.get("season_multiplier") or {}
+    if isinstance(raw, list):
+        windows(targets)  # validates
+        return base, {}
     if not isinstance(raw, dict):
         raise ConfigError("config/targets.yaml: volume.season_multiplier must be a mapping month -> multiplier")
     mult: dict[int, float] = {}
@@ -57,8 +60,69 @@ def _volume(targets: dict[str, Any]) -> tuple[int, dict[int, float]]:
     return base, mult
 
 
+LEVELS = ("low", "normal", "high", "peak")
+DEFAULT_LEVEL_MULT = {"low": 0.5, "normal": 1.0, "high": 1.5, "peak": 2.0}
+
+
+def windows(targets: dict[str, Any]) -> list[dict[str, Any]]:
+    """REQ-160: named season windows from `volume.season_multiplier` when it is a list of
+    {name, start "MM-DD", end "MM-DD", level, multiplier?, advice?}. Empty for the old month->multiplier mapping."""
+    raw = ((targets or {}).get("volume") or {}).get("season_multiplier")
+    if not isinstance(raw, list):
+        return []
+    out: list[dict[str, Any]] = []
+    for i, w in enumerate(raw, 1):
+        if not isinstance(w, dict) or not w.get("name"):
+            raise ConfigError(f"config/targets.yaml: volume.season_multiplier window {i} needs a name")
+        try:
+            sm, sd = (int(x) for x in str(w.get("start")).split("-"))
+            em, ed = (int(x) for x in str(w.get("end")).split("-"))
+            date(2024, sm, sd), date(2024, em, ed)
+        except (ValueError, TypeError):
+            raise ConfigError(f"config/targets.yaml: season window {w.get('name')!r}: start and end must be MM-DD") from None
+        level = str(w.get("level") or "normal")
+        if level not in LEVELS:
+            raise ConfigError(f"config/targets.yaml: season window {w['name']!r}: level must be one of {', '.join(LEVELS)}")
+        m = w.get("multiplier", DEFAULT_LEVEL_MULT[level])
+        if isinstance(m, bool) or not isinstance(m, (int, float)) or m <= 0:
+            raise ConfigError(f"config/targets.yaml: season window {w['name']!r}: multiplier must be a number > 0")
+        out.append({"name": str(w["name"]), "start": (sm, sd), "end": (em, ed), "level": level,
+                    "multiplier": float(m), "advice": str(w.get("advice") or "")})
+    return out
+
+
+def _in(w: dict[str, Any], day: date) -> bool:
+    md = (day.month, day.day)
+    return w["start"] <= md <= w["end"] if w["start"] <= w["end"] else md >= w["start"] or md <= w["end"]
+
+
+def season_on(targets: dict[str, Any], day: date) -> dict[str, Any] | None:
+    """The window containing `day` (first match), with the adjusted cap, or None."""
+    for w in windows(targets):
+        if _in(w, day):
+            cap = daily_cap(targets, day)
+            return {"name": w["name"], "level": w["level"], "advice": w["advice"], "multiplier": w["multiplier"],
+                    "daily_cap": cap, "weekly_target": cap * 7}
+    return None
+
+
+def upcoming_window(targets: dict[str, Any], day: date, days: int = 7) -> dict[str, Any] | None:
+    """A high/peak window whose first day is within the next 1..`days` days (for the one-time heads-up)."""
+    for w in windows(targets):
+        if w["level"] not in ("high", "peak"):
+            continue
+        for n in range(1, days + 1):
+            d = date.fromordinal(day.toordinal() + n)
+            if (d.month, d.day) == w["start"]:
+                return {"name": w["name"], "level": w["level"], "starts": d.isoformat(), "advice": w["advice"]}
+    return None
+
+
 def daily_cap(targets: dict[str, Any], day: date) -> int:
     base, mult = _volume(targets)
+    for w in windows(targets):
+        if _in(w, day):
+            return max(1, math.floor(base * w["multiplier"]))
     return max(1, math.floor(base * mult.get(day.month, 1.0)))
 
 
@@ -71,8 +135,9 @@ def cap_status(targets: dict[str, Any], records: Iterable[Any], day: date) -> di
     base, mult = _volume(targets)
     cap = daily_cap(targets, day)
     done = applied_on(records, day)
+    season = season_on(targets, day)
     return {"date": day.isoformat(), "cap": cap, "applied": done, "remaining": max(0, cap - done),
-            "multiplier": mult.get(day.month, 1.0), "base": base, "reached": done >= cap}
+            "multiplier": season["multiplier"] if season else mult.get(day.month, 1.0), "base": base, "reached": done >= cap}
 
 
 def current_cap(settings: Any, day: date | None = None) -> dict[str, Any]:

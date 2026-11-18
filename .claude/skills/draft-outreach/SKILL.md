@@ -9,7 +9,7 @@ description: Draft (never send) per-contact outreach for a job dir from contacts
 
 `$ARGUMENTS` = job dir (`JOB`). Needs `JOB/contacts.json` (run `.claude/skills/find-contacts/SKILL.md` first)
 unless the job has referral contacts (step 1, `careeros network match --job`): then a missing `contacts.json` means
-referral drafts only; skip reading it and skip `careeros outreach check` (it exits 1 without the file). This skill writes drafts only. It never sends, never creates Gmail drafts, never opens LinkedIn.
+referral drafts only; skip reading it and skip `careeros outreach check` (it exits 1 without the file). This skill writes drafts only. It never sends, never opens LinkedIn. To show drafts for sending, run `careeros outreach panel --gmail` and print its table (the standard send UI in chat: Read / iPhone Mail / Gmail draft with résumé / auto-send on the user's explicit yes per email).
 
 ## 1. Read
 
@@ -30,21 +30,46 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   LinkedIn export, `careeros network import`) is a contact with `role: "referral"`, `linkedin_degree: 1`,
   `confidence: high`, added to the drafts even when `contacts.json` is missing (then skip find-contacts' contacts).
   For them draft only `linkedin_message` (50-100 words): what the role is (title + posting URL), one proof, and the ask
-  "would you be open to referring me, or pointing me to the right person?". Connected, so always `manual_tailor: true`.
+  "would you be open to referring me, or pointing me to the right person?" plus the referral-form line (rule below).
+  Connected, so always `manual_tailor: true`.
 - `templates/followup_email/README.md` + `post_apply_outreach.md` (the after-applying email), and the candidate's own
   wording in `profile/voice/followups/*.md` if present: that wording is the base text; fill its `[VARIABLES]`.
 
 ## 2. Rules
 
+- Shared network (same school, employer, program or high school as the candidate, from `profile/master.yaml` and the
+  contact's profile): set `shared_network` (e.g. "State University alum") and write a short, warm note instead of a pitch.
+  Open with the overlap ("fellow <school> alum"), one line of interest in the role, the ask, "résumé attached". Body
+  at most ~60 words, no experience proof (no bullet needed; the gate accepts `shared_network` instead), no team
+  sizes or résumé lines. Busy people skim; the overlap is the reason they reply.
 - Every claim traces to a bullet id or narrative id; numbers and tools exactly as in the bullet.
   Placeholder bullets never. Record `bullet_ids` / `narrative_ids` per draft.
 - One company/team fact per message, from `contacts.json`/posting/cover letter facts (source recorded).
-- Voice: first person, short sentences, plain ask, no flattery, no banned phrases, no em-dash > 1 per
-  message, no rhetorical questions, no "I hope this finds you well".
+- Voice: warm, humble, brief and easy to read, like a person, not a status report. Follow the candidate's
+  template (the after-applying file in `profile/voice/followups/`) when present (greeting line, why I'd fit in 2-3 plain
+  reasons, résumé attached, one ask). Open with the person, in plain words a stranger understands: "I came across your
+  profile and saw that you lead <team> at <company>." Never name a source they would not recognise ("your Built In
+  interview"). Then one honest line on why that connects to me ("Payments at that scale are the kind of work I want
+  to do"). Use their CURRENT role only: verify it (company team page, recent news or post, dated within ~6 months;
+  record `role_verified` with url + date). If they have moved on, drop them unless they share a school or employer with
+  the candidate; then say it plainly ("I saw you were at <company> and that we both went to <school>"). For a recruiter, "so I thought you'd be the right person to reach out to". No praise. Then "I see <company> has
+  <role> open, and I think I'd be a great fit because ...". Fit reasons are impact, not stack: what the work means
+  (ships to production at an investment bank, high-stakes and fast-paced, builds with AI agents), never "Java and
+  Kafka at <employer>" or résumé numbers (user 2026-11-18). A friendly opener such as "I hope this message finds you well" is fine when the
+  template uses it (user 2026-11-17: the clipped "I applied. <résumé line>. Could you...?" emails read as robotic).
+  Vary the ask: a brief chat, a referral (employees only, not every email), or how to position myself in the process.
+  No flattery, no banned phrases, no em-dash > 1 per message, no rhetorical questions, no stacked numbers.
 - Plain text: bullet text may carry `**bold**` markers (résumé PDF only). Never copy them into a note, message or
   email; any `**` in outreach.json hard-fails QA (`no_markdown_bold`).
 - Never claim a referral, a mutual contact, or that you were told to reach out. Never mention having
   guessed the email.
+- Referral ask (employee contact, not a recruiter): ask them to submit the referral through the company's applicant
+  system, not just forward the resume. When `posting.json: ats` is `greenhouse`, name the Greenhouse referral form
+  (referrals entered there land in the recruiters' priority review queue; research/greenhouse.md s5). Other ATS:
+  ask them to use their company's internal referral process, with no claim about priority. Lead with a brief chat,
+  since a stranger needs a reason to refer: "<Company> uses Greenhouse, where referrals reach recruiters first. Would you
+  be open to a brief chat about a referral, or to referring me directly? Totally understand if not." (user 2026-11-18); keep the message at most 120 words (sign-off not counted). Recruiters never get this line. Never claim a referral that
+  was not agreed.
 - Use the contact's first name only if `confidence` is `high`; else open with "Hi," (no name).
 - Addressing by role: recruiter -> ask about process/timeline and offer the resume; hiring manager
   -> one proof + one question about the team's system; team lead -> a specific technical question or
@@ -60,8 +85,8 @@ For each entry in `contacts.json.contacts` produce:
    number, the ask (15-min chat or "would you be the right person to ask about <role>?").
 3. `email`: when the job is already applied, this is the after-applying outreach (`post_apply_outreach.md`, ~100 words,
    one hook, one or two proofs, not a mini cover letter). Otherwise: `subject` (<= 60 chars, e.g. "New grad backend
-   applicant: <role> at <company>"), `body` (90-150 words): greeting per rule above, hook fact, proof (bullet ids), ask, sign-off
-   `identity.name` + phone + LinkedIn URL from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
+   applicant: <role> at <company>"), `body` (at most 120 words before the sign-off, DEC-027), in the template shape: greeting, "reaching out regarding <role>", 2-3 plain fit reasons (bullet ids), résumé attached, one varied ask, sign-off "Thank you," + name + LinkedIn
+   `identity.name` + LinkedIn URL (never the phone number) from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
 4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.
 5. `followup_14d` (30-50 words): final, polite close-the-loop, leaves the door open. No guilt. Only when the contact

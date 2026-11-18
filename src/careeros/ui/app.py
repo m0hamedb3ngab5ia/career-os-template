@@ -162,6 +162,9 @@ def create_app(settings: Settings, *, index: Index | None = None, broker: Broker
     from careeros.ui.routers import ui_state  # first-run tour flag (TASK-019)
     app.include_router(ui_state.router, prefix="/api")
 
+    from careeros.ui.routers import catalogue as catalogue_router  # REQ-165: What can I do?
+    app.include_router(catalogue_router.router, prefix="/api")
+
     @app.api_route("/api/{rest:path}", methods=["GET", "POST", "PUT", "PATCH", "DELETE"], include_in_schema=False)
     async def api_404(rest: str) -> JSONResponse:
         return JSONResponse({"detail": f"no such endpoint: /api/{rest}"}, status_code=404)

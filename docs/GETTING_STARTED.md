@@ -391,3 +391,7 @@ What changes: those CLIs have no `/skill` slash commands, so each run asks them 
   `~/.gemini/policies/` (the repo-level `.gemini/policies` tier is documented as disabled; untested). `yolo` works
   but approves everything.
 - `apply-job` needs the Claude in Chrome extension: Claude only.
+
+## What else can it do?
+
+See [CATALOGUE.md](CATALOGUE.md): every feature by task, with how to use it.

@@ -931,6 +931,27 @@ requirements:
     - test_done_sticks_across_ticks
     - test_locked_ticks_are_idempotent
     - sections.test.ts
+  REQ-155:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_digest_sections_and_days
+    - test_digest_none_when_everything_empty
+    - test_send_once_per_day_after_send_at
+    - test_failure_is_returned_and_retried_next_tick
+    - test_weekly_digest_only_on_its_day_and_off_never
+    - test_urgent_sends_immediately_once_per_key_and_can_be_off
+    - test_urgent_failure_is_retried_and_digest_state_survives
+    - test_keychain_uses_security_binary_and_never_leaks
+    - test_store_password_lets_security_prompt_so_we_never_see_it
+    - test_cli_digest_dry_run_prints_body_and_test_sends
+    - test_tick_sends_digest_and_survives_failure
+  REQ-156:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_reach_out_item_for_recent_applied_job_only
+    - test_reach_out_closes_when_outreach_sent_or_done_sticks
   REQ-157:
     status: implemented
     provenance: confirmed
@@ -949,6 +970,44 @@ requirements:
     - test_codex_stream_yields_the_last_agent_message_as_the_result
     - test_gemini_stream_joins_assistant_deltas_and_reads_status
     - test_doctor_checks_the_configured_cli_binary
+  REQ-159:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_watch_urgent_once_per_job_and_only_high_fit_unfiltered
+    - test_digest_lists_new_at_targets_once
+  REQ-161:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_fresh_boost_only_within_window
+    - test_scan_fresh_emails_once_for_fresh_fitting_job
+  REQ-162:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_gate_flags_slop_and_your_line_is_optional
+    - test_cli_outreach_qa_records_line_and_prints_link
+  REQ-163:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_reach_first_item_raised_and_closed
+    - test_digest_leads_with_reach_first_and_has_why
+  REQ-165:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_parse_sections_rows_and_intro
+    - test_endpoint_and_missing_file
+    - test_real_catalogue_parses
+  REQ-160:
+    status: implemented
+    provenance: confirmed
+    tests:
+    - test_named_windows_set_cap_and_describe_season
+    - test_old_month_form_still_works_and_bad_window_rejected
+    - test_digest_heads_up_once_before_high_window
 use_cases:
   UC-001:
     status: approved

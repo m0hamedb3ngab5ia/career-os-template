@@ -162,3 +162,20 @@ def test_apply_plan_ai_drafts_one_review_action_and_rebuild_keeps_approval(temp_
     by = {f["field_id"]: f for f in json.loads((jd / "fill_plan.json").read_text())["fields"]}
     assert by["q1"]["reviewed"] is True and by["q2"]["reviewed"] is False
     assert len([a for a in _actions(temp_root) if a["Type"] == "review"]) == 1
+
+
+def test_apply_plan_warns_on_knockout_answer(temp_root: Path, monkeypatch, capsys):
+    """A "No" to work authorization is recorded as knockout_risk and printed; the answer is untouched."""
+    import careeros.apply.gh_schema as gs
+    import careeros.cli as cli_mod
+
+    jd = _gh_job(temp_root)
+    rows = [{"field_id": "q1", "label": "Are you legally authorized to work in the US?", "type": "select",
+             "value": "No", "source": "standard", "needs_review": False, "required": True}]
+    monkeypatch.setattr(gs, "build_plan", lambda *a, **k: {"fields": rows, "files": {}})
+    assert cli_mod.main(["--root", str(temp_root), "apply", "plan", "x-1", "--schema-json",
+                         str(FIXTURES / "greenhouse" / "job_questions.json")]) == 0
+    assert "WARN knockout_risk: work_authorization" in capsys.readouterr().out
+    plan = json.loads((jd / "fill_plan.json").read_text())
+    assert plan["knockout_risk"] == ["work_authorization"]
+    assert plan["fields"][0]["value"] == "No"

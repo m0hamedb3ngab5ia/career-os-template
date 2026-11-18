@@ -31,6 +31,13 @@ export interface paths {
     /** Reopen */
     post: operations["reopen_api_actions__aid__reopen_post"];
   };
+  "/api/catalogue": {
+    /**
+     * Catalogue
+     * @description REQ-165: docs/CATALOGUE.md parsed into sections and rows.
+     */
+    get: operations["catalogue_api_catalogue_get"];
+  };
   "/api/events": {
     /** Events */
     get: operations["events_api_events_get"];
@@ -511,6 +518,36 @@ export interface components {
     CancelBody: {
       /** Run Id */
       run_id?: string | null;
+    };
+    /** Catalogue */
+    Catalogue: {
+      /** Intro */
+      intro: string[];
+      /** Sections */
+      sections: components["schemas"]["CatalogueSection"][];
+    };
+    /** CatalogueRow */
+    CatalogueRow: {
+      /** Feature */
+      feature: string;
+      /** How */
+      how: string;
+      /** Req */
+      req: string;
+      /** What */
+      what: string;
+    };
+    /** CatalogueSection */
+    CatalogueSection: {
+      /**
+       * Notes
+       * @default []
+       */
+      notes?: string[];
+      /** Rows */
+      rows: components["schemas"]["CatalogueRow"][];
+      /** Title */
+      title: string;
     };
     /** CatchUp */
     CatchUp: {
@@ -1657,6 +1694,24 @@ export interface components {
       /** Job Ids */
       job_ids: string[];
     };
+    /**
+     * Season
+     * @description REQ-160: the named season window today falls in (targets.yaml volume.season_multiplier list form).
+     */
+    Season: {
+      /** Advice */
+      advice: string;
+      /** Daily Cap */
+      daily_cap: number;
+      /** Level */
+      level: string;
+      /** Multiplier */
+      multiplier: number;
+      /** Name */
+      name: string;
+      /** Weekly Target */
+      weekly_target: number;
+    };
     /** SelectBody */
     SelectBody: {
       /** Ids */
@@ -1767,6 +1822,7 @@ export interface components {
       /** Outreach */
       outreach: components["schemas"]["OutreachItem"][];
       prepare_queue: components["schemas"]["PrepareQueue"];
+      season: components["schemas"]["Season"] | null;
       /** Top Picks */
       top_picks: components["schemas"]["JobListItem"][];
     };
@@ -1975,6 +2031,20 @@ export interface operations {
       422: {
         content: {
           "application/json": components["schemas"]["HTTPValidationError"];
+        };
+      };
+    };
+  };
+  /**
+   * Catalogue
+   * @description REQ-165: docs/CATALOGUE.md parsed into sections and rows.
+   */
+  catalogue_api_catalogue_get: {
+    responses: {
+      /** @description Successful Response */
+      200: {
+        content: {
+          "application/json": components["schemas"]["Catalogue"];
         };
       };
     };

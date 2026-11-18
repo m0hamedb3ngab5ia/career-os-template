@@ -1,6 +1,6 @@
 import { Link } from "react-router";
 import { Page } from "../../app/PageHeader";
-import { Button } from "../../kit/Button";
+import { Button, ButtonLink } from "../../kit/Button";
 import { EmptyState } from "../../kit/EmptyState";
 import { formatLongDate } from "../../lib/dates";
 import { formatCount } from "../../lib/format";
@@ -22,7 +22,7 @@ export function TodayPage() {
   const picks = today.data?.top_picks ?? [];
 
   return (
-    <Page title="Today" subtitle={formatLongDate(now)}>
+    <Page title="Today" subtitle={formatLongDate(now)} actions={<ButtonLink to="/catalogue" size="regular">What can I do?</ButtonLink>}>
       <div className={styles.stack}>
         {today.data ? <p className={styles.lead}>{summary(buildSections(today.data.actions ?? [], today.data.outreach ?? []))}</p> : null}
         {status.isError ? (
@@ -39,8 +39,13 @@ export function TodayPage() {
             </EmptyState>
           </div>
         ) : null}
-        {picks.length ? <TopPicks picks={picks} /> : null}
+        {today.data?.season ? (
+          <p className={styles.season}>
+            <strong>{today.data.season.name.replace(/-/g, " ")}.</strong> {today.data.season.advice} Aim for about {formatCount(today.data.season.weekly_target)} applications this week.
+          </p>
+        ) : null}
         <NeedsYou />
+        {picks.length ? <TopPicks picks={picks} /> : null}
         {s ? <Quiet runs={s.recent_runs ?? []} columns={s.pipeline?.columns ?? []} now={now} /> : null}
       </div>
     </Page>

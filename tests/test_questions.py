@@ -518,3 +518,21 @@ def test_answer_for_required_street_falls_back_to_full(tmp_path: Path) -> None:
                  '  full: "1 Main St, Springfield, NY 10001"\n', encoding="utf-8")
     assert answer_for("Street address", p, required=True) == ("address", "1 Main St, Springfield, NY 10001")
     assert answer_for("Street address", p, required=False) is None
+
+
+def test_learned_exact_question_beats_earlier_generic_entry(tmp_path: Path) -> None:
+    """`careeros learn answer` appends an exact-question pattern; an older generic keyword entry
+    ("location", "state") earlier in the file must not win over it (live bugs 2026-11-17)."""
+    clear_cache()
+    p = tmp_path / "sa.yaml"
+    p.write_text("""\
+- key: address
+  match: ["location"]
+  answer: "Springfield"
+- key: which_office_location_would_you_prefer
+  match: ["Which\\\\s+office\\\\s+location\\\\s+would\\\\s+you\\\\s+prefer\\\\?"]
+  answer: "New York"
+""", encoding="utf-8")
+    assert match_standard_answer("Which office location would you prefer?", p) == (
+        "which_office_location_would_you_prefer", "New York")
+    assert match_standard_answer("Current location", p) == ("address", "Springfield")

@@ -649,7 +649,13 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
             old = json.loads((jd / "fill_plan.json").read_text(encoding="utf-8"))
         except (OSError, ValueError):
             old = None
-        path = store._write(args.job_id, "fill_plan.json", carry_over(old, plan))  # keep this job's edits/skips
+        merged = carry_over(old, plan)  # keep this job's edits/skips
+        from careeros.apply.knockout import knockout_risk
+        risk = knockout_risk(merged["fields"])  # warning only: answers are never changed
+        merged.pop("knockout_risk", None)
+        if risk:
+            merged["knockout_risk"] = risk
+        path = store._write(args.job_id, "fill_plan.json", merged)
     if blocked:
         what = "; ".join(blocked)[:300]
         print(f"  BLOCK  sensitive_field {what}")
@@ -658,6 +664,9 @@ def cmd_apply_plan(args: argparse.Namespace) -> int:
         _set_status_both(s, args.job_id, "needs_review", f"safety block (form): sensitive_field: {what}"[:200])
         return SAFETY_HARD_EXIT
     fields = plan["fields"]
+    if merged.get("knockout_risk"):
+        print("  WARN knockout_risk: " + ", ".join(merged["knockout_risk"])
+              + " (a negative answer here can auto-reject; check before submitting)")
     review = [f for f in fields if f["needs_review"]]
     paused = [f["label"] for f in review if str(f["source"]).startswith("pause:")
               or (f["source"] == "unanswered" and f.get("required"))]  # REQ-106: required unknowns ask too
@@ -1489,11 +1498,15 @@ NETWORK_OPEN = ["scored", "queued", "prepared", "needs_review"]
 
 
 def cmd_network_import(args: argparse.Namespace) -> int:
-    from careeros.network import import_csv, network_path
+    from careeros.network import find_export, import_csv, network_path
 
     s = _settings(args)
+    src = Path(args.csv).expanduser() if args.csv else find_export(Path.home() / "Downloads")
+    if src is None:
+        print("network import: no Connections.csv or LinkedIn export .zip in ~/Downloads", file=sys.stderr)
+        return 1
     try:
-        n = import_csv(s, Path(args.csv).expanduser())
+        n = import_csv(s, src)
     except (OSError, ValueError) as e:
         print(f"network import: {e}", file=sys.stderr)
         return 1
@@ -1572,6 +1585,197 @@ def cmd_outreach_sent(args: argparse.Namespace) -> int:
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"marked {len(hit)} draft(s) sent on {when}")
     return 0
+
+
+def cmd_outreach_kit(args: argparse.Namespace) -> int:
+    """Send kit (markdown) for the given jobs, or every job with an unsent draft: links + copy blocks."""
+    import json
+
+    from careeros import high_odds as ho
+
+    store = Store(_settings(args))
+    ids = args.job_ids or sorted(p.parent.name for p in store.jobs_dir.glob("*/outreach.json"))
+    kits = []
+    for jid in ids:
+        d = store.job_dir(jid)
+        try:
+            out = json.loads((d / "outreach.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            if args.job_ids:
+                print(f"outreach kit: no readable drafts for {jid}", file=sys.stderr)
+            continue
+        try:
+            contacts = json.loads((d / "contacts.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            contacts = {}
+        p = store.load_posting(jid)
+        kit = ho.send_kit(jid, p.title if p else "", out, contacts)
+        if kit:
+            kits.append(kit)
+    print("\n\n".join(kits) if kits else "outreach kit: nothing unsent")
+    return 0
+
+
+def _outreach_ctx(s: Any) -> tuple[str, str, str]:
+    """(from address, Keychain app password, candidate name) for Gmail drafts and sends."""
+    import yaml
+
+    from careeros import notify
+
+    frm = notify.config(s)["email"]
+    if not frm:
+        raise SystemExit("set config/pipeline.yaml: notify.email and run `careeros notify setup` first")
+    try:
+        ident = (yaml.safe_load(Path(s.paths["profile"]).read_text(encoding="utf-8")) or {}).get("identity") or {}
+    except OSError:
+        ident = {}
+    return frm, notify.keychain_password(frm), str(ident.get("name") or "Resume")
+
+
+def _job_resume(job_dir: Path) -> Path | None:
+    """The résumé that went with the application: the newest frozen submission, else the job's resume.pdf."""
+    sub = sorted(job_dir.glob("submitted/*/resume.pdf"))
+    return sub[-1] if sub else (job_dir / "resume.pdf" if (job_dir / "resume.pdf").exists() else None)
+
+
+def cmd_outreach_panel(args: argparse.Namespace) -> int:
+    """Send panel (markdown): every unsent email draft with Read / Mail app (iPhone or Mac) / Gmail draft / auto-send.
+    `--gmail` first puts each unheld draft in Gmail Drafts with the résumé attached (once per draft)."""
+    import imaplib
+    import json
+
+    from careeros import notify
+    from careeros import outreach_send as osend
+
+    s = _settings(args)
+    store = Store(s)
+    ids = args.job_ids or sorted(p.parent.name for p in store.jobs_dir.glob("*/outreach.json"))
+    try:
+        ctx = _outreach_ctx(s) if args.gmail else None
+    except notify.NotifyError as e:  # no app password in the Keychain
+        print(f"outreach panel: {e}", file=sys.stderr)
+        return 1
+    rows, index = [], {}
+    for jid in ids:
+        path = store.job_dir(jid) / "outreach.json"
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            continue
+        p = store.load_posting(jid)
+        for d in data.get("drafts") or []:
+            if not isinstance(d, dict) or d.get("sent") or not d.get("to") or not isinstance(d.get("email"), dict):
+                continue
+            if ctx and osend.mail_link(d) and not d.get("gmail_draft_url"):  # unheld and QA-passed only
+                try:
+                    d["gmail_draft_url"] = osend.gmail_draft(ctx[0], ctx[1], d, _job_resume(store.job_dir(jid)), ctx[2])
+                except (osend.SendError, imaplib.IMAP4.error, OSError) as e:
+                    print(f"outreach panel: Gmail draft for {d.get('contact')} failed: {e}", file=sys.stderr)
+                    return 1
+                # saved per draft, so a later failure never loses a link (a rerun would duplicate the Gmail draft)
+                path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            n = len(rows) + 1
+            rows.append({"n": n, "job_id": jid, "company": p.company if p else "", "title": p.title if p else "",
+                         "url": p.url if p else "", "draft": d, "gmail": d.get("gmail_draft_url")})
+            index[str(n)] = {"job_id": jid, "contact": d.get("contact")}
+    (store.jobs_dir.parent / "outreach_panel.json").write_text(json.dumps(index, indent=2), encoding="utf-8")
+    print(osend.panel(rows) if rows else "outreach panel: nothing unsent")
+    return 0
+
+
+def cmd_outreach_send(args: argparse.Namespace) -> int:
+    """Send one approved draft now from the candidate's Gmail (résumé attached). Needs --yes; prints the warning."""
+    import json
+    import smtplib
+
+    from careeros import notify
+    from careeros import outreach_send as osend
+
+    s = _settings(args)
+    store = Store(s)
+    path = store.job_dir(args.job_id) / "outreach.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    hit = [d for d in data.get("drafts") or [] if isinstance(d, dict)
+           and str(d.get("contact") or "").lower() == args.contact.lower()]
+    if len(hit) != 1:
+        print(f"outreach send: no single draft for contact {args.contact!r}", file=sys.stderr)
+        return 1
+    if hit[0].get("hold"):
+        print(f"outreach send: {args.contact} is held ({hit[0].get('hold_reason') or 'unverified'}); fix the draft first",
+              file=sys.stderr)
+        return 1
+    if not args.yes:
+        print(osend.WARNING + " Re-run with --yes to send.", file=sys.stderr)
+        return 1
+    try:
+        frm, pw, name = _outreach_ctx(s)
+        osend.send_now(frm, pw, hit[0], _job_resume(store.job_dir(args.job_id)), name, yes=True)
+    except (osend.SendError, notify.NotifyError, smtplib.SMTPException, OSError) as e:  # one line; nothing recorded
+        print(f"outreach send: {e}", file=sys.stderr)
+        return 1
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"sent to {hit[0]['to']} ({args.contact})")
+    return 0
+
+
+def cmd_outreach_qa(args: argparse.Namespace) -> int:
+    """REQ-162: gate every draft (length, banned phrases, sourced fact, bullet id, ask); stamp qa_pass/ready.
+    `--line TEXT --contact NAME` records the candidate's own sentence. Prints a compose link per ready email."""
+    import json
+
+    from careeros import high_odds as ho
+
+    s = _settings(args)
+    path = Store(s).job_dir(args.job_id) / "outreach.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        print(f"outreach qa: no readable drafts in {path}", file=sys.stderr)
+        return 1
+    if args.line:
+        hit = [d for d in data.get("drafts") or [] if isinstance(d, dict)
+               and (not args.contact or str(d.get("contact") or "").lower() == args.contact.lower())]
+        for d in hit:
+            d["your_line"] = args.line.strip()
+    probs = ho.gate_outreach(data, [str(b) for b in (s.qa.get("banned_phrases") or [])])
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
+    for d in data.get("drafts") or []:
+        if isinstance(d, dict):
+            url = ho.compose_url(d)
+            print(f"{d.get('contact')}: {'ready' if d.get('ready') else 'not ready'}"
+                  + "" + (f"\n  send: {url}\n  iphone: {ho.compose_url(d, mail=True)}" if url else ""))
+    for p in probs:
+        print(f"  problem: {p}")
+    return 1 if probs else 0
+
+
+def cmd_notify(args: argparse.Namespace) -> int:
+    """Email digest to yourself (REQ-155). The app password lives only in the macOS Keychain."""
+    from careeros import notify
+
+    s = _settings(args)
+    try:
+        if args.notify_cmd == "setup":
+            email = (args.email or input("Your email address (the digest goes to you only): ")).strip()
+            print("Paste a Gmail app password when `security` asks (it is stored in the Keychain, nowhere else).")
+            notify.store_password(email)
+            print(f"saved. Now set pipeline.yaml notify: {{enabled: true, email: {email}}}, then `careeros notify test`.")
+            return 0
+        c = notify.config(s)
+        if args.notify_cmd == "digest":
+            body = notify.build_digest(s)
+            print(body if body else "nothing to send: every section is empty")
+            return 0
+        if not c["email"]:
+            print("notify: set notify.email in config/pipeline.yaml first", file=sys.stderr)
+            return 1
+        notify.smtp_send(c, "career-os test", "If you can read this, the daily digest will reach you.",
+                         notify.keychain_password(c["email"]))
+        print(f"test email sent to {c['email']}")
+        return 0
+    except (notify.NotifyError, OSError) as e:
+        print(f"notify: {e}", file=sys.stderr)
+        return 1
 
 
 def cmd_stats(args: argparse.Namespace) -> int:
@@ -2648,6 +2852,15 @@ def build_parser() -> argparse.ArgumentParser:
     pr.add_argument("--json", action="store_true", help="machine-readable plan (and result with --yes)")
     pr.set_defaults(fn=cmd_prune)
 
+    nt = sub.add_parser("notify", help="daily email digest to yourself (SMTP app password in the macOS Keychain)")
+    nts = nt.add_subparsers(dest="notify_cmd", required=True)
+    nsu = nts.add_parser("setup", help="store your app password in the Keychain (asked by `security`, never by us)")
+    nsu.add_argument("--email")
+    nts.add_parser("test", help="send a one-line test email to yourself")
+    ndg = nts.add_parser("digest", help="print today's digest body (--dry-run); sending is done by `careeros tick`")
+    ndg.add_argument("--dry-run", action="store_true")
+    nt.set_defaults(fn=cmd_notify)
+
     out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")
     outs = out.add_subparsers(dest="outreach_cmd", required=True)
     och = outs.add_parser("check", help="JSON per contact: manual (never automated) + reason code; action_text for the one Action Item")
@@ -2664,6 +2877,23 @@ def build_parser() -> argparse.ArgumentParser:
     osn.add_argument("--contact", help="contact name; default every draft")
     osn.add_argument("--date", help="YYYY-MM-DD, default today")
     osn.set_defaults(fn=cmd_outreach_sent)
+    okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
+    okt.add_argument("job_ids", nargs="*")
+    okt.set_defaults(fn=cmd_outreach_kit)
+    opn = outs.add_parser("panel", help="send panel: every unsent email with Read / Mail app (iPhone or Mac) / Gmail draft / auto-send")
+    opn.add_argument("job_ids", nargs="*")
+    opn.add_argument("--gmail", action="store_true", help="first put each draft in Gmail Drafts with the résumé attached")
+    opn.set_defaults(fn=cmd_outreach_panel)
+    osd = outs.add_parser("send", help="send one approved draft now from your Gmail, résumé attached (needs --yes)")
+    osd.add_argument("job_id")
+    osd.add_argument("--contact", required=True)
+    osd.add_argument("--yes", action="store_true", help="you approved this send; guessed addresses can bounce")
+    osd.set_defaults(fn=cmd_outreach_send)
+    oqa = outs.add_parser("qa", help="gate outreach drafts, optionally add your own line (--line); prints the one-click compose link")
+    oqa.add_argument("job_id")
+    oqa.add_argument("--contact")
+    oqa.add_argument("--line", help="one genuine sentence of your own; a draft is not ready without it")
+    oqa.set_defaults(fn=cmd_outreach_qa)
     otg = outs.add_parser("targets", help="high-yield jobs for outreach (tier rule + outreach.min_fit), no outreach.json yet")
     otg.add_argument("--status", nargs="+", choices=STATUSES, help="default: applied queued")
     otg.add_argument("--min-fit", type=int)
@@ -2681,7 +2911,7 @@ def build_parser() -> argparse.ArgumentParser:
     nw = sub.add_parser("network", help="your LinkedIn connections (your own export) -> referral matches")
     nws = nw.add_subparsers(dest="network_cmd", required=True)
     nwi = nws.add_parser("import", help="load LinkedIn's Connections.csv into data/network.json (replaces it)")
-    nwi.add_argument("csv")
+    nwi.add_argument("csv", nargs="?", help="Connections.csv or LinkedIn's export .zip; default the newest in ~/Downloads")
     nwi.set_defaults(fn=cmd_network_import)
     nwm = nws.add_parser("match", help="jobs at companies where you have a 1st-degree connection")
     nwm.add_argument("--status", nargs="+", choices=STATUSES, help=f"default: {' '.join(NETWORK_OPEN)}")

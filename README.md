@@ -16,8 +16,16 @@ All AI work runs through your Claude Code subscription. There is no API key.
 
 Step by step, by hand: **[docs/GETTING_STARTED.md](docs/GETTING_STARTED.md)**. Day-to-day process (applying, status,
 follow-ups): **[docs/PROCESS.md](docs/PROCESS.md)**.
+Everything it can do, by task: **[docs/CATALOGUE.md](docs/CATALOGUE.md)**.
 
 ## How it works
+
+**How career-os gets you interviews.** AI-tailored volume is now the baseline (applications per recruiter went from
+146 to 746 between 2022 and 2025, Greenhouse), and a cold application becomes an interview about 3% of the time
+against about 40% when referred (Ashby). So the default path is: apply to fresh postings first, send a short sourced
+note to a real person right after applying (drafted for you, with one line left for you to write, never sent by
+career-os), and pause new applications while reach-outs are overdue. Numbers and sources:
+`docs/work/yield-model/research/`.
 
 - **Scout** (`careeros scout --sync`): pulls the job boards listed in `config/companies.yaml` (Greenhouse,
   Lever and Ashby adapters built in), runs the prefilters you turn on, and stores each posting in

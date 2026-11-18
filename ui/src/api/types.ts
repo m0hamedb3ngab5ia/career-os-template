@@ -10,3 +10,8 @@ export type StatusSummary = Schemas["Status"];
 
 /** GET /api/meta (src/careeros/ui/services/meta.py: Meta): every code the UI renders, plus the ui settings. */
 export type Meta = Schemas["Meta"];
+
+/** GET /api/catalogue (src/careeros/ui/services/catalogue.py: Catalogue): docs/CATALOGUE.md as sections and rows (REQ-165). */
+export type Catalogue = Schemas["Catalogue"];
+export type CatalogueSection = Schemas["CatalogueSection"];
+export type CatalogueRow = Schemas["CatalogueRow"];

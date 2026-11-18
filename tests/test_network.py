@@ -151,3 +151,30 @@ def test_cli_referral_item_does_not_swallow_draft_outreach_item(tmp_path, capsys
     main(["--root", str(root), "network", "match", "--job", "job000000001", "--actions"])
     whats = [i["What to do"] for i in Tracker(settings=s).list_action_items(open_only=True)]
     assert sum(w.startswith("referral:") for w in whats) == 1 and "tailor by hand: Ada Lovelace" in whats
+
+
+def test_find_export_picks_newest_csv_or_zip_and_reads_the_zip(tmp_path):
+    import os
+    import zipfile
+
+    from careeros.network import find_export, parse_connections_csv
+    assert find_export(tmp_path) is None
+    old = tmp_path / "Connections.csv"
+    old.write_text("First Name,Last Name,URL,Email Address,Company,Position,Connected On\nA,B,u,,Acme,Eng,1\n")
+    os.utime(old, (1, 1))
+    z = tmp_path / "Basic_LinkedInDataExport_11-16-2026.zip"
+    with zipfile.ZipFile(z, "w") as f:
+        f.writestr("Connections.csv", "Notes:\n\nFirst Name,Last Name,URL,Email Address,Company,Position,Connected On\n"
+                                      "Sam,Lee,u2,,Garage,CTO,1\n")
+    assert find_export(tmp_path) == z
+    assert [r["name"] for r in parse_connections_csv(z)] == ["Sam Lee"]
+
+
+def test_bad_zip_is_a_clean_error(tmp_path):
+    import pytest
+
+    from careeros.network import parse_connections_csv
+    z = tmp_path / "Basic_LinkedInDataExport.zip"
+    z.write_text("not a zip")
+    with pytest.raises(ValueError, match="not a readable zip"):
+        parse_connections_csv(z)

@@ -679,6 +679,87 @@
         "title": "CancelBody",
         "type": "object"
       },
+      "Catalogue": {
+        "properties": {
+          "intro": {
+            "items": {
+              "type": "string"
+            },
+            "title": "Intro",
+            "type": "array"
+          },
+          "sections": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogueSection"
+            },
+            "title": "Sections",
+            "type": "array"
+          }
+        },
+        "required": [
+          "intro",
+          "sections"
+        ],
+        "title": "Catalogue",
+        "type": "object"
+      },
+      "CatalogueRow": {
+        "properties": {
+          "feature": {
+            "title": "Feature",
+            "type": "string"
+          },
+          "how": {
+            "title": "How",
+            "type": "string"
+          },
+          "req": {
+            "title": "Req",
+            "type": "string"
+          },
+          "what": {
+            "title": "What",
+            "type": "string"
+          }
+        },
+        "required": [
+          "feature",
+          "what",
+          "how",
+          "req"
+        ],
+        "title": "CatalogueRow",
+        "type": "object"
+      },
+      "CatalogueSection": {
+        "properties": {
+          "notes": {
+            "default": [],
+            "items": {
+              "type": "string"
+            },
+            "title": "Notes",
+            "type": "array"
+          },
+          "rows": {
+            "items": {
+              "$ref": "#/components/schemas/CatalogueRow"
+            },
+            "title": "Rows",
+            "type": "array"
+          },
+          "title": {
+            "title": "Title",
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "rows"
+        ],
+        "title": "CatalogueSection",
+        "type": "object"
+      },
       "CatchUp": {
         "properties": {
           "created_at": {
@@ -4696,6 +4777,45 @@
         "title": "ScoreBody",
         "type": "object"
       },
+      "Season": {
+        "description": "REQ-160: the named season window today falls in (targets.yaml volume.season_multiplier list form).",
+        "properties": {
+          "advice": {
+            "title": "Advice",
+            "type": "string"
+          },
+          "daily_cap": {
+            "title": "Daily Cap",
+            "type": "integer"
+          },
+          "level": {
+            "title": "Level",
+            "type": "string"
+          },
+          "multiplier": {
+            "title": "Multiplier",
+            "type": "number"
+          },
+          "name": {
+            "title": "Name",
+            "type": "string"
+          },
+          "weekly_target": {
+            "title": "Weekly Target",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "name",
+          "level",
+          "advice",
+          "multiplier",
+          "daily_cap",
+          "weekly_target"
+        ],
+        "title": "Season",
+        "type": "object"
+      },
       "SelectBody": {
         "properties": {
           "ids": {
@@ -5052,6 +5172,16 @@
           "prepare_queue": {
             "$ref": "#/components/schemas/PrepareQueue"
           },
+          "season": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Season"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "top_picks": {
             "items": {
               "$ref": "#/components/schemas/JobListItem"
@@ -5064,7 +5194,8 @@
           "actions",
           "prepare_queue",
           "top_picks",
-          "outreach"
+          "outreach",
+          "season"
         ],
         "title": "Today",
         "type": "object"
@@ -5491,6 +5622,28 @@
         "summary": "Reopen",
         "tags": [
           "actions"
+        ]
+      }
+    },
+    "/api/catalogue": {
+      "get": {
+        "description": "REQ-165: docs/CATALOGUE.md parsed into sections and rows.",
+        "operationId": "catalogue_api_catalogue_get",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Catalogue"
+                }
+              }
+            },
+            "description": "Successful Response"
+          }
+        },
+        "summary": "Catalogue",
+        "tags": [
+          "catalogue"
         ]
       }
     },

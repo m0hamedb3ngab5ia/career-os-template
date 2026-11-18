@@ -164,7 +164,17 @@ def _match_entry(question_text: str, standard_answers_yaml: str | Path,
     # A legal or salary question may only be answered by an entry whose pattern hit the legal/salary
     # wording itself: "convicted of a crime in any city" must not borrow the `address` answer.
     guard_spans = [m.span() for rx in (_SALARY_RE, _LEGAL_RE) for m in rx.finditer(t)]
-    for entry in load_company_answers(standard_answers_yaml, company) + load_standard_answers(standard_answers_yaml):
+    entries = load_company_answers(standard_answers_yaml, company) + load_standard_answers(standard_answers_yaml)
+    # An answer saved for this exact question (`careeros learn answer`) beats an earlier generic keyword entry:
+    # "location" must not answer "Which office location would you prefer?".
+    for entry in entries:
+        for pat in entry.get("match") or []:
+            try:
+                if not re.search(r"(?<!\\)\.", pat) and re.fullmatch(pat, t, re.I):  # literal (learned) only
+                    return entry
+            except re.error:
+                continue
+    for entry in entries:
         for pat in entry.get("match") or []:
             try:
                 m = re.search(pat, t, re.I)
