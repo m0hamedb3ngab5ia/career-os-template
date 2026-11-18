@@ -20,6 +20,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 
 | Feature | What it does | How to use | REQ |
 |---|---|---|---|
+| Guided setup | Walks a new user from a fresh clone to a first application, asking every preference; resumes where you left off. | `/onboard`; or "set me up" | REQ-157 |
 | Init | Copies the example candidate into `profile/` and `config/` (gitignored). | `careeros init`; or "set me up" | |
 | Doctor | Checks setup: example data left, broken YAML, unknown bullet ids, missing tools. | `careeros doctor`; or "what's missing?" | REQ-102 |
 | Readiness checklist | Blocks applying until the must-items are done. | Setup card on Today; `careeros doctor` | REQ-102, REQ-103, REQ-131 |
@@ -38,6 +39,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 | Feature | What it does | How to use | REQ |
 |---|---|---|---|
 | Scout | Pulls job boards, prefilters, stores new postings, syncs the tracker. | `careeros scout --sync`; or "find new jobs" | |
+| Job alerts | Turns LinkedIn job-alert emails in Gmail into company boards for scout. | `/job-alerts` | |
 | Company boards | Finds the Greenhouse/Ashby/Lever board for a company name. | `careeros company find-board <name>` | |
 | Add one job | Adds a posting by URL, or from alert-email JSON. | `careeros job add <url>`; `careeros job describe <id> --text-file <path>` | |
 | Check any job | Score a pasted posting without scouting it. | Paste it in chat, run `/score-job` | REQ-114 |
