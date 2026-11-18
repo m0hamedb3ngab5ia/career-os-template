@@ -1666,7 +1666,7 @@ def cmd_outreach_panel(args: argparse.Namespace) -> int:
         for d in data.get("drafts") or []:
             if not isinstance(d, dict) or d.get("sent") or not d.get("to") or not isinstance(d.get("email"), dict):
                 continue
-            if ctx and not d.get("hold") and not d.get("gmail_draft_url"):
+            if ctx and osend.mail_link(d) and not d.get("gmail_draft_url"):  # unheld and QA-passed only
                 try:
                     d["gmail_draft_url"] = osend.gmail_draft(ctx[0], ctx[1], d, _job_resume(store.job_dir(jid)), ctx[2])
                 except (osend.SendError, imaplib.IMAP4.error, OSError) as e:

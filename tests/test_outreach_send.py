@@ -171,3 +171,16 @@ def test_every_route_refuses_a_draft_that_failed_qa_and_uses_the_candidates_line
     body = o.build_message("me@x.com", lined, pdf, "Alex").get_body(("plain",)).get_content()
     assert body.startswith("Hi Sam,\n\nWe met at the fintech meetup.\n\nAsk.")
     assert "We%20met" in o.mail_link(lined)
+
+
+def test_cli_panel_skips_gmail_for_a_draft_that_failed_qa(settings, monkeypatch):
+    import argparse
+
+    from careeros import cli
+    _job(settings, [{**D, "qa_pass": False}, {**D, "contact": "Kim Park", "to": "kim@x.com"}])
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    monkeypatch.setattr(cli, "_outreach_ctx", lambda s: ("me@x.com", "pw", "Alex"))
+    made = []
+    monkeypatch.setattr(o, "gmail_draft", lambda frm, pw, d, r, n: made.append(d["to"]) or "https://mail.google.com/x")
+    assert cli.cmd_outreach_panel(argparse.Namespace(job_ids=["j9"], gmail=True)) == 0
+    assert made == ["kim@x.com"]
