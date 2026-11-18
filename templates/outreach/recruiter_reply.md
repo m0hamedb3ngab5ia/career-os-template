@@ -27,7 +27,7 @@ Hi <First>,
 <Candidate-supplied slots with timezone, or <AVAILABILITY: candidate to fill>.> <Résumé attached, if asked.>
 
 <Candidate first name>
-<identity.phone>
+<identity.linkedin>
 ```
 
 ## Example

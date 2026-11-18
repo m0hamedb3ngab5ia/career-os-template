@@ -12,20 +12,23 @@ Subject: [ROLE] at [COMPANY]
 
 Hi [NAME],
 
-I hope this message finds you well. I'm reaching out regarding the [ROLE] role at [COMPANY]. I think I'd be a great
-fit because [REASON 1], [REASON 2] and [REASON 3]. I've attached my résumé for more information.
+I hope this message finds you well. I came across your [BACKGROUND OR WORK, one sourced line, no praise] and wanted
+to reach out. I see [COMPANY] has the [ROLE] role open, and I think I'd be a great fit because [IMPACT REASON 1] and
+[IMPACT REASON 2]. My résumé is attached.
 
 [ONE ASK, vary it; a referral only from employees, and not in every email:]
-I'd be eager for the opportunity to connect briefly if you're interested.
-  / Would you be open to referring me through [Greenhouse's referral form / your referral process]?
-  / Is there anything I could do to better position myself as the process moves forward? I'm excited about [ONE THING].
+I'd be glad to connect briefly if you're open to it.
+  / Would you be open to referring me through [Greenhouse's referral form / your referral process]? Totally understand if not.
+  / Is there anything I could do to better position myself in the process?
 
 Thank you,
 <identity.name>
-<identity.phone> · <identity.linkedin>
+<identity.linkedin>
 ```
 
-Reasons are short and plain (what I do, one result, what I like doing), each traced to a bullet id; no stacked numbers.
+Reasons say what the work means, not the stack: "I ship software to production at a bank, so I'm used to high-stakes,
+fast-paced work", not "I build Kafka services in Java". No résumé numbers, no phone number. Each reason still traces
+to a bullet id.
 
 ## Example
 
@@ -36,17 +39,17 @@ Subject: Backend Engineer at Acme
 
 Hi Dan,
 
-I hope this message finds you well. I'm reaching out regarding the Backend Engineer role at Acme. I think I'd be a
-great fit because I build event pipelines in Python and Kafka at Initech, I cut a nightly job from hours to minutes,
-and I like working on payments systems. I've attached my résumé for more information.
+I hope this message finds you well. I came across your talk on Acme's payments platform and wanted to reach out. I see
+Acme has the Backend Engineer role open, and I think I'd be a great fit because I ship production software at a
+logistics company where outages cost real money, and I move fast without breaking things. My résumé is attached.
 
-I'd be eager for the opportunity to connect briefly if you're interested.
+I'd be glad to connect briefly if you're open to it.
 
 Thank you,
 Alex Example
-555-010-0199 · linkedin.com/in/alex-example
+linkedin.com/in/alex-example
 ```
-(proof: initech.1, initech.2)
+(proof: initech.1, initech.2; background source: conference talk URL in contacts.json)
 
 ## Notes from public guides (2026-11-17)
 

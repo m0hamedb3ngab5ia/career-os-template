@@ -12,12 +12,11 @@ At most 80 words before the sign-off. Subject under 60 characters.
   submit it in the company's applicant system (the Greenhouse referral form when `posting.ats` is greenhouse, where referrals land in the recruiters'
   priority review queue; other ATS: their internal referral process, no priority claim). Keep the message at most 80 words (the sign-off is not counted).
 - Close: "Thank you," then the full name from `profile/master.yaml: identity.name`,
-  phone and LinkedIn from `identity` under it.
+  LinkedIn from `identity` under it. Never the phone number.
 - Email address confidence must be `verified` or `pattern_match_high` before any auto-send.
 - Nothing from `config/qa.yaml: banned_phrases`.
 
 ## Skeleton
 
 Same shape as `templates/followup_email/post_apply_outreach.md` (warm greeting, "I'm reaching out regarding <role>",
-2-3 plain reasons I'd fit, résumé attached, one varied ask, "Thank you," + name, phone, LinkedIn). Swap the opening
-for one sourced fact about their team when you have it.
+2-3 plain reasons I'd fit, résumé attached, one varied ask, "Thank you," + name, LinkedIn; no phone). Open with one sourced line about the person's background or work.
