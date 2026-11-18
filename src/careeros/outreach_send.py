@@ -74,7 +74,8 @@ def panel(rows: list[dict[str, Any]]) -> str:
     full = []
     for r in rows:
         d, n = r["draft"], r["n"]
-        who = f"{d.get('contact')} ({str(d.get('role') or '').replace('_', ' ')})"
+        role = str(d.get("role") or "").replace("_", " ")
+        who = f"{d.get('contact')} ({role})" if role and role != "other" else str(d.get("contact"))
         job = f"{r['company']}, [{r['title']}]({r['url']})"
         addr = f"{d.get('to')} ({d.get('to_confidence') or '?'})"
         if d.get("hold"):
