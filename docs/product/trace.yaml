@@ -987,6 +987,7 @@ requirements:
     provenance: confirmed
     tests:
     - test_gate_flags_slop_and_your_line_is_optional
+    - test_gate_requires_why_refer_and_rejects_bonus_and_trait_claims
     - test_cli_outreach_qa_records_line_and_prints_link
   REQ-163:
     status: implemented

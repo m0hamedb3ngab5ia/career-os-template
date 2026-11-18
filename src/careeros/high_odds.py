@@ -143,6 +143,12 @@ def message_text(body: str) -> str:
     return body[:m[-1].start()] if m else body
 
 
+# Research 2026-11-18 (docs/work/yield-model/research/stranger-referrals.md): a stated trait is a claim, not proof,
+# and naming the referral bonus makes the ask look transactional. Show traits through one fact instead.
+TRAIT_CLAIMS = ("go-getter", "charismatic", "witty", "hard-working", "hardworking", "passionate", "self-starter",
+                "team player", "fast learner", "detail-oriented")
+
+
 def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     """Deterministic gate for one outreach draft. [] = passes."""
     em = d.get("email") if isinstance(d.get("email"), dict) else {}
@@ -162,6 +168,12 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
         out.append("no profile bullet id")
     if "**" in body:
         out.append("markdown bold in message")
+    if not str(d.get("why_refer") or "").strip():
+        out.append("no why_refer: say in one clause why THIS person would help (shared background, or a checkable "
+                   "proof plus a short chat)")
+    if "bonus" in low:
+        out.append("mentions a referral bonus")
+    out += [f"trait claim: {t} (show it with a fact)" for t in TRAIT_CLAIMS if t in low]
     return out
 
 
