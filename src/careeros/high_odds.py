@@ -152,7 +152,7 @@ TRAIT_CLAIMS = ("go-getter", "charismatic", "witty", "hard-working", "hardworkin
 def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     """Deterministic gate for one outreach draft. [] = passes."""
     em = d.get("email") if isinstance(d.get("email"), dict) else {}
-    body = str(em.get("body") or d.get("linkedin_message") or "")
+    body = final_body(d) if em.get("body") else str(d.get("linkedin_message") or "")  # as sent, your_line included
     out = []
     if not body.strip():
         out.append("no message text")
@@ -175,6 +175,8 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     if "bonus" in sendable:
         out.append("mentions a referral bonus")
     out += [f"trait claim: {t} (show it with a fact)" for t in TRAIT_CLAIMS if t in sendable]
+    sents = [x.strip().lower() for x in re.split(r"(?<=[.!?])\s+|\n+", message_text(body)) if len(x.split()) > 3]
+    out += [f"repeated sentence: {x[:60]}" for x in dict.fromkeys(x for x in sents if sents.count(x) > 1)]
     return out
 
 

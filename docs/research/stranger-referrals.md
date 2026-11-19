@@ -28,3 +28,15 @@ Question: a random employee has no reason to help; what turns "stranger" into "I
   10-minute chat so they judge before vouching. Never mention the bonus.
 - Personality words (go-getter, charismatic, witty) are claims; show one, never state them.
 - Keep the easy out ("Totally understand if not").
+
+## Carnegie, How to Win Friends and Influence People (1936), applied to outreach
+Added 2026-11-19 at the candidate's request. Principles paraphrased; grade C (classic practitioner advice, consistent
+with findings 1, 4 and 6 above, not itself an experiment).
+- Be genuinely interested in them first: open with their work or their company, one specific, true detail.
+- Talk in terms of what they want: frame fit as "it looks like <company> is looking for X, Y, Z", then show you've done it.
+- Make them feel important, sincerely: notice something real; flattery is the opposite (no praise words).
+- Use their name; write to one person.
+- Ask, don't push: a question with an easy out ("If you have time…", "Totally understand if not") lets them say yes on
+  their terms. Offer the chat, but let them refer without it if they're busy.
+- Plain words a stranger understands: what the work means (high stakes, volume), not internal detail they can read on
+  the résumé.

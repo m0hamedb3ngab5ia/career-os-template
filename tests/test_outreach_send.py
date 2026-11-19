@@ -29,13 +29,17 @@ def test_gmail_draft_appends_to_drafts_and_returns_a_link(tmp_path):
     class Imap:
         def __init__(self, host): calls.append(("host", host))
         def login(self, u, p): calls.append(("login", u))
-        def append(self, box, flags, when, raw): calls.append(("append", box, raw)); return ("OK", [b""])
+        def append(self, box, flags, when, raw):
+            calls.append(("append", box, raw)); return ("OK", [b"[APPENDUID 7 42] (Success)"])
+        def select(self, box): calls.append(("select", box)); return ("OK", [b"3"])
+        def uid(self, cmd, uid, what): calls.append(("uid", cmd, uid)); return ("OK", [b"3 (X-GM-MSGID 255 UID 42)"])
         def logout(self): calls.append(("logout",))
 
     url = o.gmail_draft("me@x.com", "pw", D, pdf, "Alex Example", imap=Imap)
     box, raw = [c for c in calls if c[0] == "append"][0][1:]
     assert box == '"[Gmail]/Drafts"' and email.message_from_bytes(raw)["To"] == "sam@x.com"
-    assert url.startswith("https://mail.google.com/mail/u/0/#search/in%3Adrafts") and "sam%40x.com" in url
+    # user 2026-11-19: a search link opened an empty compose; the draft's own id opens the draft itself
+    assert ("uid", "FETCH", "42") in calls and url == "https://mail.google.com/mail/u/0/#drafts?compose=ff"
 
 
 def test_send_needs_explicit_yes_and_records_the_send(tmp_path):
