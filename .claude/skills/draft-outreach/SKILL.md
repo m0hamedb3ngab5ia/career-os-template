@@ -53,6 +53,15 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
     the bullet doesn't state.
   - Write each message for one named person; no sentence repeated verbatim across a batch, least of all two
     emails to one company. Prefer one strong contact per company over several near-identical emails.
+- Pick the shape from the reader before writing (user 2026-11-19: "identify what type of recruiter this is").
+  Inputs: `role` (contacts.json), `shared_network`, a verified public piece by them, the ATS, applied status.
+  | Reader | Line 3 (interest) | Fit paragraph | Ask |
+  |---|---|---|---|
+  | Recruiter / recruiting ops / team inbox | why they're the right person (they hire for it) | the posting's own keywords, matched one by one to what I did, plainly; they screen by keywords | chat or advice on the application |
+  | Hiring manager / engineer on the team | one concrete point from their verified piece, else their team's problem | technical specifics they'd recognise (named techniques, tools, scale) tied to their team's work; never employer-internal names or ticket detail | chat; referral if busy |
+  | Founder / exec | the company's mission or traction, one real number | outcomes and ownership (built it, who uses it) over techniques | chat; referral if busy |
+  | Shared network (alum, ex-colleague), any role | the overlap itself, warm ("a fellow <mascot> for some assistance :)") | qualifications at a high level; the bond carries the email | chat; referral if busy |
+  Greenhouse → add the referral reason in every row. Not applied → "I'm about to apply".
 - Message order, every email (user 2026-11-19; Carnegie principles in `docs/research/stranger-referrals.md`):
   1. "Hi <name>," then "I hope this message finds you well." (first sentence, once).
   2. Shared background, if any ("I'm a fellow <school> alum, and I wanted to reach out to a fellow <mascot> for some
