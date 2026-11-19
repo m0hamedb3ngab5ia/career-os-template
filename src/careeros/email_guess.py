@@ -54,10 +54,14 @@ def email_candidates(name: str, domain: str, pattern: str | None = None) -> list
     return out
 
 
+ROLE_INBOX = {"jobs", "talent", "hiring", "founders", "team", "hello", "info", "people", "hr", "contact"}
+
+
 def pattern_of(addr: str, name: str) -> str | None:
     """Which PATTERNS entry produced this address for this person; None for a shared inbox or an unknown shape."""
     local, _, domain = addr.lower().partition("@")
-    if len(_ascii_words(name)) < 2:
+    if len(_ascii_words(name)) < 2 or "recruit" in local or "career" in local \
+            or ROLE_INBOX & set(re.split(r"[._+-]", local)):
         return None
     return next((p for p in PATTERNS if email_candidates(name, domain, p)[0].split("@")[0] == local), None)
 

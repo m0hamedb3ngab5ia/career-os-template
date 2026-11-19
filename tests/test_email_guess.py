@@ -318,6 +318,8 @@ def test_learned_patterns_order_guesses_and_drop_failed_ones(tmp_path):
     f = tmp_path / "email_patterns.json"
     assert pattern_of("jane.doe@acme.com", "Jane Doe") == "{first}.{last}"
     assert pattern_of("founders@acme.com", "Founders") is None
+    assert pattern_of("recruiting@acme.com", "Acme recruiting") is None  # a team inbox teaches nothing about people
+    assert pattern_of("chris.hartley@acme.com", "Chris Hartley") == "{first}.{last}"
     record_email_result(f, "jane.doe@acme.com", "Jane Doe", ok=False)
     record_email_result(f, "jdoe@acme.com", "Jane Doe", ok=True)
     assert learned_pattern(f, "acme.com") == {"works": "{f}{last}", "failed": ["{first}.{last}"]}
