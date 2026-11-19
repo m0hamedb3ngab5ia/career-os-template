@@ -91,6 +91,16 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   ("correctness at volume", "high-stakes production work"). Vary the wording between emails; only the candidate's
   fixed lines (greeting, "so I think I'd be a great fit", the ask, sign-off) repeat. Still professional: no "lol",
   no ellipses. The candidate's own edited email, when there is one, is the reference.
+- Content lessons (user feedback 2026-11-19; apply to every reader, not just the drafts that prompted them):
+  1. Reader first: classify the person (table above) before choosing a single sentence.
+  2. The ask matches their power: the decider gets "join the team", a peer at a big company gets "referral",
+     a recruiter gets "chat or advice". Asking a founder for a referral shows you didn't think.
+  3. Proof is chosen, not defaulted: list the posting's main ask, then pick the strongest true match on the résumé,
+     primary job first. Ask "is there a better example?" before keeping one.
+  4. Depth fits the reader: recruiter → the posting's keywords; engineer → named techniques; founder → outcomes.
+     Never employer-internal jargon.
+  5. Show interest, don't claim it: a concrete point they made (verified URL), or why they're the right person.
+  6. A project named gets its one result, briefly and with the résumé's own hedging ("should save ~3,000 hours").
 - Self-review before showing or creating any Gmail draft: read each email top to bottom as the stranger would. Check
   the order above, no sentence or idea said twice (including `your_line`, which is inserted after the greeting:
   clear it when the body already covers it), no word like "daily" twice, no jargon, the role and the applied status
