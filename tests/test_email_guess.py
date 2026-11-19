@@ -310,3 +310,18 @@ def test_cli_emails_asks_hunter_by_researched_domain(tmp_path, monkeypatch):
     monkeypatch.setattr(email_guess, "_fetch", lambda url, key: urls.append(url) or json.dumps({"data": None}))
     assert main(["--root", str(root), "outreach", "emails", "j1", "--no-apollo"]) == 0
     assert len(urls) == 1 and "domain=shophammock.com" in urls[0] and "company=" not in urls[0]
+
+
+def test_learned_patterns_order_guesses_and_drop_failed_ones(tmp_path):
+    """User 2026-11-19: learn from every bounce and delivery; reuse the format that worked for the next person."""
+    from careeros.email_guess import learned_pattern, pattern_of, record_email_result
+    f = tmp_path / "email_patterns.json"
+    assert pattern_of("jane.doe@acme.com", "Jane Doe") == "{first}.{last}"
+    assert pattern_of("founders@acme.com", "Founders") is None
+    record_email_result(f, "jane.doe@acme.com", "Jane Doe", ok=False)
+    record_email_result(f, "jdoe@acme.com", "Jane Doe", ok=True)
+    assert learned_pattern(f, "acme.com") == {"works": "{f}{last}", "failed": ["{first}.{last}"]}
+    out = apply_to_contacts({"contacts": [{"name": "Sam Lee"}]}, "acme.com", "high", None,
+                            learned=learned_pattern(f, "acme.com"))
+    cands = out["contacts"][0]["email_candidates"]
+    assert cands[0] == "slee@acme.com" and "sam.lee@acme.com" not in cands

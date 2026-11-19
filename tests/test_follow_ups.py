@@ -128,3 +128,21 @@ def test_locked_ticks_are_idempotent(env, monkeypatch):
     monkeypatch.setattr(Workbook, "save", real_save)
     Tracker(settings=s).flush_pending()
     assert len(_open(tr)) == 1
+
+
+def test_outreach_email_result_bounce_rotates_to_the_next_guess(env, monkeypatch):
+    from careeros.cli import main
+
+    s, tr = env
+    p = _job(s, tr, 1, applied="2026-11-15")
+    d = Store(s).job_dir(p.job_id)
+    (d / "outreach.json").write_text(json.dumps({"drafts": [
+        {"contact": "Jane Doe", "to": "jane.doe@acme.com", "sent": True, "sent_by": "candidate"}]}))
+    monkeypatch.setattr("careeros.cli._settings", lambda a: s)
+    assert main(["outreach", "email-result", p.job_id, "--contact", "Jane Doe", "--bounced", "550 5.1.1"]) == 0
+    dr = json.loads((d / "outreach.json").read_text())["drafts"][0]
+    assert dr["to"] != "jane.doe@acme.com" and dr["sent"] is False
+    assert dr["bounced"][0]["to"] == "jane.doe@acme.com" and dr["bounced"][0]["error"] == "550 5.1.1"
+    assert main(["outreach", "email-result", p.job_id, "--contact", "Jane Doe", "--delivered"]) == 0
+    pats = json.loads((Store(s).jobs_dir.parent / "email_patterns.json").read_text())
+    assert pats["acme.com"]["failed"] == ["{first}.{last}"] and pats["acme.com"]["works"]

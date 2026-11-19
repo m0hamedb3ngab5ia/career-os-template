@@ -105,7 +105,23 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   6. A project named gets its one result, briefly and with the résumé's own hedging ("should save ~3,000 hours").
 - Bounce codes: `550 5.1.1` no such user = wrong address pattern, try the next one; `550 5.2.1` account inactive =
   the pattern is right but the person likely left: verify they still work there (the candidate checks LinkedIn)
-  before any resend, and pick a new contact if not.
+  before any resend, and pick a new contact if not. Record every result with `careeros outreach email-result`
+  (delivered or bounced) so the company's format is learned; a resend reuses the candidate's sent text
+  (`candidate_edited: true` skips the word limit for it).
+- Lessons from the candidate's own sent edits (2026-11-19; their sent emails in `profile/voice/samples/` are the
+  best reference, read them first):
+  1. Lead the fit with primary-job production impact, scaled by tenure ("only four months in, about a dozen
+     improvements in production"), and AI or automation work that helped the team in production. A side project
+     only when it is the role's domain.
+  2. A "you wrote X" opener survives only when it connects to the candidate personally ("as an engineer who builds
+     apps in my free time, I appreciate UX details like this"). Otherwise cut it and open with "I wanted to reach out
+     because I recently applied to…".
+  3. Recruiters: two techniques named as principles ("system design principles like lazy loading and prefetching"),
+     not a list of six.
+  4. Founders: congratulate the traction ("$100M a year speaks to the value of the problem you solve"), then "I'd
+     love the opportunity to join your team, or even just hear about your experience"; a sized ask ("10 minutes").
+  5. "I've attached my résumé with more details on these accomplishments."
+  6. No emoji, even with alumni ("for some assistance if possible").
 - Self-review before showing or creating any Gmail draft: read each email top to bottom as the stranger would. Check
   the order above, no sentence or idea said twice (including `your_line`, which is inserted after the greeting:
   clear it when the body already covers it), no word like "daily" twice, no jargon, the role and the applied status

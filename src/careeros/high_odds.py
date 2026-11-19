@@ -157,7 +157,7 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     if not body.strip():
         out.append("no message text")
     n = _words(message_text(body))
-    if n > MAX_WORDS:
+    if n > MAX_WORDS and not d.get("candidate_edited"):  # the limit guards Claude's drafts, not the candidate's own text
         out.append(f"too long: {n} words, limit {MAX_WORDS}")
     low = body.lower()
     out += [f"banned phrase: {b}" for b in banned if b and b.lower() in low]
