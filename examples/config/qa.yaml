@@ -118,7 +118,7 @@ style_rules:
 # outreach:                        # outreach.json policy (skipped when a job has no outreach.json)
 #   linkedin_note_max_chars: 300   # hard: LinkedIn truncates connection notes
 #   cold_email_max_words: 150      # soft word limits below
-#   after_apply_max_words: 130
+#   after_apply_max_words: 130   # default (Recommended)
 #   status_followup_max_words: 80
 #   thank_you_max_words: 120
 #   linkedin_message_max_words: 120

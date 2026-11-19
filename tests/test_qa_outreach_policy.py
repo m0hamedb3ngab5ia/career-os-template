@@ -271,7 +271,7 @@ def test_thank_you_inside_drafts_list_is_checked_too(root):
 # ---- 5. word counts (soft) -------------------------------------------------------------------------
 
 @pytest.mark.parametrize("override,field", [
-    ({"kind": "post_apply_outreach", "email": {"subject": "x", "body": words(130)}}, "email.body"),
+    ({"kind": "post_apply_outreach", "email": {"subject": "x", "body": words(140)}}, "email.body"),
     ({"followup_7d": words(90)}, "followup_7d"),
     ({"linkedin_message": words(140)}, "linkedin_message"),
     ({"email": {"subject": "x", "body": words(160)}}, "email.body"),         # cold email default cap 150

@@ -146,3 +146,21 @@ def test_outreach_email_result_bounce_rotates_to_the_next_guess(env, monkeypatch
     assert main(["outreach", "email-result", p.job_id, "--contact", "Jane Doe", "--delivered"]) == 0
     pats = json.loads((Store(s).jobs_dir.parent / "email_patterns.json").read_text())
     assert pats["acme.com"]["failed"] == ["{first}.{last}"] and pats["acme.com"]["works"]
+
+
+def test_outreach_email_result_inactive_mailbox_holds_and_keeps_the_format(env, monkeypatch):
+    """550 5.2.1: the address format is right but the person left; hold, no rotation (user 2026-11-19)."""
+    from careeros.cli import main
+
+    s, tr = env
+    p = _job(s, tr, 1, applied="2026-11-15")
+    d = Store(s).job_dir(p.job_id)
+    (d / "outreach.json").write_text(json.dumps({"drafts": [
+        {"contact": "Jane Doe", "to": "jane.doe@acme.com", "sent": True, "sent_by": "candidate"}]}))
+    monkeypatch.setattr("careeros.cli._settings", lambda a: s)
+    assert main(["outreach", "email-result", p.job_id, "--contact", "Jane Doe", "--bounced", "550 5.2.1"]) == 0
+    dr = json.loads((d / "outreach.json").read_text())["drafts"][0]
+    assert dr["to"] == "jane.doe@acme.com" and dr["sent"] is False and dr["hold"] is True
+    assert "left" in dr["hold_reason"]
+    pats = json.loads((Store(s).jobs_dir.parent / "email_patterns.json").read_text())
+    assert pats["acme.com"] == {"works": "{first}.{last}", "failed": []}

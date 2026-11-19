@@ -62,8 +62,8 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   | Founder / exec, or the person who decides at a small company | the company's mission or traction, one real number | outcomes and ownership (built it, who uses it) over techniques | a chat about joining the team; never a referral (they decide; user 2026-11-19) |
   | Shared network (alum, ex-colleague), any role | the overlap itself, warm ("a fellow <mascot> for some assistance :)") | qualifications at a high level; the bond carries the email | chat; referral if busy |
   Proof = the experience that best matches the posting's main ask, primary job first: "reliable and fast production
-  systems" → the real-time stock record and its safeguards, not a side project (user 2026-11-19). A side project
-  leads only when the posting's ask is its domain (web performance → the desktop app).
+  systems" → the primary job's production system and its safeguards, not a side project (user 2026-11-19). A side
+  project leads only when the posting's ask is its domain (web performance → a side project built for speed).
   Greenhouse → add the referral reason in every row. Not applied → "I'm about to apply".
 - Message order, every email (user 2026-11-19; Carnegie principles in `docs/research/stranger-referrals.md`):
   1. "Hi <name>," then "I hope this message finds you well." (first sentence, once).
@@ -102,7 +102,7 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   5. Show interest, don't claim it: a concrete point they made (verified URL), or why they're the right person.
      Never grade their idea ("you might be right", "great point"): a junior judging a senior's take reads as odd.
      Build on it instead: what their point implies, tied to why this role caught your eye.
-  6. A project named gets its one result, briefly and with the résumé's own hedging ("should save ~3,000 hours").
+  6. A project named gets its one result, briefly and with the résumé's own hedging (the résumé's own words, e.g. "should save ~<N> hours").
 - Bounce codes: `550 5.1.1` no such user = wrong address pattern, try the next one; `550 5.2.1` account inactive =
   the pattern is right but the person likely left: verify they still work there (the candidate checks LinkedIn)
   before any resend, and pick a new contact if not. Record every result with `careeros outreach email-result`
@@ -110,15 +110,16 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   (`candidate_edited: true` skips the word limit for it).
 - Lessons from the candidate's own sent edits (2026-11-19; their sent emails in `profile/voice/samples/` are the
   best reference, read them first):
-  1. Lead the fit with primary-job production impact, scaled by tenure ("only four months in, about a dozen
-     improvements in production"), and AI or automation work that helped the team in production. A side project
-     only when it is the role's domain.
+  1. Lead the fit with primary-job production impact, scaled by tenure ("only <N> months in, <count> improvements
+     in production"), and AI or automation work that helped the team in production. A side project only when it is
+     the role's domain. Every fact and number comes from a `profile/master.yaml` bullet (cite its id); a claim the
+     candidate wrote in a sent email but master.yaml lacks is an Action Item to confirm, never reused.
   2. A "you wrote X" opener survives only when it connects to the candidate personally ("as an engineer who builds
      apps in my free time, I appreciate UX details like this"). Otherwise cut it and open with "I wanted to reach out
      because I recently applied to…".
   3. Recruiters: two techniques named as principles ("system design principles like lazy loading and prefetching"),
      not a list of six.
-  4. Founders: congratulate the traction ("$100M a year speaks to the value of the problem you solve"), then "I'd
+  4. Founders: congratulate the traction ("<their number> speaks to the value of the problem you solve"), then "I'd
      love the opportunity to join your team, or even just hear about your experience"; a sized ask ("10 minutes").
   5. "I've attached my résumé with more details on these accomplishments."
   6. No emoji, even with alumni ("for some assistance if possible").
