@@ -34,11 +34,15 @@ def test_contact_rows_track_reach_email_and_follow_up(settings):
          "hold_reason": "address inactive 2026-11-19"},
         {"contact": "Ana Ruiz", "to": "aruiz@nimbus.com", "sent": False,
          "bounced": [{"to": "ana.ruiz@nimbus.com", "error": "550 5.1.1"}]},
+        {"contact": "Kim Park", "to": None, "sent": True, "sent_at": "2026-11-19"},  # LinkedIn only
+        {"contact": "Lou Chan", "to": None},
     ]}))
     tr.sync_contacts(contact_rows(st, settings))
     tr.sync_contacts(contact_rows(st, settings))  # idempotent: one row per job + contact
     rows = {r["Name"]: r for r in _sheet(tr)}
-    assert len(_sheet(tr)) == 3
+    assert len(_sheet(tr)) == 5
+    assert rows["Kim Park"]["ContactStatus"] == "contacted" and rows["Kim Park"]["EmailStatus"] == "LinkedIn, no email"
+    assert rows["Lou Chan"]["ContactStatus"] == "not contacted" and rows["Lou Chan"]["EmailStatus"] == "LinkedIn, no email"
     j = rows["Jane Doe"]
     assert (j["Company"], j["Sent"], j["SentDate"], j["Email"]) == ("Nimbus", "Y", "2026-11-19", "jdoe@nimbus.com")
     assert j["ContactStatus"] == "contacted" and j["EmailStatus"] == "delivered after 1 bounce"

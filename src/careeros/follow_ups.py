@@ -57,7 +57,7 @@ def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
     for f in sorted(store.jobs_dir.glob("*/outreach.json")):
         company = _json(f.parent / "posting.json").get("company") or ""
         for d in _json(f).get("drafts") or []:
-            if not isinstance(d, dict) or not d.get("contact") or not (d.get("to") or d.get("sent")):
+            if not isinstance(d, dict) or not d.get("contact"):
                 continue
             bounces, sent, reason = len(d.get("bounced") or []), d.get("sent") is True, str(d.get("hold_reason") or "")
             when = _day(d.get("sent_at") or d.get("sent_date"))
@@ -70,6 +70,8 @@ def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
                 who, mail = "not reached", f"bounced; next try {d.get('to')}"
             else:
                 who, mail = "not contacted", "draft"
+            if not d.get("to") and not d.get("hold"):  # LinkedIn-only draft: no email to deliver or bounce
+                mail = "LinkedIn, no email"
             out.append({"JobID": f.parent.name, "Company": company, "Name": d["contact"],
                         "Email": d.get("to") or "", "EmailConfidence": d.get("to_confidence") or "",
                         "Sent": "Y" if sent else "N", "SentDate": when.isoformat() if sent and when else "",
