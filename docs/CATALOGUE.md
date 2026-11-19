@@ -102,6 +102,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 | Send now | Sends one approved email from your Gmail with the résumé; warns that guessed addresses bounce. | `careeros outreach send <id> --contact X --yes`; "send 3" | REQ-162 |
 | Record a send | Marks what you sent by hand and starts the follow-up clock. | `careeros outreach sent <id>` | REQ-154 |
 | Record a delivery or bounce | Learns each company's email format; a bounce moves to the next guess. | `careeros outreach email-result <id>` | REQ-154 |
+| Contacts sheet | Who you reached, whether the email landed, when the follow-up is due; updates after every send or bounce. | `careeros tracker contacts` | REQ-154 |
 | Network match | Imports your LinkedIn export and shows jobs where you know someone. | `careeros network import <csv>`, `careeros network match` | |
 
 ## 7. Follow-ups and reminders

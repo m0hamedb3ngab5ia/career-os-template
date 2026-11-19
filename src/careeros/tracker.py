@@ -112,6 +112,7 @@ ACTION_MIGRATIONS: list[tuple[str, int, str | None]] = [("Needs", 9, "anytime"),
 CONTACT_COLUMNS = [
     ("JobID", 14), ("Company", 22), ("Name", 24), ("Title", 28), ("LinkedIn", 40), ("Email", 30),
     ("EmailConfidence", 15), ("DraftMessage", 60), ("Sent", 7), ("SentDate", 12), ("Replied", 10),
+    ("ContactStatus", 16), ("EmailStatus", 32), ("FollowUpDue", 12),  # user 2026-11-19; appended to old sheets
 ]
 LOG_COLUMNS = [("Timestamp", 20), ("JobID", 14), ("Component", 14), ("Message", 90)]
 CONFIG_COLUMNS = [("Key", 24), ("Value", 60)]
@@ -491,6 +492,16 @@ class Tracker:
                     if ws.cell(row=r, column=hdr["Status"]).value == "skipped":
                         b.apply({"job_id": jid, "status": "skipped"})
                 b.finish()
+        if "Contacts" in wb.sheetnames:
+            wc = wb["Contacts"]
+            have = _header_index(wc)
+            for name, width in CONTACT_COLUMNS:
+                if name not in have:  # append, never move: user data stays put
+                    col = max(have.values(), default=0) + 1
+                    c = wc.cell(row=1, column=col, value=name)
+                    c.font, c.fill = Font(bold=True), HEADER_FILL
+                    wc.column_dimensions[get_column_letter(col)].width = width
+                    have[name] = col
         if "Action Items" not in wb.sheetnames:
             return
         ws = wb["Action Items"]
@@ -899,6 +910,26 @@ class Tracker:
 
         payload = c.model_dump(include={"company", "name", "job_id", "title", "linkedin", "email", "email_confidence", "draft_message"})
         self._mutate("add_contact", payload, fn)
+
+    def sync_contacts(self, rows: list[dict[str, Any]]) -> None:
+        """Upsert Contacts rows (keyed by sheet header) by JobID + Name. A Replied value the candidate typed wins:
+        that row reads "replied" with no follow-up due."""
+        def fn(wb: Workbook) -> None:
+            ws = wb["Contacts"]
+            hdr = _header_index(ws)
+            at = {(str(ws.cell(row=r, column=hdr["JobID"]).value or ""), ws.cell(row=r, column=hdr["Name"]).value): r
+                  for r in range(2, ws.max_row + 1)}
+            for row in rows:
+                key = (str(row.get("JobID") or ""), row.get("Name"))
+                r = at.setdefault(key, ws.max_row + 1)
+                vals = dict(row)
+                if ws.cell(row=r, column=hdr["Replied"]).value:
+                    vals.update(ContactStatus="replied", FollowUpDue="")
+                for k, v in vals.items():
+                    if k in hdr:
+                        _put(ws, r, hdr[k], v)
+
+        self._mutate("sync_contacts", {"rows": rows}, fn)
 
     # --- log / config ------------------------------------------------------
 
