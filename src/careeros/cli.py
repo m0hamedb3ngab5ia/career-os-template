@@ -155,6 +155,16 @@ def cmd_tracker_sync(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_tracker_contacts(args: argparse.Namespace) -> int:
+    """Contacts sheet = every outreach.json: reached or not, email delivered/bounced/held, follow-up due."""
+    from careeros.follow_ups import contact_rows
+    s = _settings(args)
+    rows = contact_rows(Store(s), s)
+    Tracker(settings=s).sync_contacts(rows)
+    print(f"contacts sheet: {len(rows)} rows synced")
+    return 0
+
+
 def cmd_tracker_flush(args: argparse.Namespace) -> int:
     tr = Tracker(settings=_settings(args))
     print(f"flushed {tr.flush_pending()} queued ops; {tr.pending_count()} remaining")
@@ -2554,6 +2564,7 @@ def build_parser() -> argparse.ArgumentParser:
     ti.set_defaults(fn=cmd_tracker_init)
     trs.add_parser("sync").set_defaults(fn=cmd_tracker_sync)
     trs.add_parser("flush").set_defaults(fn=cmd_tracker_flush)
+    trs.add_parser("contacts", help="sync the Contacts sheet from outreach.json (also runs after outreach send/sent/email-result)").set_defaults(fn=cmd_tracker_contacts)
     tac = trs.add_parser("applied-count", help="applications within --days to a company (or all); prints an integer")
     tac.add_argument("company", nargs="?", help="company name (normalized match); omit for all companies")
     tac.add_argument("--days", type=int, default=90)
@@ -2920,14 +2931,14 @@ def build_parser() -> argparse.ArgumentParser:
     osn.add_argument("job_id")
     osn.add_argument("--contact", help="contact name; default every draft")
     osn.add_argument("--date", help="YYYY-MM-DD, default today")
-    osn.set_defaults(fn=cmd_outreach_sent)
+    osn.set_defaults(fn=cmd_outreach_sent, sync_contacts=True)
     oer = outs.add_parser("email-result", help="record a delivery or bounce: learns the company's address format; a bounce moves to the next guess")
     oer.add_argument("job_id")
     oer.add_argument("--contact", required=True)
     g = oer.add_mutually_exclusive_group(required=True)
     g.add_argument("--delivered", action="store_true")
     g.add_argument("--bounced", metavar="CODE", help="the bounce's SMTP code, e.g. '550 5.1.1'")
-    oer.set_defaults(fn=cmd_outreach_email_result)
+    oer.set_defaults(fn=cmd_outreach_email_result, sync_contacts=True)
     okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
     okt.add_argument("job_ids", nargs="*")
     okt.set_defaults(fn=cmd_outreach_kit)
@@ -2939,7 +2950,7 @@ def build_parser() -> argparse.ArgumentParser:
     osd.add_argument("job_id")
     osd.add_argument("--contact", required=True)
     osd.add_argument("--yes", action="store_true", help="you approved this send; guessed addresses can bounce")
-    osd.set_defaults(fn=cmd_outreach_send)
+    osd.set_defaults(fn=cmd_outreach_send, sync_contacts=True)
     oqa = outs.add_parser("qa", help="gate outreach drafts, optionally add your own line (--line); prints the one-click compose link")
     oqa.add_argument("job_id")
     oqa.add_argument("--contact")
@@ -3110,7 +3121,13 @@ def build_parser() -> argparse.ArgumentParser:
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     try:
-        return int(args.fn(args) or 0)
+        rc = int(args.fn(args) or 0)
+        if rc == 0 and getattr(args, "sync_contacts", False):
+            try:
+                cmd_tracker_contacts(args)
+            except Exception as e:  # the send/record already happened; a sheet hiccup must not report failure
+                print(f"contacts sheet not updated ({e}); run `careeros tracker contacts`", file=sys.stderr)
+        return rc
     except (SetupError, ConfigError) as e:
         print(f"careeros: {e}", file=sys.stderr)
         return 1

@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import hashlib
 import json
-from datetime import date, datetime
+from datetime import date, datetime, timedelta
 from typing import Any
 
 from careeros.config import Settings
@@ -48,6 +48,35 @@ def _outreach_wait(store: Store, job_id: str) -> date | None:
         return None
     days = [_day(x.get("sent_at") or x.get("sent_date")) for x in drafts]
     return min((x for x in days if x), default=None)
+
+
+def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
+    """Contacts-sheet rows from every outreach.json (user 2026-11-19): who was reached, did the email land, when to
+    follow up. Rows are keyed by sheet headers; `Tracker.sync_contacts` writes them."""
+    n, out = after_days(s), []
+    for f in sorted(store.jobs_dir.glob("*/outreach.json")):
+        company = _json(f.parent / "posting.json").get("company") or ""
+        for d in _json(f).get("drafts") or []:
+            if not isinstance(d, dict) or not d.get("contact") or not (d.get("to") or d.get("sent")):
+                continue
+            bounces, sent, reason = len(d.get("bounced") or []), d.get("sent") is True, str(d.get("hold_reason") or "")
+            when = _day(d.get("sent_at") or d.get("sent_date"))
+            if sent:
+                who = "replied" if d.get("replied") else "contacted"
+                mail = "delivered" + (f" after {bounces} bounce{'s' * (bounces > 1)}" if bounces else "")
+            elif d.get("hold"):
+                who, mail = ("left company" if "left" in reason or "inactive" in reason else "not contacted"), f"held: {reason}"
+            elif bounces:
+                who, mail = "not reached", f"bounced; next try {d.get('to')}"
+            else:
+                who, mail = "not contacted", "draft"
+            out.append({"JobID": f.parent.name, "Company": company, "Name": d["contact"],
+                        "Email": d.get("to") or "", "EmailConfidence": d.get("to_confidence") or "",
+                        "Sent": "Y" if sent else "N", "SentDate": when.isoformat() if sent and when else "",
+                        "ContactStatus": who, "EmailStatus": mail,
+                        "FollowUpDue": (when + timedelta(days=n)).isoformat() if sent and when and who != "replied"
+                        else ""})
+    return out
 
 
 def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
