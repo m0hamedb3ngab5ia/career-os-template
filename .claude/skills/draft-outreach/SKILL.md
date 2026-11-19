@@ -100,7 +100,12 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   4. Depth fits the reader: recruiter → the posting's keywords; engineer → named techniques; founder → outcomes.
      Never employer-internal jargon.
   5. Show interest, don't claim it: a concrete point they made (verified URL), or why they're the right person.
+     Never grade their idea ("you might be right", "great point"): a junior judging a senior's take reads as odd.
+     Build on it instead: what their point implies, tied to why this role caught your eye.
   6. A project named gets its one result, briefly and with the résumé's own hedging ("should save ~3,000 hours").
+- Bounce codes: `550 5.1.1` no such user = wrong address pattern, try the next one; `550 5.2.1` account inactive =
+  the pattern is right but the person likely left: verify they still work there (the candidate checks LinkedIn)
+  before any resend, and pick a new contact if not.
 - Self-review before showing or creating any Gmail draft: read each email top to bottom as the stranger would. Check
   the order above, no sentence or idea said twice (including `your_line`, which is inserted after the greeting:
   clear it when the body already covers it), no word like "daily" twice, no jargon, the role and the applied status
