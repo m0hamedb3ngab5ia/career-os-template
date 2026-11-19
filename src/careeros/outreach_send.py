@@ -5,6 +5,7 @@ The app password is the one `careeros notify setup` stored in the Keychain; noth
 from __future__ import annotations
 
 import imaplib
+import re
 import smtplib
 import time
 from datetime import date
@@ -65,6 +66,14 @@ def gmail_draft(frm: str, password: str, d: dict[str, Any], resume: Path | None,
         typ, data = box.append('"[Gmail]/Drafts"', "\\Draft", imaplib.Time2Internaldate(time.time()), msg.as_bytes())
         if typ != "OK":  # a rejected APPEND returns NO without raising
             raise SendError(f"Gmail refused the draft: {data!r}")
+        # Gmail opens a draft by its X-GM-MSGID in hex; a search link only lands on the list (user 2026-11-19)
+        uid = re.search(rb"APPENDUID \d+ (\d+)", b" ".join(x for x in data if isinstance(x, bytes)))
+        if uid:
+            box.select('"[Gmail]/Drafts"')
+            _, got = box.uid("FETCH", uid.group(1).decode(), "(X-GM-MSGID)")
+            mid = re.search(rb"X-GM-MSGID (\d+)", got[0] if got and isinstance(got[0], bytes) else b"")
+            if mid:
+                return f"https://mail.google.com/mail/u/0/#drafts?compose={int(mid.group(1)):x}"
     finally:
         box.logout()
     return "https://mail.google.com/mail/u/0/#search/" + quote(f"in:drafts to:{d['to']}")

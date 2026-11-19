@@ -88,7 +88,7 @@ def test_gate_requires_why_refer_and_rejects_bonus_and_trait_claims():
 
 
 def test_gate_flags_slop_and_your_line_is_optional():
-    bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * 130}, "facts_used": []}
+    bad = {**GOOD, "email": {**GOOD["email"], "body": "I hope this finds you well. " + "word " * h.MAX_WORDS}, "facts_used": []}
     probs = h.draft_problems(bad, ["I hope this finds you well"])
     assert any("too long" in p for p in probs) and any("banned" in p for p in probs) and any("fact" in p for p in probs)
     d = dict(GOOD)
@@ -239,7 +239,7 @@ def test_mail_app_link_for_iphone():
 
 def test_word_limit_skips_the_signature():
     """The candidate's template signs off with name and LinkedIn; only the message counts toward the limit."""
-    msg = " ".join(["word"] * 118)
+    msg = " ".join(["word"] * (h.MAX_WORDS - 2))
     d = {**GOOD, "email": {"subject": "S", "body": f"Hi Sam,\n\n{msg}\n\nThank you,\nAlex Example\n555-0100\nhttps://linkedin.com/in/x"}}
     assert h.draft_problems(d, []) == []
     d["email"]["body"] = f"Hi Sam,\n\n{msg} two more words\n\nThank you,\nAlex Example"
@@ -248,7 +248,7 @@ def test_word_limit_skips_the_signature():
 
 def test_a_long_closing_paragraph_starting_with_thanks_still_counts():
     """Only a short sign-off line is skipped; a long last paragraph that opens with "Thank you" is message."""
-    msg = " ".join(["word"] * 100)
+    msg = " ".join(["word"] * (h.MAX_WORDS - 20))
     long_close = "Thank you " + " ".join(["more"] * 40)
     d = {**GOOD, "email": {"subject": "S", "body": f"Hi Sam,\n\n{msg}\n\n{long_close}\n\nBest,\nAlex Example"}}
     assert any("too long" in p for p in h.draft_problems(d, []))
@@ -261,3 +261,19 @@ def test_fresh_urgent_failure_is_retried_next_tick(settings):
     a = _job(settings, 1, 90, 10)
     assert h.scan_fresh(settings, NOW, send=lambda *x, **k: "error: SMTPException: down") == []
     assert h.scan_fresh(settings, NOW, send=lambda *x, **k: "sent") == [a.job_id]
+
+
+def test_gate_rejects_a_sentence_repeated_within_one_message():
+    """User 2026-11-19: 'I hope this message finds you well' appeared twice in one email ('Did you not read this?')."""
+    twice = {**GOOD, "email": {"subject": "Hi", "body": "Hi Sam,\n\nI hope this message finds you well. I built a "
+                               "stock reconciler. I hope this message finds you well.\n\nThank you,\nAlex"}}
+    assert any("repeated sentence" in p for p in h.draft_problems(twice, []))
+    assert not any("repeated sentence" in p for p in h.draft_problems(GOOD, []))
+
+
+def test_gate_checks_the_body_as_sent_including_your_line():
+    """User 2026-11-19: an old your_line was inserted above a body that already said the same thing; the gate,
+    reading only email.body, passed it. The gate must read final_body (what Gmail and send actually use), so the
+    inserted line counts toward the word limit."""
+    long_line = {**GOOD, "your_line": " ".join(["word"] * h.MAX_WORDS)}
+    assert any("too long" in p for p in h.draft_problems(long_line, []))
