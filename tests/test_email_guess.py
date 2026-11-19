@@ -325,3 +325,6 @@ def test_learned_patterns_order_guesses_and_drop_failed_ones(tmp_path):
                             learned=learned_pattern(f, "acme.com"))
     cands = out["contacts"][0]["email_candidates"]
     assert cands[0] == "slee@acme.com" and "sam.lee@acme.com" not in cands
+    # a bounce can land minutes after a send was recorded as delivered: the bounce wins
+    record_email_result(f, "jdoe@acme.com", "Jane Doe", ok=False)
+    assert learned_pattern(f, "acme.com") == {"works": None, "failed": ["{first}.{last}", "{f}{last}"]}

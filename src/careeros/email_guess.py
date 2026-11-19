@@ -83,8 +83,11 @@ def record_email_result(path: Path, addr: str, name: str, *, ok: bool) -> None:
     if ok:
         e["works"] = p
         e["failed"] = [x for x in e["failed"] if x != p]
-    elif p not in e["failed"] and p != e["works"]:
-        e["failed"].append(p)
+    else:  # a late bounce overrides an earlier "delivered" (bounces can land minutes after the send)
+        if e["works"] == p:
+            e["works"] = None
+        if p not in e["failed"]:
+            e["failed"].append(p)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
