@@ -55,20 +55,24 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
     emails to one company. Prefer one strong contact per company over several near-identical emails.
 - Message order, every email (user 2026-11-19; Carnegie principles in `docs/research/stranger-referrals.md`):
   1. "Hi <name>," then "I hope this message finds you well." (first sentence, once).
-  2. Shared background, if any ("I'm a fellow <school> alum…"), never repeated later.
+  2. Shared background, if any ("I'm a fellow <school> alum, and I wanted to reach out to a fellow <mascot> for some
+     assistance :)"), never repeated later. Warm and a little informal beats formal.
   3. Interest in THEM: one true, specific line about their work or what the company does.
-  4. "I recently applied to the <role> role, and I think I'd be a great fit: it looks like <company> is looking for
-     <X, Y, Z from the posting>." Then what I've done that matches, high level, in plain words a layman gets: where
-     I work and what it means ("I work on <employer>'s <system>, <what it does, its volume or stakes>"). Not yet
-     applied → "I'm about to apply to" (check `status.json`).
-  5. "I've attached my résumé." 6. The ask paragraph. 7. "Thank you," + name + LinkedIn.
+  4. "I recently applied to the <Company> <role> role. It looks like <Company> wants <X, Y, Z from the posting>."
+     Then what I've done that matches, high level, in plain words a layman gets: where I work and what it means
+     ("I work on <employer>'s <system>, <what it does, its volume or stakes>"), ending ", so I think I'd be a great
+     fit." The claim comes after the evidence, never before it. <Company> is the company's real name, not a URL slug. Not yet
+     applied → "I'm about to apply to" (check `status.json`). The position is always a hyperlink: put
+     `"links": {"<Company> <role>": "<posting.json url>"}` in the draft; the Gmail draft and send add an HTML part
+     that links that text (user 2026-11-19).
+  5. "I've attached my résumé." 6. The ask paragraph. 7. "Thank you and all the best," + name + LinkedIn.
   Never start with the proof; never internal detail (ticket-level fixes, internal system names, test counts, latency numbers):
   the résumé carries specifics. Overlap is framed from THEIR side (what their team needs), not my ticket.
-  Greenhouse posting → say why the referral helps: "<Company>'s Greenhouse reviews referrals first".
+  Greenhouse posting → say why the referral helps: "<Company>'s Greenhouse reviews referrals first for job positions".
 - Self-review before showing or creating any Gmail draft: read each email top to bottom as the stranger would. Check
   the order above, no sentence or idea said twice (including `your_line`, which is inserted after the greeting:
   clear it when the body already covers it), no word like "daily" twice, no jargon, the role and the applied status
-  right, ≤120 words. Fix, then show.
+  right, ≤130 words. Fix, then show.
 - Shared network (same school, employer, program or high school as the candidate, from `profile/master.yaml` and the
   contact's profile): set `shared_network` (e.g. "State University alum") and write a short, warm note instead of a pitch.
   The overlap is step 2 of the message order; the rest of the order still applies. Busy people skim; the overlap is the reason they reply.
@@ -99,7 +103,7 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   ask them to use their company's internal referral process, with no claim about priority. Lead with a brief chat,
   since a stranger needs a reason to refer: "If you have time, I'd love a quick chat. If you're busy but comfortable
   referring me, that would mean a lot, since <Company>'s Greenhouse reviews referrals first. Totally understand if
-  not." (user 2026-11-19); keep the message at most 120 words (sign-off not counted). Recruiters never get this line. Never claim a referral that
+  not." (user 2026-11-19); keep the message at most 130 words (sign-off not counted). Recruiters never get this line. Never claim a referral that
   was not agreed.
 - Use the contact's first name only if `confidence` is `high`; else open with "Hi," (no name).
 - Addressing by role: recruiter -> ask about process/timeline and offer the resume; hiring manager
@@ -116,7 +120,7 @@ For each entry in `contacts.json.contacts` produce:
    number, the ask (15-min chat or "would you be the right person to ask about <role>?").
 3. `email`: when the job is already applied, this is the after-applying outreach (`post_apply_outreach.md`, ~100 words,
    one hook, one or two proofs, not a mini cover letter). Otherwise: `subject` (<= 60 chars, e.g. "New grad backend
-   applicant: <role> at <company>"), `body` (at most 120 words before the sign-off, DEC-027), in the message order above (bullet ids recorded), sign-off "Thank you," + name + LinkedIn
+   applicant: <role> at <company>"), `body` (at most 130 words before the sign-off; DEC-027's 120 raised 2026-11-19), in the message order above (bullet ids recorded), sign-off "Thank you and all the best," + name + LinkedIn
    `identity.name` + LinkedIn URL (never the phone number) from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
 4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.
@@ -150,6 +154,7 @@ For each contact `outreach check` marks `manual: true`:
      "followup_7d": "...", "followup_14d": null,
      "bullet_ids": ["acme.1"], "narrative_ids": ["n.data"], "facts_used": [{"fact": "...", "source": "posting"}],
      "why_refer": "fellow State University alum" ,
+     "links": {"Acme Software Engineer": "https://jobs.example.com/123"},
      "manual_tailor": false, "manual_reason": null, "send_after": null, "linkedin_send_after": null,
      "auto_send": false, "sent": false, "sent_by": null}
   ],
@@ -160,7 +165,7 @@ For each contact `outreach check` marks `manual: true`:
 Fields the deterministic gate reads (`python -m careeros.qa`, `careeros.qa_ext.outreach_policy`; qa-review fails the
 job on a hard violation), so write every one:
 - `kind`: `cold_email` | `post_apply_outreach` (job already applied) | `status_followup` | `post_interview_thanks`.
-  It picks the word limit (`config/qa.yaml: outreach`: cold 150, after-apply 120, status 80, thank-you 120) and the
+  It picks the word limit (`config/qa.yaml: outreach`: cold 150, after-apply 130, status 80, thank-you 120) and the
   rules below. `channel`: `email` | `linkedin` (the channel the first touch goes out on).
 - `linkedin_note`: at most 300 characters (`linkedin_note_length` is a hard fail: LinkedIn truncates the note);
   `linkedin_note_chars` = its exact `len()`, or the gate warns.

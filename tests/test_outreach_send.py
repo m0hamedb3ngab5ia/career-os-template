@@ -188,3 +188,18 @@ def test_cli_panel_skips_gmail_for_a_draft_that_failed_qa(settings, monkeypatch)
     monkeypatch.setattr(o, "gmail_draft", lambda frm, pw, d, r, n: made.append(d["to"]) or "https://mail.google.com/x")
     assert cli.cmd_outreach_panel(argparse.Namespace(job_ids=["j9"], gmail=True)) == 0
     assert made == ["kim@x.com"]
+
+
+def test_links_turn_the_named_text_into_a_hyperlink_in_the_html_part(tmp_path):
+    """User 2026-11-19: hyperlink the position wherever an email names it."""
+    pdf = tmp_path / "resume.pdf"
+    pdf.write_bytes(b"%PDF")
+    d = {**D, "email": {"subject": "Hi", "body": "Hi Sam,\n\nI applied to the Acme <SWE> role.\n\nThanks"},
+         "links": {"Acme <SWE>": "https://jobs.example.com/1?a=1&b=2"}}
+    m = o.build_message("me@x.com", d, pdf, "Alex")
+    html = m.get_body(("html",)).get_content()
+    assert '<a href="https://jobs.example.com/1?a=1&amp;b=2">Acme &lt;SWE&gt;</a> role.' in html
+    assert "<br>" in html
+    assert m.get_body(("plain",)).get_content().startswith("Hi Sam,\n\nI applied to the Acme <SWE> role.")
+    assert len(list(m.iter_attachments())) == 1
+    assert o.build_message("me@x.com", D, pdf, "Alex").get_body(("html",)) is None  # no links, plain only
