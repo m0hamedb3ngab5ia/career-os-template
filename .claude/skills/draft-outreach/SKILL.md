@@ -58,8 +58,8 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   | Reader | Line 3 (interest) | Fit paragraph | Ask |
   |---|---|---|---|
   | Recruiter / recruiting ops / team inbox | why they're the right person (they hire for it) | the posting's own keywords, matched one by one to what I did, plainly; they screen by keywords | chat or advice on the application |
-  | Hiring manager / engineer on the team | one concrete point from their verified piece, else their team's problem | technical specifics they'd recognise (named techniques, tools, scale) tied to their team's work; never employer-internal names or ticket detail | chat; referral if busy |
-  | Founder / exec | the company's mission or traction, one real number | outcomes and ownership (built it, who uses it) over techniques | chat; referral if busy |
+  | Engineer or manager at a big company | one concrete point from their verified piece, else their team's problem | technical specifics they'd recognise (named techniques, tools, scale) tied to their team's work; never employer-internal names or ticket detail | chat; referral if busy |
+  | Founder / exec, or the person who decides at a small company | the company's mission or traction, one real number | outcomes and ownership (built it, who uses it) over techniques | a chat about joining the team; never a referral (they decide; user 2026-11-19) |
   | Shared network (alum, ex-colleague), any role | the overlap itself, warm ("a fellow <mascot> for some assistance :)") | qualifications at a high level; the bond carries the email | chat; referral if busy |
   Greenhouse → add the referral reason in every row. Not applied → "I'm about to apply".
 - Message order, every email (user 2026-11-19; Carnegie principles in `docs/research/stranger-referrals.md`):
