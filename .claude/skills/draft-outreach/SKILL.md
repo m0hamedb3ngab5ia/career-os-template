@@ -61,6 +61,9 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   | Engineer or manager at a big company | one concrete point from their verified piece, else their team's problem | technical specifics they'd recognise (named techniques, tools, scale) tied to their team's work; never employer-internal names or ticket detail | chat; referral if busy |
   | Founder / exec, or the person who decides at a small company | the company's mission or traction, one real number | outcomes and ownership (built it, who uses it) over techniques | a chat about joining the team; never a referral (they decide; user 2026-11-19) |
   | Shared network (alum, ex-colleague), any role | the overlap itself, warm ("a fellow <mascot> for some assistance :)") | qualifications at a high level; the bond carries the email | chat; referral if busy |
+  Proof = the experience that best matches the posting's main ask, primary job first: "reliable and fast production
+  systems" → the real-time stock record and its safeguards, not a side project (user 2026-11-19). A side project
+  leads only when the posting's ask is its domain (web performance → the desktop app).
   Greenhouse → add the referral reason in every row. Not applied → "I'm about to apply".
 - Message order, every email (user 2026-11-19; Carnegie principles in `docs/research/stranger-referrals.md`):
   1. "Hi <name>," then "I hope this message finds you well." (first sentence, once).
