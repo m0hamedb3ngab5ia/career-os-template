@@ -69,6 +69,12 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   Never start with the proof; never internal detail (ticket-level fixes, internal system names, test counts, latency numbers):
   the résumé carries specifics. Overlap is framed from THEIR side (what their team needs), not my ticket.
   Greenhouse posting → say why the referral helps: "<Company>'s Greenhouse reviews referrals first for job positions".
+- Sound like a person, not a model (user 2026-11-19: "so clear to see the AI"): plain verbs, uneven sentence
+  lengths, contractions, at most one idea per sentence. No stacked appositives ("X, the Y's Z for about N W daily"),
+  no neat triples ("fast, reliable, and scalable"), no colons or em dashes mid-sentence, no polished abstractions
+  ("correctness at volume", "high-stakes production work"). Vary the wording between emails; only the candidate's
+  fixed lines (greeting, "so I think I'd be a great fit", the ask, sign-off) repeat. Still professional: no "lol",
+  no ellipses. The candidate's own edited email, when there is one, is the reference.
 - Self-review before showing or creating any Gmail draft: read each email top to bottom as the stranger would. Check
   the order above, no sentence or idea said twice (including `your_line`, which is inserted after the greeting:
   clear it when the body already covers it), no word like "daily" twice, no jargon, the role and the applied status
