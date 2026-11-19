@@ -57,7 +57,11 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   1. "Hi <name>," then "I hope this message finds you well." (first sentence, once).
   2. Shared background, if any ("I'm a fellow <school> alum, and I wanted to reach out to a fellow <mascot> for some
      assistance :)"), never repeated later. Warm and a little informal beats formal.
-  3. Interest in THEM: one true, specific line about their work or what the company does.
+  3. Interest in THEM: one true, specific line about their work or what the company does. "I read your piece and
+     enjoyed it" reads as flattery (user 2026-11-19: "they're just glazing me"). Show you read it: name one concrete
+     point they made, from a fetched page recorded in `facts_used` with its URL ("you wrote that X, which matched
+     what I've seen with Y"). Can't verify one → drop the reading line and say instead why they're in a position to
+     help (their team owns the role, shared background).
   4. "I recently applied to the <Company> <role> role. It looks like <Company> wants <X, Y, Z from the posting>."
      Then what I've done that matches, high level, in plain words a layman gets: where I work and what it means
      ("I work on <employer>'s <system>, <what it does, its volume or stakes>"), ending ", so I think I'd be a great
