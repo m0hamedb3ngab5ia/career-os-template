@@ -1486,7 +1486,9 @@ def cmd_outreach_emails(args: argparse.Namespace) -> int:
                                if hunter else "no answer (quota, key or network); pattern guesses only"))
     else:
         print("no hunter key (optional: careeros creds set hunter --password-stdin); pattern guesses only")
-    out = apply_to_contacts(data, domain, conf, hunter, apollo=apollo)
+    from careeros.email_guess import learned_pattern
+    out = apply_to_contacts(data, domain, conf, hunter, apollo=apollo,
+                            learned=learned_pattern(store.jobs_dir.parent / "email_patterns.json", domain))
     write_json(f, out)
     store.append_log(args.job_id, "outreach emails: " + ("; ".join(used) or "no provider keys, 0 credits"),
                      component="outreach")
@@ -1584,6 +1586,48 @@ def cmd_outreach_sent(args: argparse.Namespace) -> int:
         d.update(sent=True, sent_by="candidate", sent_at=when)
     path.write_text(json.dumps(data, indent=2), encoding="utf-8")
     print(f"marked {len(hit)} draft(s) sent on {when}")
+    return 0
+
+
+def cmd_outreach_email_result(args: argparse.Namespace) -> int:
+    """Delivered or bounced: learns the company's address format (data/email_patterns.json) and, on a bounce, moves the
+    draft to the next untried guess. `5.2.1` (account inactive) means the format is right but the person left: hold."""
+    import json
+    from datetime import date
+
+    from careeros.email_guess import email_candidates, learned_pattern, pattern_of, record_email_result
+
+    store = Store(_settings(args))
+    path = store.job_dir(args.job_id) / "outreach.json"
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        hit = [d for d in data["drafts"] if isinstance(d, dict)
+               and str(d.get("contact") or "").lower() == args.contact.lower()]
+    except (OSError, ValueError, KeyError, TypeError):
+        hit = []
+    if len(hit) != 1 or not hit[0].get("to"):
+        print(f"outreach email-result: no single draft with an address for {args.contact!r}", file=sys.stderr)
+        return 1
+    d, f = hit[0], store.jobs_dir.parent / "email_patterns.json"
+    addr, name = str(d["to"]), str(d["contact"])
+    inactive = bool(args.bounced and "5.2.1" in args.bounced)
+    record_email_result(f, addr, name, ok=args.delivered or inactive)
+    if args.bounced:
+        d.setdefault("bounced", []).append({"to": addr, "date": date.today().isoformat(), "error": args.bounced})
+        d.update(sent=False, gmail_draft_url=None)
+        dom = addr.partition("@")[2]
+        lp = learned_pattern(f, dom) or {}
+        tried = {b.get("to") for b in d["bounced"]}
+        nxt = [a for a in email_candidates(name, dom, lp.get("works"))
+               if a not in tried and pattern_of(a, name) not in (lp.get("failed") or [])]
+        if inactive or not nxt:
+            d.update(hold=True, hold_reason="mailbox inactive: likely left; find a new contact" if inactive
+                     else "every address guess bounced")
+            print(f"{name}: held ({d['hold_reason']})")
+        else:
+            d.update(to=nxt[0], to_confidence="low")
+            print(f"{name}: next try {nxt[0]}")
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
     return 0
 
 
@@ -2877,6 +2921,13 @@ def build_parser() -> argparse.ArgumentParser:
     osn.add_argument("--contact", help="contact name; default every draft")
     osn.add_argument("--date", help="YYYY-MM-DD, default today")
     osn.set_defaults(fn=cmd_outreach_sent)
+    oer = outs.add_parser("email-result", help="record a delivery or bounce: learns the company's address format; a bounce moves to the next guess")
+    oer.add_argument("job_id")
+    oer.add_argument("--contact", required=True)
+    g = oer.add_mutually_exclusive_group(required=True)
+    g.add_argument("--delivered", action="store_true")
+    g.add_argument("--bounced", metavar="CODE", help="the bounce's SMTP code, e.g. '550 5.1.1'")
+    oer.set_defaults(fn=cmd_outreach_email_result)
     okt = outs.add_parser("kit", help="links + copy blocks to send drafts by hand (default: every unsent draft)")
     okt.add_argument("job_ids", nargs="*")
     okt.set_defaults(fn=cmd_outreach_kit)

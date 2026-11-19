@@ -32,7 +32,7 @@ from careeros.qa import count_words
 from careeros.qa_ext import outreach_data, outreach_items
 
 DEFAULTS: dict[str, Any] = {
-    "after_apply_max_words": 120,       # post_apply_outreach.md: ~100 words
+    "after_apply_max_words": 130,       # = high_odds.MAX_WORDS (user 2026-11-19)
     "cold_email_max_words": 150,        # draft-outreach: body 90-150 words
     "status_followup_max_words": 80,    # status_followup.md / followup_7d.md: 40-70 words
     "thank_you_max_words": 120,         # post_interview_thanks.md: 60-120 words

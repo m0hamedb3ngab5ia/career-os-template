@@ -277,3 +277,12 @@ def test_gate_checks_the_body_as_sent_including_your_line():
     inserted line counts toward the word limit."""
     long_line = {**GOOD, "your_line": " ".join(["word"] * h.MAX_WORDS)}
     assert any("too long" in p for p in h.draft_problems(long_line, []))
+
+
+def test_candidate_edited_text_skips_only_the_word_limit():
+    """User 2026-11-19: their own sent edits ran 97-154 words. The limit guards drafts Claude writes; a resend of the
+    candidate's own text keeps every other check."""
+    long = {**GOOD, "your_line": " ".join(["word"] * h.MAX_WORDS)}
+    assert any("too long" in p for p in h.draft_problems(long, []))
+    assert not any("too long" in p for p in h.draft_problems({**long, "candidate_edited": True}, []))
+    assert any("why_refer" in p for p in h.draft_problems({**long, "candidate_edited": True, "why_refer": ""}, []))

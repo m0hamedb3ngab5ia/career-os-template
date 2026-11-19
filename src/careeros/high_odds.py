@@ -16,7 +16,7 @@ from careeros.tracker import Tracker
 FRESH_URGENT_HOURS = 48
 DONE_STATUSES = {"applied", "screening", "interview", "offer", "rejected", "skipped", "withdrawn"}
 REACH_FIRST = "reach_first"
-MAX_WORDS = 120  # message only, sign-off excluded; same as config qa.yaml after-apply (user 2026-11-18)
+MAX_WORDS = 130  # message only, sign-off excluded (user 2026-11-18: 120; 2026-11-19: their own edited email ran 126)
 
 # One plain line per item kind. Numbers are copied from docs/work/yield-model/research (funnel.md, competition.md).
 WHY = {
@@ -157,7 +157,7 @@ def draft_problems(d: dict[str, Any], banned: list[str]) -> list[str]:
     if not body.strip():
         out.append("no message text")
     n = _words(message_text(body))
-    if n > MAX_WORDS:
+    if n > MAX_WORDS and not d.get("candidate_edited"):  # the limit guards Claude's drafts, not the candidate's own text
         out.append(f"too long: {n} words, limit {MAX_WORDS}")
     low = body.lower()
     out += [f"banned phrase: {b}" for b in banned if b and b.lower() in low]

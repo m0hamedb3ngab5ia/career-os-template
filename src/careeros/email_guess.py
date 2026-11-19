@@ -14,6 +14,7 @@ import unicodedata
 import urllib.parse
 import urllib.request
 from collections.abc import Callable, Iterable
+from pathlib import Path
 from typing import Any
 
 from careeros.config import Settings, normalize_company
@@ -51,6 +52,47 @@ def email_candidates(name: str, domain: str, pattern: str | None = None) -> list
         if addr not in out:
             out.append(addr)
     return out
+
+
+ROLE_INBOX = {"jobs", "talent", "hiring", "founders", "team", "hello", "info", "people", "hr", "contact"}
+
+
+def pattern_of(addr: str, name: str) -> str | None:
+    """Which PATTERNS entry produced this address for this person; None for a shared inbox or an unknown shape."""
+    local, _, domain = addr.lower().partition("@")
+    if len(_ascii_words(name)) < 2 or "recruit" in local or "career" in local \
+            or ROLE_INBOX & set(re.split(r"[._+-]", local)):
+        return None
+    return next((p for p in PATTERNS if email_candidates(name, domain, p)[0].split("@")[0] == local), None)
+
+
+def learned_pattern(path: Path, domain: str) -> dict[str, Any] | None:
+    """{"works": pattern or None, "failed": [patterns]} learned from earlier deliveries and bounces at this domain."""
+    try:
+        return json.loads(path.read_text(encoding="utf-8")).get(domain.lower())
+    except (OSError, ValueError):
+        return None
+
+
+def record_email_result(path: Path, addr: str, name: str, *, ok: bool) -> None:
+    """User 2026-11-19: learn from every bounce and delivery so the next person at that company gets the right format."""
+    p = pattern_of(addr, name)
+    if not p:
+        return
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        data = {}
+    e = data.setdefault(addr.lower().partition("@")[2], {"works": None, "failed": []})
+    if ok:
+        e["works"] = p
+        e["failed"] = [x for x in e["failed"] if x != p]
+    else:  # a late bounce overrides an earlier "delivered" (bounces can land minutes after the send)
+        if e["works"] == p:
+            e["works"] = None
+        if p not in e["failed"]:
+            e["failed"].append(p)
+    path.write_text(json.dumps(data, indent=2), encoding="utf-8")
 
 
 def company_domain(s: Settings, company: str, posting_url: str = "") -> tuple[str, str]:
@@ -116,11 +158,13 @@ def apollo_contacts(key: str, domain: str, enrich: int = 2,
 
 
 def apply_to_contacts(data: dict[str, Any], domain: str, domain_conf: str,
-                      hunter: dict[str, Any] | None, apollo: list[dict[str, Any]] | None = None) -> dict[str, Any]:
+                      hunter: dict[str, Any] | None, apollo: list[dict[str, Any]] | None = None,
+                      learned: dict[str, Any] | None = None) -> dict[str, Any]:
     """contacts.json with email candidates filled in. Apollo people (who + email) are added first and their email
     wins; then Hunter: exact hits by name (medium, never verified), recruiters it knows are added, and its pattern
     orders every guess."""
-    pattern = (hunter or {}).get("pattern") or data.get("email_pattern") or None  # a rerun keeps what credits bought
+    learned = learned or {}  # a delivered format beats any provider estimate; a bounced one is never guessed again
+    pattern = learned.get("works") or (hunter or {}).get("pattern") or data.get("email_pattern") or None
     if hunter and hunter.get("domain"):
         domain, domain_conf = hunter["domain"], "high"
     hits = {" ".join(_ascii_words(f"{e.get('first_name') or ''} {e.get('last_name') or ''}")): e
@@ -146,7 +190,8 @@ def apply_to_contacts(data: dict[str, Any], domain: str, domain_conf: str,
                              "confidence": "medium", "possible_referral": False, "linkedin_degree": None,
                              "mutuals": None, "note": ""})
     for c in contacts:
-        cands = email_candidates(c.get("name", ""), domain, pattern)
+        cands = [a for a in email_candidates(c.get("name", ""), domain, pattern)
+                 if pattern_of(a, c.get("name", "")) not in (learned.get("failed") or [])]
         hit = found.get(" ".join(_ascii_words(c.get("name", ""))))
         if c.get("email_confidence") == "verified" and c.get("email"):
             hit = None  # an address seen on a public page beats any provider guess

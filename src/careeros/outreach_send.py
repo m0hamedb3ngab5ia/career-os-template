@@ -4,6 +4,7 @@ Drafts; the candidate presses Send), or send it now on the candidate's explicit 
 The app password is the one `careeros notify setup` stored in the Keychain; nothing here runs on a schedule."""
 from __future__ import annotations
 
+import html
 import imaplib
 import re
 import smtplib
@@ -41,6 +42,11 @@ def build_message(frm: str, d: dict[str, Any], resume: Path | None, name: str) -
     m = EmailMessage()
     m["From"], m["To"], m["Subject"] = frm, str(d["to"]), str(em.get("subject") or "")
     m.set_content(final_body(d))
+    if d.get("links"):  # {"text in body": url}: Gmail shows the HTML part, so the role name links to the posting
+        h = html.escape(final_body(d), quote=False)
+        for text, url in d["links"].items():
+            h = h.replace(html.escape(text, quote=False), f'<a href="{html.escape(url)}">{html.escape(text, quote=False)}</a>')
+        m.add_alternative(f"<div>{h.replace(chr(10), '<br>')}</div>", subtype="html")
     m.add_attachment(resume.read_bytes(), maintype="application", subtype="pdf",
                      filename=f"{name.replace(' ', '_')}_Resume.pdf")
     return m
