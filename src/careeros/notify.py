@@ -257,7 +257,7 @@ def _sent_drafts(store: Store, jid: str) -> list[dict[str, Any]]:
 
 
 def _follow_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, today: date,
-                 ) -> tuple[list[Row], set[str]]:
+                 s: Settings | None = None) -> tuple[list[Row], set[str]]:
     """One row per job: the applied nudge and the outreach nudge of a job merge. Outreach rows first, then
     applied-only, longest wait first. Returns the rows and the job ids they cover."""
     groups: dict[str, list[dict[str, Any]]] = {}
@@ -284,14 +284,13 @@ def _follow_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], s
                     if d.get(f"followup_{k}") and not d.get(f"followup_{k}_sent_at") and (k == "7d" or d.get("followup_7d_sent_at"))), None)
         ready = nxt is not None
         if nxt:
-            action = (f'Follow-up drafted. Ask Claude in chat: "send the follow-ups", or run: careeros outreach send {jid} '
-                      f'--contact "{nxt[0].get("contact")}" --followup {nxt[1]} --yes')
+            action = ""   # drafted: the section note says how to send, once
         elif since_out:
             action = f'No follow-up text yet. Ask Claude in chat: "draft follow-ups for {title}".'
         else:
             action = f'You have not emailed anyone yet. Ask Claude in chat: "draft outreach for {title}".'
         chips = ["follow-up ready"] if ready else []
-        row = _job_row(p, *chips, note=note, action=action) if p else Row(title, note=note, chips=chips, icon="\u21bb", action=action)
+        row = _job_row(p, *chips, note=note, s=s, action=action) if p else Row(title, note=note, chips=chips, icon="\u21bb", action=action)
         out.append((bool(since_out), n, row))
     out.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return [r for _, _, r in out], {j for j in groups if not j.startswith("~")}
@@ -354,7 +353,7 @@ def build_sections(s: Settings, today: date | None = None) -> list[Section]:
     items = tr.list_action_items(open_only=True)
 
 
-    follow_rows, followed = _follow_rows(items, jobs, store, today)
+    follow_rows, followed = _follow_rows(items, jobs, store, today, s)
     reach: list[tuple[int, Row]] = []
     for it in items:
         if _kind(it) != REACH or str(it.get("JobID") or "") in followed:
@@ -372,7 +371,7 @@ def build_sections(s: Settings, today: date | None = None) -> list[Section]:
     needs = _cap(Section("needs", "Needs you", need_rows,
                          f"Tasks waiting on you. On your laptop, open Today at {url} (start it with `careeros ui`); "
                          "or do them by chat with Claude. Each line says how.", count=need_total), min(cap, 6))
-    secs = [_cap(Section("follow", "Follow up", follow_rows, "Jobs you applied to or emailed that have had no reply. Next step is under each one."), cap),
+    secs = [_cap(Section("follow", "Follow up", follow_rows, "Jobs you applied to or emailed with no reply yet. For each 'follow-up ready' one the follow-up is drafted: say \"send the follow-ups\" to Claude in chat."), cap),
             _deadline_section(s, c, jobs, items, store, today), _apply_section(s, c, jobs, store, today), needs,
             _cap(Section("reach_first", "Reach out before applying to more", reach_first, WHY[REACH_FIRST] if reach_first else ""), cap),
             _cap(Section("reach", "Reach out", [r for _, r in reach], WHY["reach_out"] if reach else ""), cap)]

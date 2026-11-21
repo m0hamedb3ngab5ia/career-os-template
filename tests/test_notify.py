@@ -516,12 +516,12 @@ def test_follow_up_row_states_basis_dates_and_next_action(env):
     (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
     out, app = sec.rows
     assert out.note == "Applied 4 Nov · emailed Ann Lee 12 Nov · no reply (4 days)"
-    assert f'careeros outreach send {b.job_id} --contact "Ann Lee" --followup 7d --yes' in out.action
-    assert "send the follow-ups" in out.action
+    assert out.action == "" and "follow-up ready" in out.chips          # drafted: the section note says how, once
+    assert "send the follow-ups" in sec.note
     assert app.note == "Applied 10 Nov · no reply (6 days)" and "draft" in app.action.lower()
     assert "applied" in sec.note.lower() and "no reply" in sec.note.lower()
     text = notify.render_text([sec], TODAY)
-    assert "Applied 4 Nov" in text and "--followup 7d --yes" in text
+    assert "Applied 4 Nov" in text and "send the follow-ups" in text
 
 
 def test_needs_you_rows_have_an_action_and_a_today_link(env):
@@ -566,3 +566,11 @@ def test_location_shows_the_candidate_preferred_office(env):
     assert loc["Role 1"] == "Seattle, WA · +2 other offices"
     assert loc["Role 2"] == "Austin, TX · +1 other office"           # nothing preferred: first one
     assert loc["Role 3"] == "Chicago, IL (remote)"
+
+
+def test_city_list_without_states_shows_the_preferred_city(env):
+    s, tr = env
+    s.targets["location"] = {"preferred": ["New York NY"]}
+    p = _job(s, tr, 1, applied="2026-11-10")
+    p.location = "San Francisco, Seattle, New York"
+    assert notify._place(p, s) == "New York, NY · +2 other offices"

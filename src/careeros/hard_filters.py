@@ -135,12 +135,20 @@ def preferred_offices(settings: Settings, location: str) -> tuple[list[str], int
             cities.append((name.lower(), st.upper(), f"{name}, {st.upper()}"))
     region = {st for r in loc.get("preferred_regions") or [] for st in REGION_STATES.get(str(r).strip().lower(), [])}
     segs = [x.strip() for x in re.split(r"[;|\n\u2022/&]| or ", location or "") if x.strip() and not _COUNTRY.fullmatch(x)]
+    places: list[str] = []
+    for seg in segs:   # "San Francisco, Seattle, New York, NY" -> one place per city; a bare state code joins its city
+        for i, y in enumerate(y.strip() for y in seg.split(",")):
+            if i and y.upper() in _STATES and len(y) == 2:
+                places[-1] += f", {y}"
+            elif y:
+                places.append(y)
+    segs = places
     hits: list[str] = []
     hit_segs = 0
     for seg in segs:
         states, low, got = _states_in(seg), seg.lower(), []
         for name, st, shown in cities:
-            if st in states and re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", low):
+            if (st in states or not states) and re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", low):
                 got.append(shown)
         if not got and region & states:
             got.append(", ".join(seg.split(", ")[:2]))
