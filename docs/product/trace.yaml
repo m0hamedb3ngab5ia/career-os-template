@@ -950,6 +950,10 @@ requirements:
     - test_deadlines_section_soonest_first_and_window
     - test_digest_dry_run_writes_html_with_apply_list
     - test_follow_up_one_row_per_job_merges_applied_and_outreach
+    - test_follow_up_row_states_basis_dates_and_next_action
+    - test_needs_you_rows_have_an_action_and_a_today_link
+    - test_apply_row_shows_posted_and_found_dates_not_a_bare_new_chip
+    - test_location_shows_the_candidate_preferred_office
     - test_follow_up_applied_only_subtitle_ready_chip_and_order
     - test_reach_out_shows_days_since_applied_and_skips_jobs_in_follow_up
     - test_needs_you_groups_by_type_with_counts_most_urgent_first

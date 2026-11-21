@@ -256,7 +256,7 @@ def test_apply_section_keeps_reminding_and_lists_new_jobs_first(env):
     _scored_job(s, tr, 2, 60)
     body = notify.build_digest(s, date(2026, 11, 17))
     assert body.index("Role 2") < body.index("Role 1")             # new first, though lower fit
-    assert "new" in body.split("Role 1")[0] and "fit 60" in body and "fit 90" in body            # not applied yet: still listed, no longer new
+    assert "fit 60" in body and "fit 90" in body and "Found today" not in body            # not applied yet: still listed
 
 
 def test_ready_marker_reads_qa_review_pass_flag(env):
@@ -314,10 +314,10 @@ def test_html_part_subject_and_escaping(env):
     snd = FakeSender()
     assert notify.maybe_send_digest(s, datetime(2026, 11, 16, 9), sender=snd, keychain=lambda e: "pw") == "sent"
     subject = snd.sent[0][1]
-    assert subject.startswith("career-os: ") and "2 jobs to apply to" in subject and "1 needs you" in subject
+    assert subject.startswith("career-os: ") and "2 jobs to apply to" in subject and "1 task waiting on you" in subject
     h = snd.html
     assert "<table" in h and 'href="https://example.com/s1"' in h and "R&amp;D &lt;b&gt;" in h and "<b>Lead" not in h
-    assert "max-width:600px" in h and "prefers-color-scheme: dark" in h and "http://" not in h.replace("https://", "")
+    assert "max-width:600px" in h and "prefers-color-scheme: dark" in h and "http://" not in h.replace("https://", "").replace("http://127.0.0.1", "")
     assert "<img" not in h and "<link" not in h
 
 
@@ -373,7 +373,7 @@ def test_follow_up_one_row_per_job_merges_applied_and_outreach(env):
     assert len([i for i in tr.list_action_items() if i["Type"] == "follow_up"]) == 2     # two nudges, same job
     (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
     assert len(sec.rows) == 1 and sec.rows[0].title == "Engineer 1"
-    assert sec.rows[0].note == "Emailed Tom Rickards \u00b7 2 days, no reply"
+    assert sec.rows[0].note == "Applied 4 Nov \u00b7 emailed Tom Rickards 14 Nov \u00b7 no reply (2 days)"
 
 
 def test_follow_up_applied_only_subtitle_ready_chip_and_order(env):
@@ -387,9 +387,9 @@ def test_follow_up_applied_only_subtitle_ready_chip_and_order(env):
     _follow_items(s, tr, a)
     (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
     assert [r.title for r in sec.rows] == ["Engineer 3", "Engineer 2", "Engineer 1"]       # outreach first, longest wait first
-    assert sec.rows[2].note == "Applied 6 days ago, no reply" and sec.rows[2].chips == []
+    assert sec.rows[2].note == "Applied 10 Nov \u00b7 no reply (6 days)" and sec.rows[2].chips == []
     assert sec.rows[1].chips == ["follow-up ready"] and sec.rows[0].chips == []
-    assert sec.rows[1].note == "Emailed Ann Lee, Bo Chen \u00b7 4 days, no reply"
+    assert sec.rows[1].note == "Applied 12 Nov \u00b7 emailed Ann Lee, Bo Chen 12 Nov \u00b7 no reply (4 days)"
 
 
 def test_reach_out_shows_days_since_applied_and_skips_jobs_in_follow_up(env):
@@ -496,9 +496,73 @@ def test_subject_stays_short_with_big_counts(env):
 
 def test_unscored_job_has_no_fit_chip_and_long_location_is_shortened(env):
     s, tr = env
+    s.targets["location"] = {}
     p = _scored_job(s, tr, 1, None)
     p.location = "San Juan, Puerto Rico, New York, NY, District of Columbia, Europe | Spain"
     Store(s).save_posting(p)
     body = notify.build_digest(s, TODAY)
     assert "fit 0" not in body and "fit None" not in body
     assert "San Juan, Puerto Rico and more" in body and "Spain" not in body
+
+
+# ---- digest answers the reader's questions: why, where to click, how fresh, which office -------------------------
+def test_follow_up_row_states_basis_dates_and_next_action(env):
+    s, tr = env
+    s.pipeline["follow_ups"] = {"after_days": 2}
+    b = _job(s, tr, 2, applied="2026-11-04")
+    _outreach(s, b, "Ann Lee", sent_at="2026-11-12", fu7="Hi again")
+    a = _job(s, tr, 1, applied="2026-11-10")
+    _follow_items(s, tr, a)
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
+    out, app = sec.rows
+    assert out.note == "Applied 4 Nov · emailed Ann Lee 12 Nov · no reply (4 days)"
+    assert f'careeros outreach send {b.job_id} --contact "Ann Lee" --followup 7d --yes' in out.action
+    assert "send the follow-ups" in out.action
+    assert app.note == "Applied 10 Nov · no reply (6 days)" and "draft" in app.action.lower()
+    assert "applied" in sec.note.lower() and "no reply" in sec.note.lower()
+    text = notify.render_text([sec], TODAY)
+    assert "Applied 4 Nov" in text and "--followup 7d --yes" in text
+
+
+def test_needs_you_rows_have_an_action_and_a_today_link(env):
+    s, tr = env
+    _needs(tr, "question", 7)
+    _needs(tr, "injection_suspected", 3)
+    secs = notify.build_sections(s, TODAY)
+    (sec,) = [x for x in secs if x.key == "needs"]
+    assert all(r.action for r in sec.rows)
+    assert "answer" in sec.rows[1].action.lower() and "chat" in sec.rows[1].action.lower()
+    assert "http://127.0.0.1:8765" in sec.note and "laptop" in sec.note
+    assert "http://127.0.0.1:8765" in notify.render_text(secs, TODAY)
+    s.pipeline["ui"] = {"port": 9000}
+    assert "http://127.0.0.1:9000" in notify.build_digest(s, TODAY)
+    summary = notify._summary(secs)
+    assert "10 tasks waiting on you" in summary
+
+
+def test_apply_row_shows_posted_and_found_dates_not_a_bare_new_chip(env):
+    s, tr = env
+    p = _scored_job(s, tr, 1, 80, found="2026-11-16")
+    Store(s).save_posting(p.model_copy(update={"posted_at": "2026-11-12T09:00:00Z"}))
+    q = _scored_job(s, tr, 2, 70, found="2026-11-14")          # ATS gave no posted date
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "apply"]
+    notes = {r.title: r.note for r in sec.rows}
+    assert notes["Role 1"] == "Posted 12 Nov (4 days ago) · found today"
+    assert notes["Role 2"] == "Found 14 Nov (2 days ago)"
+    assert all("new" not in r.chips for r in sec.rows)
+
+
+def test_location_shows_the_candidate_preferred_office(env):
+    s, tr = env
+    s.targets["location"] = {"preferred": ["Boston MA", "Seattle WA"], "preferred_regions": ["US"], "remote_ok": True}
+    p = _scored_job(s, tr, 1, 80)
+    Store(s).save_posting(p.model_copy(update={"location": "San Francisco, CA; Seattle, WA; New York, NY"}))
+    q = _scored_job(s, tr, 2, 70)
+    Store(s).save_posting(q.model_copy(update={"location": "Austin, TX; Denver, CO"}))
+    r = _scored_job(s, tr, 3, 60)
+    Store(s).save_posting(r.model_copy(update={"location": "Chicago, IL", "remote": True}))
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "apply"]
+    loc = {r_.title: r_.location for r_ in sec.rows}
+    assert loc["Role 1"] == "Seattle, WA · +2 other offices"
+    assert loc["Role 2"] == "Austin, TX · +1 other office"           # nothing preferred: first one
+    assert loc["Role 3"] == "Chicago, IL (remote)"

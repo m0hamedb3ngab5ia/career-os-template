@@ -105,8 +105,9 @@ class Row:
     location: str = ""
     url: str = ""
     note: str = ""       # status line: "Emailed Tom · 2 days, no reply"
-    chips: list[str] = field(default_factory=list)   # small grey pills: "fit 87", "new", "ready", "closes in 3 days"
+    chips: list[str] = field(default_factory=list)   # small grey pills: "fit 87", "ready", "closes in 3 days"
     icon: str = ""       # badge symbol for a non-job row
+    action: str = ""     # what to do next and where: "Ask Claude in chat: ..." / a command
 
 
 @dataclass
@@ -124,17 +125,47 @@ _PRE_APPLY = ("found", "scored", "queued", "prepared", "needs_review")
 _APPLY = ("queued", "prepared")
 
 
-def _place(p: Any) -> str:
+def _others(n: int) -> str:
+    return f" \u00b7 +{n} other office" + ("" if n == 1 else "s") if n > 0 else ""
+
+
+def _place(p: Any, s: Settings | None = None) -> str:
+    """The office that matters to the candidate (`location.preferred` / `preferred_regions`, same parsing as the
+    hard filters) plus "+N other offices"; no match: the first one."""
+    from careeros.hard_filters import preferred_offices
+
     loc = (p.location or "").strip()
-    if len(loc) > 40:   # multi-office strings: first place only
+    hits, others = preferred_offices(s, loc) if s is not None and loc else ([], 0)
+    if hits:
+        loc = ", ".join(hits[:2]) + _others(others + max(0, len(hits) - 2))
+    elif len(loc) > 40:   # multi-office strings: first place only
         loc = ", ".join(re.split(r"\s*[;|]\s*", loc)[0].split(", ")[:2]) + " and more"
-    if p.remote and "remote" not in loc.lower():
+    else:
+        segs = [x.strip() for x in re.split(r"[;|]", loc) if x.strip()]
+        loc = segs[0] + _others(len(segs) - 1) if segs else loc
+    remote_ok = (s.targets.get("location") or {}).get("remote_ok", True) if s is not None else True
+    if p.remote and remote_ok and "remote" not in loc.lower():
         return f"{loc} (remote)" if loc else "Remote"
     return loc
 
 
-def _job_row(p: Any, *chips: str, note: str = "") -> Row:
-    return Row(p.title, p.company, _place(p), p.url, note, [c for c in chips if c])
+def _job_row(p: Any, *chips: str, note: str = "", s: Settings | None = None, action: str = "") -> Row:
+    return Row(p.title, p.company, _place(p, s), p.url, note, [c for c in chips if c], action=action)
+
+
+def _d(d: date) -> str:
+    return f"{d.day} {d:%b}"
+
+
+def _ago(n: int) -> str:
+    return "today" if n <= 0 else f"{_days(n)} ago"
+
+
+def today_url(s: Settings) -> str:
+    from careeros.ui.config import load_ui_config
+
+    c = load_ui_config(s)
+    return f"http://{c.host}:{c.port}"
 
 
 def _cap(sec: Section, n: int) -> Section:
@@ -170,7 +201,7 @@ def _in_days(n: int) -> str:
 
 def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any]], store: Store, today: date) -> Section:
     """Jobs from any source worth applying to (queued/prepared, still open) until you apply: ones not in an earlier
-    digest first ("new"), then best fit. `ids` = every job listed, so the next digest knows what is new."""
+    digest first, then best fit. `ids` = every job listed, so the next digest knows what is new."""
     shown = set(_state(s).get("apply_shown") or [])
     cands = []
     for jid, j in jobs.items():
@@ -178,20 +209,37 @@ def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any
         if p is None or (_day(p.closes_at) and _day(p.closes_at) < today):
             continue
         cands.append((jid not in shown, int(j.get("Fit") or 0), str(j.get("DateFound") or ""), jid, p))
-    cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # new first, then best fit, then newest
+    cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # not in an earlier email first, then best fit, then newest
     top = cands[:min(c["apply_max"], c["section_max"])]
-    rows = [_job_row(p, f"fit {fit}" if fit else "", "new" if new else "", "ready" if _ready(store, jid) else "") for new, fit, _, jid, p in top]
-    return Section("apply", "Apply to these", rows, "", [jid for _, _, _, jid, _ in top], len(cands), len(cands) - len(top))
+    rows = [_job_row(p, f"fit {fit}" if fit else "", "ready" if _ready(store, jid) else "", s=s,
+                     note=_fresh(p.posted_at, found, today)) for _, fit, found, jid, p in top]
+    return Section("apply", "Apply to these", rows, "Not applied yet. Jobs you have not seen in an earlier email come first, then best fit.",
+                   [jid for _, _, _, jid, _ in top], len(cands), len(cands) - len(top))
 
 
-def _deadline_section(c: dict[str, Any], jobs: dict[str, dict[str, Any]], items: list[dict[str, Any]], store: Store,
+def _fresh(posted: Any, found: Any, today: date) -> str:
+    """"Posted 18 Nov (3 days ago) \u00b7 found today": when the job came out and when career-os first saw it."""
+    pd, fd = _day(posted), _day(found)
+    parts = []
+    if pd:
+        parts.append(f"Posted {_d(pd)} ({_ago((today - pd).days)})" if pd != today else "Posted today")
+    if fd:
+        n = (today - fd).days
+        if parts:
+            parts.append("found today" if n <= 0 else f"found {_d(fd)}")
+        else:
+            parts.append("Found today" if n <= 0 else f"Found {_d(fd)} ({_ago(n)})")
+    return " \u00b7 ".join(parts)
+
+
+def _deadline_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any]], items: list[dict[str, Any]], store: Store,
                       today: date) -> Section:
     found: list[tuple[date, Row]] = []
     for jid, j in jobs.items():
         p = store.load_posting(jid) if str(j.get("Status")) in _PRE_APPLY else None
         d = _day(p.closes_at) if p else None
         if p and d and 0 <= (d - today).days <= c["deadline_days"]:
-            found.append((d, _job_row(p, f"closes {_in_days((d - today).days)}")))
+            found.append((d, _job_row(p, f"closes {_in_days((d - today).days)}", s=s)))
     for it in items:
         d = _day(it.get("Due"))
         if d and it.get("Type") != FOLLOW and (d - today).days <= c["deadline_days"]:
@@ -222,19 +270,28 @@ def _follow_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], s
         since_out = _outreach_wait(store, jid) if p and any(_kind(i) in (OUTREACH, OUTREACH14) for i in its) else None
         since = since_out or _waiting_since(its[0], jobs, store)
         n = max(0, (today - since).days) if since else 0
+        applied = _day((jobs.get(jid) or {}).get("DateApplied")) if p else None
+        parts = [f"Applied {_d(applied)}"] if applied else []
+        title = p.title if p else _short(its[0].get("What to do") or "")
         if since_out:
             names = list(dict.fromkeys(str(d["contact"]) for d in drafts if d.get("contact")))
             who = ", ".join(names[:2]) + (f" +{len(names) - 2}" if len(names) > 2 else "") or "a contact"
-            verb = "Emailed" if any(d.get("to") for d in drafts) else "Messaged"
-            note = f"{verb} {who} \u00b7 {_days(n)}, no reply"
-        elif since:
-            note = "Applied today, no reply" if n == 0 else f"Applied {_days(n)} ago, no reply"
+            verb = "emailed" if any(d.get("to") for d in drafts) else "messaged"
+            parts.append(f"{verb} {who} {_d(since_out)}")
+        parts.append(f"no reply ({_days(n)})" if since else "no reply yet")
+        note = " \u00b7 ".join(parts)
+        nxt = next(((d, k) for d in drafts for k in ("7d", "14d")
+                    if d.get(f"followup_{k}") and not d.get(f"followup_{k}_sent_at") and (k == "7d" or d.get("followup_7d_sent_at"))), None)
+        ready = nxt is not None
+        if nxt:
+            action = (f'Follow-up drafted. Ask Claude in chat: "send the follow-ups", or run: careeros outreach send {jid} '
+                      f'--contact "{nxt[0].get("contact")}" --followup {nxt[1]} --yes')
+        elif since_out:
+            action = f'No follow-up text yet. Ask Claude in chat: "draft follow-ups for {title}".'
         else:
-            note = "No reply yet"
-        ready = any((d.get("followup_7d") and not d.get("followup_7d_sent_at"))
-                    or (d.get("followup_14d") and not d.get("followup_14d_sent_at")) for d in drafts)
+            action = f'You have not emailed anyone yet. Ask Claude in chat: "draft outreach for {title}".'
         chips = ["follow-up ready"] if ready else []
-        row = _job_row(p, *chips, note=note) if p else Row(_short(its[0].get("What to do") or ""), note=note, chips=chips, icon="\u21bb")
+        row = _job_row(p, *chips, note=note, action=action) if p else Row(title, note=note, chips=chips, icon="\u21bb", action=action)
         out.append((bool(since_out), n, row))
     out.sort(key=lambda x: (x[0], x[1]), reverse=True)
     return [r for _, _, r in out], {j for j in groups if not j.startswith("~")}
@@ -250,7 +307,16 @@ _NEEDS = {"scam_suspected": ("scam warning", "scam warnings", "!"),
           "other": ("other task", "other tasks", "\u2022")}
 
 
-def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store) -> list[Row]:
+_ACT = {"scam_suspected": "Check each one, then skip the job or dismiss the warning.",
+        "review": "Open each, read the résumé and letter, then submit. Or ask Claude in chat: \"show me what is ready to review\".",
+        "qa_fail": "Decide per job: regenerate or skip. Or ask Claude in chat: \"fix the QA failures\".",
+        "injection_suspected": "Read the flagged text, then skip the job or clear the flag.",
+        "question": "Ask Claude in chat: \"answer my form questions\"; it drafts them for your approval.",
+        "ghost_job": "Check if the posting is still live, then skip it or apply.",
+        "other": "Do each task, then mark it done in Today."}
+
+
+def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, url: str = "") -> list[Row]:
     by: dict[str, list[dict[str, Any]]] = {}
     for i in items:
         if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST:
@@ -261,7 +327,7 @@ def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], st
         its, n = by[ty], len(by[ty])
         one, many, icon = _NEEDS.get(ty) or (f"{ty.replace('_', ' ')} item", f"{ty.replace('_', ' ')} items", "\u2022")
         if n == 1:
-            rows.append(Row(_short(its[0].get("What to do") or one), icon=icon))
+            rows.append(Row(_short(its[0].get("What to do") or one), icon=icon, action=_ACT.get(ty, _ACT["other"]), url=url))
             continue
         title = f"{n} {many}"
         if ty == "review":
@@ -273,7 +339,7 @@ def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], st
             names = list(dict.fromkeys(x for x in names if x))
             if names:
                 title += ": " + ", ".join(names[:3]) + (f" +{len(names) - 3}" if len(names) > 3 else "")
-        rows.append(Row(title, icon=icon))
+        rows.append(Row(title, icon=icon, action=_ACT.get(ty, _ACT["other"]), url=url))
     return rows
 
 
@@ -299,12 +365,15 @@ def build_sections(s: Settings, today: date | None = None) -> list[Section]:
         note = ("Applied today" if n == 0 else f"Applied {_days(n)} ago") + " \u00b7 no contact yet" if since else "no contact yet"
         reach.append((n, _job_row(p, note=note) if p else Row(_short(it.get("What to do") or ""), note=note, icon="@")))
     reach.sort(key=lambda x: -x[0])
-    need_rows = _needs_rows(items, jobs, store)
+    url = today_url(s)
+    need_rows = _needs_rows(items, jobs, store, url)
     need_total = sum(1 for i in items if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST)
     reach_first = [Row(_short(i.get("What to do") or ""), icon="!") for i in items if _kind(i) == REACH_FIRST]
-    needs = _cap(Section("needs", "Needs you", need_rows, count=need_total), min(cap, 6))
-    secs = [_cap(Section("follow", "Follow up", follow_rows), cap),
-            _deadline_section(c, jobs, items, store, today), _apply_section(s, c, jobs, store, today), needs,
+    needs = _cap(Section("needs", "Needs you", need_rows,
+                         f"Tasks waiting on you. On your laptop, open Today at {url} (start it with `careeros ui`); "
+                         "or do them by chat with Claude. Each line says how.", count=need_total), min(cap, 6))
+    secs = [_cap(Section("follow", "Follow up", follow_rows, "Jobs you applied to or emailed that have had no reply. Next step is under each one."), cap),
+            _deadline_section(s, c, jobs, items, store, today), _apply_section(s, c, jobs, store, today), needs,
             _cap(Section("reach_first", "Reach out before applying to more", reach_first, WHY[REACH_FIRST] if reach_first else ""), cap),
             _cap(Section("reach", "Reach out", [r for _, r in reach], WHY["reach_out"] if reach else ""), cap)]
     secs += _extra_sections(s, today, store)
@@ -326,9 +395,9 @@ def _summary(secs: list[Section]) -> str:
 
 def render_text(secs: list[Section], today: date | None = None, footer: str = "") -> str:
     def line(r: Row) -> str:
-        first = f"- {r.title}" + (f", {r.company}" if r.company else "") + (f": {r.url}" if r.url else "")
+        first = f"- {r.title}" + (f", {r.company}" if r.company else "") + (f": {r.url}" if r.url and r.company else "")
         sub = " \u00b7 ".join([x for x in (r.location, r.note) if x] + [f"[{c}]" for c in r.chips])
-        return first + (f"\n  {sub}" if sub else "")
+        return first + (f"\n  {sub}" if sub else "") + (f"\n  Next: {r.action}" if r.action else "")
 
     out = ["Your job search today" + (f", {today.strftime('%a %d %b %Y')}" if today else "") + f"\n{_summary(secs)}"]
     for x in secs:
@@ -347,8 +416,8 @@ def build_digest(s: Settings, today: date | None = None) -> str | None:
     return render_text(secs, today, footer(config(s))) if secs else None
 
 
-_LABEL = {"apply": ("job to apply to", "jobs to apply to"), "follow": ("follow-up", "follow-ups"),
-          "deadlines": ("deadline", "deadlines"), "needs": ("needs you", "need you")}
+_LABEL = {"apply": ("job to apply to", "jobs to apply to"), "follow": ("follow-up due", "follow-ups due"),
+          "deadlines": ("deadline soon", "deadlines soon"), "needs": ("task waiting on you", "tasks waiting on you")}
 
 
 def counts(secs: list[Section]) -> list[tuple[int, str]]:
@@ -364,7 +433,8 @@ def counts(secs: list[Section]) -> list[tuple[int, str]]:
 
 
 def subject_for(secs: list[Section]) -> str:
-    order = {"jobs to apply to": 0, "job to apply to": 0, "follow-up": 1, "follow-ups": 1, "deadline": 2, "deadlines": 2}
+    order = {"jobs to apply to": 0, "job to apply to": 0, "follow-up due": 1, "follow-ups due": 1,
+             "deadline soon": 2, "deadlines soon": 2}
     cs = sorted(counts(secs), key=lambda x: order.get(x[1], 3))[:3]
     while cs:
         subj = "career-os: " + ", ".join(f"{n} {w}" for n, w in cs)
@@ -420,6 +490,7 @@ def render_html(secs: list[Section], today: date | None = None, footer: str = ""
                 f'<div class="t" style="font-size:{size};font-weight:700;line-height:1.35;color:#0f172a">{t}</div>',
                 f'<div class="m" style="font-size:14px;line-height:1.4;color:#475569">{line2}</div>' if line2 else "",
                 f'<div class="m" style="font-size:13px;line-height:1.4;color:#64748b">{e(r.note)}</div>' if r.note else "",
+                f'<div class="t" style="padding-top:2px;font-size:13px;line-height:1.4;color:#0f172a"><b>Next:</b> {e(r.action)}</div>' if r.action else "",
                 f"<div>{chips}</div>" if chips else ""])
             body += (f'<tr><td class="row" style="padding:14px 0;border-top:1px solid #e2e8f0">'
                      f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
@@ -456,7 +527,7 @@ def _extra_sections(s: Settings, today: date, store: Store) -> list[Section]:
         p = store.load_posting(jid)
         sc = store.load_score(jid)
         if p:
-            rows.append(_job_row(p, f"fit {sc.fit}" if sc else ""))
+            rows.append(_job_row(p, f"fit {sc.fit}" if sc else "", s=s))
     out = [_cap(Section("watch", "New at your target companies", rows), config(s)["section_max"])]
     up = _heads_up(s, today)
     if up:
