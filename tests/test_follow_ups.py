@@ -164,3 +164,59 @@ def test_outreach_email_result_inactive_mailbox_holds_and_keeps_the_format(env, 
     assert "left" in dr["hold_reason"]
     pats = json.loads((Store(s).jobs_dir.parent / "email_patterns.json").read_text())
     assert pats["acme.com"] == {"works": "{first}.{last}", "failed": []}
+
+
+def test_7d_followup_sent_closes_item_and_14d_is_raised_later(env):
+    s, tr = env
+    p = _job(s, tr, 20, applied="2026-12-31")
+    _outreach(s, p, sent_at="2026-11-01", followup_7d="a", followup_14d="b")
+    raise_follow_ups(s, TODAY)
+    assert [i["Detail"] for i in tr.list_action_items()] == ["follow_up:outreach"]
+    _outreach(s, p, sent_at="2026-11-01", followup_7d="a", followup_14d="b", followup_7d_sent_at="2026-11-09")
+    raise_follow_ups(s, date(2026, 11, 14))  # 13 days after the send: 14d not due yet
+    assert tr.list_action_items() == []
+    raise_follow_ups(s, date(2026, 11, 15))
+    assert [i["Detail"] for i in tr.list_action_items()] == ["follow_up:outreach14"]
+
+
+def test_no_14d_text_means_no_second_item(env):
+    s, tr = env
+    p = _job(s, tr, 21, applied="2026-12-31")
+    _outreach(s, p, sent_at="2026-11-01", followup_7d="a", followup_7d_sent_at="2026-11-09")
+    raise_follow_ups(s, date(2026, 12, 1))
+    assert tr.list_action_items() == []
+
+
+def test_contact_rows_show_followed_up_and_next_due(env):
+    from careeros.follow_ups import contact_rows
+    s, tr = env
+    p = _job(s, tr, 22, applied="2026-12-31")
+    _outreach(s, p, contact="Sam", to="s@x.com", sent_at="2026-11-01", followup_7d="a", followup_14d="b")
+    assert contact_rows(Store(s), s)[0]["FollowUpDue"] == "2026-11-08"
+    _outreach(s, p, contact="Sam", to="s@x.com", sent_at="2026-11-01", followup_7d="a", followup_14d="b",
+              followup_7d_sent_at="2026-11-09")
+    r = contact_rows(Store(s), s)[0]
+    assert r["EmailStatus"] == "delivered; followed up 2026-11-09" and r["FollowUpDue"] == "2026-11-15"
+    _outreach(s, p, contact="Sam", to="s@x.com", sent_at="2026-11-01", followup_7d="a", followup_14d="b",
+              followup_7d_sent_at="2026-11-09", followup_14d_sent_at="2026-11-15")
+    r = contact_rows(Store(s), s)[0]
+    assert "followed up 2026-11-15" in r["EmailStatus"] and r["FollowUpDue"] == ""
+
+
+def test_one_contact_waiting_on_7d_does_not_hide_anothers_14d(env):
+    s, tr = env
+    p = _job(s, tr, 23, applied="2026-12-31")
+    drafts = [{"sent": True, "contact": "A", "sent_at": "2026-11-01", "followup_7d": "a", "followup_14d": "b",
+               "followup_7d_sent_at": "2026-11-09"},
+              {"sent": True, "contact": "B", "sent_at": "2026-11-14", "followup_7d": "a"}]
+    (Store(s).job_dir(p.job_id) / "outreach.json").write_text(json.dumps({"drafts": drafts}))
+    raise_follow_ups(s, date(2026, 11, 15))
+    assert [i["Detail"] for i in tr.list_action_items()] == ["follow_up:outreach14"]
+
+
+def test_digest_days_waiting_still_a_date(env):
+    from careeros.follow_ups import _outreach_wait
+    s, tr = env
+    p = _job(s, tr, 24, applied="2026-12-31")
+    _outreach(s, p, sent_at="2026-11-01", followup_7d="a")
+    assert _outreach_wait(Store(s), p.job_id) == date(2026, 11, 1)

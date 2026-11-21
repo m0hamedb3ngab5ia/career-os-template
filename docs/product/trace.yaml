@@ -928,6 +928,9 @@ requirements:
     - test_applied_job_with_no_reply_gets_one_deduped_item
     - test_item_closes_when_job_moves_on
     - test_sent_outreach_without_answer_gets_item_and_closes_on_reply
+    - test_7d_followup_sent_closes_item_and_14d_is_raised_later
+    - test_one_contact_waiting_on_7d_does_not_hide_anothers_14d
+    - test_followup_refusals
     - test_outreach_sent_writes_sent_at_and_triggers_nudge
     - test_done_sticks_across_ticks
     - test_locked_ticks_are_idempotent

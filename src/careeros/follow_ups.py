@@ -14,7 +14,7 @@ from careeros.store import Store
 from careeros.tracker import Tracker
 
 TYPE = "follow_up"
-APPLIED, OUTREACH = "follow_up:applied", "follow_up:outreach"
+APPLIED, OUTREACH, OUTREACH14 = "follow_up:applied", "follow_up:outreach", "follow_up:outreach14"
 
 
 def after_days(s: Settings) -> int:
@@ -39,15 +39,27 @@ def _json(path) -> dict[str, Any]:
     return d if isinstance(d, dict) else {}
 
 
-def _outreach_wait(store: Store, job_id: str) -> date | None:
-    """Date of the oldest sent, unanswered message for this job, else None."""
+def _outreach_stages(store: Store, job_id: str) -> list[tuple[str, date, int]]:
+    """Outreach nudges this job wants, each as (marker, send date, days after the send; 0 = after_days). Per draft:
+    the 7d nudge until `followup_7d_sent_at` is set, then (if a 14d text exists) the 14d one. Any reply stops all."""
     d = store.job_dir(job_id)
     drafts = [x for x in _json(d / "outreach.json").get("drafts") or [] if isinstance(x, dict) and x.get("sent") is True]
     contacts = [c for c in _json(d / "contacts.json").get("contacts") or [] if isinstance(c, dict)]
     if not drafts or any(x.get("replied") for x in drafts) or any(c.get("replied") for c in contacts):
-        return None
-    days = [_day(x.get("sent_at") or x.get("sent_date")) for x in drafts]
-    return min((x for x in days if x), default=None)
+        return []
+    first = [x for x in drafts if not x.get("followup_7d_sent_at")]
+    late = [x for x in drafts if x.get("followup_7d_sent_at") and x.get("followup_14d") and not x.get("followup_14d_sent_at")]
+    out = []
+    for stage, pool, days in ((OUTREACH, first, 0), (OUTREACH14, late, 14)):
+        since = min((x for x in (_day(y.get("sent_at") or y.get("sent_date")) for y in pool) if x), default=None)
+        if since:
+            out.append((stage, since, days))
+    return out
+
+
+def _outreach_wait(store: Store, job_id: str) -> date | None:
+    """Date of the oldest sent, unanswered message still waiting on a nudge, else None (the digest's days waiting)."""
+    return min((x[1] for x in _outreach_stages(store, job_id)), default=None)
 
 
 def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
@@ -61,9 +73,15 @@ def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
                 continue
             bounces, sent, reason = len(d.get("bounced") or []), d.get("sent") is True, str(d.get("hold_reason") or "")
             when = _day(d.get("sent_at") or d.get("sent_date"))
+            due = when + timedelta(days=n) if sent and when and not d.get("followup_7d_sent_at") else None
+            if sent and d.get("followup_7d_sent_at"):  # next one: 14d after the send, only if its text exists
+                due = when + timedelta(days=14) if when and d.get("followup_14d") and not d.get("followup_14d_sent_at") else None
             if sent:
                 who = "replied" if d.get("replied") else "contacted"
                 mail = "delivered" + (f" after {bounces} bounce{'s' * (bounces > 1)}" if bounces else "")
+                fu = d.get("followup_14d_sent_at") or d.get("followup_7d_sent_at")
+                if fu:
+                    mail += f"; followed up {str(fu)[:10]}"
             elif d.get("hold"):
                 who, mail = ("left company" if "left" in reason or "inactive" in reason else "not contacted"), f"held: {reason}"
             elif bounces:
@@ -76,8 +94,7 @@ def contact_rows(store: Store, s: Settings) -> list[dict[str, Any]]:
                         "Email": d.get("to") or "", "EmailConfidence": d.get("to_confidence") or "",
                         "Sent": "Y" if sent else "N", "SentDate": when.isoformat() if sent and when else "",
                         "ContactStatus": who, "EmailStatus": mail,
-                        "FollowUpDue": (when + timedelta(days=n)).isoformat() if sent and when and who != "replied"
-                        else ""})
+                        "FollowUpDue": due.isoformat() if due and who != "replied" else ""})
     return out
 
 
@@ -92,9 +109,10 @@ def raise_follow_ups(s: Settings, today: date | None = None) -> list[str]:
         since = _day(j.get("DateApplied"))
         if since and (today - since).days >= n:
             want[(jid, APPLIED)] = (f"No reply in {(today - since).days} days. Send a short follow-up.", since)
-        sent = _outreach_wait(store, jid)
-        if sent and (today - sent).days >= n:
-            want[(jid, OUTREACH)] = (f"Your message got no answer in {(today - sent).days} days. Send a nudge.", sent)
+        for stage, sent, days in _outreach_stages(store, jid):
+            if (today - sent).days >= (days or n):
+                what = "Your follow-up got no answer either" if stage == OUTREACH14 else "Your message got no answer"
+                want[(jid, stage)] = (f"{what} in {(today - sent).days} days. Send a nudge.", sent)
     have: set[tuple[str, str]] = set()  # open AND done keys: Done sticks
     for it in tr.list_action_items(open_only=False):
         if it.get("Type") != TYPE or str(it.get("Detail") or "").split("\n")[0] in (REACH, "reach_first"):

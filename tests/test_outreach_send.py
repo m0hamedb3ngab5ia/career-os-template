@@ -203,3 +203,110 @@ def test_links_turn_the_named_text_into_a_hyperlink_in_the_html_part(tmp_path):
     assert m.get_body(("plain",)).get_content().startswith("Hi Sam,\n\nI applied to the Acme <SWE> role.")
     assert len(list(m.iter_attachments())) == 1
     assert o.build_message("me@x.com", D, pdf, "Alex").get_body(("html",)) is None  # no links, plain only
+
+
+# ---- follow-up in the same Gmail thread -------------------------------------------------------------
+from datetime import date, datetime  # noqa: E402
+
+SENT = {**D, "sent": True, "sent_at": "2026-11-10", "followup_7d": "Hi Sam, following on my note.", "followup_14d": "Last note."}
+TUE_10AM = datetime(2026, 11, 17, 10, 0)
+
+
+def test_send_stores_message_id_and_subject(tmp_path):
+    pdf = tmp_path / "r.pdf"
+    pdf.write_bytes(b"%PDF")
+    d, sent = dict(D), []
+    o.send_now("me@x.com", "pw", d, pdf, "Alex", yes=True, smtp=lambda f, p, m: sent.append(m))
+    assert d["message_id"].startswith("<") and d["message_id"].endswith("@x.com>") and d["sent_subject"] == "Hi Sam"
+    assert sent[0]["Message-ID"] == d["message_id"]
+
+
+@pytest.mark.parametrize("patch,msg", [
+    ({"sent": False}, "not been sent"), ({"bounced": [{"to": "sam@x.com"}]}, "bounced"), ({"replied": "2026-11-12"}, "replied"),
+    ({"followup_7d_sent_at": "2026-11-17"}, "already sent"), ({"followup_7d": ""}, "draft-outreach follow-ups")])
+def test_followup_refusals(patch, msg):
+    with pytest.raises(o.SendError, match=msg):
+        o.followup_check({**SENT, **patch}, "7d", today=date(2026, 11, 20))
+
+
+def test_followup_refuses_when_contact_replied_and_warns_when_early():
+    with pytest.raises(o.SendError, match="replied"):
+        o.followup_check(SENT, "7d", replied=True, today=date(2026, 11, 20))
+    assert "before the due date (2026-11-17)" in o.followup_check(SENT, "7d", today=date(2026, 11, 12))[0]
+    assert o.followup_check(SENT, "7d", today=date(2026, 11, 17)) == []
+
+
+def test_followup_threads_with_stored_message_id():
+    d, sent = {**SENT, "message_id": "<abc@x.com>", "sent_subject": "Hi Sam"}, []
+    notes = o.send_followup("me@x.com", "pw", d, "7d", yes=True, smtp=lambda f, p, m: sent.append(m),
+                            today=date(2026, 11, 17), now=TUE_10AM, imap=lambda h: pytest.fail("no lookup needed"))
+    m = sent[0]
+    assert m["Subject"] == "Re: Hi Sam" and m["In-Reply-To"] == m["References"] == "<abc@x.com>" and m["To"] == "sam@x.com"
+    assert not list(m.iter_attachments()) and d["followup_7d_sent_at"] == "2026-11-17" and notes == []
+
+
+def test_followup_needs_yes():
+    d = {**SENT, "message_id": "<abc@x.com>"}
+    with pytest.raises(o.SendError, match="--yes"):
+        o.send_followup("me@x.com", "pw", d, "7d", yes=False, smtp=lambda *a: pytest.fail("sent"), today=date(2026, 11, 17))
+    assert "followup_7d_sent_at" not in d
+
+
+class SentBox:
+    def __init__(self, found=True): self.found, self.log = found, []
+    def __call__(self, host): self.log.append(host); return self
+    def login(self, u, p): pass
+    def select(self, box, readonly=False): self.log.append(box); return ("OK", [b"1"])
+    def search(self, _c, *crit): self.log.append(crit); return ("OK", [b"4 9" if self.found else b""])
+    def fetch(self, n, what):
+        self.log.append(n)
+        subj = b"Hi Sam" if n == b"9" else b"=?utf-8?q?Other_=E2=80=94_r=C3=A9sum=C3=A9?="
+        return ("OK", [(b"x {30}", b"Message-ID: <old@mail.gmail.com>\r\nSubject: " + subj + b"\r\n\r\n"), b")"])
+    def logout(self): pass
+
+
+def test_followup_looks_up_message_id_over_imap_for_older_sends():
+    d, sent, box = dict(SENT), [], SentBox()
+    o.send_followup("me@x.com", "pw", d, "7d", yes=True, smtp=lambda f, p, m: sent.append(m), today=date(2026, 11, 17),
+                    now=TUE_10AM, imap=box)
+    assert "[Gmail]/Sent Mail" in box.log[1] and ("TO", '"sam@x.com"') in box.log
+    assert sent[0]["In-Reply-To"] == "<old@mail.gmail.com>" and d["message_id"] == "<old@mail.gmail.com>"
+
+
+def test_followup_without_original_goes_unthreaded_and_says_so():
+    sent = []
+    notes = o.send_followup("me@x.com", "pw", dict(SENT), "7d", yes=True, smtp=lambda f, p, m: sent.append(m),
+                            today=date(2026, 11, 17), now=TUE_10AM, imap=SentBox(found=False))
+    assert sent[0]["Subject"] == "Re: Hi Sam" and sent[0]["In-Reply-To"] is None and "without threading" in notes[0]
+
+
+def test_window_hint_outside_tue_thu_morning():
+    assert o.window_hint(TUE_10AM) is None
+    assert "Tue-Thu 8am-12pm" in o.window_hint(datetime(2026, 11, 21, 10, 0))  # Saturday
+
+
+def test_cli_followup_dry_run_yes_and_record(settings, monkeypatch, capsys):
+    import argparse
+    import json
+
+    from careeros import cli
+    jd = _job(settings, [{**SENT, "message_id": "<abc@x.com>"}])
+    monkeypatch.setattr(cli, "_settings", lambda a: settings)
+    monkeypatch.setattr(cli, "_outreach_ctx", lambda s: ("me@x.com", "pw", "Alex"))
+    sent = []
+    monkeypatch.setattr(o, "_smtp", lambda f, p, m: sent.append(m))
+    ns = dict(job_id="j9", contact="Sam Lee", followup="7d")
+    assert cli.cmd_outreach_send(argparse.Namespace(**ns, yes=False, dry_run=True)) == 0
+    out = capsys.readouterr().out
+    assert "[dry run]" in out and "Re: Hi Sam" in out and "<abc@x.com>" in out and not sent
+    assert cli.cmd_outreach_send(argparse.Namespace(**ns, yes=False, dry_run=False)) == 1 and not sent
+    assert cli.cmd_outreach_send(argparse.Namespace(**ns, yes=True, dry_run=False)) == 0
+    assert len(sent) == 1 and json.loads((jd / "outreach.json").read_text())["drafts"][0]["followup_7d_sent_at"]
+    assert cli.cmd_outreach_send(argparse.Namespace(**ns, yes=True, dry_run=False)) == 1 and len(sent) == 1
+    assert "already sent" in capsys.readouterr().err
+
+
+def test_followup_lookup_matches_non_ascii_subject():
+    box = SentBox()
+    d = {**SENT, "email": {**SENT["email"], "subject": "Other — résumé"}}
+    assert o.find_message_id("me@x.com", "pw", d, imap=box) == "<old@mail.gmail.com>"

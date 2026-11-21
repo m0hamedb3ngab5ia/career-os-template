@@ -1737,6 +1737,48 @@ def cmd_outreach_panel(args: argparse.Namespace) -> int:
     return 0
 
 
+def _outreach_followup(args: argparse.Namespace, s: Any, store: Store, path: Path, data: dict, d: dict) -> int:
+    """`outreach send --followup 7d|14d`: the follow-up text as a reply in the first email's Gmail thread (no résumé)."""
+    import imaplib
+    import json
+    import smtplib
+
+    from careeros import notify
+    from careeros import outreach_send as osend
+    from careeros.follow_ups import after_days
+
+    kind = args.followup
+    try:
+        cs = json.loads((store.job_dir(args.job_id) / "contacts.json").read_text(encoding="utf-8")).get("contacts") or []
+    except (OSError, ValueError, AttributeError):
+        cs = []
+    replied = any(isinstance(c, dict) and c.get("replied") and str(c.get("name") or "").lower() == args.contact.lower()
+                  for c in cs)
+    try:
+        if getattr(args, "dry_run", False):
+            notes = osend.followup_check(d, kind, replied=replied, after_days=after_days(s))
+            m = osend.build_followup("(you)", d, kind, d.get("message_id"))
+            print(f"[dry run] To: {m['To']}\nSubject: {m['Subject']}\nThreading: "
+                  + (f"In-Reply-To {m['In-Reply-To']}" if m["In-Reply-To"] else "looked up in Sent Mail at send time")
+                  + f"\n\n{m.get_content()}")
+            for n in notes:
+                print(f"note: {n}")
+            return 0
+        if not args.yes:
+            print(osend.WARNING + " Re-run with --yes to send.", file=sys.stderr)
+            return 1
+        frm, pw, _ = _outreach_ctx(s)
+        notes = osend.send_followup(frm, pw, d, kind, yes=True, replied=replied, after_days=after_days(s))
+    except (osend.SendError, notify.NotifyError, smtplib.SMTPException, imaplib.IMAP4.error, OSError) as e:
+        print(f"outreach send: {e}", file=sys.stderr)
+        return 1
+    path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+    print(f"sent {kind} follow-up to {d['to']} ({args.contact})")
+    for n in notes:
+        print(f"note: {n}")
+    return 0
+
+
 def cmd_outreach_send(args: argparse.Namespace) -> int:
     """Send one approved draft now from the candidate's Gmail (résumé attached). Needs --yes; prints the warning."""
     import json
@@ -1754,6 +1796,8 @@ def cmd_outreach_send(args: argparse.Namespace) -> int:
     if len(hit) != 1:
         print(f"outreach send: no single draft for contact {args.contact!r}", file=sys.stderr)
         return 1
+    if getattr(args, "followup", None):
+        return _outreach_followup(args, s, store, path, data, hit[0])
     if hit[0].get("hold"):
         print(f"outreach send: {args.contact} is held ({hit[0].get('hold_reason') or 'unverified'}); fix the draft first",
               file=sys.stderr)
@@ -2950,6 +2994,9 @@ def build_parser() -> argparse.ArgumentParser:
     osd.add_argument("job_id")
     osd.add_argument("--contact", required=True)
     osd.add_argument("--yes", action="store_true", help="you approved this send; guessed addresses can bounce")
+    osd.add_argument("--followup", nargs="?", const="7d", choices=["7d", "14d"],
+                     help="send the 7d (default) or 14d follow-up as a reply in the first email's thread (no résumé)")
+    osd.add_argument("--dry-run", action="store_true", help="with --followup: show the email, send nothing")
     osd.set_defaults(fn=cmd_outreach_send, sync_contacts=True)
     oqa = outs.add_parser("qa", help="gate outreach drafts, optionally add your own line (--line); prints the one-click compose link")
     oqa.add_argument("job_id")

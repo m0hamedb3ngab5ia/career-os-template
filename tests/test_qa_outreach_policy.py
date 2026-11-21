@@ -336,9 +336,9 @@ def test_linkedin_note_chars_mismatch_warns(root):
 
 # ---- 6. cold contacts: one outreach + one follow-up ------------------------------------------------
 
-def test_cold_contact_with_14d_followup_fails(root):
-    res = run(make(root, [draft("Jane Doe", followup_14d=words(40))], [contact("Jane Doe")]))
-    assert res["outreach_cold_limit"]["ok"] is False and "Jane Doe" in res["outreach_cold_limit"]["detail"]
+def test_cold_contact_may_get_7d_and_14d_followups(root):
+    res = run(make(root, [draft("Jane Doe", followup_7d=words(40), followup_14d=words(40))], [contact("Jane Doe")]))
+    assert res["outreach_cold_limit"]["ok"], res["outreach_cold_limit"]["detail"]
 
 
 def test_contact_who_replied_may_get_14d_followup(root):
@@ -353,7 +353,7 @@ def test_cold_contact_with_two_drafts_fails(root):
 
 def test_cold_contact_extra_followup_entry_counts(root):
     fu = [{"contact": "Jane Doe", "kind": "status_followup", "email": {"subject": "x", "body": words(40)}}]
-    res = run(make(root, [draft("Jane Doe")], [contact("Jane Doe")], followups=fu))
+    res = run(make(root, [draft("Jane Doe", followup_14d=words(40))], [contact("Jane Doe")], followups=fu))
     assert res["outreach_cold_limit"]["ok"] is False
 
 
