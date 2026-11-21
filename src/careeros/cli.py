@@ -1861,10 +1861,10 @@ def cmd_notify(args: argparse.Namespace) -> int:
             return 0
         c = notify.config(s)
         if args.notify_cmd == "digest":
-            secs = notify.build_sections(s)
-            print(notify.subject_for(secs) + "\n\n" + notify.render_text(secs) if secs else "nothing to send: every section is empty")
+            secs, today = notify.build_sections(s), datetime.now().date()
+            print(notify.subject_for(secs) + "\n\n" + notify.render_text(secs, today, notify.footer(c)) if secs else "nothing to send: every section is empty")
             if secs and args.html:
-                Path(args.html).write_text(notify.render_html(secs), encoding="utf-8")
+                Path(args.html).write_text(notify.render_html(secs, today, notify.footer(c)), encoding="utf-8")
                 print(f"\nHTML preview: {args.html}")
             return 0
         if not c["email"]:

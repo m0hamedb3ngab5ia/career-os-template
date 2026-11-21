@@ -68,8 +68,8 @@ def test_digest_sections_and_days(env):
     raise_reach_outs(s, date(2026, 11, 13))             # due 11-13 -> 3 days overdue on 11-16
     tr.add_action_item("Upload transcript", type="other", priority="H")
     body = notify.build_digest(s, TODAY)
-    assert "Reach out" in body and "Engineer 1 @ Nimbus" in body and "https://example.com/1" in body
-    assert "3 days" in body and "Needs you" in body and "Upload transcript" in body
+    assert "Reach out" in body and "Engineer 1, Nimbus: https://example.com/1" in body
+    assert "Applied 14 days ago" in body and "0 days" not in body and "Needs you" in body and "Upload transcript" in body
     assert "Follow up" not in body                       # empty section omitted
     assert p.job_id not in body
 
@@ -242,7 +242,7 @@ def test_apply_section_best_fit_first_capped_ready_marker_and_excludes(env):
     _scored_job(s, tr, 5, 99, status="skipped")
     _scored_job(s, tr, 6, 99, closes="2026-11-01")          # posting already closed
     body = notify.build_digest(s, TODAY)
-    assert "Apply to these" in body and "showing 2 of 3" in body
+    assert "Apply to these" in body and "+1 more: open Today" in body
     assert body.index("Role 2") < body.index("Role 3") and "Role 1" not in body
     assert "https://example.com/s2" in body and "ready" in body.split("Role 3")[0]
     assert "Role 4" not in body and "Role 5" not in body and "Role 6" not in body
@@ -256,7 +256,7 @@ def test_apply_section_keeps_reminding_and_lists_new_jobs_first(env):
     _scored_job(s, tr, 2, 60)
     body = notify.build_digest(s, date(2026, 11, 17))
     assert body.index("Role 2") < body.index("Role 1")             # new first, though lower fit
-    assert "new - fit 60" in body and "(fit 90)" in body            # not applied yet: still listed, no longer new
+    assert "new" in body.split("Role 1")[0] and "fit 60" in body and "fit 90" in body            # not applied yet: still listed, no longer new
 
 
 def test_ready_marker_reads_qa_review_pass_flag(env):
@@ -282,7 +282,7 @@ def test_deadlines_section_soonest_first_and_window(env):
 def test_sections_ordered_follow_up_deadlines_apply_needs_you(env):
     s, tr = env
     p = _job(s, tr, 1, applied="2026-11-02")
-    tr.add_action_item("Reply to recruiter", type="follow_up", job_id=p.job_id, priority="M", detail="applied")
+    tr.add_action_item("Reply to recruiter", type="follow_up", job_id=p.job_id, priority="M", detail="follow_up:applied")
     _scored_job(s, tr, 2, 80, closes="2026-11-18")
     tr.add_action_item("Upload transcript", type="other", priority="H")
     body = notify.build_digest(s, TODAY)
@@ -350,3 +350,145 @@ def test_cli_digest_html_file(env, monkeypatch, tmp_path):
     out = tmp_path / "d.html"
     assert main(["notify", "digest", "--dry-run", "--html", str(out)]) == 0
     assert "Role 1" in out.read_text()
+
+
+# ---- brief digest (REQ-155): one row per job, grouped Needs you, caps, LinkedIn-alert look -------------------------
+def _outreach(s, p, *names, sent_at="2026-11-14", fu7=None, fu7_sent=None, replied=False):
+    drafts = [{"contact": n, "to": "x@example.com", "sent": True, "sent_at": sent_at, "followup_7d": fu7,
+               "followup_7d_sent_at": fu7_sent, "replied": replied} for n in names]
+    (Store(s).job_dir(p.job_id) / "outreach.json").write_text(json.dumps({"drafts": drafts}))
+
+
+def _follow_items(s, tr, p):
+    from careeros.follow_ups import raise_follow_ups
+    raise_follow_ups(s, TODAY)
+
+
+def test_follow_up_one_row_per_job_merges_applied_and_outreach(env):
+    s, tr = env
+    p = _job(s, tr, 1, applied="2026-11-04")
+    _outreach(s, p, "Tom Rickards", sent_at="2026-11-14")
+    s.pipeline.setdefault("follow_ups", {})["after_days"] = 2
+    _follow_items(s, tr, p)
+    assert len([i for i in tr.list_action_items() if i["Type"] == "follow_up"]) == 2     # two nudges, same job
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
+    assert len(sec.rows) == 1 and sec.rows[0].title == "Engineer 1"
+    assert sec.rows[0].note == "Emailed Tom Rickards \u00b7 2 days, no reply"
+
+
+def test_follow_up_applied_only_subtitle_ready_chip_and_order(env):
+    s, tr = env
+    s.pipeline["follow_ups"] = {"after_days": 2}
+    a = _job(s, tr, 1, applied="2026-11-10")                  # applied-only, 6 days
+    b = _job(s, tr, 2, applied="2026-11-12")                  # outreach, 4 days, follow-up text ready
+    c = _job(s, tr, 3, applied="2026-11-01")                  # outreach, 10 days
+    _outreach(s, b, "Ann Lee", "Bo Chen", sent_at="2026-11-12", fu7="Hi again")
+    _outreach(s, c, "Cy Day", sent_at="2026-11-06")
+    _follow_items(s, tr, a)
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "follow"]
+    assert [r.title for r in sec.rows] == ["Engineer 3", "Engineer 2", "Engineer 1"]       # outreach first, longest wait first
+    assert sec.rows[2].note == "Applied 6 days ago, no reply" and sec.rows[2].chips == []
+    assert sec.rows[1].chips == ["follow-up ready"] and sec.rows[0].chips == []
+    assert sec.rows[1].note == "Emailed Ann Lee, Bo Chen \u00b7 4 days, no reply"
+
+
+def test_reach_out_shows_days_since_applied_and_skips_jobs_in_follow_up(env):
+    s, tr = env
+    s.pipeline["follow_ups"] = {"after_days": 2}
+    a = _job(s, tr, 1, applied="2026-11-10")
+    b = _job(s, tr, 2, applied="2026-11-15")
+    raise_reach_outs(s, TODAY)                                # items due today: the old "0 days" bug
+    _follow_items(s, tr, a)                                   # a also has an applied nudge
+    secs = {x.key: x for x in notify.build_sections(s, TODAY)}
+    assert [r.title for r in secs["follow"].rows] == ["Engineer 1"]
+    assert [r.title for r in secs["reach"].rows] == ["Engineer 2"]
+    assert secs["reach"].rows[0].note == "Applied 1 day ago \u00b7 no contact yet"
+
+
+def _needs(tr, type_, n, what="x", job_id=""):
+    for i in range(n):
+        tr.add_action_item(f"{what} {i}" if n > 1 else what, type=type_, job_id=job_id, priority="L")
+
+
+def test_needs_you_groups_by_type_with_counts_most_urgent_first(env):
+    s, tr = env
+    for n in range(1, 6):
+        p = _scored_job(s, tr, n, 80, status="needs_review")
+        tr.add_action_item("Review and submit", type="review", job_id=p.job_id, priority="M")
+    _needs(tr, "question", 7)
+    _needs(tr, "injection_suspected", 18, "Possible prompt injection")
+    _needs(tr, "qa_fail", 3)
+    _needs(tr, "scam_suspected", 2)
+    _needs(tr, "ghost_job", 4)
+    _needs(tr, "other", 2)
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "needs"]
+    assert [r.title for r in sec.rows] == [
+        "2 scam warnings", "5 applications ready for your review: Co1, Co2, Co3 +2", "3 QA failures to decide",
+        "18 postings with hidden text to check", "7 form questions to answer"] and sec.more == 2
+    assert sec.count == 2 + 5 + 3 + 18 + 7 + 4 + 2 and len(sec.rows) <= 6
+
+
+def test_needs_you_single_item_text_is_shortened_to_one_line(env):
+    s, tr = env
+    tr.add_action_item("Upload the transcript to the portal. " * 6, type="other", priority="L")
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "needs"]
+    assert sec.rows[0].title.startswith("Upload the transcript") and len(sec.rows[0].title) <= 90
+    assert sec.rows[0].title.endswith("\u2026") and "\n" not in sec.rows[0].title
+
+
+def test_section_max_caps_every_section_with_more_line(env):
+    s, tr = env
+    s.pipeline["notify"]["section_max"] = 2
+    for n in range(1, 6):
+        _scored_job(s, tr, n, 50 + n, closes=f"2026-11-{17 + n}")
+    secs = {x.key: x for x in notify.build_sections(s, TODAY)}
+    assert len(secs["apply"].rows) == 2 and secs["apply"].more == 3 and secs["apply"].count == 5
+    assert len(secs["deadlines"].rows) == 2 and secs["deadlines"].more == 3
+    text = notify.render_text(list(secs.values()))
+    assert text.count("+3 more: open Today (`careeros ui`)") == 2
+    assert "5 jobs to apply to" in notify.subject_for(list(secs.values()))     # subject counts all, not shown
+    assert notify.config(s)["section_max"] == 2
+    del s.pipeline["notify"]["section_max"]
+    assert notify.config(s)["section_max"] == 5
+
+
+def test_html_looks_like_a_job_alert(env):
+    s, tr = env
+    p = _scored_job(s, tr, 1, 87, qa=True, closes="2026-11-19")
+    Store(s).save_posting(p.model_copy(update={"location": "Austin, TX", "remote": True}))
+    s.pipeline["notify"]["every_days"] = 3
+    secs = notify.build_sections(s, TODAY)
+    h = notify.render_html(secs, TODAY, footer=notify.footer(notify.config(s)))
+    assert "Your job search today" in h and "Mon 16 Nov 2026" in h
+    assert 'href="https://example.com/s1"' in h and ">Role 1</a>" in h and "font-size:16px" in h
+    assert "Co1 &middot; Austin, TX" in h and ">CO<" in h and "border-radius" in h and "fit 87" in h
+    assert "closes in 3 days" in h and "ready" in h
+    assert "Sent every 3 days by career-os. Change it in pipeline.yaml notify.every_days." in h
+    assert ">https://example.com/s1<" not in h and "<img" not in h
+
+
+def test_badge_colour_is_stable_and_readable():
+    def lum(hex_):
+        ch = [int(hex_[i:i + 2], 16) / 255 for i in (1, 3, 5)]
+        ch = [c / 12.92 if c <= .03928 else ((c + .055) / 1.055) ** 2.4 for c in ch]
+        return .2126 * ch[0] + .7152 * ch[1] + .0722 * ch[2]
+
+    assert notify.badge_colour("Acme") == notify.badge_colour("Acme") != notify.badge_colour("Zed Corp")
+    for i in range(400):
+        assert 1.05 / (lum(notify.badge_colour(f"Company {i}")) + .05) >= 4.5
+    assert notify.initials("Jane Street") == "JS" and notify.initials("OpenAI") == "OP" and notify.initials("") == "?"
+
+
+def test_text_body_one_link_per_job_and_no_bare_urls_elsewhere(env):
+    s, tr = env
+    _scored_job(s, tr, 1, 80)
+    body = notify.build_digest(s, TODAY)
+    assert body.count("https://") == 1 and "- Role 1, Co1: https://example.com/s1" in body
+
+
+def test_subject_stays_short_with_big_counts(env):
+    secs = [notify.Section("follow", "Follow up", [notify.Row("a")], count=123),
+            notify.Section("deadlines", "Deadlines", [notify.Row("a")], count=45),
+            notify.Section("apply", "Apply to these", [notify.Row("a")], count=678),
+            notify.Section("needs", "Needs you", [notify.Row("a")], count=999)]
+    assert len(notify.subject_for(secs)) <= 60

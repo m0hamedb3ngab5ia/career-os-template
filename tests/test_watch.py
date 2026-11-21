@@ -62,7 +62,7 @@ def test_digest_lists_new_at_targets_once(env):
     p = _scored(env, 1, "Globex", 70)
     scan_watch(env, send=lambda *a: "sent")
     body = notify.build_digest(env, date(2026, 11, 16))
-    assert "New at your target companies" in body and "Engineer 1 @ Globex" in body and p.url in body
+    assert "New at your target companies" in body and "Engineer 1, Globex" in body and p.url in body
     env.pipeline["notify"] = {"enabled": True, "email": "me@example.com", "send_at": "00:00"}
     from datetime import datetime
     out = []

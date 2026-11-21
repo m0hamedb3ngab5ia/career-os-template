@@ -608,6 +608,7 @@ NOT_IN_UI: dict[tuple[str, str], str] = {
     (P, "notify.digest"): "Chat-set (daily, weekly or off); default daily is fine.",
     (P, "notify.weekly_day"): "Chat-set weekday for the weekly digest.",
     (P, "notify.every_days"): "Chat-set: email the digest every N days instead of daily/weekly.",
+    (P, "notify.section_max"): "Chat-set: most rows per digest section before \"+N more\" (default 5).",
     (P, "notify.apply_max"): "Chat-set: most jobs listed under Apply to these (default 10).",
     (P, "notify.deadline_days"): "Chat-set: days ahead the digest lists deadlines (default 7).",
     (P, "notify.urgent"): "Chat-set: whether rare urgent emails are sent at all.",
