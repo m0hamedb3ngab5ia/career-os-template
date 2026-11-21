@@ -66,7 +66,7 @@ def test_digest_lists_new_at_targets_once(env):
     env.pipeline["notify"] = {"enabled": True, "email": "me@example.com", "send_at": "00:00"}
     from datetime import datetime
     out = []
-    notify.maybe_send_digest(env, datetime(2026, 11, 16, 9), sender=lambda c, sub, b, pw: out.append(b),
+    notify.maybe_send_digest(env, datetime(2026, 11, 16, 9), sender=lambda c, sub, b, pw, html=None: out.append(b),
                              keychain=lambda e: "x")
     assert len(out) == 1 and notify.build_digest(env, date(2026, 11, 17)) is None or "Globex" not in notify.build_digest(env, date(2026, 11, 17))
 
@@ -106,5 +106,5 @@ def test_digest_heads_up_once_before_high_window(env):
     assert policy.upcoming_window(env.targets, date(2026, 11, 20)) is None   # lull is low, fall already running
     env.pipeline["notify"] = {"enabled": True, "email": "me@example.com", "send_at": "00:00"}
     from datetime import datetime
-    notify.maybe_send_digest(env, datetime(2026, 12, 27, 9), sender=lambda *a: None, keychain=lambda e: "x")
+    notify.maybe_send_digest(env, datetime(2026, 12, 27, 9), sender=lambda *a, **k: None, keychain=lambda e: "x")
     assert notify.build_digest(env, date(2026, 12, 28)) is None
