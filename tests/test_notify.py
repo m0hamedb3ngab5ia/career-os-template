@@ -492,3 +492,13 @@ def test_subject_stays_short_with_big_counts(env):
             notify.Section("apply", "Apply to these", [notify.Row("a")], count=678),
             notify.Section("needs", "Needs you", [notify.Row("a")], count=999)]
     assert len(notify.subject_for(secs)) <= 60
+
+
+def test_unscored_job_has_no_fit_chip_and_long_location_is_shortened(env):
+    s, tr = env
+    p = _scored_job(s, tr, 1, None)
+    p.location = "San Juan, Puerto Rico, New York, NY, District of Columbia, Europe | Spain"
+    Store(s).save_posting(p)
+    body = notify.build_digest(s, TODAY)
+    assert "fit 0" not in body and "fit None" not in body
+    assert "San Juan, Puerto Rico and more" in body and "Spain" not in body

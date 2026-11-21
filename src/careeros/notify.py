@@ -126,6 +126,8 @@ _APPLY = ("queued", "prepared")
 
 def _place(p: Any) -> str:
     loc = (p.location or "").strip()
+    if len(loc) > 40:   # multi-office strings: first place only
+        loc = ", ".join(re.split(r"\s*[;|]\s*", loc)[0].split(", ")[:2]) + " and more"
     if p.remote and "remote" not in loc.lower():
         return f"{loc} (remote)" if loc else "Remote"
     return loc
@@ -178,7 +180,7 @@ def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any
         cands.append((jid not in shown, int(j.get("Fit") or 0), str(j.get("DateFound") or ""), jid, p))
     cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # new first, then best fit, then newest
     top = cands[:min(c["apply_max"], c["section_max"])]
-    rows = [_job_row(p, f"fit {fit}", "new" if new else "", "ready" if _ready(store, jid) else "") for new, fit, _, jid, p in top]
+    rows = [_job_row(p, f"fit {fit}" if fit else "", "new" if new else "", "ready" if _ready(store, jid) else "") for new, fit, _, jid, p in top]
     return Section("apply", "Apply to these", rows, "", [jid for _, _, _, jid, _ in top], len(cands), len(cands) - len(top))
 
 
