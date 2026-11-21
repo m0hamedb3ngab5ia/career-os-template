@@ -106,11 +106,14 @@ def _alert_ref(url: str) -> tuple[str, str] | None:
     if host.endswith("indeed.com"):
         jk = parse_qs(u.query).get("jk") or parse_qs(u.query).get("vjk")
         return ("indeed", jk[0]) if jk else None
+    if host.endswith("joinhandshake.com"):
+        m = re.search(r"/(?:jobs|job-search)/(\d+)", u.path)
+        return ("handshake", m[1]) if m else None
     return None
 
 
 def add_alerts(settings: Settings, items: list[dict[str, Any]]) -> list[dict[str, Any]]:
-    """Import [{title, company, url}] taken from LinkedIn/Indeed alert emails. Nothing is fetched."""
+    """Import [{title, company, url}] taken from LinkedIn/Indeed/Handshake alert emails. Nothing is fetched."""
     out: list[dict[str, Any]] = []
     for it in items:
         title, company, url = (str(it.get(k) or "").strip() for k in ("title", "company", "url"))
@@ -120,8 +123,11 @@ def add_alerts(settings: Settings, items: list[dict[str, Any]]) -> list[dict[str
         ref = _alert_ref(url)
         if ref:
             ats, ref_id = ref
-            clean = (f"https://www.linkedin.com/jobs/view/{ref_id}" if ats == "linkedin"
-                     else f"https://www.indeed.com/viewjob?jk={ref_id}")
+            from careeros.scout.handshake import JOB_URL
+
+            clean = {"linkedin": f"https://www.linkedin.com/jobs/view/{ref_id}",
+                     "indeed": f"https://www.indeed.com/viewjob?jk={ref_id}",
+                     "handshake": JOB_URL.format(id=ref_id)}[ats]
         else:
             ats, ref_id, clean = "manual", None, url
         p = Posting(company=company, title=title, url=clean, apply_url=clean, ats=ats, ats_job_id=ref_id,
