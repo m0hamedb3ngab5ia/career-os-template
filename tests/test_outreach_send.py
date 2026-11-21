@@ -258,7 +258,10 @@ class SentBox:
     def login(self, u, p): pass
     def select(self, box, readonly=False): self.log.append(box); return ("OK", [b"1"])
     def search(self, _c, *crit): self.log.append(crit); return ("OK", [b"4 9" if self.found else b""])
-    def fetch(self, n, what): self.log.append(n); return ("OK", [(b"9 (BODY[HEADER.FIELDS (MESSAGE-ID)] {30}", b"Message-ID: <old@mail.gmail.com>\r\n\r\n"), b")"])
+    def fetch(self, n, what):
+        self.log.append(n)
+        subj = b"Hi Sam" if n == b"9" else b"=?utf-8?q?Other_=E2=80=94_r=C3=A9sum=C3=A9?="
+        return ("OK", [(b"x {30}", b"Message-ID: <old@mail.gmail.com>\r\nSubject: " + subj + b"\r\n\r\n"), b")"])
     def logout(self): pass
 
 
@@ -266,7 +269,7 @@ def test_followup_looks_up_message_id_over_imap_for_older_sends():
     d, sent, box = dict(SENT), [], SentBox()
     o.send_followup("me@x.com", "pw", d, "7d", yes=True, smtp=lambda f, p, m: sent.append(m), today=date(2026, 11, 17),
                     now=TUE_10AM, imap=box)
-    assert "[Gmail]/Sent Mail" in box.log[1] and ("TO", '"sam@x.com"', "SUBJECT", '"Hi Sam"') in box.log
+    assert "[Gmail]/Sent Mail" in box.log[1] and ("TO", '"sam@x.com"') in box.log
     assert sent[0]["In-Reply-To"] == "<old@mail.gmail.com>" and d["message_id"] == "<old@mail.gmail.com>"
 
 
@@ -301,3 +304,9 @@ def test_cli_followup_dry_run_yes_and_record(settings, monkeypatch, capsys):
     assert len(sent) == 1 and json.loads((jd / "outreach.json").read_text())["drafts"][0]["followup_7d_sent_at"]
     assert cli.cmd_outreach_send(argparse.Namespace(**ns, yes=True, dry_run=False)) == 1 and len(sent) == 1
     assert "already sent" in capsys.readouterr().err
+
+
+def test_followup_lookup_matches_non_ascii_subject():
+    box = SentBox()
+    d = {**SENT, "email": {**SENT["email"], "subject": "Other — résumé"}}
+    assert o.find_message_id("me@x.com", "pw", d, imap=box) == "<old@mail.gmail.com>"

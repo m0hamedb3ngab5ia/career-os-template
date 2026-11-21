@@ -250,8 +250,8 @@ def check_outreach_policy(ck: Any) -> None:
             continue
         if pc["outreach"] > 1:
             flag("outreach_cold_limit", pc["who"], f"cold contact has {pc['outreach']} outreach drafts (max 1)")
-        if pc["followups"] > 1:
-            flag("outreach_cold_limit", pc["who"], f"cold contact has {pc['followups']} follow-ups (max 1)")
+        if pc["followups"] > 2:  # 7d + 14d (draft-outreach: never a third email)
+            flag("outreach_cold_limit", pc["who"], f"cold contact has {pc['followups']} follow-ups (max 2)")
 
     extras["manual_contacts"] = manual_names
     _report(ck, "outreach_manual_contacts", issues["outreach_manual_contacts"],

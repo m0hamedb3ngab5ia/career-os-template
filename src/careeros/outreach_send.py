@@ -5,6 +5,7 @@ The app password is the one `careeros notify setup` stored in the Keychain; noth
 from __future__ import annotations
 
 import email
+import email.policy
 import html
 import imaplib
 import re
@@ -155,19 +156,21 @@ def window_hint(now: datetime | None = None) -> str | None:
 
 
 def find_message_id(frm: str, password: str, d: dict[str, Any], *, imap: Callable[[str], Any] = imaplib.IMAP4_SSL) -> str | None:
-    """Message-ID of the original email in the candidate's Sent Mail (To + Subject), for drafts sent before the id was stored."""
-    subj = str((d.get("email") or {}).get("subject") or "").replace("\\", "\\\\").replace('"', '\\"')
+    """Message-ID of the original email in the candidate's Sent Mail, for drafts sent before the id was stored. Searches
+    by To (ASCII) and matches the decoded Subject here, so subjects with accents or dashes work."""
+    want = str((d.get("email") or {}).get("subject") or "").strip().lower()
     box = imap("imap.gmail.com")
     box.login(frm, password)
     try:
         box.select('"[Gmail]/Sent Mail"', readonly=True)
-        typ, ids = box.search(None, "TO", f'"{d["to"]}"', "SUBJECT", f'"{subj}"')
-        nums = ids[0].split() if typ == "OK" and ids and ids[0] else []
-        if not nums:
-            return None
-        typ, got = box.fetch(nums[-1], "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID)])")
-        raw = got[0][1] if typ == "OK" and got and isinstance(got[0], tuple) else b""
-        return email.message_from_bytes(raw)["Message-ID"] or None
+        typ, ids = box.search(None, "TO", f'"{d["to"]}"')
+        for num in reversed(ids[0].split() if typ == "OK" and ids and ids[0] else []):
+            typ, got = box.fetch(num, "(BODY.PEEK[HEADER.FIELDS (MESSAGE-ID SUBJECT)])")
+            raw = got[0][1] if typ == "OK" and got and isinstance(got[0], tuple) else b""
+            h = email.message_from_bytes(raw, policy=email.policy.default)
+            if str(h["Subject"] or "").strip().lower() == want and h["Message-ID"]:
+                return str(h["Message-ID"]).strip()
+        return None
     finally:
         box.logout()
 
