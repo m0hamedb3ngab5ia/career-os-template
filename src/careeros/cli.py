@@ -1861,8 +1861,11 @@ def cmd_notify(args: argparse.Namespace) -> int:
             return 0
         c = notify.config(s)
         if args.notify_cmd == "digest":
-            body = notify.build_digest(s)
-            print(body if body else "nothing to send: every section is empty")
+            secs = notify.build_sections(s)
+            print(notify.subject_for(secs) + "\n\n" + notify.render_text(secs) if secs else "nothing to send: every section is empty")
+            if secs and args.html:
+                Path(args.html).write_text(notify.render_html(secs), encoding="utf-8")
+                print(f"\nHTML preview: {args.html}")
             return 0
         if not c["email"]:
             print("notify: set notify.email in config/pipeline.yaml first", file=sys.stderr)
@@ -2958,6 +2961,7 @@ def build_parser() -> argparse.ArgumentParser:
     nts.add_parser("test", help="send a one-line test email to yourself")
     ndg = nts.add_parser("digest", help="print today's digest body (--dry-run); sending is done by `careeros tick`")
     ndg.add_argument("--dry-run", action="store_true")
+    ndg.add_argument("--html", metavar="FILE", help="also write the HTML email to FILE (open it in a browser)")
     nt.set_defaults(fn=cmd_notify)
 
     out = sub.add_parser("outreach", help="LinkedIn relationship gate: connected / mutuals -> tailor by hand")

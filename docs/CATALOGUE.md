@@ -120,7 +120,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 
 | Feature | What it does | How to use | REQ |
 |---|---|---|---|
-| Email digest | Daily or weekly summary emailed to yourself. | `careeros notify setup`, `careeros notify test`, `careeros notify digest` | REQ-155 |
+| Email digest | Brief HTML email to yourself every N days (daily, weekly or `every_days`): follow-ups, deadlines, new jobs to apply to, items that need you. | `careeros notify setup`, `careeros notify test`, `careeros notify digest` | REQ-155 |
 | Urgent emails | One email for a fresh, high-fit job at a watched company. | `notify.urgent` in `config/pipeline.yaml` | REQ-159 |
 | Hiring seasons | Raises the weekly volume target in busy windows. | `volume.season_multiplier` in `config/targets.yaml` | REQ-160 |
 | Today in chat | The dashboard in at most 25 lines, read-only. | `/today` | |

@@ -83,9 +83,10 @@ class FakeSender:
     def __init__(self, fail=False):
         self.sent, self.fail = [], fail
 
-    def __call__(self, cfg, subject, body, password):
+    def __call__(self, cfg, subject, body, password, html=None):
         if self.fail:
             raise OSError("smtp down")
+        self.html = html
         self.sent.append((cfg["email"], subject, body, password))
 
 
@@ -217,3 +218,135 @@ def test_urgent_failure_is_retried_and_digest_state_survives(env):
     at = datetime(2026, 11, 16, 9, 0)
     assert notify.maybe_send_digest(s, at, sender=FakeSender(), keychain=kc) == "sent"
     assert notify.send_urgent(s, "k", "s", "b", sender=FakeSender(), keychain=kc) == "already_sent"
+
+
+def _scored_job(settings, tr, n, fit, status="queued", closes=None, qa=None, found="2026-11-15"):
+    p = Posting(company=f"Co{n}", title=f"Role {n}", ats="greenhouse", ats_job_id=f"s{n}", description_text="x",
+                url=f"https://example.com/s{n}", closes_at=closes)
+    st = Store(settings)
+    st.save_posting(p)
+    tr.upsert_jobs([{"job_id": p.job_id, "company": p.company, "title": p.title, "status": status, "fit": fit,
+                     "date_found": found}])
+    if qa is not None:  # what qa-review writes
+        (st.job_dir(p.job_id) / "qa.json").write_text(json.dumps({"pass": qa, "fail_reasons": []}))
+    return p
+
+
+def test_apply_section_best_fit_first_capped_ready_marker_and_excludes(env):
+    s, tr = env
+    s.pipeline["notify"]["apply_max"] = 2
+    _scored_job(s, tr, 1, 70)
+    _scored_job(s, tr, 2, 90, qa=True)
+    _scored_job(s, tr, 3, 80, status="prepared")
+    _scored_job(s, tr, 4, 99, status="applied")
+    _scored_job(s, tr, 5, 99, status="skipped")
+    _scored_job(s, tr, 6, 99, closes="2026-11-01")          # posting already closed
+    body = notify.build_digest(s, TODAY)
+    assert "Apply to these" in body and "showing 2 of 3" in body
+    assert body.index("Role 2") < body.index("Role 3") and "Role 1" not in body
+    assert "https://example.com/s2" in body and "ready" in body.split("Role 3")[0]
+    assert "Role 4" not in body and "Role 5" not in body and "Role 6" not in body
+
+
+def test_apply_section_keeps_reminding_and_lists_new_jobs_first(env):
+    s, tr = env
+    _scored_job(s, tr, 1, 90)
+    at = datetime(2026, 11, 16, 9, 0)
+    assert notify.maybe_send_digest(s, at, sender=FakeSender(), keychain=lambda e: "pw") == "sent"
+    _scored_job(s, tr, 2, 60)
+    body = notify.build_digest(s, date(2026, 11, 17))
+    assert body.index("Role 2") < body.index("Role 1")             # new first, though lower fit
+    assert "new - fit 60" in body and "(fit 90)" in body            # not applied yet: still listed, no longer new
+
+
+def test_ready_marker_reads_qa_review_pass_flag(env):
+    s, tr = env
+    _scored_job(s, tr, 1, 90, qa=False)
+    assert "ready" not in notify.build_digest(s, TODAY)
+
+
+def test_deadlines_section_soonest_first_and_window(env):
+    s, tr = env
+    s.pipeline["notify"]["deadline_days"] = 7
+    _scored_job(s, tr, 1, 70, closes="2026-11-22")
+    _scored_job(s, tr, 2, 70, closes="2026-11-19")
+    _scored_job(s, tr, 3, 70, closes="2026-12-30")          # outside the window
+    _scored_job(s, tr, 4, 70, status="applied", closes="2026-11-18")
+    tr.add_action_item("Send transcript", type="other", priority="M", due="2026-11-20", due_reason="portal closes")
+    body = notify.build_digest(s, TODAY)
+    sec = body.split("Deadlines")[1].split("\n\n")[0]
+    assert sec.index("Role 2") < sec.index("Send transcript") < sec.index("Role 1")
+    assert "Role 3" not in sec and "Role 4" not in sec and "in 3 days" in sec
+
+
+def test_sections_ordered_follow_up_deadlines_apply_needs_you(env):
+    s, tr = env
+    p = _job(s, tr, 1, applied="2026-11-02")
+    tr.add_action_item("Reply to recruiter", type="follow_up", job_id=p.job_id, priority="M", detail="applied")
+    _scored_job(s, tr, 2, 80, closes="2026-11-18")
+    tr.add_action_item("Upload transcript", type="other", priority="H")
+    body = notify.build_digest(s, TODAY)
+    heads = [h for h in ("Follow up", "Deadlines", "Apply to these", "Needs you") if h in body]
+    assert heads == sorted(heads, key=body.index) and len(heads) == 4
+
+
+def test_every_days_cadence(env):
+    s, tr = env
+    s.pipeline["notify"]["every_days"] = 3
+    _scored_job(s, tr, 1, 80)
+    snd, kc = FakeSender(), lambda e: "pw"
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 16, 9), sender=snd, keychain=kc) == "sent"
+    _scored_job(s, tr, 2, 80)
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 18, 9), sender=snd, keychain=kc) == "not_today"
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 19, 7), sender=snd, keychain=kc) == "too_early"
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 19, 9), sender=snd, keychain=kc) == "sent"
+    s.pipeline["notify"]["digest"] = "off"
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 25, 9), sender=snd, keychain=kc) == "disabled"
+
+
+def test_html_part_subject_and_escaping(env):
+    s, tr = env
+    _scored_job(s, tr, 1, 85, qa=True)
+    p = _scored_job(s, tr, 2, 80)
+    tr.upsert_jobs([{"job_id": p.job_id, "title": "R&D <b>Lead</b>"}])
+    Store(s).save_posting(p.model_copy(update={"title": "R&D <b>Lead</b>"}))
+    tr.add_action_item("Upload transcript", type="other", priority="H")
+    snd = FakeSender()
+    assert notify.maybe_send_digest(s, datetime(2026, 11, 16, 9), sender=snd, keychain=lambda e: "pw") == "sent"
+    subject = snd.sent[0][1]
+    assert subject.startswith("career-os: ") and "2 jobs to apply to" in subject and "1 needs you" in subject
+    h = snd.html
+    assert "<table" in h and 'href="https://example.com/s1"' in h and "R&amp;D &lt;b&gt;" in h and "<b>Lead" not in h
+    assert "max-width:600px" in h and "prefers-color-scheme: dark" in h and "http://" not in h.replace("https://", "")
+    assert "<img" not in h and "<link" not in h
+
+
+def test_smtp_send_is_multipart_alternative(env, monkeypatch):
+    s, _ = env
+    got = {}
+
+    class SM:
+        def __init__(self, *a, **k): pass
+        def __enter__(self): return self
+        def __exit__(self, *a): pass
+        def starttls(self): pass
+        def login(self, *a): pass
+        def send_message(self, m): got["m"] = m
+
+    monkeypatch.setattr(notify.smtplib, "SMTP", SM)
+    notify.smtp_send(notify.config(s), "subj", "plain body", "pw", html="<p>hi</p>")
+    m = got["m"]
+    assert m.get_content_type() == "multipart/alternative"
+    assert m.get_body(("plain",)).get_content().strip() == "plain body"
+    assert "<p>hi</p>" in m.get_body(("html",)).get_content()
+
+
+def test_cli_digest_html_file(env, monkeypatch, tmp_path):
+    from careeros.cli import main
+
+    s, tr = env
+    _scored_job(s, tr, 1, 85)
+    monkeypatch.setattr("careeros.cli._settings", lambda a: s)
+    out = tmp_path / "d.html"
+    assert main(["notify", "digest", "--dry-run", "--html", str(out)]) == 0
+    assert "Role 1" in out.read_text()
