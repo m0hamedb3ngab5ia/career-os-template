@@ -110,13 +110,13 @@ minus threads already matched to a job. For each real inbound outreach (a person
 newsletter): `careeros action add "Recruiter outreach: <name> at <company> re <role/subject> — <link>" --type review --priority M --company "<company>"`.
 Optionally print a suggested `data/jobs/` seed if the role is on a supported ATS (do not create the dir).
 
-## 5b. Job-alert emails (LinkedIn, Indeed)
+## 5b. Job-alert emails (LinkedIn, Indeed, Handshake)
 
-Search `from:(jobalerts-noreply@linkedin.com OR jobs-noreply@linkedin.com OR alert@indeed.com OR noreply@indeed.com) newer_than:<n>d`
+Search `from:(jobalerts-noreply@linkedin.com OR jobs-noreply@linkedin.com OR alert@indeed.com OR noreply@indeed.com OR joinhandshake.com) newer_than:<n>d`
 (same `inbox_seen.json` rule). From each alert read the listed jobs as `{"title", "company", "url"}` (the link
 in the email; copy the three fields as written, skip a job missing any). Write the list to a scratch file and run
-`careeros job add --from-alert <file>`: it stores new ones as `found` and reports `exists` for repeats. Never open
-or fetch the LinkedIn/Indeed link and never click anything in the email; the posting text is added later by the user
+`careeros job add --from-alert <file>`: it stores new ones as `found` and reports `exists` for repeats. Handshake mail also carries messages and event invites: take only emails that list jobs. Never open
+or fetch the LinkedIn/Indeed/Handshake link and never click anything in the email; the posting text is added later by the user
 or in the apply browser. Imported alert jobs have no text, so they cannot be scored yet: add one Action Item per added job (`careeros action add "Paste the posting text for <title> at <company>, then run: careeros job describe <job_id> --text-file -" --type review --job <job_id> --needs laptop`). When the user pastes the text, run `careeros job describe <job_id> --text-file -` with it on stdin; that clears the needs-description mark. Count `alerts_added` in RESULT.
 
 ## 6. RESULT

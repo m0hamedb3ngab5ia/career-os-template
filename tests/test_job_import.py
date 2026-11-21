@@ -120,3 +120,12 @@ def test_cli_add(cli, settings, monkeypatch, capsys, tmp_path):
     assert "added" in capsys.readouterr().out
     assert cli(["job", "add", "https://app.joinhandshake.com/jobs/9"]) == 1
     assert "signed-in browser" in capsys.readouterr().err
+
+
+def test_handshake_alert_maps_to_scout_job_url(settings):
+    from careeros.scout.handshake import JOB_URL
+
+    r = ji.add_alerts(settings, [{"title": "Software Engineer", "company": "Acme",
+                                  "url": "https://app.joinhandshake.com/stu/jobs/9876543?ref=email"}])[0]
+    p = Store(settings).load_posting(r["job_id"])
+    assert (p.ats, p.ats_job_id, p.url) == ("handshake", "9876543", JOB_URL.format(id="9876543"))

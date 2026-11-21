@@ -912,6 +912,7 @@ requirements:
     status: implemented
     provenance: confirmed
     tests:
+    - test_handshake_alert_maps_to_scout_job_url
     - test_add_ats_job_stores_posting_and_dedups
     - test_manual_page_becomes_ats_manual
     - test_handshake_needs_browser
