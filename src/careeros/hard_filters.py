@@ -137,8 +137,9 @@ def preferred_offices(settings: Settings, location: str) -> tuple[list[str], int
     segs = [x.strip() for x in re.split(r"[;|\n\u2022/&]| or ", location or "") if x.strip() and not _COUNTRY.fullmatch(x)]
     places: list[str] = []
     for seg in segs:   # "San Francisco, Seattle, New York, NY" -> one place per city; a bare state code joins its city
-        for i, y in enumerate(y.strip() for y in seg.split(",")):
-            if i and y.upper() in _STATES and len(y) == 2:
+        start = len(places)
+        for y in (y.strip() for y in seg.split(",")):
+            if len(places) > start and y.upper() in _STATES and len(y) == 2:
                 places[-1] += f", {y}"
             elif y:
                 places.append(y)

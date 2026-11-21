@@ -303,6 +303,14 @@ _NEEDS = {"scam_suspected": ("scam warning", "scam warnings", "!"),
           "injection_suspected": ("posting with hidden text to check", "postings with hidden text to check", "!"),
           "question": ("form question to answer", "form questions to answer", "?"),
           "ghost_job": ("possible ghost job", "possible ghost jobs", "~"),
+          "captcha": ("CAPTCHA to solve", "CAPTCHAs to solve", "!"),
+          "bot_detection": ("form blocked by bot checks", "forms blocked by bot checks", "!"),
+          "laptop_required": ("step that needs your laptop", "steps that need your laptop", "\u2022"),
+          "salary": ("salary question", "salary questions", "$"),
+          "profile_gap": ("profile gap to fill", "profile gaps to fill", "?"),
+          "referral": ("referral to ask for", "referrals to ask for", "@"),
+          "send_email": ("email to send", "emails to send", "@"),
+          "send_linkedin": ("LinkedIn message to send", "LinkedIn messages to send", "@"),
           "other": ("other task", "other tasks", "\u2022")}
 
 
@@ -312,17 +320,30 @@ _ACT = {"scam_suspected": "Check each one, then skip the job or dismiss the warn
         "injection_suspected": "Read the flagged text, then skip the job or clear the flag.",
         "question": "Ask Claude in chat: \"answer my form questions\"; it drafts them for your approval.",
         "ghost_job": "Check if the posting is still live, then skip it or apply.",
+        "captcha": "Open the form in your browser, solve the CAPTCHA, then ask Claude in chat: \"resume the application\".",
+        "bot_detection": "Submit this one by hand in your browser, then mark it done in Today.",
+        "laptop_required": "On your laptop, do the step named, then mark it done in Today.",
+        "salary": "Give your answer once; ask Claude in chat: \"save my salary answer\" so it is reused.",
+        "profile_gap": "Ask Claude in chat: \"fill my profile gaps\"; it asks you only for the facts.",
+        "referral": "Ask Claude in chat: \"draft the referral asks\"; you send them.",
+        "send_email": "Ask Claude in chat: \"show the emails to send\"; each needs your yes.",
+        "send_linkedin": "Open the drafted message and send it yourself on LinkedIn (never automated).",
         "other": "Do each task, then mark it done in Today."}
 
 
-def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, url: str = "") -> list[Row]:
+def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, url: str = "",
+                today: date | None = None) -> list[Row]:
     by: dict[str, list[dict[str, Any]]] = {}
     for i in items:
         if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST:
             by.setdefault(str(i.get("Type") or "other"), []).append(i)
     order = list(_NEEDS)
     rows = []
-    for ty in sorted(by, key=lambda k: (order.index(k) if k in order else len(order), -len(by[k]))):
+    def urgency(k: str) -> tuple[bool, int]:   # most urgent item of the group: overdue first, then H/M/L
+        overdue = any(today and _day(i.get("Due")) and _day(i.get("Due")) < today for i in by[k])
+        return (not overdue, min({"H": 0, "M": 1}.get(str(i.get("Priority") or ""), 2) for i in by[k]))
+
+    for ty in sorted(by, key=lambda k: (*urgency(k), order.index(k) if k in order else len(order), -len(by[k]))):
         its, n = by[ty], len(by[ty])
         one, many, icon = _NEEDS.get(ty) or (f"{ty.replace('_', ' ')} item", f"{ty.replace('_', ' ')} items", "\u2022")
         if n == 1:
@@ -365,7 +386,7 @@ def build_sections(s: Settings, today: date | None = None) -> list[Section]:
         reach.append((n, _job_row(p, note=note) if p else Row(_short(it.get("What to do") or ""), note=note, icon="@")))
     reach.sort(key=lambda x: -x[0])
     url = today_url(s)
-    need_rows = _needs_rows(items, jobs, store, url)
+    need_rows = _needs_rows(items, jobs, store, url, today)
     need_total = sum(1 for i in items if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST)
     reach_first = [Row(_short(i.get("What to do") or ""), icon="!") for i in items if _kind(i) == REACH_FIRST]
     needs = _cap(Section("needs", "Needs you", need_rows,

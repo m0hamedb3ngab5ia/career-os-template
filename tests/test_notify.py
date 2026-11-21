@@ -421,9 +421,9 @@ def test_needs_you_groups_by_type_with_counts_most_urgent_first(env):
     _needs(tr, "scam_suspected", 2)
     _needs(tr, "ghost_job", 4)
     _needs(tr, "other", 2)
-    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "needs"]
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "needs"]   # priority M beats L, then type order
     assert [r.title for r in sec.rows] == [
-        "2 scam warnings", "5 applications ready for your review: Co1, Co2, Co3 +2", "3 QA failures to decide",
+        "5 applications ready for your review: Co1, Co2, Co3 +2", "2 scam warnings", "3 QA failures to decide",
         "18 postings with hidden text to check", "7 form questions to answer"] and sec.more == 2
     assert sec.count == 2 + 5 + 3 + 18 + 7 + 4 + 2 and len(sec.rows) <= 6
 
@@ -574,3 +574,15 @@ def test_city_list_without_states_shows_the_preferred_city(env):
     p = _job(s, tr, 1, applied="2026-11-10")
     p.location = "San Francisco, Seattle, New York"
     assert notify._place(p, s) == "New York, NY · +2 other offices"
+
+
+def test_needs_you_urgent_types_first_and_every_type_has_its_own_action(env):
+    from careeros.models import ACTION_TYPES
+    s, tr = env
+    for k in range(3):
+        tr.add_action_item(f"Answer q{k}", type="question", priority="L")
+    tr.add_action_item("Solve captcha", type="captcha", priority="H", due="2026-11-15")
+    (sec,) = [x for x in notify.build_sections(s, TODAY) if x.key == "needs"]
+    assert sec.rows[0].title == "Solve captcha"                       # overdue + high beats type order
+    generic = notify._ACT["other"]
+    assert all(notify._ACT.get(t, generic) != generic for t in ACTION_TYPES if t not in ("other", "follow_up"))
