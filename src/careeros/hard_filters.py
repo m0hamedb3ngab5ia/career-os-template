@@ -71,7 +71,7 @@ _STATES = {
     "NE": "nebraska", "NV": "nevada", "NH": "new hampshire", "NJ": "new jersey", "NM": "new mexico",
     "NY": "new york", "NC": "north carolina", "ND": "north dakota", "OH": "ohio", "OK": "oklahoma",
     "OR": "oregon", "PA": "pennsylvania", "RI": "rhode island", "SC": "south carolina", "SD": "south dakota",
-    "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont", "VA": "virginia", "WV": "west virginia",
+    "TN": "tennessee", "TX": "texas", "UT": "utah", "VT": "vermont", "VA": "virginia", "WA": "", "WV": "west virginia",
     "WI": "wisconsin", "WY": "wyoming"}  # no "washington" name: state or D.C.? "Seattle, WA" still parses by code
 # `location.preferred_regions` entries that name US states. "US" itself = every state; any other entry
 # (ISO country code, unknown name) makes the check undecidable.
@@ -89,13 +89,13 @@ def _states_in(text: str) -> set[str]:
     """Every US state named in `text` by 2-letter code or full name."""
     found = {c for c in _STATE_CODE.findall(text) if c in _STATES}
     low = text.lower()
-    return found | {c for c, n in _STATES.items() if re.search(rf"(?<![a-z]){n}(?![a-z])", low)}
+    return found | {c for c, n in _STATES.items() if n and re.search(rf"(?<![a-z]){n}(?![a-z])", low)}
 
 
 _COUNTRY = re.compile(r"\s*(united states( of america)?|usa|u\.s\.a?\.?|us)\s*", re.I)
 
 
-_NAME_TO_CODE = {n: c for c, n in _STATES.items()}
+_NAME_TO_CODE = {n: c for c, n in _STATES.items() if n}
 
 
 def _strict_states(segment: str) -> set[str]:
@@ -121,6 +121,41 @@ def posting_states(posting: dict[str, Any]) -> list[str]:
              if x.strip() and not _COUNTRY.fullmatch(x)]
     sets = [_strict_states(x) for x in parts]
     return sorted(set().union(*sets)) if parts and all(sets) else []
+
+
+def preferred_offices(settings: Settings, location: str) -> tuple[list[str], int]:
+    """(the candidate's preferred places named in `location`, how many other offices it lists). A place is preferred
+    when it names a `location.preferred` city with its state, or a state inside a named `preferred_regions` region
+    ("US" alone prefers nothing in particular). Uses the same state parsing as `location_nonpreferred`."""
+    loc = settings.targets.get("location") or {}
+    cities = []
+    for entry in loc.get("preferred") or []:
+        name, _, st = str(entry).strip().rpartition(" ")
+        if name and st.upper() in _STATES:
+            cities.append((name.lower(), st.upper(), f"{name}, {st.upper()}"))
+    region = {st for r in loc.get("preferred_regions") or [] for st in REGION_STATES.get(str(r).strip().lower(), [])}
+    segs = [x.strip() for x in re.split(r"[;|\n\u2022/&]| or ", location or "") if x.strip() and not _COUNTRY.fullmatch(x)]
+    places: list[str] = []
+    for seg in segs:   # "San Francisco, Seattle, New York, NY" -> one place per city; a bare state code joins its city
+        start = len(places)
+        for y in (y.strip() for y in seg.split(",")):
+            if len(places) > start and y.upper() in _STATES and len(y) == 2:
+                places[-1] += f", {y}"
+            elif y:
+                places.append(y)
+    segs = places
+    hits: list[str] = []
+    hit_segs = 0
+    for seg in segs:
+        states, low, got = _states_in(seg), seg.lower(), []
+        for name, st, shown in cities:
+            if (st in states or not states) and re.search(rf"(?<![a-z]){re.escape(name)}(?![a-z])", low):
+                got.append(shown)
+        if not got and region & states:
+            got.append(", ".join(seg.split(", ")[:2]))
+        hits += [g for g in got if g not in hits]
+        hit_segs += bool(got)
+    return hits, len(segs) - hit_segs
 
 
 def location_nonpreferred(settings: Settings, posting: dict[str, Any]) -> bool:

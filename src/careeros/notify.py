@@ -3,8 +3,11 @@ lives only in the macOS Keychain (service `careeros-smtp`, account = the address
 written to a file, log or argv we control. Sender and keychain are injectable so tests touch neither."""
 from __future__ import annotations
 
+import colorsys
+import hashlib
 import html as _html
 import json
+import re
 import smtplib
 import subprocess
 from dataclasses import dataclass, field
@@ -13,7 +16,8 @@ from email.message import EmailMessage
 from typing import Any, Callable
 
 from careeros.config import Settings
-from careeros.follow_ups import APPLIED, OUTREACH, REACH, TYPE as FOLLOW
+from careeros.follow_ups import APPLIED, OUTREACH, OUTREACH14, REACH, TYPE as FOLLOW, _outreach_wait
+from careeros.high_odds import REACH_FIRST, WHY
 from careeros.runs.store import RunStore
 from careeros.store import Store
 from careeros.tracker import Tracker
@@ -34,6 +38,7 @@ def config(s: Settings) -> dict[str, Any]:
             "urgent": bool(c.get("urgent", True)),
             "every_days": max(0, int(c.get("every_days") or 0)),
             "apply_max": max(1, int(c.get("apply_max") or 10)),
+            "section_max": max(1, int(c.get("section_max") or 5)),
             "deadline_days": max(0, int(c.get("deadline_days") if c.get("deadline_days") is not None else 7))}
 
 
@@ -84,8 +89,8 @@ def _waiting_since(it: dict[str, Any], jobs: dict[str, dict[str, Any]], store: S
     from careeros.follow_ups import _outreach_wait
 
     jid, kind = str(it.get("JobID") or ""), _kind(it)
-    if kind == REACH:
-        return _day(it.get("Due")) or _day(it.get("Created"))
+    if kind == REACH:   # the item is due the day it is raised, so count from the application, not the item
+        return _day((jobs.get(jid) or {}).get("DateApplied")) or _day(it.get("Due")) or _day(it.get("Created"))
     if kind == OUTREACH:
         return _outreach_wait(store, jid)
     if kind == APPLIED:
@@ -96,10 +101,13 @@ def _waiting_since(it: dict[str, Any], jobs: dict[str, dict[str, Any]], store: S
 @dataclass
 class Row:
     title: str
-    sub: str = ""        # company, or the action's second half
+    company: str = ""    # set = a job row (badge with initials, "Company · Location" line)
+    location: str = ""
     url: str = ""
-    note: str = ""       # "fit 87 - ready", "3 days", "in 2 days"
-    ready: bool = False
+    note: str = ""       # status line: "Emailed Tom · 2 days, no reply"
+    chips: list[str] = field(default_factory=list)   # small grey pills: "fit 87", "ready", "closes in 3 days"
+    icon: str = ""       # badge symbol for a non-job row
+    action: str = ""     # what to do next and where: "Ask Claude in chat: ..." / a command
 
 
 @dataclass
@@ -109,14 +117,68 @@ class Section:
     rows: list[Row] = field(default_factory=list)
     note: str = ""
     ids: list[str] = field(default_factory=list)   # job ids listed (apply section): remembered so they are not repeated
+    count: int = -1      # headline count (all of them, before the row cap); -1 = len(rows)
+    more: int = 0        # rows hidden by `notify.section_max`
 
 
 _PRE_APPLY = ("found", "scored", "queued", "prepared", "needs_review")
 _APPLY = ("queued", "prepared")
 
 
-def _job_row(p: Any, note: str = "", ready: bool = False) -> Row:
-    return Row(p.title, p.company, p.url, note, ready)
+def _others(n: int) -> str:
+    return f" \u00b7 +{n} other office" + ("" if n == 1 else "s") if n > 0 else ""
+
+
+def _place(p: Any, s: Settings | None = None) -> str:
+    """The office that matters to the candidate (`location.preferred` / `preferred_regions`, same parsing as the
+    hard filters) plus "+N other offices"; no match: the first one."""
+    from careeros.hard_filters import preferred_offices
+
+    loc = (p.location or "").strip()
+    hits, others = preferred_offices(s, loc) if s is not None and loc else ([], 0)
+    if hits:
+        loc = ", ".join(hits[:2]) + _others(others + max(0, len(hits) - 2))
+    elif len(loc) > 40:   # multi-office strings: first place only
+        loc = ", ".join(re.split(r"\s*[;|]\s*", loc)[0].split(", ")[:2]) + " and more"
+    else:
+        segs = [x.strip() for x in re.split(r"[;|]", loc) if x.strip()]
+        loc = segs[0] + _others(len(segs) - 1) if segs else loc
+    remote_ok = (s.targets.get("location") or {}).get("remote_ok", True) if s is not None else True
+    if p.remote and remote_ok and "remote" not in loc.lower():
+        return f"{loc} (remote)" if loc else "Remote"
+    return loc
+
+
+def _job_row(p: Any, *chips: str, note: str = "", s: Settings | None = None, action: str = "") -> Row:
+    return Row(p.title, p.company, _place(p, s), p.url, note, [c for c in chips if c], action=action)
+
+
+def _d(d: date) -> str:
+    return f"{d.day} {d:%b}"
+
+
+def _ago(n: int) -> str:
+    return "today" if n <= 0 else f"{_days(n)} ago"
+
+
+def today_url(s: Settings) -> str:
+    from careeros.ui.config import load_ui_config
+
+    c = load_ui_config(s)
+    return f"http://{c.host}:{c.port}"
+
+
+def _cap(sec: Section, n: int) -> Section:
+    if sec.count < 0:
+        sec.count = len(sec.rows)
+    sec.more = max(0, len(sec.rows) - n)
+    sec.rows = sec.rows[:n]
+    return sec
+
+
+def _short(text: str, n: int = 90) -> str:
+    one = " ".join(str(text).split())
+    return one if len(one) <= n else one[:n - 1].rsplit(" ", 1)[0].rstrip(".,;:- ") + "\u2026"
 
 
 def _ready(store: Store, jid: str) -> bool:
@@ -139,7 +201,7 @@ def _in_days(n: int) -> str:
 
 def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any]], store: Store, today: date) -> Section:
     """Jobs from any source worth applying to (queued/prepared, still open) until you apply: ones not in an earlier
-    digest first ("new"), then best fit. `ids` = every job listed, so the next digest knows what is new."""
+    digest first, then best fit. `ids` = every job listed, so the next digest knows what is new."""
     shown = set(_state(s).get("apply_shown") or [])
     cands = []
     for jid, j in jobs.items():
@@ -147,85 +209,243 @@ def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any
         if p is None or (_day(p.closes_at) and _day(p.closes_at) < today):
             continue
         cands.append((jid not in shown, int(j.get("Fit") or 0), str(j.get("DateFound") or ""), jid, p))
-    cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # new first, then best fit, then newest
-    top = cands[:c["apply_max"]]
-    rows = [_job_row(p, f"{'new - ' if new else ''}fit {fit}", _ready(store, jid)) for new, fit, _, jid, p in top]
-    note = f"showing {len(top)} of {len(cands)}: new first, then best fit" if len(cands) > len(top) else ""
-    return Section("apply", "Apply to these", rows, note, [jid for _, _, _, jid, _ in top])
+    cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # not in an earlier email first, then best fit, then newest
+    top = cands[:min(c["apply_max"], c["section_max"])]
+    rows = [_job_row(p, f"fit {fit}" if fit else "", "ready" if _ready(store, jid) else "", s=s,
+                     note=_fresh(p.posted_at, found, today)) for _, fit, found, jid, p in top]
+    return Section("apply", "Apply to these", rows, "Not applied yet. Jobs you have not seen in an earlier email come first, then best fit.",
+                   [jid for _, _, _, jid, _ in top], len(cands), len(cands) - len(top))
 
 
-def _deadline_section(c: dict[str, Any], jobs: dict[str, dict[str, Any]], items: list[dict[str, Any]], store: Store,
+def _fresh(posted: Any, found: Any, today: date) -> str:
+    """"Posted 18 Nov (3 days ago) \u00b7 found today": when the job came out and when career-os first saw it."""
+    pd, fd = _day(posted), _day(found)
+    parts = []
+    if pd:
+        parts.append(f"Posted {_d(pd)} ({_ago((today - pd).days)})" if pd != today else "Posted today")
+    if fd:
+        n = (today - fd).days
+        if parts:
+            parts.append("found today" if n <= 0 else f"found {_d(fd)}")
+        else:
+            parts.append("Found today" if n <= 0 else f"Found {_d(fd)} ({_ago(n)})")
+    return " \u00b7 ".join(parts)
+
+
+def _deadline_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any]], items: list[dict[str, Any]], store: Store,
                       today: date) -> Section:
     found: list[tuple[date, Row]] = []
     for jid, j in jobs.items():
         p = store.load_posting(jid) if str(j.get("Status")) in _PRE_APPLY else None
         d = _day(p.closes_at) if p else None
         if p and d and 0 <= (d - today).days <= c["deadline_days"]:
-            found.append((d, _job_row(p, f"closes {_in_days((d - today).days)}")))
+            found.append((d, _job_row(p, f"closes {_in_days((d - today).days)}", s=s)))
     for it in items:
         d = _day(it.get("Due"))
         if d and it.get("Type") != FOLLOW and (d - today).days <= c["deadline_days"]:
             why = str(it.get("Due reason") or "")
-            found.append((d, Row(str(it.get("What to do") or ""), "", "", f"{why + ': ' if why else ''}{_in_days((d - today).days)}")))
-    return Section("deadlines", "Deadlines", [r for _, r in sorted(found, key=lambda x: x[0])])
+            found.append((d, Row(_short(it.get("What to do") or ""), chips=[f"{why + ': ' if why else ''}{_in_days((d - today).days)}"],
+                                 icon="!")))
+    return _cap(Section("deadlines", "Deadlines", [r for _, r in sorted(found, key=lambda x: x[0])]), c["section_max"])
+
+
+def _sent_drafts(store: Store, jid: str) -> list[dict[str, Any]]:
+    from careeros.follow_ups import _json
+
+    return [x for x in _json(store.job_dir(jid) / "outreach.json").get("drafts") or []
+            if isinstance(x, dict) and x.get("sent") is True and not x.get("replied")]
+
+
+def _follow_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, today: date,
+                 s: Settings | None = None) -> tuple[list[Row], set[str]]:
+    """One row per job: the applied nudge and the outreach nudge of a job merge. Outreach rows first, then
+    applied-only, longest wait first. Returns the rows and the job ids they cover."""
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for n, it in enumerate(i for i in items if i.get("Type") == FOLLOW and _kind(i) not in (REACH, REACH_FIRST)):
+        groups.setdefault(str(it.get("JobID") or f"~{n}"), []).append(it)
+    out: list[tuple[bool, int, Row]] = []
+    for jid, its in groups.items():
+        p = store.load_posting(jid) if not jid.startswith("~") else None
+        drafts = _sent_drafts(store, jid) if p else []
+        since_out = _outreach_wait(store, jid) if p and any(_kind(i) in (OUTREACH, OUTREACH14) for i in its) else None
+        since = since_out or _waiting_since(its[0], jobs, store)
+        n = max(0, (today - since).days) if since else 0
+        applied = _day((jobs.get(jid) or {}).get("DateApplied")) if p else None
+        parts = [f"Applied {_d(applied)}"] if applied else []
+        title = p.title if p else _short(its[0].get("What to do") or "")
+        if since_out:
+            names = list(dict.fromkeys(str(d["contact"]) for d in drafts if d.get("contact")))
+            who = ", ".join(names[:2]) + (f" +{len(names) - 2}" if len(names) > 2 else "") or "a contact"
+            verb = "emailed" if any(d.get("to") for d in drafts) else "messaged"
+            parts.append(f"{verb} {who} {_d(since_out)}")
+        parts.append(f"no reply ({_days(n)})" if since else "no reply yet")
+        note = " \u00b7 ".join(parts)
+        nxt = next(((d, k) for d in drafts for k in ("7d", "14d")
+                    if d.get(f"followup_{k}") and not d.get(f"followup_{k}_sent_at") and (k == "7d" or d.get("followup_7d_sent_at"))), None)
+        ready = nxt is not None
+        if nxt:
+            action = ""   # drafted: the section note says how to send, once
+        elif since_out:
+            action = f'No follow-up text yet. Ask Claude in chat: "draft follow-ups for {title}".'
+        else:
+            action = f'You have not emailed anyone yet. Ask Claude in chat: "draft outreach for {title}".'
+        chips = ["follow-up ready"] if ready else []
+        row = _job_row(p, *chips, note=note, s=s, action=action) if p else Row(title, note=note, chips=chips, icon="\u21bb", action=action)
+        out.append((bool(since_out), n, row))
+    out.sort(key=lambda x: (x[0], x[1]), reverse=True)
+    return [r for _, _, r in out], {j for j in groups if not j.startswith("~")}
+
+
+# Needs you: one row per Type, most urgent first. (singular/plural label, badge symbol)
+_NEEDS = {"scam_suspected": ("scam warning", "scam warnings", "!"),
+          "review": ("application ready for your review", "applications ready for your review", "\u2713"),
+          "qa_fail": ("QA failure to decide", "QA failures to decide", "\u00d7"),
+          "injection_suspected": ("posting with hidden text to check", "postings with hidden text to check", "!"),
+          "question": ("form question to answer", "form questions to answer", "?"),
+          "ghost_job": ("possible ghost job", "possible ghost jobs", "~"),
+          "captcha": ("CAPTCHA to solve", "CAPTCHAs to solve", "!"),
+          "bot_detection": ("form blocked by bot checks", "forms blocked by bot checks", "!"),
+          "laptop_required": ("step that needs your laptop", "steps that need your laptop", "\u2022"),
+          "salary": ("salary question", "salary questions", "$"),
+          "profile_gap": ("profile gap to fill", "profile gaps to fill", "?"),
+          "referral": ("referral to ask for", "referrals to ask for", "@"),
+          "send_email": ("email to send", "emails to send", "@"),
+          "send_linkedin": ("LinkedIn message to send", "LinkedIn messages to send", "@"),
+          "other": ("other task", "other tasks", "\u2022")}
+
+
+_ACT = {"scam_suspected": "Check each one, then skip the job or dismiss the warning.",
+        "review": "Open each, read the résumé and letter, then submit. Or ask Claude in chat: \"show me what is ready to review\".",
+        "qa_fail": "Decide per job: regenerate or skip. Or ask Claude in chat: \"fix the QA failures\".",
+        "injection_suspected": "Read the flagged text, then skip the job or clear the flag.",
+        "question": "Ask Claude in chat: \"answer my form questions\"; it drafts them for your approval.",
+        "ghost_job": "Check if the posting is still live, then skip it or apply.",
+        "captcha": "Open the form in your browser, solve the CAPTCHA, then ask Claude in chat: \"resume the application\".",
+        "bot_detection": "Submit this one by hand in your browser, then mark it done in Today.",
+        "laptop_required": "On your laptop, do the step named, then mark it done in Today.",
+        "salary": "Give your answer once; ask Claude in chat: \"save my salary answer\" so it is reused.",
+        "profile_gap": "Ask Claude in chat: \"fill my profile gaps\"; it asks you only for the facts.",
+        "referral": "Ask Claude in chat: \"draft the referral asks\"; you send them.",
+        "send_email": "Ask Claude in chat: \"show the emails to send\"; each needs your yes.",
+        "send_linkedin": "Open the drafted message and send it yourself on LinkedIn (never automated).",
+        "other": "Do each task, then mark it done in Today."}
+
+
+def _needs_rows(items: list[dict[str, Any]], jobs: dict[str, dict[str, Any]], store: Store, url: str = "",
+                today: date | None = None) -> list[Row]:
+    by: dict[str, list[dict[str, Any]]] = {}
+    for i in items:
+        if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST:
+            by.setdefault(str(i.get("Type") or "other"), []).append(i)
+    order = list(_NEEDS)
+    rows = []
+    def urgency(k: str) -> tuple[bool, int]:   # most urgent item of the group: overdue first, then H/M/L
+        overdue = any(today and _day(i.get("Due")) and _day(i.get("Due")) < today for i in by[k])
+        return (not overdue, min({"H": 0, "M": 1}.get(str(i.get("Priority") or ""), 2) for i in by[k]))
+
+    for ty in sorted(by, key=lambda k: (*urgency(k), order.index(k) if k in order else len(order), -len(by[k]))):
+        its, n = by[ty], len(by[ty])
+        one, many, icon = _NEEDS.get(ty) or (f"{ty.replace('_', ' ')} item", f"{ty.replace('_', ' ')} items", "\u2022")
+        if n == 1:
+            rows.append(Row(_short(its[0].get("What to do") or one), icon=icon, action=_ACT.get(ty, _ACT["other"]), url=url))
+            continue
+        title = f"{n} {many}"
+        if ty == "review":
+            names = []
+            for i in its:
+                jid = str(i.get("JobID") or "")
+                p = store.load_posting(jid) if jid else None
+                names.append(p.company if p else str((jobs.get(jid) or {}).get("Company") or ""))
+            names = list(dict.fromkeys(x for x in names if x))
+            if names:
+                title += ": " + ", ".join(names[:3]) + (f" +{len(names) - 3}" if len(names) > 3 else "")
+        rows.append(Row(title, icon=icon, action=_ACT.get(ty, _ACT["other"]), url=url))
+    return rows
 
 
 def build_sections(s: Settings, today: date | None = None) -> list[Section]:
-    """Non-empty sections in email order: follow up, deadlines, apply, needs you, then the older ones."""
+    """Non-empty sections in email order: follow up, deadlines, apply, needs you, then the older ones. Every
+    section shows at most `notify.section_max` rows; `count` is the full number, `more` what the cap hid."""
     today = today or date.today()
     c = config(s)
+    cap = c["section_max"]
     tr, store = Tracker(settings=s), Store(s)
     jobs = {str(j["JobID"]): j for j in tr.list_jobs()}
     items = tr.list_action_items(open_only=True)
 
-    def row(it: dict[str, Any], with_days: bool) -> Row:
+
+    follow_rows, followed = _follow_rows(items, jobs, store, today, s)
+    reach: list[tuple[int, Row]] = []
+    for it in items:
+        if _kind(it) != REACH or str(it.get("JobID") or "") in followed:
+            continue
         p = store.load_posting(str(it.get("JobID") or "")) if it.get("JobID") else None
-        since = _waiting_since(it, jobs, store) if with_days else None
-        note = _days(max(0, (today - since).days)) if since else ""
-        return Row(p.title, p.company, p.url, note) if p else Row(str(it.get("What to do") or ""), note=note)
-
-    def prio(it: dict[str, Any]) -> bool:
-        return str(it.get("Priority") or "").upper() == "H" and it.get("Type") != FOLLOW
-
-    from careeros.high_odds import REACH_FIRST, WHY
-
-    reach = [i for i in items if _kind(i) == REACH]
-    apply = _apply_section(s, c, jobs, store, today)
-    secs = [Section("follow", "Follow up", [row(i, True) for i in items if i.get("Type") == FOLLOW
-                                            and _kind(i) not in (REACH, REACH_FIRST)]),
-            _deadline_section(c, jobs, items, store, today), apply,
-            Section("needs", "Needs you", [Row(str(i.get("What to do"))) for i in items if prio(i)]),
-            Section("reach_first", "Reach out before applying to more",
-                    [Row(str(i.get("What to do"))) for i in items if _kind(i) == REACH_FIRST], WHY[REACH_FIRST]),
-            Section("reach", "Reach out (overdue)", [row(i, True) for i in reach], WHY["reach_out"] if reach else "")]
+        since = _waiting_since(it, jobs, store)
+        n = max(0, (today - since).days) if since else 0
+        note = ("Applied today" if n == 0 else f"Applied {_days(n)} ago") + " \u00b7 no contact yet" if since else "no contact yet"
+        reach.append((n, _job_row(p, note=note) if p else Row(_short(it.get("What to do") or ""), note=note, icon="@")))
+    reach.sort(key=lambda x: -x[0])
+    url = today_url(s)
+    need_rows = _needs_rows(items, jobs, store, url, today)
+    need_total = sum(1 for i in items if i.get("Type") != FOLLOW and _kind(i) != REACH_FIRST)
+    reach_first = [Row(_short(i.get("What to do") or ""), icon="!") for i in items if _kind(i) == REACH_FIRST]
+    needs = _cap(Section("needs", "Needs you", need_rows,
+                         f"Tasks waiting on you. On your laptop, open Today at {url} (start it with `careeros ui`); "
+                         "or do them by chat with Claude. Each line says how.", count=need_total), min(cap, 6))
+    secs = [_cap(Section("follow", "Follow up", follow_rows, "Jobs you applied to or emailed with no reply yet. For each 'follow-up ready' one the follow-up is drafted: say \"send the follow-ups\" to Claude in chat."), cap),
+            _deadline_section(s, c, jobs, items, store, today), _apply_section(s, c, jobs, store, today), needs,
+            _cap(Section("reach_first", "Reach out before applying to more", reach_first, WHY[REACH_FIRST] if reach_first else ""), cap),
+            _cap(Section("reach", "Reach out", [r for _, r in reach], WHY["reach_out"] if reach else ""), cap)]
     secs += _extra_sections(s, today, store)
     return [x for x in secs if x.rows]
 
 
-def render_text(secs: list[Section]) -> str:
-    def line(r: Row) -> str:
-        return f"- {r.title}" + (f" @ {r.sub}" if r.sub else "") + (f" - {r.url}" if r.url else "") \
-            + (f" ({r.note}{', ready' if r.ready else ''})" if r.note or r.ready else "")
+def footer(c: dict[str, Any]) -> str:
+    if c["every_days"]:
+        return f"Sent every {c['every_days']} days by career-os. Change it in pipeline.yaml notify.every_days."
+    if c["digest"] == "weekly":
+        return f"Sent weekly on {c['weekly_day']} by career-os. Change it in pipeline.yaml notify.digest."
+    return "Sent daily by career-os. Change it in pipeline.yaml notify.digest."
 
-    return "\n\n".join(f"{x.heading}\n" + (f"  {x.note}\n" if x.note else "") + "\n".join(line(r) for r in x.rows)
-                       for x in secs)
+
+def _summary(secs: list[Section]) -> str:
+    return (" \u00b7 ".join(f"{n} {w}" for n, w in counts(secs))
+            or " \u00b7 ".join(f"{x.count if x.count >= 0 else len(x.rows)} {x.heading.lower()}" for x in secs) or "nothing urgent")
+
+
+def render_text(secs: list[Section], today: date | None = None, footer: str = "") -> str:
+    def line(r: Row) -> str:
+        first = f"- {r.title}" + (f", {r.company}" if r.company else "") + (f": {r.url}" if r.url and r.company else "")
+        sub = " \u00b7 ".join([x for x in (r.location, r.note) if x] + [f"[{c}]" for c in r.chips])
+        return first + (f"\n  {sub}" if sub else "") + (f"\n  Next: {r.action}" if r.action else "")
+
+    out = ["Your job search today" + (f", {today.strftime('%a %d %b %Y')}" if today else "") + f"\n{_summary(secs)}"]
+    for x in secs:
+        n = x.count if x.count >= 0 else len(x.rows)
+        more = f"\n+{x.more} more: open Today (`careeros ui`)" if x.more else ""
+        out.append(f"{x.heading} ({n})\n" + (f"  {x.note}\n" if x.note else "") + "\n".join(line(r) for r in x.rows) + more)
+    if footer:
+        out.append(footer)
+    return "\n\n".join(out)
 
 
 def build_digest(s: Settings, today: date | None = None) -> str | None:
     """Plain-text body, or None when every section is empty."""
+    today = today or date.today()
     secs = build_sections(s, today)
-    return render_text(secs) if secs else None
+    return render_text(secs, today, footer(config(s))) if secs else None
 
 
-_LABEL = {"apply": ("job to apply to", "jobs to apply to"), "follow": ("follow-up", "follow-ups"),
-          "deadlines": ("deadline", "deadlines"), "needs": ("needs you", "need you")}
+_LABEL = {"apply": ("job to apply to", "jobs to apply to"), "follow": ("follow-up due", "follow-ups due"),
+          "deadlines": ("deadline soon", "deadlines soon"), "needs": ("task waiting on you", "tasks waiting on you")}
 
 
 def counts(secs: list[Section]) -> list[tuple[int, str]]:
     """(n, label) per headline section, in email order: 6 jobs to apply to, 3 follow-ups, ..."""
     out = []
     for key in ("follow", "deadlines", "apply", "needs"):
-        n = next((len(x.rows) for x in secs if x.key == key), 0)
+        x = next((x for x in secs if x.key == key), None)
+        n = (x.count if x.count >= 0 else len(x.rows)) if x else 0
         if n:
             one, many = _LABEL[key]
             out.append((n, one if n == 1 else many))
@@ -233,40 +453,80 @@ def counts(secs: list[Section]) -> list[tuple[int, str]]:
 
 
 def subject_for(secs: list[Section]) -> str:
-    order = {"jobs to apply to": 0, "job to apply to": 0, "follow-up": 1, "follow-ups": 1, "deadline": 2, "deadlines": 2}
+    order = {"jobs to apply to": 0, "job to apply to": 0, "follow-up due": 1, "follow-ups due": 1,
+             "deadline soon": 2, "deadlines soon": 2}
     cs = sorted(counts(secs), key=lambda x: order.get(x[1], 3))[:3]
-    return "career-os: " + ", ".join(f"{n} {w}" for n, w in cs) if cs else "career-os: what needs you today"
+    while cs:
+        subj = "career-os: " + ", ".join(f"{n} {w}" for n, w in cs)
+        if len(subj) <= 60:
+            return subj
+        cs.pop()
+    return "career-os: what needs you today"
 
 
-def render_html(secs: list[Section], today: date | None = None) -> str:
-    """Email-safe: tables, inline CSS, no images/fonts/scripts, 600px column, dark-mode overrides in <style>."""
+def initials(company: str) -> str:
+    words = re.findall(r"[A-Za-z0-9]+", company)
+    if not words:
+        return "?"
+    return (words[0][0] + words[1][0] if len(words) > 1 else words[0][:2]).upper()
+
+
+def badge_colour(name: str) -> str:
+    """Hex colour from the company name: stable, dark enough for white text (WCAG AA) at any hue."""
+    hue = int(hashlib.sha1(name.lower().encode("utf-8")).hexdigest()[:6], 16) % 360 / 360
+    r, g, b = colorsys.hls_to_rgb(hue, 0.30, 0.60)
+    return f"#{round(r * 255):02x}{round(g * 255):02x}{round(b * 255):02x}"
+
+
+def render_html(secs: list[Section], today: date | None = None, footer: str = "") -> str:
+    """Email-safe, modelled on a job-alert mail: tables, inline CSS, no images/fonts/scripts, 600px column,
+    dark-mode overrides in <style>."""
     e = _html.escape
     today = today or date.today()
-    head = " &middot; ".join(f"<strong>{n}</strong> {e(w)}" for n, w in counts(secs)) or "Nothing urgent"
     body = ""
     for x in secs:
-        body += (f'<tr><td class="h" style="padding:20px 0 6px;font-size:13px;font-weight:700;letter-spacing:.04em;'
-                 f'text-transform:uppercase;color:#475569">{e(x.heading)}</td></tr>')
+        n = x.count if x.count >= 0 else len(x.rows)
+        body += (f'<tr><td class="h" style="padding:28px 0 8px;font-size:13px;font-weight:700;letter-spacing:.04em;'
+                 f'text-transform:uppercase;color:#475569">{e(x.heading)} ({n})</td></tr>')
         if x.note:
-            body += f'<tr><td class="m" style="padding:0 0 6px;font-size:13px;color:#64748b">{e(x.note)}</td></tr>'
+            body += f'<tr><td class="m" style="padding:0 0 8px;font-size:13px;line-height:1.4;color:#64748b">{e(x.note)}</td></tr>'
         for r in x.rows:
             t = e(r.title)
             if r.url.startswith(("https://", "http://")):
-                t = f'<a href="{e(r.url, quote=True)}" class="a" style="color:#1d4ed8;text-decoration:underline">{t}</a>'
-            meta = " &middot; ".join(e(v) for v in (r.sub, r.note) if v)
-            tag = (' <span class="r" style="display:inline-block;padding:1px 6px;border-radius:9px;background:#dcfce7;'
-                   'color:#166534;font-size:11px;font-weight:600">ready</span>' if r.ready else "")
-            body += (f'<tr><td class="row" style="padding:9px 0;border-top:1px solid #e2e8f0;font-size:15px;line-height:1.4;'
-                     f'color:#0f172a">{t}{tag}'
-                     + (f'<br><span class="m" style="font-size:13px;color:#64748b">{meta}</span>' if meta else "")
-                     + "</td></tr>")
+                t = f'<a href="{e(r.url, quote=True)}" class="a" style="color:#1d4ed8;text-decoration:none">{t}</a>'
+            if r.company:
+                badge = (f'<td width="40" height="40" align="center" valign="middle" style="width:40px;height:40px;'
+                         f'border-radius:8px;background:{badge_colour(r.company)};color:#ffffff;font-size:15px;'
+                         f'font-weight:700">{e(initials(r.company))}</td>')
+                size = "16px"
+            else:
+                badge = (f'<td width="40" height="40" align="center" valign="middle" class="ib" style="width:40px;height:40px;'
+                         f'border-radius:20px;background:#e2e8f0;color:#475569;font-size:16px;font-weight:700">{e(r.icon or chr(8226))}</td>')
+                size = "15px"
+            line2 = " &middot; ".join(e(v) for v in (r.company, r.location) if v)
+            chips = "".join(f'<span class="c" style="display:inline-block;margin:4px 6px 0 0;padding:2px 8px;border-radius:10px;'
+                            f'background:#e2e8f0;color:#475569;font-size:12px;line-height:1.4">{e(c)}</span>' for c in r.chips)
+            text = "".join([
+                f'<div class="t" style="font-size:{size};font-weight:700;line-height:1.35;color:#0f172a">{t}</div>',
+                f'<div class="m" style="font-size:14px;line-height:1.4;color:#475569">{line2}</div>' if line2 else "",
+                f'<div class="m" style="font-size:13px;line-height:1.4;color:#64748b">{e(r.note)}</div>' if r.note else "",
+                f'<div class="t" style="padding-top:2px;font-size:13px;line-height:1.4;color:#0f172a"><b>Next:</b> {e(r.action)}</div>' if r.action else "",
+                f"<div>{chips}</div>" if chips else ""])
+            body += (f'<tr><td class="row" style="padding:14px 0;border-top:1px solid #e2e8f0">'
+                     f'<table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>'
+                     f'<td width="52" valign="top" style="width:52px"><table role="presentation" cellpadding="0" cellspacing="0">'
+                     f'<tr>{badge}</tr></table></td><td valign="top">{text}</td></tr></table></td></tr>')
+        if x.more:
+            body += (f'<tr><td class="m" style="padding:6px 0 0;font-size:13px;color:#64748b">+{x.more} more: open Today '
+                     f'(<code>careeros ui</code>)</td></tr>')
+    foot = f'<tr><td class="m" style="padding:28px 0 0;font-size:12px;line-height:1.5;color:#64748b">{e(footer)}</td></tr>' if footer else ""
     return (
         '<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
         '<meta name="color-scheme" content="light dark"><meta name="supported-color-schemes" content="light dark">'
         "<title>career-os digest</title><style>"
         "@media (prefers-color-scheme: dark){body,.bg{background:#0b1220 !important}.card{background:#111a2e !important}"
-        ".row{color:#e5e7eb !important;border-color:#26334d !important}.h{color:#94a3b8 !important}.m{color:#94a3b8 !important}"
-        ".a{color:#93c5fd !important}.t{color:#f8fafc !important}.r{background:#14532d !important;color:#bbf7d0 !important}}"
+        ".row{border-color:#26334d !important}.h,.m{color:#94a3b8 !important}"
+        ".a{color:#93c5fd !important}.t{color:#f8fafc !important}.c,.ib{background:#26334d !important;color:#cbd5e1 !important}}"
         "@media (max-width:620px){.card{padding:16px !important}}</style></head>"
         '<body class="bg" style="margin:0;padding:0;background:#f1f5f9;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" class="bg" style="background:#f1f5f9"><tr>'
@@ -274,9 +534,10 @@ def render_html(secs: list[Section], today: date | None = None) -> str:
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:600px;width:100%"><tr>'
         '<td class="card" style="background:#ffffff;border-radius:10px;padding:24px">'
         '<table role="presentation" width="100%" cellpadding="0" cellspacing="0">'
-        f'<tr><td class="t" style="font-size:18px;line-height:1.35;color:#0f172a">{head}</td></tr>'
-        f'<tr><td class="m" style="padding-top:2px;font-size:13px;color:#64748b">{e(today.strftime("%a %d %b %Y"))}</td></tr>'
-        f"{body}</table></td></tr></table></td></tr></table></body></html>")
+        '<tr><td class="t" style="font-size:22px;font-weight:700;line-height:1.3;color:#0f172a">Your job search today</td></tr>'
+        f'<tr><td class="m" style="padding-top:4px;font-size:13px;color:#64748b">{e(today.strftime("%a %d %b %Y"))}</td></tr>'
+        f'<tr><td class="t" style="padding-top:8px;font-size:15px;line-height:1.4;color:#0f172a">{e(_summary(secs))}</td></tr>'
+        f"{body}{foot}</table></td></tr></table></td></tr></table></body></html>")
 
 
 def _extra_sections(s: Settings, today: date, store: Store) -> list[Section]:
@@ -286,11 +547,11 @@ def _extra_sections(s: Settings, today: date, store: Store) -> list[Section]:
         p = store.load_posting(jid)
         sc = store.load_score(jid)
         if p:
-            rows.append(_job_row(p, f"fit {sc.fit}" if sc else ""))
-    out = [Section("watch", "New at your target companies", rows)]
+            rows.append(_job_row(p, f"fit {sc.fit}" if sc else "", s=s))
+    out = [_cap(Section("watch", "New at your target companies", rows), config(s)["section_max"])]
     up = _heads_up(s, today)
     if up:
-        out.append(Section("season", "Coming up", [Row(f"{up['name']} starts {up['starts']} ({up['level']}). {up['advice']}")]))
+        out.append(Section("season", "Coming up", [Row(f"{up['name']} starts {up['starts']} ({up['level']}). {up['advice']}", icon="i")]))
     return out
 
 
@@ -350,8 +611,8 @@ def maybe_send_digest(s: Settings, now: datetime, *, sender: Callable[..., None]
         secs = build_sections(s, today)
         if not secs:
             return "empty"
-        (sender or smtp_send)(c, subject_for(secs), render_text(secs), (keychain or keychain_password)(c["email"]),
-                              html=render_html(secs, today))
+        (sender or smtp_send)(c, subject_for(secs), render_text(secs, today, footer(c)), (keychain or keychain_password)(c["email"]),
+                              html=render_html(secs, today, footer(c)))
         up = _heads_up(s, today)
         live = {str(j["JobID"]) for j in Tracker(settings=s).list_jobs() if str(j.get("Status")) in _APPLY}
         shown = sorted(({*(_state(s).get("apply_shown") or [])} & live)    # applied/closed jobs drop out: no cap

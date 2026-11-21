@@ -135,7 +135,7 @@ def test_digest_leads_with_reach_first_and_has_why(settings):
         _reach(settings, f"r{i}", today - timedelta(days=3))
     h.raise_reach_first(settings, today)
     body = notify.build_digest(settings, today)
-    assert body.startswith("Reach out before applying to more") and "40%" in body
+    assert body.split("\n\n", 1)[1].startswith("Reach out before applying to more") and "40%" in body
 
 
 def test_cli_outreach_qa_records_line_and_prints_link(settings, monkeypatch, capsys):

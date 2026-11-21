@@ -215,6 +215,7 @@ def _never(settings, preferred=("New York NY", "Boston MA"), regions=("Northeast
     ("Austin, TX, Remote or Boston", False), ("Austin, TX, somewhere in Texas", False),
     ("Boston, MA, United States", False), ("Austin, TX, USA", True), ("Austin, TX (HQ)", True),
     ("Dallas, TX; Austin, TX", True),           # every location outside
+    ("Seattle, WA", True), ("Seattle, Washington", False),   # WA by code; "Washington" may be D.C.: skill decides
 ])
 def test_location_nonpreferred(settings: Settings, location, skipped):
     _never(settings)
@@ -290,3 +291,10 @@ def test_preferred_state_entry_without_a_code(settings: Settings):
     _never(settings, preferred=("New Jersey (any city)",), regions=())
     assert hard_filters(settings, _posting(location="Hoboken, NJ")) == []
     assert hard_filters(settings, _posting(location="Austin, TX")) == ["location_nonpreferred"]
+
+
+@pytest.mark.parametrize("location", [", NY", "NY", " , , NJ | , CA"])
+def test_preferred_offices_never_crashes_on_bare_state_codes(settings: Settings, location):
+    from careeros.hard_filters import preferred_offices
+    _never(settings)
+    preferred_offices(settings, location)
