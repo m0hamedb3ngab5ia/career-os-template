@@ -177,9 +177,15 @@ For each entry in `contacts.json.contacts` produce:
    applicant: <role> at <company>"), `body` (at most 130 words before the sign-off; DEC-027's 120 raised 2026-11-19), in the message order above (bullet ids recorded), sign-off "Thank you and all the best," + name + LinkedIn
    `identity.name` + LinkedIn URL (never the phone number) from `profile/master.yaml: identity`. `to` = `contact.email` if verified else
    the first `email_candidates` entry with `to_confidence` copied from `email_confidence`.
-4. `followup_7d` (40-70 words): reference the original message, add one new proof or fact, repeat the ask once.
-5. `followup_14d` (30-50 words): final, polite close-the-loop, leaves the door open. No guilt. Only when the contact
-   has replied before; for a cold application with zero contact set it to null (one outreach + at most one follow-up).
+4. `followup_7d` (40-70 words, 3-4 sentences): same human voice rules as the main email: warm, short, plain words. Reference
+   the first email, add one new point or restate the ask once. No guilt-trip, no "just bumping this", no "following up on my
+   previous email". Sent by `careeros outreach send <job> --contact X --followup 7d --yes` as a reply in the same thread.
+5. `followup_14d` (30-70 words, 3-4 sentences): the last one. It takes a genuinely different angle from the first email and
+   the 7d one: a new proof point or a different, smaller ask (e.g. "who is the right person?"), never a restatement. Polite,
+   leaves the door open, no guilt. Write it for every contact that has an email; it only goes out if there is still no reply.
+   Rules (vendor cold-email data, Belkins 2026, Gong): at most 2 follow-ups per contact, never a 3rd email (more steps raise
+   spam and unsubscribe rates); follow-ups at most 70 words. Best send window is Tue-Thu, 8am-12pm in the recipient's time
+   zone (`outreach send --followup` only hints when outside it).
    A recruiter with no verified email still gets `linkedin_note` + `linkedin_message` (the LinkedIn variant, about half
    the length of the email).
 
@@ -194,6 +200,13 @@ For each contact `outreach check` marks `manual: true`:
   contact is manual). Pass it verbatim:
   `careeros action add "<action_text>" --type send_linkedin --job <job_id> --link "<first manual contact.linkedin or search url>" --priority M --needs phone --dedupe`
   (`--dedupe` keys on job + type, so a second call for the same job is a no-op; never call it once per contact).
+
+### 3b. Follow-ups only (already-sent drafts with null follow-ups)
+
+Input: `/draft-outreach <id> follow-ups`, or any job whose `outreach.json` has `sent: true` drafts with `followup_7d` /
+`followup_14d` null. Fill only those two fields, only for sent, non-bounced, unreplied, non-manual drafts with an email, and
+touch nothing else (not `email`, `sent*`, `qa_*`, `message_id`). Read the draft's `email.body` first so the follow-up
+references it and adds something new (steps 4-5). Skip a field that is already set. Then run `careeros outreach qa <id>`.
 
 ## 4. Write `JOB/outreach.json`
 
@@ -230,8 +243,8 @@ job on a hard violation), so write every one:
   (`candidate` when the candidate sent it by hand; the candidate records it with `careeros outreach sent <job_id> [--contact X]`, which also writes `sent_at` YYYY-MM-DD, the date the follow-up nudge counts from); `sent: true` with any other `sent_by` counts as system-sent.
 - `manual_tailor` (+ `manual_reason`): true for every contact step 3a marks manual; then no `send_after`, no
   `followup_7d`/`followup_14d`, never system-sent.
-- `followup_7d` / `followup_14d` / per-draft `followups[]`: a cold contact (never replied, no interview) gets one
-  outreach + at most one follow-up in total. Top-level `followups[]` holds later messages written for this job
+- `followup_7d` / `followup_14d` / per-draft `followups[]`: a contact gets the outreach + at most two follow-ups in total.
+  Sending records `message_id`, `sent_subject`, `followup_7d_sent_at` / `followup_14d_sent_at` on the draft; never edit them. Top-level `followups[]` holds later messages written for this job
   (status follow-ups, thank-yous), same fields plus `kind`; a `post_interview_thanks` is never scheduled or auto-sent.
 `review_required` is always true for tier A, and true for tier B until the user confirms a template
 (`TODO.md`: "Confirm follow-up email template"). Set `send_after` null; the follow-up scheduler fills it.

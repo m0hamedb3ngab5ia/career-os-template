@@ -100,6 +100,7 @@ Hard rules: no invented résumé facts, no guessed legal or salary answers, neve
 | Outreach QA | Gates drafts (length, sourced fact, ask); gives a Gmail compose link. | `careeros outreach qa <id>` | REQ-162 |
 | Send panel | Table of every unsent email: Read, Mail app (iPhone or Mac), Gmail draft with résumé attached, auto-send. | `careeros outreach panel --gmail`; "show my outreach" | REQ-162 |
 | Send now | Sends one approved email from your Gmail with the résumé; warns that guessed addresses bounce. | `careeros outreach send <id> --contact X --yes`; "send 3" | REQ-162 |
+| Send a follow-up | Sends the 7-day or 14-day follow-up as a reply in the same Gmail thread; refuses if replied, bounced or already sent. | `careeros outreach send <id> --contact X --followup 7d --yes` (`--dry-run` previews) | REQ-154 |
 | Record a send | Marks what you sent by hand and starts the follow-up clock. | `careeros outreach sent <id>` | REQ-154 |
 | Record a delivery or bounce | Learns each company's email format; a bounce moves to the next guess. | `careeros outreach email-result <id>` | REQ-154 |
 | Contacts sheet | Who you reached, whether the email landed, when the follow-up is due; updates after every send or bounce. | `careeros tracker contacts` | REQ-154 |
