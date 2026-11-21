@@ -120,6 +120,15 @@ def _job_row(p: Any, note: str = "", ready: bool = False) -> Row:
 
 
 def _ready(store: Store, jid: str) -> bool:
+    """qa-review's qa.json passed: top-level `pass: true`, or every legacy `results` entry passed."""
+    try:
+        d = json.loads((store.job_dir(jid) / "qa.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return False
+    if not isinstance(d, dict):
+        return False
+    if "pass" in d:
+        return d["pass"] is True
     qa = store.load_qa(jid)
     return bool(qa) and all(r.passed for r in qa)
 
@@ -129,20 +138,20 @@ def _in_days(n: int) -> str:
 
 
 def _apply_section(s: Settings, c: dict[str, Any], jobs: dict[str, dict[str, Any]], store: Store, today: date) -> Section:
-    """Jobs from any source that are scored, worth applying to (queued/prepared) and not yet in an earlier digest."""
+    """Jobs from any source worth applying to (queued/prepared, still open) until you apply: ones not in an earlier
+    digest first ("new"), then best fit. `ids` = every job listed, so the next digest knows what is new."""
     shown = set(_state(s).get("apply_shown") or [])
     cands = []
     for jid, j in jobs.items():
-        p = store.load_posting(jid) if str(j.get("Status")) in _APPLY and jid not in shown else None
+        p = store.load_posting(jid) if str(j.get("Status")) in _APPLY else None
         if p is None or (_day(p.closes_at) and _day(p.closes_at) < today):
             continue
-        cands.append((int(j.get("Fit") or 0), str(j.get("DateFound") or ""), jid, p))
-    cands.sort(key=lambda x: x[1], reverse=True)   # newest first ...
-    cands.sort(key=lambda x: -x[0])                # ... then best fit first (stable)
+        cands.append((jid not in shown, int(j.get("Fit") or 0), str(j.get("DateFound") or ""), jid, p))
+    cands.sort(key=lambda x: (x[0], x[1], x[2]), reverse=True)   # new first, then best fit, then newest
     top = cands[:c["apply_max"]]
-    rows = [_job_row(p, f"fit {fit}", _ready(store, jid)) for fit, _, jid, p in top]
-    note = f"showing {len(top)} of {len(cands)}, best fit first" if len(cands) > len(top) else ""
-    return Section("apply", "Apply to these", rows, note, [jid for _, _, jid, _ in top])
+    rows = [_job_row(p, f"{'new - ' if new else ''}fit {fit}", _ready(store, jid)) for new, fit, _, jid, p in top]
+    note = f"showing {len(top)} of {len(cands)}: new first, then best fit" if len(cands) > len(top) else ""
+    return Section("apply", "Apply to these", rows, note, [jid for _, _, _, jid, _ in top])
 
 
 def _deadline_section(c: dict[str, Any], jobs: dict[str, dict[str, Any]], items: list[dict[str, Any]], store: Store,
@@ -344,8 +353,10 @@ def maybe_send_digest(s: Settings, now: datetime, *, sender: Callable[..., None]
         (sender or smtp_send)(c, subject_for(secs), render_text(secs), (keychain or keychain_password)(c["email"]),
                               html=render_html(secs, today))
         up = _heads_up(s, today)
-        shown = [*(_state(s).get("apply_shown") or []), *next((x.ids for x in secs if x.key == "apply"), [])]
-        _save(s, last_sent=today.isoformat(), watch_pending=[], apply_shown=shown[-2000:],
+        live = {str(j["JobID"]) for j in Tracker(settings=s).list_jobs() if str(j.get("Status")) in _APPLY}
+        shown = sorted(({*(_state(s).get("apply_shown") or [])} & live)    # applied/closed jobs drop out: no cap
+                       | set(next((x.ids for x in secs if x.key == "apply"), [])))
+        _save(s, last_sent=today.isoformat(), watch_pending=[], apply_shown=shown,
               season_pinged=[*(_state(s).get("season_pinged") or []), *([f"{up['name']}:{up['starts'][:4]}"] if up else [])])
     except Exception as e:  # noqa: BLE001 - never crash the tick; the message never contains the password
         return f"error: {type(e).__name__}: {e}"[:200]

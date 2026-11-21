@@ -227,9 +227,8 @@ def _scored_job(settings, tr, n, fit, status="queued", closes=None, qa=None, fou
     st.save_posting(p)
     tr.upsert_jobs([{"job_id": p.job_id, "company": p.company, "title": p.title, "status": status, "fit": fit,
                      "date_found": found}])
-    if qa is not None:
-        from careeros.models import QAResult
-        st.save_qa(p.job_id, QAResult(job_id=p.job_id, artifact="resume", passed=qa))
+    if qa is not None:  # what qa-review writes
+        (st.job_dir(p.job_id) / "qa.json").write_text(json.dumps({"pass": qa, "fail_reasons": []}))
     return p
 
 
@@ -249,15 +248,21 @@ def test_apply_section_best_fit_first_capped_ready_marker_and_excludes(env):
     assert "Role 4" not in body and "Role 5" not in body and "Role 6" not in body
 
 
-def test_apply_section_only_jobs_not_shown_in_last_digest(env):
+def test_apply_section_keeps_reminding_and_lists_new_jobs_first(env):
     s, tr = env
     _scored_job(s, tr, 1, 90)
     at = datetime(2026, 11, 16, 9, 0)
     assert notify.maybe_send_digest(s, at, sender=FakeSender(), keychain=lambda e: "pw") == "sent"
-    assert notify.build_digest(s, date(2026, 11, 17)) is None
     _scored_job(s, tr, 2, 60)
     body = notify.build_digest(s, date(2026, 11, 17))
-    assert "Role 2" in body and "Role 1" not in body
+    assert body.index("Role 2") < body.index("Role 1")             # new first, though lower fit
+    assert "new - fit 60" in body and "(fit 90)" in body            # not applied yet: still listed, no longer new
+
+
+def test_ready_marker_reads_qa_review_pass_flag(env):
+    s, tr = env
+    _scored_job(s, tr, 1, 90, qa=False)
+    assert "ready" not in notify.build_digest(s, TODAY)
 
 
 def test_deadlines_section_soonest_first_and_window(env):

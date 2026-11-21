@@ -944,6 +944,11 @@ requirements:
     - test_send_once_per_day_after_send_at
     - test_failure_is_returned_and_retried_next_tick
     - test_weekly_digest_only_on_its_day_and_off_never
+    - test_every_days_cadence
+    - test_html_part_subject_and_escaping
+    - test_apply_section_keeps_reminding_and_lists_new_jobs_first
+    - test_deadlines_section_soonest_first_and_window
+    - test_digest_dry_run_writes_html_with_apply_list
     - test_urgent_sends_immediately_once_per_key_and_can_be_off
     - test_urgent_failure_is_retried_and_digest_state_survives
     - test_keychain_uses_security_binary_and_never_leaks
