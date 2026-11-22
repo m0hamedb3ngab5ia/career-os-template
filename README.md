@@ -246,7 +246,7 @@ src/careeros/  scout/ (Greenhouse/Lever/Ashby APIs), apply/ (ATS adapters, quest
 .claude/skills Claude Code skills (table above)
 data/          jobs/<id>/ (posting.json, score.json, resume.*, cover_letter.*, answers.json, qa.json, log.md, submitted/<stamp>/ ...), JobTracker.xlsx,
                runs/ (<run_id>/run.json + run.log + attempts/, queue, schedule and scheduler logs)   [gitignored]
-docs/          PROCESS.md, GETTING_STARTED.md, CHAT.md, CODE_REVIEW_PROMPT.md, UI.md
+docs/          PROCESS.md, GETTING_STARTED.md, CHAT.md, CODE_REVIEW_PROMPT.md, UI.md, CLAUDE_SETUP_BLUEPRINT.md
 tests/         pytest (uses examples/ and temp dirs only)
 ```
 
