@@ -602,6 +602,11 @@ class Checker:
             docs["resume.txt"] = self.resume_txt
         if isinstance(self.answers, list):
             docs["answers.json"] = " \n".join(str(a.get("answer") or "") for a in self.answers if isinstance(a, dict))
+        if self.outreach_raw is not None and not self.outreach_error:   # outreach stays humble too (user 2026-11-25)
+            from careeros.qa_ext import outreach_items, outreach_texts
+            text = " \n".join(t for _, _, d in outreach_items(self) for _, t in outreach_texts(d))
+            if text:
+                docs["outreach.json"] = text
         if not docs:
             self.skip("banned_phrases", "hard", "no text artifacts")
             return

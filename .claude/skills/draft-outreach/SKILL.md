@@ -74,14 +74,16 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
      point they made, from a fetched page recorded in `facts_used` with its URL ("you wrote that X, which matched
      what I've seen with Y"). Can't verify one → drop the reading line and say instead why they're in a position to
      help (their team owns the role, shared background).
-  4. "I recently applied to the <Company> <role> role. It looks like <Company> wants <X, Y, Z from the posting>."
-     Then what I've done that matches, high level, in plain words a layman gets: where I work and what it means
-     ("I work on <employer>'s <system>, <what it does, its volume or stakes>"), ending ", so I think I'd be a great
-     fit." The claim comes after the evidence, never before it. <Company> is the company's real name, not a URL slug. Not yet
+  4. "I recently applied to the <Company> <role> role." Then what I've worked on, high level, in plain words a
+     layman gets ("I've been working on <employer>'s <system>, <what it does>"), as plain fact, then why their work
+     interests me ("so <their work, in their words> really interests me"). Humble always (user 2026-11-25: "we need
+     to be more humble"): never grade myself ("great fit", "perfect fit", "ideal candidate"; qa.yaml
+     `banned_phrases` fails them), never tell them what they want and then claim it ("It looks like X wants Y.
+     That's my day job."); the reader judges the fit. Interest, learning and gratitude, not claims. <Company> is the company's real name, not a URL slug. Not yet
      applied → "I'm about to apply to" (check `status.json`). The position is always a hyperlink: put
      `"links": {"<Company> <role>": "<posting.json url>"}` in the draft; the Gmail draft and send add an HTML part
      that links that text (user 2026-11-19).
-  5. "I've attached my résumé." 6. The ask paragraph. 7. "Thank you and all the best," + name + LinkedIn.
+  5. "I've attached my résumé in case it's helpful." 6. The ask paragraph. 7. "Thank you and all the best," + name + LinkedIn.
   Never start with the proof; never internal detail (ticket-level fixes, internal system names, test counts, latency numbers):
   the résumé carries specifics. Overlap is framed from THEIR side (what their team needs), not my ticket.
   Greenhouse posting → say why the referral helps: "<Company>'s Greenhouse reviews referrals first for job positions".
@@ -89,7 +91,7 @@ referral drafts only; skip reading it and skip `careeros outreach check` (it exi
   lengths, contractions, at most one idea per sentence. No stacked appositives ("X, the Y's Z for about N W daily"),
   no neat triples ("fast, reliable, and scalable"), no colons or em dashes mid-sentence, no polished abstractions
   ("correctness at volume", "high-stakes production work"). Vary the wording between emails; only the candidate's
-  fixed lines (greeting, "so I think I'd be a great fit", the ask, sign-off) repeat. Still professional: no "lol",
+  fixed lines (greeting, the ask, sign-off) repeat. Still professional: no "lol",
   no ellipses. The candidate's own edited email, when there is one, is the reference.
 - Content lessons (user feedback 2026-11-19; apply to every reader, not just the drafts that prompted them):
   1. Reader first: classify the person (table above) before choosing a single sentence.
