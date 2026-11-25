@@ -15,8 +15,8 @@ Hi [NAME],
 I hope this message finds you well. I came across your profile and saw that you [WHAT THEY DO, plain words].
 [WHY THAT CONNECTS TO ME, one honest line; recruiter: "so I thought you'd be the right person to reach out to."]
 
-I saw the [ROLE] role at [COMPANY], and I think I'd be a great fit because [IMPACT REASON 1] and
-[IMPACT REASON 2]. My résumé is attached.
+I recently applied to the [ROLE] role at [COMPANY]. I've been working on [WHAT I'VE WORKED ON, plain fact], so
+[THEIR WORK, in their words] really interests me. I've attached my résumé in case it's helpful.
 
 [ONE ASK, vary it; a referral only from employees, and not in every email:]
 I'd be glad to connect briefly if you're open to it.
@@ -29,9 +29,11 @@ Thank you,
 <identity.linkedin>
 ```
 
-Reasons say what the work means, not the stack: "I ship software to production at a bank, so I'm used to high-stakes,
-fast-paced work", not "I build Kafka services in Java". No résumé numbers, no phone number. Each reason still traces
-to a bullet id.
+Humble always (user 2026-11-25): state what you've worked on as plain fact and let the reader judge the fit. Never
+grade yourself ("great fit", "perfect fit", "ideal candidate"), never tell them what they want and then say it's you
+("That's my day job"); qa.yaml `banned_phrases` fails these. Interest and gratitude, not claims. Say what the work
+means, not the stack ("I work on software a bank runs on every day", not "I build Kafka services in Java"). No
+résumé numbers, no phone number. Each fact still traces to a bullet id.
 
 ## Example
 
@@ -45,8 +47,9 @@ Hi Dan,
 I hope this message finds you well. I came across your profile and saw that you lead Acme's payments platform.
 Payments are the kind of work I want to do.
 
-I saw the Backend Engineer role at Acme, and I think I'd be a great fit because I ship production software at a
-logistics company where outages cost real money, and I move fast without breaking things. My résumé is attached.
+I recently applied to the Backend Engineer role at Acme. I've been working on production software at a logistics
+company, where I've learned a lot about keeping systems up, so the payments work on your team really interests me.
+I've attached my résumé in case it's helpful.
 
 I'd be glad to connect briefly if you're open to it.
 

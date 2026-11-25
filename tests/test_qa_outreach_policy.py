@@ -361,3 +361,12 @@ def test_thank_you_does_not_count_against_cold_limit(root):
     c = contact("Jane Doe", email="jane.doe@ledgerline.com", email_confidence="verified")
     res = run(make(root, [draft("Jane Doe")], [c], followups=[THANKS]))
     assert res["outreach_cold_limit"]["ok"], res["outreach_cold_limit"]["detail"]
+
+
+def test_banned_phrases_cover_outreach_emails_and_follow_ups(root):
+    """Outreach stays humble: qa.yaml banned_phrases (e.g. "great fit") fail outreach text too (user 2026-11-25)."""
+    ck = make(root, [draft("Jane Doe", followup_14d="Honestly I think I'd be a great fit.")], [contact("Jane Doe")])
+    ck.qa_cfg["banned_phrases"] = ["great fit"]
+    ck.check_banned()
+    (res,) = [c for c in ck.checks if c["check"] == "banned_phrases"]
+    assert res["ok"] is False and "outreach.json" in res["detail"] and "great fit" in res["detail"]

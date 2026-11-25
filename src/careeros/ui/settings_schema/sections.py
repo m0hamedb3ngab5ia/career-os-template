@@ -589,7 +589,7 @@ SECTIONS: tuple[Section, ...] = (
                 "I am excited to apply", "I am writing to express", "proven track record", "results-driven",
                 "synergy", "dynamic", "thrilled", "delve", "tapestry", "testament to", "in today's",
                 "game-changer", "cutting-edge", "hit the ground running", "wear many hats",
-                "I believe I would be a great fit", "Dear Hiring Manager,"]),
+                "great fit", "perfect fit", "ideal candidate", "my day job", "Dear Hiring Manager,"]),
         )),
     ), checks=(_min_below_max,), advanced=True),
 )
